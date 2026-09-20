@@ -2,7 +2,7 @@
  * 附近微光：一次一盏，随机而来，看完即止。
  */
 const { keys } = require('../../utils/constants')
-const { collectNearbyLight } = require('../../utils/storage')
+const { receiveNearbyLight } = require('../../services/nearby-service.js')
 const { generateMockNearby } = require('../../utils/mockNearby')
 
 Page({
@@ -48,7 +48,7 @@ Page({
     const current = this.data.current
     if (!current || !current.id) return
 
-    collectNearbyLight(current)
+    receiveNearbyLight(current)
     wx.vibrateShort({ type: 'light' })
     this.goToNext()
   },

@@ -4,12 +4,19 @@
   "compileType": "miniprogram",
   "libVersion": "3.8.0",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "test" },
+      { "type": "folder", "value": "spec" },
+      { "type": "suffix", "value": ".md" },
+      { "type": "suffix", "value": ".d.ts" },
+      { "type": "file", "value": "package.json" }
+    ],
     "include": []
   },
   "setting": {
     "es6": true,
     "enhance": true,
+    "ignoreDevUnusedFiles": true,
     "minified": true,
     "postcss": true,
     "minifyWXSS": true,

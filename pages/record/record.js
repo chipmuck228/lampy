@@ -1,7 +1,7 @@
 /**
  * 记录页：写下今天的瞬间，点亮一盏微光。
  */
-const { addLight, markNewestPassed, getDraft, saveDraft, clearDraft } = require('../../utils/storage')
+const { loadDraftForm, saveDraftFromForm, submitRecord, passLatestMoment } = require('../../services/record-service.js')
 
 function glowFromText(text) {
   const length = (text || '').length
@@ -36,7 +36,7 @@ Page({
 
   onLoad() {
     const windowInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
-    const draft = getDraft()
+    const draft = loadDraftForm()
     const text = draft && draft.text ? draft.text : ''
     const imagePath = draft && draft.imagePath ? draft.imagePath : ''
     const emotion = draft && draft.emotion ? draft.emotion : ''
@@ -65,7 +65,7 @@ Page({
 
   saveDraft() {
     const { text, imagePath, emotion, voicePath } = this.data
-    saveDraft({ text, imagePath, emotion, voicePath })
+    saveDraftFromForm({ text, imagePath, emotion, voicePath })
   },
 
   onChooseImage() {
@@ -167,22 +167,19 @@ Page({
     if (!this.data.canSubmit || this.data.showPass) return
 
     const { text, imagePath, emotion, voicePath } = this.data
-    addLight({
+    const moment = submitRecord({
       text: text.trim(),
       imagePath: imagePath || '',
       voicePath: voicePath || '',
       emotion: emotion || '',
-      createdAt: Date.now(),
-      isPublic: false,
-      isPassed: false,
     })
-    clearDraft()
+    this._submittedMomentId = moment && moment.id
     wx.vibrateShort({ type: 'light' })
     this.setData({ showPass: true })
   },
 
   onPassConfirm() {
-    markNewestPassed()
+    passLatestMoment(this._submittedMomentId)
     wx.showShareMenu({
       withShareTicket: false,
       menus: ['shareAppMessage'],

@@ -3,7 +3,7 @@
  */
 const { motion } = require('../../utils/constants')
 const { formatHomeDate } = require('../../utils/date')
-const { ensureMockLights, getLights, hasIncomingLight } = require('../../utils/storage')
+const { hasIncomingLight } = require('../../utils/storage')
 
 const SPLASH_KEY = 'lampy_splash_shown'
 
@@ -34,13 +34,27 @@ Page({
         : 16) + 12,
     })
     this._timers = []
-    this.refresh()
+    try {
+      const catalog = require('../../services/catalog.js')
+      catalog.bootstrapCatalog()
+    } catch (error) {
+      console.error('[lampy] catalog bootstrap failed', error)
+    }
+    try {
+      this.refresh()
+    } catch (error) {
+      console.error('[lampy] refresh failed', error)
+    }
     this.playSplashIfNeeded()
   },
 
   onShow() {
-    this.refresh()
-    this.refreshLights()
+    try {
+      this.refresh()
+      this.refreshLights()
+    } catch (error) {
+      console.error('[lampy] onShow refresh failed', error)
+    }
   },
 
   onUnload() {
@@ -50,41 +64,22 @@ Page({
   refresh() {
     this.setData({
       dateLabel: formatHomeDate(),
-      lights: ensureMockLights(),
       incoming: hasIncomingLight(),
     })
+    this.refreshLights()
   },
 
   refreshLights() {
-    const lights = getLights()
-    this.setData({
-      lights: lights.map((light) => this.decorateLight(light)),
-    })
-  },
-
-  decorateLight(light) {
-    const daysAgo = Math.max(0, Math.floor((Date.now() - light.createdAt) / (1000 * 60 * 60 * 24)))
-    const ratio = Math.min(1, daysAgo / 365)
-    return {
-      ...light,
-      size: Math.max(16, 56 - ratio * 40),
-      opacity: Math.max(0.4, 1 - ratio * 0.6),
-      blur: Math.min(2.5, ratio * 2.5),
-      shadowBlur: Math.max(4, 24 - ratio * 20),
-      color: this.interpolateColor('#FFD97D', '#8A93B2', ratio),
-      animationDelay: light.animationDelay || Math.round(Math.random() * 6000),
+    try {
+      const catalog = require('../../services/catalog.js')
+      const { projectMomentsToLightWall } = require('../../projections/light-wall-projection.js')
+      const moments = catalog.listActiveMoments()
+      this.setData({
+        lights: projectMomentsToLightWall(moments, Date.now()),
+      })
+    } catch (error) {
+      console.error('[lampy] refreshLights failed', error)
     }
-  },
-
-  interpolateColor(c1, c2, ratio) {
-    const hex = (color) => parseInt(color.slice(1), 16)
-    const r1 = (hex(c1) >> 16) & 255
-    const g1 = (hex(c1) >> 8) & 255
-    const b1 = hex(c1) & 255
-    const r2 = (hex(c2) >> 16) & 255
-    const g2 = (hex(c2) >> 8) & 255
-    const b2 = hex(c2) & 255
-    return `rgb(${Math.round(r1 + (r2 - r1) * ratio)}, ${Math.round(g1 + (g2 - g1) * ratio)}, ${Math.round(b1 + (b2 - b1) * ratio)})`
   },
 
   playSplashIfNeeded() {
