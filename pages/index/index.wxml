@@ -1,0 +1,62 @@
+<!-- 首页：启动层覆盖在同一页上，避免独立 splash 白屏。 -->
+<view class="page {{homeLocked ? 'is-locked' : ''}}" style="padding-top: {{topPad}}px; padding-bottom: {{bottomPad}}px;">
+  <view class="vault-entry" hover-class="is-pressing" bindtap="onVaultTap">
+    <view class="vault-icon"></view>
+  </view>
+
+  <view class="home {{wallInstant ? 'is-ready' : ''}} {{wallAwaken ? 'is-visible' : ''}}">
+    <view class="top">
+      <text class="date">{{dateLabel}}</text>
+    </view>
+
+    <view
+      wx:if="{{incoming}}"
+      class="row incoming"
+      hover-class="is-pressing"
+      bindtap="onIncoming"
+    >
+      <view class="row-dot"></view>
+      <text class="row-text">有人为你点亮了一盏微光</text>
+    </view>
+
+    <scroll-view
+      class="stage"
+      scroll-y
+      refresher-enabled="{{!homeLocked}}"
+      refresher-default-style="none"
+      refresher-triggered="{{refreshing}}"
+      bindrefresherpulling="onPulling"
+      bindrefresherrefresh="onRefresh"
+    >
+      <view class="wall-box {{wallInstant ? 'is-ready' : ''}} {{wallAwaken ? 'is-awake' : ''}}">
+        <light-wall
+          lights="{{lights}}"
+          lift="{{wallLift}}"
+          awaken="{{wallAwaken}}"
+          instant="{{wallInstant}}"
+          gathering="{{gathering}}"
+          bind:select="onSelectLight"
+        />
+      </view>
+    </scroll-view>
+
+    <view class="row nearby nearby-entry" hover-class="is-pressing" bindtap="onNearbyTap">
+      <view class="row-dot nearby-dot"></view>
+      <text class="row-text nearby-text">附近微光</text>
+      <text class="arrow nearby-arrow">›</text>
+    </view>
+
+    <view class="cta light-button" hover-class="is-pressing" bindtap="onRecordTap">
+      <view class="orb light-button-inner"></view>
+      <text class="cta-label light-button-text">点亮今天</text>
+    </view>
+  </view>
+
+  <view
+    class="splash {{splashGrow ? 'is-grow' : ''}} {{splashLeaving ? 'is-leaving' : ''}} {{splashHidden ? 'is-hidden' : ''}}"
+    catchtouchmove="onSplashTouch"
+  >
+    <view class="splash-dot"></view>
+    <text class="splash-name">Lampy</text>
+  </view>
+</view>

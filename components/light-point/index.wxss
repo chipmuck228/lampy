@@ -1,0 +1,51 @@
+.point {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.halo,
+.core {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.halo {
+  top: -60%;
+  right: -60%;
+  bottom: -60%;
+  left: -60%;
+  filter: blur(8rpx);
+  animation-name: breathe;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.core {
+  width: 38%;
+  height: 38%;
+}
+
+.is-seed .halo {
+  filter: blur(10rpx);
+}
+
+.is-seed .core {
+  width: 28%;
+  height: 28%;
+}
+
+.is-pressing {
+  opacity: 0.82;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+  50% {
+    opacity: 1;
+  }
+}

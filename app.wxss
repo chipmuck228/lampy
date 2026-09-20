@@ -1,0 +1,25 @@
+/**
+ * Lampy 全局样式：深夜底、暖白字、宋体外观。
+ */
+page {
+  --color-bg: #0B1026;
+  --color-bg-soft: #141A33;
+  --color-glow: #FFD97D;
+  --color-glow-green: #A8E6A3;
+  --color-text: #F5F1E8;
+  --color-text-muted: #8A93B2;
+  --color-accent: #FFB86B;
+
+  background: #0B1026;
+  color: #F5F1E8;
+  font-family: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong", "PingFang SC", serif;
+  font-size: 32rpx;
+  line-height: 1.7;
+  min-height: 100%;
+}
+
+view,
+text,
+scroll-view {
+  box-sizing: border-box;
+}

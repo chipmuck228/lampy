@@ -1,0 +1,349 @@
+page {
+  background: #0B1026;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.record-page {
+  width: 100%;
+  height: 100vh;
+  background: #0B1026;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding: 0 60rpx;
+  box-sizing: border-box;
+}
+
+.record-header {
+  padding: 80rpx 0 20rpx;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.close-btn {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  color: #8A93B2;
+  font-weight: 200;
+  transition: color 0.3s ease;
+}
+
+.close-btn.is-pressing {
+  color: #F5F1E8;
+}
+
+.breathing-light {
+  --light-scale: 1;
+  --light-opacity: 0.8;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    #FFE9A8 0%,
+    #FFD97D 40%,
+    rgba(255, 217, 125, 0.3) 70%,
+    rgba(255, 217, 125, 0) 100%
+  );
+  margin: 40rpx auto 40rpx;
+  animation: breathe 5s ease-in-out infinite;
+}
+
+.input-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 20rpx;
+  min-height: 0;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 200rpx;
+  font-size: 36rpx;
+  color: #F5F1E8;
+  line-height: 1.8;
+  letter-spacing: 2rpx;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.placeholder {
+  color: #8A93B2;
+  opacity: 0.7;
+}
+
+.attach-row {
+  display: flex;
+  justify-content: space-around;
+  padding: 32rpx 0;
+  border-top: 1rpx solid rgba(138, 147, 178, 0.1);
+  margin-top: 24rpx;
+}
+
+.attach-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16rpx 24rpx;
+  transition: opacity 0.3s ease;
+}
+
+.attach-icon {
+  font-size: 40rpx;
+  opacity: 0.5;
+  margin-bottom: 12rpx;
+  transition: opacity 0.3s ease;
+}
+
+.attach-label {
+  font-size: 22rpx;
+  color: #8A93B2;
+  letter-spacing: 2rpx;
+}
+
+.attach-btn.active .attach-icon,
+.attach-btn.active .attach-label {
+  opacity: 1;
+  color: #FFD97D;
+}
+
+.attach-btn.recording .attach-icon,
+.attach-btn.recording .attach-label {
+  opacity: 1;
+  color: #FFB86B;
+  animation: breathe 1.5s ease-in-out infinite;
+}
+
+.image-preview {
+  position: relative;
+  width: 100%;
+  margin-top: 12rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.image-preview image {
+  width: 100%;
+  height: 240rpx;
+  display: block;
+}
+
+.remove-image {
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: rgba(11, 16, 38, 0.7);
+  color: #F5F1E8;
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bottom-area {
+  padding: 32rpx 0 64rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.light-button {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease;
+  opacity: 0.3;
+}
+
+.light-button.active {
+  opacity: 1;
+}
+
+.light-button-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    #FFE9A8 0%,
+    #FFD97D 40%,
+    rgba(255, 217, 125, 0.3) 70%,
+    rgba(255, 217, 125, 0) 100%
+  );
+  animation: breathe 6s ease-in-out infinite;
+}
+
+.light-button.active.is-pressing .light-button-inner {
+  transform: scale(1.08);
+}
+
+.light-button-text {
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  color: #8A93B2;
+  letter-spacing: 4rpx;
+  transition: color 0.3s ease;
+}
+
+.light-button.active + .light-button-text {
+  color: #F5F1E8;
+}
+
+.emotion-overlay,
+.pass-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.emotion-overlay {
+  background: rgba(11, 16, 38, 0.8);
+}
+
+.pass-overlay {
+  background: rgba(11, 16, 38, 0.9);
+}
+
+.emotion-panel {
+  background: #141A33;
+  border-radius: 24rpx;
+  padding: 48rpx 40rpx;
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 560rpx;
+  justify-content: center;
+}
+
+.emotion-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20rpx;
+  min-width: 120rpx;
+  margin: 8rpx 16rpx;
+  transition: opacity 0.3s ease;
+}
+
+.emotion-dot {
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  background: #8A93B2;
+  opacity: 0.4;
+  margin-bottom: 12rpx;
+  transition: background 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+}
+
+.emotion-item.selected .emotion-dot {
+  background: #FFD97D;
+  opacity: 1;
+  box-shadow: 0 0 20rpx rgba(255, 217, 125, 0.8);
+  transform: scale(1.3);
+}
+
+.emotion-name {
+  font-size: 26rpx;
+  color: #8A93B2;
+  letter-spacing: 2rpx;
+}
+
+.emotion-item.selected .emotion-name {
+  color: #FFD97D;
+}
+
+.pass-panel {
+  background: #141A33;
+  border-radius: 24rpx;
+  padding: 60rpx 48rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 560rpx;
+  width: 100%;
+}
+
+.pass-title {
+  font-size: 32rpx;
+  color: #F5F1E8;
+  letter-spacing: 2rpx;
+  text-align: center;
+  line-height: 1.6;
+  margin-bottom: 40rpx;
+}
+
+.pass-actions {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.pass-btn {
+  padding: 28rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  color: #8A93B2;
+  text-align: center;
+  letter-spacing: 4rpx;
+  background: transparent;
+  border: 1rpx solid rgba(138, 147, 178, 0.2);
+  transition: background 0.3s ease;
+}
+
+.pass-btn + .pass-btn {
+  margin-top: 20rpx;
+}
+
+.pass-btn.is-pressing {
+  background: rgba(138, 147, 178, 0.1);
+}
+
+.pass-btn.primary {
+  color: #FFD97D;
+  border-color: rgba(255, 217, 125, 0.4);
+}
+
+.pass-btn.primary.is-pressing {
+  background: rgba(255, 217, 125, 0.1);
+}
+
+.is-pressing {
+  opacity: 0.78;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(var(--light-scale, 1));
+    opacity: calc(var(--light-opacity, 0.85) * 0.92);
+  }
+  50% {
+    transform: scale(calc(var(--light-scale, 1) * 1.08));
+    opacity: var(--light-opacity, 1);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

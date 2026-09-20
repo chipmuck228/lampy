@@ -1,0 +1,46 @@
+<view class="vault-page {{entering ? 'entering' : ''}}">
+  <view class="vault-header" style="padding-top: {{headerPad}}px;">
+    <view class="back-btn" hover-class="is-pressing" bindtap="onBack">‹</view>
+    <view class="vault-title">你的光罐</view>
+    <view class="vault-count">{{lights.length}} 个瞬间</view>
+  </view>
+
+  <view class="vault-sky">
+    <view
+      wx:for="{{arrangedLights}}"
+      wx:key="id"
+      class="light-hit-area"
+      style="left: {{item.x * 100}}%; top: {{item.y * 100}}%;"
+      catchtap="onLightTap"
+      data-id="{{item.id}}"
+    >
+      <view
+        class="light-point"
+        style="width: {{item.size}}rpx; height: {{item.size}}rpx; opacity: {{item.opacity}}; background: radial-gradient(circle, {{item.color}} 0%, {{item.color}} 40%, transparent 100%); filter: blur({{item.blur}}px); box-shadow: 0 0 {{item.shadowBlur}}rpx {{item.color}}; animation-delay: {{item.animationDelay}}ms;"
+      ></view>
+    </view>
+  </view>
+
+  <view class="view-switcher">
+    <view
+      class="view-btn {{currentView === 'day' ? 'active' : ''}}"
+      hover-class="is-pressing"
+      bindtap="switchView"
+      data-view="day"
+    >日</view>
+    <view
+      class="view-btn {{currentView === 'month' ? 'active' : ''}}"
+      hover-class="is-pressing"
+      bindtap="switchView"
+      data-view="month"
+    >月</view>
+    <view
+      class="view-btn {{currentView === 'year' ? 'active' : ''}}"
+      hover-class="is-pressing"
+      bindtap="switchView"
+      data-view="year"
+    >年</view>
+  </view>
+
+  <view class="vault-caption">{{caption}}</view>
+</view>

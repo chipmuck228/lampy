@@ -1,0 +1,13 @@
+<view
+  class="point {{seed ? 'is-seed' : ''}}"
+  style="width: {{size}}rpx; height: {{size}}rpx;"
+  hover-class="is-pressing"
+  hover-stay-time="80"
+  bindtap="onTap"
+>
+  <view
+    class="halo"
+    style="background: {{color}}; animation-duration: {{duration}}ms; animation-delay: {{delay}}ms; opacity: {{opacity}};"
+  ></view>
+  <view class="core" style="background: {{color}}; opacity: {{opacity}};"></view>
+</view>

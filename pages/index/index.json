@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "light-wall": "/components/light-wall/index"
+  },
+  "navigationStyle": "custom",
+  "backgroundColor": "#0B1026",
+  "disableScroll": true
+}

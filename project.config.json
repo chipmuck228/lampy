@@ -1,0 +1,22 @@
+{
+  "appid": "wx7992d58229e38a82",
+  "projectname": "Lampy",
+  "compileType": "miniprogram",
+  "libVersion": "3.8.0",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "minified": true,
+    "postcss": true,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "coverView": true,
+    "compileHotReLoad": true,
+    "urlCheck": true
+  },
+  "simulatorPluginLibVersion": {}
+}

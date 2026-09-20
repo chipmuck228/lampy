@@ -1,0 +1,49 @@
+<view class="nearby-page">
+  <view class="nearby-header" style="padding-top: {{headerPad}}px;">
+    <view class="back-btn" hover-class="is-pressing" bindtap="onBack">‹</view>
+    <view class="nearby-title">附近微光</view>
+    <view class="placeholder"></view>
+  </view>
+
+  <view class="nearby-content" wx:if="{{!finished}}">
+    <view
+      class="current-light"
+      style="opacity: {{transitioning ? 0 : 1}};"
+      bindtouchstart="onTouchStart"
+      bindtouchend="onTouchEnd"
+    >
+      <view
+        class="light-point-large"
+        style="animation-delay: {{current.animationDelay}}ms;"
+      ></view>
+
+      <view class="light-content">
+        <text class="light-text">{{current.text}}</text>
+        <text class="light-emotion" wx:if="{{current.emotion}}">{{current.emotion}}</text>
+      </view>
+
+      <view class="light-actions">
+        <view class="action-btn" hover-class="is-pressing" bindtap="onCollect">
+          <text>收下</text>
+        </view>
+        <view class="action-btn" hover-class="is-pressing" bindtap="onPass">
+          <text>继续传</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="progress-dots">
+      <view
+        wx:for="{{lights}}"
+        wx:key="id"
+        class="dot {{index === currentIndex ? 'active' : ''}} {{index < currentIndex ? 'done' : ''}}"
+      ></view>
+    </view>
+  </view>
+
+  <view class="nearby-finished" wx:if="{{finished}}">
+    <view class="finished-dot"></view>
+    <text class="finished-text">今天的微光，就到这里。</text>
+    <text class="finished-sub">明天再来看看</text>
+  </view>
+</view>

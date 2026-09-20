@@ -1,0 +1,82 @@
+<view class="record-page">
+  <view class="record-header" style="padding-top: {{headerPad}}px;">
+    <view class="close-btn" hover-class="is-pressing" bindtap="onClose">✕</view>
+  </view>
+
+  <view
+    class="breathing-light"
+    style="--light-scale: {{lightScale}}; --light-opacity: {{lightOpacity}};"
+  ></view>
+
+  <view class="input-area">
+    <textarea
+      class="text-input"
+      placeholder="今天有什么想留下的？"
+      placeholder-class="placeholder"
+      value="{{text}}"
+      bindinput="onTextInput"
+      maxlength="500"
+      auto-height
+      show-confirm-bar="{{false}}"
+      cursor-spacing="40"
+    />
+  </view>
+
+  <view class="attach-row">
+    <view class="attach-btn {{hasImage ? 'active' : ''}}" hover-class="is-pressing" bindtap="onChooseImage">
+      <text class="attach-icon">📷</text>
+      <text class="attach-label">{{hasImage ? '已添加' : '照片'}}</text>
+    </view>
+    <view
+      class="attach-btn {{isRecording ? 'recording' : ''}} {{hasVoice ? 'active' : ''}}"
+      catchtouchstart="onVoiceStart"
+      catchtouchend="onVoiceEnd"
+      catchtouchcancel="onVoiceEnd"
+    >
+      <text class="attach-icon">🎙</text>
+      <text class="attach-label">{{voiceLabel}}</text>
+    </view>
+    <view class="attach-btn {{emotion ? 'active' : ''}}" hover-class="is-pressing" bindtap="onEmotionTap">
+      <text class="attach-icon">◉</text>
+      <text class="attach-label">{{emotion || '情绪'}}</text>
+    </view>
+  </view>
+
+  <view class="image-preview" wx:if="{{hasImage}}">
+    <image src="{{imagePath}}" mode="aspectFill" />
+    <view class="remove-image" hover-class="is-pressing" bindtap="onRemoveImage">✕</view>
+  </view>
+
+  <view class="bottom-area">
+    <view class="light-button {{canSubmit ? 'active' : ''}}" hover-class="is-pressing" bindtap="onSubmit">
+      <view class="light-button-inner"></view>
+    </view>
+    <text class="light-button-text">{{canSubmit ? '点亮' : '写点什么吧'}}</text>
+  </view>
+
+  <view class="emotion-overlay" wx:if="{{showEmotion}}" bindtap="onEmotionClose">
+    <view class="emotion-panel" catchtap="onEmotionPanelTap">
+      <view
+        wx:for="{{emotions}}"
+        wx:key="*this"
+        class="emotion-item {{emotion === item ? 'selected' : ''}}"
+        hover-class="is-pressing"
+        bindtap="onEmotionSelect"
+        data-emotion="{{item}}"
+      >
+        <view class="emotion-dot"></view>
+        <text class="emotion-name">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="pass-overlay" wx:if="{{showPass}}">
+    <view class="pass-panel">
+      <text class="pass-title">把这份微光递给一个人？</text>
+      <view class="pass-actions">
+        <view class="pass-btn primary" hover-class="is-pressing" bindtap="onPassConfirm">递灯</view>
+        <view class="pass-btn" hover-class="is-pressing" bindtap="onPassCancel">先收进光罐</view>
+      </view>
+    </view>
+  </view>
+</view>

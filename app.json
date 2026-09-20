@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/vault/vault",
+    "pages/nearby/nearby",
+    "pages/record/record"
+  ],
+  "window": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "Lampy",
+    "navigationBarBackgroundColor": "#0B1026",
+    "backgroundColor": "#0B1026",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

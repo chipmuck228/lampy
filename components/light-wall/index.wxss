@@ -1,0 +1,76 @@
+.light-wall {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  overflow: visible;
+  transition: transform 420ms ease-out;
+}
+
+.light-hit-area {
+  position: absolute;
+  width: 96rpx;
+  height: 96rpx;
+  margin-left: -48rpx;
+  margin-top: -48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  z-index: 10;
+  transition: transform 0.6s ease, opacity 0.6s ease;
+}
+
+.light-wall.gathering .light-hit-area {
+  transform: scale(0.5);
+  opacity: 0;
+}
+
+.light-point {
+  border-radius: 50%;
+  animation: breathe 6s ease-in-out infinite;
+  pointer-events: none;
+  transition: transform 0.3s ease;
+}
+
+.light-hit-area.tapped .light-point {
+  animation: none;
+  transform: scale(1.3);
+  opacity: 1 !important;
+  filter: blur(0) !important;
+}
+
+.seed {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0;
+  z-index: 10;
+}
+
+.seed.is-ready,
+.seed.is-awake {
+  opacity: 1;
+}
+
+.hint {
+  margin-top: 28rpx;
+  max-width: 420rpx;
+  text-align: center;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: rgba(245, 241, 232, 0.46);
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
