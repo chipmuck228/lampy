@@ -1,6 +1,6 @@
 /**
- * 详情页录音播放适配。每次播放有独立 session，
- * 过期的 onStop / onEnded / onError 不能覆盖当前播放。
+ * 详情页录音播放适配。每次播放创建独立播放器实例，
+ * 监听器关闭在该 session 上。旧实例的延迟事件不能改写新播放。
  */
 const { idleAudioState, applyAudioIntent } = require('./audio-player-state.js')
 
@@ -12,7 +12,9 @@ function markAssetPlaybackFailed(detail, assetId) {
       id: item.id,
       type: item.type,
       status: 'failed',
-      display: item.display || {},
+      display: Object.assign({}, item.display, {
+        unavailableLabel: '声音暂时无法播放',
+      }),
     }
   })
   const state = Object.assign({}, detail.state, {
@@ -22,13 +24,19 @@ function markAssetPlaybackFailed(detail, assetId) {
   return Object.assign({}, detail, { assets, state })
 }
 
+function destroyPlayer(player) {
+  if (!player) return
+  try { player.stop() } catch (error) { /* already stopped */ }
+  if (player.destroy) {
+    try { player.destroy() } catch (error) { /* already destroyed */ }
+  }
+}
+
 function createAudioPlaybackController(options) {
   const opts = options || {}
   let seq = 0
   let current = null
-  let lastStopSessionId = null
   let state = idleAudioState()
-  let player = opts.player || null
 
   function publish(next) {
     state = next
@@ -40,16 +48,35 @@ function createAudioPlaybackController(options) {
     return publish(applyAudioIntent(state, intent))
   }
 
+  function createPlayer() {
+    if (opts.createPlayer) return opts.createPlayer()
+    return null
+  }
+
+  function bindSession(player, session) {
+    const sessionId = session.sessionId
+    if (!player) return
+    player.onPlay(() => dispatch({ type: 'play', sessionId }))
+    player.onPause(() => dispatch({ type: 'pause', sessionId }))
+    player.onStop(() => dispatch({ type: 'stop', sessionId }))
+    player.onEnded(() => dispatch({ type: 'ended', sessionId }))
+    player.onError((error) => {
+      if (opts.onPlayerError) opts.onPlayerError(error)
+      dispatch({ type: 'error', sessionId })
+    })
+  }
+
   function play(assetId, src) {
     seq += 1
-    const next = { sessionId: `play:${seq}`, assetId }
-    if (current) {
-      lastStopSessionId = current.sessionId
-      if (player) {
-        try { player.stop() } catch (error) { /* switching */ }
-      }
-    }
+    const next = { sessionId: `play:${seq}`, assetId, player: null }
+    const previous = current
     current = next
+    if (previous && previous.player) {
+      destroyPlayer(previous.player)
+    }
+    const player = createPlayer()
+    next.player = player
+    bindSession(player, next)
     if (player) {
       player.src = src
       player.play()
@@ -75,27 +102,12 @@ function createAudioPlaybackController(options) {
     return state
   }
 
-  function bindPlayer(nextPlayer) {
-    player = nextPlayer
-    player.onPlay(() => {
-      dispatch({ type: 'play', sessionId: current && current.sessionId })
-    })
-    player.onPause(() => {
-      dispatch({ type: 'pause', sessionId: current && current.sessionId })
-    })
-    player.onEnded(() => {
-      dispatch({ type: 'ended', sessionId: current && current.sessionId })
-    })
-    player.onStop(() => {
-      dispatch({ type: 'stop', sessionId: lastStopSessionId })
-    })
-    player.onError((error) => {
-      if (opts.onPlayerError) opts.onPlayerError(error)
-      dispatch({ type: 'error', sessionId: current && current.sessionId })
-    })
+  function currentPlayer() {
+    return current && current.player
   }
 
   function pause() {
+    const player = currentPlayer()
     if (player) {
       try { player.pause() } catch (error) { /* already paused */ }
     }
@@ -103,6 +115,7 @@ function createAudioPlaybackController(options) {
   }
 
   function resume() {
+    const player = currentPlayer()
     if (player) {
       try { player.play() } catch (error) { /* keep paused */ }
     }
@@ -110,7 +123,7 @@ function createAudioPlaybackController(options) {
   }
 
   function stopCurrent() {
-    if (current) lastStopSessionId = current.sessionId
+    const player = currentPlayer()
     if (player) {
       try { player.stop() } catch (error) { /* already stopped */ }
     }
@@ -119,13 +132,8 @@ function createAudioPlaybackController(options) {
   }
 
   function release() {
-    stopCurrent()
-    if (player && player.destroy) {
-      try { player.destroy() } catch (error) { /* already destroyed */ }
-    }
-    player = null
+    if (current && current.player) destroyPlayer(current.player)
     current = null
-    lastStopSessionId = null
     return publish(idleAudioState())
   }
 
@@ -136,7 +144,6 @@ function createAudioPlaybackController(options) {
     stopCurrent,
     release,
     dispatch,
-    bindPlayer,
     getState() { return state },
     getSession() { return current },
   }

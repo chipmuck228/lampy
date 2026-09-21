@@ -60,6 +60,8 @@ describe('moment detail service', () => {
     assert.equal(view.assets[0].status, 'available')
     assert.equal(view.assets[1].status, 'available')
     assert.equal(view.assets[2].status, 'missing')
+    assert.equal(view.assets[2].type, 'unknown')
+    assert.equal(view.assets[2].display.unavailableLabel, '这份记录暂时无法显示')
     assert.equal(view.content.note, '两份媒体')
   })
 

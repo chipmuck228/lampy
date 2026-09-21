@@ -62,11 +62,13 @@
 
 | 情况 | 媒体状态 |
 |---|---|
-| Asset 不存在 | `missing`，保留 assetId |
-| `storage.status === missing` | `missing` |
-| `storage.status === failed` | `failed` |
+| Asset 不存在 | `missing`，`type: unknown`，文案「这份记录暂时无法显示」 |
+| 已知 image 不可用 | `missing`/`failed`，文案「这张照片暂时无法显示」 |
+| 已知 audio 不可用 | `missing`/`failed`，文案「声音暂时无法播放」 |
+| 已知 video 不可用或暂不支持 | 文案「暂不支持播放」 |
 | `localUri` 为空 | 不得为 `available` |
-| 视频且路径可用 | `unsupported` |
+
+找不到 Asset 时不得默认成 `image`。不得把丢失的录音显示成照片。
 
 任一媒体失败不影响文字和其他媒体。不删除 Moment 或 Asset。
 
@@ -74,8 +76,8 @@
 
 - 可用图片单击 `wx.previewImage()`，`urls` 为当前 Moment 全部可用图片。
 - 组件加载失败只改页面状态：`这张照片暂时无法显示`。
-- 录音使用一个 `InnerAudioContext`：播放 / 暂停 / 继续；结束后复位；卸载时 stop + destroy。
-- 每次播放有 `playbackSessionId`。切换录音时停止旧音频产生的 onStop / onEnded / onError 不得覆盖新播放。
+- 每次播放创建独立 `InnerAudioContext`，监听器关闭在该 session；切换时销毁旧实例。
+- 旧实例迟到的 onStop / onEnded / onError 不得覆盖新播放。卸载时 stop + destroy。
 - 播放失败只改本次页面会话中的 Asset 展示状态，不写回领域 Asset。
 - 非法 query 编码进入 not-found，不得让 decodeURIComponent 把页面打崩。
 - 不自动播放。文案：`听听当时的声音` / `播放` / `暂停` / `声音暂时无法播放`。

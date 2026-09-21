@@ -33,9 +33,8 @@
       wx:key="id"
       class="asset-block"
     >
-      <block wx:if="{{item.type === 'image'}}">
+      <block wx:if="{{item.type === 'image' && item.status === 'available'}}">
         <image
-          wx:if="{{item.status === 'available'}}"
           class="photo"
           src="{{item.localUri}}"
           mode="widthFix"
@@ -43,11 +42,10 @@
           bindtap="onImageTap"
           binderror="onImageError"
         />
-        <text wx:else class="asset-fallback">这张照片暂时无法显示</text>
       </block>
 
-      <block wx:elif="{{item.type === 'audio'}}">
-        <view wx:if="{{item.status === 'available'}}" class="audio-card">
+      <block wx:elif="{{item.type === 'audio' && item.status === 'available'}}">
+        <view class="audio-card">
           <text class="audio-hint">听听当时的声音</text>
           <text wx:if="{{item.display.durationLabel}}" class="audio-duration">{{item.display.durationLabel}}</text>
           <view
@@ -57,10 +55,9 @@
             bindtap="onAudioTap"
           >{{audio.playingAssetId === item.id && audio.isPlaying ? '暂停' : '播放'}}</view>
         </view>
-        <text wx:else class="asset-fallback">声音暂时无法播放</text>
       </block>
 
-      <text wx:elif="{{item.type === 'video'}}" class="asset-fallback">暂不支持播放</text>
+      <text wx:else class="asset-fallback">{{item.display.unavailableLabel}}</text>
     </view>
 
     <text wx:if="{{detail.content.emotion}}" class="emotion">{{detail.content.emotion}}</text>

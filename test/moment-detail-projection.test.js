@@ -96,8 +96,53 @@ describe('moment detail projection', () => {
     assert.equal(view.assets[0].status, 'available')
     assert.equal(view.assets[1].id, 'gone')
     assert.equal(view.assets[1].status, 'missing')
+    assert.equal(view.assets[1].type, 'unknown')
+    assert.equal(view.assets[1].display.unavailableLabel, '这份记录暂时无法显示')
     assert.equal(view.state.hasUnavailableAssets, true)
     assert.equal(view.content.note, '还有一张')
+  })
+
+  it('keeps known types when an image, audio, or video asset is missing', () => {
+    const missingImage = makeAsset({
+      id: 'photo-gone',
+      type: 'image',
+      localUri: '',
+      storage: { status: 'missing' },
+    })
+    const missingAudio = makeAsset({
+      id: 'voice-gone',
+      type: 'audio',
+      localUri: '',
+      storage: { status: 'missing' },
+    })
+    const missingVideo = makeAsset({
+      id: 'clip-gone',
+      type: 'video',
+      localUri: '',
+      storage: { status: 'missing' },
+    })
+    const moment = makeActiveMoment({
+      id: 'typed-missing',
+      note: '类型仍在',
+      assetIds: ['photo-gone', 'voice-gone', 'clip-gone', 'never-existed'],
+    })
+    const view = projectMomentDetail(moment, [missingImage, missingAudio, missingVideo], {
+      timezoneOffsetMinutes: 0,
+    })
+    assert.equal(view.assets[0].type, 'image')
+    assert.equal(view.assets[0].status, 'missing')
+    assert.equal(view.assets[0].display.unavailableLabel, '这张照片暂时无法显示')
+    assert.equal(view.assets[1].type, 'audio')
+    assert.equal(view.assets[1].status, 'missing')
+    assert.equal(view.assets[1].display.unavailableLabel, '声音暂时无法播放')
+    assert.equal(view.assets[2].type, 'video')
+    assert.equal(view.assets[2].status, 'missing')
+    assert.equal(view.assets[2].display.unavailableLabel, '暂不支持播放')
+    assert.equal(view.assets[3].type, 'unknown')
+    assert.equal(view.assets[3].status, 'missing')
+    assert.equal(view.assets[3].display.unavailableLabel, '这份记录暂时无法显示')
+    assert.equal(view.state.hasImages, false)
+    assert.equal(view.state.hasAudio, false)
   })
 
   it('marks a failed asset as failed', () => {

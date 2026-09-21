@@ -28,6 +28,9 @@ Page({
         : 40,
     })
     this._playback = createAudioPlaybackController({
+      createPlayer() {
+        return wx.createInnerAudioContext()
+      },
       onState: (audio) => this.setData({ audio }),
       onPlaybackFailed: (assetId) => this.markAudioFailed(assetId),
       onPlayerError: (error) => console.error('[lampy] audio playback failed', error),
@@ -46,7 +49,6 @@ Page({
 
   onUnload() {
     if (this._playback) this._playback.release()
-    this._player = null
   },
 
   loadDetail(momentId) {
@@ -112,14 +114,6 @@ Page({
     if (detail) this.setData({ detail })
   },
 
-  ensurePlayer() {
-    if (this._player) return this._player
-    const player = wx.createInnerAudioContext()
-    this._player = player
-    if (this._playback) this._playback.bindPlayer(player)
-    return player
-  },
-
   onAudioTap(e) {
     const id = e.currentTarget.dataset.id
     const detail = this.data.detail
@@ -129,7 +123,6 @@ Page({
       this.markAudioFailed(id)
       return
     }
-    this.ensurePlayer()
     const audio = this.data.audio
     if (audio.playingAssetId === id && audio.isPlaying) {
       this._playback.pause()

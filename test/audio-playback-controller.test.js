@@ -9,13 +9,16 @@ function createFakePlayer() {
   const handlers = {}
   return {
     src: '',
+    destroyed: false,
     onPlay(fn) { handlers.play = fn },
     onPause(fn) { handlers.pause = fn },
     onStop(fn) { handlers.stop = fn },
     onEnded(fn) { handlers.ended = fn },
     onError(fn) { handlers.error = fn },
     play() {},
-    stop() {},
+    stop() {
+      if (handlers.stop) handlers.stop()
+    },
     pause() {},
     destroy() { this.destroyed = true },
     emit(type, payload) {
@@ -24,49 +27,62 @@ function createFakePlayer() {
   }
 }
 
+function createController(extra) {
+  const players = []
+  const failed = []
+  const controller = createAudioPlaybackController(Object.assign({
+    createPlayer() {
+      const player = createFakePlayer()
+      players.push(player)
+      return player
+    },
+    onPlaybackFailed(assetId) { failed.push(assetId) },
+  }, extra || {}))
+  return { controller, players, failed }
+}
+
 describe('audio playback controller', () => {
-  it('keeps B playing when a late onStop from A arrives', () => {
-    const player = createFakePlayer()
-    const controller = createAudioPlaybackController({ player })
-    controller.bindPlayer(player)
+  it('keeps B playing when A later emits stop, ended, and error through its own player', () => {
+    const { controller, players, failed } = createController()
 
-    const sessionA = controller.play('voice-a', 'wxfile://a.mp3').session
+    controller.play('voice-a', 'wxfile://a.mp3')
     assert.equal(controller.getState().playingAssetId, 'voice-a')
+    const playerA = players[0]
 
-    const sessionB = controller.play('voice-b', 'wxfile://b.mp3').session
-    player.emit('play')
-    controller.dispatch({ type: 'stop', sessionId: sessionA.sessionId })
+    controller.play('voice-b', 'wxfile://b.mp3')
+    const playerB = players[1]
+    assert.equal(playerA.destroyed, true)
+    assert.notEqual(playerA, playerB)
+
+    playerB.emit('play')
+    playerA.emit('stop')
+    playerA.emit('ended')
+    playerA.emit('error', { errMsg: 'late A' })
 
     const state = controller.getState()
-    assert.equal(sessionB.assetId, 'voice-b')
     assert.equal(state.playingAssetId, 'voice-b')
     assert.equal(state.status, 'playing')
     assert.equal(state.isPlaying, true)
+    assert.deepEqual(failed, [])
   })
 
-  it('does not let a stale onEnded or onError replace the new session', () => {
-    const player = createFakePlayer()
-    const controller = createAudioPlaybackController({ player })
-    controller.bindPlayer(player)
-    const sessionA = controller.play('voice-a', 'wxfile://a.mp3').session
+  it('still marks the current clip unavailable when its own player errors', () => {
+    const { controller, players, failed } = createController()
+    controller.play('voice-a', 'wxfile://a.mp3')
     controller.play('voice-b', 'wxfile://b.mp3')
-    player.emit('play')
-    controller.dispatch({ type: 'ended', sessionId: sessionA.sessionId })
-    controller.dispatch({ type: 'error', sessionId: sessionA.sessionId })
-    assert.equal(controller.getState().playingAssetId, 'voice-b')
+    players[1].emit('play')
+    players[0].emit('error', { errMsg: 'stale A' })
     assert.equal(controller.getState().status, 'playing')
+    players[1].emit('error', { errMsg: 'real B' })
+    assert.deepEqual(failed, ['voice-b'])
+    assert.equal(controller.getState().status, 'unavailable')
+    assert.equal(controller.getState().playingAssetId, 'voice-b')
   })
 
   it('marks only the failed clip unavailable in page session state', () => {
-    const failed = []
-    const player = createFakePlayer()
-    const controller = createAudioPlaybackController({
-      player,
-      onPlaybackFailed(assetId) { failed.push(assetId) },
-    })
-    controller.bindPlayer(player)
+    const { controller, players, failed } = createController()
     controller.play('voice-a', 'wxfile://a.mp3')
-    player.emit('error', { errMsg: 'fail' })
+    players[0].emit('error', { errMsg: 'fail' })
     assert.deepEqual(failed, ['voice-a'])
     assert.equal(controller.getState().status, 'unavailable')
     assert.equal(controller.getState().playingAssetId, 'voice-a')
@@ -82,6 +98,7 @@ describe('audio playback controller', () => {
     const next = markAssetPlaybackFailed(detail, 'voice-a')
     assert.deepEqual(detail, before)
     assert.equal(next.assets[0].status, 'failed')
+    assert.equal(next.assets[0].display.unavailableLabel, '声音暂时无法播放')
     assert.equal(next.assets[1].status, 'available')
     assert.equal(next.state.hasAudio, true)
     assert.equal(next.state.hasUnavailableAssets, true)

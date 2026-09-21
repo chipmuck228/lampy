@@ -10,6 +10,13 @@ const SOURCE_LABELS = {
   received: '收下的一盏微光',
 }
 
+function resolveAssetType(asset) {
+  if (asset && (asset.type === 'image' || asset.type === 'audio' || asset.type === 'video')) {
+    return asset.type
+  }
+  return 'unknown'
+}
+
 function resolveAssetStatus(asset) {
   if (!asset) return 'missing'
   const storageStatus = asset.storage && asset.storage.status
@@ -20,8 +27,15 @@ function resolveAssetStatus(asset) {
   return 'available'
 }
 
+function unavailableLabel(type) {
+  if (type === 'image') return '这张照片暂时无法显示'
+  if (type === 'audio') return '声音暂时无法播放'
+  if (type === 'video') return '暂不支持播放'
+  return '这份记录暂时无法显示'
+}
+
 function projectAsset(assetId, asset) {
-  const type = asset && asset.type ? asset.type : 'image'
+  const type = resolveAssetType(asset)
   const status = resolveAssetStatus(asset)
   const metadata = (asset && asset.metadata) || {}
   const display = {}
@@ -30,6 +44,7 @@ function projectAsset(assetId, asset) {
   if (durationLabel) display.durationLabel = durationLabel
   if (Number.isFinite(metadata.width)) display.width = metadata.width
   if (Number.isFinite(metadata.height)) display.height = metadata.height
+  if (status !== 'available') display.unavailableLabel = unavailableLabel(type)
 
   const view = {
     id: assetId,
@@ -122,4 +137,5 @@ module.exports = {
   SOURCE_LABELS,
   projectMomentDetail,
   projectAsset,
+  unavailableLabel,
 }
