@@ -69,3 +69,28 @@ trashed -> active
 
 - 正式 Moment 的 `content`、`time.occurredAt`、`origin` 只能由用户确认的命令写入。
 - Suggestion 模型不得被 repository 当作 Moment 保存。
+
+## 输入引用隔离
+
+进入 Moment / Asset / Transmission 的嵌套对象与数组必须复制。调用者之后修改原 input 不得改变领域对象；命令返回新对象，不修改原聚合。`revision` 只由领域命令递增。
+
+## 运行时 Validator
+
+`.d.ts` 只是开发期契约。持久化读写必须经过完整运行时校验。结构错误使用稳定错误码，不只匹配英文文本：
+
+- `MOMENT_INVALID_CONTENT` / `MOMENT_INVALID_CONTEXT` / `MOMENT_INVALID_ACCESS` / `MOMENT_INVALID_LIFECYCLE`
+- `ASSET_INVALID`
+- `TRANSMISSION_INVALID`
+- `REPOSITORY_INVALID_RECORD`
+
+Validator 不得猜测或改写时间。
+
+## 光罐日历
+
+`projectMomentsToVault` 按查看者时区的自然日 / 自然月 / 自然年筛选。
+
+- `timezoneOffsetMinutes`：东为正，UTC+8 = 480，UTC-5 = -300。
+- 页面把 `Date#getTimezoneOffset()` 取反后传入。
+- 未传入时默认 `0`（UTC）。
+- 非法 view 抛 `VAULT_INVALID_VIEW`，不得静默当 year。
+- 优先 `time.occurredAt`；缺失时回退 `time.recordedAt` 仅作展示，不伪造发生日期。

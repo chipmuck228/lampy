@@ -4,6 +4,12 @@ const { validateMoment } = require('../domain/moment/index.js')
 const { createAsset } = require('../domain/asset/index.js')
 const { createTransmission, createLegacyReceivedTransmission } = require('../domain/transmission/index.js')
 const { KEYS } = require('../repositories/keys.js')
+const {
+  fingerprintOf,
+  toQuarantineEntry,
+  mergeQuarantine,
+  stableStringify,
+} = require('../repositories/record-partition.js')
 
 function log(logger, message, extra) {
   if (logger && logger.info) logger.info(message, extra)
@@ -24,7 +30,16 @@ function mapVisibility(isPublic) {
   return isPublic ? 'public' : 'private'
 }
 
-function buildMigratedMoment(light, nowIso) {
+function resolveOwner(ownerId) {
+  return ownerId || LOCAL_OWNER_ID
+}
+
+function sourceFingerprint(lights) {
+  return fingerprintOf('legacy-light-set', lights)
+}
+
+function buildMigratedMoment(light, nowIso, ownerId) {
+  const owner = resolveOwner(ownerId)
   const occurredAt = toIso(light.createdAt) || nowIso
   const received = light.source === 'nearby'
   const origin = received
@@ -46,7 +61,7 @@ function buildMigratedMoment(light, nowIso) {
     id: String(light.id),
     schemaVersion: 1,
     revision: 1,
-    ownerId: LOCAL_OWNER_ID,
+    ownerId: owner,
     content: {
       note: typeof light.text === 'string' ? light.text : '',
       significance: '',
@@ -78,27 +93,32 @@ function buildMigratedMoment(light, nowIso) {
   }
 }
 
-function buildAssets(light, nowIso) {
+function buildAssets(light, nowIso, ownerId) {
+  const owner = resolveOwner(ownerId)
   const assets = []
   if (light.imagePath) {
     assets.push(createAsset({
       id: `asset:${light.id}:image`,
-      ownerId: LOCAL_OWNER_ID,
+      ownerId: owner,
       type: 'image',
       localUri: light.imagePath,
       storage: { status: 'local' },
-    }, { now: () => nowIso }))
+    }, { now: () => nowIso, ownerId: owner }))
   }
   if (light.voicePath) {
     assets.push(createAsset({
       id: `asset:${light.id}:audio`,
-      ownerId: LOCAL_OWNER_ID,
+      ownerId: owner,
       type: 'audio',
       localUri: light.voicePath,
       storage: { status: 'local' },
-    }, { now: () => nowIso }))
+    }, { now: () => nowIso, ownerId: owner }))
   }
   return assets
+}
+
+function countSkipped(lights, existingIds) {
+  return lights.filter((light) => light && light.id && existingIds[light.id]).length
 }
 
 /**
@@ -107,6 +127,7 @@ function buildAssets(light, nowIso) {
  */
 function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
   const nowIso = toIso(now || Date.now())
+  const owner = resolveOwner(ownerId)
   const result = {
     migrated: 0,
     skipped: 0,
@@ -114,11 +135,27 @@ function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
     alreadyDone: false,
   }
 
+  const lights = storage.get(KEYS.lights, [])
+  if (!Array.isArray(lights)) {
+    warn(logger, 'old lights is not an array, abort without deleting or writing marker')
+    return result
+  }
+
   const existingMoments = Array.isArray(storage.get(KEYS.moments, [])) ? storage.get(KEYS.moments, []) : []
   const existingIds = {}
   existingMoments.forEach((item) => {
     if (item && item.id) existingIds[item.id] = true
   })
+
+  const fingerprint = sourceFingerprint(lights)
+  const marker = storage.get(KEYS.migration, null)
+  if (marker && marker.version === 1 && marker.sourceFingerprint === fingerprint) {
+    result.alreadyDone = true
+    result.skipped = countSkipped(lights, existingIds)
+    result.quarantined = marker.quarantined || 0
+    log(logger, 'migration already done for this source set', result)
+    return result
+  }
 
   const existingAssets = Array.isArray(storage.get(KEYS.assets, [])) ? storage.get(KEYS.assets, []) : []
   const existingAssetIds = {}
@@ -132,20 +169,19 @@ function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
     if (item && item.id) existingTxIds[item.id] = true
   })
 
-  const lights = storage.get(KEYS.lights, [])
-  if (!Array.isArray(lights)) {
-    warn(logger, 'old lights is not an array, abort without deleting')
-    return result
-  }
-
   const nextMoments = existingMoments.slice()
   const nextAssets = existingAssets.slice()
   const nextTx = existingTx.slice()
-  const quarantine = Array.isArray(storage.get(KEYS.quarantine, [])) ? storage.get(KEYS.quarantine, []).slice() : []
+  const discovered = []
 
   lights.forEach((light, index) => {
     if (!light || typeof light !== 'object' || !light.id) {
-      quarantine.push({ reason: 'missing-id', index, raw: light })
+      discovered.push({
+        raw: light,
+        index,
+        errors: [{ code: 'MOMENT_INVALID_ID', message: 'legacy light missing id' }],
+        reason: 'missing-id',
+      })
       result.quarantined += 1
       warn(logger, 'skip corrupt light', { index })
       return
@@ -157,11 +193,15 @@ function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
     }
 
     try {
-      const moment = buildMigratedMoment(light, nowIso)
-      if (ownerId) moment.ownerId = ownerId
+      const moment = buildMigratedMoment(light, nowIso, owner)
       const checked = validateMoment(moment)
       if (!checked.ok) {
-        quarantine.push({ reason: 'invalid-moment', id: light.id, errors: checked.errors })
+        discovered.push({
+          raw: light,
+          index,
+          errors: checked.errors,
+          reason: 'invalid-moment',
+        })
         result.quarantined += 1
         warn(logger, 'migrated moment failed validation', { id: light.id, errors: checked.errors })
         return
@@ -171,7 +211,7 @@ function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
       existingIds[moment.id] = true
       result.migrated += 1
 
-      buildAssets(light, nowIso).forEach((asset) => {
+      buildAssets(light, nowIso, owner).forEach((asset) => {
         if (!existingAssetIds[asset.id]) {
           nextAssets.push(asset)
           existingAssetIds[asset.id] = true
@@ -179,7 +219,10 @@ function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
       })
 
       if (light.source === 'nearby') {
-        const tx = createLegacyReceivedTransmission(light.id, originalNearbyId(light), { now: () => nowIso })
+        const tx = createLegacyReceivedTransmission(light.id, originalNearbyId(light), {
+          now: () => nowIso,
+          ownerId: owner,
+        })
         if (!existingTxIds[tx.id]) {
           nextTx.push(tx)
           existingTxIds[tx.id] = true
@@ -191,12 +234,12 @@ function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
           id: `tx:legacy:passed:${light.id}`,
           sourceMomentId: light.id,
           sourceRevision: 1,
-          senderId: LOCAL_OWNER_ID,
+          senderId: owner,
           status: 'sent',
           sentAt: nowIso,
           legacy: true,
           legacySource: 'migrated-isPassed',
-          message: 'migrated from isPassed; not a real recipient loop',
+          message: 'migrated from isPassed; local share intent only, not proof of delivery',
         }, { now: () => nowIso })
         if (!existingTxIds[tx.id]) {
           nextTx.push(tx)
@@ -204,18 +247,30 @@ function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
         }
       }
     } catch (error) {
-      quarantine.push({ reason: 'exception', id: light.id, message: error.message })
+      discovered.push({
+        raw: light,
+        index,
+        errors: [{ code: 'MOMENT_INVALID_ORIGIN', message: error.message }],
+        reason: 'exception',
+      })
       result.quarantined += 1
       warn(logger, 'light migration exception', { id: light.id, message: error.message })
     }
   })
 
+  const stamp = nowIso
+  const incoming = discovered.map((item) => toQuarantineEntry('legacy-light', item, stamp))
+  const existingQuarantine = Array.isArray(storage.get(KEYS.quarantine, []))
+    ? storage.get(KEYS.quarantine, [])
+    : []
+  storage.set(KEYS.quarantine, mergeQuarantine(existingQuarantine, incoming, stamp))
+
   storage.set(KEYS.moments, nextMoments)
   storage.set(KEYS.assets, nextAssets)
   storage.set(KEYS.transmissions, nextTx)
-  storage.set(KEYS.quarantine, quarantine)
   storage.set(KEYS.migration, {
     version: 1,
+    sourceFingerprint: fingerprint,
     completedAt: nowIso,
     migrated: result.migrated,
     skipped: result.skipped,
@@ -229,4 +284,6 @@ function migrateLightsToMomentsV1({ storage, now, ownerId, logger }) {
 module.exports = {
   migrateLightsToMomentsV1,
   buildMigratedMoment,
+  sourceFingerprint,
+  stableStringify,
 }

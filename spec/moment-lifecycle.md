@@ -46,3 +46,13 @@ Asset 有自己的 `storage.status`：`local | pending | ready | failed | missin
 ## 删除为什么不是普通状态
 
 回收站是可逆隔离。永久删除破坏身份稳定性，影响 Transmission 引用和迁移幂等，因此只作为 repository 操作，不进入状态机。
+
+## 递灯
+
+`passMoment(momentId, storage, actorId)` 必须精确指定 Moment：
+
+1. `momentId` 必填。
+2. 找不到目标明确失败，不得回退到列表第一条。
+3. 只有当前 actor 的 `active` Moment 可以递灯。
+4. 本地幂等 id：`tx:local:pass:{momentId}:{revision}`。同 id 保存更新同一项。
+5. Transmission 的 `sent` 只表示本地分享意图，不是真实送达证明。当前没有网络接收闭环。

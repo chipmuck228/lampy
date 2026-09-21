@@ -7,6 +7,7 @@ const {
 } = require('../domain/moment/index.js')
 const { createAsset } = require('../domain/asset/index.js')
 const { createLocalPassTransmission } = require('../domain/transmission/index.js')
+const { ERROR_CODES, fail } = require('../domain/moment/moment.errors.js')
 const { KEYS } = require('../repositories/keys.js')
 const { getRuntime } = require('./runtime.js')
 
@@ -132,18 +133,39 @@ function submitRecord(form, storage) {
   return moment
 }
 
-function passLatestMoment(momentId, storage) {
+/**
+ * 为指定 Moment 记录本地分享意图。不是真实送达。
+ * 同 momentId+revision 重复调用只更新同一条 Transmission。
+ */
+function passMoment(momentId, storage, actorId) {
+  if (!momentId || typeof momentId !== 'string') {
+    fail(ERROR_CODES.MOMENT_INVALID_ID, 'momentId is required')
+  }
   const runtime = getRuntime(storage)
-  const moment = runtime.moments.getById(momentId) || runtime.moments.list()[0]
-  if (!moment) return null
+  const moment = runtime.moments.getById(momentId)
+  if (!moment) {
+    fail(ERROR_CODES.MOMENT_INVALID_ID, 'moment not found')
+  }
+  const actor = actorId || LOCAL_OWNER_ID
+  if (moment.ownerId !== actor) {
+    fail(ERROR_CODES.MOMENT_FORBIDDEN, 'only the owner can pass this moment')
+  }
+  if (moment.lifecycle.status !== 'active') {
+    fail(ERROR_CODES.MOMENT_INVALID_TRANSITION, 'only an active moment can be passed')
+  }
   const transmission = createLocalPassTransmission(moment, { now: () => new Date() })
   runtime.transmissions.save(transmission)
   return transmission
+}
+
+function passLatestMoment(momentId, storage, actorId) {
+  return passMoment(momentId, storage, actorId)
 }
 
 module.exports = {
   saveDraftFromForm,
   loadDraftForm,
   submitRecord,
+  passMoment,
   passLatestMoment,
 }

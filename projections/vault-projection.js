@@ -1,16 +1,49 @@
 const { hash01 } = require('../domain/shared/hash')
+const { parseMillis } = require('../domain/shared/time')
+const { ERROR_CODES } = require('../domain/moment/moment.errors')
+const { isSameCalendarDay, isSameCalendarMonth, isSameCalendarYear } = require('../domain/shared/calendar')
 const { visualDecay, momentOccurredMillis } = require('./visual-decay')
 
-function projectMomentsToVault(moments, view, now) {
+const VIEWS = ['day', 'month', 'year']
+
+/**
+ * 展示时间：优先 occurredAt；未知时回退 recordedAt，不伪造发生日。
+ */
+function displayMillis(moment) {
+  const occurred = parseMillis(moment.time && moment.time.occurredAt)
+  if (occurred !== null) return occurred
+  return parseMillis(moment.time && moment.time.recordedAt)
+}
+
+/**
+ * @param {object[]} moments
+ * @param {'day'|'month'|'year'} view
+ * @param {number} now
+ * @param {{ timezoneOffsetMinutes?: number }} [options]
+ * 默认 timezoneOffsetMinutes = 0（UTC），测试必须显式注入。
+ */
+function projectMomentsToVault(moments, view, now, options) {
+  if (VIEWS.indexOf(view) === -1) {
+    const error = new Error('invalid vault view')
+    error.code = ERROR_CODES.VAULT_INVALID_VIEW
+    throw error
+  }
+
+  const timezoneOffsetMinutes = options && Number.isFinite(options.timezoneOffsetMinutes)
+    ? options.timezoneOffsetMinutes
+    : 0
+
   const active = (moments || []).filter((item) => item && item.lifecycle && item.lifecycle.status === 'active')
   const withDays = active
     .map((moment) => {
       const visual = visualDecay(moment, now)
+      const createdAt = displayMillis(moment)
       return {
         moment,
         daysAgo: Math.floor(visual.daysAgo),
         visual,
-        createdAt: momentOccurredMillis(moment),
+        createdAt: createdAt === null ? momentOccurredMillis(moment) : createdAt,
+        usedRecordedAtFallback: !(moment.time && moment.time.occurredAt),
       }
     })
     .sort((a, b) => a.daysAgo - b.daysAgo)
@@ -19,13 +52,14 @@ function projectMomentsToVault(moments, view, now) {
   let caption = ''
 
   if (view === 'day') {
-    rows = withDays.filter((item) => item.daysAgo === 0)
+    rows = withDays.filter((item) => isSameCalendarDay(item.createdAt, now, timezoneOffsetMinutes))
     caption = `今天，你点亮了 ${rows.length} 个瞬间`
   } else if (view === 'month') {
-    rows = withDays.filter((item) => item.daysAgo <= 30)
+    rows = withDays.filter((item) => isSameCalendarMonth(item.createdAt, now, timezoneOffsetMinutes))
     caption = `这个月，你点亮了 ${rows.length} 个瞬间`
   } else {
-    caption = `这一年，你点亮了 ${withDays.length} 个瞬间`
+    rows = withDays.filter((item) => isSameCalendarYear(item.createdAt, now, timezoneOffsetMinutes))
+    caption = `这一年，你点亮了 ${rows.length} 个瞬间`
   }
 
   const arrangedLights = rows.map((item, index) => {
@@ -47,6 +81,7 @@ function projectMomentsToVault(moments, view, now) {
       emotion: item.moment.content && item.moment.content.emotion || '',
       createdAt: item.createdAt,
       daysAgo: item.daysAgo,
+      usedRecordedAtFallback: item.usedRecordedAtFallback,
       x,
       y,
       size: item.visual.size,
@@ -62,9 +97,11 @@ function projectMomentsToVault(moments, view, now) {
     arrangedLights,
     caption,
     count: active.length,
+    timezoneOffsetMinutes,
   }
 }
 
 module.exports = {
   projectMomentsToVault,
+  displayMillis,
 }

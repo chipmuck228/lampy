@@ -21,8 +21,21 @@
 | `position` 不进入新模型 | `test/migration.test.js` |
 | `isPassed` 不进入 Moment | `test/migration.test.js` |
 | projection 确定性 | `test/projection.test.js` |
-| 光罐日/月/年筛选 | `test/projection.test.js` |
+| 光罐日/月/年筛选 | `test/projection.test.js` / `test/calendar-boundary.test.js` |
+| 自然日/月/年与时区边界 | `test/calendar-boundary.test.js` |
 | repository 保存后可再读 | `test/repository.test.js` |
+| 非法记录保存后仍在主存储 | `test/repository-data-preservation.test.js` |
+| 非法记录不出现在 list | `test/repository-data-preservation.test.js` |
+| quarantine 幂等 | `test/repository-data-preservation.test.js` |
+| 删除合法记录不影响非法邻居 | `test/repository-data-preservation.test.js` |
+| replaceAll 非法输入整体拒绝 | `test/repository-data-preservation.test.js` |
+| Asset / Transmission 相同保全 | `test/repository-data-preservation.test.js` |
+| 迁移 alreadyDone 与增量 lights | `test/migration-idempotency.test.js` |
+| 自定义 ownerId 一致 | `test/migration-idempotency.test.js` |
+| 精确 momentId 递灯 | `test/pass-moment.test.js` |
+| 错误 id 不回退第一条 | `test/pass-moment.test.js` |
+| 输入引用隔离 | `test/domain-reference-isolation.test.js` |
+| Validator 完整契约 | `test/validator-contract.test.js` |
 
 ## 未在 Node 中运行的页面回归
 

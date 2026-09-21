@@ -91,22 +91,22 @@ function createDraftMoment(input, dependencies) {
     revision: 1,
     ownerId,
     content: {
-      note: input && input.content && input.content.note || '',
-      significance: input && input.content && input.content.significance || '',
-      emotion: input && input.content && input.content.emotion || '',
+      note: input && input.content && typeof input.content.note === 'string' ? input.content.note : '',
+      significance: input && input.content && typeof input.content.significance === 'string' ? input.content.significance : '',
+      emotion: input && input.content && typeof input.content.emotion === 'string' ? input.content.emotion : '',
     },
     time: {
       occurredAt: occurredAt || undefined,
       occurredAtPrecision: precision,
-      timezone: timeInput.timezone,
+      timezone: typeof timeInput.timezone === 'string' ? timeInput.timezone : undefined,
       recordedAt,
       importedAt: importedAt || undefined,
     },
     assetIds: Array.isArray(input && input.assetIds) ? input.assetIds.slice() : [],
     context: {
-      people: (input && input.context && input.context.people) || [],
-      place: input && input.context && input.context.place,
-      tags: (input && input.context && input.context.tags) || [],
+      people: input && input.context && Array.isArray(input.context.people) ? clone(input.context.people) : [],
+      place: input && input.context && input.context.place ? clone(input.context.place) : undefined,
+      tags: input && input.context && Array.isArray(input.context.tags) ? input.context.tags.slice() : [],
     },
     origin: buildOrigin(input),
     accessSummary: {
@@ -164,7 +164,7 @@ function updateMomentContent(moment, patch, actorId, now) {
   if (patch && patch.context) {
     if (Array.isArray(patch.context.people)) next.context.people = clone(patch.context.people)
     if (Array.isArray(patch.context.tags)) next.context.tags = clone(patch.context.tags)
-    if (patch.context.place !== undefined) next.context.place = patch.context.place
+    if (patch.context.place !== undefined) next.context.place = patch.context.place ? clone(patch.context.place) : undefined
   }
   return bump(next, toIso(now) || isoNow(() => new Date()))
 }

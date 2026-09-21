@@ -1,7 +1,7 @@
 /**
  * 记录页：写下今天的瞬间，点亮一盏微光。
  */
-const { loadDraftForm, saveDraftFromForm, submitRecord, passLatestMoment } = require('../../services/record-service.js')
+const { loadDraftForm, saveDraftFromForm, submitRecord, passMoment } = require('../../services/record-service.js')
 
 function glowFromText(text) {
   const length = (text || '').length
@@ -179,7 +179,12 @@ Page({
   },
 
   onPassConfirm() {
-    passLatestMoment(this._submittedMomentId)
+    try {
+      passMoment(this._submittedMomentId)
+    } catch (error) {
+      console.error('[lampy] pass moment failed', error)
+      return
+    }
     wx.showShareMenu({
       withShareTicket: false,
       menus: ['shareAppMessage'],

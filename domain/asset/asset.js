@@ -1,5 +1,6 @@
 const { toIso } = require('../shared/time')
 const { LOCAL_OWNER_ID } = require('../shared/identity')
+const { clone } = require('../shared/clone')
 const { validateAsset } = require('./asset.validator')
 const { fail, ERROR_CODES } = require('../moment/moment.errors')
 
@@ -15,22 +16,23 @@ function createAsset(input, dependencies) {
   if (!input || !input.id || !input.type) {
     fail(ERROR_CODES.ASSET_NOT_FOUND, 'asset id and type are required')
   }
+  const storageInput = input.storage && typeof input.storage === 'object' ? input.storage : {}
   const asset = {
     id: String(input.id),
     ownerId,
     type: input.type,
     captureTime: toIso(input.captureTime) || undefined,
     captureTimeSource: input.captureTimeSource,
-    localUri: input.localUri || '',
+    localUri: typeof input.localUri === 'string' ? input.localUri : '',
     storage: {
-      status: (input.storage && input.storage.status) || 'local',
-      originalKey: input.storage && input.storage.originalKey,
-      previewKey: input.storage && input.storage.previewKey,
-      thumbnailKey: input.storage && input.storage.thumbnailKey,
+      status: storageInput.status || 'local',
+      originalKey: storageInput.originalKey,
+      previewKey: storageInput.previewKey,
+      thumbnailKey: storageInput.thumbnailKey,
     },
-    metadata: input.metadata || {},
-    integrity: input.integrity || {},
-    userCaption: input.userCaption || '',
+    metadata: clone(input.metadata || {}),
+    integrity: clone(input.integrity || {}),
+    userCaption: typeof input.userCaption === 'string' ? input.userCaption : '',
     audit: {
       createdAt: nowIso,
       updatedAt: nowIso,

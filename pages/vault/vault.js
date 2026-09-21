@@ -3,6 +3,7 @@
  */
 const { listActiveMoments } = require('../../services/catalog.js')
 const { projectMomentsToVault } = require('../../projections/vault-projection.js')
+const { deviceTimezoneOffsetMinutes } = require('../../domain/shared/calendar.js')
 
 Page({
   data: {
@@ -30,7 +31,12 @@ Page({
   },
 
   arrangeLights() {
-    const projected = projectMomentsToVault(this.data.lights, this.data.currentView, Date.now())
+    const projected = projectMomentsToVault(
+      this.data.lights,
+      this.data.currentView,
+      Date.now(),
+      { timezoneOffsetMinutes: deviceTimezoneOffsetMinutes() }
+    )
     this.setData({
       arrangedLights: projected.arrangedLights,
       caption: projected.caption,
