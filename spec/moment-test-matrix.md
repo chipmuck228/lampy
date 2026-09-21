@@ -43,8 +43,8 @@
 | 详情读取不改写 Moment / Asset | `test/moment-detail-service.test.js` |
 | 详情 URL 编码 | `test/moment-detail-service.test.js` |
 | 非法 query 编码不抛错 | `test/moment-detail-service.test.js` |
-| 缺失 Asset 为 unknown 而非 image | `test/moment-detail-projection.test.js` |
-| 缺失 image/audio/video 保留类型与文案 | `test/moment-detail-projection.test.js` |
+| 缺失图片 / 录音 / 视频 / 无法识别类型 | `test/moment-detail-projection.test.js` |
+| play A → play B → 迟到 onStop A 仍播放 B | `test/audio-playback-controller.test.js` |
 | 切换录音时旧播放器 emit error/ended/stop | `test/audio-playback-controller.test.js` |
 | 播放失败只改页面会话状态 | `test/audio-playback-controller.test.js` |
 | 详情日期精度与时区 | `test/moment-detail-projection.test.js` |

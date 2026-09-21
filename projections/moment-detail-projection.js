@@ -10,11 +10,23 @@ const SOURCE_LABELS = {
   received: '收下的一盏微光',
 }
 
-function resolveAssetType(asset) {
+/**
+ * V1 兼容：迁移和记录页使用稳定 id `asset:{momentId}:{image|audio|video}`。
+ * Asset 丢失时只能看到 id，用后缀恢复类型。这不是长期身份方案。
+ */
+function inferTypeFromAssetId(assetId) {
+  if (typeof assetId !== 'string' || !assetId) return 'unknown'
+  const parts = assetId.split(':')
+  const suffix = parts[parts.length - 1]
+  if (suffix === 'image' || suffix === 'audio' || suffix === 'video') return suffix
+  return 'unknown'
+}
+
+function resolveAssetType(asset, assetId) {
   if (asset && (asset.type === 'image' || asset.type === 'audio' || asset.type === 'video')) {
     return asset.type
   }
-  return 'unknown'
+  return inferTypeFromAssetId(assetId)
 }
 
 function resolveAssetStatus(asset) {
@@ -31,11 +43,11 @@ function unavailableLabel(type) {
   if (type === 'image') return '这张照片暂时无法显示'
   if (type === 'audio') return '声音暂时无法播放'
   if (type === 'video') return '暂不支持播放'
-  return '这份记录暂时无法显示'
+  return '这份内容暂时无法打开'
 }
 
 function projectAsset(assetId, asset) {
-  const type = resolveAssetType(asset)
+  const type = resolveAssetType(asset, assetId)
   const status = resolveAssetStatus(asset)
   const metadata = (asset && asset.metadata) || {}
   const display = {}
@@ -138,4 +150,5 @@ module.exports = {
   projectMomentDetail,
   projectAsset,
   unavailableLabel,
+  inferTypeFromAssetId,
 }

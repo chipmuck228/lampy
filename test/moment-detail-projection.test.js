@@ -97,52 +97,49 @@ describe('moment detail projection', () => {
     assert.equal(view.assets[1].id, 'gone')
     assert.equal(view.assets[1].status, 'missing')
     assert.equal(view.assets[1].type, 'unknown')
-    assert.equal(view.assets[1].display.unavailableLabel, '这份记录暂时无法显示')
+    assert.equal(view.assets[1].display.unavailableLabel, '这份内容暂时无法打开')
     assert.equal(view.state.hasUnavailableAssets, true)
     assert.equal(view.content.note, '还有一张')
   })
 
-  it('keeps known types when an image, audio, or video asset is missing', () => {
-    const missingImage = makeAsset({
-      id: 'photo-gone',
+  it('does not treat a lost image id as available and keeps the image copy', () => {
+    const moment = makeActiveMoment({ id: 'lost-image', note: '照片丢了', assetIds: ['asset:m:image'] })
+    const view = projectMomentDetail(moment, [null], { timezoneOffsetMinutes: 0 })
+    assert.deepEqual(view.assets[0], {
+      id: 'asset:m:image',
       type: 'image',
-      localUri: '',
-      storage: { status: 'missing' },
+      status: 'missing',
+      display: { unavailableLabel: '这张照片暂时无法显示' },
     })
-    const missingAudio = makeAsset({
-      id: 'voice-gone',
-      type: 'audio',
-      localUri: '',
-      storage: { status: 'missing' },
-    })
-    const missingVideo = makeAsset({
-      id: 'clip-gone',
-      type: 'video',
-      localUri: '',
-      storage: { status: 'missing' },
-    })
-    const moment = makeActiveMoment({
-      id: 'typed-missing',
-      note: '类型仍在',
-      assetIds: ['photo-gone', 'voice-gone', 'clip-gone', 'never-existed'],
-    })
-    const view = projectMomentDetail(moment, [missingImage, missingAudio, missingVideo], {
-      timezoneOffsetMinutes: 0,
-    })
-    assert.equal(view.assets[0].type, 'image')
+  })
+
+  it('does not treat a lost audio id as a photo', () => {
+    const moment = makeActiveMoment({ id: 'lost-audio', note: '声音丢了', assetIds: ['asset:m:audio'] })
+    const view = projectMomentDetail(moment, [null], { timezoneOffsetMinutes: 0 })
+    assert.equal(view.assets[0].id, 'asset:m:audio')
+    assert.equal(view.assets[0].type, 'audio')
     assert.equal(view.assets[0].status, 'missing')
-    assert.equal(view.assets[0].display.unavailableLabel, '这张照片暂时无法显示')
-    assert.equal(view.assets[1].type, 'audio')
-    assert.equal(view.assets[1].status, 'missing')
-    assert.equal(view.assets[1].display.unavailableLabel, '声音暂时无法播放')
-    assert.equal(view.assets[2].type, 'video')
-    assert.equal(view.assets[2].status, 'missing')
-    assert.equal(view.assets[2].display.unavailableLabel, '暂不支持播放')
-    assert.equal(view.assets[3].type, 'unknown')
-    assert.equal(view.assets[3].status, 'missing')
-    assert.equal(view.assets[3].display.unavailableLabel, '这份记录暂时无法显示')
-    assert.equal(view.state.hasImages, false)
-    assert.equal(view.state.hasAudio, false)
+    assert.equal(view.assets[0].display.unavailableLabel, '声音暂时无法播放')
+    assert.notEqual(view.assets[0].type, 'image')
+    assert.notEqual(view.assets[0].display.unavailableLabel, '这张照片暂时无法显示')
+  })
+
+  it('does not treat a lost video id as a photo', () => {
+    const moment = makeActiveMoment({ id: 'lost-video', note: '影像丢了', assetIds: ['asset:m:video'] })
+    const view = projectMomentDetail(moment, [null], { timezoneOffsetMinutes: 0 })
+    assert.equal(view.assets[0].id, 'asset:m:video')
+    assert.equal(view.assets[0].type, 'video')
+    assert.equal(view.assets[0].status, 'missing')
+    assert.equal(view.assets[0].display.unavailableLabel, '暂不支持播放')
+  })
+
+  it('uses a neutral copy when a missing asset type cannot be recovered', () => {
+    const moment = makeActiveMoment({ id: 'lost-unknown', note: '无法识别', assetIds: ['legacy-blob'] })
+    const view = projectMomentDetail(moment, [], { timezoneOffsetMinutes: 0 })
+    assert.equal(view.assets[0].id, 'legacy-blob')
+    assert.equal(view.assets[0].type, 'unknown')
+    assert.equal(view.assets[0].status, 'missing')
+    assert.equal(view.assets[0].display.unavailableLabel, '这份内容暂时无法打开')
   })
 
   it('marks a failed asset as failed', () => {

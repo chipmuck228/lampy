@@ -42,6 +42,19 @@ function createController(extra) {
 }
 
 describe('audio playback controller', () => {
+  it('keeps B playing after play A, stop A, play B, onPlay B, then a late onStop A', () => {
+    const { controller, players } = createController()
+    controller.play('voice-a', 'wxfile://a.mp3')
+    players[0].stop()
+    controller.play('voice-b', 'wxfile://b.mp3')
+    players[1].emit('play')
+    players[0].emit('stop')
+    const state = controller.getState()
+    assert.equal(state.playingAssetId, 'voice-b')
+    assert.equal(state.status, 'playing')
+    assert.equal(state.isPlaying, true)
+  })
+
   it('keeps B playing when A later emits stop, ended, and error through its own player', () => {
     const { controller, players, failed } = createController()
 

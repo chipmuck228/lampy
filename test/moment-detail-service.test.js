@@ -43,6 +43,23 @@ describe('moment detail service', () => {
     })
   })
 
+  it('infers a lost audio asset from its stable V1 id instead of calling it a photo', () => {
+    const moment = makeActiveMoment({
+      id: 'm',
+      note: '只剩声音id',
+      assetIds: ['asset:m:audio'],
+    })
+    const storage = createMemoryStorage({
+      [KEYS.moments]: [moment],
+      [KEYS.assets]: [],
+    })
+    const view = getMomentDetail('m', storage, { timezoneOffsetMinutes: 0 })
+    assert.equal(view.assets[0].id, 'asset:m:audio')
+    assert.equal(view.assets[0].type, 'audio')
+    assert.equal(view.assets[0].status, 'missing')
+    assert.equal(view.assets[0].display.unavailableLabel, '声音暂时无法播放')
+  })
+
   it('resolves every assetId and keeps a missing neighbor', () => {
     const image = makeAsset({ id: 'photo-1', type: 'image' })
     const audio = makeAsset({ id: 'voice-1', type: 'audio', localUri: 'wxfile://tmp/a.mp3' })
@@ -61,7 +78,7 @@ describe('moment detail service', () => {
     assert.equal(view.assets[1].status, 'available')
     assert.equal(view.assets[2].status, 'missing')
     assert.equal(view.assets[2].type, 'unknown')
-    assert.equal(view.assets[2].display.unavailableLabel, '这份记录暂时无法显示')
+    assert.equal(view.assets[2].display.unavailableLabel, '这份内容暂时无法打开')
     assert.equal(view.content.note, '两份媒体')
   })
 

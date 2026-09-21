@@ -62,7 +62,8 @@
 
 | 情况 | 媒体状态 |
 |---|---|
-| Asset 不存在 | `missing`，`type: unknown`，文案「这份记录暂时无法显示」 |
+| Asset 不存在且 id 以 `:image` / `:audio` / `:video` 结尾 | V1 兼容：按后缀恢复类型，不默认成 image |
+| Asset 不存在且无法识别 | `missing`，`type: unknown`，文案「这份内容暂时无法打开」 |
 | 已知 image 不可用 | `missing`/`failed`，文案「这张照片暂时无法显示」 |
 | 已知 audio 不可用 | `missing`/`failed`，文案「声音暂时无法播放」 |
 | 已知 video 不可用或暂不支持 | 文案「暂不支持播放」 |
