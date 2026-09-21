@@ -134,8 +134,9 @@ function createAudioPlaybackController(options) {
   }
 
   function release() {
-    if (current && current.player) destroyPlayer(current.player)
+    const session = current
     current = null
+    if (session && session.player) destroyPlayer(session.player)
     return publish(idleAudioState())
   }
 

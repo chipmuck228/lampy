@@ -10,6 +10,8 @@ function createFakePlayer() {
   return {
     src: '',
     destroyed: false,
+    stopCalls: 0,
+    destroyCalls: 0,
     onPlay(fn) { handlers.play = fn },
     onPause(fn) { handlers.pause = fn },
     onStop(fn) { handlers.stop = fn },
@@ -17,10 +19,14 @@ function createFakePlayer() {
     onError(fn) { handlers.error = fn },
     play() {},
     stop() {
+      this.stopCalls += 1
       if (handlers.stop) handlers.stop()
     },
     pause() {},
-    destroy() { this.destroyed = true },
+    destroy() {
+      this.destroyCalls += 1
+      this.destroyed = true
+    },
     emit(type, payload) {
       if (handlers[type]) handlers[type](payload)
     },
@@ -96,31 +102,38 @@ describe('audio playback controller', () => {
     const ended = createController()
     ended.controller.play('voice-a', 'wxfile://a.mp3')
     ended.players[0].emit('ended')
-    assert.equal(ended.players[0].destroyed, true)
+    assert.equal(ended.players[0].stopCalls, 1)
+    assert.equal(ended.players[0].destroyCalls, 1)
     assert.equal(ended.controller.getSession(), null)
     ended.controller.release()
-    assert.equal(ended.players[0].destroyed, true)
+    assert.equal(ended.players[0].stopCalls, 1)
+    assert.equal(ended.players[0].destroyCalls, 1)
 
     const errored = createController()
     errored.controller.play('voice-a', 'wxfile://a.mp3')
     errored.players[0].emit('error', { errMsg: 'fail' })
-    assert.equal(errored.players[0].destroyed, true)
+    assert.equal(errored.players[0].stopCalls, 1)
+    assert.equal(errored.players[0].destroyCalls, 1)
     assert.equal(errored.controller.getSession(), null)
     errored.controller.release()
-    assert.equal(errored.players[0].destroyed, true)
+    assert.equal(errored.players[0].stopCalls, 1)
+    assert.equal(errored.players[0].destroyCalls, 1)
 
     const stopped = createController()
     stopped.controller.play('voice-a', 'wxfile://a.mp3')
     stopped.controller.stopCurrent()
-    assert.equal(stopped.players[0].destroyed, true)
+    assert.equal(stopped.players[0].stopCalls, 1)
+    assert.equal(stopped.players[0].destroyCalls, 1)
     assert.equal(stopped.controller.getSession(), null)
     stopped.controller.release()
-    assert.equal(stopped.players[0].destroyed, true)
+    assert.equal(stopped.players[0].stopCalls, 1)
+    assert.equal(stopped.players[0].destroyCalls, 1)
 
     const released = createController()
     released.controller.play('voice-a', 'wxfile://a.mp3')
     released.controller.release()
-    assert.equal(released.players[0].destroyed, true)
+    assert.equal(released.players[0].stopCalls, 1)
+    assert.equal(released.players[0].destroyCalls, 1)
     assert.equal(released.controller.getSession(), null)
   })
 
