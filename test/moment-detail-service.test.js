@@ -5,7 +5,7 @@ const { createMomentRepository } = require('../repositories/moment-repository.js
 const { createAssetRepository } = require('../repositories/asset-repository.js')
 const { KEYS } = require('../repositories/keys.js')
 const { ERROR_CODES } = require('../domain/moment/moment.errors.js')
-const { getMomentDetail, buildMomentDetailUrl } = require('../services/moment-detail-service.js')
+const { getMomentDetail, buildMomentDetailUrl, decodeMomentQueryId } = require('../services/moment-detail-service.js')
 const { idleAudioState, applyAudioIntent } = require('../services/audio-player-state.js')
 const { resetRuntime } = require('../services/runtime.js')
 const { makeActiveMoment, makeAsset } = require('./helpers.js')
@@ -127,6 +127,14 @@ describe('moment detail url', () => {
   it('rejects an empty id', () => {
     assert.throws(() => buildMomentDetailUrl(''), (error) => error.code === ERROR_CODES.MOMENT_INVALID_ID)
     assert.throws(() => buildMomentDetailUrl(null), (error) => error.code === ERROR_CODES.MOMENT_INVALID_ID)
+  })
+
+  it('returns empty for illegal percent-encoding instead of throwing', () => {
+    assert.equal(decodeMomentQueryId('light-1'), 'light-1')
+    assert.equal(decodeMomentQueryId('%E4%B8%80'), '一')
+    assert.equal(decodeMomentQueryId('%'), '')
+    assert.equal(decodeMomentQueryId('%E0%A4%A'), '')
+    assert.equal(decodeMomentQueryId(undefined), '')
   })
 })
 

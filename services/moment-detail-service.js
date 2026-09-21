@@ -5,6 +5,16 @@ const { ERROR_CODES, fail } = require('../domain/moment/moment.errors.js')
 const { projectMomentDetail } = require('../projections/moment-detail-projection.js')
 const { createRuntime, getRuntime } = require('./runtime.js')
 
+function decodeMomentQueryId(rawId) {
+  if (rawId == null || rawId === '') return ''
+  if (typeof rawId !== 'string') return ''
+  try {
+    return decodeURIComponent(rawId)
+  } catch (error) {
+    return ''
+  }
+}
+
 function buildMomentDetailUrl(momentId) {
   if (!momentId || typeof momentId !== 'string') {
     fail(ERROR_CODES.MOMENT_INVALID_ID, 'momentId is required')
@@ -33,4 +43,5 @@ function getMomentDetail(momentId, storage, options) {
 module.exports = {
   getMomentDetail,
   buildMomentDetailUrl,
+  decodeMomentQueryId,
 }

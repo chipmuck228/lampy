@@ -42,6 +42,9 @@
 | 详情 Asset 精确解析与缺失降级 | `test/moment-detail-service.test.js` |
 | 详情读取不改写 Moment / Asset | `test/moment-detail-service.test.js` |
 | 详情 URL 编码 | `test/moment-detail-service.test.js` |
+| 非法 query 编码不抛错 | `test/moment-detail-service.test.js` |
+| 切换录音忽略过期 onStop | `test/audio-playback-controller.test.js` |
+| 播放失败只改页面会话状态 | `test/audio-playback-controller.test.js` |
 | 详情日期精度与时区 | `test/moment-detail-projection.test.js` |
 | 详情来源文案与媒体状态 | `test/moment-detail-projection.test.js` |
 | 详情输入不变性 | `test/moment-detail-projection.test.js` |

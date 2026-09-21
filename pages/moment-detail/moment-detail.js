@@ -1,8 +1,12 @@
 /**
  * Moment 只读详情：重新看见一条已经点亮的光。
  */
-const { getMomentDetail } = require('../../services/moment-detail-service.js')
-const { idleAudioState, applyAudioIntent } = require('../../services/audio-player-state.js')
+const { getMomentDetail, decodeMomentQueryId } = require('../../services/moment-detail-service.js')
+const { idleAudioState } = require('../../services/audio-player-state.js')
+const {
+  createAudioPlaybackController,
+  markAssetPlaybackFailed,
+} = require('../../services/audio-playback-controller.js')
 const { ERROR_CODES } = require('../../domain/moment/moment.errors.js')
 const { deviceTimezoneOffsetMinutes } = require('../../domain/shared/calendar.js')
 
@@ -23,8 +27,12 @@ Page({
         ? windowInfo.screenHeight - windowInfo.safeArea.bottom + 24
         : 40,
     })
-    const rawId = query && query.id
-    const momentId = rawId ? decodeURIComponent(rawId) : ''
+    this._playback = createAudioPlaybackController({
+      onState: (audio) => this.setData({ audio }),
+      onPlaybackFailed: (assetId) => this.markAudioFailed(assetId),
+      onPlayerError: (error) => console.error('[lampy] audio playback failed', error),
+    })
+    const momentId = decodeMomentQueryId(query && query.id)
     if (!momentId) {
       this.setData({ status: 'not-found' })
       return
@@ -33,11 +41,12 @@ Page({
   },
 
   onHide() {
-    this.stopAudio()
+    if (this._playback) this._playback.stopCurrent()
   },
 
   onUnload() {
-    this.releasePlayer()
+    if (this._playback) this._playback.release()
+    this._player = null
   },
 
   loadDetail(momentId) {
@@ -98,69 +107,38 @@ Page({
     })
   },
 
+  markAudioFailed(assetId) {
+    const detail = markAssetPlaybackFailed(this.data.detail, assetId)
+    if (detail) this.setData({ detail })
+  },
+
   ensurePlayer() {
     if (this._player) return this._player
     const player = wx.createInnerAudioContext()
-    player.onPlay(() => {
-      this.setData({ audio: applyAudioIntent(this.data.audio, { type: 'play', assetId: this._playingId }) })
-    })
-    player.onPause(() => {
-      this.setData({ audio: applyAudioIntent(this.data.audio, { type: 'pause' }) })
-    })
-    player.onEnded(() => {
-      this.setData({ audio: applyAudioIntent(this.data.audio, { type: 'ended' }) })
-    })
-    player.onStop(() => {
-      this.setData({ audio: applyAudioIntent(this.data.audio, { type: 'stop' }) })
-    })
-    player.onError((error) => {
-      console.error('[lampy] audio playback failed', error)
-      this.setData({ audio: applyAudioIntent(this.data.audio, { type: 'fail', assetId: this._playingId }) })
-    })
     this._player = player
+    if (this._playback) this._playback.bindPlayer(player)
     return player
   },
 
   onAudioTap(e) {
     const id = e.currentTarget.dataset.id
     const detail = this.data.detail
-    if (!detail) return
+    if (!detail || !this._playback) return
     const asset = (detail.assets || []).find((item) => item.id === id)
     if (!asset || asset.type !== 'audio' || asset.status !== 'available' || !asset.localUri) {
-      this.setData({ audio: applyAudioIntent(this.data.audio, { type: 'fail', assetId: id }) })
+      this.markAudioFailed(id)
       return
     }
+    this.ensurePlayer()
     const audio = this.data.audio
-    const player = this.ensurePlayer()
     if (audio.playingAssetId === id && audio.isPlaying) {
-      player.pause()
+      this._playback.pause()
       return
     }
     if (audio.playingAssetId === id && audio.status === 'paused') {
-      player.play()
+      this._playback.resume()
       return
     }
-    this._playingId = id
-    if (audio.playingAssetId && audio.playingAssetId !== id) {
-      try { player.stop() } catch (error) { /* keep switching */ }
-    }
-    player.src = asset.localUri
-    player.play()
-    this.setData({ audio: applyAudioIntent(audio, { type: 'play', assetId: id }) })
-  },
-
-  stopAudio() {
-    if (!this._player) return
-    try { this._player.stop() } catch (error) { /* already stopped */ }
-    this.setData({ audio: applyAudioIntent(this.data.audio, { type: 'stop' }) })
-  },
-
-  releasePlayer() {
-    if (!this._player) return
-    try { this._player.stop() } catch (error) { /* already stopped */ }
-    try { this._player.destroy() } catch (error) { /* already destroyed */ }
-    this._player = null
-    this._playingId = ''
-    this.setData({ audio: idleAudioState() })
+    this._playback.play(id, asset.localUri)
   },
 })
