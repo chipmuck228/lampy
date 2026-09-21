@@ -4,6 +4,7 @@
 const { listActiveMoments } = require('../../services/catalog.js')
 const { projectMomentsToVault } = require('../../projections/vault-projection.js')
 const { deviceTimezoneOffsetMinutes } = require('../../domain/shared/calendar.js')
+const { buildMomentDetailUrl } = require('../../services/moment-detail-service.js')
 
 Page({
   data: {
@@ -57,7 +58,16 @@ Page({
 
   onLightTap(e) {
     const id = e.currentTarget.dataset.id
-    const light = (this.data.arrangedLights || []).find((item) => item.id === id)
-    console.log('光罐点击光点：', light)
+    if (!id) {
+      console.error('[lampy] vault tap missing moment id')
+      return
+    }
+    try {
+      wx.navigateTo({
+        url: buildMomentDetailUrl(id),
+      })
+    } catch (error) {
+      console.error('[lampy] cannot open moment detail', error)
+    }
   },
 })

@@ -4,6 +4,7 @@
 const { motion } = require('../../utils/constants')
 const { formatHomeDate } = require('../../utils/date')
 const { hasIncomingLight } = require('../../utils/storage')
+const { buildMomentDetailUrl } = require('../../services/moment-detail-service.js')
 
 const SPLASH_KEY = 'lampy_splash_shown'
 
@@ -135,11 +136,19 @@ Page({
   onSelectLight(e) {
     if (this.data.homeLocked) return
     const detail = e.detail || {}
-    if (detail.seed) {
-      console.log('[lampy] seed light')
+    if (detail.seed) return
+    const id = detail.light && detail.light.id
+    if (!id) {
+      console.error('[lampy] light tap missing moment id')
       return
     }
-    console.log('点击光点：', detail.light)
+    try {
+      wx.navigateTo({
+        url: buildMomentDetailUrl(id),
+      })
+    } catch (error) {
+      console.error('[lampy] cannot open moment detail', error)
+    }
   },
 
   onIncoming() {

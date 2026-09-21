@@ -1,0 +1,180 @@
+page {
+  background: #0B1026;
+  min-height: 100%;
+}
+
+.detail-page {
+  min-height: 100vh;
+  background: #0B1026;
+  padding-left: 56rpx;
+  padding-right: 56rpx;
+  box-sizing: border-box;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  padding-bottom: 12rpx;
+}
+
+.back-btn {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  color: #F5F1E8;
+  font-weight: 200;
+}
+
+.breathing-light {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  margin: 48rpx auto 56rpx;
+  background: radial-gradient(
+    circle at 50% 50%,
+    #FFE9A8 0%,
+    #FFD97D 40%,
+    rgba(255, 217, 125, 0.28) 70%,
+    rgba(255, 217, 125, 0) 100%
+  );
+  animation: breathe 5s ease-in-out infinite;
+}
+
+.breathing-light.is-dim {
+  opacity: 0.45;
+}
+
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 80rpx;
+}
+
+.state-text {
+  font-size: 32rpx;
+  color: #F5F1E8;
+  letter-spacing: 2rpx;
+  margin-top: 12rpx;
+}
+
+.state-action {
+  margin-top: 48rpx;
+  font-size: 26rpx;
+  color: #8A93B2;
+  letter-spacing: 4rpx;
+}
+
+.ready {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 80rpx;
+}
+
+.date-label {
+  display: block;
+  text-align: center;
+  font-size: 26rpx;
+  color: #8A93B2;
+  letter-spacing: 2rpx;
+}
+
+.source-label {
+  display: block;
+  text-align: center;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #8A93B2;
+  letter-spacing: 4rpx;
+}
+
+.note {
+  display: block;
+  margin-top: 64rpx;
+  font-size: 36rpx;
+  color: #F5F1E8;
+  line-height: 1.85;
+  letter-spacing: 2rpx;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.significance {
+  display: block;
+  margin-top: 28rpx;
+  font-size: 28rpx;
+  color: #8A93B2;
+  line-height: 1.7;
+  letter-spacing: 1rpx;
+  white-space: pre-wrap;
+}
+
+.asset-block {
+  margin-top: 48rpx;
+}
+
+.photo {
+  display: block;
+  width: 100%;
+  border-radius: 8rpx;
+  background: transparent;
+}
+
+.audio-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.audio-hint {
+  font-size: 26rpx;
+  color: #8A93B2;
+  letter-spacing: 2rpx;
+}
+
+.audio-duration {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8A93B2;
+}
+
+.audio-action {
+  margin-top: 20rpx;
+  font-size: 30rpx;
+  color: #FFD97D;
+  letter-spacing: 4rpx;
+}
+
+.asset-fallback {
+  display: block;
+  font-size: 26rpx;
+  color: #8A93B2;
+  letter-spacing: 2rpx;
+}
+
+.emotion {
+  display: block;
+  margin-top: 64rpx;
+  font-size: 26rpx;
+  color: #8A93B2;
+  letter-spacing: 6rpx;
+}
+
+.is-pressing {
+  opacity: 0.78;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.86;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}

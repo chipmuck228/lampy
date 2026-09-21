@@ -64,6 +64,9 @@ function createSafeRepository({ storage, collectionKey, quarantineKey, entityTyp
     list() {
       return listValid()
     },
+    collectionKind() {
+      return inspectCollection(storage, collectionKey).kind
+    },
     save(entity) {
       const result = validate(entity)
       if (!result.ok) {

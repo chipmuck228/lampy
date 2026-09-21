@@ -3,7 +3,8 @@
     "pages/index/index",
     "pages/vault/vault",
     "pages/nearby/nearby",
-    "pages/record/record"
+    "pages/record/record",
+    "pages/moment-detail/moment-detail"
   ],
   "window": {
     "navigationBarTextStyle": "white",

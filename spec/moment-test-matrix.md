@@ -37,12 +37,21 @@
 | 错误 id 不回退第一条 | `test/pass-moment.test.js` |
 | 输入引用隔离 | `test/domain-reference-isolation.test.js` |
 | Validator 完整契约 | `test/validator-contract.test.js` |
+| 详情按精确 ID 读取 | `test/moment-detail-service.test.js` |
+| 详情不回退到第一条 | `test/moment-detail-service.test.js` |
+| 详情 Asset 精确解析与缺失降级 | `test/moment-detail-service.test.js` |
+| 详情读取不改写 Moment / Asset | `test/moment-detail-service.test.js` |
+| 详情 URL 编码 | `test/moment-detail-service.test.js` |
+| 详情日期精度与时区 | `test/moment-detail-projection.test.js` |
+| 详情来源文案与媒体状态 | `test/moment-detail-projection.test.js` |
+| 详情输入不变性 | `test/moment-detail-projection.test.js` |
 
 ## 未在 Node 中运行的页面回归
 
 微信 `Page` / `wx.*` 无法在普通 Node 中完整启动。以下只做代码接线，不宣称 E2E 通过：
 
 - 记录页点亮后回首页；
+- 首页 / 光罐进入 Moment 详情、图片预览、录音播放；
 - 光罐点击与视图切换手势；
 - 附近微光左滑与录音权限弹窗；
 - 启动层动画。

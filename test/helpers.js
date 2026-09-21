@@ -8,15 +8,24 @@ const OWNER = 'local-user'
 function makeActiveMoment(overrides) {
   const ownerId = (overrides && overrides.ownerId) || OWNER
   const now = (overrides && overrides.now) || NOW
+  const time = {
+    occurredAt: overrides && overrides.occurredAt === null
+      ? undefined
+      : (overrides && overrides.occurredAt) || now.toISOString(),
+    occurredAtPrecision: (overrides && overrides.occurredAtPrecision) || 'exact',
+    recordedAt: (overrides && overrides.recordedAt) || now.toISOString(),
+  }
   let moment = createDraftMoment({
     id: (overrides && overrides.id) || 'moment_ok',
     ownerId,
-    content: { note: (overrides && overrides.note) || '一份记录' },
-    time: {
-      occurredAt: (overrides && overrides.occurredAt) || now.toISOString(),
-      occurredAtPrecision: 'exact',
-      recordedAt: (overrides && overrides.recordedAt) || now.toISOString(),
+    content: {
+      note: overrides && overrides.note !== undefined ? overrides.note : '一份记录',
+      significance: (overrides && overrides.significance) || '',
+      emotion: (overrides && overrides.emotion) || '',
     },
+    time,
+    origin: overrides && overrides.origin,
+    assetIds: overrides && overrides.assetIds,
   }, { now: () => now })
   moment = activateMoment(moment, ownerId, now)
   if (overrides && overrides.status === 'archived') {
@@ -33,8 +42,12 @@ function makeAsset(overrides) {
     id: (overrides && overrides.id) || 'asset_ok',
     ownerId: (overrides && overrides.ownerId) || OWNER,
     type: (overrides && overrides.type) || 'image',
-    localUri: (overrides && overrides.localUri) || 'wxfile://tmp/a.jpg',
-    storage: { status: 'local' },
+    localUri: Object.prototype.hasOwnProperty.call(overrides || {}, 'localUri')
+      ? overrides.localUri
+      : 'wxfile://tmp/a.jpg',
+    storage: (overrides && overrides.storage) || { status: 'local' },
+    metadata: overrides && overrides.metadata,
+    userCaption: overrides && overrides.userCaption,
   }, { now: () => NOW })
 }
 
