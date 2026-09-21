@@ -92,6 +92,38 @@ describe('audio playback controller', () => {
     assert.equal(controller.getState().playingAssetId, 'voice-b')
   })
 
+  it('destroys the player on ended, error, stopCurrent, and release', () => {
+    const ended = createController()
+    ended.controller.play('voice-a', 'wxfile://a.mp3')
+    ended.players[0].emit('ended')
+    assert.equal(ended.players[0].destroyed, true)
+    assert.equal(ended.controller.getSession(), null)
+    ended.controller.release()
+    assert.equal(ended.players[0].destroyed, true)
+
+    const errored = createController()
+    errored.controller.play('voice-a', 'wxfile://a.mp3')
+    errored.players[0].emit('error', { errMsg: 'fail' })
+    assert.equal(errored.players[0].destroyed, true)
+    assert.equal(errored.controller.getSession(), null)
+    errored.controller.release()
+    assert.equal(errored.players[0].destroyed, true)
+
+    const stopped = createController()
+    stopped.controller.play('voice-a', 'wxfile://a.mp3')
+    stopped.controller.stopCurrent()
+    assert.equal(stopped.players[0].destroyed, true)
+    assert.equal(stopped.controller.getSession(), null)
+    stopped.controller.release()
+    assert.equal(stopped.players[0].destroyed, true)
+
+    const released = createController()
+    released.controller.play('voice-a', 'wxfile://a.mp3')
+    released.controller.release()
+    assert.equal(released.players[0].destroyed, true)
+    assert.equal(released.controller.getSession(), null)
+  })
+
   it('marks only the failed clip unavailable in page session state', () => {
     const { controller, players, failed } = createController()
     controller.play('voice-a', 'wxfile://a.mp3')

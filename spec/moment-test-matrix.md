@@ -45,6 +45,8 @@
 | 非法 query 编码不抛错 | `test/moment-detail-service.test.js` |
 | 缺失图片 / 录音 / 视频 / 无法识别类型 | `test/moment-detail-projection.test.js` |
 | play A → play B → 迟到 onStop A 仍播放 B | `test/audio-playback-controller.test.js` |
+| ended/error/stopCurrent/release 销毁播放器 | `test/audio-playback-controller.test.js` |
+| 记录提交使用统一 Clock | `test/record-clock.test.js` |
 | 切换录音时旧播放器 emit error/ended/stop | `test/audio-playback-controller.test.js` |
 | 播放失败只改页面会话状态 | `test/audio-playback-controller.test.js` |
 | 详情日期精度与时区 | `test/moment-detail-projection.test.js` |

@@ -78,7 +78,8 @@
 - 可用图片单击 `wx.previewImage()`，`urls` 为当前 Moment 全部可用图片。
 - 组件加载失败只改页面状态：`这张照片暂时无法显示`。
 - 每次播放创建独立 `InnerAudioContext`，监听器关闭在该 session；切换时销毁旧实例。
-- 旧实例迟到的 onStop / onEnded / onError 不得覆盖新播放。卸载时 stop + destroy。
+- ended / error / stopCurrent / release 都必须销毁当前实例，避免 session 清空后无法再 release。
+- 旧实例迟到的 onStop / onEnded / onError 不得覆盖新播放。
 - 播放失败只改本次页面会话中的 Asset 展示状态，不写回领域 Asset。
 - 非法 query 编码进入 not-found，不得让 decodeURIComponent 把页面打崩。
 - 不自动播放。文案：`听听当时的声音` / `播放` / `暂停` / `声音暂时无法播放`。

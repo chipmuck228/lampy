@@ -90,16 +90,23 @@ function createAudioPlaybackController(options) {
     if (event.type === 'play') return apply({ type: 'play', assetId: current.assetId })
     if (event.type === 'pause') return apply({ type: 'pause' })
     if (event.type === 'ended' || event.type === 'stop') {
-      current = null
-      return apply({ type: event.type })
+      return finishSession(event.type)
     }
     if (event.type === 'error') {
       const assetId = current.assetId
-      current = null
+      const next = finishSession('fail', assetId)
       if (opts.onPlaybackFailed) opts.onPlaybackFailed(assetId)
-      return apply({ type: 'fail', assetId })
+      return next
     }
     return state
+  }
+
+  function finishSession(type, assetId) {
+    const session = current
+    current = null
+    if (session && session.player) destroyPlayer(session.player)
+    if (type === 'fail') return apply({ type: 'fail', assetId: assetId || (session && session.assetId) })
+    return apply({ type })
   }
 
   function currentPlayer() {
@@ -123,12 +130,7 @@ function createAudioPlaybackController(options) {
   }
 
   function stopCurrent() {
-    const player = currentPlayer()
-    if (player) {
-      try { player.stop() } catch (error) { /* already stopped */ }
-    }
-    current = null
-    return apply({ type: 'stop' })
+    return finishSession('stop')
   }
 
   function release() {

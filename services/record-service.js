@@ -11,6 +11,14 @@ const { ERROR_CODES, fail } = require('../domain/moment/moment.errors.js')
 const { KEYS } = require('../repositories/keys.js')
 const { getRuntime } = require('./runtime.js')
 
+function resolveNow(clock) {
+  if (!clock) return new Date()
+  if (typeof clock.now === 'function') return clock.now()
+  if (typeof clock === 'function') return clock()
+  if (clock instanceof Date) return clock
+  return new Date()
+}
+
 function readDraft(storage) {
   return storage.get(KEYS.draftMoment, null)
 }
@@ -20,9 +28,14 @@ function writeDraft(storage, moment) {
   else storage.set(KEYS.draftMoment, moment)
 }
 
-function ensureDraft(input, runtime) {
+/**
+ * 使用调用方已经读取的同一个 now，不再自己取时间。
+ */
+function ensureDraft(input, runtime, now) {
   const existing = readDraft(runtime.storage)
   if (existing && existing.id) return existing
+  const instant = now || new Date()
+  const iso = instant.toISOString()
   const draft = createDraftMoment({
     ownerId: LOCAL_OWNER_ID,
     content: {
@@ -30,30 +43,31 @@ function ensureDraft(input, runtime) {
       emotion: input && input.emotion || '',
     },
     time: {
-      occurredAt: new Date().toISOString(),
+      occurredAt: iso,
       occurredAtPrecision: 'exact',
-      recordedAt: new Date().toISOString(),
+      recordedAt: iso,
     },
     origin: { type: 'created' },
-  })
+  }, { now: () => instant })
   writeDraft(runtime.storage, draft)
   return draft
 }
 
-function saveDraftFromForm(form, storage) {
+function saveDraftFromForm(form, storage, clock) {
   const runtime = getRuntime(storage)
   if (!form || (!form.text && !form.imagePath && !form.emotion && !form.voicePath)) {
     writeDraft(runtime.storage, null)
     runtime.storage.remove(KEYS.legacyDraft)
     return null
   }
-  let draft = ensureDraft(form, runtime)
+  const now = resolveNow(clock)
+  let draft = ensureDraft(form, runtime, now)
   draft = updateMomentContent(draft, {
     content: {
       note: form.text || '',
       emotion: form.emotion || '',
     },
-  }, LOCAL_OWNER_ID, new Date())
+  }, LOCAL_OWNER_ID, now)
   writeDraft(runtime.storage, draft)
   runtime.storage.set(KEYS.legacyDraft, {
     text: form.text || '',
@@ -87,10 +101,10 @@ function loadDraftForm(storage) {
   return null
 }
 
-function submitRecord(form, storage) {
+function submitRecord(form, storage, clock) {
   const runtime = getRuntime(storage)
-  const now = new Date()
-  let moment = ensureDraft(form, runtime)
+  const now = resolveNow(clock)
+  let moment = ensureDraft(form, runtime, now)
   moment = updateMomentContent(moment, {
     content: {
       note: (form.text || '').trim(),
@@ -137,7 +151,7 @@ function submitRecord(form, storage) {
  * 为指定 Moment 记录本地分享意图。不是真实送达。
  * 同 momentId+revision 重复调用只更新同一条 Transmission。
  */
-function passMoment(momentId, storage, actorId) {
+function passMoment(momentId, storage, actorId, clock) {
   if (!momentId || typeof momentId !== 'string') {
     fail(ERROR_CODES.MOMENT_INVALID_ID, 'momentId is required')
   }
@@ -153,13 +167,14 @@ function passMoment(momentId, storage, actorId) {
   if (moment.lifecycle.status !== 'active') {
     fail(ERROR_CODES.MOMENT_INVALID_TRANSITION, 'only an active moment can be passed')
   }
-  const transmission = createLocalPassTransmission(moment, { now: () => new Date() })
+  const now = resolveNow(clock)
+  const transmission = createLocalPassTransmission(moment, { now: () => now })
   runtime.transmissions.save(transmission)
   return transmission
 }
 
-function passLatestMoment(momentId, storage, actorId) {
-  return passMoment(momentId, storage, actorId)
+function passLatestMoment(momentId, storage, actorId, clock) {
+  return passMoment(momentId, storage, actorId, clock)
 }
 
 module.exports = {
@@ -168,4 +183,6 @@ module.exports = {
   submitRecord,
   passMoment,
   passLatestMoment,
+  ensureDraft,
+  resolveNow,
 }

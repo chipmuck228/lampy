@@ -21,7 +21,7 @@ describe('repository and page use cases', () => {
     const moment = submitRecord({
       text: '喝到一杯刚好的咖啡',
       emotion: '温暖',
-    }, storage)
+    }, storage, { now: () => new Date('2026-09-21T10:00:00.000Z') })
     assert.equal(moment.lifecycle.status, 'active')
     assert.equal(moment.origin.type, 'created')
     const listed = listActiveMoments(storage)
