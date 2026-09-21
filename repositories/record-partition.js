@@ -68,9 +68,22 @@ function mergeQuarantine(existing, incoming, nowIso) {
   return next
 }
 
+const MISSING_COLLECTION = { __lampyMissingCollection: true }
+
+function inspectCollection(storage, key) {
+  const raw = storage.get(key, MISSING_COLLECTION)
+  if (raw === MISSING_COLLECTION) {
+    return { kind: 'missing', raw: undefined }
+  }
+  if (Array.isArray(raw)) {
+    return { kind: 'array', raw: raw.slice() }
+  }
+  return { kind: 'corrupt', raw }
+}
+
 function readRawArray(storage, key) {
-  const raw = storage.get(key, [])
-  return Array.isArray(raw) ? raw.slice() : []
+  const inspected = inspectCollection(storage, key)
+  return inspected.kind === 'array' ? inspected.raw : []
 }
 
 module.exports = {
@@ -79,5 +92,6 @@ module.exports = {
   partitionRecords,
   toQuarantineEntry,
   mergeQuarantine,
+  inspectCollection,
   readRawArray,
 }

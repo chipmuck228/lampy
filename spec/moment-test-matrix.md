@@ -30,6 +30,7 @@
 | 删除合法记录不影响非法邻居 | `test/repository-data-preservation.test.js` |
 | replaceAll 非法输入整体拒绝 | `test/repository-data-preservation.test.js` |
 | Asset / Transmission 相同保全 | `test/repository-data-preservation.test.js` |
+| 顶层集合非数组不得覆盖 | `test/repository-data-preservation.test.js` |
 | 迁移 alreadyDone 与增量 lights | `test/migration-idempotency.test.js` |
 | 自定义 ownerId 一致 | `test/migration-idempotency.test.js` |
 | 精确 momentId 递灯 | `test/pass-moment.test.js` |

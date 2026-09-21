@@ -82,6 +82,7 @@ trashed -> active
 - `ASSET_INVALID`
 - `TRANSMISSION_INVALID`
 - `REPOSITORY_INVALID_RECORD`
+- `REPOSITORY_COLLECTION_NOT_ARRAY`：主集合已存在但不是数组，不得覆盖
 
 Validator 不得猜测或改写时间。
 

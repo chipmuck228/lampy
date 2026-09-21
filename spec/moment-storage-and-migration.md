@@ -32,6 +32,8 @@ Repository 不向页面暴露这些 key。
 - `remove(id)` 只删除明确匹配的 id。
 - 不得把“过滤后的合法数组”整表写回。
 - `replaceAll(records)`：任一条非法则整体拒绝，原存储不变。
+- 顶层集合已存在但不是数组：`list()` 返回空；`save` / `remove` / `replaceAll` 抛 `REPOSITORY_COLLECTION_NOT_ARRAY`，**不得覆盖原文**；整份原文进入 quarantine。
+- 集合 key 缺失时视为空数组，允许第一次写入。
 - quarantine 用稳定 fingerprint 去重：`entityType + 稳定序列化哈希`。相同原文只更新 `lastSeenAt`。
 - 内容变化会产生新 fingerprint，这是有意行为。
 

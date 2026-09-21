@@ -4,6 +4,7 @@ const {
   partitionRecords,
   toQuarantineEntry,
   mergeQuarantine,
+  inspectCollection,
   readRawArray,
 } = require('./record-partition.js')
 
@@ -20,8 +21,37 @@ function createSafeRepository({ storage, collectionKey, quarantineKey, entityTyp
     storage.set(quarantineKey, mergeQuarantine(existing, incoming, stamp))
   }
 
+  function quarantineCorruptCollection(raw) {
+    quarantineInvalid([{
+      raw,
+      index: -1,
+      errors: [{
+        code: ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY,
+        message: 'top-level collection is not an array',
+      }],
+      reason: ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY,
+    }])
+  }
+
+  function readArrayOrMissing() {
+    const inspected = inspectCollection(storage, collectionKey)
+    if (inspected.kind === 'corrupt') {
+      quarantineCorruptCollection(inspected.raw)
+      throw new DomainError(
+        ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY,
+        'top-level collection is not an array'
+      )
+    }
+    return inspected.kind === 'array' ? inspected.raw : []
+  }
+
   function listValid() {
-    const raw = readRawArray(storage, collectionKey)
+    const inspected = inspectCollection(storage, collectionKey)
+    if (inspected.kind === 'corrupt') {
+      quarantineCorruptCollection(inspected.raw)
+      return []
+    }
+    const raw = inspected.kind === 'array' ? inspected.raw : []
     const { valid, invalid } = partitionRecords(raw, validate)
     quarantineInvalid(invalid)
     return valid
@@ -42,7 +72,7 @@ function createSafeRepository({ storage, collectionKey, quarantineKey, entityTyp
           (result.errors[0] && result.errors[0].message) || 'invalid record'
         )
       }
-      const raw = readRawArray(storage, collectionKey)
+      const raw = readArrayOrMissing()
       const next = []
       const discovered = []
       raw.forEach((item, index) => {
@@ -67,7 +97,7 @@ function createSafeRepository({ storage, collectionKey, quarantineKey, entityTyp
       if (!id || typeof id !== 'string') {
         throw new DomainError(ERROR_CODES.REPOSITORY_INVALID_RECORD, 'remove requires a non-empty id')
       }
-      const raw = readRawArray(storage, collectionKey)
+      const raw = readArrayOrMissing()
       let removed = false
       const next = raw.filter((item) => {
         if (item && item.id === id) {
@@ -87,6 +117,7 @@ function createSafeRepository({ storage, collectionKey, quarantineKey, entityTyp
       if (invalid.length) {
         throw new DomainError(ERROR_CODES.REPOSITORY_INVALID_RECORD, 'replaceAll rejected invalid records')
       }
+      readArrayOrMissing()
       storage.set(collectionKey, valid.slice())
       return valid.slice()
     },

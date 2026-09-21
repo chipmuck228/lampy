@@ -97,6 +97,63 @@ describe('repository data preservation', () => {
     assert.throws(() => repo.replaceAll([valid, { id: 'bad' }]), (error) => error.code === ERROR_CODES.REPOSITORY_INVALID_RECORD)
   })
 
+  it('does not overwrite a non-array moment collection', () => {
+    const blob = { items: [{ id: 'hidden' }], note: 'not-an-array' }
+    const storage = createMemoryStorage({ [KEYS.moments]: blob })
+    const repo = createMomentRepository(storage)
+    assert.deepEqual(repo.list(), [])
+    assert.throws(
+      () => repo.save(makeActiveMoment({ id: 'new-moment' })),
+      (error) => error.code === ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY
+    )
+    assert.throws(
+      () => repo.remove('hidden'),
+      (error) => error.code === ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY
+    )
+    assert.throws(
+      () => repo.replaceAll([makeActiveMoment({ id: 'replacement' })]),
+      (error) => error.code === ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY
+    )
+    assert.deepEqual(storage.get(KEYS.moments), blob)
+    repo.list()
+    const quarantine = storage.get(KEYS.momentsQuarantine)
+    assert.equal(quarantine.length, 1)
+    assert.equal(quarantine[0].reason, ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY)
+    assert.deepEqual(quarantine[0].raw, blob)
+  })
+
+  it('does not overwrite a non-array asset collection', () => {
+    const blob = { type: 'object-store' }
+    const storage = createMemoryStorage({ [KEYS.assets]: blob })
+    const repo = createAssetRepository(storage)
+    assert.throws(
+      () => repo.save(makeAsset({ id: 'new-asset' })),
+      (error) => error.code === ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY
+    )
+    assert.deepEqual(storage.get(KEYS.assets), blob)
+    assert.equal(storage.get(KEYS.assetsQuarantine).length, 1)
+  })
+
+  it('does not overwrite a non-array transmission collection', () => {
+    const blob = 'not-an-array'
+    const storage = createMemoryStorage({ [KEYS.transmissions]: blob })
+    const repo = createTransmissionRepository(storage)
+    assert.throws(
+      () => repo.save(makeTransmission({ id: 'new-tx' })),
+      (error) => error.code === ERROR_CODES.REPOSITORY_COLLECTION_NOT_ARRAY
+    )
+    assert.equal(storage.get(KEYS.transmissions), blob)
+    assert.equal(storage.get(KEYS.transmissionsQuarantine).length, 1)
+  })
+
+  it('still writes when the collection key is missing', () => {
+    const storage = createMemoryStorage({})
+    const repo = createMomentRepository(storage)
+    const valid = makeActiveMoment({ id: 'first-write' })
+    repo.save(valid)
+    assert.equal(storage.get(KEYS.moments)[0].id, 'first-write')
+  })
+
   it('applies the same preservation rules to transmissions', () => {
     const broken = { id: 'broken-tx' }
     const storage = createMemoryStorage({ [KEYS.transmissions]: [broken] })
