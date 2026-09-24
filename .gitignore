@@ -3,3 +3,12 @@ project.private.config.json
 node_modules/
 miniprogram_npm/
 *.log
+apps/ios/.expo/
+apps/ios/dist/
+apps/ios/ios/
+apps/ios/android/
+*.mobileprovision
+*.p12
+*.p8
+.env
+.env.*
