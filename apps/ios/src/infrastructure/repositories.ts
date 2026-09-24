@@ -7,26 +7,46 @@ export type MomentRead =
   | { kind: 'missing' }
   | { kind: 'unreadable' };
 
+export type AssetReferenceLookup = 'referenced' | 'clear' | 'unknown';
+
 export interface MomentRepository {
   save(moment: MomentRecord): Promise<void>;
   findById(id: string): Promise<MomentRead>;
   listRecent(limit?: number): Promise<MomentRecord[]>;
+  lookupAssetReferences(assetId: string): Promise<AssetReferenceLookup>;
 }
 
 export interface DraftRepository {
   save(draft: MomentRecord): Promise<void>;
   loadActive(): Promise<MomentRecord | null>;
   clear(draftId: string): Promise<void>;
+  lookupAssetReferences(assetId: string): Promise<AssetReferenceLookup>;
 }
 
 export type AssetRead =
   | { kind: 'ready'; asset: AssetRecord }
   | { kind: 'missing' }
-  | { kind: 'unreadable' };
+  | { kind: 'unreadable'; type?: string };
 
 export interface AssetRepository {
   save(asset: AssetRecord): Promise<void>;
   findById(id: string): Promise<AssetRead>;
+}
+
+function lookupInRecords(
+  records: (MomentRecord | null)[],
+  assetId: string,
+): AssetReferenceLookup {
+  let unknown = false;
+  for (const record of records) {
+    if (!record) continue;
+    if (!validateMoment(record).ok) {
+      unknown = true;
+      continue;
+    }
+    if (record.assetIds.includes(assetId)) return 'referenced';
+  }
+  return unknown ? 'unknown' : 'clear';
 }
 
 export function createMemoryRepositories(): {
@@ -71,6 +91,9 @@ export function createMemoryRepositories(): {
           .slice(0, limit)
           .map((item) => structuredClone(item));
       },
+      async lookupAssetReferences(assetId) {
+        return lookupInRecords([...moments.values()], assetId);
+      },
     },
     drafts: {
       async save(draft) {
@@ -98,6 +121,9 @@ export function createMemoryRepositories(): {
           activeDraft = null;
         }
       },
+      async lookupAssetReferences(assetId) {
+        return lookupInRecords([activeDraft], assetId);
+      },
     },
     assets: {
       async save(asset) {
@@ -122,7 +148,7 @@ export function createMemoryRepositories(): {
         if (!found) return { kind: 'missing' };
         return validateAsset(found).ok
           ? { kind: 'ready', asset: structuredClone(found) }
-          : { kind: 'unreadable' };
+          : { kind: 'unreadable', type: typeof found.type === 'string' ? found.type : undefined };
       },
     },
   };

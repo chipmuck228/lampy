@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  AppState,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,8 +16,10 @@ import { useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
-import type { ImageView } from '../application/use-cases';
+import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
+import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/moment-audio';
 import { MomentImages } from '../screens/moment-images';
+import { useSoundPlayer } from '../screens/use-sound-player';
 
 export default function LeaveScreen() {
   const router = useRouter();
@@ -25,12 +28,34 @@ export default function LeaveScreen() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [images, setImages] = useState<ImageView[]>([]);
+  const [audio, setAudio] = useState<AudioView | null>(null);
+  const [unknownMedia, setUnknownMedia] = useState<UnknownMediaView[]>([]);
+  const [phase, setPhase] = useState<RecordPhase>('ready');
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [restored, setRestored] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'idle' | 'media' | 'save'>('idle');
+  const [busy, setBusy] = useState<'idle' | 'photo' | 'record' | 'audio' | 'save'>('idle');
   const draftIdRef = useRef<string | null>(null);
   const busyRef = useRef(false);
+  const phaseRef = useRef<RecordPhase>('ready');
   const persistChain = useRef(Promise.resolve());
+  const interruptRef = useRef<() => void>(() => {});
+  const sound = useSoundPlayer();
+
+  function setRecordPhase(next: RecordPhase) {
+    phaseRef.current = next;
+    setPhase(next);
+  }
+
+  function applyComposer(next: {
+    images: ImageView[];
+    audio: AudioView | null;
+    unknownMedia?: UnknownMediaView[];
+  }) {
+    setImages(next.images);
+    setAudio(next.audio);
+    setUnknownMedia(next.unknownMedia ?? []);
+  }
 
   function enqueue<T>(work: () => Promise<T>): Promise<T> {
     const run = persistChain.current.then(work);
@@ -50,8 +75,9 @@ export default function LeaveScreen() {
         draftIdRef.current = draft.draftId;
         setDraftId(draft.draftId);
         setNote(draft.note);
-        setImages(draft.images);
+        applyComposer(draft);
         setRestored(draft.isRestored);
+        setRecordPhase(draft.audio ? 'stopped' : 'ready');
       })
       .catch(() => {
         if (!cancelled) setMessage('草稿暂时读不出来，原来的内容没有被改写。');
@@ -60,6 +86,34 @@ export default function LeaveScreen() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    let cancelled = false;
+    const timer = setInterval(() => {
+      void getUseCases()
+        .then((app) => app.getRecordingElapsedMs())
+        .then((next) => {
+          if (!cancelled) setElapsedMs(next);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [phase]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') {
+        void sound.stop();
+        if (phaseRef.current === 'recording') {
+          interruptRef.current();
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [sound]);
 
   function persistNote(next: string) {
     setNote(next);
@@ -77,20 +131,20 @@ export default function LeaveScreen() {
     const id = draftIdRef.current;
     if (!id || busyRef.current) return;
     busyRef.current = true;
-    setBusy('media');
+    setBusy('photo');
     void enqueue(async () => {
       const app = await getUseCases();
       return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id);
     })
       .then((next) => {
-        setImages(next.images);
+        applyComposer(next);
         setMessage(null);
       })
       .catch(async (error) => {
         if (isApplicationError(error) && error.code === 'IMAGE_LIMIT') {
           const app = await getUseCases();
           const draft = await app.restoreOrCreateDraft();
-          setImages(draft.images);
+          applyComposer(draft);
           setMessage('每条最多三张照片');
           return;
         }
@@ -103,6 +157,154 @@ export default function LeaveScreen() {
       .finally(() => {
         busyRef.current = false;
         setBusy('idle');
+      });
+  }
+
+  function startRecording() {
+    const id = draftIdRef.current;
+    if (!id || busyRef.current) return;
+    busyRef.current = true;
+    setBusy('record');
+    setElapsedMs(0);
+    setRecordPhase('processing');
+    void sound.stop();
+    void enqueue(async () => {
+      const app = await getUseCases();
+      await app.beginDraftRecording(id);
+    })
+      .then(() => {
+        setRecordPhase('recording');
+        setMessage(null);
+      })
+      .catch((error) => {
+        busyRef.current = false;
+        setBusy('idle');
+        if (isApplicationError(error) && error.code === 'MIC_DENIED') {
+          setRecordPhase('ready');
+          setMessage(error.message);
+          return;
+        }
+        if (isApplicationError(error) && error.code === 'AUDIO_LIMIT') {
+          setRecordPhase(audio ? 'stopped' : 'ready');
+          setMessage('每条最多一段声音');
+          return;
+        }
+        setRecordPhase('failed');
+        setMessage('这次没有录下声音。已经写的字和照片还在。');
+      });
+  }
+
+  function stopRecording() {
+    const id = draftIdRef.current;
+    if (!id || phaseRef.current !== 'recording') return;
+    setRecordPhase('processing');
+    void enqueue(async () => {
+      const app = await getUseCases();
+      return app.finishDraftRecording(id);
+    })
+      .then((next) => {
+        applyComposer(next);
+        setRecordPhase(next.audio ? 'stopped' : 'failed');
+        setMessage(null);
+      })
+      .catch(() => {
+        setRecordPhase('failed');
+        setMessage('这次没有录下声音。已经写的字和照片还在，可以再试。');
+      })
+      .finally(() => {
+        busyRef.current = false;
+        setBusy('idle');
+      });
+  }
+
+  function interruptRecording() {
+    const id = draftIdRef.current;
+    if (!id || phaseRef.current !== 'recording') return;
+    setRecordPhase('processing');
+    void enqueue(async () => {
+      const app = await getUseCases();
+      return app.interruptDraftRecording(id);
+    })
+      .then((result) => {
+        applyComposer(result.composer);
+        setRecordPhase(result.composer.audio ? 'stopped' : 'ready');
+        if (!result.hadSession) return;
+        setMessage(
+          result.kept
+            ? '录音被打断。已经录下的声音还在草稿里。'
+            : '录音被打断。这一次没有留下声音，文字和照片还在。',
+        );
+      })
+      .catch(() => {
+        setRecordPhase('failed');
+        setMessage('录音被打断。已经写的字和照片还在。');
+      })
+      .finally(() => {
+        busyRef.current = false;
+        setBusy('idle');
+      });
+  }
+
+  useEffect(() => {
+    interruptRef.current = interruptRecording;
+  });
+
+  function removeAudio() {
+    const id = draftIdRef.current;
+    if (!id || busyRef.current) return;
+    busyRef.current = true;
+    setBusy('audio');
+    void sound.stop();
+    void enqueue(async () => {
+      const app = await getUseCases();
+      return app.removeDraftAudio(id);
+    })
+      .then((next) => {
+        applyComposer(next);
+        setRecordPhase('ready');
+        setMessage(null);
+      })
+      .catch(() => {
+        setMessage('这段声音还在草稿里，可以再试着移除。');
+      })
+      .finally(() => {
+        busyRef.current = false;
+        setBusy('idle');
+      });
+  }
+
+  function rerecord() {
+    const id = draftIdRef.current;
+    if (!id || busyRef.current) return;
+    busyRef.current = true;
+    setBusy('audio');
+    void sound.stop();
+    void enqueue(async () => {
+      const app = await getUseCases();
+      await app.beginDraftRecording(id, { replace: true });
+    })
+      .then(() => {
+        setElapsedMs(0);
+        setBusy('record');
+        setRecordPhase('recording');
+        setMessage(null);
+      })
+      .catch(async (error) => {
+        busyRef.current = false;
+        setBusy('idle');
+        try {
+          const app = await getUseCases();
+          const draft = await app.restoreOrCreateDraft();
+          applyComposer(draft);
+          setRecordPhase(draft.audio ? 'stopped' : 'ready');
+        } catch {
+          setRecordPhase(audio ? 'stopped' : 'failed');
+        }
+        if (isApplicationError(error) && error.code === 'MIC_DENIED') {
+          setMessage(error.message);
+          return;
+        }
+        setMessage('这次没有重新录上。原来的声音还在，可以再试。');
       });
   }
 
@@ -121,7 +323,7 @@ export default function LeaveScreen() {
     } catch (error) {
       setMessage(
         isApplicationError(error) && error.code === 'MOMENT_EMPTY'
-          ? '写一句或留下一张照片。已经写的草稿还在。'
+          ? '写一句、留下一张照片或一段声音。已经写的草稿还在。'
           : '这次没有留下。草稿还在，可以再试。',
       );
     } finally {
@@ -131,7 +333,8 @@ export default function LeaveScreen() {
   }
 
   const actionsLocked = !draftId || busy !== 'idle';
-  const saveLabel = busy === 'save' ? '正在留下…' : busy === 'media' ? '正在加入照片…' : '留下';
+  const saveLabel =
+    busy === 'save' ? '正在留下…' : busy === 'photo' ? '正在加入照片…' : busy === 'audio' || busy === 'record' ? '正在留下声音…' : '留下';
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="留下">
@@ -162,13 +365,32 @@ export default function LeaveScreen() {
             onChangeText={(value) => {
               void persistNote(value);
             }}
-            placeholder="写一句就可以，也可以只留下照片。"
+            placeholder="写一句就可以，也可以只留下照片或声音。"
             placeholderTextColor="#777168"
             multiline
             textAlignVertical="top"
             style={styles.input}
           />
           <MomentImages images={images} testIDPrefix="composer-image" />
+          <MomentUnknownMedia items={unknownMedia} testIDPrefix="composer-unknown" />
+          <DraftSoundBar
+            phase={phase}
+            elapsedMs={elapsedMs}
+            audio={audio}
+            playbackStatus={sound.failed ? 'unavailable' : sound.status}
+            currentTimeMs={sound.currentTimeMs}
+            disabled={actionsLocked}
+            onStart={startRecording}
+            onStop={stopRecording}
+            onPlay={() => {
+              if (audio?.uri) void sound.play(audio.uri);
+            }}
+            onPause={() => {
+              void sound.pause();
+            }}
+            onRerecord={rerecord}
+            onRemove={removeAudio}
+          />
           {message ? <Text style={styles.message}>{message}</Text> : null}
           <View style={styles.actions}>
             <Pressable

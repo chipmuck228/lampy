@@ -39,7 +39,8 @@ const emptyDraft = {
   draftId: 'moment_draft',
   note: '还可以写字',
   isRestored: true,
-  images: [],
+    images: [],
+  audio: null,
 };
 
 describe('leave image actions', () => {
@@ -114,7 +115,13 @@ describe('leave image actions', () => {
   });
 
   it('does not save while a photo pick is still in progress', async () => {
-    let finishPick: (value: { draftId: string; note: string; isRestored: boolean; images: [] }) => void =
+    let finishPick: (value: {
+      draftId: string;
+      note: string;
+      isRestored: boolean;
+      images: [];
+      audio: null;
+    }) => void =
       () => undefined;
     mockAddLibraryImages.mockImplementation(
       () =>
@@ -142,6 +149,7 @@ describe('leave image actions', () => {
       note: '还可以写字',
       isRestored: true,
       images: [],
+      audio: null,
     });
     await waitFor(() => {
       expect(view.getByText('留下')).toBeTruthy();

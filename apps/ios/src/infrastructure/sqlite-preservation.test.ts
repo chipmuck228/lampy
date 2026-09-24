@@ -214,4 +214,179 @@ describe('sqlite file preservation', () => {
       await db.close();
     });
   });
+
+  it('keeps persisted audio after closing the database file', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'voice.m4a');
+      await writeFile(source, Buffer.from('m4a-bytes'));
+      const media = createNodeMediaStore(mediaRoot);
+      const firstDb = await openPreparedNodeSqliteDatabase(file);
+      const first = createUseCases({
+        ...createSqliteRepositories(firstDb),
+        media,
+        clock: clockAt('2026-09-24T17:00:00.000Z'),
+        assetId: () => 'asset_voice_file',
+      });
+      const draft = await first.restoreOrCreateDraft();
+      await first.updateDraftNote(draft.draftId, '文件关掉还有声音');
+      await first.addRecordedAudio(draft.draftId, {
+        sourceUri: source,
+        durationMs: 2400,
+        mimeType: 'audio/mp4',
+      });
+      const saved = await first.saveTextMoment(draft.draftId);
+      await firstDb.close();
+
+      const secondDb = await openPreparedNodeSqliteDatabase(file);
+      const second = createUseCases({
+        ...createSqliteRepositories(secondDb),
+        media,
+        clock: clockAt('2026-09-24T17:01:00.000Z'),
+      });
+      const recent = await second.getRecentLife();
+      expect(recent.items[0].id).toBe(saved.id);
+      expect(recent.items[0].audio?.status).toBe('available');
+      const detail = await second.getMomentDetail(saved.id);
+      expect(detail.kind).toBe('ready');
+      if (detail.kind === 'ready') {
+        expect(detail.note).toBe('文件关掉还有声音');
+        expect(detail.audio?.status).toBe('available');
+      }
+      await secondDb.close();
+    });
+  });
+
+  it('keeps the moment when the audio file is later removed', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'voice.m4a');
+      await writeFile(source, Buffer.from('m4a-bytes'));
+      const media = createNodeMediaStore(mediaRoot);
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const app = createUseCases({
+        ...createSqliteRepositories(db),
+        media,
+        clock: clockAt('2026-09-24T18:00:00.000Z'),
+        assetId: () => 'asset_voice_deleted',
+      });
+      const draft = await app.restoreOrCreateDraft();
+      await app.updateDraftNote(draft.draftId, '声音没了字还在');
+      await app.addRecordedAudio(draft.draftId, {
+        sourceUri: source,
+        durationMs: 1800,
+        mimeType: 'audio/mp4',
+      });
+      const saved = await app.saveTextMoment(draft.draftId);
+      const stored = await createSqliteRepositories(db).assets.findById('asset_voice_deleted');
+      if (stored.kind !== 'ready') throw new Error('expected asset');
+      await rm(stored.asset.localUri, { force: true });
+
+      const detail = await app.getMomentDetail(saved.id);
+      expect(detail).toMatchObject({
+        kind: 'ready',
+        id: saved.id,
+        note: '声音没了字还在',
+      });
+      if (detail.kind === 'ready') {
+        expect(detail.audio?.status).toBe('unavailable');
+        expect(detail.audio?.unavailableLabel).toBe('这段声音暂时无法播放，其他内容仍然保留。');
+      }
+      await db.close();
+    });
+  });
+
+  it('does not show a damaged audio asset row as a photo', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'voice.m4a');
+      await writeFile(source, Buffer.from('m4a-bytes'));
+      const media = createNodeMediaStore(mediaRoot);
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const app = createUseCases({
+        ...createSqliteRepositories(db),
+        media,
+        clock: clockAt('2026-09-24T19:00:00.000Z'),
+        assetId: () => 'asset_voice_damaged',
+      });
+      const draft = await app.restoreOrCreateDraft();
+      await app.updateDraftNote(draft.draftId, '声音坏了不是照片');
+      await app.addRecordedAudio(draft.draftId, {
+        sourceUri: source,
+        durationMs: 1800,
+        mimeType: 'audio/mp4',
+      });
+      const saved = await app.saveTextMoment(draft.draftId);
+      await db.run('UPDATE assets SET json = ? WHERE id = ?', [
+        '{not-json',
+        'asset_voice_damaged',
+      ]);
+
+      const repos = createSqliteRepositories(db);
+      expect(await repos.assets.findById('asset_voice_damaged')).toEqual({
+        kind: 'unreadable',
+        type: 'audio',
+      });
+      const detail = await app.getMomentDetail(saved.id);
+      expect(detail.kind).toBe('ready');
+      if (detail.kind === 'ready') {
+        expect(detail.note).toBe('声音坏了不是照片');
+        expect(detail.images).toHaveLength(0);
+        expect(detail.audio?.status).toBe('unavailable');
+        expect(detail.audio?.unavailableLabel).toBe('这段声音暂时无法播放，其他内容仍然保留。');
+      }
+      await db.close();
+    });
+  });
+
+  it('keeps a generated-format audio id visible after its asset row is deleted', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'voice.m4a');
+      const photoSource = path.join(path.dirname(file), 'source.jpg');
+      await writeFile(source, Buffer.from('m4a-bytes'));
+      await writeFile(photoSource, TINY_JPEG);
+      const media = createNodeMediaStore(mediaRoot);
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const app = createUseCases({
+        ...createSqliteRepositories(db),
+        media,
+        clock: clockAt('2026-09-24T20:00:00.000Z'),
+      });
+      const draft = await app.restoreOrCreateDraft();
+      await app.updateDraftNote(draft.draftId, '字还在');
+      await app.addPickedImages(draft.draftId, [
+        { sourceUri: photoSource, mimeType: 'image/jpeg', width: 1, height: 1 },
+      ]);
+      await app.addRecordedAudio(draft.draftId, {
+        sourceUri: source,
+        durationMs: 1800,
+        mimeType: 'audio/mp4',
+      });
+      const composer = await app.restoreOrCreateDraft();
+      expect(composer.audio?.id).toMatch(/^asset_\d+_[a-z0-9]+$/);
+      const audioId = composer.audio?.id;
+      if (!audioId) throw new Error('expected generated audio id');
+      const saved = await app.saveTextMoment(draft.draftId);
+      await db.run('DELETE FROM assets WHERE id = ?', [audioId]);
+
+      const detail = await app.getMomentDetail(saved.id);
+      expect(detail.kind).toBe('ready');
+      if (detail.kind === 'ready') {
+        expect(detail.id).toBe(saved.id);
+        expect(detail.note).toBe('字还在');
+        expect(detail.images).toHaveLength(1);
+        expect(detail.audio).toBeNull();
+        expect(detail.unknownMedia).toEqual([
+          {
+            id: audioId,
+            status: 'unavailable',
+            label: '这份内容',
+            unavailableLabel: '这份内容暂时无法打开。',
+          },
+        ]);
+      }
+      await db.close();
+    });
+  });
 });

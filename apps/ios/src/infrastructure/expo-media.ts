@@ -2,7 +2,13 @@ import { Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
-import { extensionForMime, type ImageSource, type MediaStore, type PickedImage } from './media';
+import {
+  extensionForAudioMime,
+  extensionForMime,
+  type ImageSource,
+  type MediaStore,
+  type PickedImage,
+} from './media';
 
 const ASSET_DIR = 'lampy-assets';
 
@@ -72,28 +78,44 @@ export function createExpoCameraSource(): ImageSource {
   };
 }
 
+async function persistCopy(
+  dest: string,
+  sourceUri: string,
+): Promise<{ localUri: string; sizeBytes?: number }> {
+  const directory = assetDirectory();
+  const info = await FileSystem.getInfoAsync(directory);
+  if (!info.exists) {
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+  }
+  const destInfo = await FileSystem.getInfoAsync(dest);
+  if (destInfo.exists) {
+    return {
+      localUri: dest,
+      sizeBytes: destInfo.size,
+    };
+  }
+  await FileSystem.copyAsync({ from: sourceUri, to: dest });
+  const copied = await FileSystem.getInfoAsync(dest);
+  return {
+    localUri: dest,
+    sizeBytes: copied.exists ? copied.size : undefined,
+  };
+}
+
+function isAppOwned(localUri: string): boolean {
+  return localUri.includes(`/${ASSET_DIR}/`);
+}
+
 export function createExpoMediaStore(): MediaStore {
   return {
     async persistImage({ assetId, sourceUri, mimeType }) {
-      const directory = assetDirectory();
-      const info = await FileSystem.getInfoAsync(directory);
-      if (!info.exists) {
-        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-      }
-      const dest = `${directory}/${assetId}.${extensionForMime(mimeType)}`;
-      const destInfo = await FileSystem.getInfoAsync(dest);
-      if (destInfo.exists) {
-        return {
-          localUri: dest,
-          sizeBytes: destInfo.size,
-        };
-      }
-      await FileSystem.copyAsync({ from: sourceUri, to: dest });
-      const copied = await FileSystem.getInfoAsync(dest);
-      return {
-        localUri: dest,
-        sizeBytes: copied.exists ? copied.size : undefined,
-      };
+      return persistCopy(`${assetDirectory()}/${assetId}.${extensionForMime(mimeType)}`, sourceUri);
+    },
+    async persistAudio({ assetId, sourceUri, mimeType }) {
+      return persistCopy(
+        `${assetDirectory()}/${assetId}.${extensionForAudioMime(mimeType, sourceUri)}`,
+        sourceUri,
+      );
     },
     async exists(localUri) {
       const info = await FileSystem.getInfoAsync(localUri);
@@ -109,6 +131,17 @@ export function createExpoMediaStore(): MediaStore {
           () => resolve(false),
         );
       });
+    },
+    async canPlay(localUri) {
+      const info = await FileSystem.getInfoAsync(localUri);
+      return info.exists && !info.isDirectory && (info.size ?? 0) > 0;
+    },
+    async removeAppOwned(localUri) {
+      if (!isAppOwned(localUri)) return false;
+      const info = await FileSystem.getInfoAsync(localUri);
+      if (!info.exists || info.isDirectory) return false;
+      await FileSystem.deleteAsync(localUri, { idempotent: true });
+      return true;
     },
   };
 }

@@ -16,6 +16,7 @@ jest.mock('expo-file-system/legacy', () => ({
   getInfoAsync: jest.fn(),
   makeDirectoryAsync: jest.fn(),
   copyAsync: jest.fn(),
+  deleteAsync: jest.fn(),
 }));
 
 describe('expo media decode', () => {
@@ -53,5 +54,17 @@ describe('expo media decode', () => {
     });
 
     await expect(createExpoMediaStore().canDecode('file:///docs/lampy-assets/ok.jpg')).resolves.toBe(true);
+  });
+
+  it('treats an empty audio file as unplayable', async () => {
+    jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
+      exists: true,
+      isDirectory: false,
+      size: 0,
+      uri: 'file:///docs/lampy-assets/empty.m4a',
+      modificationTime: 0,
+    });
+
+    await expect(createExpoMediaStore().canPlay('file:///docs/lampy-assets/empty.m4a')).resolves.toBe(false);
   });
 });
