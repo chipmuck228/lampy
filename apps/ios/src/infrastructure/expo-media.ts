@@ -106,7 +106,7 @@ export function createExpoMediaStore(): MediaStore {
         Image.getSize(
           localUri,
           () => resolve(true),
-          () => resolve((info.size ?? 0) > 0),
+          () => resolve(false),
         );
       });
     },

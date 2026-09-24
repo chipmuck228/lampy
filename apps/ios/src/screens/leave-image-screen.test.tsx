@@ -6,6 +6,7 @@ import { ApplicationError } from '../application/errors';
 
 const mockAddLibraryImages = jest.fn();
 const mockRestore = jest.fn();
+const mockSaveTextMoment = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
@@ -17,7 +18,7 @@ jest.mock('../application/container', () => ({
     updateDraftNote: async () => undefined,
     addLibraryImages: mockAddLibraryImages,
     addCameraImage: async () => undefined,
-    saveTextMoment: async () => ({ id: 'moment_draft' }),
+    saveTextMoment: mockSaveTextMoment,
   }),
 }));
 
@@ -45,7 +46,9 @@ describe('leave image actions', () => {
   beforeEach(() => {
     mockRestore.mockReset();
     mockAddLibraryImages.mockReset();
+    mockSaveTextMoment.mockReset();
     mockRestore.mockResolvedValue(emptyDraft);
+    mockSaveTextMoment.mockResolvedValue({ id: 'moment_draft' });
   });
 
   it('shows the three-photo limit and does not lose the draft', async () => {
@@ -108,5 +111,41 @@ describe('leave image actions', () => {
       expect(view.getByText('没有打开相册。还可以写字，草稿还在。')).toBeTruthy();
     });
     expect(view.getByDisplayValue('还可以写字')).toBeTruthy();
+  });
+
+  it('does not save while a photo pick is still in progress', async () => {
+    let finishPick: (value: { draftId: string; note: string; isRestored: boolean; images: [] }) => void =
+      () => undefined;
+    mockAddLibraryImages.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishPick = resolve;
+        }),
+    );
+
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByDisplayValue('还可以写字')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('composer-library'));
+    await waitFor(() => {
+      expect(view.getByText('正在加入照片…')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('composer-save'));
+    fireEvent.press(view.getByTestId('composer-camera'));
+    expect(mockSaveTextMoment).not.toHaveBeenCalled();
+    expect(view.getByTestId('composer-save')).toBeDisabled();
+    expect(view.getByTestId('composer-camera')).toBeDisabled();
+
+    finishPick({
+      draftId: 'moment_draft',
+      note: '还可以写字',
+      isRestored: true,
+      images: [],
+    });
+    await waitFor(() => {
+      expect(view.getByText('留下')).toBeTruthy();
+    });
+    expect(mockSaveTextMoment).not.toHaveBeenCalled();
   });
 });

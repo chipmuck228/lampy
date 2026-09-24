@@ -27,9 +27,19 @@ export default function LeaveScreen() {
   const [images, setImages] = useState<ImageView[]>([]);
   const [restored, setRestored] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState<'idle' | 'media' | 'save'>('idle');
   const draftIdRef = useRef<string | null>(null);
+  const busyRef = useRef(false);
   const persistChain = useRef(Promise.resolve());
+
+  function enqueue<T>(work: () => Promise<T>): Promise<T> {
+    const run = persistChain.current.then(work);
+    persistChain.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -55,51 +65,58 @@ export default function LeaveScreen() {
     setNote(next);
     const id = draftIdRef.current;
     if (!id) return;
-    persistChain.current = persistChain.current
-      .then(async () => {
-        const app = await getUseCases();
-        await app.updateDraftNote(id, next);
-      })
-      .catch(() => {
-        setMessage('草稿暂时写不进去。已经写的字还在屏幕上。');
-      });
+    void enqueue(async () => {
+      const app = await getUseCases();
+      await app.updateDraftNote(id, next);
+    }).catch(() => {
+      setMessage('草稿暂时写不进去。已经写的字还在屏幕上。');
+    });
   }
 
-  async function applyImageAction(action: 'library' | 'camera') {
+  function applyImageAction(action: 'library' | 'camera') {
     const id = draftIdRef.current;
-    if (!id) return;
-    try {
-      await persistChain.current;
+    if (!id || busyRef.current) return;
+    busyRef.current = true;
+    setBusy('media');
+    void enqueue(async () => {
       const app = await getUseCases();
-      const next =
-        action === 'library' ? await app.addLibraryImages(id) : await app.addCameraImage(id);
-      setImages(next.images);
-      setMessage(null);
-    } catch (error) {
-      if (isApplicationError(error) && error.code === 'IMAGE_LIMIT') {
-        const app = await getUseCases();
-        const draft = await app.restoreOrCreateDraft();
-        setImages(draft.images);
-        setMessage('每条最多三张照片');
-        return;
-      }
-      if (isApplicationError(error) && (error.code === 'LIBRARY_DENIED' || error.code === 'CAMERA_DENIED')) {
-        setMessage(error.message);
-        return;
-      }
-      setMessage('这张照片没有留下。已经写的字和已有的照片还在。');
-    }
+      return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id);
+    })
+      .then((next) => {
+        setImages(next.images);
+        setMessage(null);
+      })
+      .catch(async (error) => {
+        if (isApplicationError(error) && error.code === 'IMAGE_LIMIT') {
+          const app = await getUseCases();
+          const draft = await app.restoreOrCreateDraft();
+          setImages(draft.images);
+          setMessage('每条最多三张照片');
+          return;
+        }
+        if (isApplicationError(error) && (error.code === 'LIBRARY_DENIED' || error.code === 'CAMERA_DENIED')) {
+          setMessage(error.message);
+          return;
+        }
+        setMessage('这张照片没有留下。已经写的字和已有的照片还在。');
+      })
+      .finally(() => {
+        busyRef.current = false;
+        setBusy('idle');
+      });
   }
 
   async function onSave() {
     const id = draftIdRef.current;
-    if (!id || saving) return;
-    setSaving(true);
+    if (!id || busyRef.current) return;
+    busyRef.current = true;
+    setBusy('save');
     try {
-      await persistChain.current;
-      const app = await getUseCases();
-      await app.updateDraftNote(id, note);
-      await app.saveTextMoment(id);
+      await enqueue(async () => {
+        const app = await getUseCases();
+        await app.updateDraftNote(id, note);
+        await app.saveTextMoment(id);
+      });
       router.replace('/');
     } catch (error) {
       setMessage(
@@ -108,9 +125,13 @@ export default function LeaveScreen() {
           : '这次没有留下。草稿还在，可以再试。',
       );
     } finally {
-      setSaving(false);
+      busyRef.current = false;
+      setBusy('idle');
     }
   }
+
+  const actionsLocked = !draftId || busy !== 'idle';
+  const saveLabel = busy === 'save' ? '正在留下…' : busy === 'media' ? '正在加入照片…' : '留下';
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="留下">
@@ -155,9 +176,9 @@ export default function LeaveScreen() {
               accessibilityLabel="拍摄"
               testID="composer-camera"
               onPress={() => {
-                void applyImageAction('camera');
+                applyImageAction('camera');
               }}
-              disabled={!draftId}
+              disabled={actionsLocked}
               style={styles.mediaHit}
             >
               <Text style={styles.media}>拍摄</Text>
@@ -167,9 +188,9 @@ export default function LeaveScreen() {
               accessibilityLabel="照片"
               testID="composer-library"
               onPress={() => {
-                void applyImageAction('library');
+                applyImageAction('library');
               }}
-              disabled={!draftId}
+              disabled={actionsLocked}
               style={styles.mediaHit}
             >
               <Text style={styles.media}>照片</Text>
@@ -181,10 +202,10 @@ export default function LeaveScreen() {
               onPress={() => {
                 void onSave();
               }}
-              disabled={saving}
+              disabled={actionsLocked}
               style={styles.saveHit}
             >
-              <Text style={styles.save}>{saving ? '正在留下…' : '留下'}</Text>
+              <Text style={styles.save}>{saveLabel}</Text>
             </Pressable>
           </View>
         </ScrollView>

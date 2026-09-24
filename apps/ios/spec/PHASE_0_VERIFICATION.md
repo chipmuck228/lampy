@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `npx tsc --noEmit` | `apps/ios` | **通过**（exit 0） |
 | `npx expo lint` | `apps/ios` | **通过**（exit 0） |
-| `npm test` | `apps/ios` | **通过**。10 suites / 33 tests |
+| `npm test` | `apps/ios` | **通过**。11 suites / 36 tests |
 | `npx expo run:ios --device "iPhone 17"` | `apps/ios` | **通过**。Build Succeeded，已装上模拟器 |
 | `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testPickPhotoSaveRecentExactIdDetail test` | `apps/ios/ios`（本地，不入库） | **通过**。iPhone 17 Simulator，35.8s |
 
@@ -19,7 +19,8 @@
 - 仅照片、文字加照片
 - 未点入口不请求权限；拒绝相册 / 相机后草稿和文字仍在
 - 草稿恢复带图片；保存重试不重复 Moment / Asset
-- 文件缺失或无法解码时 Moment 与文字仍在，原位不可用
+- 文件缺失或无法解码时 Moment 与文字仍在，原位不可用；`Image.getSize` 失败不得标为可用
+- 选图尚未完成时点击留下不会保存
 - SQLite 文件关闭再打开后图片仍在；删掉文件后记录仍在
 
 ## 模拟器闭环（合并前已点通）
