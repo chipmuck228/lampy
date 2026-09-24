@@ -127,6 +127,26 @@ describe('leave audio actions', () => {
     expect(view.getByTestId('composer-camera')).toBeDisabled();
   });
 
+  it('keeps the previous sound when rerecord cannot start', async () => {
+    mockRestore.mockResolvedValue(recordedDraft);
+    mockBegin.mockRejectedValueOnce(
+      new ApplicationError('MIC_DENIED', '没有打开麦克风。还可以写字和留下照片，草稿还在。'),
+    );
+
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('composer-rerecord'));
+    await waitFor(() => {
+      expect(view.getByText('没有打开麦克风。还可以写字和留下照片，草稿还在。')).toBeTruthy();
+    });
+    expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
+    expect(view.getByLabelText('播放，4秒')).toBeTruthy();
+    expect(mockRemove).not.toHaveBeenCalled();
+    expect(mockBegin).toHaveBeenCalledWith('moment_draft', { replace: true });
+  });
+
   it('shows a stopped recording that can be previewed without autoplay', async () => {
     mockBegin.mockResolvedValueOnce(undefined);
     mockFinish.mockResolvedValueOnce(recordedDraft);

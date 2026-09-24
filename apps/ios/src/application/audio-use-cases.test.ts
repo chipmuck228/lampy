@@ -1,11 +1,18 @@
-import { createUseCases } from './use-cases';
-import { ApplicationError } from './errors';
+import { createAsset } from '../domain-adapters/asset-commands';
+import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
+import {
+  activateMoment,
+  attachAsset,
+  createDraftMoment,
+} from '../domain-adapters/moment-commands';
 import {
   createMemoryAudioCapture,
   createMemoryMediaStore,
   createQueuedImageSource,
 } from '../infrastructure/media';
 import { createMemoryRepositories } from '../infrastructure/repositories';
+import { ApplicationError } from './errors';
+import { AUDIO_UNAVAILABLE_LABEL, createUseCases } from './use-cases';
 
 function clockAt(iso: string) {
   return { now: () => new Date(iso) };
@@ -307,5 +314,134 @@ describe('audio personal moment use cases', () => {
     await app.removeDraftAudio(draft.draftId);
     expect((await app.restoreOrCreateDraft()).audio).toBeNull();
     expect(media.removed).toEqual(['memory://assets/asset_remove.m4a']);
+  });
+
+  it('keeps the previous draft sound when a replacement recording cannot start', async () => {
+    const capture = createMemoryAudioCapture({ permission: 'denied' });
+    const { app, media } = createAudioApp({ capture, assetIds: ['asset_kept'] });
+    const draft = await app.restoreOrCreateDraft();
+    await app.addRecordedAudio(draft.draftId, clip('kept'));
+    await expect(app.beginDraftRecording(draft.draftId, { replace: true })).rejects.toMatchObject({
+      code: 'MIC_DENIED',
+    });
+    expect(capture.starts).toBe(0);
+    const restored = await app.restoreOrCreateDraft();
+    expect(restored.audio?.id).toBe('asset_kept');
+    expect(restored.audio?.status).toBe('available');
+    expect(restored.audio?.uri).toBe('memory://assets/asset_kept.m4a');
+    expect(media.removed).toEqual([]);
+    expect(media.persisted.has('memory://assets/asset_kept.m4a')).toBe(true);
+  });
+
+  it('does not delete a referenced audio file that sits past the recent 200 moments', async () => {
+    const repos = createMemoryRepositories();
+    const media = createMemoryMediaStore();
+    const ownerId = LOCAL_OWNER_ID;
+    const persisted = await media.persistAudio({
+      assetId: 'asset_old_voice',
+      sourceUri: 'memory://recordings/old.m4a',
+      mimeType: 'audio/mp4',
+    });
+    const firstInstant = new Date('2026-01-01T00:00:00.000Z');
+    await repos.assets.save(
+      createAsset(
+        {
+          id: 'asset_old_voice',
+          ownerId,
+          type: 'audio',
+          captureTimeSource: 'system',
+          localUri: persisted.localUri,
+          storage: { status: 'local' },
+          metadata: { mimeType: 'audio/mp4', durationMs: 2000 },
+        },
+        { now: () => firstInstant, ownerId },
+      ),
+    );
+    for (let index = 0; index < 201; index += 1) {
+      const now = new Date(Date.parse('2026-01-01T00:00:00.000Z') + index * 60_000);
+      let moment = createDraftMoment(
+        {
+          ownerId,
+          content: { note: index === 0 ? 'oldest keeps sound' : `note ${index}` },
+          time: { recordedAt: now.toISOString(), occurredAtPrecision: 'unknown' },
+          origin: { type: 'created' },
+        },
+        { now: () => now, ownerId, id: () => `moment_old_${index}` },
+      );
+      if (index === 0) {
+        moment = attachAsset(moment, 'asset_old_voice', ownerId, now);
+      }
+      moment = activateMoment(moment, ownerId, now);
+      await repos.moments.save(moment);
+    }
+    expect(
+      (await repos.moments.listRecent(200)).some((item) => item.assetIds.includes('asset_old_voice')),
+    ).toBe(false);
+    expect(await repos.moments.lookupAssetReferences('asset_old_voice')).toBe('referenced');
+
+    const app = createUseCases({
+      ...repos,
+      media,
+      capture: createMemoryAudioCapture(),
+      clock: clockAt('2026-09-24T12:00:00.000Z'),
+      assetId: () => 'asset_new_voice',
+    });
+    const draft = await app.restoreOrCreateDraft();
+    const stored = await repos.drafts.loadActive();
+    if (!stored) throw new Error('expected draft');
+    await repos.drafts.save(
+      attachAsset(stored, 'asset_old_voice', ownerId, new Date('2026-09-24T12:00:00.000Z')),
+    );
+    await app.removeDraftAudio(draft.draftId);
+    expect(media.removed).toEqual([]);
+    expect(await media.exists('memory://assets/asset_old_voice.m4a')).toBe(true);
+    expect((await repos.assets.findById('asset_old_voice')).kind).toBe('ready');
+  });
+
+  it('does not show a damaged or missing audio asset as a photo', async () => {
+    const { app, repos } = createAudioApp({ assetIds: ['asset_voice'] });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '字还在');
+    await app.addRecordedAudio(draft.draftId, clip('voice'));
+    const saved = await app.saveTextMoment(draft.draftId);
+    const originalFind = repos.assets.findById.bind(repos.assets);
+
+    repos.assets.findById = async (id) =>
+      id === 'asset_voice' ? { kind: 'unreadable', type: 'audio' } : originalFind(id);
+    const damaged = await app.getMomentDetail(saved.id);
+    expect(damaged.kind).toBe('ready');
+    if (damaged.kind === 'ready') {
+      expect(damaged.note).toBe('字还在');
+      expect(damaged.images).toHaveLength(0);
+      expect(damaged.audio?.id).toBe('asset_voice');
+      expect(damaged.audio?.status).toBe('unavailable');
+      expect(damaged.audio?.unavailableLabel).toBe(AUDIO_UNAVAILABLE_LABEL);
+    }
+    const damagedRecent = await app.getRecentLife();
+    expect(damagedRecent.items[0].images).toHaveLength(0);
+    expect(damagedRecent.items[0].audio?.status).toBe('unavailable');
+
+    repos.assets.findById = async (id) => (id === 'asset_voice' ? { kind: 'missing' } : originalFind(id));
+    const missing = await app.getMomentDetail(saved.id);
+    expect(missing.kind).toBe('ready');
+    if (missing.kind === 'ready') {
+      expect(missing.images).toHaveLength(0);
+      expect(missing.images.some((item) => item.label.includes('照片'))).toBe(false);
+    }
+
+    const suffixApp = createAudioApp({ assetIds: ['asset:m:audio'] });
+    const suffixDraft = await suffixApp.app.restoreOrCreateDraft();
+    await suffixApp.app.addRecordedAudio(suffixDraft.draftId, clip('suffix'));
+    const suffixSaved = await suffixApp.app.saveTextMoment(suffixDraft.draftId);
+    const suffixFind = suffixApp.repos.assets.findById.bind(suffixApp.repos.assets);
+    suffixApp.repos.assets.findById = async (id) =>
+      id === 'asset:m:audio' ? { kind: 'missing' } : suffixFind(id);
+    const suffixDetail = await suffixApp.app.getMomentDetail(suffixSaved.id);
+    expect(suffixDetail.kind).toBe('ready');
+    if (suffixDetail.kind === 'ready') {
+      expect(suffixDetail.images).toHaveLength(0);
+      expect(suffixDetail.audio?.status).toBe('unavailable');
+      expect(suffixDetail.audio?.unavailableLabel).toBe(AUDIO_UNAVAILABLE_LABEL);
+    }
   });
 });

@@ -16,7 +16,12 @@ import type {
   PickedImage,
   RecordedAudio,
 } from '../infrastructure/media';
-import type { AssetRepository, DraftRepository, MomentRepository } from '../infrastructure/repositories';
+import type {
+  AssetRead,
+  AssetRepository,
+  DraftRepository,
+  MomentRepository,
+} from '../infrastructure/repositories';
 import { formatSoundDuration } from './duration';
 import { ApplicationError, toApplicationError } from './errors';
 
@@ -117,12 +122,16 @@ function toProjectionAsset(asset: AssetRecord | null): object | null {
   return asset;
 }
 
-function isImageAsset(asset: AssetRecord): boolean {
-  return asset.type !== 'audio' && asset.type !== 'video';
+function inferTypeFromAssetId(assetId: string): 'image' | 'audio' | 'video' | undefined {
+  const suffix = assetId.split(':').pop();
+  if (suffix === 'image' || suffix === 'audio' || suffix === 'video') return suffix;
+  return undefined;
 }
 
-function isAudioAsset(asset: AssetRecord): boolean {
-  return asset.type === 'audio';
+function typeFromAssetRead(assetId: string, found: AssetRead): string | undefined {
+  if (found.kind === 'ready') return found.asset.type;
+  if (found.kind === 'unreadable') return found.type || inferTypeFromAssetId(assetId);
+  return inferTypeFromAssetId(assetId);
 }
 
 export function createUseCases(deps: {
@@ -157,13 +166,16 @@ export function createUseCases(deps: {
     const imageIds: string[] = [];
     let audioId: string | null = null;
     for (const assetId of assetIds) {
-      const asset = await loadAsset(assetId);
-      if (asset && isAudioAsset(asset)) {
+      const found = deps.assets ? await deps.assets.findById(assetId) : { kind: 'missing' as const };
+      const type = typeFromAssetRead(assetId, found);
+      if (type === 'audio') {
         if (!audioId) audioId = assetId;
         continue;
       }
-      if (asset && !isImageAsset(asset)) continue;
-      imageIds.push(assetId);
+      if (type === 'image') {
+        imageIds.push(assetId);
+        continue;
+      }
     }
     return { imageIds, audioId };
   }
@@ -273,14 +285,10 @@ export function createUseCases(deps: {
   }
 
   async function isAssetReferenced(assetId: string): Promise<boolean> {
-    const draft = await deps.drafts.loadActive();
-    if (draft?.assetIds.includes(assetId)) return true;
-    if (draft) {
-      const own = await deps.moments.findById(draft.id);
-      if (own.kind === 'ready' && own.moment.assetIds.includes(assetId)) return true;
-    }
-    const recent = await deps.moments.listRecent(200);
-    return recent.some((moment) => moment.assetIds.includes(assetId));
+    const draftLookup = await deps.drafts.lookupAssetReferences(assetId);
+    if (draftLookup === 'referenced' || draftLookup === 'unknown') return true;
+    const momentLookup = await deps.moments.lookupAssetReferences(assetId);
+    return momentLookup === 'referenced' || momentLookup === 'unknown';
   }
 
   async function cleanupOrphan(assetId: string, localUri: string | undefined): Promise<void> {
@@ -335,6 +343,7 @@ export function createUseCases(deps: {
   async function persistAndAttachAudio(
     draft: MomentRecord,
     recorded: RecordedAudio,
+    options?: { replace?: boolean },
   ): Promise<MomentRecord> {
     if (!deps.assets || !deps.media) {
       throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下声音。');
@@ -342,8 +351,8 @@ export function createUseCases(deps: {
     if (recorded.durationMs <= 0) {
       throw new ApplicationError('AUDIO_EMPTY', '这一次没有录下声音。');
     }
-    const { audioId } = await classify(draft.assetIds);
-    if (audioId) {
+    const { audioId: existingAudioId } = await classify(draft.assetIds);
+    if (existingAudioId && !options?.replace) {
       throw new ApplicationError('AUDIO_LIMIT', '每条最多一段声音');
     }
     const assetId = nextAssetId();
@@ -376,8 +385,13 @@ export function createUseCases(deps: {
       );
       await deps.assets.save(asset);
     }
-    const next = attachAsset(draft, assetId, ownerId, clock.now());
+    const previous = existingAudioId ? await loadAsset(existingAudioId) : null;
+    let next = existingAudioId ? detachAsset(draft, existingAudioId, ownerId, clock.now()) : draft;
+    next = attachAsset(next, assetId, ownerId, clock.now());
     await deps.drafts.save(next);
+    if (existingAudioId) {
+      await cleanupOrphan(existingAudioId, previous?.localUri);
+    }
     return next;
   }
 
@@ -481,11 +495,16 @@ export function createUseCases(deps: {
     );
   }
 
-  async function beginDraftRecording(draftId: string): Promise<void> {
+  async function beginDraftRecording(
+    draftId: string,
+    options?: { replace?: boolean },
+  ): Promise<void> {
     const draft = await requireDraft(draftId);
-    const { audioId } = await classify(draft.assetIds);
-    if (audioId) {
-      throw new ApplicationError('AUDIO_LIMIT', '每条最多一段声音');
+    if (!options?.replace) {
+      const { audioId } = await classify(draft.assetIds);
+      if (audioId) {
+        throw new ApplicationError('AUDIO_LIMIT', '每条最多一段声音');
+      }
     }
     if (!deps.capture) {
       throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下声音。');
@@ -512,10 +531,16 @@ export function createUseCases(deps: {
     }
     const elapsedMs = deps.capture.getElapsedMs();
     const recorded = await deps.capture.stop();
-    return addRecordedAudio(draftId, {
-      ...recorded,
-      durationMs: recorded.durationMs > 0 ? recorded.durationMs : elapsedMs,
-    });
+    const draft = await requireDraft(draftId);
+    const next = await persistAndAttachAudio(
+      draft,
+      {
+        ...recorded,
+        durationMs: recorded.durationMs > 0 ? recorded.durationMs : elapsedMs,
+      },
+      { replace: true },
+    );
+    return toComposer(next, true);
   }
 
   async function interruptDraftRecording(draftId: string): Promise<InterruptRecordingResult> {
@@ -527,8 +552,8 @@ export function createUseCases(deps: {
     if (!recorded || recorded.durationMs <= 0) {
       return { composer: await toComposer(draft, true), kept: false, hadSession: true };
     }
-    const composer = await addRecordedAudio(draftId, recorded);
-    return { composer, kept: true, hadSession: true };
+    const next = await persistAndAttachAudio(await requireDraft(draftId), recorded, { replace: true });
+    return { composer: await toComposer(next, true), kept: true, hadSession: true };
   }
 
   async function removeDraftAudio(draftId: string): Promise<ComposerViewModel> {

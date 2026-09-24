@@ -276,26 +276,31 @@ export default function LeaveScreen() {
     void sound.stop();
     void enqueue(async () => {
       const app = await getUseCases();
-      await app.removeDraftAudio(id);
-      await app.beginDraftRecording(id);
+      await app.beginDraftRecording(id, { replace: true });
     })
       .then(() => {
-        setAudio(null);
         setElapsedMs(0);
         setBusy('record');
         setRecordPhase('recording');
         setMessage(null);
       })
-      .catch((error) => {
+      .catch(async (error) => {
         busyRef.current = false;
         setBusy('idle');
+        try {
+          const app = await getUseCases();
+          const draft = await app.restoreOrCreateDraft();
+          setImages(draft.images);
+          setAudio(draft.audio);
+          setRecordPhase(draft.audio ? 'stopped' : 'ready');
+        } catch {
+          setRecordPhase(audio ? 'stopped' : 'failed');
+        }
         if (isApplicationError(error) && error.code === 'MIC_DENIED') {
-          setRecordPhase('ready');
           setMessage(error.message);
           return;
         }
-        setRecordPhase('failed');
-        setMessage('这次没有重新录上。已经写的字和照片还在。');
+        setMessage('这次没有重新录上。原来的声音还在，可以再试。');
       });
   }
 

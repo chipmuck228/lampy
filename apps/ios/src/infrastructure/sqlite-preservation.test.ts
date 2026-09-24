@@ -295,4 +295,47 @@ describe('sqlite file preservation', () => {
       await db.close();
     });
   });
+
+  it('does not show a damaged audio asset row as a photo', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'voice.m4a');
+      await writeFile(source, Buffer.from('m4a-bytes'));
+      const media = createNodeMediaStore(mediaRoot);
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const app = createUseCases({
+        ...createSqliteRepositories(db),
+        media,
+        clock: clockAt('2026-09-24T19:00:00.000Z'),
+        assetId: () => 'asset_voice_damaged',
+      });
+      const draft = await app.restoreOrCreateDraft();
+      await app.updateDraftNote(draft.draftId, '声音坏了不是照片');
+      await app.addRecordedAudio(draft.draftId, {
+        sourceUri: source,
+        durationMs: 1800,
+        mimeType: 'audio/mp4',
+      });
+      const saved = await app.saveTextMoment(draft.draftId);
+      await db.run('UPDATE assets SET json = ? WHERE id = ?', [
+        '{not-json',
+        'asset_voice_damaged',
+      ]);
+
+      const repos = createSqliteRepositories(db);
+      expect(await repos.assets.findById('asset_voice_damaged')).toEqual({
+        kind: 'unreadable',
+        type: 'audio',
+      });
+      const detail = await app.getMomentDetail(saved.id);
+      expect(detail.kind).toBe('ready');
+      if (detail.kind === 'ready') {
+        expect(detail.note).toBe('声音坏了不是照片');
+        expect(detail.images).toHaveLength(0);
+        expect(detail.audio?.status).toBe('unavailable');
+        expect(detail.audio?.unavailableLabel).toBe('这段声音暂时无法播放，其他内容仍然保留。');
+      }
+      await db.close();
+    });
+  });
 });
