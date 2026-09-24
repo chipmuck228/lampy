@@ -39,7 +39,8 @@ export type MomentDetailViewModel =
       usedRecordedAtFallback: boolean;
       sourceLabel: string;
     }
-  | { kind: 'missing'; requestedId: string };
+  | { kind: 'missing'; requestedId: string }
+  | { kind: 'error'; requestedId: string };
 
 function defaultClock(): Clock {
   return { now: () => new Date() };
@@ -111,9 +112,12 @@ export function createUseCases(deps: {
 
   async function saveTextMoment(draftId: string): Promise<{ id: string }> {
     const existing = await deps.moments.findById(draftId);
-    if (existing && existing.lifecycle.status === 'active') {
+    if (existing.kind === 'unreadable') {
+      throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这条记录还在，但现在不能覆盖它');
+    }
+    if (existing.kind === 'ready' && existing.moment.lifecycle.status === 'active') {
       await deps.drafts.clear(draftId);
-      return { id: existing.id };
+      return { id: existing.moment.id };
     }
 
     const draft = await deps.drafts.loadActive();
@@ -162,11 +166,19 @@ export function createUseCases(deps: {
     if (!momentId) {
       return { kind: 'missing', requestedId: '' };
     }
-    const moment = await deps.moments.findById(momentId);
-    if (!moment) {
+    let found;
+    try {
+      found = await deps.moments.findById(momentId);
+    } catch {
+      return { kind: 'error', requestedId: momentId };
+    }
+    if (found.kind === 'missing') {
       return { kind: 'missing', requestedId: momentId };
     }
-    const view = projectMomentDetailView(moment, []);
+    if (found.kind === 'unreadable') {
+      return { kind: 'error', requestedId: momentId };
+    }
+    const view = projectMomentDetailView(found.moment, []);
     return {
       kind: 'ready',
       id: view.id,

@@ -88,11 +88,13 @@ describe('text-only personal moment use cases', () => {
     await app.updateDraftNote(draft.draftId, '只有记录时间');
     const saved = await app.saveTextMoment(draft.draftId);
     const stored = await repos.moments.findById(saved.id);
-    expect(stored?.time.occurredAt).toBeUndefined();
-    expect(stored?.time.occurredAtPrecision).toBe('unknown');
-    expect(stored?.time.importedAt).toBeUndefined();
-    expect(stored?.time.recordedAt).toBe('2026-09-24T06:00:00.000Z');
-    expect(stored?.audit.createdAt).toBe('2026-09-24T06:00:00.000Z');
+    expect(stored.kind).toBe('ready');
+    if (stored.kind !== 'ready') return;
+    expect(stored.moment.time.occurredAt).toBeUndefined();
+    expect(stored.moment.time.occurredAtPrecision).toBe('unknown');
+    expect(stored.moment.time.importedAt).toBeUndefined();
+    expect(stored.moment.time.recordedAt).toBe('2026-09-24T06:00:00.000Z');
+    expect(stored.moment.audit.createdAt).toBe('2026-09-24T06:00:00.000Z');
   });
 
   it('leaves stored moments untouched when save fails on an empty note', async () => {
@@ -144,5 +146,18 @@ describe('text-only personal moment use cases', () => {
     await app.updateDraftNote(secondDraft.draftId, '这次失败');
     await expect(app.saveTextMoment(secondDraft.draftId)).rejects.toThrow('disk full');
     expect((await app.getRecentLife()).items.map((item) => item.id)).toEqual([saved.id]);
+  });
+
+  it('does not treat an unreadable moment as missing', async () => {
+    const repos = createMemoryRepositories();
+    const app = createUseCases({ ...repos, clock: clockAt('2026-09-24T10:00:00.000Z') });
+    const originalFind = repos.moments.findById.bind(repos.moments);
+    repos.moments.findById = async (id) =>
+      id === 'moment_damaged' ? { kind: 'unreadable' } : originalFind(id);
+
+    const missing = await app.getMomentDetail('moment_does_not_exist');
+    expect(missing).toEqual({ kind: 'missing', requestedId: 'moment_does_not_exist' });
+    const damaged = await app.getMomentDetail('moment_damaged');
+    expect(damaged).toEqual({ kind: 'error', requestedId: 'moment_damaged' });
   });
 });
