@@ -12,7 +12,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import type { RecentLifeViewModel } from '../application/use-cases';
-import { MomentAudio } from '../screens/moment-audio';
+import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
 import { MomentImages } from '../screens/moment-images';
 import { useSoundPlayer } from '../screens/use-sound-player';
 
@@ -80,7 +80,7 @@ export default function RecentScreen() {
             accessibilityLabel={
               item.note
                 ? `${item.dateLabel}，${item.note}`
-                : `${item.dateLabel}，${[...item.images.map((image) => image.label), item.audio?.label || ''].filter(Boolean).join('，') || '一条记录'}`
+                : `${item.dateLabel}，${[...item.images.map((image) => image.label), item.audio?.label || '', ...(item.unknownMedia ?? []).map((media) => media.label)].filter(Boolean).join('，') || '一条记录'}`
             }
             testID={`recent-item-${item.id}`}
             onPress={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
@@ -89,6 +89,7 @@ export default function RecentScreen() {
             <Text style={styles.date}>{item.dateLabel}</Text>
             {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
             <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
+            <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
             <MomentAudio
               audio={item.audio}
               playbackStatus={playingId === item.audio?.id ? (sound.failed ? 'unavailable' : sound.status) : 'idle'}

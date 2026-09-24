@@ -16,8 +16,8 @@ import { useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
-import type { AudioView, ImageView } from '../application/use-cases';
-import { DraftSoundBar, type RecordPhase } from '../screens/moment-audio';
+import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
+import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/moment-audio';
 import { MomentImages } from '../screens/moment-images';
 import { useSoundPlayer } from '../screens/use-sound-player';
 
@@ -29,6 +29,7 @@ export default function LeaveScreen() {
   const [note, setNote] = useState('');
   const [images, setImages] = useState<ImageView[]>([]);
   const [audio, setAudio] = useState<AudioView | null>(null);
+  const [unknownMedia, setUnknownMedia] = useState<UnknownMediaView[]>([]);
   const [phase, setPhase] = useState<RecordPhase>('ready');
   const [elapsedMs, setElapsedMs] = useState(0);
   const [restored, setRestored] = useState(false);
@@ -44,6 +45,16 @@ export default function LeaveScreen() {
   function setRecordPhase(next: RecordPhase) {
     phaseRef.current = next;
     setPhase(next);
+  }
+
+  function applyComposer(next: {
+    images: ImageView[];
+    audio: AudioView | null;
+    unknownMedia?: UnknownMediaView[];
+  }) {
+    setImages(next.images);
+    setAudio(next.audio);
+    setUnknownMedia(next.unknownMedia ?? []);
   }
 
   function enqueue<T>(work: () => Promise<T>): Promise<T> {
@@ -64,8 +75,7 @@ export default function LeaveScreen() {
         draftIdRef.current = draft.draftId;
         setDraftId(draft.draftId);
         setNote(draft.note);
-        setImages(draft.images);
-        setAudio(draft.audio);
+        applyComposer(draft);
         setRestored(draft.isRestored);
         setRecordPhase(draft.audio ? 'stopped' : 'ready');
       })
@@ -127,16 +137,14 @@ export default function LeaveScreen() {
       return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id);
     })
       .then((next) => {
-        setImages(next.images);
-        setAudio(next.audio);
+        applyComposer(next);
         setMessage(null);
       })
       .catch(async (error) => {
         if (isApplicationError(error) && error.code === 'IMAGE_LIMIT') {
           const app = await getUseCases();
           const draft = await app.restoreOrCreateDraft();
-          setImages(draft.images);
-          setAudio(draft.audio);
+          applyComposer(draft);
           setMessage('每条最多三张照片');
           return;
         }
@@ -195,8 +203,7 @@ export default function LeaveScreen() {
       return app.finishDraftRecording(id);
     })
       .then((next) => {
-        setImages(next.images);
-        setAudio(next.audio);
+        applyComposer(next);
         setRecordPhase(next.audio ? 'stopped' : 'failed');
         setMessage(null);
       })
@@ -219,8 +226,7 @@ export default function LeaveScreen() {
       return app.interruptDraftRecording(id);
     })
       .then((result) => {
-        setImages(result.composer.images);
-        setAudio(result.composer.audio);
+        applyComposer(result.composer);
         setRecordPhase(result.composer.audio ? 'stopped' : 'ready');
         if (!result.hadSession) return;
         setMessage(
@@ -254,8 +260,7 @@ export default function LeaveScreen() {
       return app.removeDraftAudio(id);
     })
       .then((next) => {
-        setImages(next.images);
-        setAudio(next.audio);
+        applyComposer(next);
         setRecordPhase('ready');
         setMessage(null);
       })
@@ -290,8 +295,7 @@ export default function LeaveScreen() {
         try {
           const app = await getUseCases();
           const draft = await app.restoreOrCreateDraft();
-          setImages(draft.images);
-          setAudio(draft.audio);
+          applyComposer(draft);
           setRecordPhase(draft.audio ? 'stopped' : 'ready');
         } catch {
           setRecordPhase(audio ? 'stopped' : 'failed');
@@ -368,6 +372,7 @@ export default function LeaveScreen() {
             style={styles.input}
           />
           <MomentImages images={images} testIDPrefix="composer-image" />
+          <MomentUnknownMedia items={unknownMedia} testIDPrefix="composer-unknown" />
           <DraftSoundBar
             phase={phase}
             elapsedMs={elapsedMs}

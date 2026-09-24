@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../application/container';
 import type { MomentDetailViewModel } from '../../application/use-cases';
-import { MomentAudio } from '../../screens/moment-audio';
+import { MomentAudio, MomentUnknownMedia } from '../../screens/moment-audio';
 import { MomentImages } from '../../screens/moment-images';
 import { useSoundPlayer } from '../../screens/use-sound-player';
 
@@ -78,6 +78,7 @@ export default function MomentDetailScreen() {
               </Text>
             ) : null}
             <MomentImages images={view.images} testIDPrefix="detail-image" />
+            <MomentUnknownMedia items={view.unknownMedia ?? []} testIDPrefix="detail-unknown" />
             <MomentAudio
               audio={view.audio}
               playbackStatus={sound.failed ? 'unavailable' : sound.status}

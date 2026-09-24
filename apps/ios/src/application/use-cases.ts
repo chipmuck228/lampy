@@ -29,6 +29,7 @@ export const MAX_DRAFT_IMAGES = 3;
 export const MAX_DRAFT_AUDIO = 1;
 export const IMAGE_UNAVAILABLE_LABEL = '这张照片暂时找不到了，但这条记录还在。';
 export const AUDIO_UNAVAILABLE_LABEL = '这段声音暂时无法播放，其他内容仍然保留。';
+export const UNKNOWN_UNAVAILABLE_LABEL = '这份内容暂时无法打开。';
 
 export type Clock = { now: () => Date };
 
@@ -52,6 +53,13 @@ export type AudioView = {
   unavailableLabel?: string;
 };
 
+export type UnknownMediaView = {
+  id: string;
+  status: 'unavailable';
+  label: string;
+  unavailableLabel: string;
+};
+
 export type RecentLifeItem = {
   id: string;
   note: string;
@@ -59,6 +67,7 @@ export type RecentLifeItem = {
   dateLabel: string;
   images: ImageView[];
   audio: AudioView | null;
+  unknownMedia: UnknownMediaView[];
 };
 
 export type RecentLifeViewModel = {
@@ -72,6 +81,7 @@ export type ComposerViewModel = {
   isRestored: boolean;
   images: ImageView[];
   audio: AudioView | null;
+  unknownMedia: UnknownMediaView[];
 };
 
 export type InterruptRecordingResult = {
@@ -91,6 +101,7 @@ export type MomentDetailViewModel =
       sourceLabel: string;
       images: ImageView[];
       audio: AudioView | null;
+      unknownMedia: UnknownMediaView[];
     }
   | { kind: 'missing'; requestedId: string }
   | { kind: 'error'; requestedId: string };
@@ -162,8 +173,10 @@ export function createUseCases(deps: {
   async function classify(assetIds: string[]): Promise<{
     imageIds: string[];
     audioId: string | null;
+    unknownIds: string[];
   }> {
     const imageIds: string[] = [];
+    const unknownIds: string[] = [];
     let audioId: string | null = null;
     for (const assetId of assetIds) {
       const found = deps.assets ? await deps.assets.findById(assetId) : { kind: 'missing' as const };
@@ -176,8 +189,20 @@ export function createUseCases(deps: {
         imageIds.push(assetId);
         continue;
       }
+      if (type === 'video') continue;
+      unknownIds.push(assetId);
     }
-    return { imageIds, audioId };
+    return { imageIds, audioId, unknownIds };
+  }
+
+  async function resolveUnknown(assetIds: string[]): Promise<UnknownMediaView[]> {
+    const { unknownIds } = await classify(assetIds);
+    return unknownIds.map((assetId) => ({
+      id: assetId,
+      status: 'unavailable' as const,
+      label: '这份内容',
+      unavailableLabel: UNKNOWN_UNAVAILABLE_LABEL,
+    }));
   }
 
   async function resolveImages(assetIds: string[]): Promise<ImageView[]> {
@@ -267,12 +292,16 @@ export function createUseCases(deps: {
   async function toComposer(draft: MomentRecord, isRestored: boolean): Promise<ComposerViewModel> {
     const images = await resolveImages(draft.assetIds);
     const audio = await resolveAudio(draft.assetIds);
+    const unknownMedia = await resolveUnknown(draft.assetIds);
     return {
       draftId: draft.id,
       note: draft.content.note,
-      isRestored: isRestored && (!!draft.content.note.trim() || images.length > 0 || !!audio),
+      isRestored:
+        isRestored &&
+        (!!draft.content.note.trim() || images.length > 0 || !!audio || unknownMedia.length > 0),
       images,
       audio,
+      unknownMedia,
     };
   }
 
@@ -619,6 +648,7 @@ export function createUseCases(deps: {
         dateLabel: calendarDateLabel(moment.time.occurredAt || moment.time.recordedAt),
         images: await resolveImages(moment.assetIds),
         audio: await resolveAudio(moment.assetIds),
+        unknownMedia: await resolveUnknown(moment.assetIds),
       });
     }
     return {
@@ -681,6 +711,7 @@ export function createUseCases(deps: {
       sourceLabel: view.source.label,
       images: await resolveImages(found.moment.assetIds),
       audio: await resolveAudio(found.moment.assetIds),
+      unknownMedia: await resolveUnknown(found.moment.assetIds),
     };
   }
 

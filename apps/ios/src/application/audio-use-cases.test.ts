@@ -12,7 +12,7 @@ import {
 } from '../infrastructure/media';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 import { ApplicationError } from './errors';
-import { AUDIO_UNAVAILABLE_LABEL, createUseCases } from './use-cases';
+import { AUDIO_UNAVAILABLE_LABEL, UNKNOWN_UNAVAILABLE_LABEL, createUseCases } from './use-cases';
 
 function clockAt(iso: string) {
   return { now: () => new Date(iso) };
@@ -426,7 +426,15 @@ describe('audio personal moment use cases', () => {
     expect(missing.kind).toBe('ready');
     if (missing.kind === 'ready') {
       expect(missing.images).toHaveLength(0);
-      expect(missing.images.some((item) => item.label.includes('照片'))).toBe(false);
+      expect(missing.audio).toBeNull();
+      expect(missing.unknownMedia).toEqual([
+        {
+          id: 'asset_voice',
+          status: 'unavailable',
+          label: '这份内容',
+          unavailableLabel: UNKNOWN_UNAVAILABLE_LABEL,
+        },
+      ]);
     }
 
     const suffixApp = createAudioApp({ assetIds: ['asset:m:audio'] });
@@ -443,5 +451,58 @@ describe('audio personal moment use cases', () => {
       expect(suffixDetail.audio?.status).toBe('unavailable');
       expect(suffixDetail.audio?.unavailableLabel).toBe(AUDIO_UNAVAILABLE_LABEL);
     }
+  });
+
+  it('keeps a generated-format audio id visible when its asset row is missing', async () => {
+    const repos = createMemoryRepositories();
+    const media = createMemoryMediaStore();
+    const app = createUseCases({
+      ...repos,
+      media,
+      capture: createMemoryAudioCapture(),
+      clock: clockAt('2026-09-24T15:00:00.000Z'),
+    });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '字还在');
+    await app.addPickedImages(draft.draftId, [photo('kept')]);
+    await app.addRecordedAudio(draft.draftId, clip('voice'));
+    const composer = await app.restoreOrCreateDraft();
+    expect(composer.audio?.id).toMatch(/^asset_\d+_[a-z0-9]+$/);
+    expect(composer.images[0].id).toMatch(/^asset_\d+_[a-z0-9]+$/);
+    const audioId = composer.audio?.id;
+    const photoId = composer.images[0].id;
+    if (!audioId) throw new Error('expected generated audio id');
+    const saved = await app.saveTextMoment(draft.draftId);
+
+    const originalFind = repos.assets.findById.bind(repos.assets);
+    repos.assets.findById = async (id) => (id === audioId ? { kind: 'missing' } : originalFind(id));
+
+    const detail = await app.getMomentDetail(saved.id);
+    expect(detail.kind).toBe('ready');
+    if (detail.kind !== 'ready') return;
+    expect(detail.id).toBe(saved.id);
+    expect(detail.note).toBe('字还在');
+    expect(detail.images.map((item) => item.id)).toEqual([photoId]);
+    expect(detail.images[0].status).toBe('available');
+    expect(detail.audio).toBeNull();
+    expect(detail.unknownMedia).toEqual([
+      {
+        id: audioId,
+        status: 'unavailable',
+        label: '这份内容',
+        unavailableLabel: UNKNOWN_UNAVAILABLE_LABEL,
+      },
+    ]);
+
+    const recent = await app.getRecentLife();
+    expect(recent.items[0].id).toBe(saved.id);
+    expect(recent.items[0].note).toBe('字还在');
+    expect(recent.items[0].images).toHaveLength(1);
+    expect(recent.items[0].audio).toBeNull();
+    expect(recent.items[0].unknownMedia[0]).toMatchObject({
+      id: audioId,
+      status: 'unavailable',
+      unavailableLabel: UNKNOWN_UNAVAILABLE_LABEL,
+    });
   });
 });

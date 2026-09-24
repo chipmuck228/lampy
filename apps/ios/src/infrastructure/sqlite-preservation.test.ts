@@ -338,4 +338,55 @@ describe('sqlite file preservation', () => {
       await db.close();
     });
   });
+
+  it('keeps a generated-format audio id visible after its asset row is deleted', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'voice.m4a');
+      const photoSource = path.join(path.dirname(file), 'source.jpg');
+      await writeFile(source, Buffer.from('m4a-bytes'));
+      await writeFile(photoSource, TINY_JPEG);
+      const media = createNodeMediaStore(mediaRoot);
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const app = createUseCases({
+        ...createSqliteRepositories(db),
+        media,
+        clock: clockAt('2026-09-24T20:00:00.000Z'),
+      });
+      const draft = await app.restoreOrCreateDraft();
+      await app.updateDraftNote(draft.draftId, '字还在');
+      await app.addPickedImages(draft.draftId, [
+        { sourceUri: photoSource, mimeType: 'image/jpeg', width: 1, height: 1 },
+      ]);
+      await app.addRecordedAudio(draft.draftId, {
+        sourceUri: source,
+        durationMs: 1800,
+        mimeType: 'audio/mp4',
+      });
+      const composer = await app.restoreOrCreateDraft();
+      expect(composer.audio?.id).toMatch(/^asset_\d+_[a-z0-9]+$/);
+      const audioId = composer.audio?.id;
+      if (!audioId) throw new Error('expected generated audio id');
+      const saved = await app.saveTextMoment(draft.draftId);
+      await db.run('DELETE FROM assets WHERE id = ?', [audioId]);
+
+      const detail = await app.getMomentDetail(saved.id);
+      expect(detail.kind).toBe('ready');
+      if (detail.kind === 'ready') {
+        expect(detail.id).toBe(saved.id);
+        expect(detail.note).toBe('字还在');
+        expect(detail.images).toHaveLength(1);
+        expect(detail.audio).toBeNull();
+        expect(detail.unknownMedia).toEqual([
+          {
+            id: audioId,
+            status: 'unavailable',
+            label: '这份内容',
+            unavailableLabel: '这份内容暂时无法打开。',
+          },
+        ]);
+      }
+      await db.close();
+    });
+  });
 });

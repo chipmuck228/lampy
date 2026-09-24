@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatSoundDuration } from '../application/duration';
-import type { AudioView } from '../application/use-cases';
+import type { AudioView, UnknownMediaView } from '../application/use-cases';
 import type { PlaybackStatus } from '../infrastructure/media';
 
 export type RecordPhase = 'ready' | 'recording' | 'stopped' | 'processing' | 'failed';
@@ -89,6 +89,31 @@ export function MomentAudio({
           <Text style={styles.action}>{actionLabel}</Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+export function MomentUnknownMedia({
+  items,
+  testIDPrefix,
+}: {
+  items: UnknownMediaView[];
+  testIDPrefix: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <View style={styles.block}>
+      {items.map((item) => (
+        <View
+          key={item.id}
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={`${item.label}。${item.unavailableLabel}`}
+          testID={`${testIDPrefix}-unavailable-${item.id}`}
+        >
+          <Text style={styles.missing}>{item.unavailableLabel}</Text>
+        </View>
+      ))}
     </View>
   );
 }

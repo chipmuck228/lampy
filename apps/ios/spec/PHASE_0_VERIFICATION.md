@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `npx tsc --noEmit` | `apps/ios` | **通过**（exit 0） |
 | `npx expo lint` | `apps/ios` | **通过**（exit 0） |
-| `npm test` | `apps/ios` | **通过**。14 suites / 62 tests |
+| `npm test` | `apps/ios` | **通过**。15 suites / 65 tests |
 | `npx expo run:ios --device "iPhone 17"` | `apps/ios` | **通过**。Build Succeeded，已装上模拟器 |
 | `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testRecordSoundSaveRecentExactIdDetail test` | `apps/ios/ios`（本地，不入库） | **通过**。iPhone 17 Simulator |
 | `git diff --check` | 仓库根 | **通过** |
@@ -26,6 +26,7 @@
 - 重录启动失败仍保留旧声音，可继续试听
 - 超过 200 条记录时，仍被引用的文件不会被删
 - 音频 Asset 损坏或缺失显示为声音不可用，不显示成照片
+- 真实 `asset_` 格式的音频 ID 在 Asset 行缺失时显示中性不可用占位，文字和其他媒体仍在
 - 录音处理中不能保存或再选照片
 
 ## 模拟器闭环（合并前已点通）
