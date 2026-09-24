@@ -1,7 +1,14 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+import { validateAsset, type AssetRecord } from '../domain-adapters/asset-commands';
 import { DomainError, ERROR_CODES } from '../domain-adapters/errors';
 import { validateMoment, type MomentRecord } from '../domain-adapters/moment-commands';
-import type { DraftRepository, MomentRead, MomentRepository } from './repositories';
+import type {
+  AssetRead,
+  AssetRepository,
+  DraftRepository,
+  MomentRead,
+  MomentRepository,
+} from './repositories';
 import type { SqlDatabase } from './sql';
 
 const hash = require('@lampy/domain/shared/hash.js') as { hashCode: (value: string) => number };
@@ -59,6 +66,27 @@ async function quarantine(
   );
 }
 
+type DecodedAsset =
+  | { ok: true; asset: AssetRecord }
+  | { ok: false; raw: unknown; errors: { code: string; message: string }[] };
+
+function decodeAsset(json: string): DecodedAsset {
+  try {
+    const raw = JSON.parse(json) as unknown;
+    const result = validateAsset(raw);
+    if (!result.ok) {
+      return { ok: false, raw, errors: result.errors };
+    }
+    return { ok: true, asset: raw as AssetRecord };
+  } catch {
+    return {
+      ok: false,
+      raw: json,
+      errors: [{ code: ERROR_CODES.REPOSITORY_INVALID_RECORD, message: 'asset json could not be parsed' }],
+    };
+  }
+}
+
 function assertValid(record: MomentRecord) {
   const result = validateMoment(record);
   if (!result.ok) {
@@ -69,9 +97,20 @@ function assertValid(record: MomentRecord) {
   }
 }
 
+function assertValidAsset(record: AssetRecord) {
+  const result = validateAsset(record);
+  if (!result.ok) {
+    throw new DomainError(
+      ERROR_CODES.REPOSITORY_INVALID_RECORD,
+      result.errors[0]?.message || 'invalid asset',
+    );
+  }
+}
+
 export function createSqliteRepositories(db: SqlDatabase): {
   moments: MomentRepository;
   drafts: DraftRepository;
+  assets: AssetRepository;
 } {
   return {
     moments: {
@@ -196,6 +235,47 @@ export function createSqliteRepositories(db: SqlDatabase): {
       },
       async clear(draftId) {
         await db.run('DELETE FROM drafts WHERE id = ?', [draftId]);
+      },
+    },
+    assets: {
+      async save(asset) {
+        assertValidAsset(asset);
+        const existing = await db.getFirst<{ json: string }>('SELECT json FROM assets WHERE id = ?', [
+          asset.id,
+        ]);
+        if (existing) {
+          const decoded = decodeAsset(existing.json);
+          if (!decoded.ok) {
+            await quarantine(db, 'asset', decoded.raw, decoded.errors);
+            throw new DomainError(
+              ERROR_CODES.REPOSITORY_INVALID_RECORD,
+              'refusing to overwrite an unreadable asset',
+            );
+          }
+          await db.run('UPDATE assets SET owner_id = ?, type = ?, json = ? WHERE id = ?', [
+            asset.ownerId,
+            asset.type,
+            JSON.stringify(asset),
+            asset.id,
+          ]);
+          return;
+        }
+        await db.run('INSERT INTO assets (id, owner_id, type, json) VALUES (?, ?, ?, ?)', [
+          asset.id,
+          asset.ownerId,
+          asset.type,
+          JSON.stringify(asset),
+        ]);
+      },
+      async findById(id): Promise<AssetRead> {
+        const row = await db.getFirst<{ json: string }>('SELECT json FROM assets WHERE id = ?', [id]);
+        if (!row) return { kind: 'missing' };
+        const decoded = decodeAsset(row.json);
+        if (!decoded.ok) {
+          await quarantine(db, 'asset', decoded.raw, decoded.errors);
+          return { kind: 'unreadable' };
+        }
+        return { kind: 'ready', asset: decoded.asset };
       },
     },
   };

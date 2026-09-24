@@ -1,4 +1,9 @@
 import { createUseCases } from './use-cases';
+import {
+  createExpoCameraSource,
+  createExpoLibrarySource,
+  createExpoMediaStore,
+} from '../infrastructure/expo-media';
 import { createSqliteRepositories, openLampyDatabase } from '../infrastructure/sqlite';
 
 export function createUseCaseLoader(load: () => Promise<ReturnType<typeof createUseCases>>) {
@@ -30,7 +35,12 @@ export function createUseCaseLoader(load: () => Promise<ReturnType<typeof create
 
 const defaultLoader = createUseCaseLoader(async () => {
   const db = await openLampyDatabase();
-  return createUseCases(createSqliteRepositories(db));
+  return createUseCases({
+    ...createSqliteRepositories(db),
+    media: createExpoMediaStore(),
+    library: createExpoLibrarySource(),
+    camera: createExpoCameraSource(),
+  });
 });
 
 export function getUseCases() {

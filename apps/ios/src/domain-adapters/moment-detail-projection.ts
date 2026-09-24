@@ -16,7 +16,18 @@ export type MomentDetailProjection = {
   };
   content: { note: string; significance: string; emotion: string };
   source: { type: string; label: string; isLegacy: boolean };
-  assets: { id: string; type: string; status: string }[];
+  assets: {
+    id: string;
+    type: string;
+    status: string;
+    localUri?: string;
+    display: {
+      caption?: string;
+      width?: number;
+      height?: number;
+      unavailableLabel?: string;
+    };
+  }[];
   state: {
     isActive: boolean;
     hasText: boolean;
@@ -45,5 +56,16 @@ export function projectMomentDetailView(
       ...view.source,
       label: SOURCE_LABELS[type] || view.source.label,
     },
+    assets: view.assets.map((asset) =>
+      asset.status === 'available'
+        ? asset
+        : {
+            ...asset,
+            display: {
+              ...asset.display,
+              unavailableLabel: '这张照片暂时找不到了，但这条记录还在。',
+            },
+          },
+    ),
   };
 }

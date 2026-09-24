@@ -12,6 +12,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import type { RecentLifeViewModel } from '../application/use-cases';
+import { MomentImages } from '../screens/moment-images';
 
 export default function RecentScreen() {
   const router = useRouter();
@@ -64,7 +65,7 @@ export default function RecentScreen() {
         {view?.isFirstUse ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>最近还没有留下什么。</Text>
-            <Text style={styles.body}>写一句就可以留下。照片和声音还没有接上。</Text>
+            <Text style={styles.body}>写一句或留下照片就可以。</Text>
           </View>
         ) : null}
 
@@ -72,13 +73,18 @@ export default function RecentScreen() {
           <Pressable
             key={item.id}
             accessibilityRole="button"
-            accessibilityLabel={`${item.dateLabel}，${item.note}`}
+            accessibilityLabel={
+              item.note
+                ? `${item.dateLabel}，${item.note}`
+                : `${item.dateLabel}，${item.images.map((image) => image.label).join('，') || '一张照片'}`
+            }
             testID={`recent-item-${item.id}`}
             onPress={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
             style={styles.row}
           >
             <Text style={styles.date}>{item.dateLabel}</Text>
-            <Text style={styles.note}>{item.note}</Text>
+            {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+            <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
           </Pressable>
         ))}
       </ScrollView>

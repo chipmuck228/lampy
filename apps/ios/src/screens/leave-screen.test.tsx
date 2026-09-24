@@ -13,8 +13,20 @@ jest.mock('../application/container', () => ({
       draftId: 'moment_restored',
       note: '还没留下的一句',
       isRestored: true,
+      images: [
+        {
+          id: 'asset_restored',
+          status: 'available' as const,
+          uri: 'memory://assets/asset_restored.jpg',
+          width: 800,
+          height: 600,
+          label: '照片 1/1',
+        },
+      ],
     }),
     updateDraftNote: async () => undefined,
+    addLibraryImages: async () => undefined,
+    addCameraImage: async () => undefined,
     saveTextMoment: async () => ({ id: 'moment_restored' }),
   }),
 }));
@@ -36,5 +48,8 @@ describe('leave screen', () => {
       expect(view.getByText('上次还有一些内容没保存，已经为你放回来了。')).toBeTruthy();
     });
     expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
+    expect(view.getByLabelText('照片 1/1')).toBeTruthy();
+    expect(view.getByLabelText('拍摄')).toBeTruthy();
+    expect(view.getByLabelText('照片')).toBeTruthy();
   });
 });
