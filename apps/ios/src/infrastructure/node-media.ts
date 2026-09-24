@@ -1,18 +1,27 @@
 import { copyFile, mkdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import { extensionForAudioMime, extensionForMime, type MediaStore } from './media';
+import { classifyCopyError, extensionForAudioMime, extensionForMime, type MediaStore } from './media';
 
 export function createNodeMediaStore(rootDir: string): MediaStore {
   async function persist(dest: string, sourceUri: string) {
-    await mkdir(rootDir, { recursive: true });
     try {
-      await stat(dest);
-      return { localUri: dest };
-    } catch {
-      await copyFile(sourceUri, dest);
-      const info = await stat(dest);
-      return { localUri: dest, sizeBytes: info.size };
+      await mkdir(rootDir, { recursive: true });
+      try {
+        await stat(dest);
+        return { localUri: dest };
+      } catch {
+        await copyFile(sourceUri, dest);
+        const info = await stat(dest);
+        return { localUri: dest, sizeBytes: info.size };
+      }
+    } catch (error) {
+      try {
+        await unlink(dest);
+      } catch {
+        // A failed copy must not leave a partial dest that later looks persisted.
+      }
+      throw classifyCopyError(error);
     }
   }
 

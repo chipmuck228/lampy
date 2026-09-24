@@ -16,6 +16,36 @@ export type MediaPermission = 'granted' | 'denied';
 
 export type PlaybackStatus = 'idle' | 'playing' | 'paused' | 'finished' | 'unavailable';
 
+export type MediaPersistCode = 'DISK_FULL' | 'COPY_FAILED';
+
+export class MediaPersistError extends Error {
+  readonly code: MediaPersistCode;
+
+  constructor(code: MediaPersistCode, message: string) {
+    super(message);
+    this.name = 'MediaPersistError';
+    this.code = code;
+  }
+}
+
+export function isMediaPersistError(error: unknown): error is MediaPersistError {
+  return error instanceof MediaPersistError;
+}
+
+export function classifyCopyError(error: unknown): MediaPersistError {
+  if (error instanceof MediaPersistError) return error;
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code || '')
+      : '';
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const haystack = `${code} ${message}`;
+  if (/ENOSPC|SQLITE_FULL|DISK_FULL|no space|disk full|not enough space|空间不足/i.test(haystack)) {
+    return new MediaPersistError('DISK_FULL', message || 'disk full');
+  }
+  return new MediaPersistError('COPY_FAILED', message || 'copy failed');
+}
+
 export interface ImageSource {
   requestPermission(): Promise<MediaPermission>;
   pick(remaining: number): Promise<PickedImage[]>;
@@ -83,6 +113,7 @@ export function createMemoryMediaStore(): MediaStore & {
   markMissing(localUri: string): void;
   markUndecodable(localUri: string): void;
   markUnplayable(localUri: string): void;
+  failNextPersist(code: MediaPersistCode): void;
   persisted: Map<string, { sourceUri: string; exists: boolean; decodable: boolean; playable: boolean }>;
   removed: string[];
 } {
@@ -91,11 +122,16 @@ export function createMemoryMediaStore(): MediaStore & {
     { sourceUri: string; exists: boolean; decodable: boolean; playable: boolean }
   >();
   const removed: string[] = [];
+  const persistFaults: MediaPersistCode[] = [];
 
   async function persist(
     dest: string,
     sourceUri: string,
   ): Promise<{ localUri: string; sizeBytes?: number }> {
+    const fault = persistFaults.shift();
+    if (fault) {
+      throw new MediaPersistError(fault, fault === 'DISK_FULL' ? 'disk full' : 'copy failed');
+    }
     const existing = persisted.get(dest);
     if (existing) return { localUri: dest };
     persisted.set(dest, { sourceUri, exists: true, decodable: true, playable: true });
@@ -141,6 +177,9 @@ export function createMemoryMediaStore(): MediaStore & {
     markUnplayable(localUri) {
       const file = persisted.get(localUri);
       if (file) persisted.set(localUri, { ...file, playable: false });
+    },
+    failNextPersist(code) {
+      persistFaults.push(code);
     },
   };
 }

@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import {
+  classifyCopyError,
   extensionForAudioMime,
   extensionForMime,
   type ImageSource,
@@ -82,24 +83,33 @@ async function persistCopy(
   dest: string,
   sourceUri: string,
 ): Promise<{ localUri: string; sizeBytes?: number }> {
-  const directory = assetDirectory();
-  const info = await FileSystem.getInfoAsync(directory);
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-  }
-  const destInfo = await FileSystem.getInfoAsync(dest);
-  if (destInfo.exists) {
+  try {
+    const directory = assetDirectory();
+    const info = await FileSystem.getInfoAsync(directory);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+    }
+    const destInfo = await FileSystem.getInfoAsync(dest);
+    if (destInfo.exists) {
+      return {
+        localUri: dest,
+        sizeBytes: destInfo.size,
+      };
+    }
+    await FileSystem.copyAsync({ from: sourceUri, to: dest });
+    const copied = await FileSystem.getInfoAsync(dest);
     return {
       localUri: dest,
-      sizeBytes: destInfo.size,
+      sizeBytes: copied.exists ? copied.size : undefined,
     };
+  } catch (error) {
+    try {
+      await FileSystem.deleteAsync(dest, { idempotent: true });
+    } catch {
+      // A failed copy must not later look like a persisted asset.
+    }
+    throw classifyCopyError(error);
   }
-  await FileSystem.copyAsync({ from: sourceUri, to: dest });
-  const copied = await FileSystem.getInfoAsync(dest);
-  return {
-    localUri: dest,
-    sizeBytes: copied.exists ? copied.size : undefined,
-  };
 }
 
 function isAppOwned(localUri: string): boolean {

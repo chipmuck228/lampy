@@ -9,12 +9,14 @@ import {
   type MomentRecord,
 } from '../domain-adapters/moment-commands';
 import { projectMomentDetailView } from '../domain-adapters/moment-detail-projection';
-import type {
-  AudioCapture,
-  ImageSource,
-  MediaStore,
-  PickedImage,
-  RecordedAudio,
+import {
+  classifyCopyError,
+  isMediaPersistError,
+  type AudioCapture,
+  type ImageSource,
+  type MediaStore,
+  type PickedImage,
+  type RecordedAudio,
 } from '../infrastructure/media';
 import type {
   AssetRead,
@@ -27,9 +29,35 @@ import { ApplicationError, toApplicationError } from './errors';
 
 export const MAX_DRAFT_IMAGES = 3;
 export const MAX_DRAFT_AUDIO = 1;
-export const IMAGE_UNAVAILABLE_LABEL = '这张照片暂时找不到了，但这条记录还在。';
-export const AUDIO_UNAVAILABLE_LABEL = '这段声音暂时无法播放，其他内容仍然保留。';
+export const IMAGE_MISSING_LABEL = '这张照片暂时找不到了，但这条记录还在。';
+export const IMAGE_UNDECODABLE_LABEL = '这张照片打不开了，但这条记录还在。';
+export const IMAGE_UNAVAILABLE_LABEL = IMAGE_MISSING_LABEL;
+export const AUDIO_MISSING_LABEL = '这段声音暂时找不到了，其他内容仍然保留。';
+export const AUDIO_UNPLAYABLE_LABEL = '这段声音暂时无法播放，其他内容仍然保留。';
+export const AUDIO_UNAVAILABLE_LABEL = AUDIO_UNPLAYABLE_LABEL;
 export const UNKNOWN_UNAVAILABLE_LABEL = '这份内容暂时无法打开。';
+
+export const LIBRARY_DENIED_MESSAGE =
+  '没有打开相册。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许照片后，可以再试。';
+export const CAMERA_DENIED_MESSAGE =
+  '没有打开相机。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许相机后，可以再试。';
+export const MIC_DENIED_MESSAGE =
+  '没有打开麦克风。还可以写字和留下照片，草稿还在。打开系统设置允许麦克风后，可以再试。';
+
+const IMAGE_DISK_FULL_MESSAGE =
+  '这台设备空间不够，这张照片没有留下。已经写的字和已留下的内容还在草稿里，可以清出空间后再试。';
+const IMAGE_COPY_FAILED_MESSAGE =
+  '这张照片没有复制进来。已经写的字和已留下的内容还在草稿里，可以再试。';
+const IMAGE_WRITE_FAILED_MESSAGE =
+  '这张照片还没写进草稿。已经写的字和已留下的内容还在，可以再试。';
+const AUDIO_DISK_FULL_MESSAGE =
+  '这台设备空间不够，这段声音没有留下。已经写的字和已留下的内容还在草稿里，可以清出空间后再试。';
+const AUDIO_COPY_FAILED_MESSAGE =
+  '这段声音没有复制进来。已经写的字和已留下的内容还在草稿里，可以再试。';
+const AUDIO_WRITE_FAILED_MESSAGE =
+  '这段声音还没写进草稿。已经写的字和已留下的内容还在，可以再试。';
+const SAVE_DISK_FULL_MESSAGE = '这次没有留下正式记录。草稿还在，可以清出空间后再试。';
+const SAVE_WRITE_FAILED_MESSAGE = '这次没有留下正式记录。草稿还在，可以再试。';
 
 export type Clock = { now: () => Date };
 
@@ -41,6 +69,7 @@ export type ImageView = {
   height?: number;
   label: string;
   unavailableLabel?: string;
+  reason?: 'missing' | 'undecodable';
 };
 
 export type AudioView = {
@@ -51,6 +80,7 @@ export type AudioView = {
   durationLabel: string;
   label: string;
   unavailableLabel?: string;
+  reason?: 'missing' | 'unplayable';
 };
 
 export type UnknownMediaView = {
@@ -145,6 +175,46 @@ function typeFromAssetRead(assetId: string, found: AssetRead): string | undefine
   return inferTypeFromAssetId(assetId);
 }
 
+function mapPersistError(error: unknown, kind: 'image' | 'audio'): ApplicationError {
+  if (error instanceof ApplicationError) return error;
+  const persist = isMediaPersistError(error) ? error : classifyCopyError(error);
+  if (kind === 'image') {
+    return new ApplicationError(
+      persist.code,
+      persist.code === 'DISK_FULL' ? IMAGE_DISK_FULL_MESSAGE : IMAGE_COPY_FAILED_MESSAGE,
+    );
+  }
+  return new ApplicationError(
+    persist.code,
+    persist.code === 'DISK_FULL' ? AUDIO_DISK_FULL_MESSAGE : AUDIO_COPY_FAILED_MESSAGE,
+  );
+}
+
+function mapRepositoryWrite(
+  error: unknown,
+  kind: 'image' | 'audio' | 'save',
+): ApplicationError {
+  if (error instanceof ApplicationError) return error;
+  const persist = classifyCopyError(error);
+  if (persist.code === 'DISK_FULL') {
+    if (kind === 'image') return new ApplicationError('DISK_FULL', IMAGE_DISK_FULL_MESSAGE);
+    if (kind === 'audio') return new ApplicationError('DISK_FULL', AUDIO_DISK_FULL_MESSAGE);
+    return new ApplicationError('DISK_FULL', SAVE_DISK_FULL_MESSAGE);
+  }
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = String((error as { code?: string }).code || '');
+    if (code === 'REPOSITORY_INVALID_RECORD') {
+      return new ApplicationError(
+        'REPOSITORY_INVALID_RECORD',
+        error instanceof Error ? error.message : '这条记录还在，但现在不能覆盖它',
+      );
+    }
+  }
+  if (kind === 'image') return new ApplicationError('REPOSITORY_WRITE_FAILED', IMAGE_WRITE_FAILED_MESSAGE);
+  if (kind === 'audio') return new ApplicationError('REPOSITORY_WRITE_FAILED', AUDIO_WRITE_FAILED_MESSAGE);
+  return new ApplicationError('REPOSITORY_WRITE_FAILED', SAVE_WRITE_FAILED_MESSAGE);
+}
+
 export function createUseCases(deps: {
   moments: MomentRepository;
   drafts: DraftRepository;
@@ -218,13 +288,26 @@ export function createUseCases(deps: {
           id: assetId,
           status: 'unavailable',
           label,
-          unavailableLabel: IMAGE_UNAVAILABLE_LABEL,
+          unavailableLabel: IMAGE_MISSING_LABEL,
+          reason: 'missing',
         });
         continue;
       }
       const uri = found.asset.localUri;
       const exists = deps.media ? await deps.media.exists(uri) : false;
-      const readable = exists && deps.media ? await deps.media.canDecode(uri) : false;
+      if (!exists) {
+        views.push({
+          id: assetId,
+          status: 'unavailable',
+          width: found.asset.metadata.width,
+          height: found.asset.metadata.height,
+          label,
+          unavailableLabel: IMAGE_MISSING_LABEL,
+          reason: 'missing',
+        });
+        continue;
+      }
+      const readable = deps.media ? await deps.media.canDecode(uri) : false;
       if (!readable) {
         views.push({
           id: assetId,
@@ -232,7 +315,8 @@ export function createUseCases(deps: {
           width: found.asset.metadata.width,
           height: found.asset.metadata.height,
           label,
-          unavailableLabel: IMAGE_UNAVAILABLE_LABEL,
+          unavailableLabel: IMAGE_UNDECODABLE_LABEL,
+          reason: 'undecodable',
         });
         continue;
       }
@@ -264,11 +348,24 @@ export function createUseCases(deps: {
         durationMs,
         durationLabel,
         label: '当时的声音',
-        unavailableLabel: AUDIO_UNAVAILABLE_LABEL,
+        unavailableLabel: AUDIO_MISSING_LABEL,
+        reason: 'missing',
       };
     }
     const uri = found.asset.localUri;
-    const playable = !!deps.media && (await deps.media.exists(uri)) && (await deps.media.canPlay(uri));
+    const exists = !!deps.media && (await deps.media.exists(uri));
+    if (!exists) {
+      return {
+        id: audioId,
+        status: 'unavailable',
+        durationMs,
+        durationLabel,
+        label: '当时的声音',
+        unavailableLabel: AUDIO_MISSING_LABEL,
+        reason: 'missing',
+      };
+    }
+    const playable = await deps.media!.canPlay(uri);
     if (!playable) {
       return {
         id: audioId,
@@ -276,7 +373,8 @@ export function createUseCases(deps: {
         durationMs,
         durationLabel,
         label: '当时的声音',
-        unavailableLabel: AUDIO_UNAVAILABLE_LABEL,
+        unavailableLabel: AUDIO_UNPLAYABLE_LABEL,
+        reason: 'unplayable',
       };
     }
     return {
@@ -326,6 +424,16 @@ export function createUseCases(deps: {
     await deps.media.removeAppOwned(localUri);
   }
 
+  async function rollbackUncommitted(assetId: string, localUri: string | undefined): Promise<void> {
+    if (await isAssetReferenced(assetId)) return;
+    if (localUri && deps.media) {
+      await deps.media.removeAppOwned(localUri);
+    }
+    const existing = deps.assets ? await deps.assets.findById(assetId) : { kind: 'missing' as const };
+    if (existing.kind === 'unreadable') return;
+    await deps.assets?.remove(assetId);
+  }
+
   async function persistAndAttach(draft: MomentRecord, picks: PickedImage[]): Promise<MomentRecord> {
     if (!deps.assets || !deps.media) {
       throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下照片。');
@@ -333,38 +441,49 @@ export function createUseCases(deps: {
     let current = draft;
     for (const pick of picks) {
       const assetId = nextAssetId();
-      const persisted = await deps.media.persistImage({
-        assetId,
-        sourceUri: pick.sourceUri,
-        mimeType: pick.mimeType,
-      });
-      const existing = await deps.assets.findById(assetId);
-      if (existing.kind === 'unreadable') {
-        throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这张照片还在，但现在不能覆盖它');
+      let persisted: { localUri: string; sizeBytes?: number };
+      try {
+        persisted = await deps.media.persistImage({
+          assetId,
+          sourceUri: pick.sourceUri,
+          mimeType: pick.mimeType,
+        });
+      } catch (error) {
+        throw mapPersistError(error, 'image');
       }
-      if (existing.kind === 'missing') {
-        const instant = clock.now();
-        const asset = createAsset(
-          {
-            id: assetId,
-            ownerId,
-            type: 'image',
-            captureTimeSource: 'system',
-            localUri: persisted.localUri,
-            storage: { status: 'local' },
-            metadata: {
-              mimeType: pick.mimeType,
-              sizeBytes: persisted.sizeBytes,
-              width: pick.width,
-              height: pick.height,
+      try {
+        const existing = await deps.assets.findById(assetId);
+        if (existing.kind === 'unreadable') {
+          await rollbackUncommitted(assetId, persisted.localUri);
+          throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这张照片还在，但现在不能覆盖它');
+        }
+        if (existing.kind === 'missing') {
+          const instant = clock.now();
+          const asset = createAsset(
+            {
+              id: assetId,
+              ownerId,
+              type: 'image',
+              captureTimeSource: 'system',
+              localUri: persisted.localUri,
+              storage: { status: 'local' },
+              metadata: {
+                mimeType: pick.mimeType,
+                sizeBytes: persisted.sizeBytes,
+                width: pick.width,
+                height: pick.height,
+              },
             },
-          },
-          { now: () => instant, ownerId },
-        );
-        await deps.assets.save(asset);
+            { now: () => instant, ownerId },
+          );
+          await deps.assets.save(asset);
+        }
+        current = attachAsset(current, assetId, ownerId, clock.now());
+        await deps.drafts.save(current);
+      } catch (error) {
+        await rollbackUncommitted(assetId, persisted.localUri);
+        throw mapRepositoryWrite(error, 'image');
       }
-      current = attachAsset(current, assetId, ownerId, clock.now());
-      await deps.drafts.save(current);
     }
     return current;
   }
@@ -385,41 +504,57 @@ export function createUseCases(deps: {
       throw new ApplicationError('AUDIO_LIMIT', '每条最多一段声音');
     }
     const assetId = nextAssetId();
-    const persisted = await deps.media.persistAudio({
-      assetId,
-      sourceUri: recorded.sourceUri,
-      mimeType: recorded.mimeType,
-    });
-    const existing = await deps.assets.findById(assetId);
-    if (existing.kind === 'unreadable') {
-      throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这段声音还在，但现在不能覆盖它');
+    let persisted: { localUri: string; sizeBytes?: number };
+    try {
+      persisted = await deps.media.persistAudio({
+        assetId,
+        sourceUri: recorded.sourceUri,
+        mimeType: recorded.mimeType,
+      });
+    } catch (error) {
+      throw mapPersistError(error, 'audio');
     }
-    if (existing.kind === 'missing') {
-      const instant = clock.now();
-      const asset = createAsset(
-        {
-          id: assetId,
-          ownerId,
-          type: 'audio',
-          captureTimeSource: 'system',
-          localUri: persisted.localUri,
-          storage: { status: 'local' },
-          metadata: {
-            mimeType: recorded.mimeType || 'audio/mp4',
-            sizeBytes: persisted.sizeBytes,
-            durationMs: recorded.durationMs,
+    let next = draft;
+    try {
+      const existing = await deps.assets.findById(assetId);
+      if (existing.kind === 'unreadable') {
+        await rollbackUncommitted(assetId, persisted.localUri);
+        throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这段声音还在，但现在不能覆盖它');
+      }
+      if (existing.kind === 'missing') {
+        const instant = clock.now();
+        const asset = createAsset(
+          {
+            id: assetId,
+            ownerId,
+            type: 'audio',
+            captureTimeSource: 'system',
+            localUri: persisted.localUri,
+            storage: { status: 'local' },
+            metadata: {
+              mimeType: recorded.mimeType || 'audio/mp4',
+              sizeBytes: persisted.sizeBytes,
+              durationMs: recorded.durationMs,
+            },
           },
-        },
-        { now: () => instant, ownerId },
-      );
-      await deps.assets.save(asset);
+          { now: () => instant, ownerId },
+        );
+        await deps.assets.save(asset);
+      }
+      next = existingAudioId ? detachAsset(draft, existingAudioId, ownerId, clock.now()) : draft;
+      next = attachAsset(next, assetId, ownerId, clock.now());
+      await deps.drafts.save(next);
+    } catch (error) {
+      await rollbackUncommitted(assetId, persisted.localUri);
+      throw mapRepositoryWrite(error, 'audio');
     }
-    const previous = existingAudioId ? await loadAsset(existingAudioId) : null;
-    let next = existingAudioId ? detachAsset(draft, existingAudioId, ownerId, clock.now()) : draft;
-    next = attachAsset(next, assetId, ownerId, clock.now());
-    await deps.drafts.save(next);
     if (existingAudioId) {
-      await cleanupOrphan(existingAudioId, previous?.localUri);
+      const previous = await loadAsset(existingAudioId);
+      try {
+        await cleanupOrphan(existingAudioId, previous?.localUri);
+      } catch {
+        // The replacement is already on the draft; keep both files if cleanup cannot confirm.
+      }
     }
     return next;
   }
@@ -511,7 +646,7 @@ export function createUseCases(deps: {
       draftId,
       deps.library,
       'LIBRARY_DENIED',
-      '没有打开相册。还可以写字，草稿还在。',
+      LIBRARY_DENIED_MESSAGE,
     );
   }
 
@@ -520,7 +655,7 @@ export function createUseCases(deps: {
       draftId,
       deps.camera,
       'CAMERA_DENIED',
-      '没有打开相机。还可以写字，草稿还在。',
+      CAMERA_DENIED_MESSAGE,
     );
   }
 
@@ -543,7 +678,7 @@ export function createUseCases(deps: {
     }
     const permission = await deps.capture.requestPermission();
     if (permission !== 'granted') {
-      throw new ApplicationError('MIC_DENIED', '没有打开麦克风。还可以写字和留下照片，草稿还在。');
+      throw new ApplicationError('MIC_DENIED', MIC_DENIED_MESSAGE);
     }
     await deps.capture.start();
   }
@@ -632,8 +767,16 @@ export function createUseCases(deps: {
       instant,
     );
     moment = activateMoment(moment, ownerId, instant);
-    await deps.moments.save(moment);
-    await deps.drafts.clear(draftId);
+    try {
+      await deps.moments.save(moment);
+    } catch (error) {
+      throw mapRepositoryWrite(error, 'save');
+    }
+    try {
+      await deps.drafts.clear(draftId);
+    } catch {
+      // The formal record is already committed; a later retry is idempotent.
+    }
     return { id: moment.id };
   }
 
