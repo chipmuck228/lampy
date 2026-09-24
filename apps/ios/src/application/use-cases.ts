@@ -65,31 +65,38 @@ export function createUseCases(deps: {
   const ownerId = deps.ownerId || LOCAL_OWNER_ID;
   const clock = deps.clock || defaultClock();
   const nextId = deps.id || defaultId;
+  let restoreInFlight: Promise<ComposerViewModel> | null = null;
 
   async function restoreOrCreateDraft(): Promise<ComposerViewModel> {
-    const existing = await deps.drafts.loadActive();
-    if (existing) {
-      return {
-        draftId: existing.id,
-        note: existing.content.note,
-        isRestored: true,
-      };
-    }
-    const instant = clock.now();
-    const draft = createDraftMoment(
-      {
-        ownerId,
-        content: { note: '' },
-        time: {
-          recordedAt: instant.toISOString(),
-          occurredAtPrecision: 'unknown',
+    if (restoreInFlight) return restoreInFlight;
+    restoreInFlight = (async () => {
+      const existing = await deps.drafts.loadActive();
+      if (existing) {
+        return {
+          draftId: existing.id,
+          note: existing.content.note,
+          isRestored: true,
+        };
+      }
+      const instant = clock.now();
+      const draft = createDraftMoment(
+        {
+          ownerId,
+          content: { note: '' },
+          time: {
+            recordedAt: instant.toISOString(),
+            occurredAtPrecision: 'unknown',
+          },
+          origin: { type: 'created' },
         },
-        origin: { type: 'created' },
-      },
-      { now: () => instant, ownerId, id: nextId },
-    );
-    await deps.drafts.save(draft);
-    return { draftId: draft.id, note: '', isRestored: false };
+        { now: () => instant, ownerId, id: nextId },
+      );
+      await deps.drafts.save(draft);
+      return { draftId: draft.id, note: '', isRestored: false };
+    })().finally(() => {
+      restoreInFlight = null;
+    });
+    return restoreInFlight;
   }
 
   async function updateDraftNote(draftId: string, note: string): Promise<void> {

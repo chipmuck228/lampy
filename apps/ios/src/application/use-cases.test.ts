@@ -46,6 +46,14 @@ describe('text-only personal moment use cases', () => {
     expect((await app.getRecentLife()).items).toHaveLength(0);
   });
 
+  it('returns the same draft when restore is called twice at once', async () => {
+    const repos = createMemoryRepositories();
+    const app = createUseCases({ ...repos, clock: clockAt('2026-09-24T03:30:00.000Z') });
+    const [first, second] = await Promise.all([app.restoreOrCreateDraft(), app.restoreOrCreateDraft()]);
+    expect(second.draftId).toBe(first.draftId);
+    expect((await app.getRecentLife()).items).toHaveLength(0);
+  });
+
   it('does not create a second moment when save is repeated', async () => {
     const repos = createMemoryRepositories();
     const app = createUseCases({ ...repos, clock: clockAt('2026-09-24T04:00:00.000Z') });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -24,6 +24,8 @@ export default function LeaveScreen() {
   const [restored, setRestored] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const draftIdRef = useRef<string | null>(null);
+  const persistChain = useRef(Promise.resolve());
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +33,7 @@ export default function LeaveScreen() {
       .then((app) => app.restoreOrCreateDraft())
       .then((draft) => {
         if (cancelled) return;
+        draftIdRef.current = draft.draftId;
         setDraftId(draft.draftId);
         setNote(draft.note);
         setRestored(draft.isRestored && !!draft.note.trim());
@@ -43,20 +46,29 @@ export default function LeaveScreen() {
     };
   }, []);
 
-  async function persistNote(next: string) {
+  function persistNote(next: string) {
     setNote(next);
-    if (!draftId) return;
-    const app = await getUseCases();
-    await app.updateDraftNote(draftId, next);
+    const id = draftIdRef.current;
+    if (!id) return;
+    persistChain.current = persistChain.current
+      .then(async () => {
+        const app = await getUseCases();
+        await app.updateDraftNote(id, next);
+      })
+      .catch(() => {
+        setMessage('草稿暂时写不进去。已经写的字还在屏幕上。');
+      });
   }
 
   async function onSave() {
-    if (!draftId || saving) return;
+    const id = draftIdRef.current;
+    if (!id || saving) return;
     setSaving(true);
     try {
+      await persistChain.current;
       const app = await getUseCases();
-      await app.updateDraftNote(draftId, note);
-      await app.saveTextMoment(draftId);
+      await app.updateDraftNote(id, note);
+      await app.saveTextMoment(id);
       router.replace('/');
     } catch (error) {
       setMessage(

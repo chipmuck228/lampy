@@ -86,13 +86,18 @@ export function createSqliteRepositories(db: SQLite.SQLiteDatabase): {
     },
     drafts: {
       async save(draft) {
-        await db.execAsync('DELETE FROM drafts;');
-        await db.runAsync(
-          'INSERT INTO drafts (id, json, updated_at) VALUES (?, ?, ?)',
-          draft.id,
-          JSON.stringify(draft),
-          draft.audit.updatedAt,
-        );
+        await db.withTransactionAsync(async () => {
+          await db.runAsync('DELETE FROM drafts WHERE id != ?', draft.id);
+          await db.runAsync(
+            `INSERT INTO drafts (id, json, updated_at) VALUES (?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               json = excluded.json,
+               updated_at = excluded.updated_at`,
+            draft.id,
+            JSON.stringify(draft),
+            draft.audit.updatedAt,
+          );
+        });
       },
       async loadActive() {
         const row = await db.getFirstAsync<{ json: string }>(
