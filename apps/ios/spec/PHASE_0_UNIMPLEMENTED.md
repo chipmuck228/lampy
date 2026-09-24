@@ -12,12 +12,12 @@
 | 撤回 / 送达状态变化 | 领域有 status 枚举，无网络状态机 | 未实现 |
 | 相机 / 相册写入 iOS | 未接 `expo-image-picker` / 持久文件 | 未实现 |
 | 麦克风录音 | 未接 `expo-audio` | 未实现 |
-| SQLite Moment 仓库 | 未建表 | 未实现 |
-| 草稿持久化（iOS） | 未实现 | 未实现 |
+| SQLite Moment 仓库 | iOS 已建 `moments` / `drafts` 表 | 仅文字闭环；媒体列未建 |
+| 草稿持久化（iOS） | iOS `drafts` 表 + Use Case 恢复 | 已实现纯文字草稿 |
 | significance | 领域有字段，页面未采集 | MVP 不做 |
 | 公开社交 / 点赞 / AI | 规格禁止 | 不做 |
 | 暗色完整主题 | 待决定 | 未交付 |
 | 编辑 / 删除详情内容 | 详情只读 | 未实现 |
 | 真机权限与音频中断 | 需真机 | **未验证** |
 
-当前 `apps/ios/src/app/index.tsx` 只声明「空 App，还没有创建 Moment、媒体或同步」。保持这种诚实。
+当前 `apps/ios` 只交付纯文字个人闭环。页面不得宣称照片、声音、家庭或同步已经接上。

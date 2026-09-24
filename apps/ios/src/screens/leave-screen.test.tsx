@@ -1,0 +1,40 @@
+import { render, waitFor } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import LeaveScreen from '../app/leave';
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+}));
+
+jest.mock('../application/container', () => ({
+  getUseCases: async () => ({
+    restoreOrCreateDraft: async () => ({
+      draftId: 'moment_restored',
+      note: '还没留下的一句',
+      isRestored: true,
+    }),
+    updateDraftNote: async () => undefined,
+    saveTextMoment: async () => ({ id: 'moment_restored' }),
+  }),
+}));
+
+describe('leave screen', () => {
+  it('restores the unfinished draft instead of starting a new one', async () => {
+    const view = await render(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 390, height: 844 },
+          insets: { top: 47, left: 0, right: 0, bottom: 34 },
+        }}
+      >
+        <LeaveScreen />
+      </SafeAreaProvider>,
+    );
+
+    await waitFor(() => {
+      expect(view.getByText('上次还有一些内容没保存，已经为你放回来了。')).toBeTruthy();
+    });
+    expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
+  });
+});
