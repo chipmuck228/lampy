@@ -1,54 +1,116 @@
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
 
-/**
- * Phase-gate scaffold only. No Moment UI, no mock data, no splash delay.
- */
-export default function ScaffoldHomeScreen() {
+import { getUseCases } from '../application/container';
+import type { RecentLifeViewModel } from '../application/use-cases';
+
+export default function RecentScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const readingWidth = Math.min(width, 720);
+  const [view, setView] = useState<RecentLifeViewModel | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getUseCases()
+        .then((app) => app.getRecentLife())
+        .then((next) => {
+          if (!cancelled) {
+            setView(next);
+            setError(null);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setError('最近的记录暂时读不出来，原来的内容还在这台设备上。');
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="Lampy iOS 脚手架">
-      <View style={[styles.column, { maxWidth: readingWidth }]}>
-        <Text style={styles.wordmark} accessibilityRole="header">
-          Lampy
-        </Text>
-        <Text style={styles.claim}>iOS 脚手架已就绪</Text>
-        <Text style={styles.body}>
-          这是空 App。还没有创建 Moment、媒体或同步。日期和首页会在下一阶段与启动层共用同一版面。
-        </Text>
-      </View>
+    <SafeAreaView style={styles.safe} accessibilityLabel="最近">
+      <ScrollView contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}>
+        <View style={styles.top}>
+          <Text style={styles.wordmark} accessibilityRole="header">
+            最近
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="留下"
+            testID="home-leave"
+            hitSlop={8}
+            onPress={() => router.push('/leave')}
+            style={styles.leaveHit}
+          >
+            <Text style={styles.leave}>留下</Text>
+          </Pressable>
+        </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {view?.isFirstUse ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>最近还没有留下什么。</Text>
+            <Text style={styles.body}>写一句就可以留下。照片和声音还没有接上。</Text>
+          </View>
+        ) : null}
+
+        {view?.items.map((item) => (
+          <Pressable
+            key={item.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.dateLabel}，${item.note}`}
+            testID={`recent-item-${item.id}`}
+            onPress={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
+            style={styles.row}
+          >
+            <Text style={styles.date}>{item.dateLabel}</Text>
+            <Text style={styles.note}>{item.note}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#F3F0E9',
-  },
+  safe: { flex: 1, backgroundColor: '#F3F0E9' },
   column: {
-    flex: 1,
+    flexGrow: 1,
     width: '100%',
     alignSelf: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 24,
-    gap: 12,
+    paddingBottom: 32,
+    gap: 20,
   },
-  wordmark: {
-    fontSize: 28,
-    lineHeight: 34,
-    color: '#25231F',
+  top: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 44,
+    paddingTop: 12,
   },
-  claim: {
-    fontSize: 20,
-    lineHeight: 28,
-    color: '#667568',
-  },
-  body: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#777168',
-  },
+  wordmark: { fontSize: 28, lineHeight: 34, color: '#25231F' },
+  leaveHit: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
+  leave: { fontSize: 18, lineHeight: 24, color: '#53604F' },
+  empty: { gap: 8, paddingTop: 24 },
+  emptyTitle: { fontSize: 22, lineHeight: 30, color: '#25231F' },
+  body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
+  error: { fontSize: 16, lineHeight: 24, color: '#87513D' },
+  row: { gap: 8, paddingVertical: 8, minHeight: 44 },
+  date: { fontSize: 14, lineHeight: 20, color: '#53604F' },
+  note: { fontSize: 20, lineHeight: 28, color: '#25231F' },
 });

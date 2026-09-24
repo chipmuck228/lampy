@@ -1,6 +1,6 @@
 # Lampy iOS
 
-Expo SDK 57 Development Build。阶段 0 只有空壳。
+Expo SDK 57 Development Build。当前可运行范围是本机纯文字个人 Moment：留下、草稿恢复、最近、精确 id 详情。
 
 ```bash
 npm run check-env

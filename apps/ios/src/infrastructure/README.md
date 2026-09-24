@@ -1,1 +1,1 @@
-SQLite / FileStore 适配层。本轮未实现。
+SQLite 与内存仓库。读取先做领域校验；无效行进隔离表，原文留在原位。Screen 和 projection 都不直接查库。
