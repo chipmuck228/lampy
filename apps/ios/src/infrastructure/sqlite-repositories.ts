@@ -4,6 +4,7 @@ import { DomainError, ERROR_CODES } from '../domain-adapters/errors';
 import { validateMoment, type MomentRecord } from '../domain-adapters/moment-commands';
 import type {
   AssetRead,
+  AssetReferenceLookup,
   AssetRepository,
   DraftRepository,
   MomentRead,
@@ -97,6 +98,36 @@ function assertValid(record: MomentRecord) {
   }
 }
 
+function peekAssetType(raw: unknown, columnType?: string): string | undefined {
+  if (columnType === 'image' || columnType === 'audio' || columnType === 'video') {
+    return columnType;
+  }
+  if (raw && typeof raw === 'object' && 'type' in raw) {
+    const type = (raw as { type: unknown }).type;
+    if (type === 'image' || type === 'audio' || type === 'video') return type;
+  }
+  return typeof columnType === 'string' && columnType ? columnType : undefined;
+}
+
+async function lookupMomentRows(
+  db: SqlDatabase,
+  entityType: string,
+  rows: { json: string }[],
+  assetId: string,
+): Promise<AssetReferenceLookup> {
+  let unknown = false;
+  for (const row of rows) {
+    const decoded = decodeMoment(row.json);
+    if (!decoded.ok) {
+      await quarantine(db, entityType, decoded.raw, decoded.errors);
+      unknown = true;
+      continue;
+    }
+    if (decoded.moment.assetIds.includes(assetId)) return 'referenced';
+  }
+  return unknown ? 'unknown' : 'clear';
+}
+
 function assertValidAsset(record: AssetRecord) {
   const result = validateAsset(record);
   if (!result.ok) {
@@ -187,32 +218,20 @@ export function createSqliteRepositories(db: SqlDatabase): {
         }
         return valid;
       },
-      async listActiveOccurredAtValues() {
-        const rows = await db.getAll<{ occurred_at: string }>(
-          `SELECT occurred_at FROM moments
-           WHERE lifecycle_status = 'active'
-             AND occurred_at IS NOT NULL
-             AND json_extract(json, '$.time.occurredAtPrecision') IN ('exact', 'day', 'month', 'year')`,
-        );
-        return rows.map((row) => row.occurred_at);
+      async lookupAssetReferences(assetId) {
+        const rows = await db.getAll<{ json: string }>('SELECT json FROM moments');
+        return lookupMomentRows(db, 'moment', rows, assetId);
       },
-      async listActiveOccurredBetween(startIso, endIso) {
-        const rows = await db.getAll<{ json: string }>(
-          `SELECT json FROM moments
+      async countActiveUnknown() {
+        const row = await db.getFirst<{ total: number }>(
+          `SELECT COUNT(*) as total FROM moments
            WHERE lifecycle_status = 'active'
-             AND occurred_at IS NOT NULL
-             AND occurred_at >= ?
-             AND occurred_at < ?
-           ORDER BY occurred_at ASC, recorded_at ASC`,
-          [startIso, endIso],
+             AND (
+               occurred_at IS NULL
+               OR json_extract(json, '$.time.occurredAtPrecision') = 'unknown'
+             )`,
         );
-        const valid: MomentRecord[] = [];
-        for (const row of rows) {
-          const decoded = decodeMoment(row.json);
-          if (decoded.ok) valid.push(decoded.moment);
-          else await quarantine(db, 'moment', decoded.raw, decoded.errors);
-        }
-        return valid;
+        return row?.total ?? 0;
       },
       async listActiveUnknown(limit, offset) {
         const rows = await db.getAll<{ json: string }>(
@@ -237,16 +256,59 @@ export function createSqliteRepositories(db: SqlDatabase): {
           hasMore: valid.length > limit,
         };
       },
-      async countActiveUnknown() {
+      async countActiveOccurred(query) {
+        const placeholders = query.precisions.map(() => '?').join(', ');
         const row = await db.getFirst<{ total: number }>(
           `SELECT COUNT(*) as total FROM moments
            WHERE lifecycle_status = 'active'
-             AND (
-               occurred_at IS NULL
-               OR json_extract(json, '$.time.occurredAtPrecision') = 'unknown'
-             )`,
+             AND occurred_at IS NOT NULL
+             AND occurred_at >= ?
+             AND occurred_at < ?
+             AND json_extract(json, '$.time.occurredAtPrecision') IN (${placeholders})`,
+          [query.startIso, query.endIso, ...query.precisions],
         );
         return row?.total ?? 0;
+      },
+      async listActiveOccurred(query) {
+        const placeholders = query.precisions.map(() => '?').join(', ');
+        const order =
+          query.order === 'recorded-desc'
+            ? 'recorded_at DESC'
+            : 'occurred_at ASC, recorded_at ASC';
+        const rows = await db.getAll<{ json: string }>(
+          `SELECT json FROM moments
+           WHERE lifecycle_status = 'active'
+             AND occurred_at IS NOT NULL
+             AND occurred_at >= ?
+             AND occurred_at < ?
+             AND json_extract(json, '$.time.occurredAtPrecision') IN (${placeholders})
+           ORDER BY ${order}
+           LIMIT ? OFFSET ?`,
+          [query.startIso, query.endIso, ...query.precisions, query.limit + 1, query.offset],
+        );
+        const valid: MomentRecord[] = [];
+        for (const row of rows) {
+          const decoded = decodeMoment(row.json);
+          if (decoded.ok) valid.push(decoded.moment);
+          else await quarantine(db, 'moment', decoded.raw, decoded.errors);
+        }
+        return {
+          items: valid.slice(0, query.limit),
+          hasMore: valid.length > query.limit,
+        };
+      },
+      async occurredAtSpan(precisions) {
+        const placeholders = precisions.map(() => '?').join(', ');
+        const row = await db.getFirst<{ minIso: string | null; maxIso: string | null }>(
+          `SELECT MIN(occurred_at) as minIso, MAX(occurred_at) as maxIso
+           FROM moments
+           WHERE lifecycle_status = 'active'
+             AND occurred_at IS NOT NULL
+             AND json_extract(json, '$.time.occurredAtPrecision') IN (${placeholders})`,
+          [...precisions],
+        );
+        if (!row?.minIso || !row.maxIso) return null;
+        return { minIso: row.minIso, maxIso: row.maxIso };
       },
     },
     drafts: {
@@ -297,6 +359,10 @@ export function createSqliteRepositories(db: SqlDatabase): {
       async clear(draftId) {
         await db.run('DELETE FROM drafts WHERE id = ?', [draftId]);
       },
+      async lookupAssetReferences(assetId) {
+        const rows = await db.getAll<{ json: string }>('SELECT json FROM drafts');
+        return lookupMomentRows(db, 'draft', rows, assetId);
+      },
     },
     assets: {
       async save(asset) {
@@ -329,12 +395,15 @@ export function createSqliteRepositories(db: SqlDatabase): {
         ]);
       },
       async findById(id): Promise<AssetRead> {
-        const row = await db.getFirst<{ json: string }>('SELECT json FROM assets WHERE id = ?', [id]);
+        const row = await db.getFirst<{ json: string; type: string | null }>(
+          'SELECT json, type FROM assets WHERE id = ?',
+          [id],
+        );
         if (!row) return { kind: 'missing' };
         const decoded = decodeAsset(row.json);
         if (!decoded.ok) {
           await quarantine(db, 'asset', decoded.raw, decoded.errors);
-          return { kind: 'unreadable' };
+          return { kind: 'unreadable', type: peekAssetType(decoded.raw, row.type ?? undefined) };
         }
         return { kind: 'ready', asset: decoded.asset };
       },

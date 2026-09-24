@@ -1,7 +1,9 @@
 import {
+  calendarPartsAt,
   formatCalendarDate,
-  getCalendarParts,
+  offsetMinutesAt,
   parseMillis,
+  type HistoryClock,
 } from '../domain-adapters/calendar';
 import type { MomentRecord } from '../domain-adapters/moment-commands';
 
@@ -96,7 +98,7 @@ export type HistoryUnconfirmedView = {
  */
 export function placeMomentForHistory(
   moment: MomentRecord,
-  timezoneOffsetMinutes: number,
+  clock: HistoryClock,
 ): HistoryPlacement {
   const precision = moment.time.occurredAtPrecision;
   if (precision === 'unknown' || !moment.time.occurredAt) {
@@ -104,36 +106,25 @@ export function placeMomentForHistory(
   }
   const millis = parseMillis(moment.time.occurredAt);
   if (millis === null) return { kind: 'unknown' };
-  const parts = getCalendarParts(millis, timezoneOffsetMinutes);
+  const parts = calendarPartsAt(millis, clock);
   if (precision === 'year') return { kind: 'year', year: parts.year };
   if (precision === 'month') return { kind: 'month', year: parts.year, month: parts.month };
   return { kind: 'day', year: parts.year, month: parts.month, day: parts.day };
 }
 
-export function projectHistoryYearIndex(
-  occurredAtValues: string[],
+export function projectHistoryYearIndexFromCounts(
+  years: { year: number; momentCount: number }[],
   unknownCount: number,
-  timezoneOffsetMinutes: number,
 ): HistoryYearsView {
-  const counts = new Map<number, number>();
-  for (const iso of occurredAtValues) {
-    const millis = parseMillis(iso);
-    if (millis === null) continue;
-    const year = getCalendarParts(millis, timezoneOffsetMinutes).year;
-    counts.set(year, (counts.get(year) || 0) + 1);
-  }
-  const years = [...counts.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .map(([year, momentCount]) => ({
-      year,
+  return {
+    years: years.map((item) => ({
+      year: item.year,
       monthCounts: Array.from({ length: 12 }, () => 0),
       filledMonths: 0,
       quietMonths: 12,
       yearUnconfirmedCount: 0,
-      momentCount,
-    }));
-  return {
-    years,
+      momentCount: item.momentCount,
+    })),
     unknownCount,
     isEmpty: years.length === 0 && unknownCount === 0,
   };
@@ -142,11 +133,11 @@ export function projectHistoryYearIndex(
 export function projectHistoryYears(
   moments: MomentRecord[],
   unknownCount: number,
-  timezoneOffsetMinutes: number,
+  clock: HistoryClock,
 ): HistoryYearsView {
   const byYear = new Map<number, MomentRecord[]>();
   for (const moment of moments) {
-    const place = placeMomentForHistory(moment, timezoneOffsetMinutes);
+    const place = placeMomentForHistory(moment, clock);
     if (place.kind === 'unknown') continue;
     const year = place.year;
     const list = byYear.get(year) || [];
@@ -155,7 +146,7 @@ export function projectHistoryYears(
   }
   const years = [...byYear.keys()]
     .sort((a, b) => b - a)
-    .map((year) => projectYearSummary(byYear.get(year) || [], year, timezoneOffsetMinutes));
+    .map((year) => projectYearSummary(byYear.get(year) || [], year, clock));
   return {
     years,
     unknownCount,
@@ -163,13 +154,12 @@ export function projectHistoryYears(
   };
 }
 
-export function projectHistoryYear(
-  moments: MomentRecord[],
+export function projectHistoryYearFromCounts(
   year: number,
-  timezoneOffsetMinutes: number,
+  monthCounts: number[],
+  yearUnconfirmedCount: number,
 ): HistoryYearView {
-  const summary = projectYearSummary(moments, year, timezoneOffsetMinutes);
-  const months: HistoryMonthCell[] = summary.monthCounts.map((count, index) => {
+  const months: HistoryMonthCell[] = monthCounts.map((count, index) => {
     const month = index + 1;
     const filled = count > 0;
     return {
@@ -184,30 +174,26 @@ export function projectHistoryYear(
     year,
     title: `${year}年`,
     months,
-    yearUnconfirmedCount: summary.yearUnconfirmedCount,
+    yearUnconfirmedCount,
     yearUnconfirmedLabel: '这一年，月份未确认',
   };
 }
 
-export function projectHistoryMonth(
+export function projectHistoryYear(
   moments: MomentRecord[],
   year: number,
+  clock: HistoryClock,
+): HistoryYearView {
+  const summary = projectYearSummary(moments, year, clock);
+  return projectHistoryYearFromCounts(year, summary.monthCounts, summary.yearUnconfirmedCount);
+}
+
+export function projectHistoryMonthFromCounts(
+  year: number,
   month: number,
-  timezoneOffsetMinutes: number,
+  dayCounts: number[],
+  dayUnconfirmedCount: number,
 ): HistoryMonthView {
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const dayCounts = Array.from({ length: lastDay }, () => 0);
-  let dayUnconfirmedCount = 0;
-  for (const moment of moments) {
-    const place = placeMomentForHistory(moment, timezoneOffsetMinutes);
-    if (place.kind === 'month' && place.year === year && place.month === month) {
-      dayUnconfirmedCount += 1;
-      continue;
-    }
-    if (place.kind === 'day' && place.year === year && place.month === month) {
-      dayCounts[place.day - 1] += 1;
-    }
-  }
   const days: HistoryDayCell[] = dayCounts.map((count, index) => {
     const day = index + 1;
     const filled = count > 0;
@@ -230,20 +216,42 @@ export function projectHistoryMonth(
   };
 }
 
+export function projectHistoryMonth(
+  moments: MomentRecord[],
+  year: number,
+  month: number,
+  clock: HistoryClock,
+): HistoryMonthView {
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const dayCounts = Array.from({ length: lastDay }, () => 0);
+  let dayUnconfirmedCount = 0;
+  for (const moment of moments) {
+    const place = placeMomentForHistory(moment, clock);
+    if (place.kind === 'month' && place.year === year && place.month === month) {
+      dayUnconfirmedCount += 1;
+      continue;
+    }
+    if (place.kind === 'day' && place.year === year && place.month === month) {
+      dayCounts[place.day - 1] += 1;
+    }
+  }
+  return projectHistoryMonthFromCounts(year, month, dayCounts, dayUnconfirmedCount);
+}
+
 export function projectHistoryDay(
   moments: MomentRecord[],
   year: number,
   month: number,
   day: number,
-  timezoneOffsetMinutes: number,
+  clock: HistoryClock,
 ): HistoryDayView {
   const items = moments
     .filter((moment) => {
-      const place = placeMomentForHistory(moment, timezoneOffsetMinutes);
+      const place = placeMomentForHistory(moment, clock);
       return place.kind === 'day' && place.year === year && place.month === month && place.day === day;
     })
     .sort(compareListedMoments)
-    .map((moment) => toListedMoment(moment, timezoneOffsetMinutes));
+    .map((moment) => toListedMoment(moment, clock));
   return {
     year,
     month,
@@ -257,11 +265,11 @@ export function projectHistoryDay(
 export function projectHistoryUnconfirmed(
   moments: MomentRecord[],
   filter: { kind: 'unknown' } | { kind: 'year'; year: number } | { kind: 'month'; year: number; month: number },
-  timezoneOffsetMinutes: number,
+  clock: HistoryClock,
   hasMore: boolean,
 ): HistoryUnconfirmedView {
   const filtered = moments.filter((moment) => {
-    const place = placeMomentForHistory(moment, timezoneOffsetMinutes);
+    const place = placeMomentForHistory(moment, clock);
     if (filter.kind === 'unknown') return place.kind === 'unknown';
     if (filter.kind === 'year') return place.kind === 'year' && place.year === filter.year;
     return place.kind === 'month' && place.year === filter.year && place.month === filter.month;
@@ -270,7 +278,7 @@ export function projectHistoryUnconfirmed(
     filter.kind === 'unknown'
       ? [...filtered].sort((left, right) => right.time.recordedAt.localeCompare(left.time.recordedAt))
       : [...filtered].sort(compareListedMoments);
-  const items = ordered.map((moment) => toListedMoment(moment, timezoneOffsetMinutes));
+  const items = ordered.map((moment) => toListedMoment(moment, clock));
   if (filter.kind === 'unknown') {
     return {
       kind: 'unknown',
@@ -301,13 +309,13 @@ export function projectHistoryUnconfirmed(
 function projectYearSummary(
   moments: MomentRecord[],
   year: number,
-  timezoneOffsetMinutes: number,
+  clock: HistoryClock,
 ): HistoryYearSummary {
   const monthCounts = Array.from({ length: 12 }, () => 0);
   let yearUnconfirmedCount = 0;
   let momentCount = 0;
   for (const moment of moments) {
-    const place = placeMomentForHistory(moment, timezoneOffsetMinutes);
+    const place = placeMomentForHistory(moment, clock);
     if (place.kind === 'unknown') continue;
     if (place.year !== year) continue;
     momentCount += 1;
@@ -328,12 +336,16 @@ function projectYearSummary(
   };
 }
 
-function toListedMoment(moment: MomentRecord, timezoneOffsetMinutes: number): HistoryListedMoment {
+export function toListedMoment(moment: MomentRecord, clock: HistoryClock): HistoryListedMoment {
   const precision = moment.time.occurredAtPrecision;
+  const occurredMillis = parseMillis(moment.time.occurredAt || moment.time.recordedAt);
+  const recordedMillis = parseMillis(moment.time.recordedAt);
+  const occurredOffset = occurredMillis === null ? 0 : offsetMinutesAt(occurredMillis, clock);
+  const recordedOffset = recordedMillis === null ? 0 : offsetMinutesAt(recordedMillis, clock);
   const timeLabel = formatCalendarDate(
     moment.time.occurredAt || moment.time.recordedAt,
     precision,
-    timezoneOffsetMinutes,
+    occurredOffset,
   );
   const usedRecordedAtFallback = precision === 'unknown' || !moment.time.occurredAt;
   return {
@@ -343,7 +355,7 @@ function toListedMoment(moment: MomentRecord, timezoneOffsetMinutes: number): Hi
     timeLabel: usedRecordedAtFallback ? '时间未确认' : timeLabel,
     usedRecordedAtFallback,
     recordedFallbackLabel: usedRecordedAtFallback
-      ? `记录于 ${formatCalendarDate(moment.time.recordedAt, 'day', timezoneOffsetMinutes)}`
+      ? `记录于 ${formatCalendarDate(moment.time.recordedAt, 'day', recordedOffset)}`
       : undefined,
   };
 }

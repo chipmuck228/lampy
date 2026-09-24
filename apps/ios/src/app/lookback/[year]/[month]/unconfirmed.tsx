@@ -61,6 +61,8 @@ export default function LookbackMonthUnconfirmedScreen() {
           timeLabel={item.timeLabel}
           recordedFallbackLabel={item.recordedFallbackLabel}
           images={item.images}
+          audio={item.audio}
+          unknownMedia={item.unknownMedia}
           onPress={() => router.push(momentHref(item.id))}
         />
       ))}

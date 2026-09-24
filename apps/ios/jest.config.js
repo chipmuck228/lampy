@@ -4,6 +4,7 @@ const expoPreset = require('jest-expo/jest-preset');
 module.exports = {
   ...expoPreset,
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
+  setupFilesAfterEnv: [...(expoPreset.setupFilesAfterEnv || []), '<rootDir>/jest.setup.js'],
   testPathIgnorePatterns: ['/node_modules/', '<rootDir>/ios/', '<rootDir>/android/'],
   modulePaths: ['<rootDir>/node_modules'],
   moduleNameMapper: {

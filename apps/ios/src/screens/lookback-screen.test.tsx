@@ -120,9 +120,25 @@ describe('lookback screens', () => {
           timeLabel: '2026年1月2日 08:15',
           usedRecordedAtFallback: false,
           images: [],
-          unknownMedia: [],
+          audio: {
+            id: 'asset_voice_lookback',
+            status: 'available',
+            uri: 'memory://assets/asset_voice_lookback.m4a',
+            durationMs: 1800,
+            durationLabel: '2秒',
+            label: '一段声音',
+          },
+          unknownMedia: [
+            {
+              id: 'asset_vanished',
+              status: 'unavailable',
+              label: '这份内容',
+              unavailableLabel: '这份内容暂时无法打开。',
+            },
+          ],
         },
       ],
+      hasMore: false,
     });
     mockGetMomentDetail.mockResolvedValue({
       kind: 'ready',
@@ -133,12 +149,31 @@ describe('lookback screens', () => {
       usedRecordedAtFallback: false,
       sourceLabel: '你留下的记录',
       images: [],
+      audio: {
+        id: 'asset_voice_lookback',
+        status: 'available',
+        uri: 'memory://assets/asset_voice_lookback.m4a',
+        durationMs: 1800,
+        durationLabel: '2秒',
+        label: '一段声音',
+      },
+      unknownMedia: [
+        {
+          id: 'asset_vanished',
+          status: 'unavailable',
+          label: '这份内容',
+          unavailableLabel: '这份内容暂时无法打开。',
+        },
+      ],
     });
 
     const day = await render(wrap(<LookbackDayScreen />));
     await waitFor(() => {
       expect(day.getByText('门口的风')).toBeTruthy();
     });
+    expect(day.getByText('一段声音 · 2秒')).toBeTruthy();
+    expect(day.getByText('这份内容暂时无法打开。')).toBeTruthy();
+    expect(day.queryByText('这条记录现在无法找到')).toBeNull();
     fireEvent.press(day.getByTestId('lookback-moment-m_exact'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_exact' } });
 
@@ -146,6 +181,8 @@ describe('lookback screens', () => {
     await waitFor(() => {
       expect(detail.getByText('门口的风')).toBeTruthy();
     });
+    expect(detail.getByText('一段声音 · 2秒')).toBeTruthy();
+    expect(detail.getByText('这份内容暂时无法打开。')).toBeTruthy();
     fireEvent.press(detail.getByLabelText('返回原来的位置'));
     expect(mockBack).toHaveBeenCalled();
   });

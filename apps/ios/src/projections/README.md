@@ -1,1 +1,1 @@
-只读 Projection。回看年/月/日由已读取的 Moment 生成 ViewModel，不查询 SQLite。
+只读 Projection。回看年/月格子由仓库计数生成；日与未确认页只投影当前页的 Moment。不查询 SQLite。

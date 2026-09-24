@@ -12,30 +12,89 @@ export type MomentPage = {
   hasMore: boolean;
 };
 
+export type OccurredPrecision = 'exact' | 'day' | 'month' | 'year';
+
+export const PLACED_PRECISIONS: readonly OccurredPrecision[] = ['exact', 'day', 'month', 'year'];
+export const DAY_PRECISIONS: readonly OccurredPrecision[] = ['exact', 'day'];
+
+export type HistoryCountQuery = {
+  startIso: string;
+  endIso: string;
+  precisions: readonly OccurredPrecision[];
+};
+
+export type HistoryPageQuery = HistoryCountQuery & {
+  limit: number;
+  offset: number;
+  order: 'occurred-asc' | 'recorded-desc';
+};
+
+export type OccurredAtSpan = {
+  minIso: string;
+  maxIso: string;
+};
+
+export type AssetReferenceLookup = 'referenced' | 'clear' | 'unknown';
+
 export interface MomentRepository {
   save(moment: MomentRecord): Promise<void>;
   findById(id: string): Promise<MomentRead>;
   listRecent(limit?: number): Promise<MomentRecord[]>;
-  listActiveOccurredBetween(startIso: string, endIso: string): Promise<MomentRecord[]>;
-  listActiveOccurredAtValues(): Promise<string[]>;
-  listActiveUnknown(limit: number, offset: number): Promise<MomentPage>;
+  lookupAssetReferences(assetId: string): Promise<AssetReferenceLookup>;
   countActiveUnknown(): Promise<number>;
+  listActiveUnknown(limit: number, offset: number): Promise<MomentPage>;
+  countActiveOccurred(query: HistoryCountQuery): Promise<number>;
+  listActiveOccurred(query: HistoryPageQuery): Promise<MomentPage>;
+  occurredAtSpan(precisions: readonly OccurredPrecision[]): Promise<OccurredAtSpan | null>;
 }
 
 export interface DraftRepository {
   save(draft: MomentRecord): Promise<void>;
   loadActive(): Promise<MomentRecord | null>;
   clear(draftId: string): Promise<void>;
+  lookupAssetReferences(assetId: string): Promise<AssetReferenceLookup>;
 }
 
 export type AssetRead =
   | { kind: 'ready'; asset: AssetRecord }
   | { kind: 'missing' }
-  | { kind: 'unreadable' };
+  | { kind: 'unreadable'; type?: string };
 
 export interface AssetRepository {
   save(asset: AssetRecord): Promise<void>;
   findById(id: string): Promise<AssetRead>;
+}
+
+function lookupInRecords(
+  records: (MomentRecord | null)[],
+  assetId: string,
+): AssetReferenceLookup {
+  let unknown = false;
+  for (const record of records) {
+    if (!record) continue;
+    if (!validateMoment(record).ok) {
+      unknown = true;
+      continue;
+    }
+    if (record.assetIds.includes(assetId)) return 'referenced';
+  }
+  return unknown ? 'unknown' : 'clear';
+}
+
+function isPlacedActive(item: MomentRecord, query: HistoryCountQuery): boolean {
+  return (
+    validateMoment(item).ok &&
+    item.lifecycle.status === 'active' &&
+    !!item.time.occurredAt &&
+    item.time.occurredAt >= query.startIso &&
+    item.time.occurredAt < query.endIso &&
+    query.precisions.includes(item.time.occurredAtPrecision as OccurredPrecision)
+  );
+}
+
+function compareOccurred(left: MomentRecord, right: MomentRecord): number {
+  const byOccurred = (left.time.occurredAt || '').localeCompare(right.time.occurredAt || '');
+  return byOccurred !== 0 ? byOccurred : left.time.recordedAt.localeCompare(right.time.recordedAt);
 }
 
 export function createMemoryRepositories(): {
@@ -80,29 +139,16 @@ export function createMemoryRepositories(): {
           .slice(0, limit)
           .map((item) => structuredClone(item));
       },
-      async listActiveOccurredAtValues() {
-        return [...moments.values()]
-          .filter(
-            (item) =>
-              validateMoment(item).ok &&
-              item.lifecycle.status === 'active' &&
-              !!item.time.occurredAt &&
-              item.time.occurredAtPrecision !== 'unknown',
-          )
-          .map((item) => item.time.occurredAt as string);
+      async lookupAssetReferences(assetId) {
+        return lookupInRecords([...moments.values()], assetId);
       },
-      async listActiveOccurredBetween(startIso, endIso) {
-        return [...moments.values()]
-          .filter(
-            (item) =>
-              validateMoment(item).ok &&
-              item.lifecycle.status === 'active' &&
-              !!item.time.occurredAt &&
-              item.time.occurredAt >= startIso &&
-              item.time.occurredAt < endIso,
-          )
-          .sort((a, b) => (a.time.occurredAt || '').localeCompare(b.time.occurredAt || ''))
-          .map((item) => structuredClone(item));
+      async countActiveUnknown() {
+        return [...moments.values()].filter(
+          (item) =>
+            validateMoment(item).ok &&
+            item.lifecycle.status === 'active' &&
+            (item.time.occurredAtPrecision === 'unknown' || !item.time.occurredAt),
+        ).length;
       },
       async listActiveUnknown(limit, offset) {
         const all = [...moments.values()]
@@ -118,13 +164,37 @@ export function createMemoryRepositories(): {
           hasMore: offset + limit < all.length,
         };
       },
-      async countActiveUnknown() {
-        return [...moments.values()].filter(
-          (item) =>
-            validateMoment(item).ok &&
-            item.lifecycle.status === 'active' &&
-            (item.time.occurredAtPrecision === 'unknown' || !item.time.occurredAt),
-        ).length;
+      async countActiveOccurred(query) {
+        return [...moments.values()].filter((item) => isPlacedActive(item, query)).length;
+      },
+      async listActiveOccurred(query) {
+        const all = [...moments.values()]
+          .filter((item) => isPlacedActive(item, query))
+          .sort((left, right) =>
+            query.order === 'recorded-desc'
+              ? right.time.recordedAt.localeCompare(left.time.recordedAt)
+              : compareOccurred(left, right),
+          );
+        return {
+          items: all.slice(query.offset, query.offset + query.limit).map((item) => structuredClone(item)),
+          hasMore: query.offset + query.limit < all.length,
+        };
+      },
+      async occurredAtSpan(precisions) {
+        const isos = [...moments.values()]
+          .filter(
+            (item) =>
+              validateMoment(item).ok &&
+              item.lifecycle.status === 'active' &&
+              !!item.time.occurredAt &&
+              precisions.includes(item.time.occurredAtPrecision as OccurredPrecision),
+          )
+          .map((item) => item.time.occurredAt as string);
+        if (isos.length === 0) return null;
+        return {
+          minIso: isos.reduce((left, right) => (left < right ? left : right)),
+          maxIso: isos.reduce((left, right) => (left > right ? left : right)),
+        };
       },
     },
     drafts: {
@@ -153,6 +223,9 @@ export function createMemoryRepositories(): {
           activeDraft = null;
         }
       },
+      async lookupAssetReferences(assetId) {
+        return lookupInRecords([activeDraft], assetId);
+      },
     },
     assets: {
       async save(asset) {
@@ -177,7 +250,7 @@ export function createMemoryRepositories(): {
         if (!found) return { kind: 'missing' };
         return validateAsset(found).ok
           ? { kind: 'ready', asset: structuredClone(found) }
-          : { kind: 'unreadable' };
+          : { kind: 'unreadable', type: typeof found.type === 'string' ? found.type : undefined };
       },
     },
   };

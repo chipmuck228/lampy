@@ -28,6 +28,7 @@ describe('moment detail read error', () => {
       usedRecordedAtFallback: true,
       sourceLabel: '你留下的记录',
       images: [],
+      audio: null,
     });
 
     const view = await render(

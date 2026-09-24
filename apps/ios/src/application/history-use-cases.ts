@@ -1,37 +1,43 @@
 import {
   calendarDayBounds,
   calendarMonthBounds,
+  calendarPartsAt,
   calendarYearBounds,
-  deviceTimezoneOffsetMinutes,
+  daysInMonth,
   isValidCalendarDay,
+  parseMillis,
+  type HistoryClock,
 } from '../domain-adapters/calendar';
-import type { AssetRepository, MomentRepository } from '../infrastructure/repositories';
-import type { MediaStore } from '../infrastructure/media';
+import type { MomentRecord } from '../domain-adapters/moment-commands';
 import {
-  placeMomentForHistory,
+  DAY_PRECISIONS,
+  PLACED_PRECISIONS,
+  type MomentRepository,
+} from '../infrastructure/repositories';
+import {
   projectHistoryDay,
-  projectHistoryMonth,
+  projectHistoryMonthFromCounts,
   projectHistoryUnconfirmed,
-  projectHistoryYear,
-  projectHistoryYearIndex,
+  projectHistoryYearFromCounts,
+  projectHistoryYearIndexFromCounts,
+  toListedMoment,
   type HistoryDayView,
   type HistoryListedMoment,
-  type HistoryMonthView,
   type HistoryUnconfirmedView,
-  type HistoryYearView,
-  type HistoryYearsView,
 } from '../projections/history-projection';
-import type { ImageView } from './use-cases';
+import type { AudioView, ImageView, UnknownMediaView } from './use-cases';
 
 export const HISTORY_PAGE_SIZE = 50;
 
 export type HistoryMomentItem = HistoryListedMoment & {
   images: ImageView[];
-  unknownMedia: { id: string; status: 'unavailable'; label: string; unavailableLabel: string }[];
+  audio: AudioView | null;
+  unknownMedia: UnknownMediaView[];
 };
 
 export type HistoryDayViewModel = Omit<HistoryDayView, 'items'> & {
   items: HistoryMomentItem[];
+  hasMore: boolean;
 };
 
 export type HistoryUnconfirmedViewModel = Omit<HistoryUnconfirmedView, 'items'> & {
@@ -40,126 +46,158 @@ export type HistoryUnconfirmedViewModel = Omit<HistoryUnconfirmedView, 'items'> 
 
 export function createHistoryUseCases(deps: {
   moments: MomentRepository;
-  assets?: AssetRepository;
-  media?: MediaStore;
+  timezone?: HistoryClock;
   timezoneOffsetMinutes?: number;
   resolveImages: (assetIds: string[]) => Promise<ImageView[]>;
+  resolveAudio: (assetIds: string[]) => Promise<AudioView | null>;
+  resolveUnknown: (assetIds: string[]) => Promise<UnknownMediaView[]>;
 }) {
-  const timezoneOffsetMinutes =
-    deps.timezoneOffsetMinutes ?? deviceTimezoneOffsetMinutes();
+  const clock: HistoryClock = deps.timezone ?? deps.timezoneOffsetMinutes ?? { timeZone: deviceTimeZone() };
 
-  async function decorate(items: HistoryListedMoment[]): Promise<HistoryMomentItem[]> {
+  async function decorate(moments: MomentRecord[]): Promise<HistoryMomentItem[]> {
     const decorated: HistoryMomentItem[] = [];
-    for (const item of items) {
-      const found = await deps.moments.findById(item.id);
-      if (found.kind !== 'ready') {
-        decorated.push({
-          ...item,
-          images: [],
-          unknownMedia: [],
-        });
-        continue;
-      }
+    for (const moment of moments) {
       decorated.push({
-        ...item,
-        images: await deps.resolveImages(found.moment.assetIds),
-        unknownMedia: [],
+        ...toListedMoment(moment, clock),
+        images: await deps.resolveImages(moment.assetIds),
+        audio: await deps.resolveAudio(moment.assetIds),
+        unknownMedia: await deps.resolveUnknown(moment.assetIds),
       });
     }
     return decorated;
   }
 
-  async function getHistoryYears(): Promise<HistoryYearsView> {
-    const [occurredAtValues, unknownCount] = await Promise.all([
-      deps.moments.listActiveOccurredAtValues(),
+  async function getHistoryYears() {
+    const [span, unknownCount] = await Promise.all([
+      deps.moments.occurredAtSpan(PLACED_PRECISIONS),
       deps.moments.countActiveUnknown(),
     ]);
-    return projectHistoryYearIndex(occurredAtValues, unknownCount, timezoneOffsetMinutes);
+    if (!span) {
+      return projectHistoryYearIndexFromCounts([], unknownCount);
+    }
+    const startMillis = parseMillis(span.minIso);
+    const endMillis = parseMillis(span.maxIso);
+    if (startMillis === null || endMillis === null) {
+      return projectHistoryYearIndexFromCounts([], unknownCount);
+    }
+    const startYear = calendarPartsAt(startMillis, clock).year;
+    const endYear = calendarPartsAt(endMillis, clock).year;
+    const years: { year: number; momentCount: number }[] = [];
+    for (let year = endYear; year >= startYear; year -= 1) {
+      const bounds = calendarYearBounds(year, clock);
+      const momentCount = await deps.moments.countActiveOccurred({
+        startIso: bounds.startIso,
+        endIso: bounds.endIso,
+        precisions: PLACED_PRECISIONS,
+      });
+      if (momentCount > 0) years.push({ year, momentCount });
+    }
+    return projectHistoryYearIndexFromCounts(years, unknownCount);
   }
 
-  async function getHistoryYear(year: number): Promise<HistoryYearView | { invalid: true }> {
-    if (!Number.isInteger(year) || year < 1 || year > 9999) return { invalid: true };
-    const bounds = calendarYearBounds(year, timezoneOffsetMinutes);
-    const moments = await deps.moments.listActiveOccurredBetween(bounds.startIso, bounds.endIso);
-    return projectHistoryYear(moments, year, timezoneOffsetMinutes);
+  async function getHistoryYear(year: number) {
+    if (!Number.isInteger(year) || year < 1 || year > 9999) return { invalid: true as const };
+    const monthCounts = [];
+    for (let month = 1; month <= 12; month += 1) {
+      const bounds = calendarMonthBounds(year, month, clock);
+      monthCounts.push(
+        await deps.moments.countActiveOccurred({
+          startIso: bounds.startIso,
+          endIso: bounds.endIso,
+          precisions: ['exact', 'day', 'month'],
+        }),
+      );
+    }
+    const yearBounds = calendarYearBounds(year, clock);
+    const yearUnconfirmedCount = await deps.moments.countActiveOccurred({
+      startIso: yearBounds.startIso,
+      endIso: yearBounds.endIso,
+      precisions: ['year'],
+    });
+    return projectHistoryYearFromCounts(year, monthCounts, yearUnconfirmedCount);
   }
 
-  async function getHistoryMonth(
-    year: number,
-    month: number,
-  ): Promise<HistoryMonthView | { invalid: true }> {
-    if (!Number.isInteger(year) || month < 1 || month > 12) return { invalid: true };
-    const bounds = calendarMonthBounds(year, month, timezoneOffsetMinutes);
-    const moments = await deps.moments.listActiveOccurredBetween(bounds.startIso, bounds.endIso);
-    return projectHistoryMonth(moments, year, month, timezoneOffsetMinutes);
+  async function getHistoryMonth(year: number, month: number) {
+    if (!Number.isInteger(year) || month < 1 || month > 12) return { invalid: true as const };
+    const lastDay = daysInMonth(year, month);
+    const dayCounts = [];
+    for (let day = 1; day <= lastDay; day += 1) {
+      const bounds = calendarDayBounds(year, month, day, clock);
+      dayCounts.push(
+        await deps.moments.countActiveOccurred({
+          startIso: bounds.startIso,
+          endIso: bounds.endIso,
+          precisions: DAY_PRECISIONS,
+        }),
+      );
+    }
+    const monthBounds = calendarMonthBounds(year, month, clock);
+    const dayUnconfirmedCount = await deps.moments.countActiveOccurred({
+      startIso: monthBounds.startIso,
+      endIso: monthBounds.endIso,
+      precisions: ['month'],
+    });
+    return projectHistoryMonthFromCounts(year, month, dayCounts, dayUnconfirmedCount);
   }
 
-  async function getHistoryDay(
-    year: number,
-    month: number,
-    day: number,
-  ): Promise<HistoryDayViewModel | { invalid: true }> {
-    if (!isValidCalendarDay(year, month, day)) return { invalid: true };
-    const bounds = calendarDayBounds(year, month, day, timezoneOffsetMinutes);
-    const moments = await deps.moments.listActiveOccurredBetween(bounds.startIso, bounds.endIso);
-    const view = projectHistoryDay(moments, year, month, day, timezoneOffsetMinutes);
-    return { ...view, items: await decorate(view.items) };
+  async function getHistoryDay(year: number, month: number, day: number, offset = 0) {
+    if (!isValidCalendarDay(year, month, day)) return { invalid: true as const };
+    const bounds = calendarDayBounds(year, month, day, clock);
+    const page = await deps.moments.listActiveOccurred({
+      startIso: bounds.startIso,
+      endIso: bounds.endIso,
+      precisions: DAY_PRECISIONS,
+      limit: HISTORY_PAGE_SIZE,
+      offset,
+      order: 'occurred-asc',
+    });
+    const view = projectHistoryDay(page.items, year, month, day, clock);
+    return {
+      ...view,
+      items: await decorate(page.items),
+      hasMore: page.hasMore,
+    };
   }
 
-  async function getHistoryUnknown(offset = 0): Promise<HistoryUnconfirmedViewModel> {
+  async function getHistoryUnknown(offset = 0) {
     const page = await deps.moments.listActiveUnknown(HISTORY_PAGE_SIZE, offset);
+    const view = projectHistoryUnconfirmed(page.items, { kind: 'unknown' }, clock, page.hasMore);
+    return { ...view, items: await decorate(page.items) };
+  }
+
+  async function getHistoryYearUnconfirmed(year: number, offset = 0) {
+    if (!Number.isInteger(year)) return { invalid: true as const };
+    const bounds = calendarYearBounds(year, clock);
+    const page = await deps.moments.listActiveOccurred({
+      startIso: bounds.startIso,
+      endIso: bounds.endIso,
+      precisions: ['year'],
+      limit: HISTORY_PAGE_SIZE,
+      offset,
+      order: 'occurred-asc',
+    });
+    const view = projectHistoryUnconfirmed(page.items, { kind: 'year', year }, clock, page.hasMore);
+    return { ...view, items: await decorate(page.items) };
+  }
+
+  async function getHistoryMonthUnconfirmed(year: number, month: number, offset = 0) {
+    if (month < 1 || month > 12) return { invalid: true as const };
+    const bounds = calendarMonthBounds(year, month, clock);
+    const page = await deps.moments.listActiveOccurred({
+      startIso: bounds.startIso,
+      endIso: bounds.endIso,
+      precisions: ['month'],
+      limit: HISTORY_PAGE_SIZE,
+      offset,
+      order: 'occurred-asc',
+    });
     const view = projectHistoryUnconfirmed(
       page.items,
-      { kind: 'unknown' },
-      timezoneOffsetMinutes,
+      { kind: 'month', year, month },
+      clock,
       page.hasMore,
     );
-    return { ...view, items: await decorate(view.items) };
-  }
-
-  async function getHistoryYearUnconfirmed(
-    year: number,
-    offset = 0,
-  ): Promise<HistoryUnconfirmedViewModel | { invalid: true }> {
-    if (!Number.isInteger(year)) return { invalid: true };
-    const bounds = calendarYearBounds(year, timezoneOffsetMinutes);
-    const moments = (await deps.moments.listActiveOccurredBetween(bounds.startIso, bounds.endIso)).filter(
-      (moment) => {
-        const place = placeMomentForHistory(moment, timezoneOffsetMinutes);
-        return place.kind === 'year' && place.year === year;
-      },
-    );
-    const sliced = moments.slice(offset, offset + HISTORY_PAGE_SIZE);
-    const view = projectHistoryUnconfirmed(
-      sliced,
-      { kind: 'year', year },
-      timezoneOffsetMinutes,
-      moments.length > offset + HISTORY_PAGE_SIZE,
-    );
-    return { ...view, items: await decorate(view.items) };
-  }
-
-  async function getHistoryMonthUnconfirmed(
-    year: number,
-    month: number,
-    offset = 0,
-  ): Promise<HistoryUnconfirmedViewModel | { invalid: true }> {
-    if (month < 1 || month > 12) return { invalid: true };
-    const bounds = calendarMonthBounds(year, month, timezoneOffsetMinutes);
-    const moments = (await deps.moments.listActiveOccurredBetween(bounds.startIso, bounds.endIso)).filter(
-      (moment) => {
-        const place = placeMomentForHistory(moment, timezoneOffsetMinutes);
-        return place.kind === 'month' && place.year === year && place.month === month;
-      },
-    );
-    const sliced = moments.slice(offset, offset + HISTORY_PAGE_SIZE);
-    const view = projectHistoryUnconfirmed(
-      sliced,
-      { kind: 'month', year, month },
-      timezoneOffsetMinutes,
-      moments.length > offset + HISTORY_PAGE_SIZE,
-    );
-    return { ...view, items: await decorate(view.items) };
+    return { ...view, items: await decorate(page.items) };
   }
 
   return {
@@ -171,4 +209,8 @@ export function createHistoryUseCases(deps: {
     getHistoryYearUnconfirmed,
     getHistoryMonthUnconfirmed,
   };
+}
+
+function deviceTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }

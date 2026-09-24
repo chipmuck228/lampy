@@ -121,7 +121,7 @@ describe('history lookback use cases', () => {
     const day = await app.getHistoryDay(2026, 1, 2);
     if ('invalid' in day) throw new Error('expected day');
     expect(day.title).toBe('2026年1月2日');
-    expect(day.items.map((item) => item.id)).toEqual(['m_exact', 'm_day']);
+    expect(day.items.map((item) => item.id)).toEqual(['m_day', 'm_exact']);
     expect(day.items[0].timeLabel).toContain('1月2日');
 
     const unknown = await app.getHistoryUnknown();
@@ -209,7 +209,7 @@ describe('history lookback use cases', () => {
     ]);
     const stored = await repos.drafts.loadActive();
     if (!stored) throw new Error('expected draft');
-    stored.assetIds.push('asset_missing');
+    stored.assetIds.push('asset_missing:image');
     await repos.drafts.save(stored);
     const saved = await withMedia.saveTextMoment(draft.draftId);
     const found = await repos.moments.findById(saved.id);
@@ -235,6 +235,166 @@ describe('history lookback use cases', () => {
     const broken = await app.getMomentDetail('moment_broken');
     expect(missing).toEqual({ kind: 'missing', requestedId: 'moment_absent' });
     expect(broken).toEqual({ kind: 'error', requestedId: 'moment_broken' });
+  });
+
+  it('pages a large archive without listing every moment in a year', async () => {
+    const { app, repos } = createHistoryApp();
+    const listed: number[] = [];
+    const counted: number[] = [];
+    const originalList = repos.moments.listActiveOccurred.bind(repos.moments);
+    const originalCount = repos.moments.countActiveOccurred.bind(repos.moments);
+    repos.moments.listActiveOccurred = async (query) => {
+      listed.push(query.limit);
+      return originalList(query);
+    };
+    repos.moments.countActiveOccurred = async (query) => {
+      counted.push(query.precisions.length);
+      return originalCount(query);
+    };
+    for (let index = 0; index < 80; index += 1) {
+      const occurredAt = new Date(Date.UTC(2026, 2, 1, 0, 0, index)).toISOString();
+      await saveMoment({
+        repos,
+        id: `m_year_${index}`,
+        note: `年精度${index}`,
+        recordedAt: occurredAt,
+        occurredAt,
+        precision: 'year',
+      });
+    }
+    for (let month = 1; month <= 12; month += 1) {
+      await saveMoment({
+        repos,
+        id: `m_day_${month}`,
+        note: `${month}月`,
+        recordedAt: `2026-${String(month).padStart(2, '0')}-10T00:00:00.000Z`,
+        occurredAt: `2026-${String(month).padStart(2, '0')}-10T00:00:00.000Z`,
+        precision: 'day',
+      });
+    }
+    await saveMoment({
+      repos,
+      id: 'm_other_year',
+      note: '下一年',
+      recordedAt: '2027-01-02T00:00:00.000Z',
+      occurredAt: '2027-01-02T00:00:00.000Z',
+      precision: 'day',
+    });
+
+    const years = await app.getHistoryYears();
+    expect(years.years.map((item) => item.year)).toEqual([2027, 2026]);
+    expect(years.years[1].momentCount).toBe(92);
+    expect(listed).toEqual([]);
+
+    const year = await app.getHistoryYear(2026);
+    if ('invalid' in year) throw new Error('expected year');
+    expect(year.yearUnconfirmedCount).toBe(80);
+    expect(year.months.every((item) => item.count === 1)).toBe(true);
+    expect(listed).toEqual([]);
+    expect(counted.length).toBeGreaterThan(12);
+
+    const first = await app.getHistoryYearUnconfirmed(2026, 0);
+    if ('invalid' in first) throw new Error('expected page');
+    const second = await app.getHistoryYearUnconfirmed(2026, 50);
+    if ('invalid' in second) throw new Error('expected next page');
+    expect(first.items).toHaveLength(50);
+    expect(first.hasMore).toBe(true);
+    expect(second.items).toHaveLength(30);
+    expect(second.hasMore).toBe(false);
+    expect(listed).toEqual([50, 50]);
+  });
+
+  it('places spring-forward and fall-back instants on the local calendar day', async () => {
+    const repos = createMemoryRepositories();
+    const zoned = createUseCases({
+      ...repos,
+      media: createMemoryMediaStore(),
+      clock: clockAt('2026-09-24T12:00:00.000Z'),
+      timezone: { timeZone: 'America/New_York' },
+    });
+    await saveMoment({
+      repos,
+      id: 'm_spring_eve',
+      note: '春切换前夜',
+      recordedAt: '2026-03-08T04:30:00.000Z',
+      occurredAt: '2026-03-08T04:30:00.000Z',
+      precision: 'exact',
+    });
+    await saveMoment({
+      repos,
+      id: 'm_spring_day',
+      note: '春切换当日',
+      recordedAt: '2026-03-08T06:30:00.000Z',
+      occurredAt: '2026-03-08T06:30:00.000Z',
+      precision: 'exact',
+    });
+    await saveMoment({
+      repos,
+      id: 'm_fall_late',
+      note: '秋切换重复小时',
+      recordedAt: '2026-11-01T06:30:00.000Z',
+      occurredAt: '2026-11-01T06:30:00.000Z',
+      precision: 'exact',
+    });
+    const seventh = await zoned.getHistoryDay(2026, 3, 7);
+    if ('invalid' in seventh) throw new Error('expected March 7');
+    expect(seventh.items.map((item) => item.id)).toEqual(['m_spring_eve']);
+    const eighth = await zoned.getHistoryDay(2026, 3, 8);
+    if ('invalid' in eighth) throw new Error('expected March 8');
+    expect(eighth.items.map((item) => item.id)).toEqual(['m_spring_day']);
+    const november = await zoned.getHistoryDay(2026, 11, 1);
+    if ('invalid' in november) throw new Error('expected November 1');
+    expect(november.items.map((item) => item.id)).toEqual(['m_fall_late']);
+  });
+
+  it('keeps sound and missing media on a lookback day', async () => {
+    const { repos } = createHistoryApp();
+    const media = createMemoryMediaStore();
+    const withMedia = createUseCases({
+      ...repos,
+      media,
+      clock: clockAt('2026-09-24T12:00:00.000Z'),
+      timezoneOffsetMinutes: 0,
+      assetId: () => 'asset_voice_lookback',
+    });
+    const draft = await withMedia.restoreOrCreateDraft();
+    await withMedia.updateDraftNote(draft.draftId, '回看还有声音');
+    await withMedia.addRecordedAudio(draft.draftId, {
+      sourceUri: 'memory://source/voice.m4a',
+      durationMs: 1800,
+      mimeType: 'audio/mp4',
+    });
+    const stored = await repos.drafts.loadActive();
+    if (!stored) throw new Error('expected draft');
+    stored.assetIds.push('asset_vanished');
+    await repos.drafts.save(stored);
+    const saved = await withMedia.saveTextMoment(draft.draftId);
+    const found = await repos.moments.findById(saved.id);
+    if (found.kind !== 'ready') throw new Error('expected moment');
+    found.moment.time.occurredAt = '2026-05-04T12:00:00.000Z';
+    found.moment.time.occurredAtPrecision = 'day';
+    await repos.moments.save(found.moment);
+
+    const day = await withMedia.getHistoryDay(2026, 5, 4);
+    if ('invalid' in day) throw new Error('expected day');
+    expect(day.items[0].note).toBe('回看还有声音');
+    expect(day.items[0].audio?.status).toBe('available');
+    expect(day.items[0].unknownMedia).toEqual([
+      {
+        id: 'asset_vanished',
+        status: 'unavailable',
+        label: '这份内容',
+        unavailableLabel: '这份内容暂时无法打开。',
+      },
+    ]);
+
+    const storedAudio = await repos.assets.findById('asset_voice_lookback');
+    if (storedAudio.kind !== 'ready') throw new Error('expected audio');
+    media.markMissing(storedAudio.asset.localUri);
+    const after = await withMedia.getHistoryDay(2026, 5, 4);
+    if ('invalid' in after) throw new Error('expected day after missing audio');
+    expect(after.items[0].note).toBe('回看还有声音');
+    expect(after.items[0].audio?.status).toBe('unavailable');
   });
 
   it('remembers in-process scroll and documents cold-start restore', () => {
