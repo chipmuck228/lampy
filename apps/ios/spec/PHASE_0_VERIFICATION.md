@@ -10,6 +10,7 @@
 | `npm test` | `apps/ios` | **通过**。1 suite / 1 test（空壳不发明 Moment） |
 | `xcodebuild -list -workspace ios/Lampy.xcworkspace` | `apps/ios` | **通过**。存在 scheme `Lampy` |
 | `xcodebuild -workspace ios/Lampy.xcworkspace -scheme Lampy -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -quiet build CODE_SIGNING_ALLOWED=NO` | `apps/ios` | **通过**（exit 0，增量编译约 25s） |
+| `git diff --check origin/main...HEAD` | 仓库根 | **通过**（exit 0）。已去掉四份 ADR「状态」行行尾空格 |
 
 ## 未验证
 

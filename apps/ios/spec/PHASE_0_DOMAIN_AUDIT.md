@@ -20,7 +20,7 @@
 | 共享时间/克隆/身份 | `domain/shared/time.js`、`clone.js`、`identity.js`、`calendar.js`、`date-format.js` | 可直接复用语义 | `LOCAL_OWNER_ID = local-user` 是过渡身份，不是账号。日历边界已有测试。 |
 | 哈希/光墙坐标 | `domain/shared/hash.js` | 不能复用到 iOS UI | 只服务随机视觉位置。设计规范禁止随机旋转与随机坐标。 |
 
-**共享边界：** 根目录领域是 CommonJS + JSDoc，不是 TypeScript 工程。iOS 不得把文件复制成第二套真相。见 `spec/adr/0002-typescript-javascript-share-boundary.md`。
+**共享边界：** 根目录领域是 CommonJS + JSDoc，不是 TypeScript 工程。iOS 不得把文件复制成第二套真相。application 协调仓库与领域命令；projection 只消费已读取数据。见 `spec/adr/0002-typescript-javascript-share-boundary.md`。
 
 ## 2. Repository
 

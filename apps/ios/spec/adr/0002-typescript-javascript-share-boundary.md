@@ -1,6 +1,6 @@
 # ADR 0002：TypeScript / JavaScript 共享边界
 
-状态：已接受（Phase 0）  
+状态：已接受（Phase 0）
 日期：2026-09-24
 
 ## 决策
@@ -14,15 +14,17 @@
 
 ## 依赖方向
 
+application 协调仓库和领域命令。projection 只接收已经读取的数据，生成只读 ViewModel。**Projection 不得自行查询 SQLite 或文件系统。**
+
 ```text
 screens / routes
     → application（use cases）
-        → domain-adapters（现有 domain 语义）
-        → projections（只读 ViewModel）
-            → infrastructure（SQLite / 文件 / 权限）
+         ├→ domain-adapters（领域命令 / 不变量）
+         ├→ infrastructure（仓库、文件、权限）
+         └→ projections（对已读取数据做只读 ViewModel）
 ```
 
-禁止：UI → SQLite / 文件系统。禁止：infrastructure 依赖 React 组件。
+禁止：UI → SQLite / 文件系统。禁止：projection → infrastructure。禁止：infrastructure 依赖 React 组件。
 
 ## 后果
 

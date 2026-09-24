@@ -1,6 +1,6 @@
 # ADR 0001：Expo Development Build
 
-状态：已接受（Phase 0）  
+状态：已接受（Phase 0）
 日期：2026-09-24
 
 ## 决策
