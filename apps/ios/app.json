@@ -39,7 +39,15 @@
           "imageWidth": 76
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-file-system",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Lampy 只在你从相册选择已有照片留下时读取相册。",
+          "cameraPermission": "Lampy 只在你拍照留下一条生活时使用相机。"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,11 +1,17 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { createUseCases } from '../application/use-cases';
 import { ERROR_CODES } from '../domain-adapters/errors';
+import { createNodeMediaStore } from './node-media';
 import { openPreparedNodeSqliteDatabase } from './node-sqlite';
 import { createSqliteRepositories, listQuarantine } from './sqlite-repositories';
+
+const TINY_JPEG = Buffer.from(
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wAAAAkAAwADAAIDAwMEBAQFBQQFBQUFBwcHBw4JCAoKCgoODw8PDxAQEBAREREREREREREREREREREREREREf/AABEIAAEAAQMBEQACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAA4EAACAQMDAgQDBAcIBQEBAAABAgMABBEFEiExQQYTUWEicYEHFDKRobHBCBVS0eHw8RYkM2Jy/8QAGQEAAwEBAQAAAAAAAAAAAAAAAAECAwQF/8QAIhEAAgICAgIDAQEAAAAAAAAAAAECEQMhEjEEQSJREzJh/9oADAMBAAIRAxEAPwB9oD//2Q==',
+  'base64',
+);
 
 function clockAt(iso: string) {
   return { now: () => new Date(iso) };
@@ -124,6 +130,86 @@ describe('sqlite file preservation', () => {
       expect(await app.getMomentDetail('broken-moment')).toEqual({
         kind: 'error',
         requestedId: 'broken-moment',
+      });
+      await db.close();
+    });
+  });
+
+  it('keeps persisted photos after closing the database file', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'source.jpg');
+      await writeFile(source, TINY_JPEG);
+      const media = createNodeMediaStore(mediaRoot);
+      const firstDb = await openPreparedNodeSqliteDatabase(file);
+      const first = createUseCases({
+        ...createSqliteRepositories(firstDb),
+        media,
+        clock: clockAt('2026-09-24T15:00:00.000Z'),
+        assetId: () => 'asset_file',
+      });
+      const draft = await first.restoreOrCreateDraft();
+      await first.updateDraftNote(draft.draftId, '文件关掉还在');
+      await first.addPickedImages(draft.draftId, [
+        { sourceUri: source, mimeType: 'image/jpeg', width: 1, height: 1 },
+      ]);
+      const saved = await first.saveTextMoment(draft.draftId);
+      await firstDb.close();
+
+      const secondDb = await openPreparedNodeSqliteDatabase(file);
+      const second = createUseCases({
+        ...createSqliteRepositories(secondDb),
+        media,
+        clock: clockAt('2026-09-24T15:01:00.000Z'),
+      });
+      const recent = await second.getRecentLife();
+      expect(recent.items[0].id).toBe(saved.id);
+      expect(recent.items[0].images[0].status).toBe('available');
+      const detail = await second.getMomentDetail(saved.id);
+      expect(detail.kind).toBe('ready');
+      if (detail.kind === 'ready') {
+        expect(detail.note).toBe('文件关掉还在');
+        expect(detail.images[0].status).toBe('available');
+      }
+      await secondDb.close();
+    });
+  });
+
+  it('keeps the moment when the image file is later removed', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'source.jpg');
+      await writeFile(source, TINY_JPEG);
+      const media = createNodeMediaStore(mediaRoot);
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const app = createUseCases({
+        ...createSqliteRepositories(db),
+        media,
+        clock: clockAt('2026-09-24T16:00:00.000Z'),
+        assetId: () => 'asset_deleted',
+      });
+      const draft = await app.restoreOrCreateDraft();
+      await app.updateDraftNote(draft.draftId, '图没了字还在');
+      await app.addPickedImages(draft.draftId, [
+        { sourceUri: source, mimeType: 'image/jpeg', width: 1, height: 1 },
+      ]);
+      const saved = await app.saveTextMoment(draft.draftId);
+      const stored = await createSqliteRepositories(db).assets.findById('asset_deleted');
+      if (stored.kind !== 'ready') throw new Error('expected asset');
+      await rm(stored.asset.localUri, { force: true });
+
+      const detail = await app.getMomentDetail(saved.id);
+      expect(detail).toMatchObject({
+        kind: 'ready',
+        id: saved.id,
+        note: '图没了字还在',
+      });
+      if (detail.kind === 'ready') {
+        expect(detail.images[0].status).toBe('unavailable');
+      }
+      expect(await app.getMomentDetail('missing')).toEqual({
+        kind: 'missing',
+        requestedId: 'missing',
       });
       await db.close();
     });

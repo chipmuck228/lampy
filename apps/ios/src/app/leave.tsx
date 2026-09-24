@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +15,8 @@ import { useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
+import type { ImageView } from '../application/use-cases';
+import { MomentImages } from '../screens/moment-images';
 
 export default function LeaveScreen() {
   const router = useRouter();
@@ -21,11 +24,22 @@ export default function LeaveScreen() {
   const readingWidth = Math.min(width, 720);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [images, setImages] = useState<ImageView[]>([]);
   const [restored, setRestored] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState<'idle' | 'media' | 'save'>('idle');
   const draftIdRef = useRef<string | null>(null);
+  const busyRef = useRef(false);
   const persistChain = useRef(Promise.resolve());
+
+  function enqueue<T>(work: () => Promise<T>): Promise<T> {
+    const run = persistChain.current.then(work);
+    persistChain.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +50,8 @@ export default function LeaveScreen() {
         draftIdRef.current = draft.draftId;
         setDraftId(draft.draftId);
         setNote(draft.note);
-        setRestored(draft.isRestored && !!draft.note.trim());
+        setImages(draft.images);
+        setRestored(draft.isRestored);
       })
       .catch(() => {
         if (!cancelled) setMessage('草稿暂时读不出来，原来的内容没有被改写。');
@@ -50,36 +65,73 @@ export default function LeaveScreen() {
     setNote(next);
     const id = draftIdRef.current;
     if (!id) return;
-    persistChain.current = persistChain.current
-      .then(async () => {
-        const app = await getUseCases();
-        await app.updateDraftNote(id, next);
+    void enqueue(async () => {
+      const app = await getUseCases();
+      await app.updateDraftNote(id, next);
+    }).catch(() => {
+      setMessage('草稿暂时写不进去。已经写的字还在屏幕上。');
+    });
+  }
+
+  function applyImageAction(action: 'library' | 'camera') {
+    const id = draftIdRef.current;
+    if (!id || busyRef.current) return;
+    busyRef.current = true;
+    setBusy('media');
+    void enqueue(async () => {
+      const app = await getUseCases();
+      return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id);
+    })
+      .then((next) => {
+        setImages(next.images);
+        setMessage(null);
       })
-      .catch(() => {
-        setMessage('草稿暂时写不进去。已经写的字还在屏幕上。');
+      .catch(async (error) => {
+        if (isApplicationError(error) && error.code === 'IMAGE_LIMIT') {
+          const app = await getUseCases();
+          const draft = await app.restoreOrCreateDraft();
+          setImages(draft.images);
+          setMessage('每条最多三张照片');
+          return;
+        }
+        if (isApplicationError(error) && (error.code === 'LIBRARY_DENIED' || error.code === 'CAMERA_DENIED')) {
+          setMessage(error.message);
+          return;
+        }
+        setMessage('这张照片没有留下。已经写的字和已有的照片还在。');
+      })
+      .finally(() => {
+        busyRef.current = false;
+        setBusy('idle');
       });
   }
 
   async function onSave() {
     const id = draftIdRef.current;
-    if (!id || saving) return;
-    setSaving(true);
+    if (!id || busyRef.current) return;
+    busyRef.current = true;
+    setBusy('save');
     try {
-      await persistChain.current;
-      const app = await getUseCases();
-      await app.updateDraftNote(id, note);
-      await app.saveTextMoment(id);
+      await enqueue(async () => {
+        const app = await getUseCases();
+        await app.updateDraftNote(id, note);
+        await app.saveTextMoment(id);
+      });
       router.replace('/');
     } catch (error) {
       setMessage(
         isApplicationError(error) && error.code === 'MOMENT_EMPTY'
-          ? '写一句再留下。已经写的草稿还在。'
+          ? '写一句或留下一张照片。已经写的草稿还在。'
           : '这次没有留下。草稿还在，可以再试。',
       );
     } finally {
-      setSaving(false);
+      busyRef.current = false;
+      setBusy('idle');
     }
   }
+
+  const actionsLocked = !draftId || busy !== 'idle';
+  const saveLabel = busy === 'save' ? '正在留下…' : busy === 'media' ? '正在加入照片…' : '留下';
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="留下">
@@ -87,7 +139,10 @@ export default function LeaveScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.column, { maxWidth: readingWidth }]}>
+        <ScrollView
+          contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}
+          keyboardShouldPersistTaps="handled"
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="返回最近"
@@ -107,26 +162,53 @@ export default function LeaveScreen() {
             onChangeText={(value) => {
               void persistNote(value);
             }}
-            placeholder="写一句就可以。"
+            placeholder="写一句就可以，也可以只留下照片。"
             placeholderTextColor="#777168"
             multiline
             textAlignVertical="top"
             style={styles.input}
           />
+          <MomentImages images={images} testIDPrefix="composer-image" />
           {message ? <Text style={styles.message}>{message}</Text> : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="留下"
-            testID="composer-save"
-            onPress={() => {
-              void onSave();
-            }}
-            disabled={saving}
-            style={styles.saveHit}
-          >
-            <Text style={styles.save}>{saving ? '正在留下…' : '留下'}</Text>
-          </Pressable>
-        </View>
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="拍摄"
+              testID="composer-camera"
+              onPress={() => {
+                applyImageAction('camera');
+              }}
+              disabled={actionsLocked}
+              style={styles.mediaHit}
+            >
+              <Text style={styles.media}>拍摄</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="照片"
+              testID="composer-library"
+              onPress={() => {
+                applyImageAction('library');
+              }}
+              disabled={actionsLocked}
+              style={styles.mediaHit}
+            >
+              <Text style={styles.media}>照片</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="留下"
+              testID="composer-save"
+              onPress={() => {
+                void onSave();
+              }}
+              disabled={actionsLocked}
+              style={styles.saveHit}
+            >
+              <Text style={styles.save}>{saveLabel}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -136,7 +218,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F0E9' },
   flex: { flex: 1 },
   column: {
-    flex: 1,
+    flexGrow: 1,
     width: '100%',
     alignSelf: 'center',
     paddingHorizontal: 24,
@@ -147,13 +229,16 @@ const styles = StyleSheet.create({
   back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
   restore: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
   input: {
-    flex: 1,
+    minHeight: 160,
     fontSize: 22,
     lineHeight: 32,
     color: '#25231F',
     padding: 0,
   },
   message: { fontSize: 16, lineHeight: 24, color: '#87513D' },
+  actions: { gap: 8, paddingBottom: 8 },
+  mediaHit: { minHeight: 44, justifyContent: 'center' },
+  media: { fontSize: 18, lineHeight: 24, color: '#53604F' },
   saveHit: { minHeight: 44, justifyContent: 'center' },
   save: { fontSize: 18, lineHeight: 24, color: '#53604F' },
 });

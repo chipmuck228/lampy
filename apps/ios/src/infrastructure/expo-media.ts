@@ -1,0 +1,114 @@
+import { Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+
+import { extensionForMime, type ImageSource, type MediaStore, type PickedImage } from './media';
+
+const ASSET_DIR = 'lampy-assets';
+
+function documentRoot(): string {
+  const root = FileSystem.documentDirectory;
+  if (!root) throw new Error('document directory is not available');
+  return root;
+}
+
+function assetDirectory(): string {
+  return `${documentRoot()}${ASSET_DIR}`;
+}
+
+function toPicked(asset: ImagePicker.ImagePickerAsset): PickedImage {
+  return {
+    sourceUri: asset.uri,
+    mimeType: asset.mimeType,
+    width: asset.width,
+    height: asset.height,
+    fileName: asset.fileName ?? undefined,
+  };
+}
+
+export function createExpoLibrarySource(): ImageSource {
+  return {
+    async requestPermission() {
+      const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (current.status === 'undetermined') {
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+      // PHPicker can open without full-library access. A denied TCC
+      // must not block the system picker or the rest of the draft.
+      return 'granted';
+    },
+    async pick(remaining) {
+      if (remaining <= 0) return [];
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: remaining > 1,
+        selectionLimit: remaining,
+        quality: 1,
+        allowsEditing: false,
+        exif: false,
+      });
+      if (result.canceled) return [];
+      return result.assets.map(toPicked);
+    },
+  };
+}
+
+export function createExpoCameraSource(): ImageSource {
+  return {
+    async requestPermission() {
+      const result = await ImagePicker.requestCameraPermissionsAsync();
+      return result.granted ? 'granted' : 'denied';
+    },
+    async pick() {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+        allowsEditing: false,
+        exif: false,
+      });
+      if (result.canceled) return [];
+      return result.assets.map(toPicked);
+    },
+  };
+}
+
+export function createExpoMediaStore(): MediaStore {
+  return {
+    async persistImage({ assetId, sourceUri, mimeType }) {
+      const directory = assetDirectory();
+      const info = await FileSystem.getInfoAsync(directory);
+      if (!info.exists) {
+        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+      }
+      const dest = `${directory}/${assetId}.${extensionForMime(mimeType)}`;
+      const destInfo = await FileSystem.getInfoAsync(dest);
+      if (destInfo.exists) {
+        return {
+          localUri: dest,
+          sizeBytes: destInfo.size,
+        };
+      }
+      await FileSystem.copyAsync({ from: sourceUri, to: dest });
+      const copied = await FileSystem.getInfoAsync(dest);
+      return {
+        localUri: dest,
+        sizeBytes: copied.exists ? copied.size : undefined,
+      };
+    },
+    async exists(localUri) {
+      const info = await FileSystem.getInfoAsync(localUri);
+      return info.exists && !info.isDirectory;
+    },
+    async canDecode(localUri) {
+      const info = await FileSystem.getInfoAsync(localUri);
+      if (!info.exists || info.isDirectory || (info.size ?? 0) <= 0) return false;
+      return new Promise((resolve) => {
+        Image.getSize(
+          localUri,
+          () => resolve(true),
+          () => resolve(false),
+        );
+      });
+    },
+  };
+}

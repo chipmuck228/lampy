@@ -16,6 +16,7 @@
   ],
   "exclude": [
     "src/infrastructure/node-sqlite.ts",
+    "src/infrastructure/node-media.ts",
     "src/infrastructure/sqlite-preservation.test.ts"
   ]
 }

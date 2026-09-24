@@ -8,6 +8,12 @@ const commands = require('@lampy/domain/moment/moment.commands.js') as {
     actorId: string,
     now?: Date | string,
   ) => MomentRecord;
+  attachAsset: (
+    moment: MomentRecord,
+    assetId: string,
+    actorId: string,
+    now?: Date | string,
+  ) => MomentRecord;
   validateMoment: (raw: unknown) => { ok: boolean; errors: { code: string; message: string }[] };
 };
 
@@ -31,4 +37,10 @@ export type MomentRecord = {
   audit: { createdAt: string; updatedAt: string };
 };
 
-export const { createDraftMoment, activateMoment, updateMomentContent, validateMoment } = commands;
+export const {
+  createDraftMoment,
+  activateMoment,
+  updateMomentContent,
+  attachAsset,
+  validateMoment,
+} = commands;

@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../application/container';
 import type { MomentDetailViewModel } from '../../application/use-cases';
+import { MomentImages } from '../../screens/moment-images';
 
 export default function MomentDetailScreen() {
   const router = useRouter();
@@ -68,9 +69,12 @@ export default function MomentDetailScreen() {
         {view?.kind === 'ready' ? (
           <View style={styles.block}>
             <Text style={styles.date}>{view.dateLabel}</Text>
-            <Text testID="detail-note" style={styles.note}>
-              {view.note}
-            </Text>
+            {view.note ? (
+              <Text testID="detail-note" style={styles.note}>
+                {view.note}
+              </Text>
+            ) : null}
+            <MomentImages images={view.images} testIDPrefix="detail-image" />
             <Text style={styles.meta}>{view.sourceLabel}</Text>
           </View>
         ) : null}

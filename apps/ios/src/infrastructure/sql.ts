@@ -30,6 +30,12 @@ const MIGRATIONS = [
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL
   );`,
+  `CREATE TABLE IF NOT EXISTS assets (
+    id TEXT PRIMARY KEY NOT NULL,
+    owner_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    json TEXT NOT NULL
+  );`,
 ];
 
 export async function applyLampySchema(db: SqlDatabase): Promise<void> {
