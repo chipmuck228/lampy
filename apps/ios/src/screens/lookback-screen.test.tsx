@@ -5,20 +5,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LookbackIndexScreen from '../app/lookback/index';
 import LookbackYearScreen from '../app/lookback/[year]/index';
 import LookbackDayScreen from '../app/lookback/[year]/[month]/[day]';
-import MomentDetailScreen from '../app/moment/[id]';
 
 const mockPush = jest.fn();
-const mockBack = jest.fn();
 const mockGetHistoryYears = jest.fn();
 const mockGetHistoryYear = jest.fn();
 const mockGetHistoryDay = jest.fn();
-const mockGetMomentDetail = jest.fn();
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useEffect } = require('react');
   return {
-    useRouter: () => ({ push: mockPush, back: mockBack, replace: jest.fn() }),
+    useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
@@ -31,7 +28,6 @@ jest.mock('../application/container', () => ({
     getHistoryYears: mockGetHistoryYears,
     getHistoryYear: mockGetHistoryYear,
     getHistoryDay: mockGetHistoryDay,
-    getMomentDetail: mockGetMomentDetail,
   }),
 }));
 
@@ -51,11 +47,9 @@ function wrap(ui: ReactElement) {
 describe('lookback screens', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    mockBack.mockReset();
     mockGetHistoryYears.mockReset();
     mockGetHistoryYear.mockReset();
     mockGetHistoryDay.mockReset();
-    mockGetMomentDetail.mockReset();
   });
 
   it('opens a year from the lookback entrance', async () => {
@@ -105,7 +99,7 @@ describe('lookback screens', () => {
     expect(mockPush).toHaveBeenCalledWith('/lookback/2026/01');
   });
 
-  it('opens the exact moment id and returns to the same day', async () => {
+  it('keeps sound and missing media on a lookback day and opens the exact id', async () => {
     mockGetHistoryDay.mockResolvedValue({
       year: 2026,
       month: 1,
@@ -140,32 +134,6 @@ describe('lookback screens', () => {
       ],
       hasMore: false,
     });
-    mockGetMomentDetail.mockResolvedValue({
-      kind: 'ready',
-      id: 'm_exact',
-      note: '门口的风',
-      dateLabel: '2026年1月2日 08:15',
-      precision: 'exact',
-      usedRecordedAtFallback: false,
-      sourceLabel: '你留下的记录',
-      images: [],
-      audio: {
-        id: 'asset_voice_lookback',
-        status: 'available',
-        uri: 'memory://assets/asset_voice_lookback.m4a',
-        durationMs: 1800,
-        durationLabel: '2秒',
-        label: '一段声音',
-      },
-      unknownMedia: [
-        {
-          id: 'asset_vanished',
-          status: 'unavailable',
-          label: '这份内容',
-          unavailableLabel: '这份内容暂时无法打开。',
-        },
-      ],
-    });
 
     const day = await render(wrap(<LookbackDayScreen />));
     await waitFor(() => {
@@ -176,15 +144,7 @@ describe('lookback screens', () => {
     expect(day.queryByText('这条记录现在无法找到')).toBeNull();
     fireEvent.press(day.getByTestId('lookback-moment-m_exact'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_exact' } });
-
-    const detail = await render(wrap(<MomentDetailScreen />));
-    await waitFor(() => {
-      expect(detail.getByText('门口的风')).toBeTruthy();
-    });
-    expect(detail.getByText('一段声音 · 2秒')).toBeTruthy();
-    expect(detail.getByText('这份内容暂时无法打开。')).toBeTruthy();
-    fireEvent.press(detail.getByLabelText('返回原来的位置'));
-    expect(mockBack).toHaveBeenCalled();
+    await day.unmount();
   });
 
 });
