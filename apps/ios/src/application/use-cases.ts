@@ -11,6 +11,7 @@ import { projectMomentDetailView } from '../domain-adapters/moment-detail-projec
 import type { ImageSource, MediaStore, PickedImage } from '../infrastructure/media';
 import type { AssetRepository, DraftRepository, MomentRepository } from '../infrastructure/repositories';
 import { ApplicationError, toApplicationError } from './errors';
+import { createHistoryUseCases } from './history-use-cases';
 
 export const MAX_DRAFT_IMAGES = 3;
 export const IMAGE_UNAVAILABLE_LABEL = '这张照片暂时找不到了，但这条记录还在。';
@@ -99,6 +100,7 @@ export function createUseCases(deps: {
   ownerId?: string;
   id?: () => string;
   assetId?: () => string;
+  timezoneOffsetMinutes?: number;
 }) {
   const ownerId = deps.ownerId || LOCAL_OWNER_ID;
   const clock = deps.clock || defaultClock();
@@ -430,6 +432,13 @@ export function createUseCases(deps: {
     saveTextMoment,
     getRecentLife,
     getMomentDetail,
+    ...createHistoryUseCases({
+      moments: deps.moments,
+      assets: deps.assets,
+      media: deps.media,
+      timezoneOffsetMinutes: deps.timezoneOffsetMinutes,
+      resolveImages,
+    }),
     toApplicationError,
   };
 }

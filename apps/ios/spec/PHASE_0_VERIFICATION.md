@@ -1,55 +1,58 @@
 # Phase 0 验证报告
 
-机器：macOS 26.7，Xcode 26.6 (17F113)，Node v24.7.0。日期：2026-09-24。
+机器：macOS 26.7，Xcode 26.6，Node v24.7.0。日期：2026-09-24。
 
-本轮是个人 Moment 图片闭环（GitHub PR 待开，分支 `ios/image-moment`）。
+本轮是个人 Moment「回看」年/月/日（分支 `ios/lookback`，基于已合并图片闭环的 main `3bf37f5`）。
 
 | 命令 | 工作目录 | 结果 |
 | --- | --- | --- |
 | `npx tsc --noEmit` | `apps/ios` | **通过**（exit 0） |
 | `npx expo lint` | `apps/ios` | **通过**（exit 0） |
-| `npm test` | `apps/ios` | **通过**。11 suites / 36 tests |
-| `npx expo run:ios --device "iPhone 17"` | `apps/ios` | **通过**。Build Succeeded，已装上模拟器 |
-| `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testPickPhotoSaveRecentExactIdDetail test` | `apps/ios/ios`（本地，不入库） | **通过**。iPhone 17 Simulator，35.8s |
+| `npm test` | `apps/ios` | **通过**。14 suites / 54 tests |
+| `npx expo run:ios --device "iPhone 17"` | `apps/ios` | **失败**。`pod install` 找不到 `ReactNativeDependencies`（`React-Core-prebuilt`） |
+| `xcodebuild -workspace Lampy.xcworkspace -scheme Lampy -destination 'platform=iOS Simulator,name=iPhone 17' -configuration Debug build` | `apps/ios/ios` | **通过**（exit 0，沿用本机已有 workspace） |
+| `xcodebuild … -only-testing:LampyUITests/ClosedLoopTests/testLookbackUnconfirmedDetailBack test` | `apps/ios/ios` | **通过**。iPhone 17 (iOS 26.3.1) |
+| `git diff --check` | 仓库根 | **通过** |
+
+## 模拟器走查（iPhone 17）
+
+**通过：** 最近页有可访问的「回看」；打开后见「时间未确认」；进入该架，点刚留下的一句，精确 ID 详情出现「你留下的记录」与原文；返回仍在「时间未确认」，再返回仍在「回看」。
+
+当前留下页仍写 `occurredAtPrecision: unknown`，因此真实保存的记录只出现在「时间未确认」，不会进入某年某月。
+
+**未在模拟器点过：** 年 → 月 → 日（需要已确认的 `occurredAt`）。该路径由自动化覆盖。
 
 ## 自动化覆盖
 
-- 1 / 2 / 3 张照片写入草稿
-- 第四张明确拒绝，不写入草稿，也不生成 Asset
-- 仅照片、文字加照片
-- 未点入口不请求权限；拒绝相册 / 相机后草稿和文字仍在
-- 草稿恢复带图片；保存重试不重复 Moment / Asset
-- 文件缺失或无法解码时 Moment 与文字仍在，原位不可用；`Image.getSize` 失败不得标为可用
-- 选图尚未完成时点击留下不会保存
-- SQLite 文件关闭再打开后图片仍在；删掉文件后记录仍在
+- exact / day / month / year / unknown 五种精度的浏览位置
+- recordedAt 不进入年、月、日格子；unknown 即使带 occurredAt ISO 也不进年列表
+- UTC+8 / UTC-5 时区边界；跨年、跨月；2024 闰日；非闰年 2 月 29 日无效
+- 同日多条共享日期标题；整月空白日子保留为「安静」
+- 一年以上记录时，读某年不带上另一年
+- 年→月→日→精确 ID 详情→返回
+- 详情缺失与读取失败不同状态；部分图片缺失时 Moment 与其余照片仍在
+- SQLite 按 occurred_at 范围查询，不扫全部行
 
-## 模拟器闭环（合并前已点通）
+## 浏览位置规则
 
-在 iPhone 17 Simulator 上由 XCUITest 驱动真实页面，不是只读库：
+见 `apps/ios/spec/adr/0005-lookback-browse-placement.md`。
 
-1. 点「最近」上的 **留下**（`home-leave`）；
-2. 点 **照片**（`composer-library`），系统 PHPicker 打开；
-3. 选一张模拟器相册照片并确认；
-4. 留下页出现真实图片（不是附件卡片）；
-5. 写入唯一句子 **模拟器照片闭环179022181800**；
-6. 点 **留下**；
-7. 「最近」出现同一句，并显示刚选的花田照片；
-8. 点该行，详情出现同一句和 **照片 1/1**；
-9. 详情没有「这条记录现在无法找到」。
+「时间未确认」按记录时间新到旧，避免刚留下的句子沉到屏幕外。日视图仍按发生钟点再按记录时间。
 
-`TEST SUCCEEDED`。
+## 返回与重启
 
-同屏仍能看到更早一次失败留下的记录：文字还在，原位是「这张照片暂时找不到了，但这条记录还在。」没有把读取失败当成记录不存在。
+- 所选年 / 月 / 日在路由参数中；栈内返回保持原页。
+- 滚动位置只存在于本次进程；内容出来后再恢复，避免空列表先撑满再把人甩到页底。
+- 冷启动回到「最近」，不自动跳回上次回看位置。
 
 ## 未验证
 
 | 项 | 说明 |
 | --- | --- |
-| 真机相机权限弹窗、允许后拍摄、拒绝后仍写字 | **未验证** |
-| 真机照片权限：完全访问 / 有限访问 / 拒绝 | **未验证** |
-| 真机从系统相册选原片、HEIC、竖图、超大图 | **未验证** |
-| 真机杀进程后草稿图片与正式图片仍在 | **未验证** |
-| 模拟器相机（无摄像头） | **未验证** / 不适用 |
+| 模拟器年→月→日（需 occurredAt 数据） | **未验证** |
+| 真机超大字号、VoiceOver、横屏、iPad 分屏 | **未验证** |
+| 现场录音回看 | 本分支基于图片闭环 main，无音频闭环 |
+| `npx expo run:ios` 完整重装 Pods | **失败**（见上）；改用已有 workspace 的 `xcodebuild` |
 | App Store / 签名发布 | **未验证** |
 
 ## 根目录领域回归（只读，未改代码）

@@ -7,10 +7,19 @@ export type MomentRead =
   | { kind: 'missing' }
   | { kind: 'unreadable' };
 
+export type MomentPage = {
+  items: MomentRecord[];
+  hasMore: boolean;
+};
+
 export interface MomentRepository {
   save(moment: MomentRecord): Promise<void>;
   findById(id: string): Promise<MomentRead>;
   listRecent(limit?: number): Promise<MomentRecord[]>;
+  listActiveOccurredBetween(startIso: string, endIso: string): Promise<MomentRecord[]>;
+  listActiveOccurredAtValues(): Promise<string[]>;
+  listActiveUnknown(limit: number, offset: number): Promise<MomentPage>;
+  countActiveUnknown(): Promise<number>;
 }
 
 export interface DraftRepository {
@@ -70,6 +79,52 @@ export function createMemoryRepositories(): {
           .sort((a, b) => b.time.recordedAt.localeCompare(a.time.recordedAt))
           .slice(0, limit)
           .map((item) => structuredClone(item));
+      },
+      async listActiveOccurredAtValues() {
+        return [...moments.values()]
+          .filter(
+            (item) =>
+              validateMoment(item).ok &&
+              item.lifecycle.status === 'active' &&
+              !!item.time.occurredAt &&
+              item.time.occurredAtPrecision !== 'unknown',
+          )
+          .map((item) => item.time.occurredAt as string);
+      },
+      async listActiveOccurredBetween(startIso, endIso) {
+        return [...moments.values()]
+          .filter(
+            (item) =>
+              validateMoment(item).ok &&
+              item.lifecycle.status === 'active' &&
+              !!item.time.occurredAt &&
+              item.time.occurredAt >= startIso &&
+              item.time.occurredAt < endIso,
+          )
+          .sort((a, b) => (a.time.occurredAt || '').localeCompare(b.time.occurredAt || ''))
+          .map((item) => structuredClone(item));
+      },
+      async listActiveUnknown(limit, offset) {
+        const all = [...moments.values()]
+          .filter(
+            (item) =>
+              validateMoment(item).ok &&
+              item.lifecycle.status === 'active' &&
+              (item.time.occurredAtPrecision === 'unknown' || !item.time.occurredAt),
+          )
+          .sort((a, b) => b.time.recordedAt.localeCompare(a.time.recordedAt));
+        return {
+          items: all.slice(offset, offset + limit).map((item) => structuredClone(item)),
+          hasMore: offset + limit < all.length,
+        };
+      },
+      async countActiveUnknown() {
+        return [...moments.values()].filter(
+          (item) =>
+            validateMoment(item).ok &&
+            item.lifecycle.status === 'active' &&
+            (item.time.occurredAtPrecision === 'unknown' || !item.time.occurredAt),
+        ).length;
       },
     },
     drafts: {

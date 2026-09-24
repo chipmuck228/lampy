@@ -187,6 +187,67 @@ export function createSqliteRepositories(db: SqlDatabase): {
         }
         return valid;
       },
+      async listActiveOccurredAtValues() {
+        const rows = await db.getAll<{ occurred_at: string }>(
+          `SELECT occurred_at FROM moments
+           WHERE lifecycle_status = 'active'
+             AND occurred_at IS NOT NULL
+             AND json_extract(json, '$.time.occurredAtPrecision') IN ('exact', 'day', 'month', 'year')`,
+        );
+        return rows.map((row) => row.occurred_at);
+      },
+      async listActiveOccurredBetween(startIso, endIso) {
+        const rows = await db.getAll<{ json: string }>(
+          `SELECT json FROM moments
+           WHERE lifecycle_status = 'active'
+             AND occurred_at IS NOT NULL
+             AND occurred_at >= ?
+             AND occurred_at < ?
+           ORDER BY occurred_at ASC, recorded_at ASC`,
+          [startIso, endIso],
+        );
+        const valid: MomentRecord[] = [];
+        for (const row of rows) {
+          const decoded = decodeMoment(row.json);
+          if (decoded.ok) valid.push(decoded.moment);
+          else await quarantine(db, 'moment', decoded.raw, decoded.errors);
+        }
+        return valid;
+      },
+      async listActiveUnknown(limit, offset) {
+        const rows = await db.getAll<{ json: string }>(
+          `SELECT json FROM moments
+           WHERE lifecycle_status = 'active'
+             AND (
+               occurred_at IS NULL
+               OR json_extract(json, '$.time.occurredAtPrecision') = 'unknown'
+             )
+           ORDER BY recorded_at DESC
+           LIMIT ? OFFSET ?`,
+          [limit + 1, offset],
+        );
+        const valid: MomentRecord[] = [];
+        for (const row of rows) {
+          const decoded = decodeMoment(row.json);
+          if (decoded.ok) valid.push(decoded.moment);
+          else await quarantine(db, 'moment', decoded.raw, decoded.errors);
+        }
+        return {
+          items: valid.slice(0, limit),
+          hasMore: valid.length > limit,
+        };
+      },
+      async countActiveUnknown() {
+        const row = await db.getFirst<{ total: number }>(
+          `SELECT COUNT(*) as total FROM moments
+           WHERE lifecycle_status = 'active'
+             AND (
+               occurred_at IS NULL
+               OR json_extract(json, '$.time.occurredAtPrecision') = 'unknown'
+             )`,
+        );
+        return row?.total ?? 0;
+      },
     },
     drafts: {
       async save(draft) {

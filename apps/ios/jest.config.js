@@ -13,7 +13,7 @@ module.exports = {
   },
   transformIgnorePatterns: [
     ...(expoPreset.transformIgnorePatterns || []),
-    '/domain/',
-    '/projections/',
+    '<rootDir>/../../domain/',
+    '<rootDir>/../../projections/',
   ],
 };

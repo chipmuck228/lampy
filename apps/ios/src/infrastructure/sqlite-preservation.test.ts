@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { createUseCases } from '../application/use-cases';
+import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
+import { activateMoment, createDraftMoment } from '../domain-adapters/moment-commands';
 import { ERROR_CODES } from '../domain-adapters/errors';
 import { createNodeMediaStore } from './node-media';
 import { openPreparedNodeSqliteDatabase } from './node-sqlite';
@@ -211,6 +213,69 @@ describe('sqlite file preservation', () => {
         kind: 'missing',
         requestedId: 'missing',
       });
+      await db.close();
+    });
+  });
+
+  it('reads one year by occurred range instead of every stored moment', async () => {
+    await withDatabase(async (file) => {
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const repos = createSqliteRepositories(db);
+      for (const [id, occurredAt] of [
+        ['old', '2025-12-31T12:00:00.000Z'],
+        ['in-year', '2026-06-15T12:00:00.000Z'],
+        ['next', '2027-01-02T12:00:00.000Z'],
+      ] as const) {
+        const now = new Date(occurredAt);
+        let moment = createDraftMoment(
+          {
+            ownerId: LOCAL_OWNER_ID,
+            content: { note: id },
+            time: {
+              recordedAt: occurredAt,
+              occurredAt,
+              occurredAtPrecision: 'day',
+            },
+            origin: { type: 'created' },
+          },
+          { now: () => now, ownerId: LOCAL_OWNER_ID, id: () => `moment_${id}` },
+        );
+        moment = activateMoment(moment, LOCAL_OWNER_ID, now);
+        await repos.moments.save(moment);
+      }
+      const listed = await repos.moments.listActiveOccurredBetween(
+        '2026-01-01T00:00:00.000Z',
+        '2027-01-01T00:00:00.000Z',
+      );
+      expect(listed.map((item) => item.id)).toEqual(['moment_in-year']);
+      await db.close();
+    });
+  });
+
+  it('keeps unknown precision off the year index even when occurred_at is set', async () => {
+    await withDatabase(async (file) => {
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const repos = createSqliteRepositories(db);
+      const now = new Date('2026-06-15T12:00:00.000Z');
+      let moment = createDraftMoment(
+        {
+          ownerId: LOCAL_OWNER_ID,
+          content: { note: '精度不足' },
+          time: {
+            recordedAt: '2026-06-15T12:00:00.000Z',
+            occurredAt: '2026-06-15T12:00:00.000Z',
+            occurredAtPrecision: 'unknown',
+          },
+          origin: { type: 'created' },
+        },
+        { now: () => now, ownerId: LOCAL_OWNER_ID, id: () => 'moment_unknown_iso' },
+      );
+      moment = activateMoment(moment, LOCAL_OWNER_ID, now);
+      await repos.moments.save(moment);
+      expect(await repos.moments.listActiveOccurredAtValues()).toEqual([]);
+      expect(await repos.moments.countActiveUnknown()).toBe(1);
+      const unknown = await repos.moments.listActiveUnknown(10, 0);
+      expect(unknown.items.map((item) => item.id)).toEqual(['moment_unknown_iso']);
       await db.close();
     });
   });

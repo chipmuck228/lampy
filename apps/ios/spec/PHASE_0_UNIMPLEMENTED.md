@@ -12,7 +12,7 @@
 | 撤回 / 送达状态变化 | 领域有 status 枚举，无网络状态机 | 未实现 |
 | 相机 / 相册写入 iOS | 已接 `expo-image-picker` + 持久文件 + 独立 Asset | 已实现；真机权限未验证 |
 | 麦克风录音 | 未接 `expo-audio` | 未实现 |
-| SQLite Moment 仓库 | iOS 已建 `moments` / `drafts` / `assets` 表 | 文字与图片闭环 |
+| SQLite Moment 仓库 | iOS 已建 `moments` / `drafts` / `assets` 表 | 文字、图片与回看 |
 | 草稿持久化（iOS） | iOS `drafts` 表 + Use Case 恢复 | 已实现文字与图片草稿 |
 | significance | 领域有字段，页面未采集 | MVP 不做 |
 | 公开社交 / 点赞 / AI | 规格禁止 | 不做 |
@@ -20,4 +20,4 @@
 | 编辑 / 删除详情内容 | 详情只读 | 未实现 |
 | 真机权限与音频中断 | 需真机 | **未验证** |
 
-当前 `apps/ios` 交付个人文字与最多三张照片闭环。页面不得宣称声音、家庭或同步已经接上。
+当前 `apps/ios` 交付个人文字、最多三张照片与年/月/日回看。页面不得宣称声音、家庭或同步已经接上。
