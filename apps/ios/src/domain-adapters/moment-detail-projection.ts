@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const projection = require('../../../../projections/moment-detail-projection.js') as {
+const projection = require('@lampy/projections/moment-detail-projection.js') as {
   projectMomentDetail: (
     moment: object,
     assets: (object | null | undefined)[],

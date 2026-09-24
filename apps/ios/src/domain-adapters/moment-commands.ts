@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const commands = require('../../../../domain/moment/moment.commands.js') as {
+const commands = require('@lampy/domain/moment/moment.commands.js') as {
   createDraftMoment: (input: object, dependencies?: object) => MomentRecord;
   activateMoment: (moment: MomentRecord, actorId: string, now?: Date | string) => MomentRecord;
   updateMomentContent: (
