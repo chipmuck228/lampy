@@ -1,4 +1,5 @@
 import { createUseCases } from './use-cases';
+import { createExpoAudioCapture } from '../infrastructure/expo-audio';
 import {
   createExpoCameraSource,
   createExpoLibrarySource,
@@ -40,6 +41,7 @@ const defaultLoader = createUseCaseLoader(async () => {
     media: createExpoMediaStore(),
     library: createExpoLibrarySource(),
     camera: createExpoCameraSource(),
+    capture: createExpoAudioCapture(),
   });
 });
 

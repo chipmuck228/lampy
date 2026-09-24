@@ -12,7 +12,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import type { RecentLifeViewModel } from '../application/use-cases';
+import { MomentAudio } from '../screens/moment-audio';
 import { MomentImages } from '../screens/moment-images';
+import { useSoundPlayer } from '../screens/use-sound-player';
 
 export default function RecentScreen() {
   const router = useRouter();
@@ -20,6 +22,8 @@ export default function RecentScreen() {
   const readingWidth = Math.min(width, 720);
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const sound = useSoundPlayer();
 
   useFocusEffect(
     useCallback(() => {
@@ -65,7 +69,7 @@ export default function RecentScreen() {
         {view?.isFirstUse ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>最近还没有留下什么。</Text>
-            <Text style={styles.body}>写一句或留下照片就可以。</Text>
+            <Text style={styles.body}>写一句、留下照片或一段声音就可以。</Text>
           </View>
         ) : null}
 
@@ -76,7 +80,7 @@ export default function RecentScreen() {
             accessibilityLabel={
               item.note
                 ? `${item.dateLabel}，${item.note}`
-                : `${item.dateLabel}，${item.images.map((image) => image.label).join('，') || '一张照片'}`
+                : `${item.dateLabel}，${[...item.images.map((image) => image.label), item.audio?.label || ''].filter(Boolean).join('，') || '一条记录'}`
             }
             testID={`recent-item-${item.id}`}
             onPress={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
@@ -85,6 +89,21 @@ export default function RecentScreen() {
             <Text style={styles.date}>{item.dateLabel}</Text>
             {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
             <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
+            <MomentAudio
+              audio={item.audio}
+              playbackStatus={playingId === item.audio?.id ? (sound.failed ? 'unavailable' : sound.status) : 'idle'}
+              currentTimeMs={playingId === item.audio?.id ? sound.currentTimeMs : 0}
+              onPlay={() => {
+                if (!item.audio?.uri) return;
+                setPlayingId(item.audio.id);
+                void sound.play(item.audio.uri);
+              }}
+              onPause={() => {
+                void sound.pause();
+              }}
+              testIDPrefix={`recent-sound-${item.id}`}
+              compact
+            />
           </Pressable>
         ))}
       </ScrollView>

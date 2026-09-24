@@ -4,16 +4,26 @@ import {
   activateMoment,
   attachAsset,
   createDraftMoment,
+  detachAsset,
   updateMomentContent,
   type MomentRecord,
 } from '../domain-adapters/moment-commands';
 import { projectMomentDetailView } from '../domain-adapters/moment-detail-projection';
-import type { ImageSource, MediaStore, PickedImage } from '../infrastructure/media';
+import type {
+  AudioCapture,
+  ImageSource,
+  MediaStore,
+  PickedImage,
+  RecordedAudio,
+} from '../infrastructure/media';
 import type { AssetRepository, DraftRepository, MomentRepository } from '../infrastructure/repositories';
+import { formatSoundDuration } from './duration';
 import { ApplicationError, toApplicationError } from './errors';
 
 export const MAX_DRAFT_IMAGES = 3;
+export const MAX_DRAFT_AUDIO = 1;
 export const IMAGE_UNAVAILABLE_LABEL = '这张照片暂时找不到了，但这条记录还在。';
+export const AUDIO_UNAVAILABLE_LABEL = '这段声音暂时无法播放，其他内容仍然保留。';
 
 export type Clock = { now: () => Date };
 
@@ -27,12 +37,23 @@ export type ImageView = {
   unavailableLabel?: string;
 };
 
+export type AudioView = {
+  id: string;
+  status: 'available' | 'unavailable';
+  uri?: string;
+  durationMs: number;
+  durationLabel: string;
+  label: string;
+  unavailableLabel?: string;
+};
+
 export type RecentLifeItem = {
   id: string;
   note: string;
   recordedAt: string;
   dateLabel: string;
   images: ImageView[];
+  audio: AudioView | null;
 };
 
 export type RecentLifeViewModel = {
@@ -45,6 +66,13 @@ export type ComposerViewModel = {
   note: string;
   isRestored: boolean;
   images: ImageView[];
+  audio: AudioView | null;
+};
+
+export type InterruptRecordingResult = {
+  composer: ComposerViewModel;
+  kept: boolean;
+  hadSession: boolean;
 };
 
 export type MomentDetailViewModel =
@@ -57,6 +85,7 @@ export type MomentDetailViewModel =
       usedRecordedAtFallback: boolean;
       sourceLabel: string;
       images: ImageView[];
+      audio: AudioView | null;
     }
   | { kind: 'missing'; requestedId: string }
   | { kind: 'error'; requestedId: string };
@@ -88,6 +117,14 @@ function toProjectionAsset(asset: AssetRecord | null): object | null {
   return asset;
 }
 
+function isImageAsset(asset: AssetRecord): boolean {
+  return asset.type !== 'audio' && asset.type !== 'video';
+}
+
+function isAudioAsset(asset: AssetRecord): boolean {
+  return asset.type === 'audio';
+}
+
 export function createUseCases(deps: {
   moments: MomentRepository;
   drafts: DraftRepository;
@@ -95,6 +132,7 @@ export function createUseCases(deps: {
   media?: MediaStore;
   library?: ImageSource;
   camera?: ImageSource;
+  capture?: AudioCapture;
   clock?: Clock;
   ownerId?: string;
   id?: () => string;
@@ -106,11 +144,36 @@ export function createUseCases(deps: {
   const nextAssetId = deps.assetId || defaultAssetId;
   let restoreInFlight: Promise<ComposerViewModel> | null = null;
 
+  async function loadAsset(assetId: string): Promise<AssetRecord | null> {
+    if (!deps.assets) return null;
+    const found = await deps.assets.findById(assetId);
+    return found.kind === 'ready' ? found.asset : null;
+  }
+
+  async function classify(assetIds: string[]): Promise<{
+    imageIds: string[];
+    audioId: string | null;
+  }> {
+    const imageIds: string[] = [];
+    let audioId: string | null = null;
+    for (const assetId of assetIds) {
+      const asset = await loadAsset(assetId);
+      if (asset && isAudioAsset(asset)) {
+        if (!audioId) audioId = assetId;
+        continue;
+      }
+      if (asset && !isImageAsset(asset)) continue;
+      imageIds.push(assetId);
+    }
+    return { imageIds, audioId };
+  }
+
   async function resolveImages(assetIds: string[]): Promise<ImageView[]> {
-    const total = assetIds.length;
+    const { imageIds } = await classify(assetIds);
+    const total = imageIds.length;
     if (total === 0) return [];
     const views: ImageView[] = [];
-    for (const [index, assetId] of assetIds.entries()) {
+    for (const [index, assetId] of imageIds.entries()) {
       const label = photoLabel(index + 1, total);
       const found = deps.assets ? await deps.assets.findById(assetId) : { kind: 'missing' as const };
       if (found.kind !== 'ready') {
@@ -148,13 +211,56 @@ export function createUseCases(deps: {
     return views;
   }
 
+  async function resolveAudio(assetIds: string[]): Promise<AudioView | null> {
+    const { audioId } = await classify(assetIds);
+    if (!audioId) return null;
+    const found = deps.assets ? await deps.assets.findById(audioId) : { kind: 'missing' as const };
+    const durationMs =
+      found.kind === 'ready' && Number.isFinite(found.asset.metadata.durationMs)
+        ? found.asset.metadata.durationMs || 0
+        : 0;
+    const durationLabel = formatSoundDuration(durationMs);
+    if (found.kind !== 'ready') {
+      return {
+        id: audioId,
+        status: 'unavailable',
+        durationMs,
+        durationLabel,
+        label: '当时的声音',
+        unavailableLabel: AUDIO_UNAVAILABLE_LABEL,
+      };
+    }
+    const uri = found.asset.localUri;
+    const playable = !!deps.media && (await deps.media.exists(uri)) && (await deps.media.canPlay(uri));
+    if (!playable) {
+      return {
+        id: audioId,
+        status: 'unavailable',
+        durationMs,
+        durationLabel,
+        label: '当时的声音',
+        unavailableLabel: AUDIO_UNAVAILABLE_LABEL,
+      };
+    }
+    return {
+      id: audioId,
+      status: 'available',
+      uri,
+      durationMs,
+      durationLabel,
+      label: '当时的声音',
+    };
+  }
+
   async function toComposer(draft: MomentRecord, isRestored: boolean): Promise<ComposerViewModel> {
     const images = await resolveImages(draft.assetIds);
+    const audio = await resolveAudio(draft.assetIds);
     return {
       draftId: draft.id,
       note: draft.content.note,
-      isRestored: isRestored && (!!draft.content.note.trim() || images.length > 0),
+      isRestored: isRestored && (!!draft.content.note.trim() || images.length > 0 || !!audio),
       images,
+      audio,
     };
   }
 
@@ -164,6 +270,23 @@ export function createUseCases(deps: {
       throw new ApplicationError('DRAFT_NOT_FOUND', '没有可更新的草稿');
     }
     return draft;
+  }
+
+  async function isAssetReferenced(assetId: string): Promise<boolean> {
+    const draft = await deps.drafts.loadActive();
+    if (draft?.assetIds.includes(assetId)) return true;
+    if (draft) {
+      const own = await deps.moments.findById(draft.id);
+      if (own.kind === 'ready' && own.moment.assetIds.includes(assetId)) return true;
+    }
+    const recent = await deps.moments.listRecent(200);
+    return recent.some((moment) => moment.assetIds.includes(assetId));
+  }
+
+  async function cleanupOrphan(assetId: string, localUri: string | undefined): Promise<void> {
+    if (!localUri || !deps.media) return;
+    if (await isAssetReferenced(assetId)) return;
+    await deps.media.removeAppOwned(localUri);
   }
 
   async function persistAndAttach(draft: MomentRecord, picks: PickedImage[]): Promise<MomentRecord> {
@@ -209,9 +332,58 @@ export function createUseCases(deps: {
     return current;
   }
 
+  async function persistAndAttachAudio(
+    draft: MomentRecord,
+    recorded: RecordedAudio,
+  ): Promise<MomentRecord> {
+    if (!deps.assets || !deps.media) {
+      throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下声音。');
+    }
+    if (recorded.durationMs <= 0) {
+      throw new ApplicationError('AUDIO_EMPTY', '这一次没有录下声音。');
+    }
+    const { audioId } = await classify(draft.assetIds);
+    if (audioId) {
+      throw new ApplicationError('AUDIO_LIMIT', '每条最多一段声音');
+    }
+    const assetId = nextAssetId();
+    const persisted = await deps.media.persistAudio({
+      assetId,
+      sourceUri: recorded.sourceUri,
+      mimeType: recorded.mimeType,
+    });
+    const existing = await deps.assets.findById(assetId);
+    if (existing.kind === 'unreadable') {
+      throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这段声音还在，但现在不能覆盖它');
+    }
+    if (existing.kind === 'missing') {
+      const instant = clock.now();
+      const asset = createAsset(
+        {
+          id: assetId,
+          ownerId,
+          type: 'audio',
+          captureTimeSource: 'system',
+          localUri: persisted.localUri,
+          storage: { status: 'local' },
+          metadata: {
+            mimeType: recorded.mimeType || 'audio/mp4',
+            sizeBytes: persisted.sizeBytes,
+            durationMs: recorded.durationMs,
+          },
+        },
+        { now: () => instant, ownerId },
+      );
+      await deps.assets.save(asset);
+    }
+    const next = attachAsset(draft, assetId, ownerId, clock.now());
+    await deps.drafts.save(next);
+    return next;
+  }
+
   async function addPickedImages(draftId: string, picks: PickedImage[]): Promise<ComposerViewModel> {
     const draft = await requireDraft(draftId);
-    const remaining = MAX_DRAFT_IMAGES - draft.assetIds.length;
+    const remaining = MAX_DRAFT_IMAGES - (await classify(draft.assetIds)).imageIds.length;
     if (remaining <= 0) {
       throw new ApplicationError('IMAGE_LIMIT', '每条最多三张照片');
     }
@@ -233,7 +405,7 @@ export function createUseCases(deps: {
     deniedMessage: string,
   ): Promise<ComposerViewModel> {
     const draft = await requireDraft(draftId);
-    const remaining = MAX_DRAFT_IMAGES - draft.assetIds.length;
+    const remaining = MAX_DRAFT_IMAGES - (await classify(draft.assetIds)).imageIds.length;
     if (remaining <= 0) {
       throw new ApplicationError('IMAGE_LIMIT', '每条最多三张照片');
     }
@@ -309,6 +481,69 @@ export function createUseCases(deps: {
     );
   }
 
+  async function beginDraftRecording(draftId: string): Promise<void> {
+    const draft = await requireDraft(draftId);
+    const { audioId } = await classify(draft.assetIds);
+    if (audioId) {
+      throw new ApplicationError('AUDIO_LIMIT', '每条最多一段声音');
+    }
+    if (!deps.capture) {
+      throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下声音。');
+    }
+    if (deps.capture.isRecording()) {
+      throw new ApplicationError('AUDIO_BUSY', '正在录一段声音。');
+    }
+    const permission = await deps.capture.requestPermission();
+    if (permission !== 'granted') {
+      throw new ApplicationError('MIC_DENIED', '没有打开麦克风。还可以写字和留下照片，草稿还在。');
+    }
+    await deps.capture.start();
+  }
+
+  async function addRecordedAudio(draftId: string, recorded: RecordedAudio): Promise<ComposerViewModel> {
+    const draft = await requireDraft(draftId);
+    const next = await persistAndAttachAudio(draft, recorded);
+    return toComposer(next, true);
+  }
+
+  async function finishDraftRecording(draftId: string): Promise<ComposerViewModel> {
+    if (!deps.capture) {
+      throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下声音。');
+    }
+    const elapsedMs = deps.capture.getElapsedMs();
+    const recorded = await deps.capture.stop();
+    return addRecordedAudio(draftId, {
+      ...recorded,
+      durationMs: recorded.durationMs > 0 ? recorded.durationMs : elapsedMs,
+    });
+  }
+
+  async function interruptDraftRecording(draftId: string): Promise<InterruptRecordingResult> {
+    const draft = await requireDraft(draftId);
+    if (!deps.capture || !deps.capture.isRecording()) {
+      return { composer: await toComposer(draft, true), kept: false, hadSession: false };
+    }
+    const recorded = await deps.capture.interrupt();
+    if (!recorded || recorded.durationMs <= 0) {
+      return { composer: await toComposer(draft, true), kept: false, hadSession: true };
+    }
+    const composer = await addRecordedAudio(draftId, recorded);
+    return { composer, kept: true, hadSession: true };
+  }
+
+  async function removeDraftAudio(draftId: string): Promise<ComposerViewModel> {
+    const draft = await requireDraft(draftId);
+    const { audioId } = await classify(draft.assetIds);
+    if (!audioId) {
+      return toComposer(draft, true);
+    }
+    const asset = await loadAsset(audioId);
+    const next = detachAsset(draft, audioId, ownerId, clock.now());
+    await deps.drafts.save(next);
+    await cleanupOrphan(audioId, asset?.localUri);
+    return toComposer(next, true);
+  }
+
   async function saveTextMoment(draftId: string): Promise<{ id: string }> {
     const existing = await deps.moments.findById(draftId);
     if (existing.kind === 'unreadable') {
@@ -326,7 +561,7 @@ export function createUseCases(deps: {
 
     const note = draft.content.note.trim();
     if (!note && draft.assetIds.length === 0) {
-      throw new ApplicationError('MOMENT_EMPTY', '写一句或留下一张照片。');
+      throw new ApplicationError('MOMENT_EMPTY', '写一句、留下一张照片或一段声音。');
     }
 
     const instant = clock.now();
@@ -358,6 +593,7 @@ export function createUseCases(deps: {
         recordedAt: moment.time.recordedAt,
         dateLabel: calendarDateLabel(moment.time.occurredAt || moment.time.recordedAt),
         images: await resolveImages(moment.assetIds),
+        audio: await resolveAudio(moment.assetIds),
       });
     }
     return {
@@ -392,10 +628,11 @@ export function createUseCases(deps: {
           continue;
         }
         const uri = asset.asset.localUri;
-        const readable =
-          !!deps.media && (await deps.media.exists(uri)) && (await deps.media.canDecode(uri));
+        const usable = asset.asset.type === 'audio'
+          ? !!deps.media && (await deps.media.exists(uri)) && (await deps.media.canPlay(uri))
+          : !!deps.media && (await deps.media.exists(uri)) && (await deps.media.canDecode(uri));
         projectionAssets.push(
-          readable
+          usable
             ? toProjectionAsset(asset.asset)
             : {
                 ...asset.asset,
@@ -418,6 +655,7 @@ export function createUseCases(deps: {
       usedRecordedAtFallback: view.displayDate.usedRecordedAtFallback,
       sourceLabel: view.source.label,
       images: await resolveImages(found.moment.assetIds),
+      audio: await resolveAudio(found.moment.assetIds),
     };
   }
 
@@ -427,7 +665,15 @@ export function createUseCases(deps: {
     addLibraryImages,
     addCameraImage,
     addPickedImages,
+    beginDraftRecording,
+    finishDraftRecording,
+    interruptDraftRecording,
+    addRecordedAudio,
+    removeDraftAudio,
     saveTextMoment,
+    getRecordingElapsedMs() {
+      return deps.capture?.getElapsedMs() ?? 0;
+    },
     getRecentLife,
     getMomentDetail,
     toApplicationError,

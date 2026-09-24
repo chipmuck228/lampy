@@ -26,6 +26,7 @@ jest.mock('../application/container', () => ({
           unavailableLabel: '这张照片暂时找不到了，但这条记录还在。',
         },
       ],
+      audio: null,
     }),
   }),
 }));

@@ -23,6 +23,7 @@ jest.mock('../application/container', () => ({
           label: '照片 1/1',
         },
       ],
+      audio: null,
     }),
     updateDraftNote: async () => undefined,
     addLibraryImages: async () => undefined,

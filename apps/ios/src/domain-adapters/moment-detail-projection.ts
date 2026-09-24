@@ -63,7 +63,10 @@ export function projectMomentDetailView(
             ...asset,
             display: {
               ...asset.display,
-              unavailableLabel: '这张照片暂时找不到了，但这条记录还在。',
+              unavailableLabel:
+                asset.type === 'audio'
+                  ? '这段声音暂时无法播放，其他内容仍然保留。'
+                  : '这张照片暂时找不到了，但这条记录还在。',
             },
           },
     ),
