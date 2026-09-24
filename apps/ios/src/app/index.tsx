@@ -50,6 +50,7 @@ export default function RecentScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="留下"
+            testID="home-leave"
             hitSlop={8}
             onPress={() => router.push('/leave')}
             style={styles.leaveHit}
@@ -72,6 +73,7 @@ export default function RecentScreen() {
             key={item.id}
             accessibilityRole="button"
             accessibilityLabel={`${item.dateLabel}，${item.note}`}
+            testID={`recent-item-${item.id}`}
             onPress={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
             style={styles.row}
           >

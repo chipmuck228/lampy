@@ -68,7 +68,9 @@ export default function MomentDetailScreen() {
         {view?.kind === 'ready' ? (
           <View style={styles.block}>
             <Text style={styles.date}>{view.dateLabel}</Text>
-            <Text style={styles.note}>{view.note}</Text>
+            <Text testID="detail-note" style={styles.note}>
+              {view.note}
+            </Text>
             <Text style={styles.meta}>{view.sourceLabel}</Text>
           </View>
         ) : null}

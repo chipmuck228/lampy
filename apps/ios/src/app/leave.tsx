@@ -101,6 +101,7 @@ export default function LeaveScreen() {
           ) : null}
           <TextInput
             accessibilityLabel="要留下的一句话"
+            testID="composer-note"
             value={note}
             editable={!!draftId}
             onChangeText={(value) => {
@@ -116,6 +117,7 @@ export default function LeaveScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="留下"
+            testID="composer-save"
             onPress={() => {
               void onSave();
             }}
