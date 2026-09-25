@@ -74,6 +74,8 @@ const MIGRATIONS = [
   );`,
   `CREATE UNIQUE INDEX IF NOT EXISTS family_shares_one_revision_per_author
     ON family_shares(family_id, author_user_id, source_moment_id, source_revision);`,
+  `ALTER TABLE family_shares ADD COLUMN status TEXT NOT NULL DEFAULT 'active';`,
+  `ALTER TABLE family_shares ADD COLUMN revoked_at TEXT;`,
 ];
 
 export async function applyFamilyApiSchema(db: FamilySql): Promise<void> {

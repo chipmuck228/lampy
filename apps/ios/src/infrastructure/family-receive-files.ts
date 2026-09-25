@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -7,6 +7,7 @@ export type FamilyReceiveFileStore = {
   read(storageKey: string): Promise<Uint8Array>;
   remove(storageKey: string): Promise<void>;
   removePrefix(prefix: string): Promise<void>;
+  listKeys(): Promise<string[]>;
 };
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -43,6 +44,29 @@ export function createNodeFamilyReceiveFiles(rootDir: string): FamilyReceiveFile
     },
     async removePrefix(prefix) {
       await rm(dest(prefix), { recursive: true, force: true });
+    },
+    async listKeys() {
+      async function walk(dir: string, prefix = ''): Promise<string[]> {
+        let names: string[];
+        try {
+          names = await readdir(dir);
+        } catch {
+          return [];
+        }
+        const keys: string[] = [];
+        for (const name of names) {
+          const rel = prefix ? `${prefix}/${name}` : name;
+          const full = path.join(dir, name);
+          try {
+            if ((await stat(full)).isDirectory()) keys.push(...(await walk(full, rel)));
+            else keys.push(rel);
+          } catch {
+            continue;
+          }
+        }
+        return keys;
+      }
+      return walk(rootDir);
     },
   };
 }
@@ -82,6 +106,22 @@ export function createExpoFamilyReceiveFiles(rootDir?: string): FamilyReceiveFil
     },
     async removePrefix(prefix) {
       await FileSystem.deleteAsync(dest(prefix), { idempotent: true });
+    },
+    async listKeys() {
+      async function walk(dir: string, prefix = ''): Promise<string[]> {
+        const info = await FileSystem.getInfoAsync(dir);
+        if (!info.exists) return [];
+        if (!info.isDirectory) return prefix ? [prefix] : [];
+        const names = await FileSystem.readDirectoryAsync(dir);
+        const keys: string[] = [];
+        for (const name of names) {
+          const rel = prefix ? `${prefix}/${name}` : name;
+          const child = `${dir}${dir.endsWith('/') ? '' : '/'}${name}`;
+          keys.push(...(await walk(child, rel)));
+        }
+        return keys;
+      }
+      return walk(rootDir ?? familyCacheDirectory());
     },
   };
 }

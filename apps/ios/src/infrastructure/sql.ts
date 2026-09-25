@@ -72,6 +72,10 @@ const MIGRATIONS = [
     status TEXT NOT NULL,
     PRIMARY KEY (user_id, family_id, share_id, object_id)
   );`,
+  `CREATE TABLE IF NOT EXISTS family_receive_pending_cleanup (
+    prefix TEXT PRIMARY KEY NOT NULL,
+    created_at TEXT NOT NULL
+  );`,
 ];
 
 export async function applyLampySchema(db: SqlDatabase): Promise<void> {

@@ -3,6 +3,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ApplicationError } from '../application/errors';
+import type { FamilyInboxView } from '../application/family-use-cases';
 import FamilyScreen from './family-screen';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
 
@@ -19,8 +20,9 @@ const mockFamily = {
   dissolveFamily: jest.fn(),
   signOut: jest.fn(),
   hasUnconfirmedSessionRevoke: jest.fn(async () => false),
-  refreshFamilyInbox: jest.fn(async () => ({ kind: 'hidden', reason: 'unauthenticated' })),
+  refreshFamilyInbox: jest.fn(async (): Promise<FamilyInboxView> => ({ kind: 'hidden', reason: 'unauthenticated' })),
   receiveShare: jest.fn(),
+  revokeShare: jest.fn(),
 };
 
 jest.mock('expo-router', () => {
@@ -70,6 +72,13 @@ describe('family screen', () => {
     mockFamily.signOut.mockReset();
     mockFamily.hasUnconfirmedSessionRevoke.mockReset().mockResolvedValue(false);
     mockFamily.refreshFamilyInbox.mockReset().mockResolvedValue({ kind: 'hidden', reason: 'unauthenticated' });
+    mockFamily.inviteMember.mockReset().mockResolvedValue({
+      invitationId: 'inv_1',
+      familyId: 'fam_1',
+      code: 'CODE',
+      status: 'pending',
+      expiresAt: '2026-09-25T07:00:00.000Z',
+    });
   });
 
   it('shows an accurate unavailable state when the family API is not configured', async () => {
@@ -131,6 +140,7 @@ describe('family screen', () => {
           receiveStatus: 'listed',
           expectedMediaCount: 1,
           storedMediaCount: 0,
+          canRevoke: false,
         },
       ],
     });
@@ -170,6 +180,92 @@ describe('family screen', () => {
     });
     expect(view.getByLabelText('解散这个家')).toBeTruthy();
     expect(view.getByLabelText('邀请')).toBeTruthy();
+    expect(mockFamily.refreshFamilyInbox).toHaveBeenCalled();
+  });
+
+  it('refreshes shares after a remote revoke even when the invite list fails', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      role: 'creator',
+      members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+    });
+    mockFamily.refreshFamilyInbox.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      items: [
+        {
+          shareId: 'shr_1',
+          familyId: 'fam_1',
+          snapshotRevision: 1,
+          note: '门口的风',
+          emotion: '平静',
+          occurredAtPrecision: 'day',
+          receiveStatus: 'received',
+          expectedMediaCount: 0,
+          storedMediaCount: 0,
+          canRevoke: true,
+        },
+      ],
+    });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByText('文字：门口的风')).toBeTruthy();
+    });
+
+    mockFamily.listPendingInvitations.mockRejectedValue(new ApplicationError('INTERNAL', 'invite list failed'));
+    mockFamily.refreshFamilyInbox.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      items: [],
+    });
+    fireEvent.press(view.getByLabelText('邀请'));
+    await waitFor(() => {
+      expect(view.queryByText('文字：门口的风')).toBeNull();
+      expect(view.queryByText('家里有这条分享')).toBeNull();
+      expect(view.getByText('邀请列表暂时读不出来，家里的成员已经确认。')).toBeTruthy();
+      expect(view.getByText('usr_alice')).toBeTruthy();
+    });
+    expect(mockFamily.refreshFamilyInbox).toHaveBeenCalled();
+  });
+
+  it('hides family shares when the share list request fails', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      role: 'creator',
+      members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+    });
+    mockFamily.refreshFamilyInbox.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      items: [
+        {
+          shareId: 'shr_1',
+          familyId: 'fam_1',
+          snapshotRevision: 1,
+          note: '门口的风',
+          emotion: '',
+          occurredAtPrecision: 'day',
+          receiveStatus: 'received',
+          expectedMediaCount: 0,
+          storedMediaCount: 0,
+          canRevoke: true,
+        },
+      ],
+    });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByText('文字：门口的风')).toBeTruthy();
+    });
+    mockFamily.refreshFamilyInbox.mockRejectedValue(new ApplicationError('NETWORK', 'share list failed'));
+    fireEvent.press(view.getByLabelText('邀请'));
+    await waitFor(() => {
+      expect(view.queryByText('文字：门口的风')).toBeNull();
+      expect(view.getByText('usr_alice')).toBeTruthy();
+    });
   });
 
   it('shows an unconfirmed remote revoke after a later refresh without treating it as a live session', async () => {

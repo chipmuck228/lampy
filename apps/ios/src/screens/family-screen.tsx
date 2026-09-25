@@ -25,6 +25,9 @@ function errorText(error: unknown) {
     if (error.code === 'INVITE_ALREADY_USED') return '这个邀请已经被用过了。';
     if (error.code === 'FORBIDDEN') return '这件事只有创建者能做。';
   }
+  if (error instanceof Error && error.message === 'revoke-retry') {
+    return '撤回还没完成，可以再试。';
+  }
   return '家庭这件事没有做成。个人记录还在这台设备上。';
 }
 
@@ -85,6 +88,7 @@ export default function FamilyScreen() {
       if (!refreshGate.isCurrent(generation)) return 'stale';
       setAppleAvailable(available);
       setMembership(next);
+      let invitesFailed = false;
       if (next.kind === 'ready' && next.role === 'creator') {
         try {
           const listed = await family.listPendingInvitations(next.familyId);
@@ -93,7 +97,7 @@ export default function FamilyScreen() {
         } catch {
           if (!refreshGate.isCurrent(generation)) return 'stale';
           setInvites([]);
-          return 'invites-failed';
+          invitesFailed = true;
         }
       } else {
         setInvites([]);
@@ -102,7 +106,7 @@ export default function FamilyScreen() {
         try {
           const nextInbox = await family.refreshFamilyInbox();
           if (!refreshGate.isCurrent(generation)) return 'stale';
-          setInbox(nextInbox);
+          setInbox(nextInbox.kind === 'ready' ? nextInbox : { kind: 'hidden', reason: nextInbox.reason });
         } catch {
           if (!refreshGate.isCurrent(generation)) return 'stale';
           setInbox({ kind: 'hidden', reason: 'unreachable' });
@@ -114,7 +118,7 @@ export default function FamilyScreen() {
         if (!refreshGate.isCurrent(generation)) return 'stale';
         return 'revoke-unconfirmed';
       }
-      return 'ok';
+      return invitesFailed ? 'invites-failed' : 'ok';
     } catch (error) {
       if (!refreshGate.isCurrent(generation)) return 'stale';
       hideFamilyContent();
@@ -326,6 +330,25 @@ export default function FamilyScreen() {
                         style={styles.hit}
                       >
                         <Text style={styles.action}>收下这条分享</Text>
+                      </Pressable>
+                    ) : null}
+                    {item.canRevoke ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="撤回这条分享"
+                        testID={`family-revoke-share-${item.shareId}`}
+                        disabled={busy}
+                        onPress={() =>
+                          run(async (family) => {
+                            const revoked = await family.revokeShare(item.shareId);
+                            if (revoked.status === 'failed') {
+                              throw new Error('revoke-retry');
+                            }
+                          })
+                        }
+                        style={styles.hit}
+                      >
+                        <Text style={styles.action}>撤回这条分享</Text>
                       </Pressable>
                     ) : null}
                   </View>

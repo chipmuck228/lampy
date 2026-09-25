@@ -4,6 +4,7 @@ import type {
   InvitationView,
   MediaObjectView,
   MembershipListView,
+  RevokeShareResult,
   ShareMediaView,
   ShareMomentInput,
   ShareView,
@@ -51,6 +52,7 @@ export type FamilyApiClient = {
   getMediaObject(sessionToken: string, objectId: string): Promise<MediaObjectView>;
   getMediaContent(sessionToken: string, objectId: string): Promise<{ mimeType: string; bytes: Uint8Array }>;
   shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
+  revokeShare(sessionToken: string, familyId: string, shareId: string): Promise<RevokeShareResult>;
   listVisibleShares(sessionToken: string, familyId: string): Promise<{ shares: ShareView[] }>;
   getShare(sessionToken: string, familyId: string, shareId: string): Promise<ShareView>;
   getShareMedia(sessionToken: string, familyId: string, shareId: string, objectId: string): Promise<ShareMediaView>;
@@ -163,6 +165,13 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
           mediaObjectIds: input.mediaObjectIds,
           expectedMediaCount: input.expectedMediaCount,
         },
+      });
+    },
+    revokeShare(sessionToken, familyId, shareId) {
+      return send({
+        method: 'POST',
+        path: `/v1/families/${familyId}/shares/${shareId}/revoke`,
+        sessionToken,
       });
     },
     listVisibleShares(sessionToken, familyId) {

@@ -228,6 +228,11 @@ export async function dispatchFamilyApi(
       };
     }
 
+    const shareRevoke = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/revoke$/.exec(path);
+    if (method === 'POST' && shareRevoke) {
+      return { status: 200, body: await commands.revokeShare(token || '', shareRevoke[1], shareRevoke[2]) };
+    }
+
     const shareGet = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)$/.exec(path);
     if (method === 'GET' && shareGet) {
       return { status: 200, body: await commands.getShare(token || '', shareGet[1], shareGet[2]) };

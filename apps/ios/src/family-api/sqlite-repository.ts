@@ -66,6 +66,8 @@ type ShareRow = {
   snapshot_json: string;
   audience_json: string;
   shared_at: string;
+  status: string | null;
+  revoked_at: string | null;
 };
 
 function shareFrom(row: ShareRow): ShareRecord {
@@ -78,6 +80,8 @@ function shareFrom(row: ShareRow): ShareRecord {
     snapshot: JSON.parse(row.snapshot_json) as ShareSnapshot,
     audienceUserIds: JSON.parse(row.audience_json) as string[],
     sharedAt: row.shared_at,
+    status: row.status === 'revoked' ? 'revoked' : 'active',
+    revokedAt: row.revoked_at || undefined,
   };
 }
 
@@ -380,7 +384,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findShare(shareId) {
       const row = await db.getFirst<ShareRow>(
-        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at
+        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at, status, revoked_at
          FROM family_shares WHERE share_id = ?`,
         [shareId],
       );
@@ -388,7 +392,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findShareBySource(familyId, authorUserId, sourceMomentId, sourceRevision) {
       const row = await db.getFirst<ShareRow>(
-        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at
+        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at, status, revoked_at
          FROM family_shares
          WHERE family_id = ? AND author_user_id = ? AND source_moment_id = ? AND source_revision = ?`,
         [familyId, authorUserId, sourceMomentId, sourceRevision],
@@ -397,7 +401,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async listSharesInFamily(familyId) {
       const rows = await db.getAll<ShareRow>(
-        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at
+        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at, status, revoked_at
          FROM family_shares WHERE family_id = ? ORDER BY shared_at DESC`,
         [familyId],
       );
@@ -407,8 +411,11 @@ function createSqliteTx(db: FamilySql): FamilyTx {
       try {
         await db.run(
           `INSERT INTO family_shares
-           (share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at, status, revoked_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(share_id) DO UPDATE SET
+             status = excluded.status,
+             revoked_at = excluded.revoked_at`,
           [
             share.shareId,
             share.familyId,
@@ -418,6 +425,8 @@ function createSqliteTx(db: FamilySql): FamilyTx {
             JSON.stringify(share.snapshot),
             JSON.stringify(share.audienceUserIds),
             share.sharedAt,
+            share.status,
+            share.revokedAt ?? null,
           ],
         );
       } catch (error) {
