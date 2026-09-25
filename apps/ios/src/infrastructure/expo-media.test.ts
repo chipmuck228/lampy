@@ -96,6 +96,31 @@ describe('expo media decode', () => {
     );
   });
 
+  it('does not copy or delete when checking an existing dest fails', async () => {
+    jest.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => {
+      if (String(uri).endsWith('lampy-assets')) {
+        return {
+          exists: true,
+          isDirectory: true,
+          uri: String(uri),
+          size: 0,
+          modificationTime: 0,
+        };
+      }
+      throw Object.assign(new Error('EIO: dest probe failed'), { code: 'EIO' });
+    });
+
+    await expect(
+      createExpoMediaStore().persistImage({
+        assetId: 'asset_existing',
+        sourceUri: 'file:///tmp/source.jpg',
+        mimeType: 'image/jpeg',
+      }),
+    ).rejects.toMatchObject({ code: 'COPY_FAILED' });
+    expect(FileSystem.copyAsync).not.toHaveBeenCalled();
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+  });
+
   it('classifies a generic copy failure as COPY_FAILED', async () => {
     jest.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => {
       if (String(uri).endsWith('lampy-assets')) {

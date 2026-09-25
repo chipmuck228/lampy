@@ -83,32 +83,41 @@ async function persistCopy(
   dest: string,
   sourceUri: string,
 ): Promise<{ localUri: string; sizeBytes?: number }> {
+  const directory = assetDirectory();
+  const info = await FileSystem.getInfoAsync(directory);
+  if (!info.exists) {
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+  }
+  let destInfo;
   try {
-    const directory = assetDirectory();
-    const info = await FileSystem.getInfoAsync(directory);
-    if (!info.exists) {
-      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-    }
-    const destInfo = await FileSystem.getInfoAsync(dest);
-    if (destInfo.exists) {
-      return {
-        localUri: dest,
-        sizeBytes: destInfo.size,
-      };
-    }
+    destInfo = await FileSystem.getInfoAsync(dest);
+  } catch (error) {
+    throw classifyCopyError(error);
+  }
+  if (destInfo.exists) {
+    return {
+      localUri: dest,
+      sizeBytes: destInfo.size,
+    };
+  }
+  try {
     await FileSystem.copyAsync({ from: sourceUri, to: dest });
+  } catch (error) {
+    try {
+      await FileSystem.deleteAsync(dest, { idempotent: true });
+    } catch {
+      // Only a dest this copy started may be a partial file.
+    }
+    throw classifyCopyError(error);
+  }
+  try {
     const copied = await FileSystem.getInfoAsync(dest);
     return {
       localUri: dest,
       sizeBytes: copied.exists ? copied.size : undefined,
     };
-  } catch (error) {
-    try {
-      await FileSystem.deleteAsync(dest, { idempotent: true });
-    } catch {
-      // A failed copy must not later look like a persisted asset.
-    }
-    throw classifyCopyError(error);
+  } catch {
+    return { localUri: dest };
   }
 }
 

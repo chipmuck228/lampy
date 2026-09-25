@@ -5,23 +5,30 @@ import { classifyCopyError, extensionForAudioMime, extensionForMime, type MediaS
 
 export function createNodeMediaStore(rootDir: string): MediaStore {
   async function persist(dest: string, sourceUri: string) {
+    await mkdir(rootDir, { recursive: true });
     try {
-      await mkdir(rootDir, { recursive: true });
-      try {
-        await stat(dest);
-        return { localUri: dest };
-      } catch {
-        await copyFile(sourceUri, dest);
-        const info = await stat(dest);
-        return { localUri: dest, sizeBytes: info.size };
+      await stat(dest);
+      return { localUri: dest };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw classifyCopyError(error);
       }
+    }
+    try {
+      await copyFile(sourceUri, dest);
     } catch (error) {
       try {
         await unlink(dest);
       } catch {
-        // A failed copy must not leave a partial dest that later looks persisted.
+        // Only a dest this copy started may be a partial file.
       }
       throw classifyCopyError(error);
+    }
+    try {
+      const info = await stat(dest);
+      return { localUri: dest, sizeBytes: info.size };
+    } catch {
+      return { localUri: dest };
     }
   }
 
