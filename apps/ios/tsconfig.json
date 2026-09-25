@@ -21,6 +21,8 @@
     "src/infrastructure/sqlite-preservation.test.ts",
     "src/infrastructure/pending-family-sqlite.test.ts",
     "src/family-api/apple-node.ts",
-    "src/family-api/listen.ts"
+    "src/family-api/listen.ts",
+    "src/family-api/node-db.ts",
+    "src/family-api/sqlite-repository.test.ts"
   ]
 }

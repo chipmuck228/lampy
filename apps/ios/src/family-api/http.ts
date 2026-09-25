@@ -80,48 +80,53 @@ export async function dispatchFamilyApi(
 
   try {
     if (method === 'GET' && path === '/health') {
-      return { status: 200, body: { ok: true, slice: 'F1-identity-membership' } };
+      return { status: 200, body: { ok: true, slice: 'identity-membership' } };
     }
 
     if (method === 'POST' && path === '/v1/auth/apple') {
-      const result = await commands.signInWithApple(readString(body, 'identityToken'));
-      return { status: 200, body: result };
+      return { status: 200, body: await commands.signInWithApple(readString(body, 'identityToken')) };
     }
 
     if (method === 'POST' && path === '/v1/families') {
-      return { status: 200, body: commands.createFamily(token || '', idempotencyKey) };
+      return { status: 200, body: await commands.createFamily(token || '', idempotencyKey) };
     }
 
     const inviteCreate = /^\/v1\/families\/([^/]+)\/invitations$/.exec(path);
     if (method === 'POST' && inviteCreate) {
-      return { status: 200, body: commands.inviteMember(token || '', inviteCreate[1], idempotencyKey) };
+      return { status: 200, body: await commands.inviteMember(token || '', inviteCreate[1], idempotencyKey) };
+    }
+    if (method === 'GET' && inviteCreate) {
+      return { status: 200, body: await commands.listPendingInvitations(token || '', inviteCreate[1]) };
     }
 
     const inviteRevoke = /^\/v1\/invitations\/([^/]+)\/revoke$/.exec(path);
     if (method === 'POST' && inviteRevoke) {
-      return { status: 200, body: commands.revokeInvitation(token || '', inviteRevoke[1]) };
+      return { status: 200, body: await commands.revokeInvitation(token || '', inviteRevoke[1]) };
     }
 
     if (method === 'POST' && path === '/v1/invitations/accept') {
-      return { status: 200, body: commands.acceptInvitation(token || '', readString(body, 'code'), idempotencyKey) };
+      return {
+        status: 200,
+        body: await commands.acceptInvitation(token || '', readString(body, 'code'), idempotencyKey),
+      };
     }
 
     if (method === 'GET' && path === '/v1/me/membership') {
-      return { status: 200, body: commands.listMembership(token || '') };
+      return { status: 200, body: await commands.listMembership(token || '') };
     }
 
     if (method === 'POST' && path === '/v1/me/leave') {
-      return { status: 200, body: commands.leaveFamily(token || '') };
+      return { status: 200, body: await commands.leaveFamily(token || '') };
     }
 
     const remove = /^\/v1\/families\/([^/]+)\/members\/([^/]+)\/remove$/.exec(path);
     if (method === 'POST' && remove) {
-      return { status: 200, body: commands.removeMember(token || '', remove[1], remove[2]) };
+      return { status: 200, body: await commands.removeMember(token || '', remove[1], remove[2]) };
     }
 
     const dissolve = /^\/v1\/families\/([^/]+)\/dissolve$/.exec(path);
     if (method === 'POST' && dissolve) {
-      return { status: 200, body: commands.dissolveFamily(token || '', dissolve[1]) };
+      return { status: 200, body: await commands.dissolveFamily(token || '', dissolve[1]) };
     }
 
     throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Unknown family API route.');

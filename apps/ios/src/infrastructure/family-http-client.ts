@@ -18,6 +18,7 @@ export type FamilyApiClient = {
   revokeInvitation(sessionToken: string, invitationId: string): Promise<InvitationView>;
   acceptInvitation(sessionToken: string, code: string, idempotencyKey: string): Promise<FamilyView>;
   listMembership(sessionToken: string): Promise<MembershipListView>;
+  listPendingInvitations(sessionToken: string, familyId: string): Promise<InvitationView[]>;
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
   dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
@@ -75,6 +76,9 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     },
     listMembership(sessionToken) {
       return send({ method: 'GET', path: '/v1/me/membership', sessionToken });
+    },
+    listPendingInvitations(sessionToken, familyId) {
+      return send({ method: 'GET', path: `/v1/families/${familyId}/invitations`, sessionToken });
     },
     leaveFamily(sessionToken) {
       return send({ method: 'POST', path: '/v1/me/leave', sessionToken });

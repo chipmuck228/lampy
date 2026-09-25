@@ -1,3 +1,22 @@
+jest.mock('expo-secure-store', () => {
+  const memory = new Map();
+  return {
+    getItemAsync: async (key) => memory.get(key) ?? null,
+    setItemAsync: async (key, value) => {
+      memory.set(key, value);
+    },
+    deleteItemAsync: async (key) => {
+      memory.delete(key);
+    },
+  };
+});
+
+jest.mock('expo-apple-authentication', () => ({
+  isAvailableAsync: async () => false,
+  signInAsync: async () => ({ identityToken: null }),
+  AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
+}));
+
 jest.mock('expo-audio', () => ({
   AudioModule: {
     AudioRecorder: class AudioRecorder {

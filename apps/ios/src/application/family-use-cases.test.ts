@@ -96,6 +96,16 @@ describe('family use cases against a real in-process API', () => {
     expect(recent.items[0].note).toBe('门口的风');
   });
 
+  it('clears the session on signOut without changing personal moments', async () => {
+    const { family, personal } = createHarness();
+    const saved = await savePersonalNote(personal, '退出登录也不改个人');
+    await family.signInWithApple('apple_alice');
+    await family.createFamily();
+    await family.signOut();
+    expect(await family.getMembership()).toEqual({ kind: 'unauthenticated' });
+    expect((await personal.getMomentDetail(saved.id)).kind).toBe('ready');
+  });
+
   it('shows members only after a successful create/accept and treats retry as the same family', async () => {
     const { family, personal } = createHarness();
     const saved = await savePersonalNote(personal, '个人还在');

@@ -42,7 +42,7 @@ ADR 0004：家庭 / 网络送达不是 Moment 布尔字段；本地 `Transmissio
 ## 实现位置（技术选型，不是产品未决）
 
 - 家庭身份与成员命令先放在 iOS 仓库内可测试的服务端模块（`apps/ios/src/family-api`），由 HTTP 暴露。不改根目录微信 `domain/`。
-- 生产部署、Apple 密钥、公网 URL、持久家庭数据库 **本仓库尚未具备**。内存 listen 仅允许 test 模式；`production` 必须拒绝启动。不得把 JWT 校验当成生产后端已就绪。
+- 生产 listen 必须具备 SQLite 家庭库、迁移和 `LAMPY_APPLE_CLIENT_ID`，并拒绝测试 token。公网部署与真机 Apple **仍须单独完成**。不得把 JWT 校验或本机 SQLite 文件当成公网后端已就绪。
 - Transmission / 快照存储的共享领域扩展留给分享切片；本轮不改微信领域文件。
 
 ## 仍属实现细节或未交付（不是产品未决）

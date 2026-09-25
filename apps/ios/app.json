@@ -10,6 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.lampy.ios",
+      "usesAppleSignIn": true,
       "icon": "./assets/expo.icon",
       "infoPlist": {
         "NSCameraUsageDescription": "Lampy 只在你拍照留下一条生活时使用相机。",
@@ -40,6 +41,8 @@
         }
       ],
       "expo-sqlite",
+      "expo-secure-store",
+      "expo-apple-authentication",
       "expo-file-system",
       [
         "expo-image-picker",

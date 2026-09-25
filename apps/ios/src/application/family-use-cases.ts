@@ -283,6 +283,16 @@ export function createFamilyUseCases(deps: {
       await cache.clear();
       return result;
     },
+
+    async listPendingInvitations(familyId: string) {
+      const { sessionToken } = await requireAccount();
+      return deps.client.listPendingInvitations(sessionToken, familyId);
+    },
+
+    async signOut() {
+      await deps.session.clearSession();
+      await cache.clear();
+    },
   };
 }
 
