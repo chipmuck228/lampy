@@ -14,9 +14,14 @@ import type {
   FamilyView,
   Invitation,
   InvitationView,
+  MediaObjectView,
   MembershipListView,
   SignInResult,
 } from './types';
+import type { MediaBlobStore } from './media-blobs';
+import { createMemoryMediaBlobStore } from './media-blobs';
+import { createMediaCommands } from './media-commands';
+import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = {
   signInWithApple(identityToken: string): Promise<SignInResult>;
@@ -30,6 +35,12 @@ export type FamilyCommands = {
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
   dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
   signOut(sessionToken: string): Promise<{ signedOut: true }>;
+  uploadMedia(
+    sessionToken: string,
+    input: { bytes: Uint8Array; mimeType: string; idempotencyKey?: string },
+  ): Promise<MediaObjectView>;
+  getMediaObject(sessionToken: string, objectId: string): Promise<MediaObjectView>;
+  getMediaContent(sessionToken: string, objectId: string): Promise<{ mimeType: string; bytes: Uint8Array }>;
 };
 
 function iso(date: Date) {
@@ -177,6 +188,7 @@ export function createFamilyCommands(deps: {
   ids?: FamilyIds;
   inviteTtlMs?: number;
   sessionTtlMs?: number;
+  mediaBlobs?: MediaBlobStore;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -184,6 +196,12 @@ export function createFamilyCommands(deps: {
   const sessionTtlMs = deps.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;
   const store = deps.store ?? createFamilyStore();
   const repository = deps.repository ?? createMemoryFamilyRepository(store);
+  const media = createMediaCommands({
+    repository,
+    blobs: deps.mediaBlobs ?? createMemoryMediaBlobStore(),
+    clock,
+    assertPayload: assertMediaPayload,
+  });
 
   return {
     async signInWithApple(identityToken: string) {
@@ -460,6 +478,16 @@ export function createFamilyCommands(deps: {
         await tx.deleteSession(sessionToken);
         return { signedOut: true as const };
       });
+    },
+
+    uploadMedia(sessionToken, input) {
+      return media.uploadMedia(sessionToken, input);
+    },
+    getMediaObject(sessionToken, objectId) {
+      return media.getMediaObject(sessionToken, objectId);
+    },
+    getMediaContent(sessionToken, objectId) {
+      return media.getMediaContent(sessionToken, objectId);
     },
   };
 }

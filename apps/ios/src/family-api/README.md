@@ -32,6 +32,7 @@
 | `LAMPY_APPLE_CLIENT_ID` | 生产 Apple audience（通常为 iOS bundle id） |
 | `LAMPY_FAMILY_API_PORT` | 默认 `8787` |
 | `LAMPY_FAMILY_API_HOST` | 默认 `127.0.0.1` |
+| `LAMPY_FAMILY_MEDIA_PATH` | 可选。生产媒体文件目录。未设则为数据库目录下的 `media/` |
 | iOS `EXPO_PUBLIC_FAMILY_API_BASE_URL` | 客户端指向上述服务。未配置则视为不可达，不展示成员 |
 
 Apple 私钥、Key ID、Team ID、生产 Session 密钥：**本仓库不提供，也不写入。**
@@ -96,7 +97,21 @@ npm run family-api
 6. 前面用本机反向代理做 HTTPS。客户端 `EXPO_PUBLIC_FAMILY_API_BASE_URL` 必须是 `https://`，或仅用于本机/局域网调试的 `http://127.0.0.1` / 私网地址。公网 `http://` 会被客户端拒绝，会话令牌不会发出去。
 7. 端口占用、缺路径、缺 Apple client、生产环境出现测试 token、迁移失败：进程退出，不得听端口。
 
-重启后账号、成员、邀请和幂等行应仍在。用测试 token 或内存库做的重启不能当作这项通过。
+重启后账号、成员、邀请、幂等行和已提交的媒体对象应仍在。用测试 token 或内存库做的重启不能当作这项通过。
+
+## 媒体对象（F2，不是分享）
+
+只建立将来分享可引用的服务端对象。**没有** Moment 分享、家庭时间线或「已分享」。
+
+```text
+POST /v1/media          raw bytes + Content-Type image/jpeg|image/png|audio/mp4
+GET  /v1/media/:id      元数据 { objectId, ownerUserId, mimeType, byteLength, createdAt }
+GET  /v1/media/:id/content  raw bytes
+```
+
+限制：单对象 8 MiB；声明 MIME 须与魔数一致；可选 `Idempotency-Key`；同一用户同一内容哈希复用对象。只有上传者且会话有效才能读。他人知道 objectId 也是 403。失败（过大、不支持、损坏、磁盘不足、元数据未提交）不得返回已保存，并删除本次写入。响应、日志、SQLite 行不含本机路径或会话令牌。`storage_key` 只存 `objectId`。F2 不提供删除 API，退出/解散也不删对象。
+
+客户端 `uploadSelectedMedia({ bytes, mimeType })` 只上传这次传入的字节，状态为 `idle` / `uploading` / `stored` / `failed`。失败不改个人 Moment。不扫描个人库。
 
 ## 备份与恢复
 
@@ -158,4 +173,4 @@ npm run family-identity:accept
 
 ## 本轮不做
 
-Moment 分享、媒体上传、家庭时间线、接收快照、创建者移交、删除账号、微信领域修改。规格里的 F2 仍是媒体对象，不是本目录范围。
+Moment 分享、Transmission 改写、家庭时间线、接收快照、跨设备同步、媒体自动上传、创建者移交、删除账号、微信领域修改。本目录已含 F2 媒体对象，不是分享完成，也不是身份闭环验收通过。`identityLoopAccepted` 仍为 false，家庭入口仍关闭。

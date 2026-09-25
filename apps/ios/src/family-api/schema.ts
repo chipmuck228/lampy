@@ -51,6 +51,17 @@ const MIGRATIONS = [
     body_json TEXT NOT NULL,
     PRIMARY KEY (user_id, command, idempotency_key)
   );`,
+  `CREATE TABLE IF NOT EXISTS family_media_objects (
+    object_id TEXT PRIMARY KEY NOT NULL,
+    owner_user_id TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    byte_length INTEGER NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    storage_key TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS family_media_one_hash_per_owner
+    ON family_media_objects(owner_user_id, content_sha256);`,
 ];
 
 export async function applyFamilyApiSchema(db: FamilySql): Promise<void> {

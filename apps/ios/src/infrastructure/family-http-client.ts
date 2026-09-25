@@ -1,15 +1,26 @@
 import { ApplicationError } from '../application/errors';
-import type { FamilyView, InvitationView, MembershipListView, SignInResult } from '../family-api/types';
+import type { FamilyView, InvitationView, MediaObjectView, MembershipListView, SignInResult } from '../family-api/types';
 import { isSafeFamilyApiBaseUrl } from './family-config';
 
+export type FamilyTransportRequest = {
+  method: string;
+  path: string;
+  sessionToken?: string;
+  idempotencyKey?: string;
+  body?: unknown;
+  bytes?: Uint8Array;
+  contentType?: string;
+  expectBytes?: boolean;
+};
+
+export type FamilyTransportResponse = {
+  status: number;
+  body: unknown;
+  bytes?: Uint8Array;
+};
+
 export type FamilyTransport = {
-  request(input: {
-    method: string;
-    path: string;
-    sessionToken?: string;
-    idempotencyKey?: string;
-    body?: unknown;
-  }): Promise<{ status: number; body: unknown }>;
+  request(input: FamilyTransportRequest): Promise<FamilyTransportResponse>;
 };
 
 export type FamilyApiClient = {
@@ -24,6 +35,12 @@ export type FamilyApiClient = {
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
   dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
   signOut(sessionToken: string): Promise<{ signedOut: true }>;
+  uploadMedia(
+    sessionToken: string,
+    input: { bytes: Uint8Array; mimeType: string; idempotencyKey?: string },
+  ): Promise<MediaObjectView>;
+  getMediaObject(sessionToken: string, objectId: string): Promise<MediaObjectView>;
+  getMediaContent(sessionToken: string, objectId: string): Promise<{ mimeType: string; bytes: Uint8Array }>;
 };
 
 type ErrorBody = { error?: { code?: string; message?: string } };
@@ -98,6 +115,39 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     signOut(sessionToken) {
       return send({ method: 'POST', path: '/v1/auth/sign-out', sessionToken });
     },
+    uploadMedia(sessionToken, input) {
+      return send({
+        method: 'POST',
+        path: '/v1/media',
+        sessionToken,
+        idempotencyKey: input.idempotencyKey,
+        bytes: input.bytes,
+        contentType: input.mimeType,
+      });
+    },
+    getMediaObject(sessionToken, objectId) {
+      return send({ method: 'GET', path: `/v1/media/${objectId}`, sessionToken });
+    },
+    async getMediaContent(sessionToken, objectId) {
+      let response: FamilyTransportResponse;
+      try {
+        response = await transport.request({
+          method: 'GET',
+          path: `/v1/media/${objectId}/content`,
+          sessionToken,
+          expectBytes: true,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Family server is unreachable.';
+        throw new ApplicationError('SERVER_UNREACHABLE', message);
+      }
+      throwIfFailed(response.status, response.body);
+      if (!response.bytes) {
+        throw new ApplicationError('MEDIA_NOT_FOUND', 'Media object was not found.');
+      }
+      const meta = (response.body || {}) as { mimeType?: string };
+      return { mimeType: meta.mimeType || 'application/octet-stream', bytes: response.bytes };
+    },
   };
 }
 
@@ -121,15 +171,27 @@ export function createFamilyHttpTransport(deps: {
       if (!fetchImpl) {
         throw new ApplicationError('SERVER_UNREACHABLE', 'No HTTP fetch is available.');
       }
-      const headers: Record<string, string> = { accept: 'application/json' };
-      if (input.body !== undefined) headers['content-type'] = 'application/json';
+      const headers: Record<string, string> = { accept: input.expectBytes ? '*/*' : 'application/json' };
+      if (input.bytes) headers['content-type'] = input.contentType || 'application/octet-stream';
+      else if (input.body !== undefined) headers['content-type'] = 'application/json';
       if (input.sessionToken) headers.authorization = `Bearer ${input.sessionToken}`;
       if (input.idempotencyKey) headers['idempotency-key'] = input.idempotencyKey;
       const response = await fetchImpl(`${baseUrl}${input.path}`, {
         method: input.method,
         headers,
-        body: input.body === undefined ? undefined : JSON.stringify(input.body),
+        body: input.bytes ? input.bytes : input.body === undefined ? undefined : JSON.stringify(input.body),
       });
+      if (input.expectBytes && response.ok) {
+        const buffer = await response.arrayBuffer();
+        return {
+          status: response.status,
+          body: {
+            mimeType: response.headers.get('content-type') || 'application/octet-stream',
+            byteLength: buffer.byteLength,
+          },
+          bytes: new Uint8Array(buffer),
+        };
+      }
       const text = await response.text();
       let body: unknown = undefined;
       if (text) {
@@ -150,19 +212,30 @@ export function createDispatchTransport(
     path: string;
     headers: Record<string, string | undefined>;
     body?: unknown;
-  }) => Promise<{ status: number; body: unknown }>,
+    bytes?: Uint8Array;
+  }) => Promise<{ status: number; body: unknown; bytes?: Uint8Array; contentType?: string }>,
 ): FamilyTransport {
   return {
-    request(input) {
-      return dispatch({
+    async request(input) {
+      const response = await dispatch({
         method: input.method,
         path: input.path,
         headers: {
           authorization: input.sessionToken ? `Bearer ${input.sessionToken}` : undefined,
           'idempotency-key': input.idempotencyKey,
+          'content-type': input.contentType,
         },
         body: input.body,
+        bytes: input.bytes,
       });
+      if (response.bytes) {
+        return {
+          status: response.status,
+          body: response.body,
+          bytes: response.bytes,
+        };
+      }
+      return { status: response.status, body: response.body };
     },
   };
 }

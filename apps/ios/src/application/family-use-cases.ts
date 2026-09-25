@@ -9,7 +9,13 @@ import {
 } from '../infrastructure/pending-family-operations';
 import { fingerprintAcceptInvitation, fingerprintCreateFamily } from '../family-api/idempotency';
 import { DEFAULT_SESSION_TTL_MS } from '../family-api/ids';
-import type { FamilyMemberView, FamilyView, InvitationView } from '../family-api/types';
+import type { FamilyMemberView, FamilyView, InvitationView, MediaObjectView } from '../family-api/types';
+
+export type SelectedMediaUploadState =
+  | { status: 'idle' }
+  | { status: 'uploading' }
+  | { status: 'stored'; object: MediaObjectView }
+  | { status: 'failed'; code: string; message: string };
 
 export type PendingSessionRevoke = {
   userId: string;
@@ -128,6 +134,7 @@ export function createFamilyUseCases(deps: {
   const nextOperationId = deps.operationId ?? newOperationId;
   const clock = deps.clock ?? { now: () => new Date() };
   const sessionRevokeTtlMs = deps.sessionRevokeTtlMs ?? DEFAULT_SESSION_TTL_MS;
+  let selectedMediaUpload: SelectedMediaUploadState = { status: 'idle' };
 
   function isUnconfirmedNetwork(error: ApplicationError) {
     return error.code === 'SERVER_UNREACHABLE' || error.code === 'NETWORK';
@@ -390,6 +397,38 @@ export function createFamilyUseCases(deps: {
     async hasUnconfirmedSessionRevoke() {
       const row = await deps.session.getPendingRevoke();
       return Boolean(row && !pendingRevokeExpired(row));
+    },
+
+    getSelectedMediaUploadStatus(): SelectedMediaUploadState {
+      return selectedMediaUpload;
+    },
+
+    async uploadSelectedMedia(input: { bytes: Uint8Array; mimeType: string; idempotencyKey?: string }) {
+      selectedMediaUpload = { status: 'uploading' };
+      try {
+        const { sessionToken } = await requireAccount();
+        const object = await deps.client.uploadMedia(sessionToken, {
+          bytes: input.bytes,
+          mimeType: input.mimeType,
+          idempotencyKey: input.idempotencyKey,
+        });
+        selectedMediaUpload = { status: 'stored', object };
+        return selectedMediaUpload;
+      } catch (error) {
+        const appError = asApplicationError(error);
+        selectedMediaUpload = { status: 'failed', code: appError.code, message: appError.message };
+        return selectedMediaUpload;
+      }
+    },
+
+    async getOwnedMedia(objectId: string) {
+      const { sessionToken } = await requireAccount();
+      return deps.client.getMediaObject(sessionToken, objectId);
+    },
+
+    async getOwnedMediaContent(objectId: string) {
+      const { sessionToken } = await requireAccount();
+      return deps.client.getMediaContent(sessionToken, objectId);
     },
   };
 }

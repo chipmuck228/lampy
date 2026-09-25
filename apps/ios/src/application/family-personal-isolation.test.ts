@@ -83,5 +83,22 @@ describe('personal library while family service is down', () => {
     expect(unknown.items.map((item) => item.id).sort()).toEqual(
       [audioSaved.id, photoSaved.id, textSaved.id].sort(),
     );
+
+    const upload = await family.uploadSelectedMedia({
+      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0x00]),
+      mimeType: 'image/jpeg',
+    });
+    expect(upload.status).toBe('failed');
+    expect(upload).toMatchObject({ status: 'failed' });
+    const photoAgain = await personal.getMomentDetail(photoSaved.id);
+    expect(photoAgain.kind).toBe('ready');
+    if (photoAgain.kind === 'ready') {
+      expect(photoAgain.images[0]?.status).toBe('available');
+    }
+    const audioAgain = await personal.getMomentDetail(audioSaved.id);
+    expect(audioAgain.kind).toBe('ready');
+    if (audioAgain.kind === 'ready') {
+      expect(audioAgain.audio?.status).toBe('available');
+    }
   });
 });

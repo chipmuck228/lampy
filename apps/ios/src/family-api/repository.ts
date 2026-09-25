@@ -1,4 +1,4 @@
-import type { Account, Family, Invitation, Membership, Session } from './types';
+import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session } from './types';
 import type { FamilyStore, IdempotentRecord } from './store';
 import {
   findAccountByAppleSubject,
@@ -39,6 +39,9 @@ export type FamilyTx = {
     idempotencyKey: string,
     record: IdempotentRecord,
   ): Promise<void>;
+  findMediaObject(objectId: string): Promise<MediaObjectRecord | null>;
+  findMediaByOwnerHash(ownerUserId: string, contentSha256: string): Promise<MediaObjectRecord | null>;
+  saveMediaObject(object: MediaObjectRecord): Promise<void>;
 };
 
 export type FamilyRepository = {
@@ -46,7 +49,9 @@ export type FamilyRepository = {
 };
 
 export class FamilyStoreConstraintError extends Error {
-  constructor(readonly constraint: 'active_membership' | 'invitation_code' | 'apple_subject' | 'idempotency') {
+  constructor(
+    readonly constraint: 'active_membership' | 'invitation_code' | 'apple_subject' | 'idempotency' | 'media_hash',
+  ) {
     super(constraint);
     this.name = 'FamilyStoreConstraintError';
   }
@@ -148,6 +153,27 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       const key = `${userId}:${command}:${idempotencyKey}`;
       if (store.idempotency.has(key)) throw new FamilyStoreConstraintError('idempotency');
       store.idempotency.set(key, record);
+    },
+    async findMediaObject(objectId) {
+      return store.mediaObjects.find((row) => row.objectId === objectId) ?? null;
+    },
+    async findMediaByOwnerHash(ownerUserId, contentSha256) {
+      return (
+        store.mediaObjects.find((row) => row.ownerUserId === ownerUserId && row.contentSha256 === contentSha256) ?? null
+      );
+    },
+    async saveMediaObject(object) {
+      if (
+        store.mediaObjects.some(
+          (row) =>
+            row.ownerUserId === object.ownerUserId &&
+            row.contentSha256 === object.contentSha256 &&
+            row.objectId !== object.objectId,
+        )
+      ) {
+        throw new FamilyStoreConstraintError('media_hash');
+      }
+      replaceBy(store.mediaObjects, (row) => row.objectId, object);
     },
   };
 
