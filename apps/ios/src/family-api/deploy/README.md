@@ -42,8 +42,29 @@ npm run family-identity:accept
 | 变量 | 用途 |
 | --- | --- |
 | `LAMPY_FAMILY_ACCEPT_VOLUME` | 本机验收用的持久目录。未设则用临时目录 |
-| `LAMPY_FAMILY_ACCEPT_PUBLIC_URL` | 已部署的 HTTPS 服务。未设则公网项为 NOT VERIFIED |
+| `LAMPY_FAMILY_ACCEPT_PUBLIC_URL` | **授权测试服务** 的 URL。未设则部署环境身份项为 NOT VERIFIED。不得指向验收脚本刚拉起的 `127.0.0.1` |
+| `LAMPY_FAMILY_ACCEPT_HOSTED_DATABASE_PATH` | 托管卷上的 SQLite 文件。供本机可见的卷或主机上的 `volume-probe` 使用 |
+| `LAMPY_FAMILY_ACCEPT_HOSTED_VOLUME_ROOT` | 托管卷根目录。数据库 `realpath` 必须落在此根下且同一 device |
+| `LAMPY_FAMILY_ACCEPT_VOLUME_PROBE` | `volume-probe` 写出的 JSON。验收脚本读它，不把本机临时卷当成托管卷 |
+| `LAMPY_FAMILY_ACCEPT_VOLUME_AFTER_RESTART` | 设为 `1` 表示这次 probe 发生在家庭 API 进程重启之后 |
 | `LAMPY_FAMILY_ACCEPT_IDENTITY_TOKEN_A` | 测试用户 A 的真实 Apple identity token |
 | `LAMPY_FAMILY_ACCEPT_IDENTITY_TOKEN_B` | 测试用户 B 的真实 Apple identity token |
 
 脚本不会打印这些值。不是三部分 JWT 的 token 会被拒绝，以免把测试 token 当成真实验收。
+
+本机 `127.0.0.1` 上的登录 / 邀请 / 加入 / 创建者移除 / 成员退出，与授权部署服务上的同一组操作是两套结果。只有后者加上托管卷探测均为 PASS，`identityLoopAccepted` 才为 true。退出码 0 只表示没有 FAIL，自动化要读 `identityLoopAccepted`。需要把「未验收」当成失败时用 `npm run family-identity:accept:require`（exit 2）。
+
+托管卷探测（在主机上）：
+
+```bash
+LAMPY_FAMILY_ACCEPT_HOSTED_DATABASE_PATH=/var/lib/lampy/family/family.db \
+LAMPY_FAMILY_ACCEPT_HOSTED_VOLUME_ROOT=/var/lib/lampy/family \
+LAMPY_FAMILY_ACCEPT_VOLUME_PROBE=/tmp/family-volume-probe.json \
+npm run family-identity:volume-probe
+# 重启唯一的 family-api 进程
+LAMPY_FAMILY_ACCEPT_VOLUME_AFTER_RESTART=1 \
+LAMPY_FAMILY_ACCEPT_HOSTED_DATABASE_PATH=/var/lib/lampy/family/family.db \
+LAMPY_FAMILY_ACCEPT_HOSTED_VOLUME_ROOT=/var/lib/lampy/family \
+LAMPY_FAMILY_ACCEPT_VOLUME_PROBE=/tmp/family-volume-probe.json \
+npm run family-identity:volume-probe -- --after-restart
+```

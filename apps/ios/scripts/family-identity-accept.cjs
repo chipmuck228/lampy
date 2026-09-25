@@ -3,15 +3,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  classifyPublicUrl,
+  IOS_ROOT,
   collectInventory,
-  copySqliteFiles,
-  evidenceRef,
   fetchAppleJwksMeta,
-  looksLikeJwt,
-  redactUnknown,
   requestJson,
-  restoreSqliteFiles,
   runNpm,
   sqliteMigrationCount,
   sqliteTableNames,
@@ -19,6 +14,12 @@ const {
   stopFamilyApi,
   tmpVolume,
 } = require('./family-identity-lib.cjs');
+const { isAuthorizedDeployedUrl, tokenPairStatus, walkIdentityLoop } = require('./family-identity-walk.cjs');
+const {
+  inspectHostedVolume,
+  loadVolumeProbeFile,
+  validateHostedVolumeProbe,
+} = require('./family-identity-volume.cjs');
 
 function verdict(status, detail) {
   return { status, detail };
@@ -32,95 +33,92 @@ async function expectHealth(baseUrl) {
   return response.body?.slice || '';
 }
 
-async function callFamily(baseUrl, method, pathname, options = {}) {
-  const headers = { ...(options.headers || {}) };
-  if (options.token) headers.authorization = `Bearer ${options.token}`;
-  if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
-  const response = await requestJson(`${baseUrl}${pathname}`, {
-    method,
-    headers,
-    body: options.body,
-  });
+function readTokens() {
   return {
-    status: response.status,
-    errorCode: response.body?.error?.code,
-    body: redactUnknown(response.body),
-    raw: response.body,
+    tokenA: (process.env.LAMPY_FAMILY_ACCEPT_IDENTITY_TOKEN_A || '').trim(),
+    tokenB: (process.env.LAMPY_FAMILY_ACCEPT_IDENTITY_TOKEN_B || '').trim(),
+    testTokensSet: Boolean((process.env.LAMPY_FAMILY_API_TEST_TOKENS || '').trim()),
   };
 }
 
-async function walkIdentityLoop(baseUrl, tokenA, tokenB) {
-  const alice = await callFamily(baseUrl, 'POST', '/v1/auth/apple', { body: { identityToken: tokenA } });
-  if (alice.status !== 200 || !alice.raw?.sessionToken) {
-    return { ok: false, step: 'sign-in-a', alice };
+function walkVerdicts(walked, target) {
+  if (!walked.signedIn) {
+    return {
+      login: verdict('FAIL', `${target} Apple sign-in failed at ${walked.step}`),
+      membership: verdict('FAIL', `${target} membership walk did not start`),
+    };
   }
-  const bob = await callFamily(baseUrl, 'POST', '/v1/auth/apple', { body: { identityToken: tokenB } });
-  if (bob.status !== 200 || !bob.raw?.sessionToken) {
-    return { ok: false, step: 'sign-in-b', alice, bob };
+  if (!walked.ok) {
+    return {
+      login: verdict('PASS', `${target} Apple identity tokens accepted`),
+      membership: verdict('FAIL', `${target} stopped at ${walked.step}`),
+    };
   }
-  if (alice.raw.userId && alice.raw.userId === bob.raw.userId) {
-    return { ok: false, step: 'accounts-not-independent', alice, bob };
-  }
-
-  const created = await callFamily(baseUrl, 'POST', '/v1/families', {
-    token: alice.raw.sessionToken,
-    idempotencyKey: 'accept-create',
-  });
-  if (created.status !== 200 || !created.raw?.familyId) {
-    return { ok: false, step: 'create-family', created };
-  }
-
-  const invited = await callFamily(baseUrl, 'POST', `/v1/families/${created.raw.familyId}/invitations`, {
-    token: alice.raw.sessionToken,
-    idempotencyKey: 'accept-invite',
-  });
-  if (invited.status !== 200 || !invited.raw?.code) {
-    return { ok: false, step: 'invite', invited };
-  }
-
-  const joined = await callFamily(baseUrl, 'POST', '/v1/invitations/accept', {
-    token: bob.raw.sessionToken,
-    body: { code: invited.raw.code },
-    idempotencyKey: 'accept-join',
-  });
-  if (joined.status !== 200) {
-    return { ok: false, step: 'join', joined };
-  }
-
-  const aliceMembers = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: alice.raw.sessionToken });
-  const bobMembers = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: bob.raw.sessionToken });
-  const aliceCount = aliceMembers.raw?.family?.members?.length;
-  const bobCount = bobMembers.raw?.family?.members?.length;
-  if (aliceMembers.status !== 200 || bobMembers.status !== 200 || aliceCount !== 2 || bobCount !== 2) {
-    return { ok: false, step: 'read-members', aliceMembers, bobMembers };
-  }
-
-  const left = await callFamily(baseUrl, 'POST', '/v1/me/leave', { token: bob.raw.sessionToken });
-  if (left.status !== 200 || left.raw?.left !== true) {
-    return { ok: false, step: 'leave', left };
-  }
-
-  const bobAfter = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: bob.raw.sessionToken });
-  const aliceAfter = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: alice.raw.sessionToken });
-  const bobGone = !bobAfter.raw?.family;
-  const aliceAlone = aliceAfter.raw?.family?.members?.length === 1;
-  const leftover = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: bob.raw.sessionToken });
-  if (!bobGone || !aliceAlone || leftover.raw?.family) {
-    return { ok: false, step: 'permission-gone', bobAfter, aliceAfter };
-  }
-
   return {
-    ok: true,
-    alice: evidenceRef(alice.raw.userId),
-    bob: evidenceRef(bob.raw.userId),
-    family: evidenceRef(created.raw.familyId),
-    memberCounts: { afterJoin: { alice: aliceCount, bob: bobCount }, afterLeave: { alice: 1, bob: 0 } },
+    login: verdict('PASS', `${target} Apple identity tokens accepted`),
+    membership: verdict(
+      'PASS',
+      `${target} invite, join, creator-remove, and member-leave; accounts ${walked.alice} ${walked.bob}`,
+    ),
   };
+}
+
+function missingTokenVerdicts(pair, target) {
+  if (pair.kind === 'missing') {
+    return {
+      login: verdict('NOT VERIFIED', `no real Apple identity tokens for ${target}`),
+      membership: verdict('NOT VERIFIED', `need two independent real Apple accounts on ${target}`),
+    };
+  }
+  if (pair.kind === 'not-jwt') {
+    return {
+      login: verdict('FAIL', 'refused non-JWT / test-token substitute'),
+      membership: verdict('FAIL', 'refused to walk membership with test tokens'),
+    };
+  }
+  return {
+    login: verdict('FAIL', 'LAMPY_FAMILY_API_TEST_TOKENS is set; will not treat this as real Apple'),
+    membership: verdict('FAIL', 'test tokens present'),
+  };
+}
+
+function evaluateHostedVolume() {
+  const probePath = (process.env.LAMPY_FAMILY_ACCEPT_VOLUME_PROBE || '').trim();
+  const hostedDb = (process.env.LAMPY_FAMILY_ACCEPT_HOSTED_DATABASE_PATH || '').trim();
+  const hostedRoot = (process.env.LAMPY_FAMILY_ACCEPT_HOSTED_VOLUME_ROOT || '').trim();
+  const afterRestart = process.env.LAMPY_FAMILY_ACCEPT_VOLUME_AFTER_RESTART === '1';
+
+  if (probePath && fs.existsSync(probePath)) {
+    try {
+      return validateHostedVolumeProbe(loadVolumeProbeFile(probePath));
+    } catch (error) {
+      return verdict('FAIL', error instanceof Error ? error.message : 'volume-probe-unreadable');
+    }
+  }
+  if (hostedDb && hostedRoot) {
+    return validateHostedVolumeProbe(inspectHostedVolume({ databasePath: hostedDb, volumeRoot: hostedRoot, afterRestart }));
+  }
+  return verdict(
+    'NOT VERIFIED',
+    'no hosted volume probe. On the host: npm run family-identity:volume-probe, restart family-api, re-run with --after-restart, then set LAMPY_FAMILY_ACCEPT_VOLUME_PROBE to that JSON',
+  );
+}
+
+async function walkIfPossible(target, baseUrl, pair, tokens) {
+  if (pair.kind !== 'jwt') return missingTokenVerdicts(pair, target);
+  const walked = await walkIdentityLoop(baseUrl, tokens.tokenA, tokens.tokenB, target);
+  return walkVerdicts(walked, target);
 }
 
 async function main() {
+  const requireAccepted = process.argv.includes('--require-accepted');
   const checks = {};
   const inventory = collectInventory();
+  const harness = await runNpm(['run', 'family-identity:accept-test']);
+  checks.accept_harness_contract = harness.code === 0
+    ? verdict('PASS', 'local/deployed split and hosted-volume probe contract tests passed')
+    : verdict('FAIL', 'family-identity accept contract tests failed');
+
   checks.inventory = verdict('PASS', 'env presence only; values not printed');
 
   try {
@@ -155,21 +153,7 @@ async function main() {
     ? verdict('PASS', 'env.example, systemd unit, Caddyfile')
     : verdict('FAIL', 'deploy templates missing');
 
-  if (inventory.publicUrl.kind === 'public-http-refused') {
-    checks.public_https_service = verdict('FAIL', 'public http URL is refused by the iOS client');
-  } else if (inventory.publicUrl.kind === 'public-https' || inventory.publicUrl.kind === 'local-https') {
-    try {
-      const url = (process.env.LAMPY_FAMILY_ACCEPT_PUBLIC_URL || process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL || '').replace(/\/+$/, '');
-      const slice = await expectHealth(url);
-      checks.public_https_service = verdict('PASS', `health ok slice=${slice}`);
-    } catch (error) {
-      checks.public_https_service = verdict('FAIL', error instanceof Error ? error.message : 'public-health-failed');
-    }
-  } else {
-    checks.public_https_service = verdict('NOT VERIFIED', 'no HTTPS family service URL configured');
-  }
-
-  checks.hosted_persistent_volume = verdict('NOT VERIFIED', 'no hosted volume credentials or deploy target in this environment');
+  checks.hosted_persistent_volume = evaluateHostedVolume();
   checks.app_restart_session_restore = verdict('NOT VERIFIED', 'needs two real devices; client tests are not this check');
   checks.offline_pending_revoke_retry = verdict('NOT VERIFIED', 'needs a real device offline sign-out');
   checks.family_entry_closed = inventory.env.EXPO_PUBLIC_FAMILY_API_BASE_URL === 'UNSET'
@@ -198,7 +182,10 @@ async function main() {
     ? verdict('PASS', 'production listen rejected test tokens')
     : verdict('FAIL', 'production listen did not refuse test tokens');
 
+  const tokens = readTokens();
+  const pair = tokenPairStatus(tokens.tokenA, tokens.tokenB, tokens.testTokensSet);
   let listening;
+
   try {
     listening = await startFamilyApi({
       LAMPY_FAMILY_API_MODE: 'production',
@@ -207,11 +194,13 @@ async function main() {
       LAMPY_FAMILY_API_HOST: '127.0.0.1',
       LAMPY_FAMILY_API_PORT: '0',
     });
-    const baseUrl = `http://127.0.0.1:${listening.port}`;
-    await expectHealth(baseUrl);
-    const unsigned = await callFamily(baseUrl, 'POST', '/v1/auth/apple', { body: { identityToken: 'not-a-jwt' } });
+    const localUrl = `http://127.0.0.1:${listening.port}`;
+    await expectHealth(localUrl);
+    const unsigned = await require('./family-identity-walk.cjs').callFamily(localUrl, 'POST', '/v1/auth/apple', {
+      body: { identityToken: 'not-a-jwt' },
+    });
     checks.unsigned_token_rejected = unsigned.status === 401 && unsigned.errorCode === 'APPLE_TOKEN_INVALID'
-      ? verdict('PASS', 'non-JWT identity token rejected')
+      ? verdict('PASS', 'local non-JWT identity token rejected')
       : verdict('FAIL', `expected 401 APPLE_TOKEN_INVALID, got ${unsigned.status} ${unsigned.errorCode || ''}`);
 
     await stopFamilyApi(listening);
@@ -226,12 +215,13 @@ async function main() {
     });
     await expectHealth(`http://127.0.0.1:${listening.port}`);
     checks.restart_reads_sqlite = afterStopCount === migratedCount && sqliteMigrationCount(databasePath) === migratedCount
-      ? verdict('PASS', `sqlite still on volume after restart, migrations=${afterStopCount}`)
+      ? verdict('PASS', `local sqlite still on volume after restart, migrations=${afterStopCount}`)
       : verdict('FAIL', 'sqlite missing or migrations changed across restart');
 
     await stopFamilyApi(listening);
     listening = undefined;
     const backupDir = path.join(volume, 'backup');
+    const { copySqliteFiles, restoreSqliteFiles } = require('./family-identity-lib.cjs');
     copySqliteFiles(databasePath, backupDir);
     fs.rmSync(databasePath, { force: true });
     fs.rmSync(`${databasePath}-wal`, { force: true });
@@ -245,38 +235,27 @@ async function main() {
       LAMPY_FAMILY_API_HOST: '127.0.0.1',
       LAMPY_FAMILY_API_PORT: '0',
     });
-    await expectHealth(`http://127.0.0.1:${listening.port}`);
+    const localBaseUrl = `http://127.0.0.1:${listening.port}`;
+    await expectHealth(localBaseUrl);
     checks.backup_restore = restoredCount === migratedCount
-      ? verdict('PASS', 'stopped-process copy restored and listen accepted the file')
+      ? verdict('PASS', 'local stopped-process copy restored and listen accepted the file')
       : verdict('FAIL', 'restored sqlite missing migrations');
 
-    const tokenA = (process.env.LAMPY_FAMILY_ACCEPT_IDENTITY_TOKEN_A || '').trim();
-    const tokenB = (process.env.LAMPY_FAMILY_ACCEPT_IDENTITY_TOKEN_B || '').trim();
-    if (!tokenA && !tokenB) {
-      checks.real_apple_login = verdict('NOT VERIFIED', 'no real Apple identity tokens provided');
-      checks.two_account_invite_join_revoke = verdict('NOT VERIFIED', 'need two independent real Apple accounts');
-    } else if (!looksLikeJwt(tokenA) || !looksLikeJwt(tokenB)) {
-      checks.real_apple_login = verdict('FAIL', 'refused non-JWT / test-token substitute');
-      checks.two_account_invite_join_revoke = verdict('FAIL', 'refused to walk membership with test tokens');
-    } else if (process.env.LAMPY_FAMILY_API_TEST_TOKENS) {
-      checks.real_apple_login = verdict('FAIL', 'LAMPY_FAMILY_API_TEST_TOKENS is set; will not treat this as real Apple');
-      checks.two_account_invite_join_revoke = verdict('FAIL', 'test tokens present');
-    } else {
-      const walked = await walkIdentityLoop(`http://127.0.0.1:${listening.port}`, tokenA, tokenB);
-      checks.real_apple_login = walked.ok || walked.step === 'join' || walked.step === 'create-family' || walked.step === 'invite' || walked.step === 'read-members' || walked.step === 'leave' || walked.step === 'permission-gone'
-        ? verdict('PASS', 'both identity tokens accepted by JWKS verifier')
-        : verdict('FAIL', `stopped at ${walked.step || 'sign-in'}`);
-      checks.two_account_invite_join_revoke = walked.ok
-        ? verdict('PASS', `invite-join-leave closed; accounts ${walked.alice} ${walked.bob}`)
-        : verdict(walked.step && walked.step.startsWith('sign-in') ? 'FAIL' : 'FAIL', `stopped at ${walked.step}`);
-    }
+    const localWalk = await walkIfPossible('local-ephemeral', localBaseUrl, pair, tokens);
+    checks.local_real_apple_login = localWalk.login;
+    checks.local_invite_join_leave_and_remove = localWalk.membership;
   } catch (error) {
     checks.local_single_instance_listen = verdict('FAIL', error instanceof Error ? error.message : 'listen-failed');
     if (!checks.restart_reads_sqlite) checks.restart_reads_sqlite = verdict('FAIL', 'listen did not complete');
     if (!checks.backup_restore) checks.backup_restore = verdict('FAIL', 'listen did not complete');
-    if (!checks.real_apple_login) checks.real_apple_login = verdict('NOT VERIFIED', 'local production listen failed before Apple tokens');
-    if (!checks.two_account_invite_join_revoke) {
-      checks.two_account_invite_join_revoke = verdict('NOT VERIFIED', 'local production listen failed before membership walk');
+    if (!checks.local_real_apple_login) {
+      const skipped = missingTokenVerdicts(pair, 'local-ephemeral');
+      checks.local_real_apple_login = pair.kind === 'jwt'
+        ? verdict('NOT VERIFIED', 'local production listen failed before Apple tokens')
+        : skipped.login;
+      checks.local_invite_join_leave_and_remove = pair.kind === 'jwt'
+        ? verdict('NOT VERIFIED', 'local production listen failed before membership walk')
+        : skipped.membership;
     }
   } finally {
     await stopFamilyApi(listening);
@@ -286,6 +265,47 @@ async function main() {
     checks.local_single_instance_listen = checks.local_volume_migrate.status === 'PASS' && checks.restart_reads_sqlite?.status === 'PASS'
       ? verdict('PASS', 'single Node process on a local volume; not a hosted deployment')
       : verdict('FAIL', 'local single-instance production listen incomplete');
+  }
+
+  const authorizedUrl = (process.env.LAMPY_FAMILY_ACCEPT_PUBLIC_URL || '').trim();
+  const deployed = isAuthorizedDeployedUrl(authorizedUrl, listening);
+  if (!authorizedUrl) {
+    checks.public_https_service = verdict('NOT VERIFIED', 'LAMPY_FAMILY_ACCEPT_PUBLIC_URL is unset; /health on an Expo URL is not a deployed identity walk');
+    checks.deployed_real_apple_login = verdict(
+      'NOT VERIFIED',
+      'no authorized test service URL; local 127.0.0.1 Apple login is not this check',
+    );
+    checks.deployed_invite_join_leave_and_remove = verdict(
+      'NOT VERIFIED',
+      'no authorized test service URL; local 127.0.0.1 invite/join/leave/remove is not this check',
+    );
+  } else if (deployed.reason === 'public-http-refused') {
+    checks.public_https_service = verdict('FAIL', 'public http URL is refused by the iOS client');
+    checks.deployed_real_apple_login = verdict('FAIL', 'refused to send Apple tokens to public http');
+    checks.deployed_invite_join_leave_and_remove = verdict('FAIL', 'refused to walk membership on public http');
+  } else if (deployed.reason === 'ephemeral-local-listen') {
+    checks.public_https_service = verdict('FAIL', 'authorized URL points at this script’s ephemeral 127.0.0.1 listen');
+    checks.deployed_real_apple_login = verdict('FAIL', 'deployed login cannot use the temporary local process');
+    checks.deployed_invite_join_leave_and_remove = verdict('FAIL', 'deployed membership cannot use the temporary local process');
+  } else if (!deployed.ok) {
+    checks.public_https_service = verdict('FAIL', `authorized URL is ${deployed.reason}`);
+    checks.deployed_real_apple_login = verdict('NOT VERIFIED', 'authorized URL was not usable');
+    checks.deployed_invite_join_leave_and_remove = verdict('NOT VERIFIED', 'authorized URL was not usable');
+  } else {
+    try {
+      const slice = await expectHealth(deployed.href);
+      checks.public_https_service = verdict('PASS', `authorized service health ok slice=${slice}`);
+    } catch (error) {
+      checks.public_https_service = verdict('FAIL', error instanceof Error ? error.message : 'deployed-health-failed');
+    }
+    if (checks.public_https_service.status === 'PASS') {
+      const deployedWalk = await walkIfPossible('authorized-deployed-service', deployed.href, pair, tokens);
+      checks.deployed_real_apple_login = deployedWalk.login;
+      checks.deployed_invite_join_leave_and_remove = deployedWalk.membership;
+    } else {
+      checks.deployed_real_apple_login = verdict('NOT VERIFIED', 'authorized service /health failed; membership walk not attempted');
+      checks.deployed_invite_join_leave_and_remove = verdict('NOT VERIFIED', 'authorized service /health failed; membership walk not attempted');
+    }
   }
 
   const isolation = await runNpm([
@@ -303,9 +323,14 @@ async function main() {
     ? verdict('PASS', 'personal moment / photo / audio / lookback tests passed with family unreachable coverage')
     : verdict('FAIL', 'personal isolation or personal library tests failed');
 
-  const identityAccepted = ['real_apple_login', 'two_account_invite_join_revoke', 'public_https_service', 'hosted_persistent_volume'].every(
-    (key) => checks[key]?.status === 'PASS',
-  );
+  const localIdentityLoopPassed =
+    checks.local_real_apple_login?.status === 'PASS' && checks.local_invite_join_leave_and_remove?.status === 'PASS';
+  const deployedIdentityLoopPassed =
+    checks.deployed_real_apple_login?.status === 'PASS' && checks.deployed_invite_join_leave_and_remove?.status === 'PASS';
+  const identityLoopAccepted =
+    deployedIdentityLoopPassed &&
+    checks.hosted_persistent_volume?.status === 'PASS' &&
+    checks.public_https_service?.status === 'PASS';
   const failed = Object.values(checks).some((item) => item.status === 'FAIL');
 
   const report = {
@@ -320,17 +345,29 @@ async function main() {
       bundleIdentifier: inventory.app.bundleIdentifier,
     },
     checks,
-    identityLoopAccepted: identityAccepted,
-    conclusion: identityAccepted
-      ? 'family identity loop accepted for this environment'
+    localIdentityLoopPassed,
+    deployedIdentityLoopPassed,
+    identityLoopAccepted,
+    automation: {
+      exitZeroMeans: 'no FAIL checks; inventory/local harness succeeded',
+      identityClosureField: 'identityLoopAccepted',
+      reportFile: '.family-identity-accept.report.json',
+      requireAcceptedFlag: '--require-accepted',
+      requireAcceptedExitCode: 2,
+    },
+    conclusion: identityLoopAccepted
+      ? 'deployed family identity loop accepted for this environment'
       : failed
         ? 'family identity loop not accepted; see FAIL checks'
-        : 'family identity loop not accepted; real Apple / hosted HTTPS still NOT VERIFIED',
+        : 'family identity loop not accepted; deployed Apple / hosted volume still NOT VERIFIED',
     openToRealUsers: false,
   };
 
+  const reportFile = path.join(IOS_ROOT, '.family-identity-accept.report.json');
+  fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (failed) process.exitCode = 1;
+  else if (requireAccepted && !identityLoopAccepted) process.exitCode = 2;
 }
 
 main().catch((error) => {

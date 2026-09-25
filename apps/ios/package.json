@@ -56,6 +56,9 @@
     "family-api:migrate": "node ./scripts/family-api-migrate.cjs",
     "family-identity:inventory": "node ./scripts/family-identity-inventory.cjs",
     "family-identity:accept": "node ./scripts/family-identity-accept.cjs",
+    "family-identity:accept:require": "node ./scripts/family-identity-accept.cjs --require-accepted",
+    "family-identity:volume-probe": "node ./scripts/family-identity-volume-probe.cjs",
+    "family-identity:accept-test": "node --test ./scripts/family-identity-accept.test.cjs ./scripts/family-identity-volume.test.cjs",
     "prebuild:ios": "expo prebuild --platform ios --no-install"
   },
   "private": true

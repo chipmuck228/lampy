@@ -154,7 +154,7 @@ npm run family-identity:inventory
 npm run family-identity:accept
 ```
 
-脚本不打印令牌、邀请码或个人信息。没有真实 Apple token 或公网 HTTPS 时，对应项标 **NOT VERIFIED**，不会用测试 token 代替。结果见 `spec/FAMILY_IDENTITY_REAL_ACCEPT.md`。未再审阅不得对真实用户开放家庭入口。
+脚本不打印令牌、邀请码或个人信息。没有真实 Apple token、授权部署 URL 或托管卷探测时，对应项标 **NOT VERIFIED**，不会用测试 token 或本机 `127.0.0.1` 结果代替部署闭环。退出码 0 只表示没有 FAIL；身份闭环看 `identityLoopAccepted`。结果见 `spec/FAMILY_IDENTITY_REAL_ACCEPT.md`。未再审阅不得对真实用户开放家庭入口。
 
 ## 本轮不做
 
