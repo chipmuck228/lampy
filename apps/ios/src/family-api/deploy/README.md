@@ -42,26 +42,26 @@ npm run family-identity:accept
 | 变量 | 用途 |
 | --- | --- |
 | `LAMPY_FAMILY_ACCEPT_VOLUME` | 本机验收用的持久目录。未设则用临时目录 |
-| `LAMPY_FAMILY_ACCEPT_PUBLIC_URL` | **授权测试服务** 的 URL。未设则部署环境身份项为 NOT VERIFIED。不得指向验收脚本刚拉起的 `127.0.0.1` |
+| `LAMPY_FAMILY_ACCEPT_PUBLIC_URL` | **公网 HTTPS** 授权测试服务。未设则部署项为 NOT VERIFIED。本机 / 私网 `http://` 以及私网 `https://` 只能做 `local_*`，不能让 `public_https_service` 通过 |
 | `LAMPY_FAMILY_ACCEPT_HOSTED_DATABASE_PATH` | 托管卷上的 SQLite 文件。供本机可见的卷或主机上的 `volume-probe` 使用 |
 | `LAMPY_FAMILY_ACCEPT_HOSTED_VOLUME_ROOT` | 托管卷根目录。数据库 `realpath` 必须落在此根下且同一 device |
 | `LAMPY_FAMILY_ACCEPT_VOLUME_PROBE` | `volume-probe` 写出的 JSON。验收脚本读它，不把本机临时卷当成托管卷 |
-| `LAMPY_FAMILY_ACCEPT_VOLUME_AFTER_RESTART` | 设为 `1` 表示这次 probe 发生在家庭 API 进程重启之后 |
+| `LAMPY_FAMILY_ACCEPT_VOLUME_AFTER_RESTART` | 操作者确认已重启进程后设为 `1`。探针只核卷上 marker，**不能**证明 pid 已变 |
 | `LAMPY_FAMILY_ACCEPT_IDENTITY_TOKEN_A` | 测试用户 A 的真实 Apple identity token |
 | `LAMPY_FAMILY_ACCEPT_IDENTITY_TOKEN_B` | 测试用户 B 的真实 Apple identity token |
 
 脚本不会打印这些值。不是三部分 JWT 的 token 会被拒绝，以免把测试 token 当成真实验收。
 
-本机 `127.0.0.1` 上的登录 / 邀请 / 加入 / 创建者移除 / 成员退出，与授权部署服务上的同一组操作是两套结果。只有后者加上托管卷探测均为 PASS，`identityLoopAccepted` 才为 true。退出码 0 只表示没有 FAIL，自动化要读 `identityLoopAccepted`。需要把「未验收」当成失败时用 `npm run family-identity:accept:require`（exit 2）。
+本机 `127.0.0.1` 上的登录 / 邀请 / 加入 / 创建者移除 / 成员退出，与授权部署服务上的同一组操作是两套结果。部署走查若发现账号已有家庭会停止并报告，不会退出或解散未知家庭；只创建并在结束时清理本轮新建的家庭。只有公网 HTTPS 部署流程加上托管卷探测均为 PASS，`identityLoopAccepted` 才为 true。退出码 0 只表示没有 FAIL，自动化要读 `identityLoopAccepted`。需要把「未验收」当成失败时用 `npm run family-identity:accept:require`（exit 2）。
 
-托管卷探测（在主机上）：
+托管卷探测（在主机上）。`--after-restart` 只表示操作者声称已经重启并核了卷上 marker，**不是**进程重启证明。重启必须在探针外执行，并用 `systemctl status` / pid / journal 自行核对。
 
 ```bash
 LAMPY_FAMILY_ACCEPT_HOSTED_DATABASE_PATH=/var/lib/lampy/family/family.db \
 LAMPY_FAMILY_ACCEPT_HOSTED_VOLUME_ROOT=/var/lib/lampy/family \
 LAMPY_FAMILY_ACCEPT_VOLUME_PROBE=/tmp/family-volume-probe.json \
 npm run family-identity:volume-probe
-# 重启唯一的 family-api 进程
+# 在此重启唯一的 family-api 进程，并核对该进程的 pid 已变化
 LAMPY_FAMILY_ACCEPT_VOLUME_AFTER_RESTART=1 \
 LAMPY_FAMILY_ACCEPT_HOSTED_DATABASE_PATH=/var/lib/lampy/family/family.db \
 LAMPY_FAMILY_ACCEPT_HOSTED_VOLUME_ROOT=/var/lib/lampy/family \

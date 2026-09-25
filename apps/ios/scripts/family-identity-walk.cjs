@@ -6,6 +6,17 @@ function isLoopbackHost(hostname) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 }
 
+function isPrivateIpv4(hostname) {
+  const ipv4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(hostname);
+  if (!ipv4) return false;
+  const a = Number(ipv4[1]);
+  const b = Number(ipv4[2]);
+  if (a === 10) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+}
+
 function sameListenTarget(urlString, listening) {
   if (!listening) return false;
   try {
@@ -25,15 +36,16 @@ function isAuthorizedDeployedUrl(urlString, listening) {
   } catch {
     return { ok: false, reason: 'invalid' };
   }
-  if (parsed.protocol === 'http:' && !isLoopbackHost(parsed.hostname) && !/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(parsed.hostname)) {
-    return { ok: false, reason: 'public-http-refused' };
-  }
   if (sameListenTarget(raw, listening)) {
     return { ok: false, reason: 'ephemeral-local-listen' };
   }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return { ok: false, reason: 'invalid' };
+  if (parsed.protocol !== 'https:') {
+    if (isLoopbackHost(parsed.hostname)) return { ok: false, reason: 'loopback-http-refused' };
+    if (isPrivateIpv4(parsed.hostname)) return { ok: false, reason: 'private-http-refused' };
+    return { ok: false, reason: 'public-http-refused' };
   }
+  if (isLoopbackHost(parsed.hostname)) return { ok: false, reason: 'loopback-refused' };
+  if (isPrivateIpv4(parsed.hostname)) return { ok: false, reason: 'private-network-refused' };
   return { ok: true, href: raw.replace(/\/+$/, '') };
 }
 
@@ -54,19 +66,21 @@ async function callFamily(baseUrl, method, pathname, options = {}) {
   };
 }
 
-async function clearExistingFamily(baseUrl, session, prefix) {
-  const membership = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: session.sessionToken });
-  const family = membership.raw?.family;
-  if (!family?.familyId) return { cleared: true };
-  if (family.role === 'member') {
-    const left = await callFamily(baseUrl, 'POST', '/v1/me/leave', { token: session.sessionToken });
-    return { cleared: left.status === 200, step: 'preclear-leave', left };
+function existingFamilyId(membership) {
+  const familyId = membership?.raw?.family?.familyId;
+  return typeof familyId === 'string' && familyId ? familyId : '';
+}
+
+async function requireAccountsHaveNoFamily(baseUrl, alice, bob) {
+  const aliceMembership = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: alice.sessionToken });
+  const bobMembership = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: bob.sessionToken });
+  if (existingFamilyId(aliceMembership)) {
+    return { ok: false, step: 'account-already-in-family-a', aliceMembership };
   }
-  const dissolve = await callFamily(baseUrl, 'POST', `/v1/families/${family.familyId}/dissolve`, {
-    token: session.sessionToken,
-    idempotencyKey: `${prefix}-preclear-dissolve`,
-  });
-  return { cleared: dissolve.status === 200, step: 'preclear-dissolve', dissolve };
+  if (existingFamilyId(bobMembership)) {
+    return { ok: false, step: 'account-already-in-family-b', bobMembership };
+  }
+  return { ok: true };
 }
 
 async function expectMembers(baseUrl, aliceToken, bobToken, count) {
@@ -129,10 +143,9 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
 
   const alice = { sessionToken: aliceAuth.raw.sessionToken, userId: aliceAuth.raw.userId };
   const bob = { sessionToken: bobAuth.raw.sessionToken, userId: bobAuth.raw.userId };
-  const clearedAlice = await clearExistingFamily(baseUrl, alice, `${keyPrefix}-a`);
-  const clearedBob = await clearExistingFamily(baseUrl, bob, `${keyPrefix}-b`);
-  if (!clearedAlice.cleared || !clearedBob.cleared) {
-    return { ok: false, signedIn: true, step: 'preclear', clearedAlice, clearedBob };
+  const vacant = await requireAccountsHaveNoFamily(baseUrl, alice, bob);
+  if (!vacant.ok) {
+    return { ok: false, signedIn: true, step: vacant.step, vacant };
   }
 
   const created = await callFamily(baseUrl, 'POST', '/v1/families', {
@@ -170,6 +183,11 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
     return { ok: false, signedIn: true, step: 'permission-gone-after-leave', ...goneAfterLeave };
   }
 
+  const dissolved = await callFamily(baseUrl, 'POST', `/v1/families/${familyId}/dissolve`, {
+    token: alice.sessionToken,
+    idempotencyKey: `${keyPrefix}-cleanup-created`,
+  });
+
   return {
     ok: true,
     signedIn: true,
@@ -177,6 +195,7 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
     alice: evidenceRef(alice.userId),
     bob: evidenceRef(bob.userId),
     family: evidenceRef(familyId),
+    createdFamilyCleanup: dissolved.status === 200 && dissolved.raw?.dissolved === true ? 'dissolved-created' : 'left-in-place',
   };
 }
 
@@ -190,7 +209,11 @@ function tokenPairStatus(tokenA, tokenB, testTokensSet) {
 
 module.exports = {
   callFamily,
+  existingFamilyId,
   isAuthorizedDeployedUrl,
+  isLoopbackHost,
+  isPrivateIpv4,
+  requireAccountsHaveNoFamily,
   sameListenTarget,
   tokenPairStatus,
   walkIdentityLoop,

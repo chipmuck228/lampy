@@ -72,7 +72,9 @@
 
 ## 托管卷如何变为 PASS
 
-在主机上对真实库路径跑 `npm run family-identity:volume-probe`：确认数据库 `realpath` 落在卷根、同一 device、文件系统不是 tmpfs/overlay、迁移行仍在、同卷拷贝能打开。然后重启唯一的 family-api 进程，带 `--after-restart` 再跑一次，确认标记文件与迁移数仍在。把写出的 JSON 通过 `LAMPY_FAMILY_ACCEPT_VOLUME_PROBE` 交给验收脚本。缺任何一项则 NOT VERIFIED 或 FAIL，不会永远停在 NOT VERIFIED。
+在主机上对真实库路径跑 `npm run family-identity:volume-probe`：确认数据库 `realpath` 落在卷根、同一 device、文件系统不是 tmpfs/overlay、迁移行仍在、同卷拷贝能打开。然后在探针外重启唯一的 family-api 进程，并用服务管理器或 pid/journal **自行确认进程已换**。再带 `--after-restart` 跑一次，只核卷上 marker 与迁移数仍在。marker 和该标志不是进程重启证明。把写出的 JSON 通过 `LAMPY_FAMILY_ACCEPT_VOLUME_PROBE` 交给验收脚本。缺路径/迁移/备份证据则 NOT VERIFIED 或 FAIL。
+
+部署走查不会退出或解散账号里已有的未知家庭；发现已有家庭即停止。`public_https_service` 只接受公网 `https://`，本机与私网 HTTP/HTTPS 不能让该项通过。
 
 ## 命令
 

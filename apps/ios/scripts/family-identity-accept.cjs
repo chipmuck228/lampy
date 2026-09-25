@@ -49,9 +49,15 @@ function walkVerdicts(walked, target) {
     };
   }
   if (!walked.ok) {
+    const already = String(walked.step || '').startsWith('account-already-in-family');
     return {
       login: verdict('PASS', `${target} Apple identity tokens accepted`),
-      membership: verdict('FAIL', `${target} stopped at ${walked.step}`),
+      membership: verdict(
+        'FAIL',
+        already
+          ? `${target} account already has a family; will not leave or dissolve unknown families`
+          : `${target} stopped at ${walked.step}`,
+      ),
     };
   }
   return {
@@ -100,7 +106,7 @@ function evaluateHostedVolume() {
   }
   return verdict(
     'NOT VERIFIED',
-    'no hosted volume probe. On the host: npm run family-identity:volume-probe, restart family-api, re-run with --after-restart, then set LAMPY_FAMILY_ACCEPT_VOLUME_PROBE to that JSON',
+    'no hosted volume probe. On the host: run volume-probe, restart family-api yourself and confirm pid/journal, re-run with --after-restart, then set LAMPY_FAMILY_ACCEPT_VOLUME_PROBE',
   );
 }
 
@@ -280,9 +286,21 @@ async function main() {
       'no authorized test service URL; local 127.0.0.1 invite/join/leave/remove is not this check',
     );
   } else if (deployed.reason === 'public-http-refused') {
-    checks.public_https_service = verdict('FAIL', 'public http URL is refused by the iOS client');
+    checks.public_https_service = verdict('FAIL', 'public http URL is refused; deployed acceptance requires public HTTPS');
     checks.deployed_real_apple_login = verdict('FAIL', 'refused to send Apple tokens to public http');
     checks.deployed_invite_join_leave_and_remove = verdict('FAIL', 'refused to walk membership on public http');
+  } else if (
+    deployed.reason === 'loopback-http-refused' ||
+    deployed.reason === 'private-http-refused' ||
+    deployed.reason === 'loopback-refused' ||
+    deployed.reason === 'private-network-refused'
+  ) {
+    checks.public_https_service = verdict(
+      'FAIL',
+      'deployed HTTPS check refuses loopback and private-network URLs; use them only for local_* checks',
+    );
+    checks.deployed_real_apple_login = verdict('FAIL', 'deployed login requires a public HTTPS service');
+    checks.deployed_invite_join_leave_and_remove = verdict('FAIL', 'deployed membership requires a public HTTPS service');
   } else if (deployed.reason === 'ephemeral-local-listen') {
     checks.public_https_service = verdict('FAIL', 'authorized URL points at this script’s ephemeral 127.0.0.1 listen');
     checks.deployed_real_apple_login = verdict('FAIL', 'deployed login cannot use the temporary local process');

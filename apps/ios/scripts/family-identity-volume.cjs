@@ -151,13 +151,16 @@ function inspectHostedVolume(options) {
         previous.volumeRealpath === volumeReal &&
         previous.migrationCount === migrations.count;
       restartRead = same
-        ? verdict('PASS', 'marker and migrations survived a service restart')
-        : verdict('FAIL', 'hosted volume marker does not match the live database after restart');
+        ? verdict(
+            'PASS',
+            'marker and migrations still present after operator-asserted --after-restart; this does not prove the family-api process restarted',
+          )
+        : verdict('FAIL', 'hosted volume marker does not match the live database after the operator-asserted restart window');
     }
   } else {
     restartRead = verdict(
       'NOT VERIFIED',
-      'write this probe, restart the single family-api process, then re-run with LAMPY_FAMILY_ACCEPT_VOLUME_AFTER_RESTART=1',
+      'write this probe, restart family-api yourself and confirm the pid/journal changed, then re-run with --after-restart. The marker is not proof of process restart',
     );
   }
   fs.writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`);
@@ -170,6 +173,10 @@ function inspectHostedVolume(options) {
     migrations,
     backupRestore,
     restartRead,
+    processRestart: verdict(
+      'NOT VERIFIED',
+      'volume probe cannot see the family-api pid; confirm restart via the service manager or process list',
+    ),
     location: {
       dbUnderVolume: onVolume,
       fsType,
@@ -201,7 +208,10 @@ function validateHostedVolumeProbe(report) {
       report.restartRead.detail || 'hosted volume probe is incomplete (restart-read not observed)',
     );
   }
-  return verdict('PASS', 'hosted volume path, migrations, backup copy, and post-restart read all checked');
+  return verdict(
+    'PASS',
+    'hosted volume path, migrations, backup copy, and marker still present after the operator-asserted restart window. Process restart remains an external check',
+  );
 }
 
 function loadVolumeProbeFile(filePath) {
