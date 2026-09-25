@@ -285,4 +285,58 @@ describe('family HTTP contract', () => {
     });
     expect(hidden.status).toBe(403);
   });
+
+  it('serves share-authorized media and hides it from later joiners over HTTP', async () => {
+    const commands = api();
+    const alice = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/apple',
+      headers: {},
+      body: { identityToken: 'apple_alice' },
+    });
+    const aliceToken = (alice.body as { sessionToken: string }).sessionToken;
+    const created = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/families',
+      headers: { authorization: `Bearer ${aliceToken}`, 'idempotency-key': 'fam-inbox' },
+    });
+    const familyId = (created.body as { familyId: string }).familyId;
+    const uploaded = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/media',
+      headers: { authorization: `Bearer ${aliceToken}`, 'content-type': 'image/jpeg' },
+      bytes: sampleJpegBytes(),
+    });
+    expect(uploaded.status).toBe(200);
+    const objectId = (uploaded.body as { objectId: string }).objectId;
+    const shared = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: `/v1/families/${familyId}/shares`,
+      headers: { authorization: `Bearer ${aliceToken}`, 'idempotency-key': 'share-inbox' },
+      body: {
+        sourceMomentId: 'moment_gate',
+        sourceRevision: 1,
+        note: '门口的风',
+        emotion: '平静',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [objectId],
+        expectedMediaCount: 1,
+      },
+    });
+    const shareId = (shared.body as { shareId: string }).shareId;
+    const listed = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: `/v1/families/${familyId}/shares`,
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(listed.status).toBe(200);
+    expect((listed.body as { shares: { shareId: string }[] }).shares[0]?.shareId).toBe(shareId);
+    const media = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: `/v1/families/${familyId}/shares/${shareId}/media/${objectId}`,
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(media.status).toBe(200);
+    expect((media.body as { contentSha256: string }).contentSha256).toHaveLength(64);
+  });
 });

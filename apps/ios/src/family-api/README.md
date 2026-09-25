@@ -124,6 +124,17 @@ GET  /v1/families/:familyId/shares/:shareId
 
 **信任边界：** 服务端看不到个人 SQLite，不能证明 `sourceMomentId` 对应一条真实个人 Moment，也不知道原件有几条媒体。`expectedMediaCount` 只与同一次请求的 `mediaObjectIds.length` 比较；调用方可以把两者同时设为零。不得宣称服务端验证本人个人原件，或保证原件媒体不会遗漏。实际 App 确认必须从个人库重新读取并逐项核对。
 
+## 接收与家庭缓存（F4，不是家人已收到）
+
+```text
+GET /v1/families/:familyId/shares
+GET /v1/families/:familyId/shares/:shareId
+GET /v1/families/:familyId/shares/:shareId/media/:objectId
+GET /v1/families/:familyId/shares/:shareId/media/:objectId/content
+```
+
+每次读取再核会话、当前成员、F3 `audienceUserIds` 和分享状态。`GET /v1/media/:id` 仍仅上传者可读；接收必须走分享授权路径。已知 objectId 若不在该快照白名单里是 403。后来加入者列表为空。客户端写入 `(userId, familyId, shareId)` 家庭缓存，不进个人 `moments`。离线、401、成员无法确认、退出或被移除时立即隐藏；缓存存在不是当前授权。半条下载不得标为已接收。成功只表示本机缓存已写入，不是「家人已收到」。
+
 ## 备份与恢复
 
 SQLite 使用 WAL。备份前先停进程或做 checkpoint，然后拷贝主文件和旁路文件：
@@ -184,4 +195,4 @@ npm run family-identity:accept
 
 ## 本轮不做
 
-接收下载、家庭缓存、家庭时间线、撤回、Transmission 改写、跨设备同步、媒体自动上传、创建者移交、删除账号、微信领域修改。本目录已含 F2 媒体与 F3 快照保存，不是家人已收到，也不是身份闭环验收通过。`identityLoopAccepted` 仍为 false，家庭入口仍关闭。
+接收下载、家庭缓存、家庭时间线、撤回、Transmission 改写、跨设备同步、媒体自动上传、创建者移交、删除账号、微信领域修改。本目录已含 F2 媒体、F3 快照保存与 F4 授权读取/家庭缓存，不是家人已收到，也不是身份闭环验收通过。`identityLoopAccepted` 仍为 false，家庭入口仍关闭。

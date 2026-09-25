@@ -15,6 +15,7 @@ import {
   createExpoMediaStore,
   readExpoAssetBytes,
 } from '../infrastructure/expo-media';
+import { createSqliteFamilyReceiveCache } from '../infrastructure/family-receive-cache';
 import { createSqliteRepositories, openLampyDatabase } from '../infrastructure/sqlite';
 import type { SqlDatabase } from '../infrastructure/sql';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
@@ -77,6 +78,7 @@ export function createIosFamilyUseCases(deps: {
   session: FamilySessionStore;
   idempotencyKey?: (prefix: string) => string;
   personal?: FamilyPersonalLibrary;
+  receiveCache?: ReturnType<typeof createSqliteFamilyReceiveCache>;
 }): FamilyUseCases {
   return createFamilyUseCases({
     client: deps.client,
@@ -84,6 +86,7 @@ export function createIosFamilyUseCases(deps: {
     pending: createSqlitePendingFamilyOperationStore(deps.db),
     idempotencyKey: deps.idempotencyKey,
     personal: deps.personal,
+    receiveCache: deps.receiveCache ?? createSqliteFamilyReceiveCache(deps.db),
   });
 }
 

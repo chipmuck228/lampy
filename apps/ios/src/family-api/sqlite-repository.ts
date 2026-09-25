@@ -395,6 +395,14 @@ function createSqliteTx(db: FamilySql): FamilyTx {
       );
       return row ? shareFrom(row) : null;
     },
+    async listSharesInFamily(familyId) {
+      const rows = await db.getAll<ShareRow>(
+        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at
+         FROM family_shares WHERE family_id = ? ORDER BY shared_at DESC`,
+        [familyId],
+      );
+      return rows.map(shareFrom);
+    },
     async saveShare(share) {
       try {
         await db.run(

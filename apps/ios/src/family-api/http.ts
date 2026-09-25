@@ -98,7 +98,7 @@ export async function dispatchFamilyApi(
 
   try {
     if (method === 'GET' && path === '/health') {
-      return { status: 200, body: { ok: true, slice: 'identity-membership', media: true, shares: true } };
+      return { status: 200, body: { ok: true, slice: 'identity-membership', media: true, shares: true, inbox: true } };
     }
 
     if (method === 'POST' && path === '/v1/auth/apple') {
@@ -173,7 +173,38 @@ export async function dispatchFamilyApi(
       return { status: 200, body: { objectId: mediaContent[1], mimeType: content.mimeType, byteLength: content.bytes.length }, bytes: content.bytes, contentType: content.mimeType };
     }
 
+    const shareMediaContent = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)\/content$/.exec(path);
+    if (method === 'GET' && shareMediaContent) {
+      const content = await commands.getShareMediaContent(
+        token || '',
+        shareMediaContent[1],
+        shareMediaContent[2],
+        shareMediaContent[3],
+      );
+      return {
+        status: 200,
+        body: {
+          objectId: shareMediaContent[3],
+          mimeType: content.mimeType,
+          byteLength: content.bytes.length,
+        },
+        bytes: content.bytes,
+        contentType: content.mimeType,
+      };
+    }
+
+    const shareMedia = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)$/.exec(path);
+    if (method === 'GET' && shareMedia) {
+      return {
+        status: 200,
+        body: await commands.getShareMedia(token || '', shareMedia[1], shareMedia[2], shareMedia[3]),
+      };
+    }
+
     const shareCreate = /^\/v1\/families\/([^/]+)\/shares$/.exec(path);
+    if (method === 'GET' && shareCreate) {
+      return { status: 200, body: await commands.listVisibleShares(token || '', shareCreate[1]) };
+    }
     if (method === 'POST' && shareCreate) {
       if (Object.prototype.hasOwnProperty.call(body, 'localUri') || Object.prototype.hasOwnProperty.call(body, 'people')) {
         throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Share snapshots cannot include local paths or people.');

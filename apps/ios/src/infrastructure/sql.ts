@@ -48,6 +48,30 @@ const MIGRATIONS = [
     param_family_id TEXT,
     PRIMARY KEY (user_id, command, operation_id)
   );`,
+  `CREATE TABLE IF NOT EXISTS family_received_shares (
+    user_id TEXT NOT NULL,
+    family_id TEXT NOT NULL,
+    share_id TEXT NOT NULL,
+    snapshot_revision INTEGER NOT NULL,
+    author_user_id TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    shared_at TEXT NOT NULL,
+    receive_status TEXT NOT NULL,
+    expected_media_count INTEGER NOT NULL,
+    PRIMARY KEY (user_id, family_id, share_id)
+  );`,
+  `CREATE TABLE IF NOT EXISTS family_received_media (
+    user_id TEXT NOT NULL,
+    family_id TEXT NOT NULL,
+    share_id TEXT NOT NULL,
+    object_id TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    byte_length INTEGER NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    storage_key TEXT NOT NULL,
+    status TEXT NOT NULL,
+    PRIMARY KEY (user_id, family_id, share_id, object_id)
+  );`,
 ];
 
 export async function applyLampySchema(db: SqlDatabase): Promise<void> {

@@ -16,6 +16,8 @@ import {
 } from '../family-api/idempotency';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
 import type { ShareView } from '../family-api/types';
+import { sha256MediaBytes } from '../family-api/media-validate';
+import type { FamilyReceiveCache, ReceivedShareRecord, ReceivedShareStatus } from '../infrastructure/family-receive-cache';
 import { DEFAULT_SESSION_TTL_MS } from '../family-api/ids';
 import type { FamilyMemberView, FamilyView, InvitationView, MediaObjectView } from '../family-api/types';
 
@@ -37,6 +39,23 @@ export type SharePreview = {
   media: SharePreviewMedia[];
   canConfirm: boolean;
 };
+
+export type FamilyInboxItem = {
+  shareId: string;
+  familyId: string;
+  snapshotRevision: number;
+  note: string;
+  emotion: string;
+  occurredAt?: string;
+  occurredAtPrecision: string;
+  receiveStatus: ReceivedShareStatus;
+  expectedMediaCount: number;
+  storedMediaCount: number;
+};
+
+export type FamilyInboxView =
+  | { kind: 'hidden'; reason: 'unauthenticated' | 'unconfirmed' | 'none' | 'unreachable' }
+  | { kind: 'ready'; familyId: string; items: FamilyInboxItem[] };
 
 export type ShareConfirmState =
   | { status: 'idle' }
@@ -165,6 +184,7 @@ export function createFamilyUseCases(deps: {
     assets: { findById(id: string): Promise<AssetRead> };
     readAssetBytes?: (localUri: string) => Promise<Uint8Array>;
   };
+  receiveCache?: FamilyReceiveCache;
 }) {
   const cache = deps.cache ?? createNoopFamilyCache();
   const pending = deps.pending;
@@ -444,9 +464,10 @@ export function createFamilyUseCases(deps: {
     },
 
     async leaveFamily() {
-      const { sessionToken } = await requireAccount();
+      const { sessionToken, userId } = await requireAccount();
       const result = await deps.client.leaveFamily(sessionToken);
       await cache.clear();
+      await deps.receiveCache?.isolateAccount(userId);
       return result;
     },
 
@@ -456,9 +477,10 @@ export function createFamilyUseCases(deps: {
     },
 
     async dissolveFamily(familyId: string) {
-      const { sessionToken } = await requireAccount();
+      const { sessionToken, userId } = await requireAccount();
       const result = await deps.client.dissolveFamily(sessionToken, familyId);
       await cache.clear();
+      await deps.receiveCache?.isolateAccount(userId);
       return result;
     },
 
@@ -479,6 +501,7 @@ export function createFamilyUseCases(deps: {
         await deps.client.signOut(token);
         await deps.session.clearSession();
         await cache.clear();
+        await deps.receiveCache?.isolateAccount(userId);
         await deps.session.clearPendingRevoke();
         selectedMediaUpload = { status: 'idle' };
         shareConfirm = { status: 'idle' };
@@ -488,6 +511,7 @@ export function createFamilyUseCases(deps: {
         if (isConfirmedTokenGone(appError)) {
           await deps.session.clearSession();
           await cache.clear();
+          await deps.receiveCache?.isolateAccount(userId);
           await deps.session.clearPendingRevoke();
           return { local: 'signed-out', server: 'revoked' };
         }
@@ -502,6 +526,7 @@ export function createFamilyUseCases(deps: {
         }
         await deps.session.clearSession();
         await cache.clear();
+        await deps.receiveCache?.isolateAccount(userId);
         return { local: 'signed-out', server: 'unconfirmed' };
       }
     },
@@ -643,7 +668,129 @@ export function createFamilyUseCases(deps: {
       const { sessionToken } = await requireAccount();
       return deps.client.getShare(sessionToken, familyId, shareId);
     },
+
+    async listFamilyInbox(): Promise<FamilyInboxView> {
+      return inboxFromMembership(await this.getMembership());
+    },
+
+    async refreshFamilyInbox(): Promise<FamilyInboxView> {
+      const membership = await this.getMembership();
+      if (membership.kind !== 'ready') {
+        return hiddenInbox(membership) ?? { kind: 'hidden', reason: 'unconfirmed' };
+      }
+      const { sessionToken, userId } = await requireAccount();
+      const listed = await deps.client.listVisibleShares(sessionToken, membership.familyId);
+      if (deps.receiveCache) {
+        for (const share of listed.shares) {
+          await deps.receiveCache.upsertListed(userId, share);
+        }
+      }
+      return inboxFromMembership(membership);
+    },
+
+    async receiveShare(shareId: string) {
+      const membership = await this.getMembership();
+      if (membership.kind !== 'ready') {
+        throw new ApplicationError('NOT_IN_FAMILY', 'Not a member of this family.');
+      }
+      if (!deps.receiveCache) {
+        throw new ApplicationError('SHARE_NOT_FOUND', 'Family cache is not available.');
+      }
+      const { sessionToken, userId } = await requireAccount();
+      const share = await deps.client.getShare(sessionToken, membership.familyId, shareId);
+      await deps.receiveCache.beginReceive(userId, share);
+      try {
+        for (const item of share.snapshot.media) {
+          const existing = (await deps.receiveCache.listMedia(userId, share.familyId, share.shareId)).find(
+            (row) => row.objectId === item.objectId && row.status === 'stored',
+          );
+          if (existing) {
+            const storedBytes = await deps.receiveCache.readMediaBytes(existing.storageKey);
+            if (
+              storedBytes.length === existing.byteLength &&
+              sha256MediaBytes(storedBytes) === existing.contentSha256
+            ) {
+              continue;
+            }
+          }
+          const meta = await deps.client.getShareMedia(sessionToken, share.familyId, share.shareId, item.objectId);
+          const content = await deps.client.getShareMediaContent(
+            sessionToken,
+            share.familyId,
+            share.shareId,
+            item.objectId,
+          );
+          if (
+            content.bytes.length !== meta.byteLength ||
+            sha256MediaBytes(content.bytes) !== meta.contentSha256
+          ) {
+            throw new ApplicationError('SHARE_MEDIA_UNAVAILABLE', 'A selected media object is not available.');
+          }
+          await deps.receiveCache.saveStoredMedia({
+            userId,
+            familyId: share.familyId,
+            shareId: share.shareId,
+            objectId: item.objectId,
+            mimeType: meta.mimeType,
+            byteLength: meta.byteLength,
+            contentSha256: meta.contentSha256,
+            storageKey: `${userId}/${share.familyId}/${share.shareId}/${item.objectId}`,
+            bytes: content.bytes,
+          });
+        }
+        const stored = (await deps.receiveCache.listMedia(userId, share.familyId, share.shareId)).filter(
+          (row) => row.status === 'stored',
+        );
+        if (stored.length !== share.snapshot.media.length) {
+          throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
+        }
+        const received = await deps.receiveCache.markReceived(userId, share.familyId, share.shareId);
+        return { status: 'received' as const, item: await toInboxItem(received) };
+      } catch (error) {
+        await deps.receiveCache.markFailed(userId, share.familyId, share.shareId);
+        throw asApplicationError(error);
+      }
+    },
   };
+
+  async function inboxFromMembership(membership: FamilyMembershipView): Promise<FamilyInboxView> {
+    if (membership.kind !== 'ready') {
+      return hiddenInbox(membership) ?? { kind: 'hidden', reason: 'unconfirmed' };
+    }
+    const userId = await deps.session.getUserId();
+    if (!userId || !deps.receiveCache) return { kind: 'ready', familyId: membership.familyId, items: [] };
+    const rows = await deps.receiveCache.list(userId, membership.familyId);
+    return {
+      kind: 'ready',
+      familyId: membership.familyId,
+      items: await Promise.all(rows.map((row) => toInboxItem(row))),
+    };
+  }
+
+  async function toInboxItem(row: ReceivedShareRecord): Promise<FamilyInboxItem> {
+    const media = deps.receiveCache ? await deps.receiveCache.listMedia(row.userId, row.familyId, row.shareId) : [];
+    return {
+      shareId: row.shareId,
+      familyId: row.familyId,
+      snapshotRevision: row.snapshotRevision,
+      note: row.snapshot.note,
+      emotion: row.snapshot.emotion,
+      occurredAt: row.snapshot.occurredAt,
+      occurredAtPrecision: row.snapshot.occurredAtPrecision,
+      receiveStatus: row.receiveStatus,
+      expectedMediaCount: row.expectedMediaCount,
+      storedMediaCount: media.filter((item) => item.status === 'stored').length,
+    };
+  }
+}
+
+function hiddenInbox(membership: FamilyMembershipView): Extract<FamilyInboxView, { kind: 'hidden' }> | null {
+  if (membership.kind === 'unauthenticated') return { kind: 'hidden', reason: 'unauthenticated' };
+  if (membership.kind === 'none') return { kind: 'hidden', reason: 'none' };
+  if (membership.kind === 'unconfirmed') {
+    return { kind: 'hidden', reason: membership.reason === 'unreachable' ? 'unreachable' : 'unconfirmed' };
+  }
+  return null;
 }
 
 export type FamilyUseCases = ReturnType<typeof createFamilyUseCases>;

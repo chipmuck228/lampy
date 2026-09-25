@@ -60,6 +60,7 @@ describe('personal library while family service is down', () => {
     const audioSaved = await personal.saveTextMoment(audioDraft.draftId);
 
     expect(await family.getMembership()).toEqual({ kind: 'unconfirmed', reason: 'unreachable' });
+    expect(await family.listFamilyInbox()).toEqual({ kind: 'hidden', reason: 'unreachable' });
     expect(familyMembersOrEmpty(await family.getMembership())).toEqual([]);
     await expect(family.signInWithApple('unused')).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
 

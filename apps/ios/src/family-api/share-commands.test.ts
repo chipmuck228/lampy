@@ -6,7 +6,7 @@ import { createMapAppleVerifier } from './apple';
 import { createFamilyCommands } from './commands';
 import { FAMILY_ERROR } from './errors';
 import { createDirectoryMediaBlobStore, createMemoryMediaBlobStore } from './media-blobs';
-import { sampleJpegBytes } from './media-validate';
+import { sampleJpegBytes, samplePngBytes } from './media-validate';
 import { openFamilySqliteDatabase } from './node-db';
 import { applyFamilyApiSchema } from './schema';
 import { createSqliteFamilyRepository } from './sqlite-repository';
@@ -172,6 +172,63 @@ describe('family share snapshot commands', () => {
     });
     expect(shared.snapshot.media).toEqual([]);
     expect(shared.sourceMomentId).toBe('moment_gate');
+  });
+
+  it('lists only audience shares and reads media through the share path, not the uploader path', async () => {
+    const { commands } = setup();
+    const alice = await commands.signInWithApple('apple_alice');
+    const bob = await commands.signInWithApple('apple_bob');
+    const cara = await commands.signInWithApple('apple_cara');
+    const family = await commands.createFamily(alice.sessionToken, 'fam-1');
+    const invite = await commands.inviteMember(alice.sessionToken, family.familyId, 'inv-1');
+    await commands.acceptInvitation(bob.sessionToken, invite.code, 'accept-1');
+    const media = await commands.uploadMedia(alice.sessionToken, { bytes: sampleJpegBytes(), mimeType: 'image/jpeg' });
+    const shared = await commands.shareMoment(alice.sessionToken, family.familyId, {
+      ...textShare(),
+      mediaObjectIds: [media.objectId],
+      expectedMediaCount: 1,
+    });
+
+    const listed = await commands.listVisibleShares(bob.sessionToken, family.familyId);
+    expect(listed.shares.map((row) => row.shareId)).toEqual([shared.shareId]);
+    const authorized = await commands.getShareMedia(bob.sessionToken, family.familyId, shared.shareId, media.objectId);
+    expect(authorized.contentSha256).toHaveLength(64);
+    const content = await commands.getShareMediaContent(
+      bob.sessionToken,
+      family.familyId,
+      shared.shareId,
+      media.objectId,
+    );
+    expect(content.bytes).toEqual(sampleJpegBytes());
+    await expect(commands.getMediaObject(bob.sessionToken, media.objectId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.FORBIDDEN,
+    });
+    await expect(commands.getMediaContent(bob.sessionToken, media.objectId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.FORBIDDEN,
+    });
+
+    const laterInvite = await commands.inviteMember(alice.sessionToken, family.familyId, 'inv-2');
+    await commands.acceptInvitation(cara.sessionToken, laterInvite.code, 'accept-2');
+    expect((await commands.listVisibleShares(cara.sessionToken, family.familyId)).shares).toEqual([]);
+    await expect(commands.getShare(cara.sessionToken, family.familyId, shared.shareId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.FORBIDDEN,
+    });
+    await expect(
+      commands.getShareMedia(cara.sessionToken, family.familyId, shared.shareId, media.objectId),
+    ).rejects.toMatchObject({ code: FAMILY_ERROR.FORBIDDEN });
+
+    const other = await commands.uploadMedia(alice.sessionToken, { bytes: samplePngBytes(), mimeType: 'image/png' });
+    await expect(
+      commands.getShareMedia(bob.sessionToken, family.familyId, shared.shareId, other.objectId),
+    ).rejects.toMatchObject({ code: FAMILY_ERROR.FORBIDDEN });
+
+    await commands.removeMember(alice.sessionToken, family.familyId, bob.userId);
+    await expect(commands.listVisibleShares(bob.sessionToken, family.familyId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.NOT_IN_FAMILY,
+    });
+    await expect(
+      commands.getShareMediaContent(bob.sessionToken, family.familyId, shared.shareId, media.objectId),
+    ).rejects.toMatchObject({ code: FAMILY_ERROR.NOT_IN_FAMILY });
   });
 
   it('does not save a share when selected media cannot be read', async () => {

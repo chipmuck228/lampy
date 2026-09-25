@@ -126,6 +126,13 @@ export type ShareView = {
   stored: 'server';
 };
 
+export type ShareMediaView = {
+  objectId: string;
+  mimeType: string;
+  byteLength: number;
+  contentSha256: string;
+};
+
 export type ShareMomentInput = {
   sourceMomentId: string;
   sourceRevision: number;
