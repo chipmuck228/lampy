@@ -10,7 +10,7 @@
 | --- | --- |
 | 起点 `origin/main` | `d198a7c68f29e13490032822ca3739b76f5bf849`（PR #10 merge） |
 | 本任务分支 | `ios/family-identity-real-accept` |
-| 本轮提交 | 见该分支 HEAD |
+| 本轮提交 | `574471e9010f42d9ee1468220a2fef8dd930064e` |
 
 `d198a7c` 已核对。未从 `ios/family-phase-3b-audit` 继续。
 
