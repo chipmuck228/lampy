@@ -43,9 +43,14 @@ export default function FamilyScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function hideFamilyContent() {
+    setMembership(null);
+    setInvites([]);
+  }
+
   const refresh = useCallback(async () => {
+    hideFamilyContent();
     if (!configured) {
-      setMembership(null);
       return;
     }
     const apple = createExpoAppleIdentityTokenSource();
@@ -63,12 +68,17 @@ export default function FamilyScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      hideFamilyContent();
       refresh()
         .then(() => {
           if (!cancelled) setMessage(null);
         })
         .catch((error) => {
-          if (!cancelled) setMessage(errorText(error));
+          if (!cancelled) {
+            setMembership(null);
+            setInvites([]);
+            setMessage(errorText(error));
+          }
         });
       return () => {
         cancelled = true;

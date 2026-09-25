@@ -16,7 +16,7 @@
 
 - 命令：`createFamilyCommands`，只通过 `FamilyRepository` 读写。
 - 内存：`createMemoryFamilyRepository`。
-- 生产：`createSqliteFamilyRepository` + `applyFamilyApiSchema`。
+- 生产：`createSqliteFamilyRepository` + `applyFamilyApiSchema`。同一 SQLite 连接上的事务排队，避免 HTTP 共用连接时二次 BEGIN。
 - HTTP：`dispatchFamilyApi`；监听：`listen.ts`。
 - Apple：test 模式用 `createMapAppleVerifier`。production 用 JWKS 校验签名、issuer、audience、exp、sub。测试 token **不得**进入 production。
 - 邮箱不当主键。登录成功不创建 Membership。

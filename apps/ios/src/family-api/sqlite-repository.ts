@@ -308,21 +308,29 @@ async function beginImmediate(db: FamilySql) {
 
 export function createSqliteFamilyRepository(db: FamilySql): FamilyRepository {
   const tx = createSqliteTx(db);
+  let queue = Promise.resolve();
   return {
-    async withTransaction(work) {
-      await beginImmediate(db);
-      try {
-        const result = await work(tx);
-        await db.exec('COMMIT');
-        return result;
-      } catch (error) {
+    withTransaction(work) {
+      const run = queue.then(async () => {
+        await beginImmediate(db);
         try {
-          await db.exec('ROLLBACK');
-        } catch {
-          // The failed transaction is already closed or never opened.
+          const result = await work(tx);
+          await db.exec('COMMIT');
+          return result;
+        } catch (error) {
+          try {
+            await db.exec('ROLLBACK');
+          } catch {
+            // The failed transaction is already closed or never opened.
+          }
+          throw mapFamilySqlConstraint(error);
         }
-        throw mapFamilySqlConstraint(error);
-      }
+      });
+      queue = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      return run;
     },
   };
 }

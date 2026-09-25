@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ApplicationError } from '../application/errors';
 import FamilyScreen from './family-screen';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
 
@@ -100,5 +101,32 @@ describe('family screen', () => {
     expect(view.getByText('usr_alice')).toBeTruthy();
     expect(view.getByLabelText('邀请')).toBeTruthy();
     expect(view.queryByText(/假送达|家庭时间线/)).toBeNull();
+  });
+
+  it('hides previous members and admin actions when re-entering and revalidation fails', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      role: 'creator',
+      members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+    });
+    const first = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(first.getByText('usr_alice')).toBeTruthy();
+      expect(first.getByLabelText('解散这个家')).toBeTruthy();
+    });
+    first.unmount();
+
+    mockFamily.getMembership.mockRejectedValue(new ApplicationError('INTERNAL', 'membership lookup failed'));
+    const second = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(second.getByText('家庭这件事没有做成。个人记录还在这台设备上。')).toBeTruthy();
+    });
+    expect(second.queryByText('家里现在有这些人。')).toBeNull();
+    expect(second.queryByText('usr_alice')).toBeNull();
+    expect(second.queryByLabelText('移出 usr_alice')).toBeNull();
+    expect(second.queryByLabelText('解散这个家')).toBeNull();
+    expect(second.queryByLabelText('邀请')).toBeNull();
   });
 });

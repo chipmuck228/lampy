@@ -44,6 +44,7 @@ async function openCommands(file: string, seq: { n: number }, clock = { now: () 
       apple_alice: { appleSubject: 'apple.alice' },
       apple_bob: { appleSubject: 'apple.bob' },
       apple_cara: { appleSubject: 'apple.cara' },
+      apple_dave: { appleSubject: 'apple.dave' },
     }),
     clock,
     ids: idsWith(seq),
@@ -135,6 +136,47 @@ describe('durable SQLite family repository', () => {
       await left.db.close();
       await right.db.close();
       await check.db.close();
+    });
+  }, 15000);
+
+  it('serializes concurrent create and accept on one shared commands instance', async () => {
+    await withSqliteFile(async (file) => {
+      const seq = { n: 0 };
+      const shared = await openCommands(file, seq);
+      const alice = await shared.commands.signInWithApple('apple_alice');
+      const bob = await shared.commands.signInWithApple('apple_bob');
+      const cara = await shared.commands.signInWithApple('apple_cara');
+      const dave = await shared.commands.signInWithApple('apple_dave');
+      const family = await shared.commands.createFamily(bob.sessionToken);
+      const invite = await shared.commands.inviteMember(bob.sessionToken, family.familyId);
+
+      const joinOrCreate = await Promise.allSettled([
+        shared.commands.createFamily(alice.sessionToken),
+        shared.commands.acceptInvitation(alice.sessionToken, invite.code),
+      ]);
+      expect(joinOrCreate.filter((row) => row.status === 'fulfilled')).toHaveLength(1);
+      expect(joinOrCreate.filter((row) => row.status === 'rejected')).toHaveLength(1);
+      expect((joinOrCreate.find((row) => row.status === 'rejected') as PromiseRejectedResult).reason).toMatchObject({
+        code: FAMILY_ERROR.ALREADY_IN_FAMILY,
+      });
+      expect((await shared.commands.listMembership(alice.sessionToken)).family).not.toBeNull();
+
+      const nextInvite = await shared.commands.inviteMember(bob.sessionToken, family.familyId);
+      const accepts = await Promise.allSettled([
+        shared.commands.acceptInvitation(cara.sessionToken, nextInvite.code),
+        shared.commands.acceptInvitation(dave.sessionToken, nextInvite.code),
+      ]);
+      expect(accepts.filter((row) => row.status === 'fulfilled')).toHaveLength(1);
+      expect(accepts.filter((row) => row.status === 'rejected')).toHaveLength(1);
+      expect((accepts.find((row) => row.status === 'rejected') as PromiseRejectedResult).reason).toMatchObject({
+        code: FAMILY_ERROR.INVITE_ALREADY_USED,
+      });
+      const joined = [
+        (await shared.commands.listMembership(cara.sessionToken)).family,
+        (await shared.commands.listMembership(dave.sessionToken)).family,
+      ].filter(Boolean);
+      expect(joined).toHaveLength(1);
+      await shared.db.close();
     });
   }, 15000);
 
