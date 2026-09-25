@@ -16,6 +16,7 @@ import {
   readExpoAssetBytes,
 } from '../infrastructure/expo-media';
 import { createSqliteFamilyReceiveCache } from '../infrastructure/family-receive-cache';
+import { createExpoFamilyReceiveFiles } from '../infrastructure/family-receive-files';
 import { createSqliteRepositories, openLampyDatabase } from '../infrastructure/sqlite';
 import type { SqlDatabase } from '../infrastructure/sql';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
@@ -86,7 +87,7 @@ export function createIosFamilyUseCases(deps: {
     pending: createSqlitePendingFamilyOperationStore(deps.db),
     idempotencyKey: deps.idempotencyKey,
     personal: deps.personal,
-    receiveCache: deps.receiveCache ?? createSqliteFamilyReceiveCache(deps.db),
+    receiveCache: deps.receiveCache ?? createSqliteFamilyReceiveCache(deps.db, createExpoFamilyReceiveFiles()),
   });
 }
 

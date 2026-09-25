@@ -8,15 +8,15 @@
 
 | 项 | 决策 | 理由 |
 | --- | --- | --- |
-| 列表 | `GET /v1/families/:familyId/shares` 只返回：有效会话 + 当前 active 成员 + `audienceUserIds` 含本人 + 分享状态为 active | 后来加入者不在 F3 名单里，默认空列表。不是时间线。 |
+| 列表 | `GET /v1/families/:familyId/shares` 只返回：有效会话 + 当前 active 成员 + `audienceUserIds` 含本人 + **当前** `joinedAt <= sharedAt` + 分享状态为 active | 后来加入者、以及移除后重新加入的同一 userId，默认不可见。不是时间线。 |
 | 单条快照 | 沿用 F3 `GET .../shares/:shareId`，每次再核会话、成员、audience、状态 | 缓存存在不是授权证明。 |
 | 媒体读取 | **新路径** `GET .../shares/:shareId/media/:objectId` 与 `/content`。F2 `GET /v1/media/:id` 仍仅上传者可读 | 已知 objectId 不能绕过快照授权。objectId 必须出现在该分享白名单里。 |
 | 分享状态 | F4 视已存行为 `active`。尚无撤回列；F5 再持久化 `revoked`。读取时若将来不是 active 则当不存在 | 本切片不实现撤回。 |
 | 哈希 | 授权媒体元数据返回服务端 `contentSha256`。客户端写入前必须比对长度与哈希 | 缺文件或哈希不符不得标为已接收。 |
-| 缓存键 | `(userId, familyId, shareId)`。文件在 `family-cache/`，不进 `lampy-assets/` | 按登录账号及家庭隔离。 |
+| 缓存键 | `(userId, familyId, shareId)`。字节写在应用 `family-cache/` 目录，不进内存 Map，不进 `lampy-assets/` | 重启后须仍能读文件。重建时逐项核验，缺文件或哈希不符则降为 `listed`。 |
 | 接收状态 | `listed` / `receiving` / `received` / `failed`。只有全部媒体提交后才是 `received` | 半条下载、写失败、进程重启都不得展示「完整接收」。 |
 | 临时文件 | `{shareId}/{objectId}.part`。核验通过才改名；失败删除 `.part`；退出/登出删除该账号该家目录 | 重试幂等：已核验文件可跳过。 |
-| 展示 | 资格 `ready` 才读缓存。离线、401、成员无法确认、退出、被移除、解散：立即隐藏。`listed`/`receiving`/`failed` 只写「家里有这条分享」 | 不得用 F3 保存成功推断「家人已收到」。 |
+| 展示 | 只展示**本次成功取回**的授权列表。刷新会隔离列表里没有的缓存行。请求失败则隐藏，不用旧缓存补位。`listed`/`receiving`/`failed` 只写「家里有这条分享」 | 不得用 F3 保存成功推断「家人已收到」。 |
 | 个人库 | 接收快照不进 `moments`，不得写成 `origin.created`，不出现在最近/回看 | 个人文字、照片、录音、回看继续可离线。 |
 
 ## 授权矩阵（读取）
@@ -25,8 +25,8 @@
 | --- | --- | --- | --- | --- |
 | 未登录 | 401 | 401 | 401 | 401 |
 | 已登录、非该家成员 | 404 | 404 | 404 | 仅本人上传对象 |
-| 分享时已是成员（在 audience） | 可见该条 | 200 | 200（objectId 在快照内） | 仅本人上传对象 |
-| 后来加入者（不在 audience） | 不含该条 | 403 | 403 | 仅本人上传对象 |
+| 分享时已是成员（在 audience，且当前 `joinedAt <= sharedAt`） | 可见该条 | 200 | 200（objectId 在快照内） | 仅本人上传对象 |
+| 后来加入者，或移除后重新加入（`joinedAt > sharedAt`） | 不含该条 | 403 | 403 | 仅本人上传对象 |
 | 知道 objectId 但不在该快照 | — | — | 403 | 非上传者 403 |
 | 退出 / 被移除 / 解散后 | 404 | 404 | 404 | 仅本人上传对象 |
 | 离线 / 权限无法确认 | App 不展示 | 不展示 | 不展示 | 不展示家庭内容 |
@@ -78,7 +78,7 @@ family_received_media
 
 ## 客户端
 
-`listFamilyInbox()` / `refreshFamilyInbox()`：成员不是 `ready` 则 `{ kind: 'hidden' }`，不展示缓存行。
+`listFamilyInbox()` / `refreshFamilyInbox()`：先向服务端取授权列表。成员不是 `ready` 或请求失败 → `{ kind: 'hidden' }`，不用旧缓存补位。成功则只展示该列表，并隔离不再可见的缓存行。重建 SQLite 实例时核验磁盘文件，失效则降为待接收。
 
 `receiveShare(shareId)`：走 F4 媒体路径，不走 F2 上传者 GET。成功只表示**本机已写入家庭缓存**。
 

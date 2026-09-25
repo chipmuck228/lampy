@@ -231,6 +231,37 @@ describe('family share snapshot commands', () => {
     ).rejects.toMatchObject({ code: FAMILY_ERROR.NOT_IN_FAMILY });
   });
 
+  it('does not restore old shares after a member is removed and joins again', async () => {
+    let now = Date.parse('2026-09-25T04:00:00.000Z');
+    const commands = createFamilyCommands({
+      store: createFamilyStore(),
+      apple: createMapAppleVerifier({
+        apple_alice: { appleSubject: 'apple.alice' },
+        apple_bob: { appleSubject: 'apple.bob' },
+      }),
+      clock: { now: () => new Date(now) },
+      mediaBlobs: createMemoryMediaBlobStore(),
+    });
+    const alice = await commands.signInWithApple('apple_alice');
+    const family = await commands.createFamily(alice.sessionToken, 'fam-1');
+    const firstInvite = await commands.inviteMember(alice.sessionToken, family.familyId, 'inv-1');
+    const bob = await commands.signInWithApple('apple_bob');
+    await commands.acceptInvitation(bob.sessionToken, firstInvite.code, 'accept-1');
+    now += 60_000;
+    const shared = await commands.shareMoment(alice.sessionToken, family.familyId, textShare());
+    expect((await commands.listVisibleShares(bob.sessionToken, family.familyId)).shares).toHaveLength(1);
+    now += 60_000;
+    await commands.removeMember(alice.sessionToken, family.familyId, bob.userId);
+    now += 60_000;
+    const secondInvite = await commands.inviteMember(alice.sessionToken, family.familyId, 'inv-2');
+    await commands.acceptInvitation(bob.sessionToken, secondInvite.code, 'accept-2');
+    expect((await commands.listVisibleShares(bob.sessionToken, family.familyId)).shares).toEqual([]);
+    await expect(commands.getShare(bob.sessionToken, family.familyId, shared.shareId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.FORBIDDEN,
+    });
+    expect(shared.audienceUserIds).toContain(bob.userId);
+  });
+
   it('does not save a share when selected media cannot be read', async () => {
     const { commands, blobs, store } = setup();
     const alice = await commands.signInWithApple('apple_alice');

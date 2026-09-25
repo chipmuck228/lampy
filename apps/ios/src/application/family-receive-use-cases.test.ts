@@ -14,6 +14,7 @@ import {
   createMemoryFamilyReceiveCache,
   createSqliteFamilyReceiveCache,
 } from '../infrastructure/family-receive-cache';
+import { createNodeFamilyReceiveFiles } from '../infrastructure/family-receive-files';
 import { createPendingFamilyOperationDisk, createPendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 import { openPreparedNodeSqliteDatabase } from '../infrastructure/node-sqlite';
@@ -221,53 +222,170 @@ describe('family receive cache use cases', () => {
     expect(receiveCache.media.filter((row) => row.storageKey.endsWith('.part'))).toHaveLength(0);
   });
 
-  it('keeps receive rows isolated by account and after reopening SQLite', async () => {
+  it('persists media files across database rebuild and demotes received rows when files are gone', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'lampy-f4-cache-'));
     try {
       const file = path.join(dir, 'lampy.db');
-      const files = new Map<string, Uint8Array>();
-      const firstDb = await openPreparedNodeSqliteDatabase(file);
-      const cache = createSqliteFamilyReceiveCache(firstDb, files);
+      const cacheDir = path.join(dir, 'family-cache');
       const commands = createCommands();
-      const alice = actor(commands);
+      const aliceCmd = await commands.signInWithApple('apple_alice');
+      const family = await commands.createFamily(aliceCmd.sessionToken, 'fam-1');
+      const invite = await commands.inviteMember(aliceCmd.sessionToken, family.familyId, 'inv-1');
+      const bobCmd = await commands.signInWithApple('apple_bob');
+      await commands.acceptInvitation(bobCmd.sessionToken, invite.code, 'accept-1');
+      const media = await commands.uploadMedia(aliceCmd.sessionToken, {
+        bytes: sampleJpegBytes(),
+        mimeType: 'image/jpeg',
+      });
+      const shared = await commands.shareMoment(aliceCmd.sessionToken, family.familyId, {
+        sourceMomentId: 'moment_gate',
+        sourceRevision: 1,
+        note: '门口的风',
+        emotion: '',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [media.objectId],
+        expectedMediaCount: 1,
+      });
+      const firstDb = await openPreparedNodeSqliteDatabase(file);
+      const firstCache = createSqliteFamilyReceiveCache(firstDb, createNodeFamilyReceiveFiles(cacheDir));
       const bobSession = createMemoryFamilySessionStore();
       const bob = createFamilyUseCases({
         client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
         session: bobSession,
         pending: testPending(),
-        receiveCache: cache,
+        receiveCache: firstCache,
       });
-      await alice.family.signInWithApple('apple_alice');
-      const family = await alice.family.createFamily();
-      const invite = await alice.family.inviteMember(family.familyId);
       await bob.signInWithApple('apple_bob');
-      await bob.acceptInvitation(invite.code);
-      const draft = await alice.personal.restoreOrCreateDraft();
-      await alice.personal.updateDraftNote(draft.draftId, '门口的风');
-      const saved = await alice.personal.saveTextMoment(draft.draftId);
-      const preview = await alice.family.prepareSharePreview(saved.id);
-      expect(
-        (await alice.family.confirmShareMoment({ momentId: saved.id, sourceRevision: preview.sourceRevision }))
-          .status,
-      ).toBe('stored');
-      const inbox = await bob.refreshFamilyInbox();
-      if (inbox.kind !== 'ready') throw new Error('expected inbox');
-      await bob.receiveShare(inbox.items[0]!.shareId);
+      await bob.receiveShare(shared.shareId);
       const bobId = await bobSession.getUserId();
       expect(bobId).toBeTruthy();
       await firstDb.close();
 
       const secondDb = await openPreparedNodeSqliteDatabase(file);
-      const restored = createSqliteFamilyReceiveCache(secondDb, files);
-      const rows = await restored.list(bobId as string, family.familyId);
-      expect(rows[0]?.receiveStatus).toBe('received');
-      expect(rows[0]?.note ?? rows[0]?.snapshot.note).toBe('门口的风');
-      expect(await restored.list('usr_other', family.familyId)).toEqual([]);
-      await restored.isolateAccount(bobId as string);
-      expect(await restored.list(bobId as string, family.familyId)).toEqual([]);
+      const restored = createSqliteFamilyReceiveCache(secondDb, createNodeFamilyReceiveFiles(cacheDir));
+      const kept = await restored.list(bobId as string, family.familyId);
+      expect(kept[0]?.receiveStatus).toBe('received');
+      const stored = (await restored.listMedia(bobId as string, family.familyId, shared.shareId))[0];
+      expect(stored).toBeTruthy();
+      expect(await restored.readMediaBytes(stored!.storageKey)).toEqual(sampleJpegBytes());
       await secondDb.close();
+
+      await rm(cacheDir, { recursive: true, force: true });
+      const thirdDb = await openPreparedNodeSqliteDatabase(file);
+      const demoted = createSqliteFamilyReceiveCache(thirdDb, createNodeFamilyReceiveFiles(cacheDir));
+      const afterLoss = await demoted.list(bobId as string, family.familyId);
+      expect(afterLoss[0]?.receiveStatus).toBe('listed');
+      expect(afterLoss[0]?.receiveStatus).not.toBe('received');
+      await thirdDb.close();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it('shows only the latest authorized list and hides when the list request fails', async () => {
+    const commands = createCommands();
+    const receiveCache = createMemoryFamilyReceiveCache();
+    let failList = false;
+    const bob = createFamilyUseCases({
+      client: createFamilyApiClient(
+        createDispatchTransport(async (request) => {
+          if (failList && request.method === 'GET' && /\/shares$/.test(request.path)) {
+            throw new Error('family service down');
+          }
+          return dispatchFamilyApi(commands, request);
+        }),
+      ),
+      session: createMemoryFamilySessionStore(),
+      pending: testPending(),
+      receiveCache,
+    });
+    const alice = actor(commands);
+    await alice.family.signInWithApple('apple_alice');
+    const family = await alice.family.createFamily();
+    const invite = await alice.family.inviteMember(family.familyId);
+    await bob.signInWithApple('apple_bob');
+    await bob.acceptInvitation(invite.code);
+    const draft = await alice.personal.restoreOrCreateDraft();
+    await alice.personal.updateDraftNote(draft.draftId, '门口的风');
+    const saved = await alice.personal.saveTextMoment(draft.draftId);
+    const preview = await alice.family.prepareSharePreview(saved.id);
+    expect(
+      (await alice.family.confirmShareMoment({ momentId: saved.id, sourceRevision: preview.sourceRevision })).status,
+    ).toBe('stored');
+    const first = await bob.refreshFamilyInbox();
+    if (first.kind !== 'ready') throw new Error('expected ready');
+    const userId = receiveCache.shares[0]?.userId;
+    expect(userId).toBeTruthy();
+    receiveCache.shares.push({
+      userId: userId as string,
+      familyId: family.familyId,
+      shareId: 'shr_stale',
+      snapshotRevision: 1,
+      authorUserId: 'usr_alice',
+      snapshot: {
+        note: '旧的不可见分享',
+        emotion: '',
+        occurredAtPrecision: 'day',
+        media: [],
+        origin: { type: 'received', transmissionId: 'shr_stale', originalMomentId: 'm0', snapshotRevision: 1 },
+      },
+      sharedAt: '2026-09-25T01:00:00.000Z',
+      receiveStatus: 'received',
+      expectedMediaCount: 0,
+    });
+    const inbox = await bob.refreshFamilyInbox();
+    if (inbox.kind !== 'ready') throw new Error('expected ready');
+    expect(inbox.items.map((item) => item.shareId)).not.toContain('shr_stale');
+    expect(receiveCache.shares.map((row) => row.shareId)).not.toContain('shr_stale');
+
+    failList = true;
+    expect(await bob.refreshFamilyInbox()).toEqual({ kind: 'hidden', reason: 'unreachable' });
+    expect(receiveCache.shares.map((row) => row.shareId)).not.toContain('shr_stale');
+  });
+
+  it('does not show a share after the member is removed and joins again', async () => {
+    let now = Date.parse('2026-09-25T04:00:00.000Z');
+    const commands = createFamilyCommands({
+      store: createFamilyStore(),
+      apple: createMapAppleVerifier({
+        apple_alice: { appleSubject: 'apple.alice' },
+        apple_bob: { appleSubject: 'apple.bob' },
+      }),
+      clock: { now: () => new Date(now) },
+    });
+    const receiveCache = createMemoryFamilyReceiveCache();
+    const bob = createFamilyUseCases({
+      client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
+      session: createMemoryFamilySessionStore(),
+      pending: testPending(),
+      receiveCache,
+    });
+    const alice = actor(commands);
+    await alice.family.signInWithApple('apple_alice');
+    const family = await alice.family.createFamily();
+    const invite = await alice.family.inviteMember(family.familyId);
+    await bob.signInWithApple('apple_bob');
+    await bob.acceptInvitation(invite.code);
+    now += 60_000;
+    const draft = await alice.personal.restoreOrCreateDraft();
+    await alice.personal.updateDraftNote(draft.draftId, '门口的风');
+    const saved = await alice.personal.saveTextMoment(draft.draftId);
+    const preview = await alice.family.prepareSharePreview(saved.id);
+    expect(
+      (await alice.family.confirmShareMoment({ momentId: saved.id, sourceRevision: preview.sourceRevision })).status,
+    ).toBe('stored');
+    const first = await bob.refreshFamilyInbox();
+    if (first.kind !== 'ready') throw new Error('expected ready');
+    expect(first.items).toHaveLength(1);
+    const bobUserId = receiveCache.shares[0]?.userId;
+    expect(bobUserId).toBeTruthy();
+    now += 60_000;
+    await alice.family.removeMember(family.familyId, bobUserId as string);
+    now += 60_000;
+    const secondInvite = await alice.family.inviteMember(family.familyId);
+    await bob.acceptInvitation(secondInvite.code);
+    const again = await bob.refreshFamilyInbox();
+    expect(again).toEqual({ kind: 'ready', familyId: family.familyId, items: [] });
+    expect(receiveCache.shares).toEqual([]);
   });
 });

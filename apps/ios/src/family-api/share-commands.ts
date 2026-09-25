@@ -4,7 +4,7 @@ import { sha256MediaBytes } from './media-validate';
 import type { MediaBlobStore } from './media-blobs';
 import type { FamilyRepository, FamilyTx } from './repository';
 import { FamilyStoreConstraintError } from './repository';
-import type { ShareMediaView, ShareMomentInput, ShareRecord, ShareSnapshot, ShareView } from './types';
+import type { Membership, ShareMediaView, ShareMomentInput, ShareRecord, ShareSnapshot, ShareView } from './types';
 
 export type ShareCommands = {
   shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
@@ -92,6 +92,14 @@ async function requireUser(tx: FamilyTx, sessionToken: string | undefined, now: 
 
 function shareIsActive(_row: ShareRecord) {
   return true;
+}
+
+function canSeeShare(membership: Membership, share: ShareRecord) {
+  return (
+    shareIsActive(share) &&
+    share.audienceUserIds.includes(membership.userId) &&
+    membership.joinedAt <= share.sharedAt
+  );
 }
 
 async function requireActiveMember(tx: FamilyTx, familyId: string, userId: string) {
@@ -269,12 +277,10 @@ export function createShareCommands(deps: {
     async listVisibleShares(sessionToken, familyId) {
       return deps.repository.withTransaction(async (tx) => {
         const userId = await requireUser(tx, sessionToken, clock.now());
-        await requireActiveMember(tx, familyId, userId);
+        const membership = await requireActiveMember(tx, familyId, userId);
         const rows = await tx.listSharesInFamily(familyId);
         return {
-          shares: rows
-            .filter((row) => shareIsActive(row) && row.audienceUserIds.includes(userId))
-            .map(toView),
+          shares: rows.filter((row) => canSeeShare(membership, row)).map(toView),
         };
       });
     },
@@ -315,12 +321,12 @@ async function authorizeVisibleShare(
   now: Date,
 ) {
   const userId = await requireUser(tx, sessionToken, now);
-  await requireActiveMember(tx, familyId, userId);
+  const membership = await requireActiveMember(tx, familyId, userId);
   const row = await tx.findShare(shareId);
   if (!row || row.familyId !== familyId || !shareIsActive(row)) {
     throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
   }
-  if (!row.audienceUserIds.includes(userId)) {
+  if (!canSeeShare(membership, row)) {
     throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'This share is not available.');
   }
   return { userId, share: row };

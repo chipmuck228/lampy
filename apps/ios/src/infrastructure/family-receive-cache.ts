@@ -1,4 +1,6 @@
+import { sha256MediaBytes } from '../family-api/media-validate';
 import type { ShareSnapshot, ShareView } from '../family-api/types';
+import type { FamilyReceiveFileStore } from './family-receive-files';
 import type { SqlDatabase } from './sql';
 
 export type ReceivedShareStatus = 'listed' | 'receiving' | 'received' | 'failed';
@@ -39,6 +41,7 @@ export type FamilyReceiveCache = {
   markFailed(userId: string, familyId: string, shareId: string): Promise<ReceivedShareRecord>;
   isolateAccount(userId: string): Promise<void>;
   isolateFamily(userId: string, familyId: string): Promise<void>;
+  replaceVisible(userId: string, familyId: string, shares: ShareView[]): Promise<void>;
 };
 
 function snapshotFrom(share: ShareView): ShareSnapshot {
@@ -167,6 +170,25 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
         if (key.startsWith(`${userId}/${familyId}/`)) files.delete(key);
       }
     },
+    async replaceVisible(userId, familyId, visible) {
+      const keep = new Set(visible.map((share) => share.shareId));
+      for (const share of visible) {
+        await this.upsertListed(userId, share);
+      }
+      for (const row of shares.filter((item) => item.userId === userId && item.familyId === familyId)) {
+        if (keep.has(row.shareId)) continue;
+        const index = shares.indexOf(row);
+        if (index >= 0) shares.splice(index, 1);
+        for (let i = media.length - 1; i >= 0; i -= 1) {
+          if (media[i]?.userId === userId && media[i]?.familyId === familyId && media[i]?.shareId === row.shareId) {
+            media.splice(i, 1);
+          }
+        }
+        for (const key of [...files.keys()]) {
+          if (key.startsWith(`${userId}/${familyId}/${row.shareId}/`)) files.delete(key);
+        }
+      }
+    },
   };
 }
 
@@ -208,10 +230,7 @@ function shareFrom(row: ShareRow): ReceivedShareRecord {
   };
 }
 
-export function createSqliteFamilyReceiveCache(
-  db: SqlDatabase,
-  files: Map<string, Uint8Array> = new Map(),
-): FamilyReceiveCache {
+export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyReceiveFileStore): FamilyReceiveCache {
   async function find(userId: string, familyId: string, shareId: string) {
     const row = await db.getFirst<ShareRow>(
       `SELECT user_id, family_id, share_id, snapshot_revision, author_user_id, snapshot_json, shared_at, receive_status, expected_media_count
@@ -248,21 +267,67 @@ export function createSqliteFamilyReceiveCache(
     return row;
   }
 
+  async function listMedia(userId: string, familyId: string, shareId: string) {
+    const rows = await db.getAll<MediaRow>(
+      `SELECT user_id, family_id, share_id, object_id, mime_type, byte_length, content_sha256, storage_key, status
+       FROM family_received_media WHERE user_id = ? AND family_id = ? AND share_id = ?`,
+      [userId, familyId, shareId],
+    );
+    return rows.map((row) => ({
+      userId: row.user_id,
+      familyId: row.family_id,
+      shareId: row.share_id,
+      objectId: row.object_id,
+      mimeType: row.mime_type,
+      byteLength: row.byte_length,
+      contentSha256: row.content_sha256,
+      storageKey: row.storage_key,
+      status: row.status,
+    }));
+  }
+
+  async function demote(row: ReceivedShareRecord) {
+    await db.run(
+      `UPDATE family_received_media SET status = 'failed' WHERE user_id = ? AND family_id = ? AND share_id = ?`,
+      [row.userId, row.familyId, row.shareId],
+    );
+    await files.removePrefix(`${row.userId}/${row.familyId}/${row.shareId}`);
+    return saveShare({ ...row, receiveStatus: 'listed' });
+  }
+
+  async function reconcile(row: ReceivedShareRecord) {
+    if (row.receiveStatus !== 'received') return row;
+    const media = await listMedia(row.userId, row.familyId, row.shareId);
+    if (media.length !== row.expectedMediaCount || media.some((item) => item.status !== 'stored')) {
+      return demote(row);
+    }
+    for (const item of media) {
+      try {
+        const bytes = await files.read(item.storageKey);
+        if (bytes.length !== item.byteLength || sha256MediaBytes(bytes) !== item.contentSha256) {
+          return demote(row);
+        }
+      } catch {
+        return demote(row);
+      }
+    }
+    return row;
+  }
+
   return {
-    list(userId, familyId) {
-      return db
-        .getAll<ShareRow>(
-          `SELECT user_id, family_id, share_id, snapshot_revision, author_user_id, snapshot_json, shared_at, receive_status, expected_media_count
-           FROM family_received_shares WHERE user_id = ? AND family_id = ?`,
-          [userId, familyId],
-        )
-        .then((rows) => rows.map(shareFrom));
+    async list(userId, familyId) {
+      const rows = await db.getAll<ShareRow>(
+        `SELECT user_id, family_id, share_id, snapshot_revision, author_user_id, snapshot_json, shared_at, receive_status, expected_media_count
+         FROM family_received_shares WHERE user_id = ? AND family_id = ?`,
+        [userId, familyId],
+      );
+      return Promise.all(rows.map((row) => reconcile(shareFrom(row))));
     },
     find,
     async upsertListed(userId, share) {
       const existing = await find(userId, share.familyId, share.shareId);
       if (existing?.receiveStatus === 'received' && existing.snapshotRevision === share.sourceRevision) {
-        return existing;
+        return reconcile(existing);
       }
       return saveShare(fromShare(userId, share, existing?.receiveStatus === 'receiving' ? 'receiving' : 'listed'));
     },
@@ -271,8 +336,8 @@ export function createSqliteFamilyReceiveCache(
     },
     async saveStoredMedia(input) {
       const storageKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
-      files.delete(`${storageKey}.part`);
-      files.set(storageKey, input.bytes);
+      await files.remove(`${storageKey}.part`).catch(() => undefined);
+      await files.write(storageKey, input.bytes);
       const row: ReceivedMediaRecord = { ...input, storageKey, status: 'stored' };
       await db.run(
         `INSERT INTO family_received_media
@@ -298,28 +363,9 @@ export function createSqliteFamilyReceiveCache(
       );
       return row;
     },
-    async listMedia(userId, familyId, shareId) {
-      const rows = await db.getAll<MediaRow>(
-        `SELECT user_id, family_id, share_id, object_id, mime_type, byte_length, content_sha256, storage_key, status
-         FROM family_received_media WHERE user_id = ? AND family_id = ? AND share_id = ?`,
-        [userId, familyId, shareId],
-      );
-      return rows.map((row) => ({
-        userId: row.user_id,
-        familyId: row.family_id,
-        shareId: row.share_id,
-        objectId: row.object_id,
-        mimeType: row.mime_type,
-        byteLength: row.byte_length,
-        contentSha256: row.content_sha256,
-        storageKey: row.storage_key,
-        status: row.status,
-      }));
-    },
+    listMedia,
     async readMediaBytes(storageKey) {
-      const bytes = files.get(storageKey);
-      if (!bytes) throw new Error('family cache file is missing');
-      return bytes;
+      return files.read(storageKey);
     },
     async markReceived(userId, familyId, shareId) {
       const existing = await find(userId, familyId, shareId);
@@ -329,23 +375,42 @@ export function createSqliteFamilyReceiveCache(
     async markFailed(userId, familyId, shareId) {
       const existing = await find(userId, familyId, shareId);
       if (!existing) throw new Error('share cache row is missing');
-      for (const key of [...files.keys()]) {
-        if (key.startsWith(`${userId}/${familyId}/${shareId}/`) && key.endsWith('.part')) files.delete(key);
+      for (const item of await listMedia(userId, familyId, shareId)) {
+        await files.remove(`${item.storageKey}.part`).catch(() => undefined);
       }
       return saveShare({ ...existing, receiveStatus: 'failed' });
     },
     async isolateAccount(userId) {
       await db.run('DELETE FROM family_received_media WHERE user_id = ?', [userId]);
       await db.run('DELETE FROM family_received_shares WHERE user_id = ?', [userId]);
-      for (const key of [...files.keys()]) {
-        if (key.startsWith(`${userId}/`)) files.delete(key);
-      }
+      await files.removePrefix(userId);
     },
     async isolateFamily(userId, familyId) {
       await db.run('DELETE FROM family_received_media WHERE user_id = ? AND family_id = ?', [userId, familyId]);
       await db.run('DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ?', [userId, familyId]);
-      for (const key of [...files.keys()]) {
-        if (key.startsWith(`${userId}/${familyId}/`)) files.delete(key);
+      await files.removePrefix(`${userId}/${familyId}`);
+    },
+    async replaceVisible(userId, familyId, visible) {
+      const keep = new Set(visible.map((share) => share.shareId));
+      for (const share of visible) {
+        await this.upsertListed(userId, share);
+      }
+      const rows = await db.getAll<ShareRow>(
+        `SELECT user_id, family_id, share_id, snapshot_revision, author_user_id, snapshot_json, shared_at, receive_status, expected_media_count
+         FROM family_received_shares WHERE user_id = ? AND family_id = ?`,
+        [userId, familyId],
+      );
+      for (const row of rows) {
+        if (keep.has(row.share_id)) continue;
+        await db.run(
+          `DELETE FROM family_received_media WHERE user_id = ? AND family_id = ? AND share_id = ?`,
+          [userId, familyId, row.share_id],
+        );
+        await db.run(
+          `DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ? AND share_id = ?`,
+          [userId, familyId, row.share_id],
+        );
+        await files.removePrefix(`${userId}/${familyId}/${row.share_id}`);
       }
     },
   };

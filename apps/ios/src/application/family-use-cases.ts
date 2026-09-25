@@ -670,7 +670,7 @@ export function createFamilyUseCases(deps: {
     },
 
     async listFamilyInbox(): Promise<FamilyInboxView> {
-      return inboxFromMembership(await this.getMembership());
+      return this.refreshFamilyInbox();
     },
 
     async refreshFamilyInbox(): Promise<FamilyInboxView> {
@@ -678,14 +678,27 @@ export function createFamilyUseCases(deps: {
       if (membership.kind !== 'ready') {
         return hiddenInbox(membership) ?? { kind: 'hidden', reason: 'unconfirmed' };
       }
-      const { sessionToken, userId } = await requireAccount();
-      const listed = await deps.client.listVisibleShares(sessionToken, membership.familyId);
-      if (deps.receiveCache) {
-        for (const share of listed.shares) {
-          await deps.receiveCache.upsertListed(userId, share);
+      try {
+        const { sessionToken, userId } = await requireAccount();
+        const listed = await deps.client.listVisibleShares(sessionToken, membership.familyId);
+        const allowed = new Set(listed.shares.map((share) => share.shareId));
+        if (deps.receiveCache) {
+          await deps.receiveCache.replaceVisible(userId, membership.familyId, listed.shares);
         }
+        const rows = deps.receiveCache
+          ? (await deps.receiveCache.list(userId, membership.familyId)).filter((row) => allowed.has(row.shareId))
+          : [];
+        return {
+          kind: 'ready',
+          familyId: membership.familyId,
+          items: await Promise.all(rows.map((row) => toInboxItem(row))),
+        };
+      } catch (error) {
+        const appError = asApplicationError(error);
+        if (appError.code === 'UNAUTHENTICATED') return { kind: 'hidden', reason: 'unauthenticated' };
+        if (appError.code === 'NOT_IN_FAMILY') return { kind: 'hidden', reason: 'none' };
+        return { kind: 'hidden', reason: 'unreachable' };
       }
-      return inboxFromMembership(membership);
     },
 
     async receiveShare(shareId: string) {
@@ -752,20 +765,6 @@ export function createFamilyUseCases(deps: {
       }
     },
   };
-
-  async function inboxFromMembership(membership: FamilyMembershipView): Promise<FamilyInboxView> {
-    if (membership.kind !== 'ready') {
-      return hiddenInbox(membership) ?? { kind: 'hidden', reason: 'unconfirmed' };
-    }
-    const userId = await deps.session.getUserId();
-    if (!userId || !deps.receiveCache) return { kind: 'ready', familyId: membership.familyId, items: [] };
-    const rows = await deps.receiveCache.list(userId, membership.familyId);
-    return {
-      kind: 'ready',
-      familyId: membership.familyId,
-      items: await Promise.all(rows.map((row) => toInboxItem(row))),
-    };
-  }
 
   async function toInboxItem(row: ReceivedShareRecord): Promise<FamilyInboxItem> {
     const media = deps.receiveCache ? await deps.receiveCache.listMedia(row.userId, row.familyId, row.shareId) : [];

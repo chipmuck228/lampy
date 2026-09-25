@@ -133,7 +133,7 @@ GET /v1/families/:familyId/shares/:shareId/media/:objectId
 GET /v1/families/:familyId/shares/:shareId/media/:objectId/content
 ```
 
-每次读取再核会话、当前成员、F3 `audienceUserIds` 和分享状态。`GET /v1/media/:id` 仍仅上传者可读；接收必须走分享授权路径。已知 objectId 若不在该快照白名单里是 403。后来加入者列表为空。客户端写入 `(userId, familyId, shareId)` 家庭缓存，不进个人 `moments`。离线、401、成员无法确认、退出或被移除时立即隐藏；缓存存在不是当前授权。半条下载不得标为已接收。成功只表示本机缓存已写入，不是「家人已收到」。
+每次读取再核会话、当前成员、F3 `audienceUserIds`、当前 `joinedAt <= sharedAt` 和分享状态。`GET /v1/media/:id` 仍仅上传者可读；接收必须走分享授权路径。已知 objectId 若不在该快照白名单里是 403。后来加入者、以及移除后重新加入的同一账号，列表为空。客户端把媒体字节写入应用 `family-cache/`，不进个人 `moments`。刷新只展示本次授权列表；请求失败则隐藏，不用旧缓存补位。半条下载或重建后文件缺失不得标为已接收。成功只表示本机缓存已写入，不是「家人已收到」。
 
 ## 备份与恢复
 
