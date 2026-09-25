@@ -1,5 +1,6 @@
 import { ApplicationError } from '../application/errors';
 import type { FamilyView, InvitationView, MembershipListView, SignInResult } from '../family-api/types';
+import { isSafeFamilyApiBaseUrl } from './family-config';
 
 export type FamilyTransport = {
   request(input: {
@@ -22,6 +23,7 @@ export type FamilyApiClient = {
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
   dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
+  signOut(sessionToken: string): Promise<{ signedOut: true }>;
 };
 
 type ErrorBody = { error?: { code?: string; message?: string } };
@@ -93,6 +95,9 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     dissolveFamily(sessionToken, familyId) {
       return send({ method: 'POST', path: `/v1/families/${familyId}/dissolve`, sessionToken });
     },
+    signOut(sessionToken) {
+      return send({ method: 'POST', path: '/v1/auth/sign-out', sessionToken });
+    },
   };
 }
 
@@ -106,6 +111,12 @@ export function createFamilyHttpTransport(deps: {
     async request(input) {
       if (!baseUrl) {
         throw new ApplicationError('SERVER_UNREACHABLE', 'Family API base URL is not configured.');
+      }
+      if (!isSafeFamilyApiBaseUrl(baseUrl)) {
+        throw new ApplicationError(
+          'SERVER_UNREACHABLE',
+          'Family API must use HTTPS except on this device\'s local network.',
+        );
       }
       if (!fetchImpl) {
         throw new ApplicationError('SERVER_UNREACHABLE', 'No HTTP fetch is available.');

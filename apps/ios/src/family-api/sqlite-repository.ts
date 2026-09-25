@@ -134,6 +134,9 @@ function createSqliteTx(db: FamilySql): FamilyTx {
         [session.token, session.userId, session.expiresAt],
       );
     },
+    async deleteSession(token) {
+      await db.run('DELETE FROM family_sessions WHERE token = ?', [token]);
+    },
     async findFamily(familyId) {
       const row = await db.getFirst<FamilyRow>(
         'SELECT family_id, created_at, status FROM family_families WHERE family_id = ?',

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { isApplicationError } from '../application/errors';
 import type { InvitationView } from '../family-api/types';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { createFamilyRefreshGate } from './family-refresh';
 
 function errorText(error: unknown) {
   if (isApplicationError(error)) {
@@ -49,42 +50,59 @@ export default function FamilyScreen() {
   const [inviteCode, setInviteCode] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const refreshGate = useRef(createFamilyRefreshGate()).current;
 
   function hideFamilyContent() {
     setMembership(null);
     setInvites([]);
   }
 
-  const refresh = useCallback(async (): Promise<'ok' | 'invites-failed'> => {
-    hideFamilyContent();
+  const refresh = useCallback(async (
+    mode: 'revalidate' | 'follow-up' = 'follow-up',
+  ): Promise<'ok' | 'invites-failed' | 'stale'> => {
+    const generation = refreshGate.begin();
+    if (mode === 'revalidate') {
+      hideFamilyContent();
+    }
     if (!configured) {
       return 'ok';
     }
-    const apple = createExpoAppleIdentityTokenSource();
-    setAppleAvailable(await apple.isAvailable());
-    const family = await getFamilyUseCases();
-    const next = await family.getMembership();
-    setMembership(next);
-    if (next.kind === 'ready' && next.role === 'creator') {
-      try {
-        setInvites(await family.listPendingInvitations(next.familyId));
-      } catch {
+    try {
+      const apple = createExpoAppleIdentityTokenSource();
+      const available = await apple.isAvailable();
+      const family = await getFamilyUseCases();
+      const next = await family.getMembership();
+      if (!refreshGate.isCurrent(generation)) return 'stale';
+      setAppleAvailable(available);
+      setMembership(next);
+      if (next.kind === 'ready' && next.role === 'creator') {
+        try {
+          const listed = await family.listPendingInvitations(next.familyId);
+          if (!refreshGate.isCurrent(generation)) return 'stale';
+          setInvites(listed);
+        } catch {
+          if (!refreshGate.isCurrent(generation)) return 'stale';
+          setInvites([]);
+          return 'invites-failed';
+        }
+      } else {
         setInvites([]);
-        return 'invites-failed';
       }
-    } else {
-      setInvites([]);
+      return 'ok';
+    } catch (error) {
+      if (!refreshGate.isCurrent(generation)) return 'stale';
+      hideFamilyContent();
+      throw error;
     }
-    return 'ok';
-  }, [configured]);
+  }, [configured, refreshGate]);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       hideFamilyContent();
-      refresh()
+      refresh('revalidate')
         .then((result) => {
-          if (cancelled) return;
+          if (cancelled || result === 'stale') return;
           setMessage(result === 'invites-failed' ? '邀请列表暂时读不出来，家里的成员已经确认。' : null);
         })
         .catch((error) => {
@@ -106,7 +124,8 @@ export default function FamilyScreen() {
     try {
       const family = await getFamilyUseCases();
       await work(family);
-      const result = await refresh();
+      const result = await refresh('follow-up');
+      if (result === 'stale') return;
       setMessage(result === 'invites-failed' ? '邀请列表暂时读不出来，家里的成员已经确认。' : null);
     } catch (error) {
       setMessage(errorText(error));
@@ -306,7 +325,10 @@ export default function FamilyScreen() {
             accessibilityLabel="退出登录"
             testID="family-sign-out"
             disabled={busy}
-            onPress={() => run(async (family) => { await family.signOut(); })}
+            onPress={() => {
+              hideFamilyContent();
+              run(async (family) => { await family.signOut(); });
+            }}
             style={styles.hit}
           >
             <Text style={styles.action}>退出登录</Text>

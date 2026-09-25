@@ -20,7 +20,7 @@ Transmission 家庭目标、ReceivedSnapshot 存储、owner 与 `userId` 对齐�
 
 服务端 SQLite 家庭库、迁移、事务约束、production 与 test 隔离、iOS 系统 Sign in with Apple、Keychain 会话、最小家庭入口。规格 **F2 是媒体对象**，本切片不实现媒体或 Moment 分享。
 
-未完成 / 未验证：公网部署、真机 Apple 登录、生产 Apple 密钥。测试 token 与内存库 **不是** 生产闭环。
+未完成 / 未验证：公网部署、真机 Apple 登录、生产 Apple 密钥。测试 token 与内存库 **不是** 生产闭环。Phase 3B 生产就绪审计见 `FAMILY_PHASE_3B_PRODUCTION_AUDIT.md`：本机单实例可启动，真实用户家庭功能仍不可用。
 
 不做（仍禁止宣称）：Moment 分享、媒体上传、家庭时间线、接收快照、假成员。
 

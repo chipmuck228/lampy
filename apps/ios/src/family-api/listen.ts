@@ -83,10 +83,17 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
     }
   });
 
-  return new Promise<{ close: () => Promise<void>; port: number; host: string; banner: string }>((resolve) => {
+  return new Promise<{ close: () => Promise<void>; port: number; host: string; banner: string }>((resolve, reject) => {
+    const onError = (error: Error) => {
+      reject(error);
+    };
+    server.once('error', onError);
     server.listen(port, host, () => {
+      server.removeListener('error', onError);
+      const address = server.address();
+      const actualPort = typeof address === 'object' && address ? address.port : port;
       resolve({
-        port,
+        port: actualPort,
         host,
         banner: plan.banner,
         close: () =>

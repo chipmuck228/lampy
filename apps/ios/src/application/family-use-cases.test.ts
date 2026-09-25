@@ -106,6 +106,45 @@ describe('family use cases against a real in-process API', () => {
     expect((await personal.getMomentDetail(saved.id)).kind).toBe('ready');
   });
 
+  it('revokes the server session on signOut even if a later local retry happens', async () => {
+    const store = createFamilyStore();
+    const commands = createFamilyCommands({
+      store,
+      apple: createMapAppleVerifier({ apple_alice: { appleSubject: 'apple.alice' } }),
+      clock: clockAt('2026-09-25T02:00:00.000Z'),
+    });
+    const session = createMemoryFamilySessionStore();
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
+      session,
+      pending: testPending(),
+    });
+    await family.signInWithApple('apple_alice');
+    const token = await session.getSessionToken();
+    expect(token).toBeTruthy();
+    await family.createFamily();
+    await family.signOut();
+    expect(await session.getSessionToken()).toBeNull();
+    await expect(commands.listMembership(token || '')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+  });
+
+  it('clears the local session on signOut when the server is unreachable', async () => {
+    const session = createMemoryFamilySessionStore();
+    await session.setSession({ userId: 'usr_x', sessionToken: 'ses_x' });
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request() {
+          throw new Error('network down');
+        },
+      }),
+      session,
+      pending: testPending(),
+    });
+    await family.signOut();
+    expect(await session.getSessionToken()).toBeNull();
+    expect(await family.getMembership()).toEqual({ kind: 'unauthenticated' });
+  });
+
   it('shows members only after a successful create/accept and treats retry as the same family', async () => {
     const { family, personal } = createHarness();
     const saved = await savePersonalNote(personal, '个人还在');

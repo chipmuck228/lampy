@@ -73,6 +73,17 @@ describe('family identity and membership commands', () => {
     });
   });
 
+  it('revokes the session token on sign-out', async () => {
+    const { commands } = setup();
+    const alice = await signIn(commands, 'apple_alice');
+    await commands.createFamily(alice.sessionToken);
+    expect(await commands.signOut(alice.sessionToken)).toEqual({ signedOut: true });
+    await expect(commands.listMembership(alice.sessionToken)).rejects.toMatchObject({
+      code: FAMILY_ERROR.UNAUTHENTICATED,
+    });
+    expect(await commands.signOut(alice.sessionToken)).toEqual({ signedOut: true });
+  });
+
   it('creates a family once and rejects a second family for the same account', async () => {
     const { commands } = setup();
     const alice = await signIn(commands, 'apple_alice');

@@ -290,8 +290,15 @@ export function createFamilyUseCases(deps: {
     },
 
     async signOut() {
-      await deps.session.clearSession();
-      await cache.clear();
+      const token = await deps.session.getSessionToken();
+      try {
+        if (token) await deps.client.signOut(token);
+      } catch (error) {
+        asApplicationError(error);
+      } finally {
+        await deps.session.clearSession();
+        await cache.clear();
+      }
     },
   };
 }

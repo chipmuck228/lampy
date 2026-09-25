@@ -93,4 +93,27 @@ describe('family HTTP contract', () => {
     });
     expect((listed.body as { family: { familyId: string } | null }).family?.familyId).toBe(familyId);
   });
+
+  it('revokes the bearer session on sign-out', async () => {
+    const commands = api();
+    const alice = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/apple',
+      headers: {},
+      body: { identityToken: 'apple_alice' },
+    });
+    const aliceToken = (alice.body as { sessionToken: string }).sessionToken;
+    const signedOut = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/sign-out',
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(signedOut).toEqual({ status: 200, body: { signedOut: true } });
+    const listed = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: '/v1/me/membership',
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(listed.status).toBe(401);
+  });
 });

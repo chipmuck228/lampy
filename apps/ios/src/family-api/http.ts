@@ -87,6 +87,10 @@ export async function dispatchFamilyApi(
       return { status: 200, body: await commands.signInWithApple(readString(body, 'identityToken')) };
     }
 
+    if (method === 'POST' && path === '/v1/auth/sign-out') {
+      return { status: 200, body: await commands.signOut(token || '') };
+    }
+
     if (method === 'POST' && path === '/v1/families') {
       return { status: 200, body: await commands.createFamily(token || '', idempotencyKey) };
     }
