@@ -44,9 +44,9 @@
 
 ## PR-7 — 家庭（仅当真实能力存在）
 
-先审计邀请/成员/送达。禁止 mock 家庭 feed。Transmission 独立写入。
+产品决策已写入 ADR 0006 与 `FAMILY_*`。禁止 mock 家庭 feed。Transmission 独立写入。
 
-Phase 3A（文档，本轮）：`FAMILY_CAPABILITY_AUDIT.md`、`FAMILY_DOMAIN_MODEL.md`、`FAMILY_ACCESS_AND_SNAPSHOT.md`、`FAMILY_COMMANDS_AND_FAILURES.md`、`FAMILY_IMPLEMENTATION_SLICES.md`、`adr/0006-family-identity-and-sync.md`。未完成真实身份与权限前，不得做家庭 UI。后续切片从 F1 起，不从家庭时间页起。
+切片：先 F1（身份与成员，服务端裁定）。未完成真实身份与权限前，不得做家庭时间线或接收快照 UI。分享 / 媒体 / 时间线 / 快照另开独立 PR。
 
 ## PR-8 — 无障碍与品质
 

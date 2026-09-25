@@ -1,121 +1,104 @@
-# 家庭领域模型（Phase 3A 定义）
+# 家庭领域模型
 
-日期：2026-09-25。本文件定义「家庭需要什么」。除已引用的现有 Moment / Asset / Transmission 外，下列 Family / Membership / Invitation 均为**待实现定义**，不是当前代码。
+日期：2026-09-25。决策已锁定（ADR 0006）。Family / Membership / Invitation / Account 在本文件中是**规定**；未交付前不得写成仓库已实现。
 
-Lampy **不验证真实亲属关系**。「家庭」是由用户邀请组成、带明确边界的私人空间（产品指南 §7 说明文案、§16.2）。不得用「我们叫家庭」替代权限或 UGC 合规。
+Lampy **不验证真实亲属关系**。「家庭」是受邀请的私人空间（产品指南 §16.2）。
 
 ---
 
-## 1. 身份
+## 1. 实体
 
 ```text
-AccountIdentity     可登录、可跨设备恢复的人（当前不存在；现有 local-user 不能充当）
-DeviceIdentity      某次安装所在的设备（当前不存在）
-Family              受邀请的私人空间
-Membership          某账号在某家庭的资格
-Invitation          进入家庭的一次性或可过期请求
-Transmission        已有独立实体：某次分享/接收意图与状态
-Received Moment     已有 origin 类型：接收者自己的 Moment 副本
+Account        Lampy userId（稳定内部身份）
+AppleLink      appleSubject → userId；邮箱可选且不得作主键
+Session        服务端签发；证明登录，不证明成员资格
+Family         familyId + createdAt
+Membership     familyId + userId + role + status + joinedAt
+Invitation     invitationId + familyId + code + expiresAt + status
+Share/Transmission   后续切片；目标为家庭 + moment + revision
+ReceivedSnapshot     家庭授权缓存，不是个人 moments 行
 ```
 
-| 身份 | 当前仓库 | 家庭需要 |
-| --- | --- | --- |
-| 账号 | `local-user` 过渡字符串 | 稳定、可撤销、可删除的账号。未登录不得加入家庭。 |
-| 设备 | App 容器内的 SQLite | 可选绑定；授权证明必须来自账号+成员资格，不能只靠本机文件还在。 |
-| 家庭 | 无 | 独立 `familyId`，不是 Moment 上的布尔或 `visibility`。 |
-| 成员 | 无 | `accountId + familyId + role + status + joinedAt`。 |
-| 分享 | Transmission 无 `familyId` | 目标必须是家庭或明确收件人，不能只改 `accessSummary`。 |
+| 字段要点 | 规定 |
+| --- | --- |
+| `userId` | 服务端分配。与 `local-user` 分离。 |
+| `Membership.role` | `creator` \| `member`。创建者 = 邀请/移除/解散。成员 = 退出、且日后只能分享自己的记录。 |
+| `Membership.status` | `active` \| `left` \| `removed`。数据结构允许同一 user 多条家庭成员行，**第一版业务**拒绝加入第二个家庭。 |
+| `Invitation.status` | `pending` \| `accepted` \| `revoked` \| `expired`。一次性：accepted/revoked 后同一 code 不能再接受。 |
+| Share | 指向 `familyId` + `sourceMomentId` + `sourceRevision`。本轮不实现。 |
 
-`accessSummary.visibility` 仍只是**展示摘要**（`spec/moment-domain-model.md`）。允许在成功分享后把摘要写成 `shared_space`，但**权限以 Membership + Transmission / 快照为准**。
+`accessSummary.visibility` 仍只是展示摘要，不是授权账本。
 
 ---
 
 ## 2. 关系
 
 ```text
-Account 1 ──* Membership *── 1 Family
+Account 1 ──* Membership *── 1 Family     （v1 业务：一个 Account 最多一条 active Membership）
 Family   1 ──* Invitation
-Account  1 ──* Invitation（作为邀请人或被邀请人）
-Account  1 ──* Moment（ownerId = 该账号；默认 private）
-Moment   1 ──* Transmission（sourceMomentId；独立聚合）
-Transmission 0..1 ── 1 Received Moment（origin.transmissionId）
-Received Moment.ownerId = 接收者账号
-Received Moment.origin.originalMomentId = 发送者那份 Moment
-Asset 仍独立；Moment / 快照只持有 assetIds
+Account  1 ──* 个人 Moment（iOS SQLite，owner 语义仍为这份副本的主人；未登录为 local-user）
+Share    后续：Family 1 ──* Share
+ReceivedSnapshot 由 Share + 有效 Membership 授权；写入本机后仍受家庭权限约束
 ```
 
 约束：
 
-- 家庭管理员**不得**替成员创建私人 Moment（§16.2）。
-- 新 Moment 默认个人；进入家庭必须经过明确分享命令。
-- 一人同时能加入几个家庭：**待决定**（见 ADR 0006）。未决定前，实现不得假设「全局只有一个家庭」。
-- Transmission 现有字段是 `recipientId`（可选个人），没有家庭目标。把「分享到家庭」做成点对点伪造成员列表，或把 `visibility` 当权限，都不允许。需要的领域扩展列为共享领域提案，不在本 PR 改代码。
+- 未登录不得执行家庭命令。
+- 创建者不得读取其他成员未分享的个人记录。
+- 创建者退出前必须移交 `creator` 或解散家庭（移交命令本轮不实现，故创建者 `LeaveFamily` 应失败）。
+- 新成员看不到加入前的分享。
+- 不把个人内容默认同步到家庭。
 
 ---
 
-## 3. 所有权、可见性、快照、传输
-
-必须分开，禁止用一个布尔代替：
+## 3. 所有权 / 家庭可见性 / 快照 / 传输
 
 | 概念 | 含义 | 不是 |
 | --- | --- | --- |
-| 记录所有权 | `Moment.ownerId`：谁拥有**这份副本** | 谁曾看过、谁在家庭里 |
-| 家庭可见性 | 当前有效 Membership 是否允许在家庭时间页看见某次已授权分享 | `accessSummary.visibility` 单独取值 |
-| 接收者快照 | 接收者名下、钉在 `snapshotRevision` 的 Received Moment + 其 Asset 引用 | 对发送者原 Moment 的实时查询 |
-| 传输状态 | Transmission.status 及带证据的时间戳 | UI 文案、本地缓存文件还在 |
+| 个人所有权 | iOS 个人库里的 Moment；未登录也可用 | 家庭成员资格 |
+| 登录身份 | `userId` + 有效 Session | 家庭成员 |
+| 家庭可见性 | 服务端：active Membership + 该分享对加入时刻可见 | 本机文件还在 |
+| 接收快照 | 钉在 `sourceRevision` 的家庭缓存 | 个人 `moments` 表里的普通记录 |
+| 传输阶段 | 等待上传 / 服务端已保存 / 接收设备已写入 | `Transmission.sent` |
 
-现有领域已经把「收下别人的 Moment」定义为**接收者自己的新 Moment**（`origin.type = received`，指向 `transmissionId` / `originalMomentId` / `snapshotRevision`）。家庭接收应沿用该方向，而不是在原 Moment 上加 `isShared`。
+编辑个人原件 **不** 改变已分享 revision。媒体分享不得带 `localUri`。首版分享不含 `context.people`；确认 UI 必须列出将发送的字段。
 
 ---
 
-## 4. 成员资格变化时，历史内容与媒体
+## 4. 资格变化（已决定）
 
-产品与领域**没有**写死后的读权。下表区分：已由现有设计推出的部分，以及必须单列的待决定。
-
-| 事件 | 发送者自己的原 Moment | 家庭时间页（仍是成员的人） | 当事人已落盘的 Received Moment / 媒体 | 未决 |
+| 事件 | 个人原 Moment | 现成员看家庭内容 | 当事人在 App 内看接收快照 | 设备外已导出副本 |
 | --- | --- | --- | --- | --- |
-| 成员加入 | 不变、仍默认个人 | 只能看到**加入后**按规则授权的内容；加入前历史是否回溯 | 无 | **待决定**：加入前已分享内容是否对新人可见 |
-| 主动退出 | 本人所有权不变 | 该人不再出现在家庭时间页 | 已落盘快照是否仍可在「个人收到」里读 | **待决定**：退出后快照保留 / 只读 / 删除 |
-| 被移除 | 本人所有权不变 | 该人不再出现在家庭时间页 | 同上 | **待决定**：被移除后快照策略是否与主动退出相同 |
-| 分享撤回 | 原 Moment 仍在个人 | 家庭时间页不再把该 Transmission 当作有效分享 | 已落盘快照是否删除或保留为「已撤回」 | **待决定** |
-| 家庭解散 | 各人自己的原 Moment 仍私有 | 家庭时间页不再存在 | 各人已落盘快照 | **待决定**：解散是否等价于对所有人撤回；谁有权解散 |
+| 加入 | 不变 | 仅加入**之后**的分享 | 尚无（本轮不接收） | — |
+| 主动退出（成员） | 不删 | 否 | **否**；清理家庭缓存 | 不承诺收回 |
+| 被移除 | 不删 | 否 | **否**；清理家庭缓存 | 不承诺收回 |
+| 分享撤回 | 不删原件 | 该分享否 | **否**（该分享）；清理该缓存 | 不承诺收回 |
+| 解散 | 不删各人原件 | 否 | **否**；清理家庭缓存 | 不承诺收回 |
+| 无法确认权限 / 离线家庭 | 个人库可用 | **不展示** | **不展示** | — |
+| 个人归档 | 仍在个人库 | 不自动撤回已分享 | 仍按分享与成员资格 | — |
+| 删除个人原件 | 原件按删除命令 | 已分享快照是否仍对现成员可见：分享切片定义；**不**等于撤回 | — | — |
+| 删除账号 | 另定义 | 成员资格与分享随账号删除策略走 | 清理该账号家庭缓存 | 不承诺收回他人导出 |
 
-在未决定前：
-
-- 实现不得默认「一旦收到永远可看」，也不得默认「退出即粉碎已接收文件」。
-- 实现不得让退出/移除改变**他人**私人 Moment 的 `ownerId`。
-- 本机还存在一份 JSON / 文件，**不能**单独证明当前仍有家庭读取权（见 `FAMILY_ACCESS_AND_SNAPSHOT.md`）。
-
----
-
-## 5. 角色（最小集合，超出部分待决定）
-
-可从产品推出的最小角色：
-
-| 角色 | 可做 | 不可做 |
-| --- | --- | --- |
-| 成员 | 查看当前授权的家庭内容；把自己的个人 Moment 明确分享到该家庭；主动退出 | 替别人创建私人记录；未确认就分享 |
-| 邀请人 | 在规则允许时发出邀请 | 未决定前不得假设任何成员都能邀请 |
-
-**待决定**：是否存在管理员；谁可移除他人；谁可解散家庭；邀请是否需管理员。
-
-没有角色实现前，UI 不得画出管理员开关或成员列表假数据。
+个人归档 ≠ 撤回分享 ≠ 删除原件 ≠ 删除账号。
 
 ---
 
-## 6. 与现有生命周期的衔接
+## 5. 状态
 
-- 只有 `active` Moment 可被分享：微信 `passMoment` 已如此（`spec/moment-lifecycle.md`）。家庭分享应保持这条，除非另开 ADR。
-- 草稿不得自动分享（产品指南 §9.2 / ADR 0004）。
-- `archived` / `trashed` 不可新建分享（现有 `passMoment` 已拒绝）。已分享后归档/回收对家庭页的影响：**待决定**。
-- 永久删除影响 Transmission 引用（`spec/moment-lifecycle.md`）。家庭实现必须先定义引用还在时的读失败，而不是静默换成别人的记录。
+### Membership
 
----
+`active` → `left`（成员 Leave）  
+`active` → `removed`（创建者 Remove）  
+解散：家庭 `dissolved`，所有 active 成员不再有效。
 
-## 7. 隐私默认值（本轮锁定）
+创建者不能 `left`，除非已移交或改为解散。
 
-- 新内容默认个人。
-- 不把个人内容默认同步到家庭。
-- 不把 `local-user` 升级解释成已有账号系统。
-- 不在未实现邀请时诱导「邀请陌生人」。
-- 展示词「家庭」不改存储 Key、不改 Moment 字段名。
+### Invitation
+
+`pending` → `accepted` \| `revoked` \| `expired`（到期或接受时服务端判定）  
+终态不可再接受。
+
+### 传输（后续切片用语，不写入现有 Transmission.status）
+
+`upload-pending` → `server-stored` → `receiver-written`  
+本地 `sent` 只表示历史微信意图或未确认出站，不得显示「家人已收到」。

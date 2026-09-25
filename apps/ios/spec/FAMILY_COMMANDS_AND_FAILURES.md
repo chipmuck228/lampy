@@ -1,145 +1,72 @@
-# 家庭命令、错误与失败（Phase 3A）
+# 家庭命令与失败
 
-日期：2026-09-25。下列命令**尚未实现**。错误码名称是提案；写入共享 `ERROR_CODES` 必须另开领域 PR。没有网络确认时，UI 不得显示「家人已收到」。
+日期：2026-09-25。下列命令是规定。F1 实现身份与成员子集；分享类标「未交付」。不得用本地假成员或 mock 网络成功宣称完成。
 
----
-
-## 1. 传输状态与证据
-
-现有领域状态（`domain/transmission/transmission.types.d.ts`）：
-
-`created` | `sent` | `received` | `declined` | `expired` | `revoked`
-
-**没有** `queued`、`delivered`。
-
-| 产品想说的话 | 允许的证据 | 当前仓库能证明什么 | UI 在证据不足时 |
-| --- | --- | --- | --- |
-| 已记下分享意图 | 本地已写入合法 Transmission | `createLocalPassTransmission` 的 `sent` + `sentAt`（微信）；iOS 无 | 「已记下要分享，还没送到家庭」 |
-| 已进入出站队列 | 本机队列行 + 幂等键；**领域尚无 queued** | 无 | 不得用 `sent` 冒充排队 |
-| 服务端已接受 | 服务端 id / 签名时间；**不是**本地 `sent` | 无 | 不得写「已送达」 |
-| 对端已收到 | 接收端回执或服务端 `received` + `receivedAt` | 仅有枚举和微信 nearby mock | **禁止**「家人已收到」 |
-| 已撤回 | 带证据的 `revoked` 迁移 | 枚举有、命令无 | 保持原状态并说明未确认 |
-
-`queued` / `delivered` 若要成为领域状态，必须先改共享 Transmission 契约（提案，见 ADR 0006）。在此之前，application 可以用**本地出站作业**表达排队，但不得把它写进 Transmission.status。
+服务端对每个写/读家庭请求：校验 Session → 解析 `userId` → 再查 Membership / Invitation。客户端仅在真实成功响应后展示家庭或成员。
 
 ---
 
-## 2. 命令
+## 1. F1 命令（本轮范围）
 
-未标明的字段不得从 `visibility` 或本机文件存在性推断。
+| 命令 | 前置 | 成功 | 失败 | 重试 |
+| --- | --- | --- | --- | --- |
+| `SignInWithApple` | 有效 identity token | 稳定 `userId` + Session。**不**创建 Membership | token 无效 / 校验不可达 → 不登录 | 不重复分配不同 userId（同一 Apple `sub`） |
+| `CreateFamily` | 已登录；无 active Membership | 一个 Family；调用者为 `creator` | 未登录；已有家庭 | 幂等键：同一结果，不建第二家 |
+| `InviteMember` | 调用者是该家 `creator` | `pending` 邀请 + 限时 code | 未登录；非创建者；家庭已解散 | 幂等键可返回同一 pending 邀请 |
+| `RevokeInvitation` | 创建者；邀请仍 `pending` | `revoked` | 非创建者；已终态 | 已 revoked 再调 = 成功幂等 |
+| `AcceptInvitation` | 已登录；code 有效 pending 未过期；无 active Membership | `accepted` + 一条 `member` Membership | 未登录；过期/撤销/已接受；已有家庭；家庭解散 | 同一 user + 同一已接受邀请 = 幂等返回该 Membership |
+| `ListMembership` | 已登录 | 当前 Family + active 成员（无家庭则空） | 令牌无效 | 只读；失败不改本地个人库 |
+| `LeaveFamily` | 已登录；active **member**（非 creator） | Membership `left`；清理该端家庭缓存 | 创建者未移交；未登录；无家庭 | 已 left 再调 = 幂等成功 |
+| `RemoveMember` | 创建者；目标是其他 active 成员 | 目标 `removed` | 非创建者；目标是自己；目标已不在 | 已 removed 再调 = 幂等 |
+| `DissolveFamily` | 创建者 | 家庭 `dissolved`；成员全部失效 | 非创建者 | 已解散再调 = 幂等 |
 
-### 2.1 InviteMember
-
-| | |
-| --- | --- |
-| 前置 | 邀请人账号已认证；目标家庭存在；邀请人角色允许邀请（角色规则 **待决定**）；被邀请人可识别且尚未是有效成员 |
-| 结果 | 一条 Invitation：`id`、`familyId`、`inviterId`、`inviteeRef`、`expiresAt?`、`status=pending` |
-| 幂等键 | `invite:{familyId}:{inviteeRef}:{round}`。同一 pending 不重复建 |
-| 错误 | `FAMILY_NOT_FOUND` / `FAMILY_FORBIDDEN` / `FAMILY_ALREADY_MEMBER` / `FAMILY_INVITE_INVALID` / `ACCOUNT_UNAUTHENTICATED` |
-
-重复点击：返回同一 Invitation。超时但服务端已成功：用幂等键拉取，禁止第二条 pending。
-
-### 2.2 AcceptInvitation
-
-| | |
-| --- | --- |
-| 前置 | 当前账号是被邀请人；邀请 `pending` 且未过期；家庭仍存在 |
-| 结果 | Membership `status=active`；邀请 `accepted` |
-| 幂等键 | `accept:{invitationId}` |
-| 错误 | `FAMILY_INVITE_EXPIRED` / `FAMILY_INVITE_NOT_FOUND` / `FAMILY_ALREADY_MEMBER` / `FAMILY_DISSOLVED` |
-
-已是成员再接受：返回现有 Membership，不建第二条。
-
-### 2.3 DeclineInvitation
-
-前置：被邀请人 + pending。结果：邀请 `declined`。幂等键：`decline:{invitationId}`。已 declined 再点：原样返回。
-
-### 2.4 LeaveFamily
-
-| | |
-| --- | --- |
-| 前置 | 当前账号对该家庭有 `active` Membership |
-| 结果 | Membership `left` + `leftAt`。**不**改变本人 Moment.ownerId |
-| 幂等键 | `leave:{familyId}:{accountId}:{membershipRevision}` |
-| 错误 | `FAMILY_NOT_MEMBER` / `ACCOUNT_UNAUTHENTICATED` |
-
-退出后家庭页内容与已落盘快照：**待决定**（见领域模型 §4）。命令本身不得删除他人记录。
-
-最后一位成员离开是否解散家庭：**待决定**。
-
-### 2.5 RemoveMember
-
-| | |
-| --- | --- |
-| 前置 | 操作者角色允许移除（**待决定**）；目标是该家庭 active 成员；不得用此命令删私人 Moment |
-| 结果 | 目标 Membership `removed` |
-| 幂等键 | `remove:{familyId}:{targetAccountId}:{membershipRevision}` |
-| 错误 | `FAMILY_FORBIDDEN` / `FAMILY_NOT_MEMBER` |
-
-### 2.6 ShareMomentToFamily
-
-| | |
-| --- | --- |
-| 前置 | 发送者账号已认证；是 Moment.ownerId；Moment `lifecycle.status = active`（对齐现有 `passMoment`）；目标家庭存在；发送者对该家庭 Membership 有效；用户已明确确认「分享到家庭」 |
-| 结果 | Transmission：`sourceMomentId`、`sourceRevision`、`senderId`、家庭目标（**现有模型无 familyId，需领域提案**）。本地意图可先落盘。`status` 在未有网络确认前**不得**被 UI 解释为已送达 |
-| 幂等键 | 沿用并扩展现有 `tx:local:pass:{momentId}:{revision}`，家庭实现必须纳入 `familyId`，避免同一 revision 对两个家庭撞键 |
-| 错误 | `MOMENT_NOT_FOUND` / `MOMENT_FORBIDDEN` / `MOMENT_INVALID_TRANSITION` / `FAMILY_NOT_MEMBER` / `FAMILY_NOT_FOUND` / `TRANSMISSION_INVALID` |
-
-精确 id，禁止回退列表第一条（`test/pass-moment.test.js` 已锁定微信侧）。失败时 Moment 留在个人范围（产品指南 §9.5）。
-
-草稿、空内容、非 owner：拒绝且不写 Transmission。
-
-### 2.7 ReceiveShare
-
-| | |
-| --- | --- |
-| 前置 | 接收者账号已认证；对该家庭 Membership 有效（若目标是家庭）；Transmission 对接收者可见且未 `revoked` / `expired`；尚未物化同一幂等键的 Received Moment |
-| 结果 | 接收者名下新 Moment，`origin.type=received`，三件套完整；按快照规则挂 Asset |
-| 幂等键 | `receive:{transmissionId}:{recipientId}` |
-| 错误 | `FAMILY_FORBIDDEN` / `TRANSMISSION_REVOKED` / `TRANSMISSION_NOT_FOUND` / `MOMENT_INVALID_ORIGIN` |
-
-微信 `receiveNearbyLight` **不是**本命令。禁止把 nearby-mock 接进 iOS。
-
-部分媒体失败：正文仍可按最小内容激活（领域允许 received origin 作为非空条件）；失败 Asset 标 missing/failed，不删 Moment。
-
-### 2.8 RevokeShare
-
-| | |
-| --- | --- |
-| 前置 | 操作者是 Transmission.senderId（或另开 ADR 的家庭角色）；Transmission 尚未 `revoked` |
-| 结果 | `status=revoked`。家庭时间页不再把该分享当作有效授权 |
-| 幂等键 | `revoke:{transmissionId}` |
-| 错误 | `TRANSMISSION_NOT_FOUND` / `FAMILY_FORBIDDEN` |
-
-已物化快照是否删除：**待决定**。命令必须可在「仅改状态、快照仍在」下幂等。
+未登录、令牌无效、服务端不可达：一律不改变个人 Moment，不把失败画成已加入/已创建。
 
 ---
 
-## 3. 失败场景
+## 2. 未交付命令
 
-| 场景 | 要求 |
+| 命令 | 规定摘要 |
 | --- | --- |
-| 重复点击分享 / 邀请 / 接受 | 同一幂等键，一条结果 |
-| 请求超时但服务端已成功 | 用幂等键对账；禁止第二条 Transmission / Membership |
-| 离线重试 | 只重放未确认作业；已 `revoked` 的不再送出 |
-| 乱序送达 | 过期邀请不能压过已接受/已拒绝；旧快照不能覆盖更新的已确认接收（除非协议写明） |
-| 成员资格在飞行中变化 | 落地时重新检查 Membership；不合格则不物化 Received Moment，Transmission 留可重试或标记拒绝，不假装成功 |
-| 部分媒体失败 | 保全已写下的文字与成功 Asset；家庭页与详情原位降级 |
-| 进程重启 | 从 SQLite / 作业表恢复；保存状态机对齐 ADR 0003 的可恢复失败，不自动分享草稿 |
-| 找不到 Moment | `MOMENT_NOT_FOUND` / 独立错误，不回退相邻记录 |
-| 仓库损坏 | 进 quarantine，不覆盖原文（iOS `record_quarantine` 已用于个人行） |
+| `ShareMoment` | 确认 UI 列出字段；钉 revision；媒体走服务端对象。新成员看不到加入前分享。 |
+| `RevokeShare` | 服务端停供该分享；原件不删；接收端清理该缓存。 |
+| `ReceiveSnapshot` | 仅当 Membership 有效；写入家庭缓存，不进个人 `moments`。 |
+| `TransferCreator` | 创建者离开的前置。 |
+| `DeleteAccount` | 与删原件、撤回分享分开定义。 |
+| `ArchivePersonal` | 不自动撤回分享。 |
 
 ---
 
-## 4. 与现有微信 `passMoment` 的关系
+## 3. 失败码（F1）
 
-可复用的规则：精确 id、仅 owner、仅 active、同 revision 幂等、`sent` ≠ 送达。
+| 码 | 含义 |
+| --- | --- |
+| `UNAUTHENTICATED` | 无 Session 或令牌无效 |
+| `APPLE_TOKEN_INVALID` | Apple identity token 校验失败 |
+| `ALREADY_IN_FAMILY` | v1：已有 active Membership |
+| `NOT_IN_FAMILY` | 无 active Membership |
+| `FORBIDDEN` | 角色不足（非创建者邀请/移除/解散；创建者直接退出） |
+| `INVITE_NOT_FOUND` | code 不存在 |
+| `INVITE_EXPIRED` | 已过期（接受时判定） |
+| `INVITE_REVOKED` | 已撤销 |
+| `INVITE_ALREADY_USED` | 已被他人接受（同一人重复接受走幂等成功） |
+| `FAMILY_DISSOLVED` | 家庭已解散 |
+| `MEMBER_NOT_FOUND` | 移除目标不存在或已非 active |
+| `NETWORK` / `SERVER_UNREACHABLE` | 客户端达不到服务端 |
+| `CONFLICT` | 违背前置且不宜更细的码 |
 
-不可直接当家庭分享：
+个人库错误码（`DRAFT_NOT_FOUND` 等）与上表分离。家庭失败不得触发个人 Moment 写入。
 
-- 无 `familyId` / 无确认 UI 绑定。
-- 无网络。
-- iOS 未建 Transmission 仓库。
-- message 已写明 local intent only。
+---
 
-iOS 接入时经 application use case 调领域命令，不把 `pages/record/record.js` 的递灯按钮搬到 RN。
+## 4. 重试
+
+- 写命令带客户端 `idempotencyKey`。服务端记住 key → 结果。
+- 超时后用同一 key 重试，不得当新命令。
+- `ListMembership` 失败：界面保持「未确认」，不沿用过期成员列表充当现授权。
+
+---
+
+## 5. 与个人 Moment 的隔离
+
+任何上表失败或成功都 **不得** 修改 `moments` / `drafts` / `assets` 行，除非未来分享切片明确另写（本轮没有）。
