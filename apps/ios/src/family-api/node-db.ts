@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 
 import type { FamilySql } from './schema';
 
@@ -13,14 +13,14 @@ export function openFamilySqliteDatabase(filePath: string): FamilySql {
       native.exec(sql);
     },
     async run(sql, params = []) {
-      const result = native.prepare(sql).run(...params);
+      const result = native.prepare(sql).run(...(params as SQLInputValue[]));
       return { changes: Number(result.changes) };
     },
     async getFirst(sql, params = []) {
-      return (native.prepare(sql).get(...params) as never) ?? null;
+      return (native.prepare(sql).get(...(params as SQLInputValue[])) as never) ?? null;
     },
     async getAll(sql, params = []) {
-      return native.prepare(sql).all(...params) as never;
+      return native.prepare(sql).all(...(params as SQLInputValue[])) as never;
     },
     async close() {
       native.close();

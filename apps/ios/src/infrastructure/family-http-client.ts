@@ -33,6 +33,12 @@ export type FamilyTransport = {
   request(input: FamilyTransportRequest): Promise<FamilyTransportResponse>;
 };
 
+function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
+  if (input.bytes) return input.bytes as unknown as BodyInit;
+  if (input.body === undefined) return undefined;
+  return JSON.stringify(input.body);
+}
+
 export type FamilyApiClient = {
   signInWithApple(identityToken: string): Promise<SignInResult>;
   createFamily(sessionToken: string, idempotencyKey: string): Promise<FamilyView>;
@@ -258,7 +264,7 @@ export function createFamilyHttpTransport(deps: {
       const response = await fetchImpl(`${baseUrl}${input.path}`, {
         method: input.method,
         headers,
-        body: input.bytes ? input.bytes : input.body === undefined ? undefined : JSON.stringify(input.body),
+        body: familyFetchBody(input),
       });
       if (input.expectBytes && response.ok) {
         const buffer = await response.arrayBuffer();
