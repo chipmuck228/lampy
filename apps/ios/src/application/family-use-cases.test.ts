@@ -1,6 +1,7 @@
 import { createUseCases } from './use-cases';
 import {
   createFamilyUseCases,
+  createMemoryFamilyCache,
   createMemoryFamilySessionStore,
   familyMembersOrEmpty,
 } from './family-use-cases';
@@ -220,5 +221,150 @@ describe('family use cases against a real in-process API', () => {
     const after = await alice.getMembership();
     expect(after.kind).toBe('ready');
     if (after.kind === 'ready') expect(after.members).toHaveLength(1);
+  });
+});
+
+describe('passive membership loss and family cache', () => {
+  function sharedActors() {
+    const store = createFamilyStore();
+    const clock = clockAt('2026-09-25T04:00:00.000Z');
+    const commands = createFamilyCommands({
+      store,
+      apple: createMapAppleVerifier({
+        apple_alice: { appleSubject: 'apple.alice' },
+        apple_bob: { appleSubject: 'apple.bob' },
+      }),
+      clock,
+    });
+    const transport = createDispatchTransport((request) => dispatchFamilyApi(commands, request));
+    const personalRepos = createMemoryRepositories();
+    const personal = createUseCases({ ...personalRepos, clock });
+    const aliceSession = createMemoryFamilySessionStore();
+    const bobSession = createMemoryFamilySessionStore();
+    const bobCache = createMemoryFamilyCache();
+    const alice = createFamilyUseCases({
+      client: createFamilyApiClient(transport),
+      session: aliceSession,
+    });
+    const bob = createFamilyUseCases({
+      client: createFamilyApiClient(transport),
+      session: bobSession,
+      cache: bobCache,
+    });
+    return { commands, personal, personalRepos, alice, bob, bobSession, bobCache, transport };
+  }
+
+  async function personalFingerprint(personal: ReturnType<typeof createUseCases>) {
+    const recent = await personal.getRecentLife();
+    const draft = await personal.restoreOrCreateDraft();
+    return {
+      items: recent.items.map((item) => ({ id: item.id, note: item.note })),
+      draftId: draft.draftId,
+      draftNote: draft.note,
+    };
+  }
+
+  it('clears family cache after a remote remove and leaves personal Moments unchanged', async () => {
+    const { alice, bob, bobCache, personal } = sharedActors();
+    const saved = await savePersonalNote(personal, '被动移除也不改个人');
+    const before = await personalFingerprint(personal);
+
+    await alice.signInWithApple('apple_alice');
+    const bobAccount = await bob.signInWithApple('apple_bob');
+    const family = await alice.createFamily();
+    const invite = await alice.inviteMember(family.familyId);
+    await bob.acceptInvitation(invite.code);
+    expect((await bob.getMembership()).kind).toBe('ready');
+    const clearedAfterJoin = bobCache.clearCount;
+
+    await alice.removeMember(family.familyId, bobAccount.userId);
+    const afterRemove = await bob.getMembership();
+    expect(afterRemove).toEqual({ kind: 'none' });
+    expect(familyMembersOrEmpty(afterRemove)).toEqual([]);
+    expect(bobCache.clearCount).toBeGreaterThan(clearedAfterJoin);
+
+    expect(await personalFingerprint(personal)).toEqual(before);
+    const detail = await personal.getMomentDetail(saved.id);
+    expect(detail.kind).toBe('ready');
+  });
+
+  it('clears family cache after a remote dissolve', async () => {
+    const { alice, bob, bobCache, personal } = sharedActors();
+    const saved = await savePersonalNote(personal, '解散也不改个人');
+    const before = await personalFingerprint(personal);
+
+    await alice.signInWithApple('apple_alice');
+    await bob.signInWithApple('apple_bob');
+    const family = await alice.createFamily();
+    await bob.acceptInvitation((await alice.inviteMember(family.familyId)).code);
+    expect((await bob.getMembership()).kind).toBe('ready');
+    const clearedAfterJoin = bobCache.clearCount;
+
+    await alice.dissolveFamily(family.familyId);
+    expect(await bob.getMembership()).toEqual({ kind: 'none' });
+    expect(bobCache.clearCount).toBeGreaterThan(clearedAfterJoin);
+    expect(await personalFingerprint(personal)).toEqual(before);
+    expect((await personal.getMomentDetail(saved.id)).kind).toBe('ready');
+  });
+
+  it('does not show members for an invalid session and clears family cache', async () => {
+    const session = createMemoryFamilySessionStore();
+    const cache = createMemoryFamilyCache();
+    const personal = createUseCases({
+      ...createMemoryRepositories(),
+      clock: clockAt('2026-09-25T04:30:00.000Z'),
+    });
+    const saved = await savePersonalNote(personal, '无效会话也不改个人');
+    const before = await personalFingerprint(personal);
+    await session.setSession({ userId: 'usr_stale', sessionToken: 'ses_stale' });
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request() {
+          return {
+            status: 401,
+            body: { error: { code: 'UNAUTHENTICATED', message: 'Session is missing or invalid.' } },
+          };
+        },
+      }),
+      session,
+      cache,
+    });
+
+    const view = await family.getMembership();
+    expect(view).toEqual({ kind: 'unconfirmed', reason: 'unauthenticated' });
+    expect(familyMembersOrEmpty(view)).toEqual([]);
+    expect(cache.clearCount).toBeGreaterThan(0);
+    expect(await session.getSessionToken()).toBeNull();
+    expect(await personalFingerprint(personal)).toEqual(before);
+    expect((await personal.getMomentDetail(saved.id)).kind).toBe('ready');
+  });
+
+  it('returns unconfirmed on network failure and never shows a stale member list', async () => {
+    const { alice, bob, bobSession, personal } = sharedActors();
+    const saved = await savePersonalNote(personal, '网络不可用也不改个人');
+    const before = await personalFingerprint(personal);
+    const cache = createMemoryFamilyCache();
+
+    await alice.signInWithApple('apple_alice');
+    await bob.signInWithApple('apple_bob');
+    const family = await alice.createFamily();
+    await bob.acceptInvitation((await alice.inviteMember(family.familyId)).code);
+    expect(familyMembersOrEmpty(await bob.getMembership()).length).toBeGreaterThan(0);
+
+    const unreachable = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request() {
+          throw new Error('network down');
+        },
+      }),
+      session: bobSession,
+      cache,
+    });
+    const view = await unreachable.getMembership();
+    expect(view).toEqual({ kind: 'unconfirmed', reason: 'unreachable' });
+    expect(familyMembersOrEmpty(view)).toEqual([]);
+    expect(cache.clearCount).toBe(0);
+    expect(await personalFingerprint(personal)).toEqual(before);
+    expect((await personal.getMomentDetail(saved.id)).kind).toBe('ready');
   });
 });

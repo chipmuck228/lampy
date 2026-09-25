@@ -24,7 +24,8 @@
 
 **何时形成（后续切片）：** 用户确认可见字段后，服务端保存该 `revision` 的快照包（媒体为服务端对象，不是设备路径）。接收设备在 Membership 仍有效时下载并写入**家庭缓存**。
 
-**包含（首版）：** `note` / `emotion` / 已选媒体的服务端引用 / 时间与精度 / `origin`（received 三件套）/ `familyId` 与访问范围。  
+**包含（首版）：** `note` / `emotion` / 已选媒体的服务端引用 / 时间与精度 / `origin`（received 三件套）/ `familyId` 与访问范围。
+
 **不包含：** `context.people`；整个 Moment JSON 默认全量；`localUri`。
 
 **原件之后的编辑：** 不改已保存 revision。要更新只能新一次分享。

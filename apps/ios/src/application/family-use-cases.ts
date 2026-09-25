@@ -53,6 +53,18 @@ export function createNoopFamilyCache(): FamilyCache {
   };
 }
 
+export function createMemoryFamilyCache(): FamilyCache & { readonly clearCount: number } {
+  let clearCount = 0;
+  return {
+    get clearCount() {
+      return clearCount;
+    },
+    async clear() {
+      clearCount += 1;
+    },
+  };
+}
+
 export function createFamilyUseCases(deps: {
   client: FamilyApiClient;
   session: FamilySessionStore;
@@ -87,7 +99,10 @@ export function createFamilyUseCases(deps: {
       if (!token) return { kind: 'unauthenticated' };
       try {
         const listed = await deps.client.listMembership(token);
-        if (!listed.family) return { kind: 'none' };
+        if (!listed.family) {
+          await cache.clear();
+          return { kind: 'none' };
+        }
         return {
           kind: 'ready',
           familyId: listed.family.familyId,
@@ -98,6 +113,7 @@ export function createFamilyUseCases(deps: {
         const appError = asApplicationError(error);
         if (appError.code === 'UNAUTHENTICATED' || appError.code === 'APPLE_TOKEN_INVALID') {
           await deps.session.clearSession();
+          await cache.clear();
           return { kind: 'unconfirmed', reason: 'unauthenticated' };
         }
         if (appError.code === 'SERVER_UNREACHABLE' || appError.code === 'NETWORK') {

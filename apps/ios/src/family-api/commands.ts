@@ -1,4 +1,12 @@
 import { FAMILY_ERROR, FamilyError } from './errors';
+import {
+  fingerprintAcceptInvitation,
+  fingerprintCreateFamily,
+  fingerprintInviteMember,
+  idempotencyStoreKey,
+  readIdempotent,
+  writeIdempotent,
+} from './idempotency';
 import { DEFAULT_INVITE_TTL_MS, DEFAULT_SESSION_TTL_MS, createFamilyClock, createFamilyIds } from './ids';
 import {
   findActiveMembership,
@@ -88,17 +96,6 @@ function toInvitationView(invitation: NonNullable<ReturnType<typeof findInvitati
   };
 }
 
-function readIdempotent<T>(store: FamilyStore, key: string | undefined): T | undefined {
-  if (!key) return undefined;
-  const hit = store.idempotency.get(key);
-  return hit ? (hit.body as T) : undefined;
-}
-
-function writeIdempotent<T>(store: FamilyStore, key: string | undefined, body: T): T {
-  if (key) store.idempotency.set(key, { status: 200, body });
-  return body;
-}
-
 function expireInvitationIfNeeded(invitation: NonNullable<ReturnType<typeof findInvitationByCode>>, now: Date) {
   if (invitation.status === 'pending' && new Date(invitation.expiresAt).getTime() <= now.getTime()) {
     invitation.status = 'expired';
@@ -154,7 +151,9 @@ export function createFamilyCommands(deps: {
 
     createFamily(sessionToken, idempotencyKey) {
       const userId = requireUser(store, sessionToken, clock);
-      const cached = readIdempotent<FamilyView>(store, idempotencyKey && `${userId}:createFamily:${idempotencyKey}`);
+      const fingerprint = fingerprintCreateFamily();
+      const key = idempotencyStoreKey(userId, 'createFamily', idempotencyKey);
+      const cached = readIdempotent<FamilyView>(store, key, fingerprint);
       if (cached) return cached;
       const existing = findActiveMembershipForUser(store, userId);
       if (existing) {
@@ -171,13 +170,14 @@ export function createFamilyCommands(deps: {
         status: 'active',
         joinedAt: now,
       });
-      return writeIdempotent(store, idempotencyKey && `${userId}:createFamily:${idempotencyKey}`, toFamilyView(store, familyId, userId));
+      return writeIdempotent(store, key, fingerprint, toFamilyView(store, familyId, userId));
     },
 
     inviteMember(sessionToken, familyId, idempotencyKey) {
       const userId = requireUser(store, sessionToken, clock);
-      const key = idempotencyKey && `${userId}:inviteMember:${idempotencyKey}`;
-      const cached = readIdempotent<InvitationView>(store, key);
+      const fingerprint = fingerprintInviteMember(familyId);
+      const key = idempotencyStoreKey(userId, 'inviteMember', idempotencyKey);
+      const cached = readIdempotent<InvitationView>(store, key, fingerprint);
       if (cached) return cached;
       requireActiveFamily(store, familyId);
       const membership = findActiveMembership(store, familyId, userId);
@@ -194,7 +194,7 @@ export function createFamilyCommands(deps: {
         expiresAt: iso(new Date(now.getTime() + inviteTtlMs)),
       };
       store.invitations.push(invitation);
-      return writeIdempotent(store, key, toInvitationView(invitation));
+      return writeIdempotent(store, key, fingerprint, toInvitationView(invitation));
     },
 
     revokeInvitation(sessionToken, invitationId) {
@@ -216,8 +216,9 @@ export function createFamilyCommands(deps: {
 
     acceptInvitation(sessionToken, code, idempotencyKey) {
       const userId = requireUser(store, sessionToken, clock);
-      const key = idempotencyKey && `${userId}:acceptInvitation:${idempotencyKey}`;
-      const cached = readIdempotent<FamilyView>(store, key);
+      const fingerprint = fingerprintAcceptInvitation(code);
+      const key = idempotencyStoreKey(userId, 'acceptInvitation', idempotencyKey);
+      const cached = readIdempotent<FamilyView>(store, key, fingerprint);
       if (cached) return cached;
       const invitation = findInvitationByCode(store, code);
       if (!invitation) {
@@ -233,7 +234,7 @@ export function createFamilyCommands(deps: {
       if (invitation.status === 'accepted') {
         if (invitation.acceptedByUserId === userId) {
           const family = requireActiveFamily(store, invitation.familyId);
-          return writeIdempotent(store, key, toFamilyView(store, family.familyId, userId));
+          return writeIdempotent(store, key, fingerprint, toFamilyView(store, family.familyId, userId));
         }
         throw new FamilyError(FAMILY_ERROR.INVITE_ALREADY_USED, 'This invitation was already used.');
       }
@@ -253,7 +254,7 @@ export function createFamilyCommands(deps: {
         status: 'active',
         joinedAt: now,
       });
-      return writeIdempotent(store, key, toFamilyView(store, family.familyId, userId));
+      return writeIdempotent(store, key, fingerprint, toFamilyView(store, family.familyId, userId));
     },
 
     listMembership(sessionToken) {

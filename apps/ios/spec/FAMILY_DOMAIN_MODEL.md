@@ -87,18 +87,22 @@ ReceivedSnapshot 由 Share + 有效 Membership 授权；写入本机后仍受家
 
 ### Membership
 
-`active` → `left`（成员 Leave）  
-`active` → `removed`（创建者 Remove）  
+`active` → `left`（成员 Leave）
+
+`active` → `removed`（创建者 Remove）
+
 解散：家庭 `dissolved`，所有 active 成员不再有效。
 
 创建者不能 `left`，除非已移交或改为解散。
 
 ### Invitation
 
-`pending` → `accepted` \| `revoked` \| `expired`（到期或接受时服务端判定）  
+`pending` → `accepted` \| `revoked` \| `expired`（到期或接受时服务端判定）
+
 终态不可再接受。
 
 ### 传输（后续切片用语，不写入现有 Transmission.status）
 
-`upload-pending` → `server-stored` → `receiver-written`  
+`upload-pending` → `server-stored` → `receiver-written`
+
 本地 `sent` 只表示历史微信意图或未确认出站，不得显示「家人已收到」。

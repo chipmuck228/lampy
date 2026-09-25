@@ -1,6 +1,7 @@
 import type { Account, Family, Invitation, Membership, Session } from './types';
 
 export type IdempotentRecord = {
+  requestFingerprint: string;
   status: number;
   body: unknown;
 };

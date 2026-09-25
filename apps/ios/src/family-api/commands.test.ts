@@ -1,6 +1,11 @@
 import { createMapAppleVerifier, createAppleJwksVerifier } from './apple';
 import { createFamilyCommands } from './commands';
 import { FAMILY_ERROR, FamilyError } from './errors';
+import {
+  fingerprintAcceptInvitation,
+  fingerprintCreateFamily,
+  fingerprintInviteMember,
+} from './idempotency';
 import { createFamilyStore } from './store';
 import type { FamilyIds } from './types';
 
@@ -215,5 +220,48 @@ describe('family identity and membership commands', () => {
     await expect(verifier.verifyIdentityToken(expired)).rejects.toMatchObject({
       code: FAMILY_ERROR.APPLE_TOKEN_INVALID,
     });
+  });
+
+  it('binds idempotency keys to a deterministic request fingerprint', async () => {
+    const { commands, store } = setup();
+    const alice = await signIn(commands, 'apple_alice');
+    const bob = await signIn(commands, 'apple_bob');
+    const cara = await signIn(commands, 'apple_cara');
+    const familyA = commands.createFamily(alice.sessionToken, 'create-shared');
+    expect(commands.createFamily(alice.sessionToken, 'create-shared').familyId).toBe(familyA.familyId);
+    expect(fingerprintCreateFamily()).toBe(fingerprintCreateFamily());
+    expect(fingerprintInviteMember(familyA.familyId)).toBe(fingerprintInviteMember(familyA.familyId));
+    expect(fingerprintInviteMember('fam_other')).not.toBe(fingerprintInviteMember(familyA.familyId));
+
+    const inviteA = commands.inviteMember(alice.sessionToken, familyA.familyId, 'invite-shared');
+    expect(commands.inviteMember(alice.sessionToken, familyA.familyId, 'invite-shared').code).toBe(inviteA.code);
+
+    const familyB = commands.createFamily(cara.sessionToken, 'create-shared');
+    expect(familyB.familyId).not.toBe(familyA.familyId);
+    const inviteB = commands.inviteMember(cara.sessionToken, familyB.familyId, 'invite-shared');
+    expect(inviteB.code).not.toBe(inviteA.code);
+
+    expect(() => commands.inviteMember(alice.sessionToken, familyB.familyId, 'invite-shared')).toThrow(
+      new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.'),
+    );
+
+    const joined = commands.acceptInvitation(bob.sessionToken, inviteA.code, 'accept-shared');
+    expect(commands.acceptInvitation(bob.sessionToken, inviteA.code, 'accept-shared').familyId).toBe(joined.familyId);
+    expect(fingerprintAcceptInvitation(inviteA.code)).toBe(fingerprintAcceptInvitation(inviteA.code));
+    expect(fingerprintAcceptInvitation(inviteA.code)).not.toBe(fingerprintAcceptInvitation(inviteB.code));
+
+    commands.leaveFamily(bob.sessionToken);
+    const nextInvite = commands.inviteMember(alice.sessionToken, familyA.familyId);
+    expect(() => commands.acceptInvitation(bob.sessionToken, nextInvite.code, 'accept-shared')).toThrow(
+      new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.'),
+    );
+    expect(commands.listMembership(bob.sessionToken).family).toBeNull();
+
+    for (const record of store.idempotency.values()) {
+      expect(record.requestFingerprint).toBeTruthy();
+      expect(record.requestFingerprint).not.toContain(alice.sessionToken);
+      expect(record.requestFingerprint).not.toContain('apple_alice');
+      expect(record.requestFingerprint).not.toContain(inviteA.code);
+    }
   });
 });
