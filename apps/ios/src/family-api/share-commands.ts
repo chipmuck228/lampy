@@ -4,10 +4,19 @@ import { sha256MediaBytes } from './media-validate';
 import type { MediaBlobStore } from './media-blobs';
 import type { FamilyRepository, FamilyTx } from './repository';
 import { FamilyStoreConstraintError } from './repository';
-import type { Membership, ShareMediaView, ShareMomentInput, ShareRecord, ShareSnapshot, ShareView } from './types';
+import type {
+  Membership,
+  RevokeShareResult,
+  ShareMediaView,
+  ShareMomentInput,
+  ShareRecord,
+  ShareSnapshot,
+  ShareView,
+} from './types';
 
 export type ShareCommands = {
   shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
+  revokeShare(sessionToken: string, familyId: string, shareId: string): Promise<RevokeShareResult>;
   listVisibleShares(sessionToken: string, familyId: string): Promise<{ shares: ShareView[] }>;
   getShare(sessionToken: string, familyId: string, shareId: string): Promise<ShareView>;
   getShareMedia(sessionToken: string, familyId: string, shareId: string, objectId: string): Promise<ShareMediaView>;
@@ -90,8 +99,8 @@ async function requireUser(tx: FamilyTx, sessionToken: string | undefined, now: 
   return session.userId;
 }
 
-function shareIsActive(_row: ShareRecord) {
-  return true;
+function shareIsActive(row: ShareRecord) {
+  return row.status === 'active';
 }
 
 function canSeeShare(membership: Membership, share: ShareRecord) {
@@ -191,7 +200,7 @@ export function createShareCommands(deps: {
             }
             const replayed = asShareView(existing.body);
             const row = replayed ? await tx.findShare(replayed.shareId) : null;
-            if (!row || row.authorUserId !== userId) {
+            if (!row || row.authorUserId !== userId || !shareIsActive(row)) {
               throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
             }
             return toView(row);
@@ -216,6 +225,9 @@ export function createShareCommands(deps: {
           },
         };
         if (sameRevision) {
+          if (!shareIsActive(sameRevision)) {
+            throw new FamilyError(FAMILY_ERROR.CONFLICT, 'This moment revision was already shared and revoked.');
+          }
           if (!snapshotEquals(sameRevision.snapshot, snapshot)) {
             throw new FamilyError(FAMILY_ERROR.CONFLICT, 'This moment revision was already shared with different fields.');
           }
@@ -238,6 +250,7 @@ export function createShareCommands(deps: {
           snapshot,
           audienceUserIds,
           sharedAt: clock.now().toISOString(),
+          status: 'active',
         };
         try {
           await tx.saveShare(row);
@@ -245,6 +258,9 @@ export function createShareCommands(deps: {
           if (error instanceof FamilyStoreConstraintError && error.constraint === 'share_revision') {
             const raced = await tx.findShareBySource(familyId, userId, input.sourceMomentId, input.sourceRevision);
             if (raced) {
+              if (!shareIsActive(raced)) {
+                throw new FamilyError(FAMILY_ERROR.CONFLICT, 'This moment revision was already shared and revoked.');
+              }
               if (!snapshotEquals(raced.snapshot, snapshot)) {
                 throw new FamilyError(
                   FAMILY_ERROR.CONFLICT,
@@ -271,6 +287,26 @@ export function createShareCommands(deps: {
           });
         }
         return toView(row);
+      });
+    },
+
+    async revokeShare(sessionToken, familyId, shareId) {
+      return deps.repository.withTransaction(async (tx) => {
+        const userId = await requireUser(tx, sessionToken, clock.now());
+        await requireActiveMember(tx, familyId, userId);
+        const row = await tx.findShare(shareId);
+        if (!row || row.familyId !== familyId) {
+          throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
+        }
+        if (row.authorUserId !== userId) {
+          throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the author can revoke this share.');
+        }
+        if (row.status === 'revoked' && row.revokedAt) {
+          return { shareId: row.shareId, revoked: true as const, revokedAt: row.revokedAt };
+        }
+        const revokedAt = row.revokedAt || clock.now().toISOString();
+        await tx.saveShare({ ...row, status: 'revoked', revokedAt });
+        return { shareId: row.shareId, revoked: true as const, revokedAt };
       });
     },
 

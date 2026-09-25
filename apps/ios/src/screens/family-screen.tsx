@@ -25,6 +25,9 @@ function errorText(error: unknown) {
     if (error.code === 'INVITE_ALREADY_USED') return '这个邀请已经被用过了。';
     if (error.code === 'FORBIDDEN') return '这件事只有创建者能做。';
   }
+  if (error instanceof Error && error.message === 'revoke-retry') {
+    return '撤回还没完成，可以再试。';
+  }
   return '家庭这件事没有做成。个人记录还在这台设备上。';
 }
 
@@ -326,6 +329,25 @@ export default function FamilyScreen() {
                         style={styles.hit}
                       >
                         <Text style={styles.action}>收下这条分享</Text>
+                      </Pressable>
+                    ) : null}
+                    {item.canRevoke ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="撤回这条分享"
+                        testID={`family-revoke-share-${item.shareId}`}
+                        disabled={busy}
+                        onPress={() =>
+                          run(async (family) => {
+                            const revoked = await family.revokeShare(item.shareId);
+                            if (revoked.status === 'failed') {
+                              throw new Error('revoke-retry');
+                            }
+                          })
+                        }
+                        style={styles.hit}
+                      >
+                        <Text style={styles.action}>撤回这条分享</Text>
                       </Pressable>
                     ) : null}
                   </View>

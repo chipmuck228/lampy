@@ -21,6 +21,7 @@ const mockFamily = {
   hasUnconfirmedSessionRevoke: jest.fn(async () => false),
   refreshFamilyInbox: jest.fn(async () => ({ kind: 'hidden', reason: 'unauthenticated' })),
   receiveShare: jest.fn(),
+  revokeShare: jest.fn(),
 };
 
 jest.mock('expo-router', () => {
@@ -131,6 +132,7 @@ describe('family screen', () => {
           receiveStatus: 'listed',
           expectedMediaCount: 1,
           storedMediaCount: 0,
+          canRevoke: false,
         },
       ],
     });

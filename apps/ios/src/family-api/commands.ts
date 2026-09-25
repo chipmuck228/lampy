@@ -16,6 +16,7 @@ import type {
   InvitationView,
   MediaObjectView,
   MembershipListView,
+  RevokeShareResult,
   ShareMediaView,
   ShareMomentInput,
   ShareView,
@@ -46,6 +47,7 @@ export type FamilyCommands = {
   getMediaObject(sessionToken: string, objectId: string): Promise<MediaObjectView>;
   getMediaContent(sessionToken: string, objectId: string): Promise<{ mimeType: string; bytes: Uint8Array }>;
   shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
+  revokeShare(sessionToken: string, familyId: string, shareId: string): Promise<RevokeShareResult>;
   listVisibleShares(sessionToken: string, familyId: string): Promise<{ shares: ShareView[] }>;
   getShare(sessionToken: string, familyId: string, shareId: string): Promise<ShareView>;
   getShareMedia(sessionToken: string, familyId: string, shareId: string, objectId: string): Promise<ShareMediaView>;
@@ -511,6 +513,9 @@ export function createFamilyCommands(deps: {
     },
     shareMoment(sessionToken, familyId, input) {
       return shares.shareMoment(sessionToken, familyId, input);
+    },
+    revokeShare(sessionToken, familyId, shareId) {
+      return shares.revokeShare(sessionToken, familyId, shareId);
     },
     listVisibleShares(sessionToken, familyId) {
       return shares.listVisibleShares(sessionToken, familyId);

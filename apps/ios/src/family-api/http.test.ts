@@ -338,5 +338,26 @@ describe('family HTTP contract', () => {
     });
     expect(media.status).toBe(200);
     expect((media.body as { contentSha256: string }).contentSha256).toHaveLength(64);
+
+    const revoked = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: `/v1/families/${familyId}/shares/${shareId}/revoke`,
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(revoked.status).toBe(200);
+    expect(revoked.body).toMatchObject({ shareId, revoked: true });
+    const after = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: `/v1/families/${familyId}/shares/${shareId}`,
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(after.status).toBe(404);
+    expect(after.body).toMatchObject({ error: { code: 'SHARE_NOT_FOUND' } });
+    const oldMedia = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: `/v1/families/${familyId}/shares/${shareId}/media/${objectId}`,
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(oldMedia.status).toBe(404);
   });
 });

@@ -262,6 +262,55 @@ describe('family share snapshot commands', () => {
     expect(shared.audienceUserIds).toContain(bob.userId);
   });
 
+  it('lets only the author revoke a share and then stops serving it to every member', async () => {
+    const { commands, store } = setup();
+    const alice = await commands.signInWithApple('apple_alice');
+    const bob = await commands.signInWithApple('apple_bob');
+    const family = await commands.createFamily(alice.sessionToken, 'fam-1');
+    const invite = await commands.inviteMember(alice.sessionToken, family.familyId, 'inv-1');
+    await commands.acceptInvitation(bob.sessionToken, invite.code, 'accept-1');
+    const media = await commands.uploadMedia(alice.sessionToken, { bytes: sampleJpegBytes(), mimeType: 'image/jpeg' });
+    const shared = await commands.shareMoment(alice.sessionToken, family.familyId, {
+      ...textShare(),
+      mediaObjectIds: [media.objectId],
+      expectedMediaCount: 1,
+    });
+
+    await expect(commands.revokeShare(bob.sessionToken, family.familyId, shared.shareId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.FORBIDDEN,
+    });
+    expect((await commands.listVisibleShares(bob.sessionToken, family.familyId)).shares).toHaveLength(1);
+
+    const first = await commands.revokeShare(alice.sessionToken, family.familyId, shared.shareId);
+    expect(first).toEqual({ shareId: shared.shareId, revoked: true, revokedAt: '2026-09-25T04:00:00.000Z' });
+    const again = await commands.revokeShare(alice.sessionToken, family.familyId, shared.shareId);
+    expect(again).toEqual(first);
+    expect(store.shares[0]?.status).toBe('revoked');
+
+    expect((await commands.listVisibleShares(alice.sessionToken, family.familyId)).shares).toEqual([]);
+    expect((await commands.listVisibleShares(bob.sessionToken, family.familyId)).shares).toEqual([]);
+    await expect(commands.getShare(alice.sessionToken, family.familyId, shared.shareId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.SHARE_NOT_FOUND,
+    });
+    await expect(commands.getShare(bob.sessionToken, family.familyId, shared.shareId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.SHARE_NOT_FOUND,
+    });
+    await expect(
+      commands.getShareMedia(bob.sessionToken, family.familyId, shared.shareId, media.objectId),
+    ).rejects.toMatchObject({ code: FAMILY_ERROR.SHARE_NOT_FOUND });
+    await expect(
+      commands.getShareMediaContent(alice.sessionToken, family.familyId, shared.shareId, media.objectId),
+    ).rejects.toMatchObject({ code: FAMILY_ERROR.SHARE_NOT_FOUND });
+    expect(await commands.getMediaObject(alice.sessionToken, media.objectId)).toMatchObject({ objectId: media.objectId });
+    await expect(
+      commands.shareMoment(alice.sessionToken, family.familyId, {
+        ...textShare(),
+        mediaObjectIds: [media.objectId],
+        expectedMediaCount: 1,
+      }),
+    ).rejects.toMatchObject({ code: FAMILY_ERROR.CONFLICT });
+  });
+
   it('does not save a share when selected media cannot be read', async () => {
     const { commands, blobs, store } = setup();
     const alice = await commands.signInWithApple('apple_alice');
@@ -308,7 +357,22 @@ describe('family share snapshot commands', () => {
       expect((await second.getShare(alice.sessionToken, family.familyId, shared.shareId)).snapshot.note).toBe(
         '门口的风',
       );
+      const revoked = await second.revokeShare(alice.sessionToken, family.familyId, shared.shareId);
+      expect(revoked.revoked).toBe(true);
       await secondDb.close();
+
+      const thirdDb = openFamilySqliteDatabase(file);
+      const third = createFamilyCommands({
+        repository: createSqliteFamilyRepository(thirdDb),
+        apple: createMapAppleVerifier({ apple_alice: { appleSubject: 'apple.alice' } }),
+        clock: { now: () => new Date('2026-09-25T04:00:00.000Z') },
+        mediaBlobs: createDirectoryMediaBlobStore(mediaRoot),
+      });
+      expect((await third.listVisibleShares(alice.sessionToken, family.familyId)).shares).toEqual([]);
+      await expect(third.getShare(alice.sessionToken, family.familyId, shared.shareId)).rejects.toMatchObject({
+        code: FAMILY_ERROR.SHARE_NOT_FOUND,
+      });
+      await thirdDb.close();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

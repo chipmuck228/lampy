@@ -41,6 +41,7 @@ export type FamilyReceiveCache = {
   markFailed(userId: string, familyId: string, shareId: string): Promise<ReceivedShareRecord>;
   isolateAccount(userId: string): Promise<void>;
   isolateFamily(userId: string, familyId: string): Promise<void>;
+  isolateShare(userId: string, familyId: string, shareId: string): Promise<void>;
   replaceVisible(userId: string, familyId: string, shares: ShareView[]): Promise<void>;
 };
 
@@ -168,6 +169,21 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       }
       for (const key of [...files.keys()]) {
         if (key.startsWith(`${userId}/${familyId}/`)) files.delete(key);
+      }
+    },
+    async isolateShare(userId, familyId, shareId) {
+      for (let i = shares.length - 1; i >= 0; i -= 1) {
+        if (shares[i]?.userId === userId && shares[i]?.familyId === familyId && shares[i]?.shareId === shareId) {
+          shares.splice(i, 1);
+        }
+      }
+      for (let i = media.length - 1; i >= 0; i -= 1) {
+        if (media[i]?.userId === userId && media[i]?.familyId === familyId && media[i]?.shareId === shareId) {
+          media.splice(i, 1);
+        }
+      }
+      for (const key of [...files.keys()]) {
+        if (key.startsWith(`${userId}/${familyId}/${shareId}/`)) files.delete(key);
       }
     },
     async replaceVisible(userId, familyId, visible) {
@@ -383,12 +399,23 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     async isolateAccount(userId) {
       await db.run('DELETE FROM family_received_media WHERE user_id = ?', [userId]);
       await db.run('DELETE FROM family_received_shares WHERE user_id = ?', [userId]);
-      await files.removePrefix(userId);
+      await files.removePrefix(userId).catch(() => undefined);
     },
     async isolateFamily(userId, familyId) {
       await db.run('DELETE FROM family_received_media WHERE user_id = ? AND family_id = ?', [userId, familyId]);
       await db.run('DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ?', [userId, familyId]);
-      await files.removePrefix(`${userId}/${familyId}`);
+      await files.removePrefix(`${userId}/${familyId}`).catch(() => undefined);
+    },
+    async isolateShare(userId, familyId, shareId) {
+      await db.run(
+        `DELETE FROM family_received_media WHERE user_id = ? AND family_id = ? AND share_id = ?`,
+        [userId, familyId, shareId],
+      );
+      await db.run(
+        `DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ? AND share_id = ?`,
+        [userId, familyId, shareId],
+      );
+      await files.removePrefix(`${userId}/${familyId}/${shareId}`).catch(() => undefined);
     },
     async replaceVisible(userId, familyId, visible) {
       const keep = new Set(visible.map((share) => share.shareId));
@@ -410,7 +437,7 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
           `DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ? AND share_id = ?`,
           [userId, familyId, row.share_id],
         );
-        await files.removePrefix(`${userId}/${familyId}/${row.share_id}`);
+        await files.removePrefix(`${userId}/${familyId}/${row.share_id}`).catch(() => undefined);
       }
     },
   };

@@ -51,7 +51,14 @@ export type FamilyInboxItem = {
   receiveStatus: ReceivedShareStatus;
   expectedMediaCount: number;
   storedMediaCount: number;
+  canRevoke: boolean;
 };
+
+export type ShareRevokeState =
+  | { status: 'idle' }
+  | { status: 'revoking'; shareId: string }
+  | { status: 'revoked'; shareId: string; revokedAt: string }
+  | { status: 'failed'; shareId: string; code: string; message: string };
 
 export type FamilyInboxView =
   | { kind: 'hidden'; reason: 'unauthenticated' | 'unconfirmed' | 'none' | 'unreachable' }
@@ -194,6 +201,23 @@ export function createFamilyUseCases(deps: {
   const sessionRevokeTtlMs = deps.sessionRevokeTtlMs ?? DEFAULT_SESSION_TTL_MS;
   let selectedMediaUpload: SelectedMediaUploadState = { status: 'idle' };
   let shareConfirm: ShareConfirmState = { status: 'idle' };
+  let shareRevoke: ShareRevokeState = { status: 'idle' };
+
+  async function safeIsolateAccount(userId: string) {
+    try {
+      await deps.receiveCache?.isolateAccount(userId);
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function safeIsolateShare(userId: string, familyId: string, shareId: string) {
+    try {
+      await deps.receiveCache?.isolateShare(userId, familyId, shareId);
+    } catch {
+      return undefined;
+    }
+  }
 
   function isUnconfirmedNetwork(error: ApplicationError) {
     return error.code === 'SERVER_UNREACHABLE' || error.code === 'NETWORK';
@@ -373,6 +397,8 @@ export function createFamilyUseCases(deps: {
         const listed = await deps.client.listMembership(token);
         if (!listed.family) {
           await cache.clear();
+          const userId = await deps.session.getUserId();
+          if (userId) await safeIsolateAccount(userId);
           return { kind: 'none' };
         }
         return {
@@ -384,8 +410,10 @@ export function createFamilyUseCases(deps: {
       } catch (error) {
         const appError = asApplicationError(error);
         if (appError.code === 'UNAUTHENTICATED' || appError.code === 'APPLE_TOKEN_INVALID') {
+          const userId = await deps.session.getUserId();
           await deps.session.clearSession();
           await cache.clear();
+          if (userId) await safeIsolateAccount(userId);
           return { kind: 'unconfirmed', reason: 'unauthenticated' };
         }
         if (appError.code === 'SERVER_UNREACHABLE' || appError.code === 'NETWORK') {
@@ -467,7 +495,7 @@ export function createFamilyUseCases(deps: {
       const { sessionToken, userId } = await requireAccount();
       const result = await deps.client.leaveFamily(sessionToken);
       await cache.clear();
-      await deps.receiveCache?.isolateAccount(userId);
+      await safeIsolateAccount(userId);
       return result;
     },
 
@@ -480,7 +508,7 @@ export function createFamilyUseCases(deps: {
       const { sessionToken, userId } = await requireAccount();
       const result = await deps.client.dissolveFamily(sessionToken, familyId);
       await cache.clear();
-      await deps.receiveCache?.isolateAccount(userId);
+      await safeIsolateAccount(userId);
       return result;
     },
 
@@ -501,17 +529,18 @@ export function createFamilyUseCases(deps: {
         await deps.client.signOut(token);
         await deps.session.clearSession();
         await cache.clear();
-        await deps.receiveCache?.isolateAccount(userId);
+        await safeIsolateAccount(userId);
         await deps.session.clearPendingRevoke();
         selectedMediaUpload = { status: 'idle' };
         shareConfirm = { status: 'idle' };
+        shareRevoke = { status: 'idle' };
         return { local: 'signed-out', server: 'revoked' };
       } catch (error) {
         const appError = asApplicationError(error);
         if (isConfirmedTokenGone(appError)) {
           await deps.session.clearSession();
           await cache.clear();
-          await deps.receiveCache?.isolateAccount(userId);
+          await safeIsolateAccount(userId);
           await deps.session.clearPendingRevoke();
           return { local: 'signed-out', server: 'revoked' };
         }
@@ -526,7 +555,7 @@ export function createFamilyUseCases(deps: {
         }
         await deps.session.clearSession();
         await cache.clear();
-        await deps.receiveCache?.isolateAccount(userId);
+        await safeIsolateAccount(userId);
         return { local: 'signed-out', server: 'unconfirmed' };
       }
     },
@@ -669,6 +698,32 @@ export function createFamilyUseCases(deps: {
       return deps.client.getShare(sessionToken, familyId, shareId);
     },
 
+    getShareRevokeStatus(): ShareRevokeState {
+      return shareRevoke;
+    },
+
+    async revokeShare(shareId: string): Promise<ShareRevokeState> {
+      shareRevoke = { status: 'revoking', shareId };
+      try {
+        const membership = await this.getMembership();
+        if (membership.kind === 'unauthenticated' || (membership.kind === 'unconfirmed' && membership.reason === 'unauthenticated')) {
+          throw new ApplicationError('UNAUTHENTICATED', 'Sign in is required.');
+        }
+        if (membership.kind !== 'ready') {
+          throw new ApplicationError('NOT_IN_FAMILY', 'Not a member of this family.');
+        }
+        const { sessionToken, userId } = await requireAccount();
+        const result = await deps.client.revokeShare(sessionToken, membership.familyId, shareId);
+        await safeIsolateShare(userId, membership.familyId, shareId);
+        shareRevoke = { status: 'revoked', shareId, revokedAt: result.revokedAt };
+        return shareRevoke;
+      } catch (error) {
+        const appError = asApplicationError(error);
+        shareRevoke = { status: 'failed', shareId, code: appError.code, message: appError.message };
+        return shareRevoke;
+      }
+    },
+
     async listFamilyInbox(): Promise<FamilyInboxView> {
       return this.refreshFamilyInbox();
     },
@@ -676,6 +731,10 @@ export function createFamilyUseCases(deps: {
     async refreshFamilyInbox(): Promise<FamilyInboxView> {
       const membership = await this.getMembership();
       if (membership.kind !== 'ready') {
+        if (membership.kind === 'none' || membership.kind === 'unauthenticated') {
+          const userId = await deps.session.getUserId();
+          if (userId) await safeIsolateAccount(userId);
+        }
         return hiddenInbox(membership) ?? { kind: 'hidden', reason: 'unconfirmed' };
       }
       try {
@@ -691,12 +750,20 @@ export function createFamilyUseCases(deps: {
         return {
           kind: 'ready',
           familyId: membership.familyId,
-          items: await Promise.all(rows.map((row) => toInboxItem(row))),
+          items: await Promise.all(rows.map((row) => toInboxItem(row, userId))),
         };
       } catch (error) {
         const appError = asApplicationError(error);
-        if (appError.code === 'UNAUTHENTICATED') return { kind: 'hidden', reason: 'unauthenticated' };
-        if (appError.code === 'NOT_IN_FAMILY') return { kind: 'hidden', reason: 'none' };
+        if (appError.code === 'UNAUTHENTICATED') {
+          const userId = await deps.session.getUserId();
+          if (userId) await safeIsolateAccount(userId);
+          return { kind: 'hidden', reason: 'unauthenticated' };
+        }
+        if (appError.code === 'NOT_IN_FAMILY') {
+          const userId = await deps.session.getUserId();
+          if (userId) await safeIsolateAccount(userId);
+          return { kind: 'hidden', reason: 'none' };
+        }
         return { kind: 'hidden', reason: 'unreachable' };
       }
     },
@@ -758,15 +825,20 @@ export function createFamilyUseCases(deps: {
           throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
         }
         const received = await deps.receiveCache.markReceived(userId, share.familyId, share.shareId);
-        return { status: 'received' as const, item: await toInboxItem(received) };
+        return { status: 'received' as const, item: await toInboxItem(received, userId) };
       } catch (error) {
-        await deps.receiveCache.markFailed(userId, share.familyId, share.shareId);
-        throw asApplicationError(error);
+        const appError = asApplicationError(error);
+        if (appError.code === 'SHARE_NOT_FOUND' || appError.code === 'FORBIDDEN') {
+          await safeIsolateShare(userId, membership.familyId, shareId);
+        } else {
+          await deps.receiveCache.markFailed(userId, share.familyId, share.shareId);
+        }
+        throw appError;
       }
     },
   };
 
-  async function toInboxItem(row: ReceivedShareRecord): Promise<FamilyInboxItem> {
+  async function toInboxItem(row: ReceivedShareRecord, viewerUserId: string): Promise<FamilyInboxItem> {
     const media = deps.receiveCache ? await deps.receiveCache.listMedia(row.userId, row.familyId, row.shareId) : [];
     return {
       shareId: row.shareId,
@@ -779,6 +851,7 @@ export function createFamilyUseCases(deps: {
       receiveStatus: row.receiveStatus,
       expectedMediaCount: row.expectedMediaCount,
       storedMediaCount: media.filter((item) => item.status === 'stored').length,
+      canRevoke: row.authorUserId === viewerUserId,
     };
   }
 }

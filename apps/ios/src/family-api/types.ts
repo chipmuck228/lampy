@@ -103,6 +103,8 @@ export type ShareSnapshot = {
   origin: ShareSnapshotOrigin;
 };
 
+export type ShareStatus = 'active' | 'revoked';
+
 export type ShareRecord = {
   shareId: string;
   familyId: string;
@@ -112,6 +114,14 @@ export type ShareRecord = {
   snapshot: ShareSnapshot;
   audienceUserIds: string[];
   sharedAt: string;
+  status: ShareStatus;
+  revokedAt?: string;
+};
+
+export type RevokeShareResult = {
+  shareId: string;
+  revoked: true;
+  revokedAt: string;
 };
 
 export type ShareView = {
