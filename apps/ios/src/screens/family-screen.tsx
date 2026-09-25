@@ -155,6 +155,10 @@ export default function FamilyScreen() {
       const signed = await family.signOut();
       const result = await refresh('follow-up');
       if (result === 'stale') return;
+      if (signed.local === 'still-signed-in') {
+        setMessage('这次退出没做成。这台设备还登着，远端会话也还没确认撤销。');
+        return;
+      }
       setMessage(
         signed.server === 'unconfirmed' || result === 'revoke-unconfirmed'
           ? '这台设备已经退出。远端会话还没确认撤销，连上之后会再试。'

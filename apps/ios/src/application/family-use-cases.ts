@@ -17,10 +17,10 @@ export type PendingSessionRevoke = {
   createdAt: string;
 };
 
-export type SignOutResult = {
-  local: 'signed-out';
-  server: 'revoked' | 'unconfirmed';
-};
+export type SignOutResult =
+  | { local: 'signed-out'; server: 'revoked' }
+  | { local: 'signed-out'; server: 'unconfirmed' }
+  | { local: 'still-signed-in'; server: 'unconfirmed' };
 
 export type FamilySessionStore = {
   getSessionToken(): Promise<string | null>;
@@ -138,25 +138,25 @@ export function createFamilyUseCases(deps: {
     return !Number.isFinite(created) || created + sessionRevokeTtlMs <= clock.now().getTime();
   }
 
-  async function flushPendingRevoke(options?: { switchToUserId?: string }): Promise<void> {
+  function isConfirmedTokenGone(error: ApplicationError) {
+    return error.code === 'UNAUTHENTICATED';
+  }
+
+  async function flushPendingRevoke(): Promise<void> {
     const row = await deps.session.getPendingRevoke();
     if (!row) return;
     if (pendingRevokeExpired(row)) {
       await deps.session.clearPendingRevoke();
       return;
     }
-    const mustClear = Boolean(options?.switchToUserId && options.switchToUserId !== row.userId);
     try {
       await deps.client.signOut(row.sessionToken);
       await deps.session.clearPendingRevoke();
     } catch (error) {
       const appError = asApplicationError(error);
-      if (appError.code === 'UNAUTHENTICATED' || mustClear) {
+      if (isConfirmedTokenGone(appError)) {
         await deps.session.clearPendingRevoke();
-        return;
       }
-      if (isUnconfirmedNetwork(appError)) return;
-      await deps.session.clearPendingRevoke();
     }
   }
 
@@ -218,7 +218,7 @@ export function createFamilyUseCases(deps: {
         if (pendingRow?.userId === result.userId) {
           await deps.session.clearPendingRevoke();
         } else {
-          await flushPendingRevoke({ switchToUserId: result.userId });
+          await flushPendingRevoke();
         }
         await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
         return { userId: result.userId };
@@ -353,34 +353,36 @@ export function createFamilyUseCases(deps: {
     async signOut(): Promise<SignOutResult> {
       const token = await deps.session.getSessionToken();
       const userId = await deps.session.getUserId();
-      await deps.session.clearSession();
-      await cache.clear();
       if (!token || !userId) {
+        await deps.session.clearSession();
+        await cache.clear();
         return { local: 'signed-out', server: 'revoked' };
       }
       try {
         await deps.client.signOut(token);
+        await deps.session.clearSession();
+        await cache.clear();
         await deps.session.clearPendingRevoke();
         return { local: 'signed-out', server: 'revoked' };
       } catch (error) {
         const appError = asApplicationError(error);
-        if (appError.code === 'UNAUTHENTICATED') {
+        if (isConfirmedTokenGone(appError)) {
+          await deps.session.clearSession();
+          await cache.clear();
           await deps.session.clearPendingRevoke();
           return { local: 'signed-out', server: 'revoked' };
         }
-        if (isUnconfirmedNetwork(appError)) {
+        try {
           await deps.session.savePendingRevoke({
             userId,
             sessionToken: token,
             createdAt: clock.now().toISOString(),
           });
-          return { local: 'signed-out', server: 'unconfirmed' };
+        } catch {
+          return { local: 'still-signed-in', server: 'unconfirmed' };
         }
-        await deps.session.savePendingRevoke({
-          userId,
-          sessionToken: token,
-          createdAt: clock.now().toISOString(),
-        });
+        await deps.session.clearSession();
+        await cache.clear();
         return { local: 'signed-out', server: 'unconfirmed' };
       }
     },

@@ -4,6 +4,7 @@ import {
   createMemoryFamilyCache,
   createMemoryFamilySessionStore,
   familyMembersOrEmpty,
+  type FamilySessionStore,
 } from './family-use-cases';
 import {
   createPendingFamilyOperationDisk,
@@ -264,6 +265,59 @@ describe('family use cases against a real in-process API', () => {
     expect(await family.hasUnconfirmedSessionRevoke()).toBe(false);
     expect(await family.getMembership()).toEqual({ kind: 'unauthenticated' });
     expect(await session.getPendingRevoke()).toBeNull();
+  });
+
+  it('keeps a pending revoke when the server returns a non-network error', async () => {
+    const session = createMemoryFamilySessionStore();
+    await session.savePendingRevoke({
+      userId: 'usr_x',
+      sessionToken: 'ses_x',
+      createdAt: '2026-09-25T02:00:00.000Z',
+    });
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request() {
+          return { status: 500, body: { error: { code: 'INTERNAL', message: 'Family API failed.' } } };
+        },
+      }),
+      session,
+      pending: testPending(),
+      clock: clockAt('2026-09-25T02:00:00.000Z'),
+    });
+    expect(await family.getMembership()).toEqual({ kind: 'unauthenticated' });
+    expect(await family.hasUnconfirmedSessionRevoke()).toBe(true);
+    expect(await session.getPendingRevoke()).toMatchObject({ userId: 'usr_x', sessionToken: 'ses_x' });
+  });
+
+  it('keeps the live session when pending revoke cannot be written to secure storage', async () => {
+    const inner = createMemoryFamilySessionStore();
+    await inner.setSession({ userId: 'usr_x', sessionToken: 'ses_x' });
+    const session: FamilySessionStore = {
+      getSessionToken: () => inner.getSessionToken(),
+      getUserId: () => inner.getUserId(),
+      setSession: (row) => inner.setSession(row),
+      clearSession: () => inner.clearSession(),
+      getPendingRevoke: () => inner.getPendingRevoke(),
+      async savePendingRevoke() {
+        throw new Error('secure store write failed');
+      },
+      clearPendingRevoke: () => inner.clearPendingRevoke(),
+    };
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request() {
+          throw new Error('network down');
+        },
+      }),
+      session,
+      pending: testPending(),
+      clock: clockAt('2026-09-25T02:00:00.000Z'),
+    });
+    expect(await family.signOut()).toEqual({ local: 'still-signed-in', server: 'unconfirmed' });
+    expect(await session.getSessionToken()).toBe('ses_x');
+    expect(await session.getUserId()).toBe('usr_x');
+    expect(await session.getPendingRevoke()).toBeNull();
+    expect(await family.hasUnconfirmedSessionRevoke()).toBe(false);
   });
 
   it('does not drop a pending revoke when a later Apple sign-in fails', async () => {

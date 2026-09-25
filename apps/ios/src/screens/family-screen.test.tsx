@@ -172,6 +172,28 @@ describe('family screen', () => {
     });
   });
 
+  it('keeps the signed-in family page when pending revoke cannot be saved', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      role: 'creator',
+      members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+    });
+    mockFamily.signOut.mockResolvedValue({ local: 'still-signed-in', server: 'unconfirmed' });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('退出登录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('退出登录'));
+    await waitFor(() => {
+      expect(view.getByText('usr_alice')).toBeTruthy();
+      expect(view.getByText('这次退出没做成。这台设备还登着，远端会话也还没确认撤销。')).toBeTruthy();
+      expect(view.queryByText('已经退出登录。')).toBeNull();
+      expect(view.queryByText(/远端会话还没确认撤销，连上之后会再试/)).toBeNull();
+    });
+  });
+
   it('says the device signed out after a confirmed server revoke', async () => {
     jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
     mockFamily.getMembership
