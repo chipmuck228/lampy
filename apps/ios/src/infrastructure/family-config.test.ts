@@ -1,5 +1,6 @@
 import { isFamilyApiConfigured, isSafeFamilyApiBaseUrl } from './family-config';
 import { createFamilyHttpTransport } from './family-http-client';
+import { armFamilyTestNextRequestFailure } from './family-test-driver';
 
 describe('family API URL safety', () => {
   it('treats any non-empty URL as configured so the family entry can appear', () => {
@@ -35,5 +36,23 @@ describe('family API URL safety', () => {
       status: 200,
       body: { family: null },
     });
+  });
+
+  it('lets the test driver fail exactly one request without changing the official entry switch', async () => {
+    expect(isFamilyApiConfigured('')).toBe(false);
+    const previous = process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
+    process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
+    const fetchImpl = jest.fn();
+    const transport = createFamilyHttpTransport({
+      baseUrl: 'http://127.0.0.1:8787',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    armFamilyTestNextRequestFailure();
+    await expect(transport.request({ method: 'POST', path: '/v1/families/fam_1/shares/shr_1/revoke' })).rejects.toMatchObject({
+      code: 'NETWORK',
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    if (previous === undefined) delete process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
+    else process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = previous;
   });
 });

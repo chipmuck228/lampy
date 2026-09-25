@@ -11,6 +11,7 @@ import type {
   SignInResult,
 } from '../family-api/types';
 import { isSafeFamilyApiBaseUrl } from './family-config';
+import { consumeFamilyTestNextRequestFailure } from './family-test-driver';
 
 export type FamilyTransportRequest = {
   method: string;
@@ -255,6 +256,9 @@ export function createFamilyHttpTransport(deps: {
       }
       if (!fetchImpl) {
         throw new ApplicationError('SERVER_UNREACHABLE', 'No HTTP fetch is available.');
+      }
+      if (consumeFamilyTestNextRequestFailure()) {
+        throw new ApplicationError('NETWORK', 'The test driver armed a single request failure.');
       }
       const headers: Record<string, string> = { accept: input.expectBytes ? '*/*' : 'application/json' };
       if (input.bytes) headers['content-type'] = input.contentType || 'application/octet-stream';

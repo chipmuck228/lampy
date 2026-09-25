@@ -14,7 +14,7 @@ import {
   createMemoryFamilyReceiveCache,
   createSqliteFamilyReceiveCache,
 } from '../infrastructure/family-receive-cache';
-import { createNodeFamilyReceiveFiles } from '../infrastructure/family-receive-files';
+import { createNodeFamilyReceiveFiles } from '../infrastructure/family-receive-files-node';
 import { createPendingFamilyOperationDisk, createPendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 import { openPreparedNodeSqliteDatabase } from '../infrastructure/node-sqlite';

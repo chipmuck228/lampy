@@ -9,6 +9,13 @@ import { isApplicationError } from '../application/errors';
 import type { InvitationView } from '../family-api/types';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import {
+  armFamilyTestNextRequestFailure,
+  familyTestIdentityToken,
+  familyTestInviteCode,
+  isFamilyTestDriverEnabled,
+  storeFamilyTestInviteCode,
+} from '../infrastructure/family-test-driver';
 import { createFamilyRefreshGate } from './family-refresh';
 
 function errorText(error: unknown) {
@@ -55,6 +62,7 @@ export default function FamilyScreen() {
   const { width } = useWindowDimensions();
   const readingWidth = Math.min(width, 720);
   const configured = isFamilyApiConfigured();
+  const testDriver = isFamilyTestDriverEnabled();
   const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
   const [membership, setMembership] = useState<FamilyMembershipView | null>(null);
   const [invites, setInvites] = useState<InvitationView[]>([]);
@@ -94,6 +102,9 @@ export default function FamilyScreen() {
           const listed = await family.listPendingInvitations(next.familyId);
           if (!refreshGate.isCurrent(generation)) return 'stale';
           setInvites(listed);
+          if (testDriver && listed[0]?.code) {
+            storeFamilyTestInviteCode(listed[0].code);
+          }
         } catch {
           if (!refreshGate.isCurrent(generation)) return 'stale';
           setInvites([]);
@@ -209,8 +220,73 @@ export default function FamilyScreen() {
           <Text style={styles.body}>还没有接到能用的家庭服务。个人记录还在这台设备上。</Text>
         ) : null}
 
-        {configured && appleAvailable === false ? (
+        {configured && appleAvailable === false && !testDriver ? (
           <Text style={styles.body}>这台设备现在不能用 Apple 登录。个人记录还在这台设备上。</Text>
+        ) : null}
+
+        {configured && testDriver ? (
+          <>
+            <Text style={styles.body}>
+              仅测试环境。这些是本机测试账号，不是真实 Apple，也不是公网家庭服务。
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="测试登录 alice"
+              testID="family-test-sign-in-alice"
+              disabled={busy}
+              onPress={() =>
+                run(async (family) => {
+                  await family.signInWithApple(familyTestIdentityToken('alice'));
+                })
+              }
+              style={styles.hit}
+            >
+              <Text style={styles.action}>测试登录 alice</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="测试登录 bob"
+              testID="family-test-sign-in-bob"
+              disabled={busy}
+              onPress={() =>
+                run(async (family) => {
+                  await family.signInWithApple(familyTestIdentityToken('bob'));
+                })
+              }
+              style={styles.hit}
+            >
+              <Text style={styles.action}>测试登录 bob</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="让下一笔家庭请求失败"
+              testID="family-test-fail-next"
+              disabled={busy}
+              onPress={() => {
+                armFamilyTestNextRequestFailure();
+                setMessage('下一笔家庭请求会失败，可以用来试撤回重试。');
+              }}
+              style={styles.hit}
+            >
+              <Text style={styles.action}>让下一笔家庭请求失败</Text>
+            </Pressable>
+            {familyTestInviteCode() ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="用测试邀请码加入"
+                testID="family-test-accept-invite"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    await family.acceptInvitation(familyTestInviteCode());
+                  })
+                }
+                style={styles.hit}
+              >
+                <Text style={styles.action}>用测试邀请码加入</Text>
+              </Pressable>
+            ) : null}
+          </>
         ) : null}
 
         {configured && membership?.kind === 'unconfirmed' && membership.reason === 'unreachable' ? (
