@@ -16,4 +16,5 @@ npx expo run:ios
 - 实施拆分：`PHASE_0_IMPLEMENTATION_PLAN.md`
 - 未实现能力：`PHASE_0_UNIMPLEMENTED.md`
 - 验证：`PHASE_0_VERIFICATION.md`
-- ADR：`adr/0001`–`0004`（Expo、共享边界、SQLite/文件、家庭同步隔离）
+- 家庭 Phase 3A：`FAMILY_CAPABILITY_AUDIT.md` 起一组文档；无家庭 UI
+- ADR：`adr/0001`–`0006`
