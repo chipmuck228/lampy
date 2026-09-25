@@ -10,7 +10,7 @@ import { createDirectoryMediaBlobStore, createMemoryMediaBlobStore } from './med
 import { MEDIA_MAX_BYTES, sampleAudioBytes, sampleJpegBytes, samplePngBytes } from './media-validate';
 import { openFamilySqliteDatabase } from './node-db';
 import { applyFamilyApiSchema } from './schema';
-import { createMemoryFamilyRepository } from './repository';
+import { createMemoryFamilyRepository, type FamilyTx } from './repository';
 import { createSqliteFamilyRepository } from './sqlite-repository';
 import { createFamilyStore } from './store';
 
@@ -238,7 +238,7 @@ describe('family media object commands', () => {
     const repository = createMemoryFamilyRepository(store);
     let commits = 0;
     const wrapped = {
-      withTransaction<T>(work: Parameters<typeof repository.withTransaction>[0]): Promise<T> {
+      withTransaction<T>(work: (tx: FamilyTx) => Promise<T>): Promise<T> {
         commits += 1;
         if (commits >= 2) {
           return Promise.reject(new Error('disk full'));
@@ -325,7 +325,7 @@ describe('family media object commands', () => {
       const alice = await first.signInWithApple('apple_alice');
       const jpeg = sampleJpegBytes();
       const uploaded = await first.uploadMedia(alice.sessionToken, { bytes: jpeg, mimeType: 'image/jpeg' });
-      writeFileSync(path.join(mediaRoot, `${uploaded.objectId}.partial`), Buffer.from([0xff, 0xd8]));
+      writeFileSync(path.join(mediaRoot, `${uploaded.objectId}.partial`), new Uint8Array([0xff, 0xd8]));
       const names = readdirSync(mediaRoot);
       expect(names).toContain(uploaded.objectId);
       expect(names.every((name) => name === uploaded.objectId || name.endsWith('.partial'))).toBe(true);
