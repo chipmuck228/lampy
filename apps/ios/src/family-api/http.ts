@@ -6,11 +6,14 @@ export type FamilyHttpRequest = {
   path: string;
   headers: Record<string, string | undefined>;
   body?: unknown;
+  bytes?: Uint8Array;
 };
 
 export type FamilyHttpResponse = {
   status: number;
   body: unknown;
+  bytes?: Uint8Array;
+  contentType?: string;
 };
 
 function header(headers: FamilyHttpRequest['headers'], name: string) {
@@ -47,7 +50,16 @@ function statusFor(code: string) {
     case FAMILY_ERROR.CONFLICT:
       return 409;
     case FAMILY_ERROR.BAD_REQUEST:
+    case FAMILY_ERROR.MEDIA_CORRUPT:
       return 400;
+    case FAMILY_ERROR.MEDIA_NOT_FOUND:
+      return 404;
+    case FAMILY_ERROR.MEDIA_TOO_LARGE:
+      return 413;
+    case FAMILY_ERROR.MEDIA_UNSUPPORTED:
+      return 415;
+    case FAMILY_ERROR.MEDIA_WRITE_FAILED:
+      return 507;
     default:
       return 400;
   }
@@ -80,7 +92,7 @@ export async function dispatchFamilyApi(
 
   try {
     if (method === 'GET' && path === '/health') {
-      return { status: 200, body: { ok: true, slice: 'identity-membership' } };
+      return { status: 200, body: { ok: true, slice: 'identity-membership', media: true } };
     }
 
     if (method === 'POST' && path === '/v1/auth/apple') {
@@ -131,6 +143,28 @@ export async function dispatchFamilyApi(
     const dissolve = /^\/v1\/families\/([^/]+)\/dissolve$/.exec(path);
     if (method === 'POST' && dissolve) {
       return { status: 200, body: await commands.dissolveFamily(token || '', dissolve[1]) };
+    }
+
+    if (method === 'POST' && path === '/v1/media') {
+      return {
+        status: 200,
+        body: await commands.uploadMedia(token || '', {
+          bytes: request.bytes || new Uint8Array(),
+          mimeType: header(request.headers, 'content-type') || '',
+          idempotencyKey: idempotencyKey || undefined,
+        }),
+      };
+    }
+
+    const mediaMeta = /^\/v1\/media\/([^/]+)$/.exec(path);
+    if (method === 'GET' && mediaMeta) {
+      return { status: 200, body: await commands.getMediaObject(token || '', mediaMeta[1]) };
+    }
+
+    const mediaContent = /^\/v1\/media\/([^/]+)\/content$/.exec(path);
+    if (method === 'GET' && mediaContent) {
+      const content = await commands.getMediaContent(token || '', mediaContent[1]);
+      return { status: 200, body: { objectId: mediaContent[1], mimeType: content.mimeType, byteLength: content.bytes.length }, bytes: content.bytes, contentType: content.mimeType };
     }
 
     throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Unknown family API route.');

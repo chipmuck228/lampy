@@ -1,6 +1,7 @@
 import { createMapAppleVerifier } from './apple';
 import { createFamilyCommands } from './commands';
 import { dispatchFamilyApi } from './http';
+import { sampleJpegBytes, samplePngBytes } from './media-validate';
 import { createFamilyStore } from './store';
 
 function api() {
@@ -135,5 +136,79 @@ describe('family HTTP contract', () => {
       headers: { authorization: `Bearer ${aliceToken}` },
     });
     expect(listed.status).toBe(401);
+  });
+
+  it('uploads and reads media bytes, and classifies ownership and validation failures', async () => {
+    const commands = api();
+    const alice = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/apple',
+      headers: {},
+      body: { identityToken: 'apple_alice' },
+    });
+    const aliceToken = (alice.body as { sessionToken: string }).sessionToken;
+    const bob = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/apple',
+      headers: {},
+      body: { identityToken: 'apple_bob' },
+    });
+    const bobToken = (bob.body as { sessionToken: string }).sessionToken;
+
+    const uploaded = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/media',
+      headers: { authorization: `Bearer ${aliceToken}`, 'content-type': 'image/jpeg' },
+      bytes: sampleJpegBytes(),
+    });
+    expect(uploaded.status).toBe(200);
+    const object = uploaded.body as { objectId: string; ownerUserId: string };
+    expect(JSON.stringify(uploaded.body)).not.toMatch(/localUri|\/Users\/|ses_/);
+
+    const jsonLocalUri = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/media',
+      headers: { authorization: `Bearer ${aliceToken}`, 'content-type': 'image/jpeg' },
+      body: { localUri: '/Users/zhen/photo.jpg' },
+    });
+    expect(jsonLocalUri.status).toBe(400);
+    expect(JSON.stringify(jsonLocalUri.body)).not.toMatch(/\/Users\/zhen/);
+
+    const forbidden = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: `/v1/media/${object.objectId}/content`,
+      headers: { authorization: `Bearer ${bobToken}` },
+    });
+    expect(forbidden.status).toBe(403);
+
+    const content = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: `/v1/media/${object.objectId}/content`,
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(content.status).toBe(200);
+    expect(content.contentType).toBe('image/jpeg');
+    expect(Array.from(content.bytes || [])).toEqual(Array.from(sampleJpegBytes()));
+
+    const unsupported = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/media',
+      headers: { authorization: `Bearer ${aliceToken}`, 'content-type': 'text/plain' },
+      bytes: samplePngBytes(),
+    });
+    expect(unsupported.status).toBe(415);
+
+    const signedOut = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/sign-out',
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(signedOut.status).toBe(200);
+    const expired = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: `/v1/media/${object.objectId}`,
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    expect(expired.status).toBe(401);
   });
 });

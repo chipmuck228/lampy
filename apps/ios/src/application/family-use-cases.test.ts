@@ -16,6 +16,7 @@ import { dispatchFamilyApi } from '../family-api/http';
 import { createFamilyStore } from '../family-api/store';
 import { createDispatchTransport, createFamilyApiClient } from '../infrastructure/family-http-client';
 import { createMemoryRepositories } from '../infrastructure/repositories';
+import { sampleJpegBytes, samplePngBytes } from '../family-api/media-validate';
 
 function clockAt(iso: string) {
   return { now: () => new Date(iso) };
@@ -810,5 +811,66 @@ describe('client idempotency key retention', () => {
         userId: 'usr_alice',
       }),
     ]);
+  });
+});
+
+describe('family selected media upload', () => {
+  it('uploads only caller-supplied bytes and reports stored or failed without touching personal Moments', async () => {
+    const { family, personal } = createHarness();
+    const saved = await savePersonalNote(personal, '门口的风还在');
+    await family.signInWithApple('apple_alice');
+    expect(family.getSelectedMediaUploadStatus()).toEqual({ status: 'idle' });
+
+    const stored = await family.uploadSelectedMedia({
+      bytes: sampleJpegBytes(),
+      mimeType: 'image/jpeg',
+      idempotencyKey: 'sel-1',
+    });
+    expect(stored.status).toBe('stored');
+    if (stored.status !== 'stored') throw new Error('expected stored');
+    expect(stored.object.objectId).toMatch(/^med_/);
+    expect(JSON.stringify(stored)).not.toMatch(/localUri|已分享|家人已收到/);
+    expect(family.getSelectedMediaUploadStatus().status).toBe('stored');
+
+    const content = await family.getOwnedMediaContent(stored.object.objectId);
+    expect(Array.from(content.bytes)).toEqual(Array.from(sampleJpegBytes()));
+
+    const failed = await family.uploadSelectedMedia({
+      bytes: new Uint8Array([1, 2, 3]),
+      mimeType: 'image/jpeg',
+    });
+    expect(failed).toMatchObject({ status: 'failed', code: 'MEDIA_CORRUPT' });
+    expect((await personal.getRecentLife()).items.map((item) => item.id)).toEqual([saved.id]);
+    const detail = await personal.getMomentDetail(saved.id);
+    expect(detail.kind).toBe('ready');
+  });
+
+  it('does not let another signed-in account read an owned object', async () => {
+    const store = createFamilyStore();
+    const commands = createFamilyCommands({
+      store,
+      apple: createMapAppleVerifier({
+        apple_alice: { appleSubject: 'apple.alice' },
+        apple_bob: { appleSubject: 'apple.bob' },
+      }),
+      clock: clockAt('2026-09-25T02:00:00.000Z'),
+    });
+    const transport = createDispatchTransport((request) => dispatchFamilyApi(commands, request));
+    const alice = createFamilyUseCases({
+      client: createFamilyApiClient(transport),
+      session: createMemoryFamilySessionStore(),
+      pending: testPending(),
+    });
+    const bob = createFamilyUseCases({
+      client: createFamilyApiClient(transport),
+      session: createMemoryFamilySessionStore(),
+      pending: testPending(),
+    });
+    await alice.signInWithApple('apple_alice');
+    await bob.signInWithApple('apple_bob');
+    const stored = await alice.uploadSelectedMedia({ bytes: samplePngBytes(), mimeType: 'image/png' });
+    expect(stored.status).toBe('stored');
+    if (stored.status !== 'stored') throw new Error('expected stored');
+    await expect(bob.getOwnedMedia(stored.object.objectId)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

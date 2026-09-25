@@ -24,11 +24,13 @@ Transmission 家庭目标、ReceivedSnapshot 存储、owner 与 `userId` 对齐�
 
 真实环境身份验收见 `FAMILY_IDENTITY_REAL_ACCEPT.md`。从 `origin/main` `d198a7c` 独立进行。本机单实例与个人库隔离已跑过；本机 `127.0.0.1` 流程与部署服务流程分开记。没有授权测试服务、托管卷探测和真实双账号时 `identityLoopAccepted` 为 false（不要只看退出码）。家庭入口仍关闭。
 
-不做（仍禁止宣称）：Moment 分享、媒体上传、家庭时间线、接收快照、假成员。
+Phase 3B 不做（仍禁止宣称）：Moment 分享、家庭时间线、接收快照、假成员。媒体对象见 F2。
 
-## F2 媒体对象（之后）
+## F2 媒体对象（本切片）
 
-服务端媒体引用。禁止设备路径当分享载荷。
+服务端媒体对象：会话鉴权的 `POST /v1/media`、`GET /v1/media/:id`、`GET /v1/media/:id/content`。对象 ID 不含本机路径；元数据在家庭 SQLite；文件在 `LAMPY_FAMILY_MEDIA_PATH` 或库目录下 `media/`。仅上传者可读。决策见 `FAMILY_F2_MEDIA_OBJECTS.md`。
+
+**不做：** Moment 分享、Transmission 改写、家庭时间线、接收快照、跨设备同步、媒体自动上传、打开家庭入口、宣称身份闭环通过。
 
 ## F3 分享快照（之后）
 

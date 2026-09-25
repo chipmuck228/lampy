@@ -1,7 +1,7 @@
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilySql } from './schema';
 import type { IdempotentRecord } from './store';
-import type { Account, Family, Invitation, Membership, Session } from './types';
+import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session } from './types';
 
 type AccountRow = {
   user_id: string;
@@ -46,6 +46,28 @@ type IdempotentRow = {
   status: number;
   body_json: string;
 };
+
+type MediaRow = {
+  object_id: string;
+  owner_user_id: string;
+  mime_type: string;
+  byte_length: number;
+  content_sha256: string;
+  storage_key: string;
+  created_at: string;
+};
+
+function mediaFrom(row: MediaRow): MediaObjectRecord {
+  return {
+    objectId: row.object_id,
+    ownerUserId: row.owner_user_id,
+    mimeType: row.mime_type,
+    byteLength: row.byte_length,
+    contentSha256: row.content_sha256,
+    storageKey: row.storage_key,
+    createdAt: row.created_at,
+  };
+}
 
 function accountFrom(row: AccountRow): Account {
   return {
@@ -293,6 +315,44 @@ function createSqliteTx(db: FamilySql): FamilyTx {
          VALUES (?, ?, ?, ?, ?, ?)`,
         [userId, command, idempotencyKey, record.requestFingerprint, record.status, JSON.stringify(record.body)],
       );
+    },
+    async findMediaObject(objectId) {
+      const row = await db.getFirst<MediaRow>(
+        `SELECT object_id, owner_user_id, mime_type, byte_length, content_sha256, storage_key, created_at
+         FROM family_media_objects WHERE object_id = ?`,
+        [objectId],
+      );
+      return row ? mediaFrom(row) : null;
+    },
+    async findMediaByOwnerHash(ownerUserId, contentSha256) {
+      const row = await db.getFirst<MediaRow>(
+        `SELECT object_id, owner_user_id, mime_type, byte_length, content_sha256, storage_key, created_at
+         FROM family_media_objects WHERE owner_user_id = ? AND content_sha256 = ?`,
+        [ownerUserId, contentSha256],
+      );
+      return row ? mediaFrom(row) : null;
+    },
+    async saveMediaObject(object) {
+      try {
+        await db.run(
+          `INSERT INTO family_media_objects
+           (object_id, owner_user_id, mime_type, byte_length, content_sha256, storage_key, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            object.objectId,
+            object.ownerUserId,
+            object.mimeType,
+            object.byteLength,
+            object.contentSha256,
+            object.storageKey,
+            object.createdAt,
+          ],
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/UNIQUE|constraint/i.test(message)) throw new FamilyStoreConstraintError('media_hash');
+        throw error;
+      }
     },
   };
 }

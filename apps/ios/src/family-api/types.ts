@@ -63,6 +63,24 @@ export type SignInResult = {
   expiresAt: string;
 };
 
+export type MediaObjectRecord = {
+  objectId: string;
+  ownerUserId: string;
+  mimeType: string;
+  byteLength: number;
+  contentSha256: string;
+  storageKey: string;
+  createdAt: string;
+};
+
+export type MediaObjectView = {
+  objectId: string;
+  ownerUserId: string;
+  mimeType: string;
+  byteLength: number;
+  createdAt: string;
+};
+
 export type InvitationView = {
   invitationId: string;
   familyId: string;
