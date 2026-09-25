@@ -1,7 +1,7 @@
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilySql } from './schema';
 import type { IdempotentRecord } from './store';
-import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session } from './types';
+import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session, ShareRecord, ShareSnapshot } from './types';
 
 type AccountRow = {
   user_id: string;
@@ -56,6 +56,30 @@ type MediaRow = {
   storage_key: string;
   created_at: string;
 };
+
+type ShareRow = {
+  share_id: string;
+  family_id: string;
+  author_user_id: string;
+  source_moment_id: string;
+  source_revision: number;
+  snapshot_json: string;
+  audience_json: string;
+  shared_at: string;
+};
+
+function shareFrom(row: ShareRow): ShareRecord {
+  return {
+    shareId: row.share_id,
+    familyId: row.family_id,
+    authorUserId: row.author_user_id,
+    sourceMomentId: row.source_moment_id,
+    sourceRevision: row.source_revision,
+    snapshot: JSON.parse(row.snapshot_json) as ShareSnapshot,
+    audienceUserIds: JSON.parse(row.audience_json) as string[],
+    sharedAt: row.shared_at,
+  };
+}
 
 function mediaFrom(row: MediaRow): MediaObjectRecord {
   return {
@@ -351,6 +375,46 @@ function createSqliteTx(db: FamilySql): FamilyTx {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (/UNIQUE|constraint/i.test(message)) throw new FamilyStoreConstraintError('media_hash');
+        throw error;
+      }
+    },
+    async findShare(shareId) {
+      const row = await db.getFirst<ShareRow>(
+        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at
+         FROM family_shares WHERE share_id = ?`,
+        [shareId],
+      );
+      return row ? shareFrom(row) : null;
+    },
+    async findShareBySource(familyId, authorUserId, sourceMomentId, sourceRevision) {
+      const row = await db.getFirst<ShareRow>(
+        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at
+         FROM family_shares
+         WHERE family_id = ? AND author_user_id = ? AND source_moment_id = ? AND source_revision = ?`,
+        [familyId, authorUserId, sourceMomentId, sourceRevision],
+      );
+      return row ? shareFrom(row) : null;
+    },
+    async saveShare(share) {
+      try {
+        await db.run(
+          `INSERT INTO family_shares
+           (share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            share.shareId,
+            share.familyId,
+            share.authorUserId,
+            share.sourceMomentId,
+            share.sourceRevision,
+            JSON.stringify(share.snapshot),
+            JSON.stringify(share.audienceUserIds),
+            share.sharedAt,
+          ],
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/UNIQUE|constraint/i.test(message)) throw new FamilyStoreConstraintError('share_revision');
         throw error;
       }
     },

@@ -113,6 +113,17 @@ GET  /v1/media/:id/content  raw bytes
 
 客户端 `uploadSelectedMedia({ bytes, mimeType })` 只上传这次传入的字节，状态为 `idle` / `uploading` / `stored` / `failed`。失败不改个人 Moment。不扫描个人库。
 
+## 分享快照（F3，不是已收到）
+
+```text
+POST /v1/families/:familyId/shares
+GET  /v1/families/:familyId/shares/:shareId
+```
+
+白名单：`note`、`emotion`、时间与精度、本人 F2 `objectId`。`sourceRevision` 由调用方声称。提交时记下 `audienceUserIds`。后来加入者 GET 为 403。成功只表示服务端已保存，不是家人已收到。不下载、不写家庭缓存、不做时间线或撤回。
+
+**信任边界：** 服务端看不到个人 SQLite，不能证明 `sourceMomentId` 对应一条真实个人 Moment，也不知道原件有几条媒体。`expectedMediaCount` 只与同一次请求的 `mediaObjectIds.length` 比较；调用方可以把两者同时设为零。不得宣称服务端验证本人个人原件，或保证原件媒体不会遗漏。实际 App 确认必须从个人库重新读取并逐项核对。
+
 ## 备份与恢复
 
 SQLite 使用 WAL。备份前先停进程或做 checkpoint，然后拷贝主文件和旁路文件：
@@ -173,4 +184,4 @@ npm run family-identity:accept
 
 ## 本轮不做
 
-Moment 分享、Transmission 改写、家庭时间线、接收快照、跨设备同步、媒体自动上传、创建者移交、删除账号、微信领域修改。本目录已含 F2 媒体对象，不是分享完成，也不是身份闭环验收通过。`identityLoopAccepted` 仍为 false，家庭入口仍关闭。
+接收下载、家庭缓存、家庭时间线、撤回、Transmission 改写、跨设备同步、媒体自动上传、创建者移交、删除账号、微信领域修改。本目录已含 F2 媒体与 F3 快照保存，不是家人已收到，也不是身份闭环验收通过。`identityLoopAccepted` 仍为 false，家庭入口仍关闭。

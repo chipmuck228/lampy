@@ -130,6 +130,20 @@ function isAppOwned(localUri: string): boolean {
   return localUri.includes(`/${ASSET_DIR}/`);
 }
 
+export async function readExpoAssetBytes(localUri: string): Promise<Uint8Array> {
+  const info = await FileSystem.getInfoAsync(localUri);
+  if (!info.exists || info.isDirectory) {
+    throw new Error('asset file is missing');
+  }
+  const base64 = await FileSystem.readAsStringAsync(localUri, {
+    encoding: 'base64',
+  });
+  const binary = globalThis.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 export function createExpoMediaStore(): MediaStore {
   return {
     async persistImage({ assetId, sourceUri, mimeType }) {

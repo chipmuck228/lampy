@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../application/container';
 import type { MomentDetailViewModel } from '../../application/use-cases';
+import { isFamilyApiConfigured } from '../../infrastructure/family-config';
 import { MomentAudio, MomentUnknownMedia } from '../../screens/moment-audio';
 import { MomentFeeling } from '../../screens/moment-feeling';
 import { MomentImages } from '../../screens/moment-images';
@@ -94,6 +95,16 @@ export default function MomentDetailScreen() {
             />
             <MomentFeeling feeling={view.feeling} testID="detail-feeling" />
             <Text style={styles.meta}>{view.sourceLabel}</Text>
+            {isFamilyApiConfigured() ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="分享给家里"
+                onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)}
+                style={styles.shareHit}
+              >
+                <Text style={styles.share}>分享给家里</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -120,4 +131,6 @@ const styles = StyleSheet.create({
   meta: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
   retryHit: { minHeight: 44, justifyContent: 'center' },
   retry: { fontSize: 18, lineHeight: 24, color: '#53604F' },
+  shareHit: { minHeight: 44, justifyContent: 'center' },
+  share: { fontSize: 18, lineHeight: 24, color: '#53604F' },
 });

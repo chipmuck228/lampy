@@ -16,11 +16,14 @@ import type {
   InvitationView,
   MediaObjectView,
   MembershipListView,
+  ShareMomentInput,
+  ShareView,
   SignInResult,
 } from './types';
 import type { MediaBlobStore } from './media-blobs';
 import { createMemoryMediaBlobStore } from './media-blobs';
 import { createMediaCommands } from './media-commands';
+import { createShareCommands } from './share-commands';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = {
@@ -41,6 +44,8 @@ export type FamilyCommands = {
   ): Promise<MediaObjectView>;
   getMediaObject(sessionToken: string, objectId: string): Promise<MediaObjectView>;
   getMediaContent(sessionToken: string, objectId: string): Promise<{ mimeType: string; bytes: Uint8Array }>;
+  shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
+  getShare(sessionToken: string, familyId: string, shareId: string): Promise<ShareView>;
 };
 
 function iso(date: Date) {
@@ -196,11 +201,17 @@ export function createFamilyCommands(deps: {
   const sessionTtlMs = deps.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;
   const store = deps.store ?? createFamilyStore();
   const repository = deps.repository ?? createMemoryFamilyRepository(store);
+  const blobs = deps.mediaBlobs ?? createMemoryMediaBlobStore();
   const media = createMediaCommands({
     repository,
-    blobs: deps.mediaBlobs ?? createMemoryMediaBlobStore(),
+    blobs,
     clock,
     assertPayload: assertMediaPayload,
+  });
+  const shares = createShareCommands({
+    repository,
+    blobs,
+    clock,
   });
 
   return {
@@ -488,6 +499,12 @@ export function createFamilyCommands(deps: {
     },
     getMediaContent(sessionToken, objectId) {
       return media.getMediaContent(sessionToken, objectId);
+    },
+    shareMoment(sessionToken, familyId, input) {
+      return shares.shareMoment(sessionToken, familyId, input);
+    },
+    getShare(sessionToken, familyId, shareId) {
+      return shares.getShare(sessionToken, familyId, shareId);
     },
   };
 }

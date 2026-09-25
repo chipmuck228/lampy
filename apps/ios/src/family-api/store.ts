@@ -1,4 +1,4 @@
-import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session } from './types';
+import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session, ShareRecord } from './types';
 
 export type IdempotentRecord = {
   requestFingerprint: string;
@@ -13,6 +13,7 @@ export type FamilyStore = {
   memberships: Membership[];
   invitations: Invitation[];
   mediaObjects: MediaObjectRecord[];
+  shares: ShareRecord[];
   idempotency: Map<string, IdempotentRecord>;
 };
 
@@ -24,6 +25,7 @@ export function createFamilyStore(): FamilyStore {
     memberships: [],
     invitations: [],
     mediaObjects: [],
+    shares: [],
     idempotency: new Map(),
   };
 }

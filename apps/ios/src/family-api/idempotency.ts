@@ -26,6 +26,33 @@ export function fingerprintAcceptInvitation(code: string) {
   return digestStable(`AcceptInvitation:v1:code=${digestStable(code)}`);
 }
 
+export function canonicalizeShareSnapshot(input: {
+  note: string;
+  emotion: string;
+  occurredAt?: string;
+  occurredAtPrecision: string;
+  mediaObjectIds: readonly string[];
+}) {
+  return JSON.stringify({
+    note: input.note,
+    emotion: input.emotion,
+    occurredAt: input.occurredAt || '',
+    occurredAtPrecision: input.occurredAtPrecision,
+    mediaObjectIds: [...input.mediaObjectIds],
+  });
+}
+
+export function fingerprintShareMoment(input: {
+  familyId: string;
+  sourceMomentId: string;
+  sourceRevision: number;
+  snapshotCanonical: string;
+}) {
+  return digestStable(
+    `ShareMoment:v1:familyId=${input.familyId}:moment=${digestStable(input.sourceMomentId)}:rev=${input.sourceRevision}:snap=${digestStable(input.snapshotCanonical)}`,
+  );
+}
+
 export function idempotencyStoreKey(userId: string, command: string, idempotencyKey: string | undefined) {
   if (!idempotencyKey) return undefined;
   return `${userId}:${command}:${idempotencyKey}`;

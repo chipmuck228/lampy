@@ -62,6 +62,18 @@ const MIGRATIONS = [
   );`,
   `CREATE UNIQUE INDEX IF NOT EXISTS family_media_one_hash_per_owner
     ON family_media_objects(owner_user_id, content_sha256);`,
+  `CREATE TABLE IF NOT EXISTS family_shares (
+    share_id TEXT PRIMARY KEY NOT NULL,
+    family_id TEXT NOT NULL,
+    author_user_id TEXT NOT NULL,
+    source_moment_id TEXT NOT NULL,
+    source_revision INTEGER NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    audience_json TEXT NOT NULL,
+    shared_at TEXT NOT NULL
+  );`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS family_shares_one_revision_per_author
+    ON family_shares(family_id, author_user_id, source_moment_id, source_revision);`,
 ];
 
 export async function applyFamilyApiSchema(db: FamilySql): Promise<void> {
