@@ -1,11 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
-import { createAppleJwksVerifier, createMapAppleVerifier } from './apple';
-import { fetchAppleJwks, verifyAppleJwtSignature } from './apple-node';
+import { createMapAppleVerifier } from './apple';
 import { createFamilyCommands } from './commands';
 import { dispatchFamilyApi } from './http';
+import { planFamilyApiListen } from './runtime';
 import { createFamilyStore } from './store';
-import type { AppleVerifier } from './types';
 
 function readBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -35,47 +34,11 @@ function headersOf(req: IncomingMessage) {
   return headers;
 }
 
-function parseTestTokens(raw: string | undefined) {
-  const tokens: Record<string, { appleSubject: string; email?: string }> = {};
-  if (!raw) return tokens;
-  for (const item of raw.split(',')) {
-    const [token, subject, email] = item.split(':').map((part) => part.trim());
-    if (token && subject) {
-      tokens[token] = { appleSubject: subject, email: email || undefined };
-    }
-  }
-  return tokens;
-}
-
-export function startFamilyApiServer(options?: { port?: number; host?: string }) {
-  const mode = process.env.LAMPY_FAMILY_API_MODE || 'unset';
-  const appleClientId = process.env.LAMPY_APPLE_CLIENT_ID || '';
-  const testTokens = parseTestTokens(process.env.LAMPY_FAMILY_API_TEST_TOKENS);
-
-  let apple: AppleVerifier;
-  if (mode === 'test') {
-    if (!Object.keys(testTokens).length) {
-      throw new Error('LAMPY_FAMILY_API_TEST_TOKENS is required in test mode (token:appleSubject[,...]).');
-    }
-    apple = createMapAppleVerifier(testTokens);
-  } else if (mode === 'production') {
-    if (!appleClientId) {
-      throw new Error('LAMPY_APPLE_CLIENT_ID is required in production mode. Do not invent a bundle id or key.');
-    }
-    apple = createAppleJwksVerifier({
-      audience: appleClientId,
-      fetchJwks: fetchAppleJwks,
-      verifySignature: verifyAppleJwtSignature,
-    });
-  } else {
-    throw new Error(
-      'Set LAMPY_FAMILY_API_MODE=test with LAMPY_FAMILY_API_TEST_TOKENS for local review, or LAMPY_FAMILY_API_MODE=production with LAMPY_APPLE_CLIENT_ID after Apple credentials exist. In-memory store is not a deployed production database.',
-    );
-  }
-
+export function startFamilyApiServer(options?: { port?: number; host?: string; env?: NodeJS.ProcessEnv }) {
+  const plan = planFamilyApiListen(options?.env ?? process.env);
   const commands = createFamilyCommands({
     store: createFamilyStore(),
-    apple,
+    apple: createMapAppleVerifier(plan.testTokens),
   });
 
   const port = options?.port ?? Number(process.env.LAMPY_FAMILY_API_PORT || 8787);
@@ -98,11 +61,12 @@ export function startFamilyApiServer(options?: { port?: number; host?: string })
     }
   });
 
-  return new Promise<{ close: () => Promise<void>; port: number; host: string }>((resolve) => {
+  return new Promise<{ close: () => Promise<void>; port: number; host: string; banner: string }>((resolve) => {
     server.listen(port, host, () => {
       resolve({
         port,
         host,
+        banner: plan.banner,
         close: () =>
           new Promise((done, fail) => {
             server.close((error) => (error ? fail(error) : done()));
@@ -115,9 +79,7 @@ export function startFamilyApiServer(options?: { port?: number; host?: string })
 if (require.main === module) {
   startFamilyApiServer()
     .then((listening) => {
-      process.stdout.write(
-        `Lampy family API (test mode, in-memory, NOT production) http://${listening.host}:${listening.port}\n`,
-      );
+      process.stdout.write(`${listening.banner}\nhttp://${listening.host}:${listening.port}\n`);
     })
     .catch((error) => {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);

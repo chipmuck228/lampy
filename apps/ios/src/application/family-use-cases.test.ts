@@ -5,6 +5,10 @@ import {
   createMemoryFamilySessionStore,
   familyMembersOrEmpty,
 } from './family-use-cases';
+import {
+  createPendingFamilyOperationDisk,
+  createPendingFamilyOperationStore,
+} from '../infrastructure/pending-family-operations';
 import { createMapAppleVerifier } from '../family-api/apple';
 import { createFamilyCommands } from '../family-api/commands';
 import { dispatchFamilyApi } from '../family-api/http';
@@ -370,41 +374,146 @@ describe('passive membership loss and family cache', () => {
 });
 
 describe('client idempotency key retention', () => {
-  it('reuses the same key until the operation is confirmed', async () => {
-    const session = createMemoryFamilySessionStore();
-    await session.setSession({ userId: 'usr_alice', sessionToken: 'ses_alice' });
+  function countingClient(paths: { create?: boolean; invite?: boolean }) {
     const keys: string[] = [];
     let failNetwork = true;
-    let next = 0;
-    const family = createFamilyUseCases({
+    return {
+      keys,
+      setFailNetwork(value: boolean) {
+        failNetwork = value;
+      },
       client: createFamilyApiClient({
         async request(input) {
-          if (input.path === '/v1/families') {
+          if (paths.create && input.path === '/v1/families') {
+            keys.push(String(input.idempotencyKey));
+            if (failNetwork) throw new Error('network down');
+            return { status: 200, body: { familyId: 'fam_1', role: 'creator', members: [] } };
+          }
+          if (paths.invite && input.path.startsWith('/v1/families/') && input.path.endsWith('/invitations')) {
             keys.push(String(input.idempotencyKey));
             if (failNetwork) throw new Error('network down');
             return {
               status: 200,
-              body: { familyId: 'fam_1', role: 'creator', members: [] },
+              body: {
+                invitationId: 'inv_1',
+                familyId: 'fam_1',
+                code: 'code_hidden_from_tests_as_result_only',
+                status: 'pending',
+                expiresAt: '2026-09-26T00:00:00.000Z',
+              },
             };
           }
           throw new Error(`unexpected ${input.path}`);
         },
       }),
+    };
+  }
+
+  it('reuses a persisted key after the use-case instance is rebuilt', async () => {
+    const disk = createPendingFamilyOperationDisk();
+    const session = createMemoryFamilySessionStore();
+    await session.setSession({ userId: 'usr_alice', sessionToken: 'ses_alice' });
+    const transport = countingClient({ create: true });
+    let next = 0;
+    const deps = {
+      client: transport.client,
+      pending: createPendingFamilyOperationStore(disk),
+      idempotencyKey: (prefix: string) => {
+        next += 1;
+        return `${prefix}-${next}`;
+      },
+    };
+    const first = createFamilyUseCases({ ...deps, session });
+    await expect(first.createFamily()).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
+
+    const rebuiltSession = createMemoryFamilySessionStore();
+    await rebuiltSession.setSession({ userId: 'usr_alice', sessionToken: 'ses_alice' });
+    const rebuilt = createFamilyUseCases({
+      ...deps,
+      pending: createPendingFamilyOperationStore(disk),
+      session: rebuiltSession,
+    });
+    await expect(rebuilt.createFamily()).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
+    expect(transport.keys).toEqual(['createFamily-1', 'createFamily-1']);
+    expect(JSON.stringify(disk.read())).not.toContain('ses_alice');
+
+    transport.setFailNetwork(false);
+    await rebuilt.createFamily();
+    await rebuilt.createFamily();
+    expect(transport.keys[2]).toBe('createFamily-1');
+    expect(transport.keys[3]).toBe('createFamily-2');
+    expect(disk.read()).toEqual([]);
+  });
+
+  it('does not reuse another account pending key after switching users', async () => {
+    const disk = createPendingFamilyOperationDisk();
+    const transport = countingClient({ create: true });
+    let next = 0;
+    const make = async (userId: string) => {
+      const session = createMemoryFamilySessionStore();
+      await session.setSession({ userId, sessionToken: `ses_${userId}` });
+      return createFamilyUseCases({
+        client: transport.client,
+        session,
+        pending: createPendingFamilyOperationStore(disk),
+        idempotencyKey: (prefix) => {
+          next += 1;
+          return `${prefix}-${next}`;
+        },
+      });
+    };
+
+    await expect((await make('usr_alice')).createFamily()).rejects.toMatchObject({
+      code: 'SERVER_UNREACHABLE',
+    });
+    await expect((await make('usr_bob')).createFamily()).rejects.toMatchObject({
+      code: 'SERVER_UNREACHABLE',
+    });
+    expect(transport.keys).toEqual(['createFamily-1', 'createFamily-2']);
+    expect(disk.read().map((row) => row.userId).sort()).toEqual(['usr_alice', 'usr_bob']);
+  });
+
+  it('starts a new invite operation instead of occupying familyId forever', async () => {
+    const disk = createPendingFamilyOperationDisk();
+    const session = createMemoryFamilySessionStore();
+    await session.setSession({ userId: 'usr_alice', sessionToken: 'ses_alice' });
+    const transport = countingClient({ invite: true });
+    let next = 0;
+    const family = createFamilyUseCases({
+      client: transport.client,
       session,
+      pending: createPendingFamilyOperationStore(disk),
       idempotencyKey: (prefix) => {
         next += 1;
         return `${prefix}-${next}`;
       },
     });
 
-    await expect(family.createFamily()).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
-    await expect(family.createFamily()).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
-    expect(keys).toEqual(['createFamily-1', 'createFamily-1']);
+    await expect(family.inviteMember('fam_1', { operationId: 'op-old' })).rejects.toMatchObject({
+      code: 'SERVER_UNREACHABLE',
+    });
+    await expect(family.inviteMember('fam_1', { operationId: 'op-new', intent: 'new' })).rejects.toMatchObject({
+      code: 'SERVER_UNREACHABLE',
+    });
+    expect(transport.keys).toEqual(['inviteMember-1', 'inviteMember-2']);
 
-    failNetwork = false;
-    await family.createFamily();
-    await family.createFamily();
-    expect(keys[2]).toBe('createFamily-1');
-    expect(keys[3]).toBe('createFamily-2');
+    const rebuilt = createFamilyUseCases({
+      client: transport.client,
+      session,
+      pending: createPendingFamilyOperationStore(disk),
+      idempotencyKey: (prefix) => {
+        next += 1;
+        return `${prefix}-${next}`;
+      },
+    });
+    await expect(rebuilt.retryInviteMember('op-old')).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
+    expect(transport.keys[2]).toBe('inviteMember-1');
+
+    transport.setFailNetwork(false);
+    await rebuilt.retryInviteMember('op-old');
+    await rebuilt.inviteMember('fam_1', { operationId: 'op-after-success', intent: 'new' });
+    expect(transport.keys[3]).toBe('inviteMember-1');
+    expect(transport.keys[4]).toBe('inviteMember-3');
+    expect(disk.read().some((row) => row.operationId === 'op-old')).toBe(false);
   });
 });

@@ -16,7 +16,7 @@ Transmission 家庭目标、ReceivedSnapshot 存储、owner 与 `userId` 对齐�
 
 已在仓库：`src/family-api` 命令 / HTTP / Apple 校验接口；`family-use-cases` + `family-http-client`。测试覆盖未登录、无效 token、邀请过期/撤销/重复接受、已有家庭、非创建者、退出、重试、不可达。失败不改个人 Moment。
 
-未完成 / 未验证：公网部署、持久库、真机 Sign in with Apple、家庭 UI。配置见 `src/family-api/README.md`。
+未完成 / 未验证：公网部署、服务端持久家庭库、真机 Sign in with Apple、家庭 UI。`listen.ts` 在 production 模式拒绝启动。配置见 `src/family-api/README.md`。本机家庭 API **不能**当真实家庭服务用。
 
 不做（仍禁止宣称）：Moment 分享、媒体上传、家庭时间线、接收快照、假家庭页。
 

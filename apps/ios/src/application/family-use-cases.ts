@@ -1,9 +1,20 @@
 import { ApplicationError } from './errors';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
-import type { FamilyMemberView, FamilyView } from '../family-api/types';
+import {
+  createPendingFamilyOperationDisk,
+  createPendingFamilyOperationStore,
+  pendingAcceptOperationId,
+  pendingCreateFamilyOperationId,
+  pendingInviteFingerprint,
+  type FamilyWriteCommand,
+  type PendingFamilyOperationStore,
+} from '../infrastructure/pending-family-operations';
+import { fingerprintAcceptInvitation, fingerprintCreateFamily } from '../family-api/idempotency';
+import type { FamilyMemberView, FamilyView, InvitationView } from '../family-api/types';
 
 export type FamilySessionStore = {
   getSessionToken(): Promise<string | null>;
+  getUserId(): Promise<string | null>;
   setSession(session: { userId: string; sessionToken: string }): Promise<void>;
   clearSession(): Promise<void>;
 };
@@ -18,7 +29,17 @@ export type FamilyMembershipView =
   | { kind: 'none' }
   | { kind: 'ready'; familyId: string; role: 'creator' | 'member'; members: FamilyMemberView[] };
 
+export type InviteMemberOptions = {
+  operationId?: string;
+  intent?: 'new' | 'retry';
+  idempotencyKey?: string;
+};
+
 function newIdempotencyKey(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function newOperationId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
@@ -35,6 +56,9 @@ export function createMemoryFamilySessionStore(): FamilySessionStore {
   return {
     async getSessionToken() {
       return current?.sessionToken ?? null;
+    },
+    async getUserId() {
+      return current?.userId ?? null;
     },
     async setSession(session) {
       current = session;
@@ -69,58 +93,63 @@ export function createFamilyUseCases(deps: {
   client: FamilyApiClient;
   session: FamilySessionStore;
   cache?: FamilyCache;
+  pending?: PendingFamilyOperationStore;
   idempotencyKey?: (prefix: string) => string;
+  operationId?: (prefix: string) => string;
+  clock?: { now: () => Date };
 }) {
   const cache = deps.cache ?? createNoopFamilyCache();
+  const pending = deps.pending ?? createPendingFamilyOperationStore(createPendingFamilyOperationDisk());
   const nextKey = deps.idempotencyKey ?? newIdempotencyKey;
-  const pendingKeys = new Map<string, string>();
-
-  function operationSlot(command: string, part?: string) {
-    return part ? `${command}:${part}` : command;
-  }
-
-  function keyFor(command: string, part: string | undefined, explicit?: string) {
-    if (explicit) return explicit;
-    const slot = operationSlot(command, part);
-    const existing = pendingKeys.get(slot);
-    if (existing) return existing;
-    const created = nextKey(command);
-    pendingKeys.set(slot, created);
-    return created;
-  }
-
-  function settle(command: string, part?: string) {
-    pendingKeys.delete(operationSlot(command, part));
-  }
+  const nextOperationId = deps.operationId ?? newOperationId;
+  const clock = deps.clock ?? { now: () => new Date() };
 
   function isUnconfirmedNetwork(error: ApplicationError) {
     return error.code === 'SERVER_UNREACHABLE' || error.code === 'NETWORK';
   }
 
-  async function withRetainedKey<T>(
-    command: string,
-    part: string | undefined,
-    explicit: string | undefined,
-    work: (key: string) => Promise<T>,
-  ): Promise<T> {
-    const key = keyFor(command, part, explicit);
+  async function requireAccount() {
+    const sessionToken = await deps.session.getSessionToken();
+    const userId = await deps.session.getUserId();
+    if (!sessionToken || !userId) {
+      throw new ApplicationError('UNAUTHENTICATED', 'Sign in is required.');
+    }
+    return { sessionToken, userId };
+  }
+
+  async function withPending<T>(input: {
+    command: FamilyWriteCommand;
+    operationId: string;
+    requestFingerprint: string;
+    familyId?: string;
+    idempotencyKey?: string;
+    work: (key: string) => Promise<T>;
+  }): Promise<T> {
+    const { userId } = await requireAccount();
+    const existing = await pending.find(userId, input.command, input.operationId);
+    const idempotencyKey = existing?.idempotencyKey ?? input.idempotencyKey ?? nextKey(input.command);
+    if (!existing) {
+      await pending.save({
+        command: input.command,
+        requestFingerprint: input.requestFingerprint,
+        operationId: input.operationId,
+        idempotencyKey,
+        userId,
+        createdAt: clock.now().toISOString(),
+        familyId: input.familyId,
+      });
+    }
     try {
-      const result = await work(key);
-      settle(command, part);
+      const result = await input.work(existing?.idempotencyKey ?? idempotencyKey);
+      await pending.remove(userId, input.command, input.operationId);
       return result;
     } catch (error) {
       const appError = asApplicationError(error);
-      if (!isUnconfirmedNetwork(appError)) settle(command, part);
+      if (!isUnconfirmedNetwork(appError)) {
+        await pending.remove(userId, input.command, input.operationId);
+      }
       throw appError;
     }
-  }
-
-  async function requireSession() {
-    const token = await deps.session.getSessionToken();
-    if (!token) {
-      throw new ApplicationError('UNAUTHENTICATED', 'Sign in is required.');
-    }
-    return token;
   }
 
   return {
@@ -165,46 +194,88 @@ export function createFamilyUseCases(deps: {
     },
 
     async createFamily(idempotencyKey?: string) {
-      const token = await requireSession();
-      return withRetainedKey('createFamily', undefined, idempotencyKey, (key) =>
-        deps.client.createFamily(token, key),
-      );
+      const { sessionToken } = await requireAccount();
+      return withPending({
+        command: 'createFamily',
+        operationId: pendingCreateFamilyOperationId(),
+        requestFingerprint: fingerprintCreateFamily(),
+        idempotencyKey,
+        work: (key) => deps.client.createFamily(sessionToken, key),
+      });
     },
 
-    async inviteMember(familyId: string, idempotencyKey?: string) {
-      const token = await requireSession();
-      return withRetainedKey('inviteMember', familyId, idempotencyKey, (key) =>
-        deps.client.inviteMember(token, familyId, key),
-      );
+    async inviteMember(familyId: string, options?: string | InviteMemberOptions): Promise<InvitationView> {
+      const parsed: InviteMemberOptions = typeof options === 'string' ? { idempotencyKey: options } : options || {};
+      const intent = parsed.intent ?? 'new';
+      const { sessionToken, userId } = await requireAccount();
+      let operationId = parsed.operationId;
+      if (intent === 'retry') {
+        if (!operationId) {
+          throw new ApplicationError('PENDING_NOT_FOUND', 'Retrying an invite requires the pending operation id.');
+        }
+        const existing = await pending.find(userId, 'inviteMember', operationId);
+        if (!existing || existing.familyId !== familyId) {
+          throw new ApplicationError('PENDING_NOT_FOUND', 'No pending invite operation to retry.');
+        }
+      } else if (!operationId) {
+        operationId = nextOperationId('invite');
+      }
+      return withPending({
+        command: 'inviteMember',
+        operationId,
+        requestFingerprint: pendingInviteFingerprint(familyId, operationId),
+        familyId,
+        idempotencyKey: parsed.idempotencyKey,
+        work: (key) => deps.client.inviteMember(sessionToken, familyId, key),
+      });
+    },
+
+    async retryInviteMember(operationId: string): Promise<InvitationView> {
+      const { sessionToken, userId } = await requireAccount();
+      const existing = await pending.find(userId, 'inviteMember', operationId);
+      if (!existing?.familyId) {
+        throw new ApplicationError('PENDING_NOT_FOUND', 'No pending invite operation to retry.');
+      }
+      return withPending({
+        command: 'inviteMember',
+        operationId,
+        requestFingerprint: existing.requestFingerprint,
+        familyId: existing.familyId,
+        work: (key) => deps.client.inviteMember(sessionToken, existing.familyId as string, key),
+      });
     },
 
     async revokeInvitation(invitationId: string) {
-      const token = await requireSession();
-      return deps.client.revokeInvitation(token, invitationId);
+      const { sessionToken } = await requireAccount();
+      return deps.client.revokeInvitation(sessionToken, invitationId);
     },
 
     async acceptInvitation(code: string, idempotencyKey?: string) {
-      const token = await requireSession();
-      return withRetainedKey('acceptInvitation', code, idempotencyKey, (key) =>
-        deps.client.acceptInvitation(token, code, key),
-      );
+      const { sessionToken } = await requireAccount();
+      return withPending({
+        command: 'acceptInvitation',
+        operationId: pendingAcceptOperationId(code),
+        requestFingerprint: fingerprintAcceptInvitation(code),
+        idempotencyKey,
+        work: (key) => deps.client.acceptInvitation(sessionToken, code, key),
+      });
     },
 
     async leaveFamily() {
-      const token = await requireSession();
-      const result = await deps.client.leaveFamily(token);
+      const { sessionToken } = await requireAccount();
+      const result = await deps.client.leaveFamily(sessionToken);
       await cache.clear();
       return result;
     },
 
     async removeMember(familyId: string, userId: string) {
-      const token = await requireSession();
-      return deps.client.removeMember(token, familyId, userId);
+      const { sessionToken } = await requireAccount();
+      return deps.client.removeMember(sessionToken, familyId, userId);
     },
 
     async dissolveFamily(familyId: string) {
-      const token = await requireSession();
-      const result = await deps.client.dissolveFamily(token, familyId);
+      const { sessionToken } = await requireAccount();
+      const result = await deps.client.dissolveFamily(sessionToken, familyId);
       await cache.clear();
       return result;
     },

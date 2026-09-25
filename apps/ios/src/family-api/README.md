@@ -6,8 +6,8 @@
 
 - 进程内命令：`createFamilyCommands`（账户、会话、家庭、成员、邀请）。
 - HTTP：`dispatchFamilyApi`；本地监听：`listen.ts`。
-- 存储：内存。重启即丢。生产需要另选持久库（本轮未做）。
-- Apple：`createAppleJwksVerifier` 按 iss / aud / exp / sub / RS256 校验。`listen.ts` 在 `LAMPY_FAMILY_API_MODE=production` 时走 Apple JWKS。测试用 `createMapAppleVerifier`，不得当作生产成员。
+- 存储：内存。进程重启即丢。**在接入带事务约束的持久家庭数据库之前，`LAMPY_FAMILY_API_MODE=production` 必须拒绝启动。** Apple JWT 校验就绪不等于生产后端就绪。
+- Apple：`createAppleJwksVerifier` 只是令牌校验接口，供以后接入真实库时使用。`listen.ts` 仅允许 `test` 模式，并用 `createMapAppleVerifier`。测试 token **不得**在 production 启用。
 - 邮箱不当主键。登录成功不创建 Membership。
 
 ## 配置清单（均需真实值，禁止编造）
@@ -16,8 +16,8 @@
 | --- | --- |
 | `LAMPY_FAMILY_API_MODE=test` | 本地审阅。必须同时设 `LAMPY_FAMILY_API_TEST_TOKENS` |
 | `LAMPY_FAMILY_API_TEST_TOKENS` | `token:appleSubject` 逗号分隔。仅测试 |
-| `LAMPY_FAMILY_API_MODE=production` | 真实验证 Apple identity token |
-| `LAMPY_APPLE_CLIENT_ID` | production 模式必填（Services ID / Bundle ID） |
+| `LAMPY_FAMILY_API_MODE=production` | **拒绝启动**（仍无持久家庭库） |
+| `LAMPY_APPLE_CLIENT_ID` | 本 listen 进程不会走到生产校验 |
 | `LAMPY_FAMILY_API_PORT` | 默认 `8787` |
 | `LAMPY_FAMILY_API_HOST` | 默认 `127.0.0.1` |
 | iOS `EXPO_PUBLIC_FAMILY_API_BASE_URL` | 客户端指向上述服务。未配置则视为不可达，不展示成员 |
@@ -33,9 +33,9 @@ LAMPY_FAMILY_API_TEST_TOKENS='review-token:apple.review.sub' \
 npm run family-api
 ```
 
-入口是 `scripts/family-api.cjs`（用已有 `typescript` 转译本目录）。没有公网进程、没有持久库。
+入口是 `scripts/family-api.cjs`。启动成功时的横幅写明 **in-memory / NOT a production deploy**。没有公网进程、没有持久家庭库。本进程不能供真实家庭使用。
 
-`GET /health` 只表示本进程在听，不表示已部署或已通过 Apple。
+`GET /health` 只表示本测试进程在听，不表示已部署，也不表示生产后端就绪。
 
 ## 客户端路径
 

@@ -38,6 +38,16 @@ const MIGRATIONS = [
   );`,
   `CREATE INDEX IF NOT EXISTS moments_active_occurred_at
     ON moments (lifecycle_status, occurred_at);`,
+  `CREATE TABLE IF NOT EXISTS family_pending_operations (
+    user_id TEXT NOT NULL,
+    command TEXT NOT NULL,
+    request_fingerprint TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    param_family_id TEXT,
+    PRIMARY KEY (user_id, command, operation_id)
+  );`,
 ];
 
 export async function applyLampySchema(db: SqlDatabase): Promise<void> {
