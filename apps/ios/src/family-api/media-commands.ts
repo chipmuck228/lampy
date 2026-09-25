@@ -54,6 +54,41 @@ async function requireOwnedMedia(tx: FamilyTx, sessionToken: string, objectId: s
   return row;
 }
 
+async function blobMatchesRecord(blobs: MediaBlobStore, row: MediaObjectRecord) {
+  try {
+    const bytes = await blobs.read(row.storageKey);
+    return bytes.length === row.byteLength && sha256MediaBytes(bytes) === row.contentSha256;
+  } catch {
+    return false;
+  }
+}
+
+async function requireReadableOrRestore(
+  blobs: MediaBlobStore,
+  row: MediaObjectRecord,
+  incoming: Uint8Array,
+) {
+  if (await blobMatchesRecord(blobs, row)) return;
+  if (incoming.length !== row.byteLength || sha256MediaBytes(incoming) !== row.contentSha256) {
+    throw new FamilyError(FAMILY_ERROR.MEDIA_NOT_FOUND, 'Media object was not found.');
+  }
+  try {
+    await blobs.write(row.storageKey, incoming);
+  } catch (error) {
+    if (error instanceof FamilyError) throw error;
+    throw new FamilyError(FAMILY_ERROR.MEDIA_WRITE_FAILED, 'Media could not be stored.');
+  }
+  if (!(await blobMatchesRecord(blobs, row))) {
+    throw new FamilyError(FAMILY_ERROR.MEDIA_WRITE_FAILED, 'Media could not be stored.');
+  }
+}
+
+function asMediaView(body: unknown): MediaObjectView | null {
+  if (!body || typeof body !== 'object') return null;
+  const objectId = (body as { objectId?: unknown }).objectId;
+  return typeof objectId === 'string' && objectId ? (body as MediaObjectView) : null;
+}
+
 export function createMediaCommands(deps: {
   repository: FamilyRepository;
   blobs: MediaBlobStore;
@@ -78,7 +113,14 @@ export function createMediaCommands(deps: {
             if (existing.requestFingerprint !== fingerprint) {
               throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.');
             }
-            return { kind: 'replay' as const, view: existing.body as MediaObjectView };
+            const replayed = asMediaView(existing.body);
+            const row =
+              (replayed ? await tx.findMediaObject(replayed.objectId) : null) ??
+              (await tx.findMediaByOwnerHash(userId, sha256));
+            if (!row || row.ownerUserId !== userId) {
+              throw new FamilyError(FAMILY_ERROR.MEDIA_NOT_FOUND, 'Media object was not found.');
+            }
+            return { kind: 'reuse' as const, row };
           }
         }
         const sameHash = await tx.findMediaByOwnerHash(userId, sha256);
@@ -90,11 +132,14 @@ export function createMediaCommands(deps: {
               body: toView(sameHash),
             });
           }
-          return { kind: 'replay' as const, view: toView(sameHash) };
+          return { kind: 'reuse' as const, row: sameHash };
         }
         return { kind: 'create' as const, userId };
       });
-      if (prepared.kind === 'replay') return prepared.view;
+      if (prepared.kind === 'reuse') {
+        await requireReadableOrRestore(deps.blobs, prepared.row, bytes);
+        return toView(prepared.row);
+      }
 
       const objectId = (deps.objectId ?? newObjectId)();
       const row: MediaObjectRecord = {
@@ -130,6 +175,8 @@ export function createMediaCommands(deps: {
             row.objectId = raced.objectId;
             row.storageKey = raced.storageKey;
             row.createdAt = raced.createdAt;
+            row.contentSha256 = raced.contentSha256;
+            row.byteLength = raced.byteLength;
             return;
           }
           try {
@@ -161,6 +208,7 @@ export function createMediaCommands(deps: {
       }
       if (row.storageKey !== objectId) {
         await deps.blobs.remove(objectId);
+        await requireReadableOrRestore(deps.blobs, row, bytes);
       }
       return toView(row);
     },
@@ -176,7 +224,7 @@ export function createMediaCommands(deps: {
         return requireOwnedMedia(tx, sessionToken, objectId, clock.now());
       });
       const bytes = await deps.blobs.read(row.storageKey);
-      if (bytes.length !== row.byteLength) {
+      if (bytes.length !== row.byteLength || sha256MediaBytes(bytes) !== row.contentSha256) {
         throw new FamilyError(FAMILY_ERROR.MEDIA_NOT_FOUND, 'Media object was not found.');
       }
       return { mimeType: row.mimeType, bytes };

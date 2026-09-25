@@ -109,7 +109,7 @@ GET  /v1/media/:id      元数据 { objectId, ownerUserId, mimeType, byteLength,
 GET  /v1/media/:id/content  raw bytes
 ```
 
-限制：单对象 8 MiB；声明 MIME 须与魔数一致；可选 `Idempotency-Key`；同一用户同一内容哈希复用对象。只有上传者且会话有效才能读。他人知道 objectId 也是 403。失败（过大、不支持、损坏、磁盘不足、元数据未提交）不得返回已保存，并删除本次写入。响应、日志、SQLite 行不含本机路径或会话令牌。`storage_key` 只存 `objectId`。F2 不提供删除 API，退出/解散也不删对象。
+限制：单对象 8 MiB；声明 MIME 须与文件头一致（JPEG `FF D8 FF`、PNG 签名、MP4 `ftyp`）。F2 **不解码**整文件，带正确文件头的截断体仍可能被收下。可选 `Idempotency-Key`；同一用户同一内容哈希可复用对象，但复用前必须读到与 `contentSha256` 一致的文件，否则用这次字节写回原 key 并再核验，写不回不得返回已保存。读取内容时同时核长度和哈希。只有上传者且会话有效才能读。他人知道 objectId 也是 403。失败（过大、不支持、文件头不符、磁盘不足、元数据未提交、复用时文件无法确认）不得返回已保存。响应、日志、SQLite 行不含本机路径或会话令牌。`storage_key` 只存 `objectId`。F2 不提供删除 API，退出/解散也不删对象。
 
 客户端 `uploadSelectedMedia({ bytes, mimeType })` 只上传这次传入的字节，状态为 `idle` / `uploading` / `stored` / `failed`。失败不改个人 Moment。不扫描个人库。
 

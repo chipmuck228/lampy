@@ -116,6 +116,103 @@ describe('family media object commands', () => {
     expect(blobs.files.size).toBe(2);
   });
 
+  it('does not reuse a missing blob via idempotency key or content hash until the file is restored', async () => {
+    const { commands, blobs } = setup();
+    const alice = await commands.signInWithApple('apple_alice');
+    const jpeg = sampleJpegBytes();
+    const first = await commands.uploadMedia(alice.sessionToken, {
+      bytes: jpeg,
+      mimeType: 'image/jpeg',
+      idempotencyKey: 'photo-retry',
+    });
+    await blobs.remove(first.objectId);
+    expect(blobs.files.size).toBe(0);
+
+    const byKey = await commands.uploadMedia(alice.sessionToken, {
+      bytes: jpeg,
+      mimeType: 'image/jpeg',
+      idempotencyKey: 'photo-retry',
+    });
+    expect(byKey.objectId).toBe(first.objectId);
+    expect(Array.from((await commands.getMediaContent(alice.sessionToken, first.objectId)).bytes)).toEqual(
+      Array.from(jpeg),
+    );
+
+    await blobs.remove(first.objectId);
+    const byHash = await commands.uploadMedia(alice.sessionToken, {
+      bytes: jpeg,
+      mimeType: 'image/jpeg',
+      idempotencyKey: 'photo-retry-hash',
+    });
+    expect(byHash.objectId).toBe(first.objectId);
+    expect(Array.from((await commands.getMediaContent(alice.sessionToken, first.objectId)).bytes)).toEqual(
+      Array.from(jpeg),
+    );
+
+    await blobs.remove(first.objectId);
+    const originalWrite = blobs.write.bind(blobs);
+    blobs.write = async () => {
+      throw new FamilyError(FAMILY_ERROR.MEDIA_WRITE_FAILED, 'Not enough disk space to store media.');
+    };
+    await expect(
+      commands.uploadMedia(alice.sessionToken, {
+        bytes: jpeg,
+        mimeType: 'image/jpeg',
+        idempotencyKey: 'photo-retry',
+      }),
+    ).rejects.toMatchObject({ code: FAMILY_ERROR.MEDIA_WRITE_FAILED });
+    await expect(
+      commands.uploadMedia(alice.sessionToken, {
+        bytes: jpeg,
+        mimeType: 'image/jpeg',
+        idempotencyKey: 'photo-retry-hash-2',
+      }),
+    ).rejects.toMatchObject({ code: FAMILY_ERROR.MEDIA_WRITE_FAILED });
+    expect(blobs.files.size).toBe(0);
+    await expect(commands.getMediaContent(alice.sessionToken, first.objectId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.MEDIA_NOT_FOUND,
+    });
+    blobs.write = originalWrite;
+  });
+
+  it('rejects same-length corrupt content and restores it on a verified retry', async () => {
+    const { commands, blobs } = setup();
+    const alice = await commands.signInWithApple('apple_alice');
+    const jpeg = sampleJpegBytes();
+    const stored = await commands.uploadMedia(alice.sessionToken, {
+      bytes: jpeg,
+      mimeType: 'image/jpeg',
+      idempotencyKey: 'photo-corrupt',
+    });
+    const corrupt = new Uint8Array(jpeg);
+    corrupt[corrupt.length - 1] = (corrupt[corrupt.length - 1] ?? 0) ^ 0xff;
+    blobs.files.set(stored.objectId, corrupt);
+    expect(corrupt.length).toBe(jpeg.length);
+    await expect(commands.getMediaContent(alice.sessionToken, stored.objectId)).rejects.toMatchObject({
+      code: FAMILY_ERROR.MEDIA_NOT_FOUND,
+    });
+
+    const restoredByKey = await commands.uploadMedia(alice.sessionToken, {
+      bytes: jpeg,
+      mimeType: 'image/jpeg',
+      idempotencyKey: 'photo-corrupt',
+    });
+    expect(restoredByKey.objectId).toBe(stored.objectId);
+    expect(Array.from((await commands.getMediaContent(alice.sessionToken, stored.objectId)).bytes)).toEqual(
+      Array.from(jpeg),
+    );
+
+    blobs.files.set(stored.objectId, corrupt);
+    const restoredByHash = await commands.uploadMedia(alice.sessionToken, {
+      bytes: jpeg,
+      mimeType: 'image/jpeg',
+    });
+    expect(restoredByHash.objectId).toBe(stored.objectId);
+    expect(Array.from((await commands.getMediaContent(alice.sessionToken, stored.objectId)).bytes)).toEqual(
+      Array.from(jpeg),
+    );
+  });
+
   it('does not return saved when blob write or metadata commit fails, and removes the orphan', async () => {
     const failingWrite = createMemoryMediaBlobStore();
     failingWrite.write = async () => {
