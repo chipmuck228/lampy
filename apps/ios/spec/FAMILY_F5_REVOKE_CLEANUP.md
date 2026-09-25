@@ -42,7 +42,7 @@ family_shares
 1. **界面先隐藏**家庭内容（资格不是 `ready`，或该分享不在本次授权列表）。
 2. 确认失去资格（退出成功、解散成功、`getMembership` 为 `none`、列表/读取返回 `NOT_IN_FAMILY`）后：删除该账号该家的 `family_received_shares` / `family_received_media` 行。
 3. 再删 `family-cache/{userId}/{familyId}/` 下文件与 `.part`。单条撤回只删 `{shareId}/`。
-4. 文件删除失败：行已删，界面保持隐藏，待清理只记录**当时失效的分享路径**（`userId/familyId/shareId`），不把整个 `userId/` 当可重试删除目标。**已隐藏 ≠ 磁盘已清理**。`recoverDisk` 重试前先核当前有效缓存行；账号/家庭级目录下若已有新的授权行，只删无对应行的旧文件。
+4. 文件删除失败：行已删，界面保持隐藏，待清理只记录**当时失效或磁盘上仍在的分享路径**（`userId/familyId/shareId`），不把整个 `userId/` 当可重试删除目标。没有缓存行但目录里仍有孤儿文件时，`diskCleared` 必须以实际文件是否清除为准，并留下这些路径供重试。**已隐藏 ≠ 磁盘已清理**。`recoverDisk` 重试前先核当前有效缓存行；账号/家庭级目录下若已有新的授权行，只删无对应行的旧文件。
 5. 不碰个人 `moments` / `assets` / `lampy-assets/`。不删服务端 F2 文件。
 
 ## API

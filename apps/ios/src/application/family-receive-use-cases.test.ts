@@ -445,6 +445,36 @@ describe('family receive cache use cases', () => {
     }
   });
 
+  it('does not report disk cleared when account cleanup finds leftover files and no cache rows', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'lampy-f5-orphan-'));
+    try {
+      const file = path.join(dir, 'lampy.db');
+      const cacheDir = path.join(dir, 'family-cache');
+      const realFiles = createNodeFamilyReceiveFiles(cacheDir);
+      const orphanPrefix = 'usr_bob/fam_left/shr_orphan';
+      await realFiles.write(`${orphanPrefix}/obj`, sampleJpegBytes());
+      const files = {
+        write: realFiles.write.bind(realFiles),
+        read: realFiles.read.bind(realFiles),
+        remove: realFiles.remove.bind(realFiles),
+        listKeys: realFiles.listKeys.bind(realFiles),
+        async removePrefix() {
+          throw new Error('cannot delete leftover files');
+        },
+      };
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const cache = createSqliteFamilyReceiveCache(db, files);
+      const isolated = await cache.isolateAccount('usr_bob');
+      expect(isolated).toEqual({ hidden: true, diskCleared: false });
+      expect(isolated.diskCleared).not.toBe(true);
+      expect(await cache.pendingCleanupPrefixes()).toContain(orphanPrefix);
+      expect(await files.listKeys()).toContain(`${orphanPrefix}/obj`);
+      await db.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('shows only the latest authorized list and hides when the list request fails', async () => {
     const commands = createCommands();
     const receiveCache = createMemoryFamilyReceiveCache();

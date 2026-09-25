@@ -198,10 +198,16 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
         if (media[i]?.userId === userId) media.splice(i, 1);
       }
       deleteUnauthorized(userId, allowedPrefixes());
-      const diskCleared = ![...files.keys()].some((key) => isUnderPrefix(key, userId));
+      const leftovers = leftoverSharePrefixes(allowedPrefixes()).filter((item) => isUnderPrefix(item, userId));
+      const diskCleared = leftovers.length === 0 && ![...files.keys()].some((key) => isUnderPrefix(key, userId));
       pending.delete(userId);
-      if (!diskCleared) doomed.forEach((prefix) => pending.add(prefix));
-      else doomed.forEach((prefix) => pending.delete(prefix));
+      const targets = leftovers.length ? leftovers : doomed;
+      if (!diskCleared) {
+        if (targets.length) targets.forEach((prefix) => pending.add(prefix));
+        else pending.add(userId);
+      } else {
+        doomed.forEach((prefix) => pending.delete(prefix));
+      }
       return { hidden: true as const, diskCleared };
     },
     async isolateFamily(userId, familyId) {
@@ -216,10 +222,16 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
         if (media[i]?.userId === userId && media[i]?.familyId === familyId) media.splice(i, 1);
       }
       deleteUnauthorized(prefix, allowedPrefixes());
-      const diskCleared = ![...files.keys()].some((key) => isUnderPrefix(key, prefix));
+      const leftovers = leftoverSharePrefixes(allowedPrefixes()).filter((item) => isUnderPrefix(item, prefix));
+      const diskCleared = leftovers.length === 0 && ![...files.keys()].some((key) => isUnderPrefix(key, prefix));
       pending.delete(prefix);
-      if (!diskCleared) doomed.forEach((item) => pending.add(item));
-      else doomed.forEach((item) => pending.delete(item));
+      const targets = leftovers.length ? leftovers : doomed;
+      if (!diskCleared) {
+        if (targets.length) targets.forEach((item) => pending.add(item));
+        else pending.add(prefix);
+      } else {
+        doomed.forEach((item) => pending.delete(item));
+      }
       return { hidden: true as const, diskCleared };
     },
     async isolateShare(userId, familyId, shareId) {
@@ -394,6 +406,17 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     return false;
   }
 
+  async function leftoverTargetsUnder(prefix: string) {
+    const leftovers = new Set<string>();
+    for (const key of await files.listKeys()) {
+      if (!isUnderPrefix(key, prefix)) continue;
+      const parts = key.split('/').filter(Boolean);
+      if (parts.length >= 3) leftovers.add(`${parts[0]}/${parts[1]}/${parts[2]}`);
+      else leftovers.add(key);
+    }
+    return leftovers;
+  }
+
   async function isolateRowsThenFiles(
     doomed: string[],
     broadPrefix: string,
@@ -403,18 +426,26 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     const allowed = await authorizedPrefixes();
     if ([...allowed].some((share) => isUnderPrefix(share, broadPrefix))) {
       const diskCleared = await removeUnauthorizedUnder(broadPrefix, allowed);
-      return { hidden: true, diskCleared };
+      return { hidden: true, diskCleared: diskCleared && (await leftoverTargetsUnder(broadPrefix)).size === 0 };
     }
     if (await tryRemovePrefix(broadPrefix)) {
       for (const prefix of doomed) await clearPending(prefix);
-      return { hidden: true, diskCleared: true };
+      if ((await leftoverTargetsUnder(broadPrefix)).size === 0) {
+        return { hidden: true, diskCleared: true };
+      }
     }
     await clearPending(broadPrefix);
-    let diskCleared = doomed.length === 0;
-    for (const prefix of doomed) {
+    const targets = new Set(doomed);
+    for (const leftover of await leftoverTargetsUnder(broadPrefix)) targets.add(leftover);
+    let diskCleared = true;
+    for (const prefix of targets) {
       if (await tryRemovePrefix(prefix)) continue;
       await markPending(prefix);
       diskCleared = false;
+    }
+    if ((await leftoverTargetsUnder(broadPrefix)).size > 0) {
+      diskCleared = false;
+      if (targets.size === 0) await markPending(broadPrefix);
     }
     return { hidden: true, diskCleared };
   }
