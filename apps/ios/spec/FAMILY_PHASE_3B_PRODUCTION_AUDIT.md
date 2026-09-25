@@ -9,7 +9,7 @@
 | 审计起点 `origin/main`（含 PR #9） | `fea7780377908ed1e3e9a931a42e95f092e1ab18` |
 | PR #9 merge | https://github.com/chipmuck228/lampy/pull/9 |
 | PR #9 head | `a52ea585b4351524bfba27260657197b955d3ffe` |
-| 本审计提交 | `b67ff21b90ba7ba85d48f4676af56b1cad50ea9c` on `ios/family-phase-3b-audit` |
+| 本审计提交 | `ios/family-phase-3b-audit`（见本轮 HEAD） |
 
 `a52ea58` 是 `origin/main` 祖先。未重复合并。
 
@@ -28,8 +28,8 @@
 | 阻塞 | 交错刷新较早结果可盖住较新资格 | 本轮修复：刷新世代门闩，过期一代不写 UI |
 | 中 | 每次写成功后的 refresh 先清空成员 | 本轮修复：只有重新确认资格时先藏成员；邀请列表失败保留已确认成员 |
 | 中 | 端口占用时 listen Promise 挂起 | 本轮修复：`server` error 拒绝启动 |
-| 中 | 同一账号再次 Apple 登录不撤旧会话 | 未改。旧 token 到期前仍有效。文档已写明 |
-| 中 | 退出登录时服务不可达，服务端 token 仍有效直到过期 | 本地仍清 Keychain。残余风险已记录 |
+| 中 | 同一账号再次 Apple 登录不撤旧会话 | 本轮修复：登录事务成功后撤销该账号旧会话 |
+| 中 | 退出登录时服务不可达，服务端 token 仍有效直到过期 | 本轮修复：本机立即退出；待撤销只进 Keychain，恢复后重试或同账号再登录由服务端清理 |
 | 阻塞（上线） | 无公网服务、无真实 Apple 双账号双设备 | NOT VERIFIED。清单见 family-api README |
 | 阻塞（多实例） | 两进程写同一 SQLite 不是 production ready | 明确拒绝标 production ready |
 
@@ -83,6 +83,16 @@ LAMPY_FAMILY_API_MODE=production ... PORT=18787 npm run family-api
 
 env -u LAMPY_APPLE_CLIENT_ID LAMPY_FAMILY_API_MODE=production LAMPY_FAMILY_DATABASE_PATH=$VOL/family.db npm run family-api
 # missing_apple_exit=1
+
+# 会话收尾（本轮）
+npx tsc --noEmit
+# exit 0
+npx expo lint
+# 0 errors（既有 warning，与本轮无关）
+git diff --check
+# exit 0
+# jest 会话/家庭页/SQLite/HTTP：见下方本轮测试
+# iOS xcodebuild：仓库内无 ios/*.xcodeproj，未跑
 ```
 
 本机 `/tmp` 卷只证明「配置的路径上确实有库文件，重启后还在」。它不是托管生产卷。
@@ -110,7 +120,13 @@ env -u LAMPY_APPLE_CLIENT_ID LAMPY_FAMILY_API_MODE=production LAMPY_FAMILY_DATAB
 | 测试 token 当生产成员 | PASS（拒绝） | 生产 listen 拒绝启动 |
 | Keychain 会话存储（单元） | PASS | `secure-family-session.test.ts` |
 | App 重启后 Keychain 恢复 | NOT VERIFIED | 未在模拟器/真机杀进程 |
-| 退出登录撤服务端会话 | PASS | commands / HTTP / use-case / sqlite |
+| 退出登录撤服务端会话 | PASS | 在线：commands / HTTP / use-case / sqlite |
+| 再次登录撤销同账号旧会话 | PASS | commands / HTTP / sqlite 回滚 |
+| 验证失败不撤原会话 | PASS | commands.test |
+| 断网退出：本机已退出 vs 远端未确认 | PASS | use-case + family-screen 文案 |
+| 响应丢失后重试撤销 | PASS | use-case：服务端已删，客户端待撤销，重建后确认 |
+| App 重启后待撤销仍在 Keychain | PASS | secure-family-session + use-case rebuilt |
+| 跨账号不串待撤销 token | PASS | use-case 切换用户 |
 | 过期/401 清本地并再给 Apple 登录 | PASS | use-case + family-screen 测试 |
 | 账号切换不串 pending | PASS | `does not reuse another account pending key` |
 | 公网 HTTP 不发会话 | PASS | `family-config.test.ts` fetch 未被调用 |
@@ -124,6 +140,12 @@ env -u LAMPY_APPLE_CLIENT_ID LAMPY_FAMILY_API_MODE=production LAMPY_FAMILY_DATAB
 | 跨设备邀请加入 | NOT VERIFIED | 同上 |
 | 公网家庭服务 | NOT VERIFIED | 未部署 |
 
+## 残余风险
+
+- 待撤销 token 在断网期间仍存在于服务端，直到重试成功、同账号再登录、401，或超过会话 TTL。
+- 再次登录只撤**该账号**旧会话。另一台已登录设备若是同一账号，会被新登录踢掉。
+- 真实 Apple 令牌、双账号双设备、公网 HTTPS、托管持久卷仍是 NOT VERIFIED。
+
 ## 真实用户？
 
-不可以。家庭入口在未配置 `EXPO_PUBLIC_FAMILY_API_BASE_URL` 时不出现；即便指向本机生产形态，没有真实 Apple token 也无法登录。把测试 token 或内存库当成上线依据是错误的。
+不可以。家庭入口在未配置 `EXPO_PUBLIC_FAMILY_API_BASE_URL` 时不出现；即便指向本机生产形态，没有真实 Apple token 也无法登录。把测试 token、合成 JWT 或内存库当成上线依据是错误的。

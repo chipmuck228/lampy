@@ -211,6 +211,7 @@ export function createFamilyCommands(deps: {
           expiresAt: iso(new Date(clock.now().getTime() + sessionTtlMs)),
         };
         await tx.saveSession(session);
+        await tx.deleteOtherSessions(account.userId, session.token);
         return {
           userId: account.userId,
           sessionToken: session.token,

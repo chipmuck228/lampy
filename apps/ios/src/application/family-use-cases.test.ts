@@ -101,8 +101,9 @@ describe('family use cases against a real in-process API', () => {
     const saved = await savePersonalNote(personal, '退出登录也不改个人');
     await family.signInWithApple('apple_alice');
     await family.createFamily();
-    await family.signOut();
+    expect(await family.signOut()).toEqual({ local: 'signed-out', server: 'revoked' });
     expect(await family.getMembership()).toEqual({ kind: 'unauthenticated' });
+    expect(await family.hasUnconfirmedSessionRevoke()).toBe(false);
     expect((await personal.getMomentDetail(saved.id)).kind).toBe('ready');
   });
 
@@ -123,14 +124,155 @@ describe('family use cases against a real in-process API', () => {
     const token = await session.getSessionToken();
     expect(token).toBeTruthy();
     await family.createFamily();
-    await family.signOut();
+    expect(await family.signOut()).toEqual({ local: 'signed-out', server: 'revoked' });
     expect(await session.getSessionToken()).toBeNull();
+    expect(await session.getPendingRevoke()).toBeNull();
     await expect(commands.listMembership(token || '')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
   });
 
-  it('clears the local session on signOut when the server is unreachable', async () => {
+  it('treats a lost sign-out response as local signed-out and retries the server revoke', async () => {
+    const store = createFamilyStore();
+    const commands = createFamilyCommands({
+      store,
+      apple: createMapAppleVerifier({ apple_alice: { appleSubject: 'apple.alice' } }),
+      clock: clockAt('2026-09-25T02:00:00.000Z'),
+    });
+    const session = createMemoryFamilySessionStore();
+    let failNextSignOut = true;
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request(input) {
+          if (input.path === '/v1/auth/sign-out') {
+            await commands.signOut(input.sessionToken || '');
+            if (failNextSignOut) {
+              failNextSignOut = false;
+              throw new Error('lost response');
+            }
+            return { status: 200, body: { signedOut: true } };
+          }
+          return dispatchFamilyApi(commands, {
+            method: input.method,
+            path: input.path,
+            headers: {
+              authorization: input.sessionToken ? `Bearer ${input.sessionToken}` : undefined,
+              'idempotency-key': input.idempotencyKey,
+            },
+            body: input.body,
+          });
+        },
+      }),
+      session,
+      pending: testPending(),
+    });
+    await family.signInWithApple('apple_alice');
+    const token = await session.getSessionToken();
+    expect(await family.signOut()).toEqual({ local: 'signed-out', server: 'unconfirmed' });
+    expect(await session.getSessionToken()).toBeNull();
+    expect(await family.hasUnconfirmedSessionRevoke()).toBe(true);
+    await expect(commands.listMembership(token || '')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(await family.getMembership()).toEqual({ kind: 'unauthenticated' });
+    expect(await family.hasUnconfirmedSessionRevoke()).toBe(false);
+  });
+
+  it('clears the local session on unreachable sign-out and retries after rebuild', async () => {
     const session = createMemoryFamilySessionStore();
     await session.setSession({ userId: 'usr_x', sessionToken: 'ses_x' });
+    const unreachable = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request() {
+          throw new Error('network down');
+        },
+      }),
+      session,
+      pending: testPending(),
+      clock: clockAt('2026-09-25T02:00:00.000Z'),
+    });
+    expect(await unreachable.signOut()).toEqual({ local: 'signed-out', server: 'unconfirmed' });
+    expect(await session.getSessionToken()).toBeNull();
+    expect(await unreachable.getMembership()).toEqual({ kind: 'unauthenticated' });
+    expect(await unreachable.hasUnconfirmedSessionRevoke()).toBe(true);
+    expect(await session.getPendingRevoke()).toMatchObject({ userId: 'usr_x', sessionToken: 'ses_x' });
+
+    const rebuilt = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request(input) {
+          if (input.path === '/v1/auth/sign-out' && input.sessionToken === 'ses_x') {
+            return { status: 200, body: { signedOut: true } };
+          }
+          throw new Error(`unexpected ${input.path}`);
+        },
+      }),
+      session,
+      pending: testPending(),
+      clock: clockAt('2026-09-25T02:01:00.000Z'),
+    });
+    expect(await rebuilt.getMembership()).toEqual({ kind: 'unauthenticated' });
+    expect(await rebuilt.hasUnconfirmedSessionRevoke()).toBe(false);
+    expect(await session.getPendingRevoke()).toBeNull();
+  });
+
+  it('does not let a later account reuse an earlier pending revoke token', async () => {
+    const session = createMemoryFamilySessionStore();
+    await session.setSession({ userId: 'usr_alice', sessionToken: 'ses_alice' });
+    const revoked: string[] = [];
+    let appleOnline = false;
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request(input) {
+          if (input.path === '/v1/auth/apple') {
+            appleOnline = true;
+            return { status: 200, body: { userId: 'usr_bob', sessionToken: 'ses_bob', expiresAt: '2026-10-01T00:00:00.000Z' } };
+          }
+          if (input.path === '/v1/auth/sign-out') {
+            if (!appleOnline) throw new Error('network down');
+            revoked.push(input.sessionToken || '');
+            return { status: 200, body: { signedOut: true } };
+          }
+          throw new Error('network down');
+        },
+      }),
+      session,
+      pending: testPending(),
+    });
+    expect(await family.signOut()).toEqual({ local: 'signed-out', server: 'unconfirmed' });
+    expect(await session.getPendingRevoke()).toMatchObject({ userId: 'usr_alice', sessionToken: 'ses_alice' });
+    await family.signInWithApple('apple_bob');
+    expect(revoked).toEqual(['ses_alice']);
+    expect(await session.getPendingRevoke()).toBeNull();
+    expect(await session.getUserId()).toBe('usr_bob');
+    expect(await session.getSessionToken()).toBe('ses_bob');
+  });
+
+  it('clears an expired pending revoke without presenting it as a live session', async () => {
+    const session = createMemoryFamilySessionStore();
+    await session.savePendingRevoke({
+      userId: 'usr_x',
+      sessionToken: 'ses_old',
+      createdAt: '2026-08-01T00:00:00.000Z',
+    });
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request() {
+          throw new Error('should not send an expired revoke');
+        },
+      }),
+      session,
+      pending: testPending(),
+      clock: clockAt('2026-09-25T02:00:00.000Z'),
+      sessionRevokeTtlMs: 60_000,
+    });
+    expect(await family.hasUnconfirmedSessionRevoke()).toBe(false);
+    expect(await family.getMembership()).toEqual({ kind: 'unauthenticated' });
+    expect(await session.getPendingRevoke()).toBeNull();
+  });
+
+  it('does not drop a pending revoke when a later Apple sign-in fails', async () => {
+    const session = createMemoryFamilySessionStore();
+    await session.savePendingRevoke({
+      userId: 'usr_alice',
+      sessionToken: 'ses_alice',
+      createdAt: '2026-09-25T02:00:00.000Z',
+    });
     const family = createFamilyUseCases({
       client: createFamilyApiClient({
         async request() {
@@ -139,10 +281,11 @@ describe('family use cases against a real in-process API', () => {
       }),
       session,
       pending: testPending(),
+      clock: clockAt('2026-09-25T02:00:00.000Z'),
     });
-    await family.signOut();
+    await expect(family.signInWithApple('apple_alice')).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
+    expect(await session.getPendingRevoke()).toMatchObject({ userId: 'usr_alice', sessionToken: 'ses_alice' });
     expect(await session.getSessionToken()).toBeNull();
-    expect(await family.getMembership()).toEqual({ kind: 'unauthenticated' });
   });
 
   it('shows members only after a successful create/accept and treats retry as the same family', async () => {

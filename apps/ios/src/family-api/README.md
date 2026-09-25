@@ -124,9 +124,11 @@ test -f /var/lib/lampy/family/family.db-shm && cp /var/lib/lampy/family/family.d
 ## 会话边界
 
 - 会话令牌只放 iOS Keychain，请求用 `Authorization: Bearer`。
-- `POST /v1/auth/sign-out` 删除服务端这一条会话。客户端退出登录会先调撤销，再清 Keychain；服务不可达时仍清本地。
+- `POST /v1/auth/sign-out` 删除服务端这一条会话。
+- 同一 Lampy 账号再次 Apple 登录成功后，服务端在同一事务里撤销该账号的旧会话。验证失败或事务失败不撤原有效会话。其他账号不受影响。
+- 用户点退出后，本机立刻停止展示家庭内容并清掉可用会话。这只表示「本机已退出」。
+- 服务端撤销未确认时，待撤销 token 只进 Keychain（`lampy.family.pending-revoke.v1`），不写日志、普通 SQLite 或公开配置。恢复网络或下次进入家庭页会安全重试；同一账号重新登录由服务端清旧会话；账号切换或过期后丢掉待撤销记录。
 - 过期或已撤销的令牌读成员为 401，客户端清 Keychain，并再次提供 Apple 登录。
-- 同账号重新 Apple 登录会发新令牌，旧令牌在过期前仍有效。这不是单设备强制下线。
 
 ## 部署前清单
 

@@ -62,8 +62,33 @@ describe('family identity and membership commands', () => {
     const second = await signIn(commands, 'apple_alice');
     expect(first.userId).toBe(second.userId);
     expect(first.sessionToken).not.toBe(second.sessionToken);
-    expect((await commands.listMembership(first.sessionToken)).family).toBeNull();
+    await expect(commands.listMembership(first.sessionToken)).rejects.toMatchObject({
+      code: FAMILY_ERROR.UNAUTHENTICATED,
+    });
     expect((await commands.listMembership(second.sessionToken)).family).toBeNull();
+  });
+
+  it('revokes only that account\'s previous sessions after a successful sign-in', async () => {
+    const { commands } = setup();
+    const alice = await signIn(commands, 'apple_alice');
+    const bob = await signIn(commands, 'apple_bob');
+    await commands.createFamily(alice.sessionToken);
+    const aliceAgain = await signIn(commands, 'apple_alice');
+    await expect(commands.listMembership(alice.sessionToken)).rejects.toMatchObject({
+      code: FAMILY_ERROR.UNAUTHENTICATED,
+    });
+    expect((await commands.listMembership(aliceAgain.sessionToken)).family?.role).toBe('creator');
+    expect((await commands.listMembership(bob.sessionToken)).family).toBeNull();
+  });
+
+  it('does not revoke an existing session when Apple verification fails', async () => {
+    const { commands } = setup();
+    const alice = await signIn(commands, 'apple_alice');
+    await commands.createFamily(alice.sessionToken);
+    await expect(commands.signInWithApple('nope')).rejects.toMatchObject({
+      code: FAMILY_ERROR.APPLE_TOKEN_INVALID,
+    });
+    expect((await commands.listMembership(alice.sessionToken)).family?.role).toBe('creator');
   });
 
   it('rejects an invalid Apple token', async () => {

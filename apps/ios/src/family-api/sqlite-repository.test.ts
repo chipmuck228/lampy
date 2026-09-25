@@ -244,6 +244,38 @@ describe('durable SQLite family repository', () => {
     });
   });
 
+  it('keeps the previous session when replacing sessions fails inside the login transaction', async () => {
+    await withSqliteFile(async (file) => {
+      const seq = { n: 0 };
+      const real = openFamilySqliteDatabase(file);
+      await applyFamilyApiSchema(real);
+      let failReplace = false;
+      const db: FamilySql = {
+        exec: (sql) => real.exec(sql),
+        run: async (sql, params) => {
+          if (failReplace && typeof sql === 'string' && /DELETE FROM family_sessions WHERE user_id/.test(sql)) {
+            throw new Error('disk full');
+          }
+          return real.run(sql, params);
+        },
+        getFirst: (sql, params) => real.getFirst(sql, params),
+        getAll: (sql, params) => real.getAll(sql, params),
+        close: () => real.close(),
+      };
+      const commands = createFamilyCommands({
+        repository: createSqliteFamilyRepository(db),
+        apple: createMapAppleVerifier({ apple_alice: { appleSubject: 'apple.alice' } }),
+        clock: { now: () => new Date('2026-09-25T03:00:00.000Z') },
+        ids: idsWith(seq),
+      });
+      const first = await commands.signInWithApple('apple_alice');
+      failReplace = true;
+      await expect(commands.signInWithApple('apple_alice')).rejects.toThrow(/disk full/);
+      expect((await commands.listMembership(first.sessionToken)).family).toBeNull();
+      await real.close();
+    });
+  });
+
   it('revokes a session token so it cannot read members after sign-out', async () => {
     await withSqliteFile(async (file) => {
       const seq = { n: 0 };

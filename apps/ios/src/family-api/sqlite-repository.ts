@@ -137,6 +137,9 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     async deleteSession(token) {
       await db.run('DELETE FROM family_sessions WHERE token = ?', [token]);
     },
+    async deleteOtherSessions(userId, keepToken) {
+      await db.run('DELETE FROM family_sessions WHERE user_id = ? AND token != ?', [userId, keepToken]);
+    },
     async findFamily(familyId) {
       const row = await db.getFirst<FamilyRow>(
         'SELECT family_id, created_at, status FROM family_families WHERE family_id = ?',

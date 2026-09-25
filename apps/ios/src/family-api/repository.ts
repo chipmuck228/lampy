@@ -17,6 +17,7 @@ export type FamilyTx = {
   findSession(token: string): Promise<Session | null>;
   saveSession(session: Session): Promise<void>;
   deleteSession(token: string): Promise<void>;
+  deleteOtherSessions(userId: string, keepToken: string): Promise<void>;
   findFamily(familyId: string): Promise<Family | null>;
   saveFamily(family: Family): Promise<void>;
   findActiveMembershipForUser(userId: string): Promise<Membership | null>;
@@ -78,6 +79,9 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     },
     async deleteSession(token) {
       store.sessions = store.sessions.filter((row) => row.token !== token);
+    },
+    async deleteOtherSessions(userId, keepToken) {
+      store.sessions = store.sessions.filter((row) => row.userId !== userId || row.token === keepToken);
     },
     async findFamily(familyId) {
       return findFamily(store, familyId);

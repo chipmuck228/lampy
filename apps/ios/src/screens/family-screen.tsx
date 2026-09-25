@@ -39,6 +39,14 @@ function needsAppleSignIn(membership: FamilyMembershipView | null) {
   );
 }
 
+function refreshMessage(result: 'ok' | 'invites-failed' | 'revoke-unconfirmed') {
+  if (result === 'invites-failed') return '邀请列表暂时读不出来，家里的成员已经确认。';
+  if (result === 'revoke-unconfirmed') {
+    return '这台设备已经退出。远端会话还没确认撤销，连上之后会再试。';
+  }
+  return null;
+}
+
 export default function FamilyScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -59,7 +67,7 @@ export default function FamilyScreen() {
 
   const refresh = useCallback(async (
     mode: 'revalidate' | 'follow-up' = 'follow-up',
-  ): Promise<'ok' | 'invites-failed' | 'stale'> => {
+  ): Promise<'ok' | 'invites-failed' | 'stale' | 'revoke-unconfirmed'> => {
     const generation = refreshGate.begin();
     if (mode === 'revalidate') {
       hideFamilyContent();
@@ -88,6 +96,10 @@ export default function FamilyScreen() {
       } else {
         setInvites([]);
       }
+      if (needsAppleSignIn(next) && (await family.hasUnconfirmedSessionRevoke())) {
+        if (!refreshGate.isCurrent(generation)) return 'stale';
+        return 'revoke-unconfirmed';
+      }
       return 'ok';
     } catch (error) {
       if (!refreshGate.isCurrent(generation)) return 'stale';
@@ -103,7 +115,7 @@ export default function FamilyScreen() {
       refresh('revalidate')
         .then((result) => {
           if (cancelled || result === 'stale') return;
-          setMessage(result === 'invites-failed' ? '邀请列表暂时读不出来，家里的成员已经确认。' : null);
+          setMessage(refreshMessage(result));
         })
         .catch((error) => {
           if (!cancelled) {
@@ -126,7 +138,28 @@ export default function FamilyScreen() {
       await work(family);
       const result = await refresh('follow-up');
       if (result === 'stale') return;
-      setMessage(result === 'invites-failed' ? '邀请列表暂时读不出来，家里的成员已经确认。' : null);
+      setMessage(refreshMessage(result));
+    } catch (error) {
+      setMessage(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signOutNow() {
+    if (busy) return;
+    hideFamilyContent();
+    setBusy(true);
+    try {
+      const family = await getFamilyUseCases();
+      const signed = await family.signOut();
+      const result = await refresh('follow-up');
+      if (result === 'stale') return;
+      setMessage(
+        signed.server === 'unconfirmed' || result === 'revoke-unconfirmed'
+          ? '这台设备已经退出。远端会话还没确认撤销，连上之后会再试。'
+          : '已经退出登录。',
+      );
     } catch (error) {
       setMessage(errorText(error));
     } finally {
@@ -326,8 +359,7 @@ export default function FamilyScreen() {
             testID="family-sign-out"
             disabled={busy}
             onPress={() => {
-              hideFamilyContent();
-              run(async (family) => { await family.signOut(); });
+              void signOutNow();
             }}
             style={styles.hit}
           >
