@@ -4,10 +4,12 @@ const http = require('node:http');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  attachCreatedFamilyCleanup,
   createdFamilyCleanupResult,
   isAuthorizedDeployedUrl,
   requireAccountsHaveNoFamily,
   vacantMembership,
+  walkIdentityLoop,
 } = require('./family-identity-walk.cjs');
 const { validateHostedVolumeProbe } = require('./family-identity-volume.cjs');
 
@@ -160,4 +162,65 @@ test('failed cleanup of this run’s family is not a successful walk', () => {
 
   const ok = createdFamilyCleanupResult({ status: 200, raw: { dissolved: true } }, 'fam_accept');
   assert.equal(ok.ok, true);
+
+  const leftover = attachCreatedFamilyCleanup(
+    { ok: false, step: 'invite-1', signedIn: true },
+    createdFamilyCleanupResult({ status: 500, raw: {} }, 'fam_accept'),
+    'fam_accept',
+  );
+  assert.equal(leftover.ok, false);
+  assert.equal(leftover.step, 'invite-1');
+  assert.equal(leftover.needsManualCleanup, true);
+  assert.match(leftover.leftoverFamily, /^sha256:/);
+});
+
+test('first invite failure still dissolves the family created in this run', async () => {
+  const methods = [];
+  let apple = 0;
+  const server = http.createServer((req, res) => {
+    methods.push(`${req.method} ${req.url}`);
+    const send = (status, body) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+    };
+    if (req.method === 'POST' && req.url === '/v1/auth/apple') {
+      apple += 1;
+      send(200, {
+        userId: apple === 1 ? 'usr_a' : 'usr_b',
+        sessionToken: apple === 1 ? 'ses_a' : 'ses_b',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      });
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/v1/me/membership') {
+      send(200, { family: null });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/v1/families') {
+      send(200, { familyId: 'fam_accept' });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/v1/families/fam_accept/invitations') {
+      send(500, { error: { code: 'INTERNAL' } });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/v1/families/fam_accept/dissolve') {
+      send(500, { error: { code: 'INTERNAL' } });
+      return;
+    }
+    send(404, { error: { code: 'BAD_REQUEST' } });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  try {
+    const result = await walkIdentityLoop(`http://127.0.0.1:${port}`, 'token-a', 'token-b', 'test');
+    assert.equal(result.ok, false);
+    assert.equal(result.step, 'invite-1');
+    assert.equal(result.needsManualCleanup, true);
+    assert.match(result.leftoverFamily, /^sha256:/);
+    assert.ok(methods.includes('POST /v1/families/fam_accept/invitations'));
+    assert.ok(methods.includes('POST /v1/families/fam_accept/dissolve'));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

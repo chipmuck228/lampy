@@ -183,7 +183,17 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
     return { ok: false, signedIn: true, step: 'create-family', created };
   }
   const familyId = created.raw.familyId;
+  let outcome;
+  try {
+    outcome = await runCreatedFamilyWalk(baseUrl, alice, bob, familyId, keyPrefix);
+  } catch {
+    outcome = { ok: false, signedIn: true, step: 'walk-failed' };
+  }
+  const cleanup = await cleanupCreatedFamily(baseUrl, alice, familyId, keyPrefix);
+  return attachCreatedFamilyCleanup(outcome, cleanup, familyId);
+}
 
+async function runCreatedFamilyWalk(baseUrl, alice, bob, familyId, keyPrefix) {
   const firstJoin = await inviteAndJoin(baseUrl, alice, bob, familyId, keyPrefix, '1');
   if (!firstJoin.ok) return { ...firstJoin, signedIn: true };
 
@@ -210,6 +220,17 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
     return { ok: false, signedIn: true, step: 'permission-gone-after-leave', ...goneAfterLeave };
   }
 
+  return {
+    ok: true,
+    signedIn: true,
+    operations: ['invite', 'join', 'creator-remove', 'invite', 'join', 'member-leave'],
+    alice: evidenceRef(alice.userId),
+    bob: evidenceRef(bob.userId),
+    family: evidenceRef(familyId),
+  };
+}
+
+async function cleanupCreatedFamily(baseUrl, alice, familyId, keyPrefix) {
   let dissolved;
   try {
     dissolved = await callFamily(baseUrl, 'POST', `/v1/families/${familyId}/dissolve`, {
@@ -220,14 +241,11 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
     dissolved = null;
   }
   const cleanup = createdFamilyCleanupResult(dissolved, familyId);
-  if (!cleanup.ok) {
-    return { ...cleanup, signedIn: true, dissolved };
-  }
+  if (!cleanup.ok) return { ...cleanup, dissolved };
   const afterCleanup = await readVacantMembership(baseUrl, alice, 'cleanup');
   if (!afterCleanup.ok) {
     return {
       ok: false,
-      signedIn: true,
       step: 'created-family-cleanup-failed',
       leftoverFamily: evidenceRef(familyId),
       needsManualCleanup: true,
@@ -235,16 +253,20 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
       afterCleanup,
     };
   }
+  return { ok: true, createdFamilyCleanup: 'dissolved-created', needsManualCleanup: false };
+}
 
+function attachCreatedFamilyCleanup(outcome, cleanup, familyId) {
+  const signed = { ...outcome, signedIn: true, family: outcome.family || evidenceRef(familyId) };
+  if (cleanup.ok) {
+    return { ...signed, createdFamilyCleanup: 'dissolved-created', needsManualCleanup: false };
+  }
   return {
-    ok: true,
-    signedIn: true,
-    operations: ['invite', 'join', 'creator-remove', 'invite', 'join', 'member-leave'],
-    alice: evidenceRef(alice.userId),
-    bob: evidenceRef(bob.userId),
-    family: evidenceRef(familyId),
-    createdFamilyCleanup: 'dissolved-created',
-    needsManualCleanup: false,
+    ...signed,
+    ok: false,
+    leftoverFamily: cleanup.leftoverFamily,
+    needsManualCleanup: true,
+    createdFamilyCleanup: 'left-in-place',
   };
 }
 
@@ -270,7 +292,9 @@ function tokenPairStatus(tokenA, tokenB, testTokensSet) {
 }
 
 module.exports = {
+  attachCreatedFamilyCleanup,
   callFamily,
+  cleanupCreatedFamily,
   createdFamilyCleanupResult,
   existingFamilyId,
   isAuthorizedDeployedUrl,
