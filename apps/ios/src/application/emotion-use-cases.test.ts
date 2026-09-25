@@ -41,6 +41,7 @@ function createEmotionApp(options?: {
     library,
     capture,
     clock: clockAt('2026-09-25T02:00:00.000Z'),
+    timezoneOffsetMinutes: 0,
     assetId: () => assetIds[next++] || `asset_extra_${next}`,
   });
   return { app, repos, media };
@@ -257,6 +258,38 @@ describe('optional feeling use cases', () => {
       expect(mixedDetail.note).toBe('都留下');
       expect(mixedDetail.images).toHaveLength(1);
       expect(mixedDetail.audio?.id).toBe('asset_mix_voice');
+    }
+  });
+
+  it('shows the same feeling on lookback day and unconfirmed pages', async () => {
+    const dayApp = createEmotionApp();
+    const instant = new Date('2026-01-02T08:15:00.000Z');
+    let placed = createDraftMoment(
+      {
+        content: { note: '日页感受', emotion: '平静' },
+        time: {
+          occurredAt: '2026-01-02T08:15:00.000Z',
+          occurredAtPrecision: 'exact',
+        },
+        origin: { type: 'created' },
+      },
+      { now: () => instant, ownerId: LOCAL_OWNER_ID, id: () => 'moment_lookback_feeling' },
+    );
+    placed = activateMoment(placed, LOCAL_OWNER_ID, instant);
+    await dayApp.repos.moments.save(placed);
+    const day = await dayApp.app.getHistoryDay(2026, 1, 2);
+    if ('invalid' in day) throw new Error('expected day');
+    expect(day.items[0].note).toBe('日页感受');
+    expect(day.items[0].feeling).toEqual({ value: '平静', label: '平静', known: true });
+
+    const { app, repos } = createEmotionApp();
+    await seedActive(repos, { id: 'moment_old_joy', note: '旧词还在', emotion: '喜悦' });
+    const unknown = await app.getHistoryUnknown();
+    expect(unknown.items[0].feeling).toEqual({ value: '喜悦', label: '喜悦', known: false });
+    const stored = await repos.moments.findById('moment_old_joy');
+    expect(stored.kind).toBe('ready');
+    if (stored.kind === 'ready') {
+      expect(stored.moment.content.emotion).toBe('喜悦');
     }
   });
 

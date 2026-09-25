@@ -28,6 +28,7 @@ async function saveMoment(options: {
   repos: ReturnType<typeof createMemoryRepositories>;
   id: string;
   note: string;
+  emotion?: string;
   recordedAt: string;
   occurredAt?: string;
   precision: string;
@@ -37,7 +38,7 @@ async function saveMoment(options: {
   let moment = createDraftMoment(
     {
       ownerId: LOCAL_OWNER_ID,
-      content: { note: options.note },
+      content: { note: options.note, emotion: options.emotion ?? '' },
       time: {
         recordedAt: options.recordedAt,
         occurredAt: options.occurredAt,
@@ -73,6 +74,7 @@ describe('history lookback use cases', () => {
       repos,
       id: 'm_exact',
       note: '精确',
+      emotion: '平静',
       recordedAt: '2026-03-10T12:00:00.000Z',
       occurredAt: '2026-01-02T08:15:00.000Z',
       precision: 'exact',
@@ -105,6 +107,7 @@ describe('history lookback use cases', () => {
       repos,
       id: 'm_unknown',
       note: '未确认',
+      emotion: '喜悦',
       recordedAt: '2026-01-02T12:00:00.000Z',
       precision: 'unknown',
     });
@@ -130,11 +133,14 @@ describe('history lookback use cases', () => {
     expect(day.title).toBe('2026年1月2日');
     expect(day.items.map((item) => item.id)).toEqual(['m_day', 'm_exact']);
     expect(day.items[0].timeLabel).toContain('1月2日');
+    expect(day.items[0].feeling).toBeNull();
+    expect(day.items[1].feeling).toEqual({ value: '平静', label: '平静', known: true });
 
     const unknown = await app.getHistoryUnknown();
     expect(unknown.items.map((item) => item.id)).toEqual(['m_unknown']);
     expect(unknown.items[0].timeLabel).toBe('时间未确认');
     expect(unknown.items[0].recordedFallbackLabel).toBe('记录于 2026年1月2日');
+    expect(unknown.items[0].feeling).toEqual({ value: '喜悦', label: '喜悦', known: false });
 
     await saveMoment({
       repos,
