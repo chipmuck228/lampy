@@ -4,11 +4,19 @@ import { sha256MediaBytes } from './media-validate';
 import type { MediaBlobStore } from './media-blobs';
 import type { FamilyRepository, FamilyTx } from './repository';
 import { FamilyStoreConstraintError } from './repository';
-import type { ShareMomentInput, ShareRecord, ShareSnapshot, ShareView } from './types';
+import type { Membership, ShareMediaView, ShareMomentInput, ShareRecord, ShareSnapshot, ShareView } from './types';
 
 export type ShareCommands = {
   shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
+  listVisibleShares(sessionToken: string, familyId: string): Promise<{ shares: ShareView[] }>;
   getShare(sessionToken: string, familyId: string, shareId: string): Promise<ShareView>;
+  getShareMedia(sessionToken: string, familyId: string, shareId: string, objectId: string): Promise<ShareMediaView>;
+  getShareMediaContent(
+    sessionToken: string,
+    familyId: string,
+    shareId: string,
+    objectId: string,
+  ): Promise<{ mimeType: string; bytes: Uint8Array }>;
 };
 
 function toView(row: ShareRecord): ShareView {
@@ -80,6 +88,18 @@ async function requireUser(tx: FamilyTx, sessionToken: string | undefined, now: 
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
   return session.userId;
+}
+
+function shareIsActive(_row: ShareRecord) {
+  return true;
+}
+
+function canSeeShare(membership: Membership, share: ShareRecord) {
+  return (
+    shareIsActive(share) &&
+    share.audienceUserIds.includes(membership.userId) &&
+    membership.joinedAt <= share.sharedAt
+  );
 }
 
 async function requireActiveMember(tx: FamilyTx, familyId: string, userId: string) {
@@ -254,19 +274,86 @@ export function createShareCommands(deps: {
       });
     },
 
-    async getShare(sessionToken, familyId, shareId) {
+    async listVisibleShares(sessionToken, familyId) {
       return deps.repository.withTransaction(async (tx) => {
         const userId = await requireUser(tx, sessionToken, clock.now());
-        await requireActiveMember(tx, familyId, userId);
-        const row = await tx.findShare(shareId);
-        if (!row || row.familyId !== familyId) {
-          throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
-        }
-        if (!row.audienceUserIds.includes(userId)) {
-          throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'This share is not available.');
-        }
-        return toView(row);
+        const membership = await requireActiveMember(tx, familyId, userId);
+        const rows = await tx.listSharesInFamily(familyId);
+        return {
+          shares: rows.filter((row) => canSeeShare(membership, row)).map(toView),
+        };
       });
     },
+
+    async getShare(sessionToken, familyId, shareId) {
+      return deps.repository.withTransaction(async (tx) => {
+        const { share } = await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now());
+        return toView(share);
+      });
+    },
+
+    async getShareMedia(sessionToken, familyId, shareId, objectId) {
+      return deps.repository.withTransaction(async (tx) => {
+        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now());
+        return authorizedShareMedia(tx, deps.blobs, shareId, familyId, objectId);
+      });
+    },
+
+    async getShareMediaContent(sessionToken, familyId, shareId, objectId) {
+      return deps.repository.withTransaction(async (tx) => {
+        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now());
+        const media = await authorizedShareMedia(tx, deps.blobs, shareId, familyId, objectId);
+        const bytes = await deps.blobs.read(media.objectId);
+        if (bytes.length !== media.byteLength || sha256MediaBytes(bytes) !== media.contentSha256) {
+          throw new FamilyError(FAMILY_ERROR.SHARE_MEDIA_UNAVAILABLE, 'A selected media object is not available.');
+        }
+        return { mimeType: media.mimeType, bytes };
+      });
+    },
+  };
+}
+
+async function authorizeVisibleShare(
+  tx: FamilyTx,
+  sessionToken: string,
+  familyId: string,
+  shareId: string,
+  now: Date,
+) {
+  const userId = await requireUser(tx, sessionToken, now);
+  const membership = await requireActiveMember(tx, familyId, userId);
+  const row = await tx.findShare(shareId);
+  if (!row || row.familyId !== familyId || !shareIsActive(row)) {
+    throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
+  }
+  if (!canSeeShare(membership, row)) {
+    throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'This share is not available.');
+  }
+  return { userId, share: row };
+}
+
+async function authorizedShareMedia(
+  tx: FamilyTx,
+  blobs: MediaBlobStore,
+  shareId: string,
+  familyId: string,
+  objectId: string,
+): Promise<ShareMediaView> {
+  const share = await tx.findShare(shareId);
+  if (!share || share.familyId !== familyId || !shareIsActive(share)) {
+    throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
+  }
+  if (!share.snapshot.media.some((item) => item.objectId === objectId)) {
+    throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'This media object is not available.');
+  }
+  const row = await tx.findMediaObject(objectId);
+  if (!row || !(await blobMatches(blobs, row))) {
+    throw new FamilyError(FAMILY_ERROR.SHARE_MEDIA_UNAVAILABLE, 'A selected media object is not available.');
+  }
+  return {
+    objectId: row.objectId,
+    mimeType: row.mimeType,
+    byteLength: row.byteLength,
+    contentSha256: row.contentSha256,
   };
 }

@@ -15,6 +15,7 @@ import { createFamilyCommands } from '../family-api/commands';
 import { dispatchFamilyApi } from '../family-api/http';
 import { createFamilyStore } from '../family-api/store';
 import { createDispatchTransport, createFamilyApiClient } from '../infrastructure/family-http-client';
+import { createMemoryFamilyReceiveCache } from '../infrastructure/family-receive-cache';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 import { createMemoryMediaStore, createQueuedImageSource } from '../infrastructure/media';
 import { sampleJpegBytes, samplePngBytes } from '../family-api/media-validate';
@@ -56,6 +57,7 @@ function createHarness(
     personal: options?.readAssetBytes
       ? { ...personalRepos, readAssetBytes: options.readAssetBytes }
       : personalRepos,
+    receiveCache: createMemoryFamilyReceiveCache(),
     idempotencyKey: (prefix) => {
       keys.n += 1;
       return `${prefix}-${keys.n}`;

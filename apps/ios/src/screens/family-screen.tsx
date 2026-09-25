@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getFamilyUseCases } from '../application/container';
-import type { FamilyMembershipView, FamilyUseCases } from '../application/family-use-cases';
+import type { FamilyInboxView, FamilyMembershipView, FamilyUseCases } from '../application/family-use-cases';
 import { isApplicationError } from '../application/errors';
 import type { InvitationView } from '../family-api/types';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
@@ -56,6 +56,7 @@ export default function FamilyScreen() {
   const [membership, setMembership] = useState<FamilyMembershipView | null>(null);
   const [invites, setInvites] = useState<InvitationView[]>([]);
   const [inviteCode, setInviteCode] = useState('');
+  const [inbox, setInbox] = useState<FamilyInboxView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const refreshGate = useRef(createFamilyRefreshGate()).current;
@@ -63,6 +64,7 @@ export default function FamilyScreen() {
   function hideFamilyContent() {
     setMembership(null);
     setInvites([]);
+    setInbox(null);
   }
 
   const refresh = useCallback(async (
@@ -95,6 +97,18 @@ export default function FamilyScreen() {
         }
       } else {
         setInvites([]);
+      }
+      if (next.kind === 'ready') {
+        try {
+          const nextInbox = await family.refreshFamilyInbox();
+          if (!refreshGate.isCurrent(generation)) return 'stale';
+          setInbox(nextInbox);
+        } catch {
+          if (!refreshGate.isCurrent(generation)) return 'stale';
+          setInbox({ kind: 'hidden', reason: 'unreachable' });
+        }
+      } else {
+        setInbox(null);
       }
       if (needsAppleSignIn(next) && (await family.hasUnconfirmedSessionRevoke())) {
         if (!refreshGate.isCurrent(generation)) return 'stale';
@@ -290,6 +304,33 @@ export default function FamilyScreen() {
                 ) : null}
               </View>
             ))}
+
+            {inbox?.kind === 'ready'
+              ? inbox.items.map((item) => (
+                  <View key={item.shareId} style={styles.member}>
+                    <Text style={styles.memberName}>
+                      {item.receiveStatus === 'received' && item.note
+                        ? `文字：${item.note}`
+                        : '家里有这条分享'}
+                    </Text>
+                    {item.receiveStatus !== 'received' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="收下这条分享"
+                        disabled={busy}
+                        onPress={() =>
+                          run(async (family) => {
+                            await family.receiveShare(item.shareId);
+                          })
+                        }
+                        style={styles.hit}
+                      >
+                        <Text style={styles.action}>收下这条分享</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))
+              : null}
 
             {membership.role === 'creator' ? (
               <>

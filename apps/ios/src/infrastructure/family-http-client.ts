@@ -4,6 +4,7 @@ import type {
   InvitationView,
   MediaObjectView,
   MembershipListView,
+  ShareMediaView,
   ShareMomentInput,
   ShareView,
   SignInResult,
@@ -50,7 +51,15 @@ export type FamilyApiClient = {
   getMediaObject(sessionToken: string, objectId: string): Promise<MediaObjectView>;
   getMediaContent(sessionToken: string, objectId: string): Promise<{ mimeType: string; bytes: Uint8Array }>;
   shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
+  listVisibleShares(sessionToken: string, familyId: string): Promise<{ shares: ShareView[] }>;
   getShare(sessionToken: string, familyId: string, shareId: string): Promise<ShareView>;
+  getShareMedia(sessionToken: string, familyId: string, shareId: string, objectId: string): Promise<ShareMediaView>;
+  getShareMediaContent(
+    sessionToken: string,
+    familyId: string,
+    shareId: string,
+    objectId: string,
+  ): Promise<{ mimeType: string; bytes: Uint8Array }>;
 };
 
 type ErrorBody = { error?: { code?: string; message?: string } };
@@ -156,8 +165,38 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
         },
       });
     },
+    listVisibleShares(sessionToken, familyId) {
+      return send({ method: 'GET', path: `/v1/families/${familyId}/shares`, sessionToken });
+    },
     getShare(sessionToken, familyId, shareId) {
       return send({ method: 'GET', path: `/v1/families/${familyId}/shares/${shareId}`, sessionToken });
+    },
+    getShareMedia(sessionToken, familyId, shareId, objectId) {
+      return send({
+        method: 'GET',
+        path: `/v1/families/${familyId}/shares/${shareId}/media/${objectId}`,
+        sessionToken,
+      });
+    },
+    async getShareMediaContent(sessionToken, familyId, shareId, objectId) {
+      let response: FamilyTransportResponse;
+      try {
+        response = await transport.request({
+          method: 'GET',
+          path: `/v1/families/${familyId}/shares/${shareId}/media/${objectId}/content`,
+          sessionToken,
+          expectBytes: true,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Family server is unreachable.';
+        throw new ApplicationError('SERVER_UNREACHABLE', message);
+      }
+      throwIfFailed(response.status, response.body);
+      if (!response.bytes) {
+        throw new ApplicationError('SHARE_MEDIA_UNAVAILABLE', 'A selected media object is not available.');
+      }
+      const meta = (response.body || {}) as { mimeType?: string };
+      return { mimeType: meta.mimeType || 'application/octet-stream', bytes: response.bytes };
     },
     async getMediaContent(sessionToken, objectId) {
       let response: FamilyTransportResponse;

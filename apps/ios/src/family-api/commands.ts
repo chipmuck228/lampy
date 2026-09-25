@@ -16,6 +16,7 @@ import type {
   InvitationView,
   MediaObjectView,
   MembershipListView,
+  ShareMediaView,
   ShareMomentInput,
   ShareView,
   SignInResult,
@@ -45,7 +46,15 @@ export type FamilyCommands = {
   getMediaObject(sessionToken: string, objectId: string): Promise<MediaObjectView>;
   getMediaContent(sessionToken: string, objectId: string): Promise<{ mimeType: string; bytes: Uint8Array }>;
   shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
+  listVisibleShares(sessionToken: string, familyId: string): Promise<{ shares: ShareView[] }>;
   getShare(sessionToken: string, familyId: string, shareId: string): Promise<ShareView>;
+  getShareMedia(sessionToken: string, familyId: string, shareId: string, objectId: string): Promise<ShareMediaView>;
+  getShareMediaContent(
+    sessionToken: string,
+    familyId: string,
+    shareId: string,
+    objectId: string,
+  ): Promise<{ mimeType: string; bytes: Uint8Array }>;
 };
 
 function iso(date: Date) {
@@ -503,8 +512,17 @@ export function createFamilyCommands(deps: {
     shareMoment(sessionToken, familyId, input) {
       return shares.shareMoment(sessionToken, familyId, input);
     },
+    listVisibleShares(sessionToken, familyId) {
+      return shares.listVisibleShares(sessionToken, familyId);
+    },
     getShare(sessionToken, familyId, shareId) {
       return shares.getShare(sessionToken, familyId, shareId);
+    },
+    getShareMedia(sessionToken, familyId, shareId, objectId) {
+      return shares.getShareMedia(sessionToken, familyId, shareId, objectId);
+    },
+    getShareMediaContent(sessionToken, familyId, shareId, objectId) {
+      return shares.getShareMediaContent(sessionToken, familyId, shareId, objectId);
     },
   };
 }

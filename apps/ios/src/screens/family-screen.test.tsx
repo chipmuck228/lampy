@@ -19,6 +19,8 @@ const mockFamily = {
   dissolveFamily: jest.fn(),
   signOut: jest.fn(),
   hasUnconfirmedSessionRevoke: jest.fn(async () => false),
+  refreshFamilyInbox: jest.fn(async () => ({ kind: 'hidden', reason: 'unauthenticated' })),
+  receiveShare: jest.fn(),
 };
 
 jest.mock('expo-router', () => {
@@ -67,6 +69,7 @@ describe('family screen', () => {
     mockFamily.listPendingInvitations.mockReset().mockResolvedValue([]);
     mockFamily.signOut.mockReset();
     mockFamily.hasUnconfirmedSessionRevoke.mockReset().mockResolvedValue(false);
+    mockFamily.refreshFamilyInbox.mockReset().mockResolvedValue({ kind: 'hidden', reason: 'unauthenticated' });
   });
 
   it('shows an accurate unavailable state when the family API is not configured', async () => {
@@ -103,7 +106,40 @@ describe('family screen', () => {
     });
     expect(view.getByText('usr_alice')).toBeTruthy();
     expect(view.getByLabelText('邀请')).toBeTruthy();
-    expect(view.queryByText(/假送达|家庭时间线/)).toBeNull();
+    expect(view.queryByText(/假送达|家庭时间线|家人已收到/)).toBeNull();
+  });
+
+  it('lists a received share as household content and never says family received it', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      role: 'member',
+      members: [{ userId: 'usr_bob', role: 'member', joinedAt: '2026-09-25T03:00:00.000Z' }],
+    });
+    mockFamily.refreshFamilyInbox.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      items: [
+        {
+          shareId: 'shr_1',
+          familyId: 'fam_1',
+          snapshotRevision: 1,
+          note: '门口的风',
+          emotion: '平静',
+          occurredAtPrecision: 'day',
+          receiveStatus: 'listed',
+          expectedMediaCount: 1,
+          storedMediaCount: 0,
+        },
+      ],
+    });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByText('家里有这条分享')).toBeTruthy();
+    });
+    expect(view.getByLabelText('收下这条分享')).toBeTruthy();
+    expect(view.queryByText(/家人已收到/)).toBeNull();
   });
 
   it('offers Apple sign-in again after a stored session is rejected', async () => {

@@ -49,6 +49,7 @@ export type FamilyTx = {
     sourceMomentId: string,
     sourceRevision: number,
   ): Promise<ShareRecord | null>;
+  listSharesInFamily(familyId: string): Promise<ShareRecord[]>;
   saveShare(share: ShareRecord): Promise<void>;
 };
 
@@ -202,6 +203,12 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
             row.sourceRevision === sourceRevision,
         ) ?? null
       );
+    },
+    async listSharesInFamily(familyId) {
+      return store.shares
+        .filter((row) => row.familyId === familyId)
+        .slice()
+        .sort((left, right) => right.sharedAt.localeCompare(left.sharedAt));
     },
     async saveShare(share) {
       if (
