@@ -166,6 +166,37 @@ describe('media failure and permission recovery', () => {
     expect((await app.getRecentLife()).items).toHaveLength(0);
   });
 
+  it('does not write an asset or draft ref when the copied dest cannot be confirmed', async () => {
+    const media = createMemoryMediaStore();
+    const { app, repos } = createRecoveryApp({
+      media,
+      assetIds: ['asset_unconfirmed', 'asset_voice_unconfirmed'],
+    });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '确认不了就不留下');
+    media.failNextConfirm();
+    await expect(app.addPickedImages(draft.draftId, [photo('unconfirmed')])).rejects.toMatchObject({
+      code: 'COPY_FAILED',
+    });
+    media.failNextConfirm();
+    await expect(app.addRecordedAudio(draft.draftId, clip('unconfirmed'))).rejects.toMatchObject({
+      code: 'COPY_FAILED',
+    });
+
+    const restored = await app.restoreOrCreateDraft();
+    expect(restored.draftId).toBe(draft.draftId);
+    expect(restored.note).toBe('确认不了就不留下');
+    expect(restored.images).toHaveLength(0);
+    expect(restored.audio).toBeNull();
+    expect(media.persisted.size).toBe(0);
+    expect(await repos.assets.findById('asset_unconfirmed')).toEqual({ kind: 'missing' });
+    expect(await repos.assets.findById('asset_voice_unconfirmed')).toEqual({ kind: 'missing' });
+    const stored = await repos.drafts.loadActive();
+    expect(stored?.id).toBe(draft.draftId);
+    expect(stored?.content.note).toBe('确认不了就不留下');
+    expect(stored?.assetIds).toEqual([]);
+  });
+
   it('does not write a new asset when image copy fails', async () => {
     const media = createMemoryMediaStore();
     const { app, repos } = createRecoveryApp({ media, assetIds: ['asset_copy'] });

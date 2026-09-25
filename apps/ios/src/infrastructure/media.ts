@@ -114,6 +114,7 @@ export function createMemoryMediaStore(): MediaStore & {
   markUndecodable(localUri: string): void;
   markUnplayable(localUri: string): void;
   failNextPersist(code: MediaPersistCode): void;
+  failNextConfirm(): void;
   persisted: Map<string, { sourceUri: string; exists: boolean; decodable: boolean; playable: boolean }>;
   removed: string[];
 } {
@@ -123,6 +124,7 @@ export function createMemoryMediaStore(): MediaStore & {
   >();
   const removed: string[] = [];
   const persistFaults: MediaPersistCode[] = [];
+  let confirmFaults = 0;
 
   async function persist(
     dest: string,
@@ -134,6 +136,10 @@ export function createMemoryMediaStore(): MediaStore & {
     }
     const existing = persisted.get(dest);
     if (existing) return { localUri: dest };
+    if (confirmFaults > 0) {
+      confirmFaults -= 1;
+      throw new MediaPersistError('COPY_FAILED', 'copied dest could not be confirmed');
+    }
     persisted.set(dest, { sourceUri, exists: true, decodable: true, playable: true });
     return { localUri: dest };
   }
@@ -180,6 +186,9 @@ export function createMemoryMediaStore(): MediaStore & {
     },
     failNextPersist(code) {
       persistFaults.push(code);
+    },
+    failNextConfirm() {
+      confirmFaults += 1;
     },
   };
 }

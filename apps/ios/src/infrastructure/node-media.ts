@@ -1,7 +1,13 @@
 import { copyFile, mkdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import { classifyCopyError, extensionForAudioMime, extensionForMime, type MediaStore } from './media';
+import {
+  classifyCopyError,
+  extensionForAudioMime,
+  extensionForMime,
+  MediaPersistError,
+  type MediaStore,
+} from './media';
 
 export function createNodeMediaStore(rootDir: string): MediaStore {
   async function persist(dest: string, sourceUri: string) {
@@ -26,9 +32,13 @@ export function createNodeMediaStore(rootDir: string): MediaStore {
     }
     try {
       const info = await stat(dest);
+      if (!info.isFile()) {
+        throw new MediaPersistError('COPY_FAILED', 'copied dest could not be confirmed');
+      }
       return { localUri: dest, sizeBytes: info.size };
-    } catch {
-      return { localUri: dest };
+    } catch (error) {
+      if (error instanceof MediaPersistError) throw error;
+      throw classifyCopyError(error);
     }
   }
 

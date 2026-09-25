@@ -6,6 +6,7 @@ import {
   classifyCopyError,
   extensionForAudioMime,
   extensionForMime,
+  MediaPersistError,
   type ImageSource,
   type MediaStore,
   type PickedImage,
@@ -110,15 +111,19 @@ async function persistCopy(
     }
     throw classifyCopyError(error);
   }
+  let copied;
   try {
-    const copied = await FileSystem.getInfoAsync(dest);
-    return {
-      localUri: dest,
-      sizeBytes: copied.exists ? copied.size : undefined,
-    };
-  } catch {
-    return { localUri: dest };
+    copied = await FileSystem.getInfoAsync(dest);
+  } catch (error) {
+    throw classifyCopyError(error);
   }
+  if (!copied.exists || copied.isDirectory) {
+    throw new MediaPersistError('COPY_FAILED', 'copied dest could not be confirmed');
+  }
+  return {
+    localUri: dest,
+    sizeBytes: copied.size,
+  };
 }
 
 function isAppOwned(localUri: string): boolean {
