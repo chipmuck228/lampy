@@ -9,7 +9,7 @@
 | 审计起点 `origin/main`（含 PR #9） | `fea7780377908ed1e3e9a931a42e95f092e1ab18` |
 | PR #9 merge | https://github.com/chipmuck228/lampy/pull/9 |
 | PR #9 head | `a52ea585b4351524bfba27260657197b955d3ffe` |
-| 本审计分支 | `ios/family-phase-3b-audit` |
+| 本审计提交 | `b67ff21b90ba7ba85d48f4676af56b1cad50ea9c` on `ios/family-phase-3b-audit` |
 
 `a52ea58` 是 `origin/main` 祖先。未重复合并。
 
