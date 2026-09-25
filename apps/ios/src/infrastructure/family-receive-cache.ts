@@ -91,21 +91,32 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
   const files = new Map<string, Uint8Array>();
   const pending = new Set<string>();
 
-  function deletePrefix(prefix: string) {
+  function sharePrefixOf(row: { userId: string; familyId: string; shareId: string }) {
+    return `${row.userId}/${row.familyId}/${row.shareId}`;
+  }
+
+  function allowedPrefixes() {
+    return new Set(shares.map(sharePrefixOf));
+  }
+
+  function isUnderPrefix(pathValue: string, prefix: string) {
+    return pathValue === prefix || pathValue.startsWith(`${prefix}/`);
+  }
+
+  function deleteUnauthorized(prefix: string, allowed: Set<string>) {
     for (const key of [...files.keys()]) {
-      if (key === prefix || key.startsWith(`${prefix}/`)) files.delete(key);
+      if (!isUnderPrefix(key, prefix)) continue;
+      const parts = key.split('/').filter(Boolean);
+      if (parts.length >= 3 && allowed.has(`${parts[0]}/${parts[1]}/${parts[2]}`)) continue;
+      files.delete(key);
     }
   }
 
-  function leftoverPrefixes() {
-    const allowed = new Set(shares.map((row) => `${row.userId}/${row.familyId}/${row.shareId}`));
+  function leftoverSharePrefixes(allowed: Set<string>) {
     const leftovers = new Set<string>();
     for (const key of files.keys()) {
       const parts = key.split('/').filter(Boolean);
-      if (parts.length < 3) {
-        leftovers.add(parts[0] || key);
-        continue;
-      }
+      if (parts.length < 3) continue;
       const sharePrefix = `${parts[0]}/${parts[1]}/${parts[2]}`;
       if (!allowed.has(sharePrefix)) leftovers.add(sharePrefix);
     }
@@ -179,30 +190,36 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       return replaceShare({ ...existing, receiveStatus: 'failed' });
     },
     async isolateAccount(userId) {
+      const doomed = shares.filter((row) => row.userId === userId).map(sharePrefixOf);
       for (let i = shares.length - 1; i >= 0; i -= 1) {
         if (shares[i]?.userId === userId) shares.splice(i, 1);
       }
       for (let i = media.length - 1; i >= 0; i -= 1) {
         if (media[i]?.userId === userId) media.splice(i, 1);
       }
-      deletePrefix(userId);
-      const diskCleared = ![...files.keys()].some((key) => key === userId || key.startsWith(`${userId}/`));
-      if (!diskCleared) pending.add(userId);
-      else pending.delete(userId);
+      deleteUnauthorized(userId, allowedPrefixes());
+      const diskCleared = ![...files.keys()].some((key) => isUnderPrefix(key, userId));
+      pending.delete(userId);
+      if (!diskCleared) doomed.forEach((prefix) => pending.add(prefix));
+      else doomed.forEach((prefix) => pending.delete(prefix));
       return { hidden: true as const, diskCleared };
     },
     async isolateFamily(userId, familyId) {
       const prefix = `${userId}/${familyId}`;
+      const doomed = shares
+        .filter((row) => row.userId === userId && row.familyId === familyId)
+        .map(sharePrefixOf);
       for (let i = shares.length - 1; i >= 0; i -= 1) {
         if (shares[i]?.userId === userId && shares[i]?.familyId === familyId) shares.splice(i, 1);
       }
       for (let i = media.length - 1; i >= 0; i -= 1) {
         if (media[i]?.userId === userId && media[i]?.familyId === familyId) media.splice(i, 1);
       }
-      deletePrefix(prefix);
-      const diskCleared = ![...files.keys()].some((key) => key === prefix || key.startsWith(`${prefix}/`));
-      if (!diskCleared) pending.add(prefix);
-      else pending.delete(prefix);
+      deleteUnauthorized(prefix, allowedPrefixes());
+      const diskCleared = ![...files.keys()].some((key) => isUnderPrefix(key, prefix));
+      pending.delete(prefix);
+      if (!diskCleared) doomed.forEach((item) => pending.add(item));
+      else doomed.forEach((item) => pending.delete(item));
       return { hidden: true as const, diskCleared };
     },
     async isolateShare(userId, familyId, shareId) {
@@ -217,8 +234,8 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
           media.splice(i, 1);
         }
       }
-      deletePrefix(prefix);
-      const diskCleared = ![...files.keys()].some((key) => key === prefix || key.startsWith(`${prefix}/`));
+      deleteUnauthorized(prefix, allowedPrefixes());
+      const diskCleared = ![...files.keys()].some((key) => isUnderPrefix(key, prefix));
       if (!diskCleared) pending.add(prefix);
       else pending.delete(prefix);
       return { hidden: true as const, diskCleared };
@@ -237,15 +254,21 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       return { hidden: true as const, diskCleared };
     },
     async recoverDisk() {
+      const allowed = allowedPrefixes();
       let diskCleared = true;
       for (const prefix of [...pending]) {
-        deletePrefix(prefix);
-        if (![...files.keys()].some((key) => key === prefix || key.startsWith(`${prefix}/`))) pending.delete(prefix);
+        if ([...allowed].some((share) => isUnderPrefix(share, prefix))) {
+          deleteUnauthorized(prefix, allowed);
+          pending.delete(prefix);
+          continue;
+        }
+        deleteUnauthorized(prefix, allowed);
+        if (![...files.keys()].some((key) => isUnderPrefix(key, prefix))) pending.delete(prefix);
         else diskCleared = false;
       }
-      for (const prefix of leftoverPrefixes()) {
-        deletePrefix(prefix);
-        if ([...files.keys()].some((key) => key === prefix || key.startsWith(`${prefix}/`))) {
+      for (const prefix of leftoverSharePrefixes(allowed)) {
+        deleteUnauthorized(prefix, allowed);
+        if ([...files.keys()].some((key) => isUnderPrefix(key, prefix))) {
           pending.add(prefix);
           diskCleared = false;
         } else {
@@ -310,15 +333,90 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     await db.run(`DELETE FROM family_receive_pending_cleanup WHERE prefix = ?`, [prefix]);
   }
 
-  async function removeTracked(prefix: string) {
+  function isUnderPrefix(pathValue: string, prefix: string) {
+    return pathValue === prefix || pathValue.startsWith(`${prefix}/`);
+  }
+
+  async function authorizedPrefixes() {
+    return new Set(
+      (
+        await db.getAll<{ user_id: string; family_id: string; share_id: string }>(
+          'SELECT user_id, family_id, share_id FROM family_received_shares',
+        )
+      ).map((row) => `${row.user_id}/${row.family_id}/${row.share_id}`),
+    );
+  }
+
+  async function tryRemovePrefix(prefix: string) {
     try {
       await files.removePrefix(prefix);
       await clearPending(prefix);
       return true;
     } catch {
-      await markPending(prefix);
       return false;
     }
+  }
+
+  async function removeUnauthorizedUnder(prefix: string, allowed: Set<string>) {
+    const targets = new Set<string>();
+    for (const key of await files.listKeys()) {
+      if (!isUnderPrefix(key, prefix)) continue;
+      const parts = key.split('/').filter(Boolean);
+      if (parts.length < 3) {
+        try {
+          await files.remove(key);
+        } catch {
+          return false;
+        }
+        continue;
+      }
+      const sharePrefix = `${parts[0]}/${parts[1]}/${parts[2]}`;
+      if (!allowed.has(sharePrefix)) targets.add(sharePrefix);
+    }
+    let diskCleared = true;
+    for (const target of targets) {
+      if (!(await tryRemovePrefix(target))) {
+        await markPending(target);
+        diskCleared = false;
+      }
+    }
+    await clearPending(prefix);
+    return diskCleared;
+  }
+
+  async function removeTracked(prefix: string) {
+    const allowed = await authorizedPrefixes();
+    if ([...allowed].some((share) => isUnderPrefix(share, prefix))) {
+      return removeUnauthorizedUnder(prefix, allowed);
+    }
+    if (await tryRemovePrefix(prefix)) return true;
+    await markPending(prefix);
+    return false;
+  }
+
+  async function isolateRowsThenFiles(
+    doomed: string[],
+    broadPrefix: string,
+    deleteRows: () => Promise<void>,
+  ): Promise<FamilyCacheCleanup> {
+    await deleteRows();
+    const allowed = await authorizedPrefixes();
+    if ([...allowed].some((share) => isUnderPrefix(share, broadPrefix))) {
+      const diskCleared = await removeUnauthorizedUnder(broadPrefix, allowed);
+      return { hidden: true, diskCleared };
+    }
+    if (await tryRemovePrefix(broadPrefix)) {
+      for (const prefix of doomed) await clearPending(prefix);
+      return { hidden: true, diskCleared: true };
+    }
+    await clearPending(broadPrefix);
+    let diskCleared = doomed.length === 0;
+    for (const prefix of doomed) {
+      if (await tryRemovePrefix(prefix)) continue;
+      await markPending(prefix);
+      diskCleared = false;
+    }
+    return { hidden: true, diskCleared };
   }
 
   async function recoverDisk(): Promise<FamilyCacheCleanup> {
@@ -327,20 +425,11 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     for (const row of pending) {
       if (!(await removeTracked(row.prefix))) diskCleared = false;
     }
-    const allowed = new Set(
-      (
-        await db.getAll<{ user_id: string; family_id: string; share_id: string }>(
-          'SELECT user_id, family_id, share_id FROM family_received_shares',
-        )
-      ).map((row) => `${row.user_id}/${row.family_id}/${row.share_id}`),
-    );
+    const allowed = await authorizedPrefixes();
     const leftovers = new Set<string>();
     for (const key of await files.listKeys()) {
       const parts = key.split('/').filter(Boolean);
-      if (parts.length < 3) {
-        leftovers.add(parts[0] || key);
-        continue;
-      }
+      if (parts.length < 3) continue;
       const sharePrefix = `${parts[0]}/${parts[1]}/${parts[2]}`;
       if (!allowed.has(sharePrefix)) leftovers.add(sharePrefix);
     }
@@ -501,14 +590,28 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
       return saveShare({ ...existing, receiveStatus: 'failed' });
     },
     async isolateAccount(userId) {
-      await db.run('DELETE FROM family_received_media WHERE user_id = ?', [userId]);
-      await db.run('DELETE FROM family_received_shares WHERE user_id = ?', [userId]);
-      return { hidden: true as const, diskCleared: await removeTracked(userId) };
+      const doomed = (
+        await db.getAll<{ family_id: string; share_id: string }>(
+          'SELECT family_id, share_id FROM family_received_shares WHERE user_id = ?',
+          [userId],
+        )
+      ).map((row) => `${userId}/${row.family_id}/${row.share_id}`);
+      return isolateRowsThenFiles(doomed, userId, async () => {
+        await db.run('DELETE FROM family_received_media WHERE user_id = ?', [userId]);
+        await db.run('DELETE FROM family_received_shares WHERE user_id = ?', [userId]);
+      });
     },
     async isolateFamily(userId, familyId) {
-      await db.run('DELETE FROM family_received_media WHERE user_id = ? AND family_id = ?', [userId, familyId]);
-      await db.run('DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ?', [userId, familyId]);
-      return { hidden: true as const, diskCleared: await removeTracked(`${userId}/${familyId}`) };
+      const doomed = (
+        await db.getAll<{ share_id: string }>(
+          'SELECT share_id FROM family_received_shares WHERE user_id = ? AND family_id = ?',
+          [userId, familyId],
+        )
+      ).map((row) => `${userId}/${familyId}/${row.share_id}`);
+      return isolateRowsThenFiles(doomed, `${userId}/${familyId}`, async () => {
+        await db.run('DELETE FROM family_received_media WHERE user_id = ? AND family_id = ?', [userId, familyId]);
+        await db.run('DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ?', [userId, familyId]);
+      });
     },
     async isolateShare(userId, familyId, shareId) {
       await db.run(

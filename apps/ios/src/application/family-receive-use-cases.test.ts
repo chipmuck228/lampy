@@ -354,6 +354,97 @@ describe('family receive cache use cases', () => {
     }
   });
 
+  it('does not delete a new receive when recovering an account-level leftover after sign-out failed to wipe files', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'lampy-f5-relogin-'));
+    try {
+      const file = path.join(dir, 'lampy.db');
+      const cacheDir = path.join(dir, 'family-cache');
+      const realFiles = createNodeFamilyReceiveFiles(cacheDir);
+      let failRemove = true;
+      const files = {
+        write: realFiles.write.bind(realFiles),
+        read: realFiles.read.bind(realFiles),
+        remove: realFiles.remove.bind(realFiles),
+        listKeys: realFiles.listKeys.bind(realFiles),
+        async removePrefix(prefix: string) {
+          if (failRemove) throw new Error('cannot delete account dir');
+          return realFiles.removePrefix(prefix);
+        },
+      };
+      const commands = createCommands();
+      const aliceCmd = await commands.signInWithApple('apple_alice');
+      const family = await commands.createFamily(aliceCmd.sessionToken, 'fam-1');
+      const invite = await commands.inviteMember(aliceCmd.sessionToken, family.familyId, 'inv-1');
+      await commands.acceptInvitation((await commands.signInWithApple('apple_bob')).sessionToken, invite.code, 'accept-1');
+      const firstMedia = await commands.uploadMedia(aliceCmd.sessionToken, {
+        bytes: sampleJpegBytes(),
+        mimeType: 'image/jpeg',
+      });
+      const firstShare = await commands.shareMoment(aliceCmd.sessionToken, family.familyId, {
+        sourceMomentId: 'moment_one',
+        sourceRevision: 1,
+        note: '门口的风',
+        emotion: '',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [firstMedia.objectId],
+        expectedMediaCount: 1,
+      });
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const cache = createSqliteFamilyReceiveCache(db, files);
+      const session = createMemoryFamilySessionStore();
+      const bob = createFamilyUseCases({
+        client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
+        session,
+        pending: testPending(),
+        receiveCache: cache,
+      });
+      await bob.signInWithApple('apple_bob');
+      await bob.receiveShare(firstShare.shareId);
+      const bobId = await session.getUserId();
+      expect(bobId).toBeTruthy();
+      await bob.signOut();
+      expect(await cache.list(bobId as string, family.familyId)).toEqual([]);
+      expect(await cache.pendingCleanupPrefixes()).toContain(
+        `${bobId}/${family.familyId}/${firstShare.shareId}`,
+      );
+      expect(await cache.pendingCleanupPrefixes()).not.toContain(bobId);
+      await db.run('INSERT OR REPLACE INTO family_receive_pending_cleanup (prefix, created_at) VALUES (?, ?)', [
+        bobId,
+        '2026-09-25T06:00:00.000Z',
+      ]);
+      expect(await cache.pendingCleanupPrefixes()).toContain(bobId);
+
+      const secondMedia = await commands.uploadMedia(aliceCmd.sessionToken, {
+        bytes: samplePngBytes(),
+        mimeType: 'image/png',
+      });
+      const secondShare = await commands.shareMoment(aliceCmd.sessionToken, family.familyId, {
+        sourceMomentId: 'moment_two',
+        sourceRevision: 1,
+        note: '廊下的雨',
+        emotion: '',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [secondMedia.objectId],
+        expectedMediaCount: 1,
+      });
+      failRemove = false;
+      await bob.signInWithApple('apple_bob');
+      await bob.receiveShare(secondShare.shareId);
+      const recovered = await cache.recoverDisk();
+      expect(recovered.hidden).toBe(true);
+      const kept = await cache.list(bobId as string, family.familyId);
+      expect(kept[0]?.shareId).toBe(secondShare.shareId);
+      expect(kept[0]?.receiveStatus).toBe('received');
+      const stored = (await cache.listMedia(bobId as string, family.familyId, secondShare.shareId))[0];
+      expect(stored).toBeTruthy();
+      expect(await cache.readMediaBytes(stored!.storageKey)).toEqual(samplePngBytes());
+      expect(kept.map((row) => row.shareId)).not.toContain(firstShare.shareId);
+      await db.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('shows only the latest authorized list and hides when the list request fails', async () => {
     const commands = createCommands();
     const receiveCache = createMemoryFamilyReceiveCache();

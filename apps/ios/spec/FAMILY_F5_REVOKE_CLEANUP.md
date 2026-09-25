@@ -42,7 +42,7 @@ family_shares
 1. **界面先隐藏**家庭内容（资格不是 `ready`，或该分享不在本次授权列表）。
 2. 确认失去资格（退出成功、解散成功、`getMembership` 为 `none`、列表/读取返回 `NOT_IN_FAMILY`）后：删除该账号该家的 `family_received_shares` / `family_received_media` 行。
 3. 再删 `family-cache/{userId}/{familyId}/` 下文件与 `.part`。单条撤回只删 `{shareId}/`。
-4. 文件删除失败：行已删，界面保持隐藏，并把可重建的 `prefix` 写入 `family_receive_pending_cleanup`。**已隐藏 ≠ 磁盘已清理**。下次 `list` / 启动 `recoverDisk` 会重试这些目录，并扫描 `family-cache/` 里没有对应授权行的文件再删。
+4. 文件删除失败：行已删，界面保持隐藏，待清理只记录**当时失效的分享路径**（`userId/familyId/shareId`），不把整个 `userId/` 当可重试删除目标。**已隐藏 ≠ 磁盘已清理**。`recoverDisk` 重试前先核当前有效缓存行；账号/家庭级目录下若已有新的授权行，只删无对应行的旧文件。
 5. 不碰个人 `moments` / `assets` / `lampy-assets/`。不删服务端 F2 文件。
 
 ## API
@@ -86,7 +86,7 @@ GET .../shares/:shareId/media/:objectId/content
 | 进程重启（请求未到达） | 仍为 active | 新实例 `idle`，分享仍可见，可再试 |
 | 账号切换 | 按当前会话 | 只展示当前 `userId` 缓存；登出/401 清该账号家庭缓存 |
 | 移除后重新加入 | 旧分享仍因 `joinedAt` 或 revoked 不可见 | 列表空；旧缓存被 `replaceVisible` 隔离 |
-| 文件删除失败 | 停供不变 | 隐藏并记下待清理 prefix；不把「已隐藏」报成「磁盘已清理」。下次启动/列表核验再扫残留文件 |
+| 文件删除失败 | 停供不变 | 隐藏并记下当时失效的分享路径；不把「已隐藏」报成「磁盘已清理」。恢复清理不得删掉同账号后来新接收的文件 |
 
 ## 客户端
 
