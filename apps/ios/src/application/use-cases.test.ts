@@ -24,6 +24,7 @@ describe('text-only personal moment use cases', () => {
     expect(recent.items).toHaveLength(1);
     expect(recent.items[0].id).toBe(saved.id);
     expect(recent.items[0].note).toBe('门口的风');
+    expect(recent.items[0].feeling).toBeNull();
 
     const detail = await app.getMomentDetail(saved.id);
     expect(detail.kind).toBe('ready');
@@ -31,6 +32,7 @@ describe('text-only personal moment use cases', () => {
       expect(detail.id).toBe(saved.id);
       expect(detail.note).toBe('门口的风');
       expect(detail.usedRecordedAtFallback).toBe(true);
+      expect(detail.feeling).toBeNull();
     }
   });
 

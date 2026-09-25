@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { createUseCases } from '../application/use-cases';
+import { ERROR_CODES } from '../domain-adapters/errors';
 import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
 import { activateMoment, createDraftMoment } from '../domain-adapters/moment-commands';
-import { ERROR_CODES } from '../domain-adapters/errors';
 import { createNodeMediaStore } from './node-media';
 import { openPreparedNodeSqliteDatabase } from './node-sqlite';
 import { createSqliteRepositories, listQuarantine } from './sqlite-repositories';
@@ -39,6 +39,7 @@ describe('sqlite file preservation', () => {
       });
       const draft = await first.restoreOrCreateDraft();
       await first.updateDraftNote(draft.draftId, '关掉文件再打开还在');
+      await first.updateDraftEmotion(draft.draftId, '平静');
       const saved = await first.saveTextMoment(draft.draftId);
       await firstDb.close();
 
@@ -50,10 +51,44 @@ describe('sqlite file preservation', () => {
       const recent = await second.getRecentLife();
       expect(recent.items.map((item) => item.id)).toEqual([saved.id]);
       expect(recent.items[0].note).toBe('关掉文件再打开还在');
+      expect(recent.items[0].feeling).toEqual({ value: '平静', label: '平静', known: true });
       const detail = await second.getMomentDetail(saved.id);
       expect(detail.kind).toBe('ready');
       if (detail.kind === 'ready') {
         expect(detail.note).toBe('关掉文件再打开还在');
+        expect(detail.feeling).toEqual({ value: '平静', label: '平静', known: true });
+      }
+      await secondDb.close();
+    });
+  });
+
+  it('keeps an unknown stored emotion after closing the file', async () => {
+    await withDatabase(async (file) => {
+      const firstDb = await openPreparedNodeSqliteDatabase(file);
+      const firstRepos = createSqliteRepositories(firstDb);
+      const instant = new Date('2026-09-24T11:02:00.000Z');
+      let moment = createDraftMoment(
+        {
+          content: { note: '旧词还在', emotion: '喜悦' },
+          origin: { type: 'created' },
+        },
+        { now: () => instant, ownerId: LOCAL_OWNER_ID, id: () => 'moment_old_joy' },
+      );
+      moment = activateMoment(moment, LOCAL_OWNER_ID, instant);
+      await firstRepos.moments.save(moment);
+      await firstDb.close();
+
+      const secondDb = await openPreparedNodeSqliteDatabase(file);
+      const second = createUseCases({
+        ...createSqliteRepositories(secondDb),
+        clock: clockAt('2026-09-24T11:03:00.000Z'),
+      });
+      const recent = await second.getRecentLife();
+      expect(recent.items[0].feeling).toEqual({ value: '喜悦', label: '喜悦', known: false });
+      const stored = await createSqliteRepositories(secondDb).moments.findById('moment_old_joy');
+      expect(stored.kind).toBe('ready');
+      if (stored.kind === 'ready') {
+        expect(stored.moment.content.emotion).toBe('喜悦');
       }
       await secondDb.close();
     });

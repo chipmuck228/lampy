@@ -57,6 +57,7 @@ export default function LookbackYearUnconfirmedScreen() {
           note={item.note}
           timeLabel={item.timeLabel}
           recordedFallbackLabel={item.recordedFallbackLabel}
+          feeling={item.feeling}
           images={item.images}
           audio={item.audio}
           unknownMedia={item.unknownMedia}

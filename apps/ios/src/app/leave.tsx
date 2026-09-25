@@ -18,6 +18,7 @@ import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/moment-audio';
+import { FeelingPicker } from '../screens/moment-feeling';
 import { MomentImages } from '../screens/moment-images';
 import { useSoundPlayer } from '../screens/use-sound-player';
 
@@ -27,6 +28,7 @@ export default function LeaveScreen() {
   const readingWidth = Math.min(width, 720);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [emotion, setEmotion] = useState('');
   const [images, setImages] = useState<ImageView[]>([]);
   const [audio, setAudio] = useState<AudioView | null>(null);
   const [unknownMedia, setUnknownMedia] = useState<UnknownMediaView[]>([]);
@@ -75,6 +77,7 @@ export default function LeaveScreen() {
         draftIdRef.current = draft.draftId;
         setDraftId(draft.draftId);
         setNote(draft.note);
+        setEmotion(draft.emotion ?? '');
         applyComposer(draft);
         setRestored(draft.isRestored);
         setRecordPhase(draft.audio ? 'stopped' : 'ready');
@@ -128,6 +131,18 @@ export default function LeaveScreen() {
       await app.updateDraftNote(id, next);
     }).catch((error) => {
       setMessage(shownError(error, '草稿暂时写不进去。已经写的字还在屏幕上。'));
+    });
+  }
+
+  function persistEmotion(next: string) {
+    setEmotion(next);
+    const id = draftIdRef.current;
+    if (!id) return;
+    void enqueue(async () => {
+      const app = await getUseCases();
+      await app.updateDraftEmotion(id, next);
+    }).catch((error) => {
+      setMessage(shownError(error, '草稿暂时写不进去。已经选的感受还在屏幕上。'));
     });
   }
 
@@ -330,6 +345,7 @@ export default function LeaveScreen() {
       await enqueue(async () => {
         const app = await getUseCases();
         await app.updateDraftNote(id, note);
+        await app.updateDraftEmotion(id, emotion);
         await app.saveTextMoment(id);
       });
       router.replace('/');
@@ -403,6 +419,13 @@ export default function LeaveScreen() {
             }}
             onRerecord={rerecord}
             onRemove={removeAudio}
+          />
+          <FeelingPicker
+            value={emotion}
+            disabled={!draftId}
+            onChange={(next) => {
+              persistEmotion(next);
+            }}
           />
           {message ? <Text style={styles.message}>{message}</Text> : null}
           <View style={styles.actions}>

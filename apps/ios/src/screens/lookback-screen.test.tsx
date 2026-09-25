@@ -124,6 +124,7 @@ describe('lookback screens', () => {
           precision: 'exact',
           timeLabel: '2026年1月2日 08:15',
           usedRecordedAtFallback: false,
+          feeling: { value: '平静', label: '平静', known: true },
           images: [
             {
               id: 'asset_ok',
@@ -174,6 +175,7 @@ describe('lookback screens', () => {
     await waitFor(() => {
       expect(day.getByText('门口的风')).toBeTruthy();
     });
+    expect(day.getByText('当时的感受 · 平静')).toBeTruthy();
     expect(day.getByText('2026年1月2日')).toBeTruthy();
     expect(day.getByLabelText('照片 1/3')).toBeTruthy();
     expect(day.getByText('这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
@@ -199,6 +201,7 @@ describe('lookback screens', () => {
           precision: 'unknown',
           timeLabel: '记录于 9月24日',
           usedRecordedAtFallback: true,
+          feeling: { value: '喜悦', label: '喜悦', known: false },
           images: [
             {
               id: 'asset_unknown_ok',
@@ -236,6 +239,7 @@ describe('lookback screens', () => {
       expect(mockGetHistoryUnknown).toHaveBeenCalled();
       expect(shelf.getByText('未确认的一句')).toBeTruthy();
     });
+    expect(shelf.getByText('当时的感受 · 喜悦')).toBeTruthy();
     expect(shelf.getByText('时间未确认')).toBeTruthy();
     expect(shelf.getByLabelText('照片 1/1')).toBeTruthy();
     expect(shelf.getByText('这段声音暂时无法播放，其他内容仍然保留。')).toBeTruthy();
@@ -245,6 +249,35 @@ describe('lookback screens', () => {
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_unknown' } });
     expect(shelf.getByText('时间未确认')).toBeTruthy();
     expect(readLookbackScroll('/lookback/unconfirmed')).toBe(120);
+  });
+
+  it('hides feeling on lookback day when none was chosen', async () => {
+    mockGetHistoryDay.mockResolvedValue({
+      year: 2026,
+      month: 1,
+      day: 2,
+      title: '2026年1月2日',
+      isEmpty: false,
+      items: [
+        {
+          id: 'm_plain',
+          note: '只写字',
+          precision: 'day',
+          timeLabel: '2026年1月2日',
+          usedRecordedAtFallback: false,
+          feeling: null,
+          images: [],
+          audio: null,
+          unknownMedia: [],
+        },
+      ],
+      hasMore: false,
+    });
+    const day = await render(wrap(<LookbackDayScreen />));
+    await waitFor(() => {
+      expect(day.getByText('只写字')).toBeTruthy();
+    });
+    expect(day.queryByText(/当时的感受/)).toBeNull();
   });
 
 });

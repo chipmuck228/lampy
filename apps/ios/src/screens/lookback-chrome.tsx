@@ -10,9 +10,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
+import type { FeelingView } from '../application/feeling';
 import { rememberLookbackScroll, readLookbackScroll } from '../application/lookback-session';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
+import { MomentFeeling } from './moment-feeling';
 import { MomentImages } from './moment-images';
 
 export function lookbackHref(path: string): Href {
@@ -108,6 +110,7 @@ export function HistoryMomentRow({
   note,
   timeLabel,
   recordedFallbackLabel,
+  feeling,
   images,
   audio,
   unknownMedia,
@@ -117,17 +120,22 @@ export function HistoryMomentRow({
   note: string;
   timeLabel: string;
   recordedFallbackLabel?: string;
+  feeling?: FeelingView | null;
   images: ImageView[];
   audio: AudioView | null;
   unknownMedia: UnknownMediaView[];
   onPress: () => void;
 }) {
   const summary =
-    note ||
-    images.map((image) => image.label).join('，') ||
-    audio?.label ||
-    unknownMedia.map((item) => item.label).join('，') ||
-    '一条记录';
+    [
+      note,
+      ...images.map((image) => image.label),
+      audio?.label || '',
+      ...unknownMedia.map((item) => item.label),
+      feeling ? `当时的感受，${feeling.label}` : '',
+    ]
+      .filter(Boolean)
+      .join('，') || '一条记录';
   return (
     <Pressable
       accessibilityRole="button"
@@ -143,6 +151,7 @@ export function HistoryMomentRow({
       <MomentImages images={images} testIDPrefix={`lookback-image-${id}`} />
       <MomentAudio audio={audio} testIDPrefix={`lookback-sound-${id}`} compact />
       <MomentUnknownMedia items={unknownMedia} testIDPrefix={`lookback-unknown-${id}`} />
+      <MomentFeeling feeling={feeling ?? null} testID={`lookback-feeling-${id}`} />
     </Pressable>
   );
 }

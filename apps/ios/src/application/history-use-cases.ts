@@ -25,11 +25,13 @@ import {
   type HistoryListedMoment,
   type HistoryUnconfirmedView,
 } from '../projections/history-projection';
+import { projectFeeling, type FeelingView } from './feeling';
 import type { AudioView, ImageView, UnknownMediaView } from './use-cases';
 
 export const HISTORY_PAGE_SIZE = 50;
 
 export type HistoryMomentItem = HistoryListedMoment & {
+  feeling: FeelingView | null;
   images: ImageView[];
   audio: AudioView | null;
   unknownMedia: UnknownMediaView[];
@@ -59,6 +61,7 @@ export function createHistoryUseCases(deps: {
     for (const moment of moments) {
       decorated.push({
         ...toListedMoment(moment, clock),
+        feeling: projectFeeling(moment.content.emotion),
         images: await deps.resolveImages(moment.assetIds),
         audio: await deps.resolveAudio(moment.assetIds),
         unknownMedia: await deps.resolveUnknown(moment.assetIds),

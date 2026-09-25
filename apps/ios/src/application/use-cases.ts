@@ -9,6 +9,9 @@ import {
   type MomentRecord,
 } from '../domain-adapters/moment-commands';
 import { projectMomentDetailView } from '../domain-adapters/moment-detail-projection';
+import { projectFeeling, type FeelingView } from './feeling';
+
+export type { FeelingView };
 import {
   classifyCopyError,
   isMediaPersistError,
@@ -97,6 +100,7 @@ export type RecentLifeItem = {
   note: string;
   recordedAt: string;
   dateLabel: string;
+  feeling: FeelingView | null;
   images: ImageView[];
   audio: AudioView | null;
   unknownMedia: UnknownMediaView[];
@@ -110,6 +114,7 @@ export type RecentLifeViewModel = {
 export type ComposerViewModel = {
   draftId: string;
   note: string;
+  emotion: string;
   isRestored: boolean;
   images: ImageView[];
   audio: AudioView | null;
@@ -130,6 +135,7 @@ export type MomentDetailViewModel =
       dateLabel: string;
       precision: string;
       usedRecordedAtFallback: boolean;
+      feeling: FeelingView | null;
       sourceLabel: string;
       images: ImageView[];
       audio: AudioView | null;
@@ -398,9 +404,14 @@ export function createUseCases(deps: {
     return {
       draftId: draft.id,
       note: draft.content.note,
+      emotion: draft.content.emotion,
       isRestored:
         isRestored &&
-        (!!draft.content.note.trim() || images.length > 0 || !!audio || unknownMedia.length > 0),
+        (!!draft.content.note.trim() ||
+          !!draft.content.emotion.trim() ||
+          images.length > 0 ||
+          !!audio ||
+          unknownMedia.length > 0),
       images,
       audio,
       unknownMedia,
@@ -645,6 +656,13 @@ export function createUseCases(deps: {
     await deps.drafts.save(next);
   }
 
+  async function updateDraftEmotion(draftId: string, emotion: string): Promise<void> {
+    const draft = await requireDraft(draftId);
+    const instant = clock.now();
+    const next = updateMomentContent(draft, { content: { emotion } }, ownerId, instant);
+    await deps.drafts.save(next);
+  }
+
   async function addLibraryImages(draftId: string): Promise<ComposerViewModel> {
     return pickFromSource(
       draftId,
@@ -793,6 +811,7 @@ export function createUseCases(deps: {
         note: moment.content.note,
         recordedAt: moment.time.recordedAt,
         dateLabel: calendarDateLabel(moment.time.occurredAt || moment.time.recordedAt),
+        feeling: projectFeeling(moment.content.emotion),
         images: await resolveImages(moment.assetIds),
         audio: await resolveAudio(moment.assetIds),
         unknownMedia: await resolveUnknown(moment.assetIds),
@@ -855,6 +874,7 @@ export function createUseCases(deps: {
       dateLabel: view.displayDate.primary,
       precision: view.displayDate.precision,
       usedRecordedAtFallback: view.displayDate.usedRecordedAtFallback,
+      feeling: projectFeeling(view.content.emotion),
       sourceLabel: view.source.label,
       images: await resolveImages(found.moment.assetIds),
       audio: await resolveAudio(found.moment.assetIds),
@@ -865,6 +885,7 @@ export function createUseCases(deps: {
   return {
     restoreOrCreateDraft,
     updateDraftNote,
+    updateDraftEmotion,
     addLibraryImages,
     addCameraImage,
     addPickedImages,

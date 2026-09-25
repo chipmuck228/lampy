@@ -16,6 +16,7 @@ jest.mock('../application/container', () => ({
   getUseCases: async () => ({
     restoreOrCreateDraft: mockRestore,
     updateDraftNote: async () => undefined,
+    updateDraftEmotion: async () => undefined,
     addLibraryImages: mockAddLibraryImages,
     addCameraImage: async () => undefined,
     saveTextMoment: mockSaveTextMoment,
