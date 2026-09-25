@@ -182,6 +182,9 @@ describe('family revoke and membership cleanup', () => {
       async removePrefix() {
         throw new Error('cannot delete file');
       },
+      async listKeys() {
+        return [];
+      },
     };
     const receiveCache = createMemoryFamilyReceiveCache();
     const originalIsolate = receiveCache.isolateAccount.bind(receiveCache);

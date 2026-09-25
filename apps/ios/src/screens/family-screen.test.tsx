@@ -3,6 +3,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ApplicationError } from '../application/errors';
+import type { FamilyInboxView } from '../application/family-use-cases';
 import FamilyScreen from './family-screen';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
 
@@ -19,7 +20,7 @@ const mockFamily = {
   dissolveFamily: jest.fn(),
   signOut: jest.fn(),
   hasUnconfirmedSessionRevoke: jest.fn(async () => false),
-  refreshFamilyInbox: jest.fn(async () => ({ kind: 'hidden', reason: 'unauthenticated' })),
+  refreshFamilyInbox: jest.fn(async (): Promise<FamilyInboxView> => ({ kind: 'hidden', reason: 'unauthenticated' })),
   receiveShare: jest.fn(),
   revokeShare: jest.fn(),
 };
