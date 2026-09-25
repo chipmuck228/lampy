@@ -24,7 +24,6 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
   }
 
   useEffect(() => {
-    const timer = setInterval(sync, 250);
     const app = AppState.addEventListener('change', (state) => {
       if (state !== 'active') {
         void playerRef.current?.stop();
@@ -32,11 +31,18 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
       }
     });
     return () => {
-      clearInterval(timer);
       app.remove();
       void playerRef.current?.release();
     };
   }, []);
+
+  useEffect(() => {
+    if (status !== 'playing') return undefined;
+    const timer = setInterval(sync, 250);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [status]);
 
   return {
     status,

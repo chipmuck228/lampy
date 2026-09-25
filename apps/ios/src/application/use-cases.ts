@@ -28,7 +28,9 @@ import type {
   MomentRepository,
 } from '../infrastructure/repositories';
 import { formatSoundDuration } from './duration';
+import type { HistoryClock } from '../domain-adapters/calendar';
 import { ApplicationError, toApplicationError } from './errors';
+import { createHistoryUseCases } from './history-use-cases';
 
 export const MAX_DRAFT_IMAGES = 3;
 export const MAX_DRAFT_AUDIO = 1;
@@ -233,6 +235,8 @@ export function createUseCases(deps: {
   ownerId?: string;
   id?: () => string;
   assetId?: () => string;
+  timezoneOffsetMinutes?: number;
+  timezone?: HistoryClock;
 }) {
   const ownerId = deps.ownerId || LOCAL_OWNER_ID;
   const clock = deps.clock || defaultClock();
@@ -896,6 +900,14 @@ export function createUseCases(deps: {
     },
     getRecentLife,
     getMomentDetail,
+    ...createHistoryUseCases({
+      moments: deps.moments,
+      timezoneOffsetMinutes: deps.timezoneOffsetMinutes,
+      timezone: deps.timezone,
+      resolveImages,
+      resolveAudio,
+      resolveUnknown,
+    }),
     toApplicationError,
   };
 }

@@ -7,6 +7,33 @@ export type MomentRead =
   | { kind: 'missing' }
   | { kind: 'unreadable' };
 
+export type MomentPage = {
+  items: MomentRecord[];
+  hasMore: boolean;
+};
+
+export type OccurredPrecision = 'exact' | 'day' | 'month' | 'year';
+
+export const PLACED_PRECISIONS: readonly OccurredPrecision[] = ['exact', 'day', 'month', 'year'];
+export const DAY_PRECISIONS: readonly OccurredPrecision[] = ['exact', 'day'];
+
+export type HistoryCountQuery = {
+  startIso: string;
+  endIso: string;
+  precisions: readonly OccurredPrecision[];
+};
+
+export type HistoryPageQuery = HistoryCountQuery & {
+  limit: number;
+  offset: number;
+  order: 'occurred-asc' | 'recorded-desc';
+};
+
+export type OccurredAtSpan = {
+  minIso: string;
+  maxIso: string;
+};
+
 export type AssetReferenceLookup = 'referenced' | 'clear' | 'unknown';
 
 export interface MomentRepository {
@@ -14,6 +41,11 @@ export interface MomentRepository {
   findById(id: string): Promise<MomentRead>;
   listRecent(limit?: number): Promise<MomentRecord[]>;
   lookupAssetReferences(assetId: string): Promise<AssetReferenceLookup>;
+  countActiveUnknown(): Promise<number>;
+  listActiveUnknown(limit: number, offset: number): Promise<MomentPage>;
+  countActiveOccurred(query: HistoryCountQuery): Promise<number>;
+  listActiveOccurred(query: HistoryPageQuery): Promise<MomentPage>;
+  occurredAtSpan(precisions: readonly OccurredPrecision[]): Promise<OccurredAtSpan | null>;
 }
 
 export interface DraftRepository {
@@ -48,6 +80,22 @@ function lookupInRecords(
     if (record.assetIds.includes(assetId)) return 'referenced';
   }
   return unknown ? 'unknown' : 'clear';
+}
+
+function isPlacedActive(item: MomentRecord, query: HistoryCountQuery): boolean {
+  return (
+    validateMoment(item).ok &&
+    item.lifecycle.status === 'active' &&
+    !!item.time.occurredAt &&
+    item.time.occurredAt >= query.startIso &&
+    item.time.occurredAt < query.endIso &&
+    query.precisions.includes(item.time.occurredAtPrecision as OccurredPrecision)
+  );
+}
+
+function compareOccurred(left: MomentRecord, right: MomentRecord): number {
+  const byOccurred = (left.time.occurredAt || '').localeCompare(right.time.occurredAt || '');
+  return byOccurred !== 0 ? byOccurred : left.time.recordedAt.localeCompare(right.time.recordedAt);
 }
 
 export function createMemoryRepositories(): {
@@ -94,6 +142,60 @@ export function createMemoryRepositories(): {
       },
       async lookupAssetReferences(assetId) {
         return lookupInRecords([...moments.values()], assetId);
+      },
+      async countActiveUnknown() {
+        return [...moments.values()].filter(
+          (item) =>
+            validateMoment(item).ok &&
+            item.lifecycle.status === 'active' &&
+            (item.time.occurredAtPrecision === 'unknown' || !item.time.occurredAt),
+        ).length;
+      },
+      async listActiveUnknown(limit, offset) {
+        const all = [...moments.values()]
+          .filter(
+            (item) =>
+              validateMoment(item).ok &&
+              item.lifecycle.status === 'active' &&
+              (item.time.occurredAtPrecision === 'unknown' || !item.time.occurredAt),
+          )
+          .sort((a, b) => b.time.recordedAt.localeCompare(a.time.recordedAt));
+        return {
+          items: all.slice(offset, offset + limit).map((item) => structuredClone(item)),
+          hasMore: offset + limit < all.length,
+        };
+      },
+      async countActiveOccurred(query) {
+        return [...moments.values()].filter((item) => isPlacedActive(item, query)).length;
+      },
+      async listActiveOccurred(query) {
+        const all = [...moments.values()]
+          .filter((item) => isPlacedActive(item, query))
+          .sort((left, right) =>
+            query.order === 'recorded-desc'
+              ? right.time.recordedAt.localeCompare(left.time.recordedAt)
+              : compareOccurred(left, right),
+          );
+        return {
+          items: all.slice(query.offset, query.offset + query.limit).map((item) => structuredClone(item)),
+          hasMore: query.offset + query.limit < all.length,
+        };
+      },
+      async occurredAtSpan(precisions) {
+        const isos = [...moments.values()]
+          .filter(
+            (item) =>
+              validateMoment(item).ok &&
+              item.lifecycle.status === 'active' &&
+              !!item.time.occurredAt &&
+              precisions.includes(item.time.occurredAtPrecision as OccurredPrecision),
+          )
+          .map((item) => item.time.occurredAt as string);
+        if (isos.length === 0) return null;
+        return {
+          minIso: isos.reduce((left, right) => (left < right ? left : right)),
+          maxIso: isos.reduce((left, right) => (left > right ? left : right)),
+        };
       },
     },
     drafts: {

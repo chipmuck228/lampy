@@ -222,6 +222,94 @@ export function createSqliteRepositories(db: SqlDatabase): {
         const rows = await db.getAll<{ json: string }>('SELECT json FROM moments');
         return lookupMomentRows(db, 'moment', rows, assetId);
       },
+      async countActiveUnknown() {
+        const row = await db.getFirst<{ total: number }>(
+          `SELECT COUNT(*) as total FROM moments
+           WHERE lifecycle_status = 'active'
+             AND (
+               occurred_at IS NULL
+               OR json_extract(json, '$.time.occurredAtPrecision') = 'unknown'
+             )`,
+        );
+        return row?.total ?? 0;
+      },
+      async listActiveUnknown(limit, offset) {
+        const rows = await db.getAll<{ json: string }>(
+          `SELECT json FROM moments
+           WHERE lifecycle_status = 'active'
+             AND (
+               occurred_at IS NULL
+               OR json_extract(json, '$.time.occurredAtPrecision') = 'unknown'
+             )
+           ORDER BY recorded_at DESC
+           LIMIT ? OFFSET ?`,
+          [limit + 1, offset],
+        );
+        const valid: MomentRecord[] = [];
+        for (const row of rows) {
+          const decoded = decodeMoment(row.json);
+          if (decoded.ok) valid.push(decoded.moment);
+          else await quarantine(db, 'moment', decoded.raw, decoded.errors);
+        }
+        return {
+          items: valid.slice(0, limit),
+          hasMore: valid.length > limit,
+        };
+      },
+      async countActiveOccurred(query) {
+        const placeholders = query.precisions.map(() => '?').join(', ');
+        const row = await db.getFirst<{ total: number }>(
+          `SELECT COUNT(*) as total FROM moments
+           WHERE lifecycle_status = 'active'
+             AND occurred_at IS NOT NULL
+             AND occurred_at >= ?
+             AND occurred_at < ?
+             AND json_extract(json, '$.time.occurredAtPrecision') IN (${placeholders})`,
+          [query.startIso, query.endIso, ...query.precisions],
+        );
+        return row?.total ?? 0;
+      },
+      async listActiveOccurred(query) {
+        const placeholders = query.precisions.map(() => '?').join(', ');
+        const order =
+          query.order === 'recorded-desc'
+            ? 'recorded_at DESC'
+            : 'occurred_at ASC, recorded_at ASC';
+        const rows = await db.getAll<{ json: string }>(
+          `SELECT json FROM moments
+           WHERE lifecycle_status = 'active'
+             AND occurred_at IS NOT NULL
+             AND occurred_at >= ?
+             AND occurred_at < ?
+             AND json_extract(json, '$.time.occurredAtPrecision') IN (${placeholders})
+           ORDER BY ${order}
+           LIMIT ? OFFSET ?`,
+          [query.startIso, query.endIso, ...query.precisions, query.limit + 1, query.offset],
+        );
+        const valid: MomentRecord[] = [];
+        for (const row of rows) {
+          const decoded = decodeMoment(row.json);
+          if (decoded.ok) valid.push(decoded.moment);
+          else await quarantine(db, 'moment', decoded.raw, decoded.errors);
+        }
+        return {
+          items: valid.slice(0, query.limit),
+          hasMore: valid.length > query.limit,
+        };
+      },
+      async occurredAtSpan(precisions) {
+        const placeholders = precisions.map(() => '?').join(', ');
+        const row = await db.getFirst<{ minIso: string | null; maxIso: string | null }>(
+          `SELECT MIN(occurred_at) as minIso, MAX(occurred_at) as maxIso
+           FROM moments
+           WHERE lifecycle_status = 'active'
+             AND occurred_at IS NOT NULL
+             AND json_extract(json, '$.time.occurredAtPrecision') IN (${placeholders})`,
+          [...precisions],
+        );
+        if (!row?.minIso || !row.maxIso) return null;
+        return { minIso: row.minIso, maxIso: row.maxIso };
+      },
     },
     drafts: {
       async save(draft) {

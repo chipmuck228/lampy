@@ -1,11 +1,4 @@
-import {
-  AudioModule,
-  RecordingPresets,
-  createAudioPlayer,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-} from 'expo-audio';
-
+/* eslint-disable @typescript-eslint/no-require-imports */
 import type { AudioCapture, AudioPlayback, PlaybackStatus, RecordedAudio } from './media';
 
 type NativeRecorder = {
@@ -18,20 +11,116 @@ type NativeRecorder = {
   getStatus(): { durationMillis: number; isRecording: boolean };
 };
 
-const Recorder = (AudioModule as { AudioRecorder: new (options: object) => NativeRecorder })
-  .AudioRecorder;
-
-const RECORDING_OPTIONS = {
-  ...RecordingPresets.HIGH_QUALITY,
-  directory: 'document' as const,
+type ExpoAudioModule = {
+  AudioModule?: { AudioRecorder: new (options: object) => NativeRecorder };
+  RecordingPresets?: { HIGH_QUALITY: object };
+  createAudioPlayer: (
+    source: { uri: string },
+    options?: { updateInterval?: number },
+  ) => {
+    play(): void;
+    pause(): void;
+    seekTo(position: number): Promise<void>;
+    release(): void;
+    currentStatus: {
+      playing: boolean;
+      currentTime: number;
+      duration: number;
+      didJustFinish: boolean;
+    };
+  };
+  requestRecordingPermissionsAsync: () => Promise<{ granted: boolean }>;
+  setAudioModeAsync: (mode: object) => Promise<void>;
 };
+
+let loaded: ExpoAudioModule | null | undefined;
+
+function hasNativeAudio(): boolean {
+  try {
+    const core = require('expo-modules-core') as {
+      requireOptionalNativeModule?: (name: string) => unknown;
+    };
+    return !!core.requireOptionalNativeModule?.('ExpoAudio');
+  } catch {
+    return false;
+  }
+}
+
+export function loadExpoAudio(): ExpoAudioModule | null {
+  if (loaded !== undefined) return loaded;
+  if (!hasNativeAudio()) {
+    loaded = null;
+    return null;
+  }
+  try {
+    loaded = require('expo-audio') as ExpoAudioModule;
+    if (!loaded?.AudioModule?.AudioRecorder || !loaded.createAudioPlayer) {
+      loaded = null;
+    }
+    return loaded;
+  } catch {
+    loaded = null;
+    return null;
+  }
+}
+
+export function resetExpoAudioForTests() {
+  loaded = undefined;
+}
 
 function secondsToMs(value: number | undefined): number {
   if (!Number.isFinite(value) || (value ?? 0) < 0) return 0;
   return Math.round((value as number) * 1000);
 }
 
+function createUnavailableCapture(): AudioCapture {
+  return {
+    async requestPermission() {
+      return 'denied';
+    },
+    async start() {
+      throw new Error("Cannot find native module 'ExpoAudio'");
+    },
+    async stop() {
+      throw new Error("Cannot find native module 'ExpoAudio'");
+    },
+    async interrupt() {
+      return null;
+    },
+    isRecording() {
+      return false;
+    },
+    getElapsedMs() {
+      return 0;
+    },
+  };
+}
+
+function createUnavailablePlayback(): AudioPlayback {
+  return {
+    async load() {},
+    async play() {
+      throw new Error("Cannot find native module 'ExpoAudio'");
+    },
+    async pause() {},
+    async stop() {},
+    async release() {},
+    getStatus() {
+      return { status: 'unavailable' as PlaybackStatus, currentTimeMs: 0, durationMs: 0 };
+    },
+  };
+}
+
 export function createExpoAudioCapture(): AudioCapture {
+  const loadedNative = loadExpoAudio();
+  const Recorder = loadedNative?.AudioModule?.AudioRecorder;
+  if (!loadedNative || !Recorder) return createUnavailableCapture();
+  const native: ExpoAudioModule = loadedNative;
+  const RECORDING_OPTIONS = {
+    ...native.RecordingPresets?.HIGH_QUALITY,
+    directory: 'document' as const,
+  };
+
   let recorder: NativeRecorder | null = null;
   let startedAt = 0;
 
@@ -49,7 +138,7 @@ export function createExpoAudioCapture(): AudioCapture {
     );
     const uri = current.uri;
     recorder = null;
-    await setAudioModeAsync({
+    await native.setAudioModeAsync({
       allowsRecording: false,
       playsInSilentMode: true,
       interruptionMode: 'doNotMix',
@@ -68,14 +157,14 @@ export function createExpoAudioCapture(): AudioCapture {
 
   return {
     async requestPermission() {
-      const result = await requestRecordingPermissionsAsync();
+      const result = await native.requestRecordingPermissionsAsync();
       return result.granted ? 'granted' : 'denied';
     },
     async start() {
       if (recorder?.isRecording) {
         throw new Error('already recording');
       }
-      await setAudioModeAsync({
+      await native.setAudioModeAsync({
         allowsRecording: true,
         playsInSilentMode: true,
         interruptionMode: 'doNotMix',
@@ -111,7 +200,11 @@ export function createExpoAudioCapture(): AudioCapture {
 }
 
 export function createExpoAudioPlayback(): AudioPlayback {
-  let player: ReturnType<typeof createAudioPlayer> | null = null;
+  const loadedNative = loadExpoAudio();
+  if (!loadedNative) return createUnavailablePlayback();
+  const audio: ExpoAudioModule = loadedNative;
+
+  let player: ReturnType<ExpoAudioModule['createAudioPlayer']> | null = null;
   let finished = false;
   let failed = false;
 
@@ -120,7 +213,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
       player?.release();
       finished = false;
       failed = false;
-      player = createAudioPlayer({ uri }, { updateInterval: 250 });
+      player = audio.createAudioPlayer({ uri }, { updateInterval: 250 });
     },
     async play() {
       if (!player) throw new Error('no source');
