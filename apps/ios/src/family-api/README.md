@@ -144,6 +144,18 @@ test -f /var/lib/lampy/family/family.db-shm && cp /var/lib/lampy/family/family.d
 
 `createFamilyUseCases` → `createFamilyApiClient` → `POST/GET /v1/...`。会话在 iOS Keychain（`expo-secure-store`）。`getMembership` 只在 **200 且 body.family 非空** 时为 `ready`。失败或不可达为 `unauthenticated` / `unconfirmed`，成员列表为空。进入家庭页会先收起成员；只有资格查询失败才把已确认的成员清掉。邀请列表失败不会当成失去家庭。交错刷新只采用最新一代结果。
 
+## 真实环境验收
+
+部署模板在 `deploy/`。可独立跑的盘点与验收：
+
+```bash
+cd apps/ios
+npm run family-identity:inventory
+npm run family-identity:accept
+```
+
+脚本不打印令牌、邀请码或个人信息。没有真实 Apple token 或公网 HTTPS 时，对应项标 **NOT VERIFIED**，不会用测试 token 代替。结果见 `spec/FAMILY_IDENTITY_REAL_ACCEPT.md`。未再审阅不得对真实用户开放家庭入口。
+
 ## 本轮不做
 
 Moment 分享、媒体上传、家庭时间线、接收快照、创建者移交、删除账号、微信领域修改。规格里的 F2 仍是媒体对象，不是本目录范围。

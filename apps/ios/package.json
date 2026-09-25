@@ -54,6 +54,8 @@
     "check-env": "bash ./scripts/check-env.sh",
     "family-api": "node ./scripts/family-api.cjs",
     "family-api:migrate": "node ./scripts/family-api-migrate.cjs",
+    "family-identity:inventory": "node ./scripts/family-identity-inventory.cjs",
+    "family-identity:accept": "node ./scripts/family-identity-accept.cjs",
     "prebuild:ios": "expo prebuild --platform ios --no-install"
   },
   "private": true

@@ -22,6 +22,8 @@ Transmission 家庭目标、ReceivedSnapshot 存储、owner 与 `userId` 对齐�
 
 未完成 / 未验证：公网部署、真机 Apple 登录、生产 Apple 密钥。测试 token 与内存库 **不是** 生产闭环。Phase 3B 生产就绪审计见 `FAMILY_PHASE_3B_PRODUCTION_AUDIT.md`：本机单实例可启动，真实用户家庭功能仍不可用。
 
+真实环境身份验收见 `FAMILY_IDENTITY_REAL_ACCEPT.md`。从 `origin/main` `d198a7c` 独立进行。本机单实例与个人库隔离已跑过；没有真实双账号与托管 HTTPS，身份闭环未验收，家庭入口仍关闭。
+
 不做（仍禁止宣称）：Moment 分享、媒体上传、家庭时间线、接收快照、假成员。
 
 ## F2 媒体对象（之后）

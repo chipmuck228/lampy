@@ -1,0 +1,18 @@
+[Unit]
+Description=Lampy family identity API (single instance)
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=lampy
+Group=lampy
+WorkingDirectory=/opt/lampy/apps/ios
+EnvironmentFile=/etc/lampy/family-api.env
+ExecStart=/usr/bin/npm run family-api
+Restart=on-failure
+RestartSec=3
+# One writer only. Do not run a second unit against the same SQLite file.
+
+[Install]
+WantedBy=multi-user.target

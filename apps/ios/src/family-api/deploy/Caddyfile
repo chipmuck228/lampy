@@ -1,0 +1,6 @@
+# Reverse-proxy template. Replace the hostname with a real certificate name
+# that you control. Do not use this example hostname in production.
+
+family.example.invalid {
+	reverse_proxy 127.0.0.1:8787
+}
