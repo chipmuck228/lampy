@@ -76,11 +76,11 @@ describe('family identity and membership commands', () => {
   it('creates a family once and rejects a second family for the same account', async () => {
     const { commands } = setup();
     const alice = await signIn(commands, 'apple_alice');
-    const family = commands.createFamily(alice.sessionToken, 'create-1');
+    const family = await commands.createFamily(alice.sessionToken, 'create-1');
     expect(family.role).toBe('creator');
     expect(family.members).toHaveLength(1);
-    expect(commands.createFamily(alice.sessionToken, 'create-1').familyId).toBe(family.familyId);
-    expect(() => commands.createFamily(alice.sessionToken, 'create-2')).toThrow(
+    expect((await commands.createFamily(alice.sessionToken, 'create-1')).familyId).toBe(family.familyId);
+    await expect(commands.createFamily(alice.sessionToken, 'create-2')).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.ALREADY_IN_FAMILY, 'This account already belongs to a family.'),
     );
   });
@@ -90,63 +90,63 @@ describe('family identity and membership commands', () => {
     const alice = await signIn(commands, 'apple_alice');
     const bob = await signIn(commands, 'apple_bob');
     const cara = await signIn(commands, 'apple_cara');
-    const family = commands.createFamily(alice.sessionToken);
-    const invite = commands.inviteMember(alice.sessionToken, family.familyId, 'invite-1');
-    expect(commands.inviteMember(alice.sessionToken, family.familyId, 'invite-1').code).toBe(invite.code);
+    const family = await commands.createFamily(alice.sessionToken);
+    const invite = await commands.inviteMember(alice.sessionToken, family.familyId, 'invite-1');
+    expect((await commands.inviteMember(alice.sessionToken, family.familyId, 'invite-1')).code).toBe(invite.code);
 
-    const joined = commands.acceptInvitation(bob.sessionToken, invite.code, 'accept-1');
+    const joined = await commands.acceptInvitation(bob.sessionToken, invite.code, 'accept-1');
     expect(joined.role).toBe('member');
     expect(joined.members.map((row) => row.userId).sort()).toEqual([alice.userId, bob.userId].sort());
-    expect(commands.acceptInvitation(bob.sessionToken, invite.code, 'accept-1').familyId).toBe(family.familyId);
+    expect((await commands.acceptInvitation(bob.sessionToken, invite.code, 'accept-1')).familyId).toBe(family.familyId);
 
-    expect(() => commands.acceptInvitation(cara.sessionToken, invite.code)).toThrow(
+    await expect(commands.acceptInvitation(cara.sessionToken, invite.code)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.INVITE_ALREADY_USED, 'This invitation was already used.'),
     );
 
-    const revoked = commands.inviteMember(alice.sessionToken, family.familyId);
-    commands.revokeInvitation(alice.sessionToken, revoked.invitationId);
-    expect(() => commands.acceptInvitation(cara.sessionToken, revoked.code)).toThrow(
+    const revoked = await commands.inviteMember(alice.sessionToken, family.familyId);
+    await commands.revokeInvitation(alice.sessionToken, revoked.invitationId);
+    await expect(commands.acceptInvitation(cara.sessionToken, revoked.code)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.INVITE_REVOKED, 'This invitation was revoked.'),
     );
-    expect(commands.revokeInvitation(alice.sessionToken, revoked.invitationId).status).toBe('revoked');
+    expect((await commands.revokeInvitation(alice.sessionToken, revoked.invitationId)).status).toBe('revoked');
 
-    const expiring = commands.inviteMember(alice.sessionToken, family.familyId);
+    const expiring = await commands.inviteMember(alice.sessionToken, family.familyId);
     clock.now = () => new Date('2026-09-25T02:02:00.000Z');
-    expect(() => commands.acceptInvitation(cara.sessionToken, expiring.code)).toThrow(
+    await expect(commands.acceptInvitation(cara.sessionToken, expiring.code)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.INVITE_EXPIRED, 'This invitation has expired.'),
     );
   });
 
   it('rejects unauthenticated, already-in-family, and non-creator invite or remove', async () => {
     const { commands } = setup();
-    expect(() => commands.createFamily('')).toThrow(FamilyError);
-    expect(() => commands.listMembership('missing')).toThrow(
+    await expect(commands.createFamily('')).rejects.toThrow(FamilyError);
+    await expect(commands.listMembership('missing')).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.'),
     );
 
     const alice = await signIn(commands, 'apple_alice');
     const bob = await signIn(commands, 'apple_bob');
     const cara = await signIn(commands, 'apple_cara');
-    const family = commands.createFamily(alice.sessionToken);
-    const invite = commands.inviteMember(alice.sessionToken, family.familyId);
-    commands.acceptInvitation(bob.sessionToken, invite.code);
+    const family = await commands.createFamily(alice.sessionToken);
+    const invite = await commands.inviteMember(alice.sessionToken, family.familyId);
+    await commands.acceptInvitation(bob.sessionToken, invite.code);
 
-    expect(() => commands.inviteMember(bob.sessionToken, family.familyId)).toThrow(
+    await expect(commands.inviteMember(bob.sessionToken, family.familyId)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can invite members.'),
     );
-    expect(() => commands.removeMember(bob.sessionToken, family.familyId, alice.userId)).toThrow(
+    await expect(commands.removeMember(bob.sessionToken, family.familyId, alice.userId)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can remove a member.'),
     );
-    expect(() => commands.dissolveFamily(bob.sessionToken, family.familyId)).toThrow(
+    await expect(commands.dissolveFamily(bob.sessionToken, family.familyId)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.'),
     );
-    expect(() => commands.createFamily(bob.sessionToken)).toThrow(
+    await expect(commands.createFamily(bob.sessionToken)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.ALREADY_IN_FAMILY, 'This account already belongs to a family.'),
     );
 
-    const other = commands.createFamily(cara.sessionToken);
-    const laterInvite = commands.inviteMember(alice.sessionToken, family.familyId);
-    expect(() => commands.acceptInvitation(cara.sessionToken, laterInvite.code)).toThrow(
+    const other = await commands.createFamily(cara.sessionToken);
+    const laterInvite = await commands.inviteMember(alice.sessionToken, family.familyId);
+    await expect(commands.acceptInvitation(cara.sessionToken, laterInvite.code)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.ALREADY_IN_FAMILY, 'This account already belongs to a family.'),
     );
     expect(other.familyId).not.toBe(family.familyId);
@@ -156,25 +156,25 @@ describe('family identity and membership commands', () => {
     const { commands } = setup();
     const alice = await signIn(commands, 'apple_alice');
     const bob = await signIn(commands, 'apple_bob');
-    const family = commands.createFamily(alice.sessionToken);
-    const invite = commands.inviteMember(alice.sessionToken, family.familyId);
-    commands.acceptInvitation(bob.sessionToken, invite.code);
+    const family = await commands.createFamily(alice.sessionToken);
+    const invite = await commands.inviteMember(alice.sessionToken, family.familyId);
+    await commands.acceptInvitation(bob.sessionToken, invite.code);
 
-    expect(() => commands.leaveFamily(alice.sessionToken)).toThrow(FamilyError);
-    expect(commands.leaveFamily(bob.sessionToken)).toEqual({ left: true });
-    expect(commands.leaveFamily(bob.sessionToken)).toEqual({ left: true });
-    expect(commands.listMembership(bob.sessionToken).family).toBeNull();
-    expect(commands.listMembership(alice.sessionToken).family?.members).toHaveLength(1);
+    await expect(commands.leaveFamily(alice.sessionToken)).rejects.toThrow(FamilyError);
+    expect(await commands.leaveFamily(bob.sessionToken)).toEqual({ left: true });
+    expect(await commands.leaveFamily(bob.sessionToken)).toEqual({ left: true });
+    expect((await commands.listMembership(bob.sessionToken)).family).toBeNull();
+    expect((await commands.listMembership(alice.sessionToken)).family?.members).toHaveLength(1);
 
-    const rejoin = commands.inviteMember(alice.sessionToken, family.familyId);
-    commands.acceptInvitation(bob.sessionToken, rejoin.code);
-    expect(commands.removeMember(alice.sessionToken, family.familyId, bob.userId)).toEqual({ removed: true });
-    expect(commands.removeMember(alice.sessionToken, family.familyId, bob.userId)).toEqual({ removed: true });
-    expect(commands.listMembership(bob.sessionToken).family).toBeNull();
+    const rejoin = await commands.inviteMember(alice.sessionToken, family.familyId);
+    await commands.acceptInvitation(bob.sessionToken, rejoin.code);
+    expect(await commands.removeMember(alice.sessionToken, family.familyId, bob.userId)).toEqual({ removed: true });
+    expect(await commands.removeMember(alice.sessionToken, family.familyId, bob.userId)).toEqual({ removed: true });
+    expect((await commands.listMembership(bob.sessionToken)).family).toBeNull();
 
-    expect(commands.dissolveFamily(alice.sessionToken, family.familyId)).toEqual({ dissolved: true });
-    expect(commands.dissolveFamily(alice.sessionToken, family.familyId)).toEqual({ dissolved: true });
-    expect(commands.listMembership(alice.sessionToken).family).toBeNull();
+    expect(await commands.dissolveFamily(alice.sessionToken, family.familyId)).toEqual({ dissolved: true });
+    expect(await commands.dissolveFamily(alice.sessionToken, family.familyId)).toEqual({ dissolved: true });
+    expect((await commands.listMembership(alice.sessionToken)).family).toBeNull();
   });
 
   it('does not treat email as the account key', async () => {
@@ -227,35 +227,37 @@ describe('family identity and membership commands', () => {
     const alice = await signIn(commands, 'apple_alice');
     const bob = await signIn(commands, 'apple_bob');
     const cara = await signIn(commands, 'apple_cara');
-    const familyA = commands.createFamily(alice.sessionToken, 'create-shared');
-    expect(commands.createFamily(alice.sessionToken, 'create-shared').familyId).toBe(familyA.familyId);
+    const familyA = await commands.createFamily(alice.sessionToken, 'create-shared');
+    expect((await commands.createFamily(alice.sessionToken, 'create-shared')).familyId).toBe(familyA.familyId);
     expect(fingerprintCreateFamily()).toBe(fingerprintCreateFamily());
     expect(fingerprintInviteMember(familyA.familyId)).toBe(fingerprintInviteMember(familyA.familyId));
     expect(fingerprintInviteMember('fam_other')).not.toBe(fingerprintInviteMember(familyA.familyId));
 
-    const inviteA = commands.inviteMember(alice.sessionToken, familyA.familyId, 'invite-shared');
-    expect(commands.inviteMember(alice.sessionToken, familyA.familyId, 'invite-shared').code).toBe(inviteA.code);
+    const inviteA = await commands.inviteMember(alice.sessionToken, familyA.familyId, 'invite-shared');
+    expect((await commands.inviteMember(alice.sessionToken, familyA.familyId, 'invite-shared')).code).toBe(inviteA.code);
 
-    const familyB = commands.createFamily(cara.sessionToken, 'create-shared');
+    const familyB = await commands.createFamily(cara.sessionToken, 'create-shared');
     expect(familyB.familyId).not.toBe(familyA.familyId);
-    const inviteB = commands.inviteMember(cara.sessionToken, familyB.familyId, 'invite-shared');
+    const inviteB = await commands.inviteMember(cara.sessionToken, familyB.familyId, 'invite-shared');
     expect(inviteB.code).not.toBe(inviteA.code);
 
-    expect(() => commands.inviteMember(alice.sessionToken, familyB.familyId, 'invite-shared')).toThrow(
+    await expect(commands.inviteMember(alice.sessionToken, familyB.familyId, 'invite-shared')).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.'),
     );
 
-    const joined = commands.acceptInvitation(bob.sessionToken, inviteA.code, 'accept-shared');
-    expect(commands.acceptInvitation(bob.sessionToken, inviteA.code, 'accept-shared').familyId).toBe(joined.familyId);
+    const joined = await commands.acceptInvitation(bob.sessionToken, inviteA.code, 'accept-shared');
+    expect((await commands.acceptInvitation(bob.sessionToken, inviteA.code, 'accept-shared')).familyId).toBe(
+      joined.familyId,
+    );
     expect(fingerprintAcceptInvitation(inviteA.code)).toBe(fingerprintAcceptInvitation(inviteA.code));
     expect(fingerprintAcceptInvitation(inviteA.code)).not.toBe(fingerprintAcceptInvitation(inviteB.code));
 
-    commands.leaveFamily(bob.sessionToken);
-    const nextInvite = commands.inviteMember(alice.sessionToken, familyA.familyId);
-    expect(() => commands.acceptInvitation(bob.sessionToken, nextInvite.code, 'accept-shared')).toThrow(
+    await commands.leaveFamily(bob.sessionToken);
+    const nextInvite = await commands.inviteMember(alice.sessionToken, familyA.familyId);
+    await expect(commands.acceptInvitation(bob.sessionToken, nextInvite.code, 'accept-shared')).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.'),
     );
-    expect(commands.listMembership(bob.sessionToken).family).toBeNull();
+    expect((await commands.listMembership(bob.sessionToken)).family).toBeNull();
 
     for (const record of store.idempotency.values()) {
       expect(record.requestFingerprint).toBeTruthy();
@@ -269,35 +271,35 @@ describe('family identity and membership commands', () => {
     const { commands } = setup();
     const alice = await signIn(commands, 'apple_alice');
     const bob = await signIn(commands, 'apple_bob');
-    const family = commands.createFamily(alice.sessionToken, 'create-replay');
-    const invite = commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay');
-    commands.revokeInvitation(alice.sessionToken, invite.invitationId);
-    const replayedInvite = commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay');
+    const family = await commands.createFamily(alice.sessionToken, 'create-replay');
+    const invite = await commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay');
+    await commands.revokeInvitation(alice.sessionToken, invite.invitationId);
+    const replayedInvite = await commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay');
     expect(replayedInvite.invitationId).toBe(invite.invitationId);
     expect(replayedInvite.status).toBe('revoked');
     expect(replayedInvite.status).not.toBe('pending');
 
-    const liveInvite = commands.inviteMember(alice.sessionToken, family.familyId, 'invite-live');
-    commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay');
-    expect(commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay').members).toHaveLength(2);
-    commands.leaveFamily(bob.sessionToken);
-    expect(() => commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay')).toThrow(
+    const liveInvite = await commands.inviteMember(alice.sessionToken, family.familyId, 'invite-live');
+    await commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay');
+    expect((await commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay')).members).toHaveLength(2);
+    await commands.leaveFamily(bob.sessionToken);
+    await expect(commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay')).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.'),
     );
-    expect(commands.listMembership(bob.sessionToken).family).toBeNull();
+    expect((await commands.listMembership(bob.sessionToken)).family).toBeNull();
 
-    const rejoin = commands.inviteMember(alice.sessionToken, family.familyId);
-    commands.acceptInvitation(bob.sessionToken, rejoin.code, 'accept-removed');
-    commands.removeMember(alice.sessionToken, family.familyId, bob.userId);
-    expect(() => commands.acceptInvitation(bob.sessionToken, rejoin.code, 'accept-removed')).toThrow(
+    const rejoin = await commands.inviteMember(alice.sessionToken, family.familyId);
+    await commands.acceptInvitation(bob.sessionToken, rejoin.code, 'accept-removed');
+    await commands.removeMember(alice.sessionToken, family.familyId, bob.userId);
+    await expect(commands.acceptInvitation(bob.sessionToken, rejoin.code, 'accept-removed')).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.'),
     );
 
-    commands.dissolveFamily(alice.sessionToken, family.familyId);
-    expect(() => commands.createFamily(alice.sessionToken, 'create-replay')).toThrow(
+    await commands.dissolveFamily(alice.sessionToken, family.familyId);
+    await expect(commands.createFamily(alice.sessionToken, 'create-replay')).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.'),
     );
-    expect(() => commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay')).toThrow(
+    await expect(commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay')).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.'),
     );
   });
@@ -306,9 +308,9 @@ describe('family identity and membership commands', () => {
     const { commands, store } = setup();
     const alice = await signIn(commands, 'apple_alice');
     const bob = await signIn(commands, 'apple_bob');
-    const family = commands.createFamily(alice.sessionToken);
-    const invite = commands.inviteMember(alice.sessionToken, family.familyId);
-    commands.acceptInvitation(bob.sessionToken, invite.code);
+    const family = await commands.createFamily(alice.sessionToken);
+    const invite = await commands.inviteMember(alice.sessionToken, family.familyId);
+    await commands.acceptInvitation(bob.sessionToken, invite.code);
 
     const aliceRow = store.memberships.find((row) => row.userId === alice.userId && row.familyId === family.familyId);
     const bobRow = store.memberships.find((row) => row.userId === bob.userId && row.familyId === family.familyId);
@@ -318,13 +320,13 @@ describe('family identity and membership commands', () => {
       bobRow.role = 'creator';
     }
 
-    expect(() => commands.dissolveFamily(alice.sessionToken, family.familyId)).toThrow(
+    await expect(commands.dissolveFamily(alice.sessionToken, family.familyId)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.'),
     );
-    expect(commands.listMembership(alice.sessionToken).family?.role).toBe('member');
-    expect(commands.dissolveFamily(bob.sessionToken, family.familyId)).toEqual({ dissolved: true });
-    expect(commands.dissolveFamily(bob.sessionToken, family.familyId)).toEqual({ dissolved: true });
-    expect(() => commands.dissolveFamily(alice.sessionToken, family.familyId)).toThrow(
+    expect((await commands.listMembership(alice.sessionToken)).family?.role).toBe('member');
+    expect(await commands.dissolveFamily(bob.sessionToken, family.familyId)).toEqual({ dissolved: true });
+    expect(await commands.dissolveFamily(bob.sessionToken, family.familyId)).toEqual({ dissolved: true });
+    await expect(commands.dissolveFamily(alice.sessionToken, family.familyId)).rejects.toThrow(
       new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.'),
     );
   });

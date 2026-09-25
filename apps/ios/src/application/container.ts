@@ -1,7 +1,6 @@
 import { createUseCases } from './use-cases';
 import {
   createFamilyUseCases,
-  createMemoryFamilySessionStore,
   type FamilySessionStore,
   type FamilyUseCases,
 } from './family-use-cases';
@@ -9,6 +8,7 @@ import { createExpoAudioCapture } from '../infrastructure/expo-audio';
 import { familyApiBaseUrl } from '../infrastructure/family-config';
 import { createFamilyApiClient, createFamilyHttpTransport, type FamilyApiClient } from '../infrastructure/family-http-client';
 import { createSqlitePendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
+import { createSecureFamilySessionStore } from '../infrastructure/secure-family-session';
 import {
   createExpoCameraSource,
   createExpoLibrarySource,
@@ -82,7 +82,7 @@ const familyLoader = createUseCaseLoader(async () => {
   return createIosFamilyUseCases({
     db,
     client: createFamilyApiClient(createFamilyHttpTransport({ baseUrl: familyApiBaseUrl() })),
-    session: createMemoryFamilySessionStore(),
+    session: createSecureFamilySessionStore(),
   });
 });
 

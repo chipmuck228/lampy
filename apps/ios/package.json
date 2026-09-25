@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/ui": "~57.0.19",
     "expo": "~57.0.24",
+    "expo-apple-authentication": "~57.0.2",
     "expo-audio": "~57.0.5",
     "expo-constants": "~57.0.19",
     "expo-dev-client": "~57.0.19",
@@ -16,6 +17,7 @@
     "expo-image-picker": "~57.0.19",
     "expo-linking": "~57.0.10",
     "expo-router": "~57.0.22",
+    "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
@@ -51,6 +53,7 @@
     "lint": "expo lint",
     "check-env": "bash ./scripts/check-env.sh",
     "family-api": "node ./scripts/family-api.cjs",
+    "family-api:migrate": "node ./scripts/family-api-migrate.cjs",
     "prebuild:ios": "expo prebuild --platform ios --no-install"
   },
   "private": true

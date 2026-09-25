@@ -4,6 +4,13 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*', 'ios/*', 'android/*', 'src/family-api/listen.ts', 'src/family-api/apple-node.ts'],
+    ignores: [
+      'dist/*',
+      'ios/*',
+      'android/*',
+      'src/family-api/listen.ts',
+      'src/family-api/apple-node.ts',
+      'src/family-api/node-db.ts',
+    ],
   },
 ]);

@@ -1,9 +1,15 @@
+import { mkdirSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import path from 'node:path';
 
-import { createMapAppleVerifier } from './apple';
+import { createAppleJwksVerifier, createMapAppleVerifier } from './apple';
+import { fetchAppleJwks, verifyAppleJwtSignature } from './apple-node';
 import { createFamilyCommands } from './commands';
 import { dispatchFamilyApi } from './http';
+import { openFamilySqliteDatabase } from './node-db';
 import { planFamilyApiListen } from './runtime';
+import { applyFamilyApiSchema } from './schema';
+import { createSqliteFamilyRepository } from './sqlite-repository';
 import { createFamilyStore } from './store';
 
 function readBody(req: IncomingMessage): Promise<unknown> {
@@ -34,15 +40,31 @@ function headersOf(req: IncomingMessage) {
   return headers;
 }
 
-export function startFamilyApiServer(options?: { port?: number; host?: string; env?: NodeJS.ProcessEnv }) {
-  const plan = planFamilyApiListen(options?.env ?? process.env);
-  const commands = createFamilyCommands({
-    store: createFamilyStore(),
-    apple: createMapAppleVerifier(plan.testTokens),
-  });
+export async function startFamilyApiServer(options?: { port?: number; host?: string; env?: NodeJS.ProcessEnv }) {
+  const env = options?.env ?? process.env;
+  const plan = planFamilyApiListen(env);
+  const commands =
+    plan.mode === 'test'
+      ? createFamilyCommands({
+          store: createFamilyStore(),
+          apple: createMapAppleVerifier(plan.testTokens),
+        })
+      : await (async () => {
+          mkdirSync(path.dirname(path.resolve(plan.databasePath)), { recursive: true });
+          const db = openFamilySqliteDatabase(plan.databasePath);
+          await applyFamilyApiSchema(db);
+          return createFamilyCommands({
+            repository: createSqliteFamilyRepository(db),
+            apple: createAppleJwksVerifier({
+              audience: plan.appleClientId,
+              fetchJwks: fetchAppleJwks,
+              verifySignature: verifyAppleJwtSignature,
+            }),
+          });
+        })();
 
-  const port = options?.port ?? Number(process.env.LAMPY_FAMILY_API_PORT || 8787);
-  const host = options?.host ?? process.env.LAMPY_FAMILY_API_HOST ?? '127.0.0.1';
+  const port = options?.port ?? Number(env.LAMPY_FAMILY_API_PORT || 8787);
+  const host = options?.host ?? env.LAMPY_FAMILY_API_HOST ?? '127.0.0.1';
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {

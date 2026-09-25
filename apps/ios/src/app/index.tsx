@@ -13,6 +13,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { lookbackHref } from '../screens/lookback-chrome';
 
 import { getUseCases } from '../application/container';
+import { isFamilyApiConfigured } from '../infrastructure/family-config';
 import type { RecentLifeViewModel } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
 import { MomentFeeling } from '../screens/moment-feeling';
@@ -56,6 +57,18 @@ export default function RecentScreen() {
             最近
           </Text>
           <View style={styles.actions}>
+            {isFamilyApiConfigured() ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="家庭"
+                testID="home-family"
+                hitSlop={8}
+                onPress={() => router.push('/family')}
+                style={styles.leaveHit}
+              >
+                <Text style={styles.leave}>家庭</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="回看"

@@ -12,13 +12,17 @@
 
 Transmission 家庭目标、ReceivedSnapshot 存储、owner 与 `userId` 对齐。需要时单独 PR，说明对微信小程序的影响。
 
-## F1 身份与成员（本轮代码）
+## F1 身份与成员（已合入 main）
 
-已在仓库：`src/family-api` 命令 / HTTP / Apple 校验接口；`family-use-cases` + `family-http-client`。测试覆盖未登录、无效 token、邀请过期/撤销/重复接受、已有家庭、非创建者、退出、重试、不可达。失败不改个人 Moment。
+已在仓库：`src/family-api` 命令 / HTTP / Apple 校验接口；`family-use-cases` + `family-http-client`。失败不改个人 Moment。
 
-未完成 / 未验证：公网部署、服务端持久家庭库、真机 Sign in with Apple、家庭 UI。`listen.ts` 在 production 模式拒绝启动。配置见 `src/family-api/README.md`。本机家庭 API **不能**当真实家庭服务用。
+## 可部署身份与成员（Phase 3B，不是 F2）
 
-不做（仍禁止宣称）：Moment 分享、媒体上传、家庭时间线、接收快照、假家庭页。
+服务端 SQLite 家庭库、迁移、事务约束、production 与 test 隔离、iOS 系统 Sign in with Apple、Keychain 会话、最小家庭入口。规格 **F2 是媒体对象**，本切片不实现媒体或 Moment 分享。
+
+未完成 / 未验证：公网部署、真机 Apple 登录、生产 Apple 密钥。测试 token 与内存库 **不是** 生产闭环。
+
+不做（仍禁止宣称）：Moment 分享、媒体上传、家庭时间线、接收快照、假成员。
 
 ## F2 媒体对象（之后）
 
