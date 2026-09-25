@@ -50,6 +50,7 @@
     "test": "jest",
     "lint": "expo lint",
     "check-env": "bash ./scripts/check-env.sh",
+    "family-api": "node ./scripts/family-api.cjs",
     "prebuild:ios": "expo prebuild --platform ios --no-install"
   },
   "private": true
