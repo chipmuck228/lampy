@@ -32,9 +32,11 @@ Phase 3B 不做（仍禁止宣称）：Moment 分享、家庭时间线、接收�
 
 **不做：** Moment 分享、Transmission 改写、家庭时间线、接收快照、跨设备同步、媒体自动上传、打开家庭入口、宣称身份闭环通过。
 
-## F3 分享快照（之后）
+## F3 分享快照（本切片）
 
-确认 UI 字段列表；固定 revision；排除 `context.people`。
+确认将发送的 `note` / 感受 / 时间与精度 / 已选 F2 媒体；服务端按 `sourceRevision` 保存不可变快照并记录当时 audience。后来加入者默认不可见。决策见 `FAMILY_F3_SHARE_SNAPSHOTS.md`。
+
+**不做：** 接收下载、家庭缓存、时间线、撤回、Transmission 改写、打开家庭入口、宣称家人已收到或身份闭环通过。
 
 ## F4 接收与家庭缓存（之后）
 

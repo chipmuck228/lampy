@@ -211,4 +211,78 @@ describe('family HTTP contract', () => {
     });
     expect(expired.status).toBe(401);
   });
+
+  it('stores a share snapshot and refuses later joiners', async () => {
+    const commands = api();
+    const alice = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/apple',
+      headers: {},
+      body: { identityToken: 'apple_alice' },
+    });
+    const aliceToken = (alice.body as { sessionToken: string }).sessionToken;
+    const created = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/families',
+      headers: { authorization: `Bearer ${aliceToken}`, 'idempotency-key': 'fam-share' },
+    });
+    const familyId = (created.body as { familyId: string }).familyId;
+    const shared = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: `/v1/families/${familyId}/shares`,
+      headers: { authorization: `Bearer ${aliceToken}`, 'idempotency-key': 'share-1' },
+      body: {
+        sourceMomentId: 'moment_gate',
+        sourceRevision: 1,
+        note: '门口的风',
+        emotion: '平静',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [],
+        expectedMediaCount: 0,
+        localUri: '/Users/zhen/photo.jpg',
+      },
+    });
+    expect(shared.status).toBe(400);
+
+    const ok = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: `/v1/families/${familyId}/shares`,
+      headers: { authorization: `Bearer ${aliceToken}`, 'idempotency-key': 'share-1' },
+      body: {
+        sourceMomentId: 'moment_gate',
+        sourceRevision: 1,
+        note: '门口的风',
+        emotion: '平静',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [],
+        expectedMediaCount: 0,
+      },
+    });
+    expect(ok.status).toBe(200);
+    const shareId = (ok.body as { shareId: string }).shareId;
+    const invite = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: `/v1/families/${familyId}/invitations`,
+      headers: { authorization: `Bearer ${aliceToken}` },
+    });
+    const bob = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/apple',
+      headers: {},
+      body: { identityToken: 'apple_bob' },
+    });
+    const bobToken = (bob.body as { sessionToken: string }).sessionToken;
+    await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/invitations/accept',
+      headers: { authorization: `Bearer ${bobToken}` },
+      body: { code: (invite.body as { code: string }).code },
+    });
+    const hidden = await dispatchFamilyApi(commands, {
+      method: 'GET',
+      path: `/v1/families/${familyId}/shares/${shareId}`,
+      headers: { authorization: `Bearer ${bobToken}` },
+    });
+    expect(hidden.status).toBe(403);
+  });
 });

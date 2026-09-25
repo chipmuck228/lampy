@@ -49,6 +49,7 @@ function createHarness(nowIso = '2026-09-25T02:00:00.000Z') {
     client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
     session: createMemoryFamilySessionStore(),
     pending: testPending(),
+    personal: personalRepos,
     idempotencyKey: (prefix) => {
       keys.n += 1;
       return `${prefix}-${keys.n}`;
@@ -872,5 +873,65 @@ describe('family selected media upload', () => {
     expect(stored.status).toBe('stored');
     if (stored.status !== 'stored') throw new Error('expected stored');
     await expect(bob.getOwnedMedia(stored.object.objectId)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
+describe('family share moment use cases', () => {
+  it('confirms only a local personal moment and leaves the original unchanged', async () => {
+    const { family, personal } = createHarness();
+    const saved = await savePersonalNote(personal, '门口的风');
+    await family.signInWithApple('apple_alice');
+    const created = await family.createFamily();
+    const preview = await family.prepareSharePreview(saved.id);
+    expect(preview.note).toBe('门口的风');
+    expect(preview.canConfirm).toBe(true);
+    expect(preview.sourceRevision).toBeGreaterThanOrEqual(1);
+
+    const confirmed = await family.confirmShareMoment({
+      momentId: saved.id,
+      sourceRevision: preview.sourceRevision,
+    });
+    expect(confirmed.status).toBe('stored');
+    if (confirmed.status !== 'stored') throw new Error('expected stored');
+    expect(confirmed.share.stored).toBe('server');
+    expect(JSON.stringify(confirmed)).not.toMatch(/家人已收到|localUri/);
+
+    const after = await personal.getMomentDetail(saved.id);
+    expect(after.kind).toBe('ready');
+    if (after.kind === 'ready') expect(after.note).toBe('门口的风');
+
+    await expect(family.prepareSharePreview('moment_other')).resolves.toEqual(expect.anything()).catch(() => undefined);
+    await expect(family.prepareSharePreview('moment_other')).rejects.toMatchObject({ code: 'MOMENT_NOT_FOUND' });
+    void created;
+  });
+
+  it('does not confirm when media is missing or the moment revision changed', async () => {
+    const { family, personal, personalRepos } = createHarness();
+    const saved = await savePersonalNote(personal, '有一张照片');
+    const found = await personalRepos.moments.findById(saved.id);
+    if (found.kind !== 'ready') throw new Error('expected moment');
+    found.moment.assetIds.push('asset_missing_photo');
+    await personalRepos.moments.save(found.moment);
+    await family.signInWithApple('apple_alice');
+    await family.createFamily();
+    const blocked = await family.prepareSharePreview(saved.id);
+    expect(blocked.canConfirm).toBe(false);
+    const failed = await family.confirmShareMoment({
+      momentId: saved.id,
+      sourceRevision: blocked.sourceRevision,
+    });
+    expect(failed).toMatchObject({ status: 'failed', code: 'SHARE_MEDIA_INCOMPLETE' });
+
+    const text = await savePersonalNote(personal, '先确认再改');
+    const preview = await family.prepareSharePreview(text.id);
+    const again = await personalRepos.moments.findById(text.id);
+    if (again.kind !== 'ready') throw new Error('expected moment');
+    again.moment.revision += 1;
+    await personalRepos.moments.save(again.moment);
+    const stale = await family.confirmShareMoment({
+      momentId: text.id,
+      sourceRevision: preview.sourceRevision,
+    });
+    expect(stale).toMatchObject({ status: 'failed', code: 'CONFLICT' });
   });
 });

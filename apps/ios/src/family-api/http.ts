@@ -60,6 +60,12 @@ function statusFor(code: string) {
       return 415;
     case FAMILY_ERROR.MEDIA_WRITE_FAILED:
       return 507;
+    case FAMILY_ERROR.SHARE_NOT_FOUND:
+      return 404;
+    case FAMILY_ERROR.SHARE_MEDIA_INCOMPLETE:
+      return 400;
+    case FAMILY_ERROR.SHARE_MEDIA_UNAVAILABLE:
+      return 409;
     default:
       return 400;
   }
@@ -92,7 +98,7 @@ export async function dispatchFamilyApi(
 
   try {
     if (method === 'GET' && path === '/health') {
-      return { status: 200, body: { ok: true, slice: 'identity-membership', media: true } };
+      return { status: 200, body: { ok: true, slice: 'identity-membership', media: true, shares: true } };
     }
 
     if (method === 'POST' && path === '/v1/auth/apple') {
@@ -165,6 +171,35 @@ export async function dispatchFamilyApi(
     if (method === 'GET' && mediaContent) {
       const content = await commands.getMediaContent(token || '', mediaContent[1]);
       return { status: 200, body: { objectId: mediaContent[1], mimeType: content.mimeType, byteLength: content.bytes.length }, bytes: content.bytes, contentType: content.mimeType };
+    }
+
+    const shareCreate = /^\/v1\/families\/([^/]+)\/shares$/.exec(path);
+    if (method === 'POST' && shareCreate) {
+      if (Object.prototype.hasOwnProperty.call(body, 'localUri') || Object.prototype.hasOwnProperty.call(body, 'people')) {
+        throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Share snapshots cannot include local paths or people.');
+      }
+      const mediaObjectIds = Array.isArray(body.mediaObjectIds)
+        ? body.mediaObjectIds.filter((id): id is string => typeof id === 'string')
+        : [];
+      return {
+        status: 200,
+        body: await commands.shareMoment(token || '', shareCreate[1], {
+          sourceMomentId: readString(body, 'sourceMomentId'),
+          sourceRevision: typeof body.sourceRevision === 'number' ? body.sourceRevision : Number.NaN,
+          note: readString(body, 'note'),
+          emotion: readString(body, 'emotion'),
+          occurredAt: readString(body, 'occurredAt') || undefined,
+          occurredAtPrecision: readString(body, 'occurredAtPrecision'),
+          mediaObjectIds,
+          expectedMediaCount: typeof body.expectedMediaCount === 'number' ? body.expectedMediaCount : Number.NaN,
+          idempotencyKey: idempotencyKey || undefined,
+        }),
+      };
+    }
+
+    const shareGet = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)$/.exec(path);
+    if (method === 'GET' && shareGet) {
+      return { status: 200, body: await commands.getShare(token || '', shareGet[1], shareGet[2]) };
     }
 
     throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Unknown family API route.');

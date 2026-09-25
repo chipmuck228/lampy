@@ -89,7 +89,8 @@ describe('personal library while family service is down', () => {
       mimeType: 'image/jpeg',
     });
     expect(upload.status).toBe('failed');
-    expect(upload).toMatchObject({ status: 'failed' });
+    const share = await family.confirmShareMoment({ momentId: textSaved.id, sourceRevision: 1 });
+    expect(share.status).toBe('failed');
     const photoAgain = await personal.getMomentDetail(photoSaved.id);
     expect(photoAgain.kind).toBe('ready');
     if (photoAgain.kind === 'ready') {

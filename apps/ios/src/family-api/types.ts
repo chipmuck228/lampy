@@ -81,6 +81,63 @@ export type MediaObjectView = {
   createdAt: string;
 };
 
+export type ShareSnapshotMedia = {
+  objectId: string;
+  mimeType: string;
+  byteLength: number;
+};
+
+export type ShareSnapshotOrigin = {
+  type: 'received';
+  transmissionId: string;
+  originalMomentId: string;
+  snapshotRevision: number;
+};
+
+export type ShareSnapshot = {
+  note: string;
+  emotion: string;
+  occurredAt?: string;
+  occurredAtPrecision: string;
+  media: ShareSnapshotMedia[];
+  origin: ShareSnapshotOrigin;
+};
+
+export type ShareRecord = {
+  shareId: string;
+  familyId: string;
+  authorUserId: string;
+  sourceMomentId: string;
+  sourceRevision: number;
+  snapshot: ShareSnapshot;
+  audienceUserIds: string[];
+  sharedAt: string;
+};
+
+export type ShareView = {
+  shareId: string;
+  familyId: string;
+  authorUserId: string;
+  sourceMomentId: string;
+  sourceRevision: number;
+  snapshot: ShareSnapshot;
+  audienceUserIds: string[];
+  sharedAt: string;
+  stored: 'server';
+};
+
+export type ShareMomentInput = {
+  sourceMomentId: string;
+  sourceRevision: number;
+  note: string;
+  emotion: string;
+  occurredAt?: string;
+  occurredAtPrecision: string;
+  mediaObjectIds: string[];
+  expectedMediaCount: number;
+  idempotencyKey?: string;
+};
+
 export type InvitationView = {
   invitationId: string;
   familyId: string;

@@ -1,5 +1,13 @@
 import { ApplicationError } from '../application/errors';
-import type { FamilyView, InvitationView, MediaObjectView, MembershipListView, SignInResult } from '../family-api/types';
+import type {
+  FamilyView,
+  InvitationView,
+  MediaObjectView,
+  MembershipListView,
+  ShareMomentInput,
+  ShareView,
+  SignInResult,
+} from '../family-api/types';
 import { isSafeFamilyApiBaseUrl } from './family-config';
 
 export type FamilyTransportRequest = {
@@ -41,6 +49,8 @@ export type FamilyApiClient = {
   ): Promise<MediaObjectView>;
   getMediaObject(sessionToken: string, objectId: string): Promise<MediaObjectView>;
   getMediaContent(sessionToken: string, objectId: string): Promise<{ mimeType: string; bytes: Uint8Array }>;
+  shareMoment(sessionToken: string, familyId: string, input: ShareMomentInput): Promise<ShareView>;
+  getShare(sessionToken: string, familyId: string, shareId: string): Promise<ShareView>;
 };
 
 type ErrorBody = { error?: { code?: string; message?: string } };
@@ -127,6 +137,27 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     },
     getMediaObject(sessionToken, objectId) {
       return send({ method: 'GET', path: `/v1/media/${objectId}`, sessionToken });
+    },
+    shareMoment(sessionToken, familyId, input) {
+      return send({
+        method: 'POST',
+        path: `/v1/families/${familyId}/shares`,
+        sessionToken,
+        idempotencyKey: input.idempotencyKey,
+        body: {
+          sourceMomentId: input.sourceMomentId,
+          sourceRevision: input.sourceRevision,
+          note: input.note,
+          emotion: input.emotion,
+          occurredAt: input.occurredAt,
+          occurredAtPrecision: input.occurredAtPrecision,
+          mediaObjectIds: input.mediaObjectIds,
+          expectedMediaCount: input.expectedMediaCount,
+        },
+      });
+    },
+    getShare(sessionToken, familyId, shareId) {
+      return send({ method: 'GET', path: `/v1/families/${familyId}/shares/${shareId}`, sessionToken });
     },
     async getMediaContent(sessionToken, objectId) {
       let response: FamilyTransportResponse;

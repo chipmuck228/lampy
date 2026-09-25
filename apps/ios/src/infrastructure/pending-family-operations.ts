@@ -1,7 +1,7 @@
 import { digestStable } from '../family-api/idempotency';
 import type { SqlDatabase } from './sql';
 
-export type FamilyWriteCommand = 'createFamily' | 'inviteMember' | 'acceptInvitation';
+export type FamilyWriteCommand = 'createFamily' | 'inviteMember' | 'acceptInvitation' | 'shareMoment';
 
 export type PendingFamilyOperation = {
   command: FamilyWriteCommand;
@@ -24,7 +24,11 @@ export type PendingFamilyOperationDisk = {
   write(rows: PendingFamilyOperation[]): void;
 };
 
-const COMMANDS = new Set<FamilyWriteCommand>(['createFamily', 'inviteMember', 'acceptInvitation']);
+const COMMANDS = new Set<FamilyWriteCommand>(['createFamily', 'inviteMember', 'acceptInvitation', 'shareMoment']);
+
+export function pendingShareOperationId(sourceMomentId: string, sourceRevision: number) {
+  return `share:${digestStable(sourceMomentId)}:${sourceRevision}`;
+}
 
 export function pendingCreateFamilyOperationId() {
   return 'createFamily';

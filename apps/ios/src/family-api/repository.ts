@@ -1,4 +1,4 @@
-import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session } from './types';
+import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session, ShareRecord } from './types';
 import type { FamilyStore, IdempotentRecord } from './store';
 import {
   findAccountByAppleSubject,
@@ -42,6 +42,14 @@ export type FamilyTx = {
   findMediaObject(objectId: string): Promise<MediaObjectRecord | null>;
   findMediaByOwnerHash(ownerUserId: string, contentSha256: string): Promise<MediaObjectRecord | null>;
   saveMediaObject(object: MediaObjectRecord): Promise<void>;
+  findShare(shareId: string): Promise<ShareRecord | null>;
+  findShareBySource(
+    familyId: string,
+    authorUserId: string,
+    sourceMomentId: string,
+    sourceRevision: number,
+  ): Promise<ShareRecord | null>;
+  saveShare(share: ShareRecord): Promise<void>;
 };
 
 export type FamilyRepository = {
@@ -50,7 +58,13 @@ export type FamilyRepository = {
 
 export class FamilyStoreConstraintError extends Error {
   constructor(
-    readonly constraint: 'active_membership' | 'invitation_code' | 'apple_subject' | 'idempotency' | 'media_hash',
+    readonly constraint:
+      | 'active_membership'
+      | 'invitation_code'
+      | 'apple_subject'
+      | 'idempotency'
+      | 'media_hash'
+      | 'share_revision',
   ) {
     super(constraint);
     this.name = 'FamilyStoreConstraintError';
@@ -174,6 +188,35 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
         throw new FamilyStoreConstraintError('media_hash');
       }
       replaceBy(store.mediaObjects, (row) => row.objectId, object);
+    },
+    async findShare(shareId) {
+      return store.shares.find((row) => row.shareId === shareId) ?? null;
+    },
+    async findShareBySource(familyId, authorUserId, sourceMomentId, sourceRevision) {
+      return (
+        store.shares.find(
+          (row) =>
+            row.familyId === familyId &&
+            row.authorUserId === authorUserId &&
+            row.sourceMomentId === sourceMomentId &&
+            row.sourceRevision === sourceRevision,
+        ) ?? null
+      );
+    },
+    async saveShare(share) {
+      if (
+        store.shares.some(
+          (row) =>
+            row.familyId === share.familyId &&
+            row.authorUserId === share.authorUserId &&
+            row.sourceMomentId === share.sourceMomentId &&
+            row.sourceRevision === share.sourceRevision &&
+            row.shareId !== share.shareId,
+        )
+      ) {
+        throw new FamilyStoreConstraintError('share_revision');
+      }
+      replaceBy(store.shares, (row) => row.shareId, share);
     },
   };
 
