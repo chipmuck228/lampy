@@ -186,8 +186,13 @@ describe('family revoke and membership cleanup', () => {
     const receiveCache = createMemoryFamilyReceiveCache();
     const originalIsolate = receiveCache.isolateAccount.bind(receiveCache);
     receiveCache.isolateAccount = async (userId) => {
-      await originalIsolate(userId);
-      await files.removePrefix(userId);
+      const hidden = await originalIsolate(userId);
+      try {
+        await files.removePrefix(userId);
+        return hidden;
+      } catch {
+        return { hidden: true, diskCleared: false };
+      }
     };
     const bob = createFamilyUseCases({
       client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
@@ -207,8 +212,9 @@ describe('family revoke and membership cleanup', () => {
     await bob.leaveFamily();
     const hidden = await bob.refreshFamilyInbox();
     expect(hidden).toMatchObject({ kind: 'hidden' });
-    expect(JSON.stringify(hidden)).not.toMatch(/仍可访问/);
+    expect(JSON.stringify(hidden)).not.toMatch(/仍可访问|磁盘已清理|已清理/);
     expect(receiveCache.shares).toEqual([]);
+    expect(await receiveCache.pendingCleanupPrefixes()).toEqual([]);
   });
 
   it('rebuilds without showing a revoked share and isolates another account', async () => {

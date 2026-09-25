@@ -88,6 +88,7 @@ export default function FamilyScreen() {
       if (!refreshGate.isCurrent(generation)) return 'stale';
       setAppleAvailable(available);
       setMembership(next);
+      let invitesFailed = false;
       if (next.kind === 'ready' && next.role === 'creator') {
         try {
           const listed = await family.listPendingInvitations(next.familyId);
@@ -96,7 +97,7 @@ export default function FamilyScreen() {
         } catch {
           if (!refreshGate.isCurrent(generation)) return 'stale';
           setInvites([]);
-          return 'invites-failed';
+          invitesFailed = true;
         }
       } else {
         setInvites([]);
@@ -105,7 +106,7 @@ export default function FamilyScreen() {
         try {
           const nextInbox = await family.refreshFamilyInbox();
           if (!refreshGate.isCurrent(generation)) return 'stale';
-          setInbox(nextInbox);
+          setInbox(nextInbox.kind === 'ready' ? nextInbox : { kind: 'hidden', reason: nextInbox.reason });
         } catch {
           if (!refreshGate.isCurrent(generation)) return 'stale';
           setInbox({ kind: 'hidden', reason: 'unreachable' });
@@ -117,7 +118,7 @@ export default function FamilyScreen() {
         if (!refreshGate.isCurrent(generation)) return 'stale';
         return 'revoke-unconfirmed';
       }
-      return 'ok';
+      return invitesFailed ? 'invites-failed' : 'ok';
     } catch (error) {
       if (!refreshGate.isCurrent(generation)) return 'stale';
       hideFamilyContent();

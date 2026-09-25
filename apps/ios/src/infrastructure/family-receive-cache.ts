@@ -29,6 +29,11 @@ export type ReceivedMediaRecord = {
   status: 'pending' | 'stored' | 'failed';
 };
 
+export type FamilyCacheCleanup = {
+  hidden: true;
+  diskCleared: boolean;
+};
+
 export type FamilyReceiveCache = {
   list(userId: string, familyId: string): Promise<ReceivedShareRecord[]>;
   find(userId: string, familyId: string, shareId: string): Promise<ReceivedShareRecord | null>;
@@ -39,10 +44,12 @@ export type FamilyReceiveCache = {
   readMediaBytes(storageKey: string): Promise<Uint8Array>;
   markReceived(userId: string, familyId: string, shareId: string): Promise<ReceivedShareRecord>;
   markFailed(userId: string, familyId: string, shareId: string): Promise<ReceivedShareRecord>;
-  isolateAccount(userId: string): Promise<void>;
-  isolateFamily(userId: string, familyId: string): Promise<void>;
-  isolateShare(userId: string, familyId: string, shareId: string): Promise<void>;
-  replaceVisible(userId: string, familyId: string, shares: ShareView[]): Promise<void>;
+  isolateAccount(userId: string): Promise<FamilyCacheCleanup>;
+  isolateFamily(userId: string, familyId: string): Promise<FamilyCacheCleanup>;
+  isolateShare(userId: string, familyId: string, shareId: string): Promise<FamilyCacheCleanup>;
+  replaceVisible(userId: string, familyId: string, shares: ShareView[]): Promise<FamilyCacheCleanup>;
+  recoverDisk(): Promise<FamilyCacheCleanup>;
+  pendingCleanupPrefixes(): Promise<string[]>;
 };
 
 function snapshotFrom(share: ShareView): ShareSnapshot {
@@ -82,6 +89,28 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
   const shares: ReceivedShareRecord[] = [];
   const media: ReceivedMediaRecord[] = [];
   const files = new Map<string, Uint8Array>();
+  const pending = new Set<string>();
+
+  function deletePrefix(prefix: string) {
+    for (const key of [...files.keys()]) {
+      if (key === prefix || key.startsWith(`${prefix}/`)) files.delete(key);
+    }
+  }
+
+  function leftoverPrefixes() {
+    const allowed = new Set(shares.map((row) => `${row.userId}/${row.familyId}/${row.shareId}`));
+    const leftovers = new Set<string>();
+    for (const key of files.keys()) {
+      const parts = key.split('/').filter(Boolean);
+      if (parts.length < 3) {
+        leftovers.add(parts[0] || key);
+        continue;
+      }
+      const sharePrefix = `${parts[0]}/${parts[1]}/${parts[2]}`;
+      if (!allowed.has(sharePrefix)) leftovers.add(sharePrefix);
+    }
+    return leftovers;
+  }
 
   function replaceShare(row: ReceivedShareRecord) {
     const index = shares.findIndex(
@@ -156,22 +185,28 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       for (let i = media.length - 1; i >= 0; i -= 1) {
         if (media[i]?.userId === userId) media.splice(i, 1);
       }
-      for (const key of [...files.keys()]) {
-        if (key.startsWith(`${userId}/`)) files.delete(key);
-      }
+      deletePrefix(userId);
+      const diskCleared = ![...files.keys()].some((key) => key === userId || key.startsWith(`${userId}/`));
+      if (!diskCleared) pending.add(userId);
+      else pending.delete(userId);
+      return { hidden: true as const, diskCleared };
     },
     async isolateFamily(userId, familyId) {
+      const prefix = `${userId}/${familyId}`;
       for (let i = shares.length - 1; i >= 0; i -= 1) {
         if (shares[i]?.userId === userId && shares[i]?.familyId === familyId) shares.splice(i, 1);
       }
       for (let i = media.length - 1; i >= 0; i -= 1) {
         if (media[i]?.userId === userId && media[i]?.familyId === familyId) media.splice(i, 1);
       }
-      for (const key of [...files.keys()]) {
-        if (key.startsWith(`${userId}/${familyId}/`)) files.delete(key);
-      }
+      deletePrefix(prefix);
+      const diskCleared = ![...files.keys()].some((key) => key === prefix || key.startsWith(`${prefix}/`));
+      if (!diskCleared) pending.add(prefix);
+      else pending.delete(prefix);
+      return { hidden: true as const, diskCleared };
     },
     async isolateShare(userId, familyId, shareId) {
+      const prefix = `${userId}/${familyId}/${shareId}`;
       for (let i = shares.length - 1; i >= 0; i -= 1) {
         if (shares[i]?.userId === userId && shares[i]?.familyId === familyId && shares[i]?.shareId === shareId) {
           shares.splice(i, 1);
@@ -182,28 +217,45 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
           media.splice(i, 1);
         }
       }
-      for (const key of [...files.keys()]) {
-        if (key.startsWith(`${userId}/${familyId}/${shareId}/`)) files.delete(key);
-      }
+      deletePrefix(prefix);
+      const diskCleared = ![...files.keys()].some((key) => key === prefix || key.startsWith(`${prefix}/`));
+      if (!diskCleared) pending.add(prefix);
+      else pending.delete(prefix);
+      return { hidden: true as const, diskCleared };
     },
     async replaceVisible(userId, familyId, visible) {
       const keep = new Set(visible.map((share) => share.shareId));
       for (const share of visible) {
         await this.upsertListed(userId, share);
       }
+      let diskCleared = true;
       for (const row of shares.filter((item) => item.userId === userId && item.familyId === familyId)) {
         if (keep.has(row.shareId)) continue;
-        const index = shares.indexOf(row);
-        if (index >= 0) shares.splice(index, 1);
-        for (let i = media.length - 1; i >= 0; i -= 1) {
-          if (media[i]?.userId === userId && media[i]?.familyId === familyId && media[i]?.shareId === row.shareId) {
-            media.splice(i, 1);
-          }
-        }
-        for (const key of [...files.keys()]) {
-          if (key.startsWith(`${userId}/${familyId}/${row.shareId}/`)) files.delete(key);
+        const cleanup = await this.isolateShare(userId, familyId, row.shareId);
+        if (!cleanup.diskCleared) diskCleared = false;
+      }
+      return { hidden: true as const, diskCleared };
+    },
+    async recoverDisk() {
+      let diskCleared = true;
+      for (const prefix of [...pending]) {
+        deletePrefix(prefix);
+        if (![...files.keys()].some((key) => key === prefix || key.startsWith(`${prefix}/`))) pending.delete(prefix);
+        else diskCleared = false;
+      }
+      for (const prefix of leftoverPrefixes()) {
+        deletePrefix(prefix);
+        if ([...files.keys()].some((key) => key === prefix || key.startsWith(`${prefix}/`))) {
+          pending.add(prefix);
+          diskCleared = false;
+        } else {
+          pending.delete(prefix);
         }
       }
+      return { hidden: true as const, diskCleared };
+    },
+    async pendingCleanupPrefixes() {
+      return [...pending];
     },
   };
 }
@@ -247,6 +299,57 @@ function shareFrom(row: ShareRow): ReceivedShareRecord {
 }
 
 export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyReceiveFileStore): FamilyReceiveCache {
+  async function markPending(prefix: string) {
+    await db.run(
+      `INSERT OR REPLACE INTO family_receive_pending_cleanup (prefix, created_at) VALUES (?, ?)`,
+      [prefix, new Date().toISOString()],
+    );
+  }
+
+  async function clearPending(prefix: string) {
+    await db.run(`DELETE FROM family_receive_pending_cleanup WHERE prefix = ?`, [prefix]);
+  }
+
+  async function removeTracked(prefix: string) {
+    try {
+      await files.removePrefix(prefix);
+      await clearPending(prefix);
+      return true;
+    } catch {
+      await markPending(prefix);
+      return false;
+    }
+  }
+
+  async function recoverDisk(): Promise<FamilyCacheCleanup> {
+    const pending = await db.getAll<{ prefix: string }>('SELECT prefix FROM family_receive_pending_cleanup');
+    let diskCleared = true;
+    for (const row of pending) {
+      if (!(await removeTracked(row.prefix))) diskCleared = false;
+    }
+    const allowed = new Set(
+      (
+        await db.getAll<{ user_id: string; family_id: string; share_id: string }>(
+          'SELECT user_id, family_id, share_id FROM family_received_shares',
+        )
+      ).map((row) => `${row.user_id}/${row.family_id}/${row.share_id}`),
+    );
+    const leftovers = new Set<string>();
+    for (const key of await files.listKeys()) {
+      const parts = key.split('/').filter(Boolean);
+      if (parts.length < 3) {
+        leftovers.add(parts[0] || key);
+        continue;
+      }
+      const sharePrefix = `${parts[0]}/${parts[1]}/${parts[2]}`;
+      if (!allowed.has(sharePrefix)) leftovers.add(sharePrefix);
+    }
+    for (const prefix of leftovers) {
+      if (!(await removeTracked(prefix))) diskCleared = false;
+    }
+    return { hidden: true, diskCleared };
+  }
+
   async function find(userId: string, familyId: string, shareId: string) {
     const row = await db.getFirst<ShareRow>(
       `SELECT user_id, family_id, share_id, snapshot_revision, author_user_id, snapshot_json, shared_at, receive_status, expected_media_count
@@ -307,7 +410,7 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
       `UPDATE family_received_media SET status = 'failed' WHERE user_id = ? AND family_id = ? AND share_id = ?`,
       [row.userId, row.familyId, row.shareId],
     );
-    await files.removePrefix(`${row.userId}/${row.familyId}/${row.shareId}`);
+    await removeTracked(`${row.userId}/${row.familyId}/${row.shareId}`);
     return saveShare({ ...row, receiveStatus: 'listed' });
   }
 
@@ -332,6 +435,7 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
 
   return {
     async list(userId, familyId) {
+      await recoverDisk();
       const rows = await db.getAll<ShareRow>(
         `SELECT user_id, family_id, share_id, snapshot_revision, author_user_id, snapshot_json, shared_at, receive_status, expected_media_count
          FROM family_received_shares WHERE user_id = ? AND family_id = ?`,
@@ -399,12 +503,12 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     async isolateAccount(userId) {
       await db.run('DELETE FROM family_received_media WHERE user_id = ?', [userId]);
       await db.run('DELETE FROM family_received_shares WHERE user_id = ?', [userId]);
-      await files.removePrefix(userId).catch(() => undefined);
+      return { hidden: true as const, diskCleared: await removeTracked(userId) };
     },
     async isolateFamily(userId, familyId) {
       await db.run('DELETE FROM family_received_media WHERE user_id = ? AND family_id = ?', [userId, familyId]);
       await db.run('DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ?', [userId, familyId]);
-      await files.removePrefix(`${userId}/${familyId}`).catch(() => undefined);
+      return { hidden: true as const, diskCleared: await removeTracked(`${userId}/${familyId}`) };
     },
     async isolateShare(userId, familyId, shareId) {
       await db.run(
@@ -415,7 +519,7 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
         `DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ? AND share_id = ?`,
         [userId, familyId, shareId],
       );
-      await files.removePrefix(`${userId}/${familyId}/${shareId}`).catch(() => undefined);
+      return { hidden: true as const, diskCleared: await removeTracked(`${userId}/${familyId}/${shareId}`) };
     },
     async replaceVisible(userId, familyId, visible) {
       const keep = new Set(visible.map((share) => share.shareId));
@@ -427,18 +531,19 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
          FROM family_received_shares WHERE user_id = ? AND family_id = ?`,
         [userId, familyId],
       );
+      let diskCleared = true;
       for (const row of rows) {
         if (keep.has(row.share_id)) continue;
-        await db.run(
-          `DELETE FROM family_received_media WHERE user_id = ? AND family_id = ? AND share_id = ?`,
-          [userId, familyId, row.share_id],
-        );
-        await db.run(
-          `DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ? AND share_id = ?`,
-          [userId, familyId, row.share_id],
-        );
-        await files.removePrefix(`${userId}/${familyId}/${row.share_id}`).catch(() => undefined);
+        const cleanup = await this.isolateShare(userId, familyId, row.share_id);
+        if (!cleanup.diskCleared) diskCleared = false;
       }
+      return { hidden: true as const, diskCleared };
+    },
+    recoverDisk,
+    async pendingCleanupPrefixes() {
+      return (await db.getAll<{ prefix: string }>('SELECT prefix FROM family_receive_pending_cleanup')).map(
+        (row) => row.prefix,
+      );
     },
   };
 }

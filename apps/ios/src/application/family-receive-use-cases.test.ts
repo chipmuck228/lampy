@@ -282,6 +282,78 @@ describe('family receive cache use cases', () => {
     }
   });
 
+  it('records pending cleanup when files remain and clears them on rebuild without calling hide a disk success', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'lampy-f5-cleanup-'));
+    try {
+      const file = path.join(dir, 'lampy.db');
+      const cacheDir = path.join(dir, 'family-cache');
+      const realFiles = createNodeFamilyReceiveFiles(cacheDir);
+      let failRemove = true;
+      const files = {
+        write: realFiles.write.bind(realFiles),
+        read: realFiles.read.bind(realFiles),
+        remove: realFiles.remove.bind(realFiles),
+        listKeys: realFiles.listKeys.bind(realFiles),
+        async removePrefix(prefix: string) {
+          if (failRemove) throw new Error('cannot delete file');
+          return realFiles.removePrefix(prefix);
+        },
+      };
+      const commands = createCommands();
+      const aliceCmd = await commands.signInWithApple('apple_alice');
+      const family = await commands.createFamily(aliceCmd.sessionToken, 'fam-1');
+      const invite = await commands.inviteMember(aliceCmd.sessionToken, family.familyId, 'inv-1');
+      const bobCmd = await commands.signInWithApple('apple_bob');
+      await commands.acceptInvitation(bobCmd.sessionToken, invite.code, 'accept-1');
+      const media = await commands.uploadMedia(aliceCmd.sessionToken, {
+        bytes: sampleJpegBytes(),
+        mimeType: 'image/jpeg',
+      });
+      const shared = await commands.shareMoment(aliceCmd.sessionToken, family.familyId, {
+        sourceMomentId: 'moment_gate',
+        sourceRevision: 1,
+        note: '门口的风',
+        emotion: '',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [media.objectId],
+        expectedMediaCount: 1,
+      });
+      const firstDb = await openPreparedNodeSqliteDatabase(file);
+      const firstCache = createSqliteFamilyReceiveCache(firstDb, files);
+      const bobSession = createMemoryFamilySessionStore();
+      const bob = createFamilyUseCases({
+        client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
+        session: bobSession,
+        pending: testPending(),
+        receiveCache: firstCache,
+      });
+      await bob.signInWithApple('apple_bob');
+      await bob.receiveShare(shared.shareId);
+      const bobId = await bobSession.getUserId();
+      expect(bobId).toBeTruthy();
+      const isolated = await firstCache.isolateShare(bobId as string, family.familyId, shared.shareId);
+      expect(isolated).toEqual({ hidden: true, diskCleared: false });
+      expect(isolated.diskCleared).not.toBe(true);
+      expect(await firstCache.pendingCleanupPrefixes()).toContain(
+        `${bobId}/${family.familyId}/${shared.shareId}`,
+      );
+      expect(await firstCache.list(bobId as string, family.familyId)).toEqual([]);
+      expect((await files.listKeys()).length).toBeGreaterThan(0);
+      await firstDb.close();
+
+      failRemove = false;
+      const secondDb = await openPreparedNodeSqliteDatabase(file);
+      const restored = createSqliteFamilyReceiveCache(secondDb, files);
+      const recovered = await restored.recoverDisk();
+      expect(recovered).toEqual({ hidden: true, diskCleared: true });
+      expect(await restored.pendingCleanupPrefixes()).toEqual([]);
+      expect(await files.listKeys()).toEqual([]);
+      await secondDb.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('shows only the latest authorized list and hides when the list request fails', async () => {
     const commands = createCommands();
     const receiveCache = createMemoryFamilyReceiveCache();
