@@ -161,6 +161,19 @@ describe('family share snapshot commands', () => {
     expect(edited.snapshot.note).toBe('改过的门口');
   });
 
+  it('accepts a caller-provided empty media list because it cannot see the personal original', async () => {
+    const { commands } = setup();
+    const alice = await commands.signInWithApple('apple_alice');
+    const family = await commands.createFamily(alice.sessionToken, 'fam-1');
+    const shared = await commands.shareMoment(alice.sessionToken, family.familyId, {
+      ...textShare(),
+      mediaObjectIds: [],
+      expectedMediaCount: 0,
+    });
+    expect(shared.snapshot.media).toEqual([]);
+    expect(shared.sourceMomentId).toBe('moment_gate');
+  });
+
   it('does not save a share when selected media cannot be read', async () => {
     const { commands, blobs, store } = setup();
     const alice = await commands.signInWithApple('apple_alice');

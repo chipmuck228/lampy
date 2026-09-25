@@ -16,6 +16,7 @@ import { dispatchFamilyApi } from '../family-api/http';
 import { createFamilyStore } from '../family-api/store';
 import { createDispatchTransport, createFamilyApiClient } from '../infrastructure/family-http-client';
 import { createMemoryRepositories } from '../infrastructure/repositories';
+import { createMemoryMediaStore, createQueuedImageSource } from '../infrastructure/media';
 import { sampleJpegBytes, samplePngBytes } from '../family-api/media-validate';
 
 function clockAt(iso: string) {
@@ -26,7 +27,10 @@ function testPending() {
   return createPendingFamilyOperationStore(createPendingFamilyOperationDisk());
 }
 
-function createHarness(nowIso = '2026-09-25T02:00:00.000Z') {
+function createHarness(
+  nowIso = '2026-09-25T02:00:00.000Z',
+  options?: { readAssetBytes?: (localUri: string) => Promise<Uint8Array> },
+) {
   const store = createFamilyStore();
   const clock = clockAt(nowIso);
   const commands = createFamilyCommands({
@@ -49,13 +53,15 @@ function createHarness(nowIso = '2026-09-25T02:00:00.000Z') {
     client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
     session: createMemoryFamilySessionStore(),
     pending: testPending(),
-    personal: personalRepos,
+    personal: options?.readAssetBytes
+      ? { ...personalRepos, readAssetBytes: options.readAssetBytes }
+      : personalRepos,
     idempotencyKey: (prefix) => {
       keys.n += 1;
       return `${prefix}-${keys.n}`;
     },
   });
-  return { family, personal, personalRepos, clock };
+  return { family, personal, personalRepos, clock, commands };
 }
 
 async function savePersonalNote(personal: ReturnType<typeof createUseCases>, note: string) {
@@ -933,5 +939,71 @@ describe('family share moment use cases', () => {
       sourceRevision: preview.sourceRevision,
     });
     expect(stale).toMatchObject({ status: 'failed', code: 'CONFLICT' });
+  });
+
+  it('re-reads personal assets on confirm and refuses an empty caller media list', async () => {
+    const { family, personal, personalRepos } = createHarness();
+    const saved = await savePersonalNote(personal, '有一张照片');
+    const found = await personalRepos.moments.findById(saved.id);
+    if (found.kind !== 'ready') throw new Error('expected moment');
+    found.moment.assetIds.push('asset_photo');
+    await personalRepos.moments.save(found.moment);
+    await family.signInWithApple('apple_alice');
+    await family.createFamily();
+    const omitted = await family.confirmShareMoment({
+      momentId: saved.id,
+      sourceRevision: found.moment.revision,
+      mediaByAsset: {},
+    });
+    expect(omitted).toMatchObject({ status: 'failed', code: 'SHARE_MEDIA_INCOMPLETE' });
+  });
+
+  it('uploads every personal asset after re-reading the library on confirm', async () => {
+    const personalRepos = createMemoryRepositories();
+    const media = createMemoryMediaStore();
+    const library = createQueuedImageSource({
+      picks: [[{ sourceUri: 'memory://source/gate.jpg', mimeType: 'image/jpeg', width: 800, height: 600 }]],
+    });
+    const clock = clockAt('2026-09-25T02:00:00.000Z');
+    const personal = createUseCases({
+      ...personalRepos,
+      media,
+      library,
+      clock,
+      assetId: () => 'asset_photo',
+    });
+    const store = createFamilyStore();
+    const commands = createFamilyCommands({
+      store,
+      apple: createMapAppleVerifier({ apple_alice: { appleSubject: 'apple.alice' } }),
+      clock,
+      inviteTtlMs: 60_000,
+    });
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
+      session: createMemoryFamilySessionStore(),
+      pending: testPending(),
+      personal: {
+        ...personalRepos,
+        readAssetBytes: async () => sampleJpegBytes(),
+      },
+    });
+    const draft = await personal.restoreOrCreateDraft();
+    await personal.updateDraftNote(draft.draftId, '门口的风');
+    await personal.addLibraryImages(draft.draftId);
+    const saved = await personal.saveTextMoment(draft.draftId);
+    await family.signInWithApple('apple_alice');
+    await family.createFamily();
+    const preview = await family.prepareSharePreview(saved.id);
+    expect(preview.media).toHaveLength(1);
+    expect(preview.canConfirm).toBe(true);
+    const confirmed = await family.confirmShareMoment({
+      momentId: saved.id,
+      sourceRevision: preview.sourceRevision,
+    });
+    expect(confirmed.status).toBe('stored');
+    if (confirmed.status !== 'stored') throw new Error('expected stored');
+    expect(confirmed.share.snapshot.media).toHaveLength(1);
+    expect(confirmed.share.snapshot.media[0]?.mimeType).toBe('image/jpeg');
   });
 });

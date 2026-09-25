@@ -26,7 +26,7 @@ Transmission 家庭目标、ReceivedSnapshot 存储、owner 与 `userId` 对齐�
 
 Phase 3B 不做（仍禁止宣称）：Moment 分享、家庭时间线、接收快照、假成员。媒体对象见 F2。
 
-## F2 媒体对象（本切片）
+## F2 媒体对象（已合入 main）
 
 服务端媒体对象：会话鉴权的 `POST /v1/media`、`GET /v1/media/:id`、`GET /v1/media/:id/content`。对象 ID 不含本机路径；元数据在家庭 SQLite；文件在 `LAMPY_FAMILY_MEDIA_PATH` 或库目录下 `media/`。仅上传者可读。决策见 `FAMILY_F2_MEDIA_OBJECTS.md`。
 
@@ -34,9 +34,11 @@ Phase 3B 不做（仍禁止宣称）：Moment 分享、家庭时间线、接收�
 
 ## F3 分享快照（本切片）
 
-确认将发送的 `note` / 感受 / 时间与精度 / 已选 F2 媒体；服务端按 `sourceRevision` 保存不可变快照并记录当时 audience。后来加入者默认不可见。决策见 `FAMILY_F3_SHARE_SNAPSHOTS.md`。
+确认将发送的 `note` / 感受 / 时间与精度 / 已选 F2 媒体；服务端按调用方提供的 `sourceRevision` 保存不可变快照并记录当时 audience。后来加入者默认不可见。决策见 `FAMILY_F3_SHARE_SNAPSHOTS.md`。
 
-**不做：** 接收下载、家庭缓存、时间线、撤回、Transmission 改写、打开家庭入口、宣称家人已收到或身份闭环通过。
+服务端不验证个人原件，也不知道原件媒体数量。App 组合根注入个人库；个人详情（家庭 API 已配置时）进入确认页；确认必须重新读取并逐项核对。
+
+**不做：** 接收下载、家庭缓存、时间线、撤回、Transmission 改写、打开未配置的家庭入口、宣称家人已收到或身份闭环通过。
 
 ## F4 接收与家庭缓存（之后）
 

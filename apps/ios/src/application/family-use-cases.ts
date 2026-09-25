@@ -163,6 +163,7 @@ export function createFamilyUseCases(deps: {
   personal?: {
     moments: { findById(id: string): Promise<MomentRead> };
     assets: { findById(id: string): Promise<AssetRead> };
+    readAssetBytes?: (localUri: string) => Promise<Uint8Array>;
   };
 }) {
   const cache = deps.cache ?? createNoopFamilyCache();
@@ -251,6 +252,77 @@ export function createFamilyUseCases(deps: {
       if (!isUnconfirmedNetwork(appError)) {
         await pending.remove(userId, input.command, input.operationId);
       }
+      throw appError;
+    }
+  }
+
+  async function loadPersonalMoment(momentId: string) {
+    if (!deps.personal) {
+      throw new ApplicationError('MOMENT_NOT_FOUND', 'This moment is not on this device.');
+    }
+    const found = await deps.personal.moments.findById(momentId);
+    if (found.kind !== 'ready' || found.moment.lifecycle.status !== 'active') {
+      throw new ApplicationError('MOMENT_NOT_FOUND', 'This moment is not on this device.');
+    }
+    return found.moment;
+  }
+
+  async function listPersonalShareMedia(
+    assetIds: string[],
+    mediaByAsset?: Record<string, string>,
+  ): Promise<SharePreviewMedia[]> {
+    const media: SharePreviewMedia[] = [];
+    for (const assetId of assetIds) {
+      const asset = deps.personal ? await deps.personal.assets.findById(assetId) : { kind: 'missing' as const };
+      const objectId = mediaByAsset?.[assetId];
+      const localUri = asset.kind === 'ready' ? asset.asset.localUri : '';
+      const canReadLocal = Boolean(localUri && deps.personal?.readAssetBytes);
+      media.push({
+        assetId,
+        objectId,
+        mimeType: asset.kind === 'ready' ? asset.asset.metadata.mimeType || '' : '',
+        ready: Boolean(objectId) || canReadLocal,
+      });
+    }
+    return media;
+  }
+
+  async function resolvePersonalShareMedia(assetId: string, mediaByAsset?: Record<string, string>) {
+    if (!deps.personal) {
+      throw new ApplicationError('MOMENT_NOT_FOUND', 'This moment is not on this device.');
+    }
+    const mapped = mediaByAsset?.[assetId];
+    if (mapped) return mapped;
+    const asset = await deps.personal.assets.findById(assetId);
+    if (asset.kind !== 'ready' || !asset.asset.localUri) {
+      throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
+    }
+    if (!deps.personal.readAssetBytes) {
+      throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
+    }
+    let bytes: Uint8Array;
+    try {
+      bytes = await deps.personal.readAssetBytes(asset.asset.localUri);
+    } catch {
+      throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
+    }
+    if (!bytes.byteLength) {
+      throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
+    }
+    const uploaded = await uploadOwnedBytes(bytes, asset.asset.metadata.mimeType || '');
+    return uploaded.objectId;
+  }
+
+  async function uploadOwnedBytes(bytes: Uint8Array, mimeType: string) {
+    const { sessionToken } = await requireAccount();
+    selectedMediaUpload = { status: 'uploading' };
+    try {
+      const object = await deps.client.uploadMedia(sessionToken, { bytes, mimeType });
+      selectedMediaUpload = { status: 'stored', object };
+      return object;
+    } catch (error) {
+      const appError = asApplicationError(error);
+      selectedMediaUpload = { status: 'failed', code: appError.code, message: appError.message };
       throw appError;
     }
   }
@@ -483,32 +555,16 @@ export function createFamilyUseCases(deps: {
       if (membership.kind !== 'ready') {
         throw new ApplicationError('NOT_IN_FAMILY', 'Not a member of this family.');
       }
-      if (!deps.personal) {
-        throw new ApplicationError('MOMENT_NOT_FOUND', 'This moment is not on this device.');
-      }
-      const found = await deps.personal.moments.findById(momentId);
-      if (found.kind !== 'ready' || found.moment.lifecycle.status !== 'active') {
-        throw new ApplicationError('MOMENT_NOT_FOUND', 'This moment is not on this device.');
-      }
-      const media: SharePreviewMedia[] = [];
-      for (const assetId of found.moment.assetIds) {
-        const asset = await deps.personal.assets.findById(assetId);
-        const objectId = mediaByAsset?.[assetId];
-        media.push({
-          assetId,
-          objectId,
-          mimeType: asset.kind === 'ready' ? asset.asset.metadata.mimeType || '' : '',
-          ready: Boolean(objectId),
-        });
-      }
+      const moment = await loadPersonalMoment(momentId);
+      const media = await listPersonalShareMedia(moment.assetIds, mediaByAsset);
       return {
         familyId: membership.familyId,
-        sourceMomentId: found.moment.id,
-        sourceRevision: found.moment.revision,
-        note: found.moment.content.note,
-        emotion: found.moment.content.emotion,
-        occurredAt: found.moment.time.occurredAt,
-        occurredAtPrecision: found.moment.time.occurredAtPrecision,
+        sourceMomentId: moment.id,
+        sourceRevision: moment.revision,
+        note: moment.content.note,
+        emotion: moment.content.emotion,
+        occurredAt: moment.time.occurredAt,
+        occurredAtPrecision: moment.time.occurredAtPrecision,
         media,
         canConfirm: media.every((item) => item.ready),
       };
@@ -522,43 +578,55 @@ export function createFamilyUseCases(deps: {
     }) {
       shareConfirm = { status: 'confirming' };
       try {
-        const preview = await this.prepareSharePreview(input.momentId, input.mediaByAsset);
-        if (preview.sourceRevision !== input.sourceRevision) {
+        const membership = await this.getMembership();
+        if (membership.kind === 'unauthenticated' || (membership.kind === 'unconfirmed' && membership.reason === 'unauthenticated')) {
+          throw new ApplicationError('UNAUTHENTICATED', 'Sign in is required.');
+        }
+        if (membership.kind !== 'ready') {
+          throw new ApplicationError('NOT_IN_FAMILY', 'Not a member of this family.');
+        }
+        const moment = await loadPersonalMoment(input.momentId);
+        if (moment.revision !== input.sourceRevision) {
           throw new ApplicationError('CONFLICT', 'This moment changed. Confirm the current fields again.');
         }
-        if (!preview.canConfirm) {
+        const requiredAssetIds = [...moment.assetIds];
+        const mediaObjectIds: string[] = [];
+        for (const assetId of requiredAssetIds) {
+          const objectId = await resolvePersonalShareMedia(assetId, input.mediaByAsset);
+          mediaObjectIds.push(objectId);
+        }
+        if (mediaObjectIds.length !== requiredAssetIds.length) {
           throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
         }
         const { sessionToken } = await requireAccount();
-        const mediaObjectIds = preview.media.map((item) => item.objectId).filter((id): id is string => Boolean(id));
         const snapshotCanonical = canonicalizeShareSnapshot({
-          note: preview.note,
-          emotion: preview.emotion,
-          occurredAt: preview.occurredAt,
-          occurredAtPrecision: preview.occurredAtPrecision,
+          note: moment.content.note,
+          emotion: moment.content.emotion,
+          occurredAt: moment.time.occurredAt,
+          occurredAtPrecision: moment.time.occurredAtPrecision,
           mediaObjectIds,
         });
         const result = await withPending({
           command: 'shareMoment',
-          operationId: pendingShareOperationId(preview.sourceMomentId, preview.sourceRevision),
+          operationId: pendingShareOperationId(moment.id, moment.revision),
           requestFingerprint: fingerprintShareMoment({
-            familyId: preview.familyId,
-            sourceMomentId: preview.sourceMomentId,
-            sourceRevision: preview.sourceRevision,
+            familyId: membership.familyId,
+            sourceMomentId: moment.id,
+            sourceRevision: moment.revision,
             snapshotCanonical,
           }),
-          familyId: preview.familyId,
+          familyId: membership.familyId,
           idempotencyKey: input.idempotencyKey,
           work: (key) =>
-            deps.client.shareMoment(sessionToken, preview.familyId, {
-              sourceMomentId: preview.sourceMomentId,
-              sourceRevision: preview.sourceRevision,
-              note: preview.note,
-              emotion: preview.emotion,
-              occurredAt: preview.occurredAt,
-              occurredAtPrecision: preview.occurredAtPrecision,
+            deps.client.shareMoment(sessionToken, membership.familyId, {
+              sourceMomentId: moment.id,
+              sourceRevision: moment.revision,
+              note: moment.content.note,
+              emotion: moment.content.emotion,
+              occurredAt: moment.time.occurredAt,
+              occurredAtPrecision: moment.time.occurredAtPrecision,
               mediaObjectIds,
-              expectedMediaCount: preview.media.length,
+              expectedMediaCount: requiredAssetIds.length,
               idempotencyKey: key,
             }),
         });
