@@ -12,17 +12,13 @@
 
 Transmission 家庭目标、ReceivedSnapshot 存储、owner 与 `userId` 对齐。需要时单独 PR，说明对微信小程序的影响。
 
-## F1 身份与成员（本轮）
+## F1 身份与成员（本轮代码）
 
-范围：Sign in with Apple 的**服务端校验接口**（测试可注入 verifier）、内部 `userId`、创建家庭、发出/撤销/接受邀请、成员列表、成员退出、创建者移除/解散。逐请求鉴权。写操作幂等。客户端只在真实成功后展示家庭/成员。
+已在仓库：`src/family-api` 命令 / HTTP / Apple 校验接口；`family-use-cases` + `family-http-client`。测试覆盖未登录、无效 token、邀请过期/撤销/重复接受、已有家庭、非创建者、退出、重试、不可达。失败不改个人 Moment。
 
-不做：Moment 分享、媒体上传、家庭时间线、接收快照、假家庭页。
+未完成 / 未验证：公网部署、持久库、真机 Sign in with Apple、家庭 UI。配置见 `src/family-api/README.md`。
 
-完成定义：
-
-- 服务端命令与 HTTP 契约有测试覆盖：未登录、无效 token、邀请过期/撤销/重复接受、已有家庭、非创建者、退出、重试、不可达。
-- 这些失败不改个人 Moment、不显示成功。
-- 生产 Apple 密钥与公网部署若缺失，文档写明阻塞，代码保持可配置。
+不做（仍禁止宣称）：Moment 分享、媒体上传、家庭时间线、接收快照、假家庭页。
 
 ## F2 媒体对象（之后）
 

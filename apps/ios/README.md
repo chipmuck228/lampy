@@ -16,5 +16,5 @@ npx expo run:ios
 - 实施拆分：`PHASE_0_IMPLEMENTATION_PLAN.md`
 - 未实现能力：`PHASE_0_UNIMPLEMENTED.md`
 - 验证：`PHASE_0_VERIFICATION.md`
-- 家庭：`FAMILY_*` + ADR `0006`（决策已定；实现按 F1 起切片，无假家庭页）
+- 家庭：`FAMILY_*` + ADR `0006`。F1 身份/成员在 `src/family-api`；无家庭页、无公网部署
 - ADR：`adr/0001`–`0006`

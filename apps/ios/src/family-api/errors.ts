@@ -1,0 +1,29 @@
+export class FamilyError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'FamilyError';
+    this.code = code;
+  }
+}
+
+export function isFamilyError(error: unknown): error is FamilyError {
+  return error instanceof FamilyError;
+}
+
+export const FAMILY_ERROR = {
+  UNAUTHENTICATED: 'UNAUTHENTICATED',
+  APPLE_TOKEN_INVALID: 'APPLE_TOKEN_INVALID',
+  ALREADY_IN_FAMILY: 'ALREADY_IN_FAMILY',
+  NOT_IN_FAMILY: 'NOT_IN_FAMILY',
+  FORBIDDEN: 'FORBIDDEN',
+  INVITE_NOT_FOUND: 'INVITE_NOT_FOUND',
+  INVITE_EXPIRED: 'INVITE_EXPIRED',
+  INVITE_REVOKED: 'INVITE_REVOKED',
+  INVITE_ALREADY_USED: 'INVITE_ALREADY_USED',
+  FAMILY_DISSOLVED: 'FAMILY_DISSOLVED',
+  MEMBER_NOT_FOUND: 'MEMBER_NOT_FOUND',
+  CONFLICT: 'CONFLICT',
+  BAD_REQUEST: 'BAD_REQUEST',
+} as const;
