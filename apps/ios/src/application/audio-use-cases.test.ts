@@ -12,7 +12,12 @@ import {
 } from '../infrastructure/media';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 import { ApplicationError } from './errors';
-import { AUDIO_UNAVAILABLE_LABEL, UNKNOWN_UNAVAILABLE_LABEL, createUseCases } from './use-cases';
+import {
+  AUDIO_MISSING_LABEL,
+  AUDIO_UNPLAYABLE_LABEL,
+  UNKNOWN_UNAVAILABLE_LABEL,
+  createUseCases,
+} from './use-cases';
 
 function clockAt(iso: string) {
   return { now: () => new Date(iso) };
@@ -197,7 +202,10 @@ describe('audio personal moment use cases', () => {
     const draft = await app.restoreOrCreateDraft();
     await app.addRecordedAudio(draft.draftId, clip('once'));
     failNext = true;
-    await expect(app.saveTextMoment(draft.draftId)).rejects.toThrow('disk full');
+    await expect(app.saveTextMoment(draft.draftId)).rejects.toMatchObject({
+      code: 'DISK_FULL',
+      message: '这次没有留下正式记录。草稿还在，可以清出空间后再试。',
+    });
     expect((await app.getRecentLife()).items).toHaveLength(0);
     expect((await app.restoreOrCreateDraft()).audio?.id).toBe('asset_once');
     expect(media.persisted.size).toBe(1);
@@ -251,7 +259,8 @@ describe('audio personal moment use cases', () => {
     if (unplayable.kind === 'ready') {
       expect(unplayable.note).toBe('字还在');
       expect(unplayable.audio?.status).toBe('unavailable');
-      expect(unplayable.audio?.unavailableLabel).toBe('这段声音暂时无法播放，其他内容仍然保留。');
+      expect(unplayable.audio?.reason).toBe('unplayable');
+      expect(unplayable.audio?.unavailableLabel).toBe(AUDIO_UNPLAYABLE_LABEL);
     }
 
     media.markMissing('memory://assets/asset_broken.m4a');
@@ -260,6 +269,8 @@ describe('audio personal moment use cases', () => {
     if (missing.kind === 'ready') {
       expect(missing.id).toBe(saved.id);
       expect(missing.audio?.status).toBe('unavailable');
+      expect(missing.audio?.reason).toBe('missing');
+      expect(missing.audio?.unavailableLabel).toBe(AUDIO_MISSING_LABEL);
     }
   });
 
@@ -415,7 +426,7 @@ describe('audio personal moment use cases', () => {
       expect(damaged.images).toHaveLength(0);
       expect(damaged.audio?.id).toBe('asset_voice');
       expect(damaged.audio?.status).toBe('unavailable');
-      expect(damaged.audio?.unavailableLabel).toBe(AUDIO_UNAVAILABLE_LABEL);
+      expect(damaged.audio?.unavailableLabel).toBe(AUDIO_MISSING_LABEL);
     }
     const damagedRecent = await app.getRecentLife();
     expect(damagedRecent.items[0].images).toHaveLength(0);
@@ -449,7 +460,7 @@ describe('audio personal moment use cases', () => {
     if (suffixDetail.kind === 'ready') {
       expect(suffixDetail.images).toHaveLength(0);
       expect(suffixDetail.audio?.status).toBe('unavailable');
-      expect(suffixDetail.audio?.unavailableLabel).toBe(AUDIO_UNAVAILABLE_LABEL);
+      expect(suffixDetail.audio?.unavailableLabel).toBe(AUDIO_MISSING_LABEL);
     }
   });
 

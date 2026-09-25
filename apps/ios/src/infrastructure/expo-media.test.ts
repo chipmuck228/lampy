@@ -21,6 +21,9 @@ jest.mock('expo-file-system/legacy', () => ({
 
 describe('expo media decode', () => {
   afterEach(() => {
+    jest.mocked(FileSystem.getInfoAsync).mockReset();
+    jest.mocked(FileSystem.copyAsync).mockReset();
+    jest.mocked(FileSystem.deleteAsync).mockReset();
     jest.restoreAllMocks();
   });
 
@@ -54,6 +57,181 @@ describe('expo media decode', () => {
     });
 
     await expect(createExpoMediaStore().canDecode('file:///docs/lampy-assets/ok.jpg')).resolves.toBe(true);
+  });
+
+  it('classifies a disk-full copy as DISK_FULL and removes the partial dest', async () => {
+    jest.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => {
+      if (String(uri).endsWith('lampy-assets')) {
+        return {
+          exists: true,
+          isDirectory: true,
+          uri: String(uri),
+          size: 0,
+          modificationTime: 0,
+        };
+      }
+      return {
+        exists: false,
+        isDirectory: false,
+        uri: String(uri),
+        size: 0,
+        modificationTime: 0,
+      };
+    });
+    jest.mocked(FileSystem.copyAsync).mockRejectedValueOnce(
+      Object.assign(new Error('ENOSPC: no space'), { code: 'ENOSPC' }),
+    );
+    jest.mocked(FileSystem.deleteAsync).mockResolvedValueOnce();
+
+    await expect(
+      createExpoMediaStore().persistImage({
+        assetId: 'asset_full',
+        sourceUri: 'file:///tmp/source.jpg',
+        mimeType: 'image/jpeg',
+      }),
+    ).rejects.toMatchObject({ code: 'DISK_FULL' });
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+      'file:///docs/lampy-assets/asset_full.jpg',
+      { idempotent: true },
+    );
+  });
+
+  it('does not copy or delete when checking an existing dest fails', async () => {
+    jest.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => {
+      if (String(uri).endsWith('lampy-assets')) {
+        return {
+          exists: true,
+          isDirectory: true,
+          uri: String(uri),
+          size: 0,
+          modificationTime: 0,
+        };
+      }
+      throw Object.assign(new Error('EIO: dest probe failed'), { code: 'EIO' });
+    });
+
+    await expect(
+      createExpoMediaStore().persistImage({
+        assetId: 'asset_existing',
+        sourceUri: 'file:///tmp/source.jpg',
+        mimeType: 'image/jpeg',
+      }),
+    ).rejects.toMatchObject({ code: 'COPY_FAILED' });
+    expect(FileSystem.copyAsync).not.toHaveBeenCalled();
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not treat an unconfirmed dest as persisted after copy', async () => {
+    let destChecks = 0;
+    jest.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => {
+      if (String(uri).endsWith('lampy-assets')) {
+        return {
+          exists: true,
+          isDirectory: true,
+          uri: String(uri),
+          size: 0,
+          modificationTime: 0,
+        };
+      }
+      destChecks += 1;
+      if (destChecks === 1) {
+        return {
+          exists: false,
+          isDirectory: false,
+          uri: String(uri),
+          size: 0,
+          modificationTime: 0,
+        };
+      }
+      throw Object.assign(new Error('EIO: dest confirm failed'), { code: 'EIO' });
+    });
+    jest.mocked(FileSystem.copyAsync).mockResolvedValueOnce();
+
+    await expect(
+      createExpoMediaStore().persistImage({
+        assetId: 'asset_unconfirmed',
+        sourceUri: 'file:///tmp/source.jpg',
+        mimeType: 'image/jpeg',
+      }),
+    ).rejects.toMatchObject({ code: 'COPY_FAILED' });
+    expect(FileSystem.copyAsync).toHaveBeenCalled();
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not persist when the copied dest cannot be found', async () => {
+    jest.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => {
+      if (String(uri).endsWith('lampy-assets')) {
+        return {
+          exists: true,
+          isDirectory: true,
+          uri: String(uri),
+          size: 0,
+          modificationTime: 0,
+        };
+      }
+      return {
+        exists: false,
+        isDirectory: false,
+        uri: String(uri),
+        size: 0,
+        modificationTime: 0,
+      };
+    });
+    jest.mocked(FileSystem.copyAsync).mockResolvedValueOnce();
+
+    await expect(
+      createExpoMediaStore().persistAudio({
+        assetId: 'asset_missing_after_copy',
+        sourceUri: 'file:///tmp/source.m4a',
+        mimeType: 'audio/mp4',
+      }),
+    ).rejects.toMatchObject({ code: 'COPY_FAILED' });
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+  });
+
+  it('classifies a generic copy failure as COPY_FAILED', async () => {
+    jest.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => {
+      if (String(uri).endsWith('lampy-assets')) {
+        return {
+          exists: true,
+          isDirectory: true,
+          uri: String(uri),
+          size: 0,
+          modificationTime: 0,
+        };
+      }
+      return {
+        exists: false,
+        isDirectory: false,
+        uri: String(uri),
+        size: 0,
+        modificationTime: 0,
+      };
+    });
+    jest.mocked(FileSystem.copyAsync).mockRejectedValueOnce(new Error('EIO'));
+
+    await expect(
+      createExpoMediaStore().persistAudio({
+        assetId: 'asset_copy',
+        sourceUri: 'file:///tmp/source.m4a',
+        mimeType: 'audio/mp4',
+      }),
+    ).rejects.toMatchObject({ code: 'COPY_FAILED' });
+  });
+
+  it('does not delete a system album original', async () => {
+    jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
+      exists: true,
+      isDirectory: false,
+      size: 2048,
+      uri: 'file:///DCIM/100APPLE/IMG_0001.JPG',
+      modificationTime: 0,
+    });
+
+    await expect(
+      createExpoMediaStore().removeAppOwned('file:///DCIM/100APPLE/IMG_0001.JPG'),
+    ).resolves.toBe(false);
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
   });
 
   it('treats an empty audio file as unplayable', async () => {

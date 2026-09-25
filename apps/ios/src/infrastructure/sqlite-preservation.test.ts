@@ -290,7 +290,8 @@ describe('sqlite file preservation', () => {
       });
       if (detail.kind === 'ready') {
         expect(detail.audio?.status).toBe('unavailable');
-        expect(detail.audio?.unavailableLabel).toBe('这段声音暂时无法播放，其他内容仍然保留。');
+        expect(detail.audio?.reason).toBe('missing');
+        expect(detail.audio?.unavailableLabel).toBe('这段声音暂时找不到了，其他内容仍然保留。');
       }
       await db.close();
     });
@@ -333,7 +334,8 @@ describe('sqlite file preservation', () => {
         expect(detail.note).toBe('声音坏了不是照片');
         expect(detail.images).toHaveLength(0);
         expect(detail.audio?.status).toBe('unavailable');
-        expect(detail.audio?.unavailableLabel).toBe('这段声音暂时无法播放，其他内容仍然保留。');
+        expect(detail.audio?.reason).toBe('missing');
+        expect(detail.audio?.unavailableLabel).toBe('这段声音暂时找不到了，其他内容仍然保留。');
       }
       await db.close();
     });
@@ -386,6 +388,65 @@ describe('sqlite file preservation', () => {
           },
         ]);
       }
+      await db.close();
+    });
+  });
+
+  it('keeps the draft and existing moment when a later photo write fails, then retries once', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const firstSource = path.join(path.dirname(file), 'kept.jpg');
+      const failSource = path.join(path.dirname(file), 'fail.jpg');
+      await writeFile(firstSource, TINY_JPEG);
+      await writeFile(failSource, TINY_JPEG);
+      const media = createNodeMediaStore(mediaRoot);
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const repos = createSqliteRepositories(db);
+      const first = createUseCases({
+        ...repos,
+        media,
+        clock: clockAt('2026-09-24T21:00:00.000Z'),
+        id: () => 'moment_kept',
+        assetId: () => 'asset_kept_photo',
+      });
+      const firstDraft = await first.restoreOrCreateDraft();
+      await first.updateDraftNote(firstDraft.draftId, '已经留下');
+      const saved = await first.saveTextMoment(firstDraft.draftId);
+
+      const innerAssetSave = repos.assets.save.bind(repos.assets);
+      let failAsset = true;
+      repos.assets.save = async (asset) => {
+        if (failAsset) throw Object.assign(new Error('SQLITE_FULL'), { code: 'SQLITE_FULL' });
+        return innerAssetSave(asset);
+      };
+      const app = createUseCases({
+        ...repos,
+        media,
+        clock: clockAt('2026-09-24T21:01:00.000Z'),
+        assetId: () => (failAsset ? 'asset_fail_photo' : 'asset_retry_photo'),
+      });
+      const draft = await app.restoreOrCreateDraft();
+      await app.updateDraftNote(draft.draftId, '这次要留下照片');
+      await expect(
+        app.addPickedImages(draft.draftId, [
+          { sourceUri: failSource, mimeType: 'image/jpeg', width: 1, height: 1 },
+        ]),
+      ).rejects.toMatchObject({ code: 'DISK_FULL' });
+
+      const restored = await app.restoreOrCreateDraft();
+      expect(restored.note).toBe('这次要留下照片');
+      expect(restored.images).toHaveLength(0);
+      expect(await repos.assets.findById('asset_fail_photo')).toEqual({ kind: 'missing' });
+      expect((await app.getRecentLife()).items.map((item) => item.id)).toEqual([saved.id]);
+      expect((await repos.moments.findById(saved.id)).kind).toBe('ready');
+
+      failAsset = false;
+      const retried = await app.addPickedImages(draft.draftId, [
+        { sourceUri: firstSource, mimeType: 'image/jpeg', width: 1, height: 1 },
+      ]);
+      expect(retried.images.map((item) => item.id)).toEqual(['asset_retry_photo']);
+      expect((await repos.assets.findById('asset_fail_photo')).kind).toBe('missing');
+      expect((await repos.assets.findById('asset_retry_photo')).kind).toBe('ready');
       await db.close();
     });
   });

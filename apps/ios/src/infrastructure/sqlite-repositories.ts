@@ -319,6 +319,9 @@ export function createSqliteRepositories(db: SqlDatabase): {
         }
         return { kind: 'ready', asset: decoded.asset };
       },
+      async remove(assetId) {
+        await db.run('DELETE FROM assets WHERE id = ?', [assetId]);
+      },
     },
   };
 }

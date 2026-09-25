@@ -80,7 +80,10 @@ describe('leave audio actions', () => {
 
   it('keeps writing after the microphone is refused', async () => {
     mockBegin.mockRejectedValueOnce(
-      new ApplicationError('MIC_DENIED', '没有打开麦克风。还可以写字和留下照片，草稿还在。'),
+      new ApplicationError(
+        'MIC_DENIED',
+        '没有打开麦克风。还可以写字和留下照片，草稿还在。打开系统设置允许麦克风后，可以再试。',
+      ),
     );
 
     const view = await render(wrap());
@@ -89,7 +92,11 @@ describe('leave audio actions', () => {
     });
     fireEvent.press(view.getByTestId('composer-sound'));
     await waitFor(() => {
-      expect(view.getByText('没有打开麦克风。还可以写字和留下照片，草稿还在。')).toBeTruthy();
+      expect(
+        view.getByText(
+          '没有打开麦克风。还可以写字和留下照片，草稿还在。打开系统设置允许麦克风后，可以再试。',
+        ),
+      ).toBeTruthy();
     });
     expect(view.getByDisplayValue('还可以写字')).toBeTruthy();
     expect(view.getByTestId('composer-note')).toBeTruthy();
@@ -130,7 +137,10 @@ describe('leave audio actions', () => {
   it('keeps the previous sound when rerecord cannot start', async () => {
     mockRestore.mockResolvedValue(recordedDraft);
     mockBegin.mockRejectedValueOnce(
-      new ApplicationError('MIC_DENIED', '没有打开麦克风。还可以写字和留下照片，草稿还在。'),
+      new ApplicationError(
+        'MIC_DENIED',
+        '没有打开麦克风。还可以写字和留下照片，草稿还在。打开系统设置允许麦克风后，可以再试。',
+      ),
     );
 
     const view = await render(wrap());
@@ -139,7 +149,11 @@ describe('leave audio actions', () => {
     });
     fireEvent.press(view.getByTestId('composer-rerecord'));
     await waitFor(() => {
-      expect(view.getByText('没有打开麦克风。还可以写字和留下照片，草稿还在。')).toBeTruthy();
+      expect(
+        view.getByText(
+          '没有打开麦克风。还可以写字和留下照片，草稿还在。打开系统设置允许麦克风后，可以再试。',
+        ),
+      ).toBeTruthy();
     });
     expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
     expect(view.getByLabelText('播放，4秒')).toBeTruthy();

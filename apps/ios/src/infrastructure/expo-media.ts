@@ -3,8 +3,10 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import {
+  classifyCopyError,
   extensionForAudioMime,
   extensionForMime,
+  MediaPersistError,
   type ImageSource,
   type MediaStore,
   type PickedImage,
@@ -87,18 +89,40 @@ async function persistCopy(
   if (!info.exists) {
     await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
   }
-  const destInfo = await FileSystem.getInfoAsync(dest);
+  let destInfo;
+  try {
+    destInfo = await FileSystem.getInfoAsync(dest);
+  } catch (error) {
+    throw classifyCopyError(error);
+  }
   if (destInfo.exists) {
     return {
       localUri: dest,
       sizeBytes: destInfo.size,
     };
   }
-  await FileSystem.copyAsync({ from: sourceUri, to: dest });
-  const copied = await FileSystem.getInfoAsync(dest);
+  try {
+    await FileSystem.copyAsync({ from: sourceUri, to: dest });
+  } catch (error) {
+    try {
+      await FileSystem.deleteAsync(dest, { idempotent: true });
+    } catch {
+      // Only a dest this copy started may be a partial file.
+    }
+    throw classifyCopyError(error);
+  }
+  let copied;
+  try {
+    copied = await FileSystem.getInfoAsync(dest);
+  } catch (error) {
+    throw classifyCopyError(error);
+  }
+  if (!copied.exists || copied.isDirectory) {
+    throw new MediaPersistError('COPY_FAILED', 'copied dest could not be confirmed');
+  }
   return {
     localUri: dest,
-    sizeBytes: copied.exists ? copied.size : undefined,
+    sizeBytes: copied.size,
   };
 }
 

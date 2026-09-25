@@ -1,57 +1,51 @@
 # Phase 0 验证报告
 
-机器：macOS 26.7，Xcode 26.6，Node v24.7.0。日期：2026-09-24。
+机器：macOS 26.6，Xcode 26.6，Node v24.7.0。日期：2026-09-25。
 
-本轮是个人 Moment 现场录音闭环（分支 `ios/audio-moment`）。
+本轮是媒体失败与权限拒绝恢复（分支 `ios/media-failure-recovery`）。基线 `origin/main` = `92272ff`。
 
 | 命令 | 工作目录 | 结果 |
 | --- | --- | --- |
 | `npx tsc --noEmit` | `apps/ios` | **通过**（exit 0） |
 | `npx expo lint` | `apps/ios` | **通过**（exit 0） |
-| `npm test` | `apps/ios` | **通过**。15 suites / 65 tests |
+| `npm test` | `apps/ios` | **通过**。18 suites / 89 tests |
 | `npx expo run:ios --device "iPhone 17"` | `apps/ios` | **通过**。Build Succeeded，已装上模拟器 |
-| `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testRecordSoundSaveRecentExactIdDetail test` | `apps/ios/ios`（本地，不入库） | **通过**。iPhone 17 Simulator |
+| `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testCameraDeniedKeepsDraft test` | `apps/ios/ios`（本地，不入库） | **通过**。iPhone 17 Simulator |
+| `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testCameraRetryAfterSettingsGrant test` | `apps/ios/ios`（本地，不入库） | **通过**。先 `simctl privacy grant camera`，再打开相机 |
 | `git diff --check` | 仓库根 | **通过** |
 
 ## 自动化覆盖
 
-- 仅声音、文字 + 声音、照片 + 声音
-- 第二段声音被拒绝，不写入草稿，也不生成 Audio Asset
-- 未点「声音」不请求麦克风；拒绝后文字和照片仍可编辑
-- 草稿恢复带录音；保存失败保留草稿；重试不重复 Moment / Audio Asset
-- 录音中断：有内容则保留，无内容则说明没有留下声音
-- 无法播放或文件缺失时 Moment 与其余内容仍在，原位不可用
-- 录音进行中重复开始被阻止；重启后正式记录仍能读到同一段声音
-- 移除草稿录音只删除应用自有且已无引用的文件
-- 重录启动失败仍保留旧声音，可继续试听
-- 超过 200 条记录时，仍被引用的文件不会被删
-- 音频 Asset 损坏或缺失显示为声音不可用，不显示成照片
-- 真实 `asset_` 格式的音频 ID 在 Asset 行缺失时显示中性不可用占位，文字和其他媒体仍在
-- 录音处理中不能保存或再选照片
+- 相册 / 相机 / 麦克风拒绝后草稿保留；从设置恢复权限后可重试，不丢草稿
+- 磁盘不足、复制失败与 SQLite 写入失败分别分类；失败后旧 Moment 不变
+- 文件已复制但 Asset / 草稿写入失败时回滚未提交 Asset，重试不重复创建
+- 部分照片缺失与解码失败分开说明；声音缺失与无法播放分开说明
+- 媒体错误不把 Moment 标成不存在；损坏行进隔离表且不覆盖原文
+- 无法确认引用时保留应用自有文件；不删除系统相册原片
+- 选图 / 录音 / 保存保持串行；保存失败后重试幂等
+- 重启后仍能读回失败前已写入的草稿文字与已留下的照片
 
-## 模拟器闭环（合并前已点通）
+## 模拟器失败→重试（合并前已点通）
 
 在 iPhone 17 Simulator 上由 XCUITest 驱动真实页面，不是只读库：
 
-1. 点「最近」上的 **留下**；
-2. 点 **声音**（或草稿里的 **重录**），开始现场录制；
-3. 点 **停止** 后出现 **一段声音** 和 **播放**，没有自动播放；
-4. 写入唯一句子并点 **留下**；
-5. 「最近」出现同一句，并显示这段声音；
-6. 点该行，详情出现同一句和声音控件；
-7. 详情没有「这条记录现在无法找到」，也没有把声音标成不可用。
+1. `simctl privacy revoke camera` 后点「留下」，写入「相机拒绝后还在可以再试」；
+2. 点「拍摄」，界面说明没有打开相机，草稿文字仍在，相册和留下仍可用；
+3. `simctl privacy grant camera` 模拟从系统设置恢复权限；
+4. 重新进入留下页，同一句草稿还在；再点「拍摄」打开相机，不再出现拒绝说明。
 
-`TEST SUCCEEDED`。29.1s。
+`TEST SUCCEEDED`（拒绝 55.0s；恢复后重试 58.2s）。
+
+系统相册 PHPicker 在原生路径上仍可打开，不依赖完整相册权限。相册拒绝与设置恢复由可注入 `ImageSource` 覆盖。
 
 ## 未验证
 
 | 项 | 说明 |
 | --- | --- |
-| 真机麦克风权限弹窗、允许后录音、拒绝后仍写字/选照片 | **未验证** |
-| 真机来电打断录制或播放，以及打断后保留了什么 | **未验证** |
-| 真机切到后台时停止录制或播放 | **未验证** |
-| 真机杀进程后草稿录音与正式录音仍在 | **未验证** |
-| 模拟器来电 / 后台音频会话中断 | **未验证** |
+| 真机相机 / 相册 / 麦克风权限弹窗、拒绝后仍写字、从设置恢复后再试 | **未验证** |
+| 真机磁盘空间不足、复制失败、SQLite 写入失败 | **未验证** |
+| 真机杀进程后草稿与正式记录仍在 | **未验证** |
+| 真机来电打断录制或播放 | **未验证** |
 | App Store / 签名发布 | **未验证** |
 
 以上真机项不能用编译或模拟器结果代替。
