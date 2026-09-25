@@ -50,13 +50,16 @@ function walkVerdicts(walked, target) {
   }
   if (!walked.ok) {
     const already = String(walked.step || '').startsWith('account-already-in-family');
+    const leftover = walked.step === 'created-family-cleanup-failed';
     return {
       login: verdict('PASS', `${target} Apple identity tokens accepted`),
       membership: verdict(
         'FAIL',
-        already
-          ? `${target} account already has a family; will not leave or dissolve unknown families`
-          : `${target} stopped at ${walked.step}`,
+        leftover
+          ? `${target} leftover accept family ${walked.leftoverFamily || ''} needs manual cleanup`
+          : already
+            ? `${target} account already has a family; will not leave or dissolve unknown families`
+            : `${target} stopped at ${walked.step}`,
       ),
     };
   }

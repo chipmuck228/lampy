@@ -52,7 +52,7 @@ npm run family-identity:accept
 
 脚本不会打印这些值。不是三部分 JWT 的 token 会被拒绝，以免把测试 token 当成真实验收。
 
-本机 `127.0.0.1` 上的登录 / 邀请 / 加入 / 创建者移除 / 成员退出，与授权部署服务上的同一组操作是两套结果。部署走查若发现账号已有家庭会停止并报告，不会退出或解散未知家庭；只创建并在结束时清理本轮新建的家庭。只有公网 HTTPS 部署流程加上托管卷探测均为 PASS，`identityLoopAccepted` 才为 true。退出码 0 只表示没有 FAIL，自动化要读 `identityLoopAccepted`。需要把「未验收」当成失败时用 `npm run family-identity:accept:require`（exit 2）。
+本机 `127.0.0.1` 上的登录 / 邀请 / 加入 / 创建者移除 / 成员退出，与授权部署服务上的同一组操作是两套结果。部署走查只有双方 `GET /v1/me/membership` 均为 200 且 `family: null` 才建家；401、500 或异常响应立即停止。发现已有家庭会停止并报告，不会退出或解散未知家庭。本轮创建的家庭若解散失败，走查失败并报告遗留家庭需人工处理。只有公网 HTTPS 部署流程加上托管卷探测均为 PASS，`identityLoopAccepted` 才为 true。退出码 0 只表示没有 FAIL，自动化要读 `identityLoopAccepted`。需要把「未验收」当成失败时用 `npm run family-identity:accept:require`（exit 2）。
 
 托管卷探测（在主机上）。`--after-restart` 只表示操作者声称已经重启并核了卷上 marker，**不是**进程重启证明。重启必须在探针外执行，并用 `systemctl status` / pid / journal 自行核对。
 

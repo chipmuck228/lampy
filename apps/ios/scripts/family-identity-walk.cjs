@@ -66,20 +66,47 @@ async function callFamily(baseUrl, method, pathname, options = {}) {
   };
 }
 
+function vacantMembership(response) {
+  if (!response) return { ok: false, reason: 'unexpected-membership' };
+  if (response.status === 401) return { ok: false, reason: 'unauthenticated' };
+  if (response.status === 500) return { ok: false, reason: 'server-error' };
+  if (response.status !== 200) return { ok: false, reason: 'unexpected-membership' };
+  const body = response.raw;
+  if (!body || typeof body !== 'object' || Array.isArray(body) || !Object.prototype.hasOwnProperty.call(body, 'family')) {
+    return { ok: false, reason: 'unexpected-membership' };
+  }
+  if (body.family === null) return { ok: true };
+  if (body.family && typeof body.family === 'object' && body.family.familyId) {
+    return { ok: false, reason: 'already-in-family' };
+  }
+  return { ok: false, reason: 'unexpected-membership' };
+}
+
 function existingFamilyId(membership) {
   const familyId = membership?.raw?.family?.familyId;
   return typeof familyId === 'string' && familyId ? familyId : '';
 }
 
+async function readVacantMembership(baseUrl, session, label) {
+  let membership;
+  try {
+    membership = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: session.sessionToken });
+  } catch {
+    return { ok: false, step: `membership-${label}-failed`, membership: null };
+  }
+  const vacant = vacantMembership(membership);
+  if (vacant.ok) return { ok: true, membership };
+  if (vacant.reason === 'already-in-family') {
+    return { ok: false, step: `account-already-in-family-${label}`, membership };
+  }
+  return { ok: false, step: `membership-${label}-${vacant.reason}`, membership };
+}
+
 async function requireAccountsHaveNoFamily(baseUrl, alice, bob) {
-  const aliceMembership = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: alice.sessionToken });
-  const bobMembership = await callFamily(baseUrl, 'GET', '/v1/me/membership', { token: bob.sessionToken });
-  if (existingFamilyId(aliceMembership)) {
-    return { ok: false, step: 'account-already-in-family-a', aliceMembership };
-  }
-  if (existingFamilyId(bobMembership)) {
-    return { ok: false, step: 'account-already-in-family-b', bobMembership };
-  }
+  const aliceVacant = await readVacantMembership(baseUrl, alice, 'a');
+  if (!aliceVacant.ok) return { ok: false, step: aliceVacant.step, aliceMembership: aliceVacant.membership };
+  const bobVacant = await readVacantMembership(baseUrl, bob, 'b');
+  if (!bobVacant.ok) return { ok: false, step: bobVacant.step, bobMembership: bobVacant.membership };
   return { ok: true };
 }
 
@@ -183,10 +210,31 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
     return { ok: false, signedIn: true, step: 'permission-gone-after-leave', ...goneAfterLeave };
   }
 
-  const dissolved = await callFamily(baseUrl, 'POST', `/v1/families/${familyId}/dissolve`, {
-    token: alice.sessionToken,
-    idempotencyKey: `${keyPrefix}-cleanup-created`,
-  });
+  let dissolved;
+  try {
+    dissolved = await callFamily(baseUrl, 'POST', `/v1/families/${familyId}/dissolve`, {
+      token: alice.sessionToken,
+      idempotencyKey: `${keyPrefix}-cleanup-created`,
+    });
+  } catch {
+    dissolved = null;
+  }
+  const cleanup = createdFamilyCleanupResult(dissolved, familyId);
+  if (!cleanup.ok) {
+    return { ...cleanup, signedIn: true, dissolved };
+  }
+  const afterCleanup = await readVacantMembership(baseUrl, alice, 'cleanup');
+  if (!afterCleanup.ok) {
+    return {
+      ok: false,
+      signedIn: true,
+      step: 'created-family-cleanup-failed',
+      leftoverFamily: evidenceRef(familyId),
+      needsManualCleanup: true,
+      createdFamilyCleanup: 'left-in-place',
+      afterCleanup,
+    };
+  }
 
   return {
     ok: true,
@@ -195,8 +243,22 @@ async function walkIdentityLoop(baseUrl, tokenA, tokenB, keyPrefix) {
     alice: evidenceRef(alice.userId),
     bob: evidenceRef(bob.userId),
     family: evidenceRef(familyId),
-    createdFamilyCleanup: dissolved.status === 200 && dissolved.raw?.dissolved === true ? 'dissolved-created' : 'left-in-place',
+    createdFamilyCleanup: 'dissolved-created',
+    needsManualCleanup: false,
   };
+}
+
+function createdFamilyCleanupResult(dissolved, familyId) {
+  if (!dissolved || dissolved.status !== 200 || dissolved.raw?.dissolved !== true) {
+    return {
+      ok: false,
+      step: 'created-family-cleanup-failed',
+      leftoverFamily: evidenceRef(familyId),
+      needsManualCleanup: true,
+      createdFamilyCleanup: 'left-in-place',
+    };
+  }
+  return { ok: true };
 }
 
 function tokenPairStatus(tokenA, tokenB, testTokensSet) {
@@ -209,6 +271,7 @@ function tokenPairStatus(tokenA, tokenB, testTokensSet) {
 
 module.exports = {
   callFamily,
+  createdFamilyCleanupResult,
   existingFamilyId,
   isAuthorizedDeployedUrl,
   isLoopbackHost,
@@ -216,5 +279,6 @@ module.exports = {
   requireAccountsHaveNoFamily,
   sameListenTarget,
   tokenPairStatus,
+  vacantMembership,
   walkIdentityLoop,
 };
