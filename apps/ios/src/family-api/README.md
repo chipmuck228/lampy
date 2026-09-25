@@ -68,9 +68,81 @@ npm run family-api
 
 `GET /health` 只表示本进程在听，不表示公网已部署。
 
+## 单实例部署（Node + 持久 SQLite 卷）
+
+只支持 **一个 Node 进程** 写这块库。listen 共用一条 SQLite 连接，事务在进程内排队。两个进程打开同一文件不是 production ready：`BEGIN IMMEDIATE` 会重试，但不能替代单写者，也没有跨进程故障转移。
+
+1. 准备持久卷，例如 `/var/lib/lampy/family`。这个目录必须在容器重启后还在。
+2. 把数据库文件放在卷上，不要放在容器可写层：
+   `LAMPY_FAMILY_DATABASE_PATH=/var/lib/lampy/family/family.db`
+3. 迁移：
+   ```bash
+   cd apps/ios
+   LAMPY_FAMILY_DATABASE_PATH=/var/lib/lampy/family/family.db npm run family-api:migrate
+   ```
+4. 启动前确认文件在卷上：
+   ```bash
+   python3 -c "import os; p=os.environ['LAMPY_FAMILY_DATABASE_PATH']; print(os.path.realpath(p)); print(os.path.exists(p))"
+   ```
+5. 启动：
+   ```bash
+   LAMPY_FAMILY_API_MODE=production \
+   LAMPY_FAMILY_DATABASE_PATH=/var/lib/lampy/family/family.db \
+   LAMPY_APPLE_CLIENT_ID=<真实 iOS bundle id> \
+   LAMPY_FAMILY_API_HOST=127.0.0.1 \
+   LAMPY_FAMILY_API_PORT=8787 \
+   npm run family-api
+   ```
+6. 前面用本机反向代理做 HTTPS。客户端 `EXPO_PUBLIC_FAMILY_API_BASE_URL` 必须是 `https://`，或仅用于本机/局域网调试的 `http://127.0.0.1` / 私网地址。公网 `http://` 会被客户端拒绝，会话令牌不会发出去。
+7. 端口占用、缺路径、缺 Apple client、生产环境出现测试 token、迁移失败：进程退出，不得听端口。
+
+重启后账号、成员、邀请和幂等行应仍在。用测试 token 或内存库做的重启不能当作这项通过。
+
+## 备份与恢复
+
+SQLite 使用 WAL。备份前先停进程或做 checkpoint，然后拷贝主文件和旁路文件：
+
+```bash
+# 停进程后
+cp /var/lib/lampy/family/family.db /backup/family.db
+test -f /var/lib/lampy/family/family.db-wal && cp /var/lib/lampy/family/family.db-wal /backup/
+test -f /var/lib/lampy/family/family.db-shm && cp /var/lib/lampy/family/family.db-shm /backup/
+```
+
+恢复：停进程，把备份写回同一卷路径，再启动。未停进程时拷贝主文件可能读到不完整的 WAL。没有自动远程备份。
+
+## 启动失败与数据库故障
+
+| 情况 | 行为 |
+| --- | --- |
+| 生产缺路径 / 缺 Apple client / 有测试 token | 拒绝启动 |
+| 迁移失败 | 拒绝听端口 |
+| 端口已被占用 | listen 失败，进程退出 |
+| 事务 COMMIT 失败 | 回滚，不留下半写入的家庭 |
+| 多实例抢同一文件 | 不视为可上线 |
+
+## 会话边界
+
+- 会话令牌只放 iOS Keychain，请求用 `Authorization: Bearer`。
+- `POST /v1/auth/sign-out` 删除服务端这一条会话。
+- 同一 Lampy 账号再次 Apple 登录成功后，服务端在同一事务里撤销该账号的旧会话。验证失败或事务失败不撤原有效会话。其他账号不受影响。
+- 用户点退出后，本机立刻停止展示家庭内容并清掉可用会话。这只表示「本机已退出」。
+- 服务端撤销未确认时，待撤销 token 只进 Keychain（`lampy.family.pending-revoke.v1`），不写日志、普通 SQLite 或公开配置。只有服务端确认撤销、该令牌已失效，或待撤销记录过期，才清掉它。500 等未确认错误会留下记录以便重试。写入 Keychain 失败时本机会话不删，页面仍视为登着。恢复网络或下次进入家庭页会安全重试；同一账号重新登录由服务端清旧会话。
+- 过期或已撤销的令牌读成员为 401，客户端清 Keychain，并再次提供 Apple 登录。
+
+## 部署前清单
+
+- [ ] 单实例 + 持久卷，`LAMPY_FAMILY_DATABASE_PATH` 的 realpath 在卷上
+- [ ] 已跑迁移；生产未设置 `LAMPY_FAMILY_API_TEST_TOKENS`
+- [ ] `LAMPY_APPLE_CLIENT_ID` 是真实 bundle id
+- [ ] 公网只走 HTTPS；iOS `EXPO_PUBLIC_FAMILY_API_BASE_URL` 指向该 HTTPS
+- [ ] 已做停进程备份/恢复演练
+- [ ] 两名真实 Apple 账号、两台设备走通登录→建家→邀请→加入→移除/退出→重启
+- [ ] 未完成上一项时，不得对真实用户开放家庭功能
+
 ## 客户端路径
 
-`createFamilyUseCases` → `createFamilyApiClient` → `POST/GET /v1/...`。会话在 iOS Keychain（`expo-secure-store`）。`getMembership` 只在 **200 且 body.family 非空** 时为 `ready`。失败或不可达为 `unauthenticated` / `unconfirmed`，成员列表为空。
+`createFamilyUseCases` → `createFamilyApiClient` → `POST/GET /v1/...`。会话在 iOS Keychain（`expo-secure-store`）。`getMembership` 只在 **200 且 body.family 非空** 时为 `ready`。失败或不可达为 `unauthenticated` / `unconfirmed`，成员列表为空。进入家庭页会先收起成员；只有资格查询失败才把已确认的成员清掉。邀请列表失败不会当成失去家庭。交错刷新只采用最新一代结果。
 
 ## 本轮不做
 

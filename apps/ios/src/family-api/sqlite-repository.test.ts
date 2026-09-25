@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -210,6 +210,83 @@ describe('durable SQLite family repository', () => {
       failCommit = false;
       expect((await commands.listMembership(alice.sessionToken)).family).toBeNull();
       await real.close();
+    });
+  });
+
+  it('restores accounts, members, invites, and idempotency from a copied SQLite file', async () => {
+    await withSqliteFile(async (file) => {
+      const seq = { n: 0 };
+      const first = await openCommands(file, seq);
+      const alice = await first.commands.signInWithApple('apple_alice');
+      const family = await first.commands.createFamily(alice.sessionToken, 'create-1');
+      await first.commands.inviteMember(alice.sessionToken, family.familyId, 'invite-1');
+      await first.db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+      await first.db.close();
+
+      const backup = `${file}.bak`;
+      await copyFile(file, backup);
+
+      const wiped = await openCommands(file, seq);
+      await wiped.db.exec('DELETE FROM family_invitations');
+      await wiped.db.exec('DELETE FROM family_memberships');
+      await wiped.db.exec('DELETE FROM family_families');
+      await wiped.db.exec('DELETE FROM family_idempotency');
+      await wiped.db.close();
+
+      await copyFile(backup, file);
+      const restored = await openCommands(file, seq);
+      const aliceAgain = await restored.commands.signInWithApple('apple_alice');
+      const listed = await restored.commands.listMembership(aliceAgain.sessionToken);
+      expect(listed.family?.familyId).toBe(family.familyId);
+      expect((await restored.commands.createFamily(aliceAgain.sessionToken, 'create-1')).familyId).toBe(family.familyId);
+      expect(await restored.commands.listPendingInvitations(aliceAgain.sessionToken, family.familyId)).toHaveLength(1);
+      await restored.db.close();
+    });
+  });
+
+  it('keeps the previous session when replacing sessions fails inside the login transaction', async () => {
+    await withSqliteFile(async (file) => {
+      const seq = { n: 0 };
+      const real = openFamilySqliteDatabase(file);
+      await applyFamilyApiSchema(real);
+      let failReplace = false;
+      const db: FamilySql = {
+        exec: (sql) => real.exec(sql),
+        run: async (sql, params) => {
+          if (failReplace && typeof sql === 'string' && /DELETE FROM family_sessions WHERE user_id/.test(sql)) {
+            throw new Error('disk full');
+          }
+          return real.run(sql, params);
+        },
+        getFirst: (sql, params) => real.getFirst(sql, params),
+        getAll: (sql, params) => real.getAll(sql, params),
+        close: () => real.close(),
+      };
+      const commands = createFamilyCommands({
+        repository: createSqliteFamilyRepository(db),
+        apple: createMapAppleVerifier({ apple_alice: { appleSubject: 'apple.alice' } }),
+        clock: { now: () => new Date('2026-09-25T03:00:00.000Z') },
+        ids: idsWith(seq),
+      });
+      const first = await commands.signInWithApple('apple_alice');
+      failReplace = true;
+      await expect(commands.signInWithApple('apple_alice')).rejects.toThrow(/disk full/);
+      expect((await commands.listMembership(first.sessionToken)).family).toBeNull();
+      await real.close();
+    });
+  });
+
+  it('revokes a session token so it cannot read members after sign-out', async () => {
+    await withSqliteFile(async (file) => {
+      const seq = { n: 0 };
+      const setup = await openCommands(file, seq);
+      const alice = await setup.commands.signInWithApple('apple_alice');
+      await setup.commands.createFamily(alice.sessionToken);
+      expect(await setup.commands.signOut(alice.sessionToken)).toEqual({ signedOut: true });
+      await expect(setup.commands.listMembership(alice.sessionToken)).rejects.toMatchObject({
+        code: FAMILY_ERROR.UNAUTHENTICATED,
+      });
+      await setup.db.close();
     });
   });
 });

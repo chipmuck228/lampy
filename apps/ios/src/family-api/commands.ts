@@ -29,6 +29,7 @@ export type FamilyCommands = {
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
   dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
+  signOut(sessionToken: string): Promise<{ signedOut: true }>;
 };
 
 function iso(date: Date) {
@@ -210,6 +211,7 @@ export function createFamilyCommands(deps: {
           expiresAt: iso(new Date(clock.now().getTime() + sessionTtlMs)),
         };
         await tx.saveSession(session);
+        await tx.deleteOtherSessions(account.userId, session.token);
         return {
           userId: account.userId,
           sessionToken: session.token,
@@ -447,6 +449,16 @@ export function createFamilyCommands(deps: {
           await tx.saveMembership(row);
         }
         return { dissolved: true as const };
+      });
+    },
+
+    signOut(sessionToken) {
+      return repository.withTransaction(async (tx) => {
+        if (!sessionToken) {
+          throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
+        }
+        await tx.deleteSession(sessionToken);
+        return { signedOut: true as const };
       });
     },
   };

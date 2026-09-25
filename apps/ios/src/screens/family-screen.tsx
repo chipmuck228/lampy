@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { isApplicationError } from '../application/errors';
 import type { InvitationView } from '../family-api/types';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { createFamilyRefreshGate } from './family-refresh';
 
 function errorText(error: unknown) {
   if (isApplicationError(error)) {
@@ -38,6 +39,14 @@ function needsAppleSignIn(membership: FamilyMembershipView | null) {
   );
 }
 
+function refreshMessage(result: 'ok' | 'invites-failed' | 'revoke-unconfirmed') {
+  if (result === 'invites-failed') return '邀请列表暂时读不出来，家里的成员已经确认。';
+  if (result === 'revoke-unconfirmed') {
+    return '这台设备已经退出。远端会话还没确认撤销，连上之后会再试。';
+  }
+  return null;
+}
+
 export default function FamilyScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -49,43 +58,64 @@ export default function FamilyScreen() {
   const [inviteCode, setInviteCode] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const refreshGate = useRef(createFamilyRefreshGate()).current;
 
   function hideFamilyContent() {
     setMembership(null);
     setInvites([]);
   }
 
-  const refresh = useCallback(async (): Promise<'ok' | 'invites-failed'> => {
-    hideFamilyContent();
+  const refresh = useCallback(async (
+    mode: 'revalidate' | 'follow-up' = 'follow-up',
+  ): Promise<'ok' | 'invites-failed' | 'stale' | 'revoke-unconfirmed'> => {
+    const generation = refreshGate.begin();
+    if (mode === 'revalidate') {
+      hideFamilyContent();
+    }
     if (!configured) {
       return 'ok';
     }
-    const apple = createExpoAppleIdentityTokenSource();
-    setAppleAvailable(await apple.isAvailable());
-    const family = await getFamilyUseCases();
-    const next = await family.getMembership();
-    setMembership(next);
-    if (next.kind === 'ready' && next.role === 'creator') {
-      try {
-        setInvites(await family.listPendingInvitations(next.familyId));
-      } catch {
+    try {
+      const apple = createExpoAppleIdentityTokenSource();
+      const available = await apple.isAvailable();
+      const family = await getFamilyUseCases();
+      const next = await family.getMembership();
+      if (!refreshGate.isCurrent(generation)) return 'stale';
+      setAppleAvailable(available);
+      setMembership(next);
+      if (next.kind === 'ready' && next.role === 'creator') {
+        try {
+          const listed = await family.listPendingInvitations(next.familyId);
+          if (!refreshGate.isCurrent(generation)) return 'stale';
+          setInvites(listed);
+        } catch {
+          if (!refreshGate.isCurrent(generation)) return 'stale';
+          setInvites([]);
+          return 'invites-failed';
+        }
+      } else {
         setInvites([]);
-        return 'invites-failed';
       }
-    } else {
-      setInvites([]);
+      if (needsAppleSignIn(next) && (await family.hasUnconfirmedSessionRevoke())) {
+        if (!refreshGate.isCurrent(generation)) return 'stale';
+        return 'revoke-unconfirmed';
+      }
+      return 'ok';
+    } catch (error) {
+      if (!refreshGate.isCurrent(generation)) return 'stale';
+      hideFamilyContent();
+      throw error;
     }
-    return 'ok';
-  }, [configured]);
+  }, [configured, refreshGate]);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       hideFamilyContent();
-      refresh()
+      refresh('revalidate')
         .then((result) => {
-          if (cancelled) return;
-          setMessage(result === 'invites-failed' ? '邀请列表暂时读不出来，家里的成员已经确认。' : null);
+          if (cancelled || result === 'stale') return;
+          setMessage(refreshMessage(result));
         })
         .catch((error) => {
           if (!cancelled) {
@@ -106,8 +136,34 @@ export default function FamilyScreen() {
     try {
       const family = await getFamilyUseCases();
       await work(family);
-      const result = await refresh();
-      setMessage(result === 'invites-failed' ? '邀请列表暂时读不出来，家里的成员已经确认。' : null);
+      const result = await refresh('follow-up');
+      if (result === 'stale') return;
+      setMessage(refreshMessage(result));
+    } catch (error) {
+      setMessage(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signOutNow() {
+    if (busy) return;
+    hideFamilyContent();
+    setBusy(true);
+    try {
+      const family = await getFamilyUseCases();
+      const signed = await family.signOut();
+      const result = await refresh('follow-up');
+      if (result === 'stale') return;
+      if (signed.local === 'still-signed-in') {
+        setMessage('这次退出没做成。这台设备还登着，远端会话也还没确认撤销。');
+        return;
+      }
+      setMessage(
+        signed.server === 'unconfirmed' || result === 'revoke-unconfirmed'
+          ? '这台设备已经退出。远端会话还没确认撤销，连上之后会再试。'
+          : '已经退出登录。',
+      );
     } catch (error) {
       setMessage(errorText(error));
     } finally {
@@ -306,7 +362,9 @@ export default function FamilyScreen() {
             accessibilityLabel="退出登录"
             testID="family-sign-out"
             disabled={busy}
-            onPress={() => run(async (family) => { await family.signOut(); })}
+            onPress={() => {
+              void signOutNow();
+            }}
             style={styles.hit}
           >
             <Text style={styles.action}>退出登录</Text>

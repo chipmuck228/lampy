@@ -1,8 +1,9 @@
 import * as SecureStore from 'expo-secure-store';
 
-import type { FamilySessionStore } from '../application/family-use-cases';
+import type { FamilySessionStore, PendingSessionRevoke } from '../application/family-use-cases';
 
 export const FAMILY_SESSION_SECURE_KEY = 'lampy.family.session.v1';
+export const FAMILY_PENDING_REVOKE_SECURE_KEY = 'lampy.family.pending-revoke.v1';
 
 export type SecureKv = {
   getItem(key: string): Promise<string | null>;
@@ -21,6 +22,23 @@ function parseStored(raw: string | null): StoredSession | null {
     const parsed = JSON.parse(raw) as Partial<StoredSession>;
     if (typeof parsed.userId === 'string' && typeof parsed.sessionToken === 'string') {
       return { userId: parsed.userId, sessionToken: parsed.sessionToken };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function parsePending(raw: string | null): PendingSessionRevoke | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PendingSessionRevoke>;
+    if (
+      typeof parsed.userId === 'string' &&
+      typeof parsed.sessionToken === 'string' &&
+      typeof parsed.createdAt === 'string'
+    ) {
+      return { userId: parsed.userId, sessionToken: parsed.sessionToken, createdAt: parsed.createdAt };
     }
     return null;
   } catch {
@@ -47,6 +65,15 @@ export function createSecureFamilySessionStore(
     },
     async clearSession() {
       await kv.deleteItem(FAMILY_SESSION_SECURE_KEY);
+    },
+    async getPendingRevoke() {
+      return parsePending(await kv.getItem(FAMILY_PENDING_REVOKE_SECURE_KEY));
+    },
+    async savePendingRevoke(row) {
+      await kv.setItem(FAMILY_PENDING_REVOKE_SECURE_KEY, JSON.stringify(row));
+    },
+    async clearPendingRevoke() {
+      await kv.deleteItem(FAMILY_PENDING_REVOKE_SECURE_KEY);
     },
   };
 }

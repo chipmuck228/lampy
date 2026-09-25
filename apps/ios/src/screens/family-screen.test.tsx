@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ApplicationError } from '../application/errors';
@@ -18,6 +18,7 @@ const mockFamily = {
   removeMember: jest.fn(),
   dissolveFamily: jest.fn(),
   signOut: jest.fn(),
+  hasUnconfirmedSessionRevoke: jest.fn(async () => false),
 };
 
 jest.mock('expo-router', () => {
@@ -64,6 +65,8 @@ describe('family screen', () => {
     jest.mocked(isFamilyApiConfigured).mockReturnValue(false);
     mockFamily.getMembership.mockReset();
     mockFamily.listPendingInvitations.mockReset().mockResolvedValue([]);
+    mockFamily.signOut.mockReset();
+    mockFamily.hasUnconfirmedSessionRevoke.mockReset().mockResolvedValue(false);
   });
 
   it('shows an accurate unavailable state when the family API is not configured', async () => {
@@ -131,6 +134,86 @@ describe('family screen', () => {
     });
     expect(view.getByLabelText('解散这个家')).toBeTruthy();
     expect(view.getByLabelText('邀请')).toBeTruthy();
+  });
+
+  it('shows an unconfirmed remote revoke after a later refresh without treating it as a live session', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({ kind: 'unauthenticated' });
+    mockFamily.hasUnconfirmedSessionRevoke.mockResolvedValue(true);
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByText('这台设备已经退出。远端会话还没确认撤销，连上之后会再试。')).toBeTruthy();
+      expect(view.getByLabelText('用 Apple 登录')).toBeTruthy();
+    });
+    expect(view.queryByText('家里现在有这些人。')).toBeNull();
+  });
+
+  it('hides family content immediately on sign-out and does not claim a remote revoke when it is unconfirmed', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership
+      .mockResolvedValueOnce({
+        kind: 'ready',
+        familyId: 'fam_1',
+        role: 'creator',
+        members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+      })
+      .mockResolvedValue({ kind: 'unauthenticated' });
+    mockFamily.signOut.mockResolvedValue({ local: 'signed-out', server: 'unconfirmed' });
+    mockFamily.hasUnconfirmedSessionRevoke.mockResolvedValue(true);
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('退出登录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('退出登录'));
+    await waitFor(() => {
+      expect(view.queryByText('usr_alice')).toBeNull();
+      expect(view.getByText('这台设备已经退出。远端会话还没确认撤销，连上之后会再试。')).toBeTruthy();
+      expect(view.queryByText('已经退出登录。')).toBeNull();
+    });
+  });
+
+  it('keeps the signed-in family page when pending revoke cannot be saved', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      role: 'creator',
+      members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+    });
+    mockFamily.signOut.mockResolvedValue({ local: 'still-signed-in', server: 'unconfirmed' });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('退出登录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('退出登录'));
+    await waitFor(() => {
+      expect(view.getByText('usr_alice')).toBeTruthy();
+      expect(view.getByText('这次退出没做成。这台设备还登着，远端会话也还没确认撤销。')).toBeTruthy();
+      expect(view.queryByText('已经退出登录。')).toBeNull();
+      expect(view.queryByText(/远端会话还没确认撤销，连上之后会再试/)).toBeNull();
+    });
+  });
+
+  it('says the device signed out after a confirmed server revoke', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership
+      .mockResolvedValueOnce({
+        kind: 'ready',
+        familyId: 'fam_1',
+        role: 'creator',
+        members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+      })
+      .mockResolvedValue({ kind: 'unauthenticated' });
+    mockFamily.signOut.mockResolvedValue({ local: 'signed-out', server: 'revoked' });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('退出登录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('退出登录'));
+    await waitFor(() => {
+      expect(view.getByText('已经退出登录。')).toBeTruthy();
+      expect(view.queryByText(/远端会话还没确认撤销/)).toBeNull();
+    });
   });
 
   it('hides previous members and admin actions when re-entering and revalidation fails', async () => {
