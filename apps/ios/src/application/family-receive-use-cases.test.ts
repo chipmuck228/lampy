@@ -581,4 +581,47 @@ describe('family receive cache use cases', () => {
     expect(again).toEqual({ kind: 'ready', familyId: family.familyId, items: [] });
     expect(receiveCache.shares).toEqual([]);
   });
+
+  it('clears memory cache files on account and family isolate, including leftovers without rows', async () => {
+    const cache = createMemoryFamilyReceiveCache();
+    cache.shares.push({
+      userId: 'usr_bob',
+      familyId: 'fam_1',
+      shareId: 'shr_keep',
+      snapshotRevision: 1,
+      authorUserId: 'usr_alice',
+      snapshot: {
+        note: '门口的风',
+        emotion: '',
+        occurredAtPrecision: 'day',
+        media: [],
+        origin: { type: 'received', transmissionId: 'shr_keep', originalMomentId: 'm1', snapshotRevision: 1 },
+      },
+      sharedAt: '2026-09-25T06:00:00.000Z',
+      receiveStatus: 'received',
+      expectedMediaCount: 0,
+    });
+    cache.files.set('usr_bob/fam_1/shr_keep/obj', sampleJpegBytes());
+    cache.files.set('usr_bob/fam_2/shr_other/obj', samplePngBytes());
+
+    await expect(cache.isolateFamily('usr_bob', 'fam_2')).resolves.toEqual({ hidden: true, diskCleared: true });
+    expect([...cache.files.keys()]).toEqual(['usr_bob/fam_1/shr_keep/obj']);
+
+    await expect(cache.isolateAccount('usr_bob')).resolves.toEqual({ hidden: true, diskCleared: true });
+    expect(cache.shares).toEqual([]);
+    expect(cache.files.size).toBe(0);
+
+    cache.files.set('usr_bob/fam_left/shr_orphan/obj', sampleJpegBytes());
+    await expect(cache.isolateAccount('usr_bob')).resolves.toEqual({ hidden: true, diskCleared: true });
+    expect(cache.files.size).toBe(0);
+    expect(await cache.pendingCleanupPrefixes()).toEqual([]);
+
+    const familyOrphan = createMemoryFamilyReceiveCache();
+    familyOrphan.files.set('usr_bob/fam_left/shr_orphan/obj', sampleJpegBytes());
+    await expect(familyOrphan.isolateFamily('usr_bob', 'fam_left')).resolves.toEqual({
+      hidden: true,
+      diskCleared: true,
+    });
+    expect(familyOrphan.files.size).toBe(0);
+  });
 });

@@ -120,7 +120,7 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       const sharePrefix = `${parts[0]}/${parts[1]}/${parts[2]}`;
       if (!allowed.has(sharePrefix)) leftovers.add(sharePrefix);
     }
-    return leftovers;
+    return [...leftovers];
   }
 
   function replaceShare(row: ReceivedShareRecord) {
