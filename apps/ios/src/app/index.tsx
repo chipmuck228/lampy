@@ -10,6 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
+import { lookbackHref } from '../screens/lookback-chrome';
+
 import { getUseCases } from '../application/container';
 import type { RecentLifeViewModel } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
@@ -52,16 +54,28 @@ export default function RecentScreen() {
           <Text style={styles.wordmark} accessibilityRole="header">
             最近
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="留下"
-            testID="home-leave"
-            hitSlop={8}
-            onPress={() => router.push('/leave')}
-            style={styles.leaveHit}
-          >
-            <Text style={styles.leave}>留下</Text>
-          </Pressable>
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="回看"
+              testID="home-lookback"
+              hitSlop={8}
+              onPress={() => router.push(lookbackHref('/lookback'))}
+              style={styles.leaveHit}
+            >
+              <Text style={styles.leave}>回看</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="留下"
+              testID="home-leave"
+              hitSlop={8}
+              onPress={() => router.push('/leave')}
+              style={styles.leaveHit}
+            >
+              <Text style={styles.leave}>留下</Text>
+            </Pressable>
+          </View>
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -130,6 +144,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   wordmark: { fontSize: 28, lineHeight: 34, color: '#25231F' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   leaveHit: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
   leave: { fontSize: 18, lineHeight: 24, color: '#53604F' },
   empty: { gap: 8, paddingTop: 24 },

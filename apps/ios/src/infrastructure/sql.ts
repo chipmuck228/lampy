@@ -36,6 +36,8 @@ const MIGRATIONS = [
     type TEXT NOT NULL,
     json TEXT NOT NULL
   );`,
+  `CREATE INDEX IF NOT EXISTS moments_active_occurred_at
+    ON moments (lifecycle_status, occurred_at);`,
 ];
 
 export async function applyLampySchema(db: SqlDatabase): Promise<void> {

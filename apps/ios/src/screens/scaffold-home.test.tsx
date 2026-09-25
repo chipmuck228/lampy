@@ -38,6 +38,7 @@ describe('recent home', () => {
   it('renders the empty recent state without inventing moments', async () => {
     const view = await render(wrap(<RecentScreen />));
     expect(view.getByLabelText('最近')).toBeTruthy();
+    expect(view.getByLabelText('回看')).toBeTruthy();
     await waitFor(() => {
       expect(view.getByText('最近还没有留下什么。')).toBeTruthy();
     });
