@@ -264,4 +264,68 @@ describe('family identity and membership commands', () => {
       expect(record.requestFingerprint).not.toContain(inviteA.code);
     }
   });
+
+  it('revalidates current membership and invitation state before replaying an idempotent result', async () => {
+    const { commands } = setup();
+    const alice = await signIn(commands, 'apple_alice');
+    const bob = await signIn(commands, 'apple_bob');
+    const family = commands.createFamily(alice.sessionToken, 'create-replay');
+    const invite = commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay');
+    commands.revokeInvitation(alice.sessionToken, invite.invitationId);
+    const replayedInvite = commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay');
+    expect(replayedInvite.invitationId).toBe(invite.invitationId);
+    expect(replayedInvite.status).toBe('revoked');
+    expect(replayedInvite.status).not.toBe('pending');
+
+    const liveInvite = commands.inviteMember(alice.sessionToken, family.familyId, 'invite-live');
+    commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay');
+    expect(commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay').members).toHaveLength(2);
+    commands.leaveFamily(bob.sessionToken);
+    expect(() => commands.acceptInvitation(bob.sessionToken, liveInvite.code, 'accept-replay')).toThrow(
+      new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.'),
+    );
+    expect(commands.listMembership(bob.sessionToken).family).toBeNull();
+
+    const rejoin = commands.inviteMember(alice.sessionToken, family.familyId);
+    commands.acceptInvitation(bob.sessionToken, rejoin.code, 'accept-removed');
+    commands.removeMember(alice.sessionToken, family.familyId, bob.userId);
+    expect(() => commands.acceptInvitation(bob.sessionToken, rejoin.code, 'accept-removed')).toThrow(
+      new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.'),
+    );
+
+    commands.dissolveFamily(alice.sessionToken, family.familyId);
+    expect(() => commands.createFamily(alice.sessionToken, 'create-replay')).toThrow(
+      new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.'),
+    );
+    expect(() => commands.inviteMember(alice.sessionToken, family.familyId, 'invite-replay')).toThrow(
+      new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.'),
+    );
+  });
+
+  it('lets only the current active creator dissolve a family', async () => {
+    const { commands, store } = setup();
+    const alice = await signIn(commands, 'apple_alice');
+    const bob = await signIn(commands, 'apple_bob');
+    const family = commands.createFamily(alice.sessionToken);
+    const invite = commands.inviteMember(alice.sessionToken, family.familyId);
+    commands.acceptInvitation(bob.sessionToken, invite.code);
+
+    const aliceRow = store.memberships.find((row) => row.userId === alice.userId && row.familyId === family.familyId);
+    const bobRow = store.memberships.find((row) => row.userId === bob.userId && row.familyId === family.familyId);
+    expect(aliceRow && bobRow).toBeTruthy();
+    if (aliceRow && bobRow) {
+      aliceRow.role = 'member';
+      bobRow.role = 'creator';
+    }
+
+    expect(() => commands.dissolveFamily(alice.sessionToken, family.familyId)).toThrow(
+      new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.'),
+    );
+    expect(commands.listMembership(alice.sessionToken).family?.role).toBe('member');
+    expect(commands.dissolveFamily(bob.sessionToken, family.familyId)).toEqual({ dissolved: true });
+    expect(commands.dissolveFamily(bob.sessionToken, family.familyId)).toEqual({ dissolved: true });
+    expect(() => commands.dissolveFamily(alice.sessionToken, family.familyId)).toThrow(
+      new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.'),
+    );
+  });
 });

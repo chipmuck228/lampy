@@ -368,3 +368,43 @@ describe('passive membership loss and family cache', () => {
     expect((await personal.getMomentDetail(saved.id)).kind).toBe('ready');
   });
 });
+
+describe('client idempotency key retention', () => {
+  it('reuses the same key until the operation is confirmed', async () => {
+    const session = createMemoryFamilySessionStore();
+    await session.setSession({ userId: 'usr_alice', sessionToken: 'ses_alice' });
+    const keys: string[] = [];
+    let failNetwork = true;
+    let next = 0;
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request(input) {
+          if (input.path === '/v1/families') {
+            keys.push(String(input.idempotencyKey));
+            if (failNetwork) throw new Error('network down');
+            return {
+              status: 200,
+              body: { familyId: 'fam_1', role: 'creator', members: [] },
+            };
+          }
+          throw new Error(`unexpected ${input.path}`);
+        },
+      }),
+      session,
+      idempotencyKey: (prefix) => {
+        next += 1;
+        return `${prefix}-${next}`;
+      },
+    });
+
+    await expect(family.createFamily()).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
+    await expect(family.createFamily()).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
+    expect(keys).toEqual(['createFamily-1', 'createFamily-1']);
+
+    failNetwork = false;
+    await family.createFamily();
+    await family.createFamily();
+    expect(keys[2]).toBe('createFamily-1');
+    expect(keys[3]).toBe('createFamily-2');
+  });
+});

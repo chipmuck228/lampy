@@ -9,6 +9,7 @@ import {
 } from './idempotency';
 import { DEFAULT_INVITE_TTL_MS, DEFAULT_SESSION_TTL_MS, createFamilyClock, createFamilyIds } from './ids';
 import {
+  findActiveCreator,
   findActiveMembership,
   findActiveMembershipForUser,
   findFamily,
@@ -103,6 +104,37 @@ function expireInvitationIfNeeded(invitation: NonNullable<ReturnType<typeof find
   return invitation;
 }
 
+function requireActiveCreator(store: FamilyStore, familyId: string, userId: string, message: string) {
+  if (!findActiveCreator(store, familyId, userId)) {
+    throw new FamilyError(FAMILY_ERROR.FORBIDDEN, message);
+  }
+}
+
+function replayCreateFamily(store: FamilyStore, cached: FamilyView, userId: string): FamilyView {
+  const family = findFamily(store, cached.familyId);
+  if (!family || family.status === 'dissolved') {
+    throw new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.');
+  }
+  return toFamilyView(store, cached.familyId, userId);
+}
+
+function replayInviteMember(
+  store: FamilyStore,
+  cached: InvitationView,
+  userId: string,
+  familyId: string,
+  now: Date,
+): InvitationView {
+  requireActiveFamily(store, familyId);
+  requireActiveCreator(store, familyId, userId, 'Only the family creator can invite members.');
+  const invitation = findInvitationById(store, cached.invitationId);
+  if (!invitation || invitation.familyId !== familyId) {
+    throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.');
+  }
+  expireInvitationIfNeeded(invitation, now);
+  return toInvitationView(invitation);
+}
+
 export function createFamilyCommands(deps: {
   store: FamilyStore;
   apple: AppleVerifier;
@@ -154,7 +186,7 @@ export function createFamilyCommands(deps: {
       const fingerprint = fingerprintCreateFamily();
       const key = idempotencyStoreKey(userId, 'createFamily', idempotencyKey);
       const cached = readIdempotent<FamilyView>(store, key, fingerprint);
-      if (cached) return cached;
+      if (cached) return replayCreateFamily(store, cached, userId);
       const existing = findActiveMembershipForUser(store, userId);
       if (existing) {
         throw new FamilyError(FAMILY_ERROR.ALREADY_IN_FAMILY, 'This account already belongs to a family.');
@@ -178,12 +210,9 @@ export function createFamilyCommands(deps: {
       const fingerprint = fingerprintInviteMember(familyId);
       const key = idempotencyStoreKey(userId, 'inviteMember', idempotencyKey);
       const cached = readIdempotent<InvitationView>(store, key, fingerprint);
-      if (cached) return cached;
+      if (cached) return replayInviteMember(store, cached, userId, familyId, clock.now());
       requireActiveFamily(store, familyId);
-      const membership = findActiveMembership(store, familyId, userId);
-      if (!membership || membership.role !== 'creator') {
-        throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can invite members.');
-      }
+      requireActiveCreator(store, familyId, userId, 'Only the family creator can invite members.');
       const now = clock.now();
       const invitation = {
         invitationId: ids.invitationId(),
@@ -204,10 +233,7 @@ export function createFamilyCommands(deps: {
         throw new FamilyError(FAMILY_ERROR.INVITE_NOT_FOUND, 'Invitation was not found.');
       }
       requireActiveFamily(store, invitation.familyId);
-      const membership = findActiveMembership(store, invitation.familyId, userId);
-      if (!membership || membership.role !== 'creator') {
-        throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can revoke an invitation.');
-      }
+      requireActiveCreator(store, invitation.familyId, userId, 'Only the family creator can revoke an invitation.');
       if (invitation.status === 'pending') {
         invitation.status = 'revoked';
       }
@@ -219,7 +245,10 @@ export function createFamilyCommands(deps: {
       const fingerprint = fingerprintAcceptInvitation(code);
       const key = idempotencyStoreKey(userId, 'acceptInvitation', idempotencyKey);
       const cached = readIdempotent<FamilyView>(store, key, fingerprint);
-      if (cached) return cached;
+      if (cached) {
+        requireActiveFamily(store, cached.familyId);
+        return toFamilyView(store, cached.familyId, userId);
+      }
       const invitation = findInvitationByCode(store, code);
       if (!invitation) {
         throw new FamilyError(FAMILY_ERROR.INVITE_NOT_FOUND, 'Invitation was not found.');
@@ -285,10 +314,7 @@ export function createFamilyCommands(deps: {
     removeMember(sessionToken, familyId, targetUserId) {
       const userId = requireUser(store, sessionToken, clock);
       requireActiveFamily(store, familyId);
-      const actor = findActiveMembership(store, familyId, userId);
-      if (!actor || actor.role !== 'creator') {
-        throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can remove a member.');
-      }
+      requireActiveCreator(store, familyId, userId, 'Only the family creator can remove a member.');
       if (targetUserId === userId) {
         throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'The creator cannot remove themselves.');
       }
@@ -310,15 +336,16 @@ export function createFamilyCommands(deps: {
       if (!family) {
         throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Family was not found.');
       }
-      const actor = store.memberships.find(
-        (row) => row.familyId === familyId && row.userId === userId && row.role === 'creator',
-      );
-      if (!actor) {
-        throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.');
-      }
       if (family.status === 'dissolved') {
+        const wasCreator = store.memberships.some(
+          (row) => row.familyId === familyId && row.userId === userId && row.role === 'creator',
+        );
+        if (!wasCreator) {
+          throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.');
+        }
         return { dissolved: true as const };
       }
+      requireActiveCreator(store, familyId, userId, 'Only the family creator can dissolve the family.');
       family.status = 'dissolved';
       for (const row of store.memberships) {
         if (row.familyId === familyId && row.status === 'active') {

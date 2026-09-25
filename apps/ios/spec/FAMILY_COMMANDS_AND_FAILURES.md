@@ -61,8 +61,8 @@
 
 ## 4. 重试
 
-- 写命令带客户端 `idempotencyKey`。服务端按 `userId + command + key` 记住结果，并绑定规范化请求指纹（CreateFamily 固定；InviteMember 绑 `familyId`；AcceptInvitation 绑 invitation code 的稳定摘要）。指纹相同返回原结果；指纹不同返回 `CONFLICT`，不得复用第一次的旧 body。
-- 超时后用同一 key **且同一规范化请求** 重试，不得当新命令。
+- 写命令带客户端 `idempotencyKey`。服务端按 `userId + command + key` 记住结果，并绑定规范化请求指纹（CreateFamily 固定；InviteMember 绑 `familyId`；AcceptInvitation 绑 invitation code 的稳定摘要）。指纹相同只表示「是同一请求」；重放必须再核验当前家庭、成员资格与邀请状态，返回符合当前状态的结果，或 `CONFLICT` / `FAMILY_DISSOLVED` / `NOT_IN_FAMILY` / `FORBIDDEN`。不得在撤销、退出、移除或解散后原样回放旧 body。
+- 客户端对同一次未确认操作保留同一 key，直到成功或收到明确业务结果；仅 `SERVER_UNREACHABLE` / `NETWORK` 时复用。不得每次重试都新生成 key。
 - 不得把 session token、Apple token 或邀请原文写入日志或指纹明文。
 - 不同用户可使用相同文本 key，互不污染。
 - `ListMembership` 失败：界面保持「未确认」，不沿用过期成员列表充当现授权。HTTP 200 且 `family === null` 为已确认无家庭，须清理家庭缓存。

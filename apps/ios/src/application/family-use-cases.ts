@@ -73,6 +73,47 @@ export function createFamilyUseCases(deps: {
 }) {
   const cache = deps.cache ?? createNoopFamilyCache();
   const nextKey = deps.idempotencyKey ?? newIdempotencyKey;
+  const pendingKeys = new Map<string, string>();
+
+  function operationSlot(command: string, part?: string) {
+    return part ? `${command}:${part}` : command;
+  }
+
+  function keyFor(command: string, part: string | undefined, explicit?: string) {
+    if (explicit) return explicit;
+    const slot = operationSlot(command, part);
+    const existing = pendingKeys.get(slot);
+    if (existing) return existing;
+    const created = nextKey(command);
+    pendingKeys.set(slot, created);
+    return created;
+  }
+
+  function settle(command: string, part?: string) {
+    pendingKeys.delete(operationSlot(command, part));
+  }
+
+  function isUnconfirmedNetwork(error: ApplicationError) {
+    return error.code === 'SERVER_UNREACHABLE' || error.code === 'NETWORK';
+  }
+
+  async function withRetainedKey<T>(
+    command: string,
+    part: string | undefined,
+    explicit: string | undefined,
+    work: (key: string) => Promise<T>,
+  ): Promise<T> {
+    const key = keyFor(command, part, explicit);
+    try {
+      const result = await work(key);
+      settle(command, part);
+      return result;
+    } catch (error) {
+      const appError = asApplicationError(error);
+      if (!isUnconfirmedNetwork(appError)) settle(command, part);
+      throw appError;
+    }
+  }
 
   async function requireSession() {
     const token = await deps.session.getSessionToken();
@@ -125,12 +166,16 @@ export function createFamilyUseCases(deps: {
 
     async createFamily(idempotencyKey?: string) {
       const token = await requireSession();
-      return deps.client.createFamily(token, idempotencyKey ?? nextKey('createFamily'));
+      return withRetainedKey('createFamily', undefined, idempotencyKey, (key) =>
+        deps.client.createFamily(token, key),
+      );
     },
 
     async inviteMember(familyId: string, idempotencyKey?: string) {
       const token = await requireSession();
-      return deps.client.inviteMember(token, familyId, idempotencyKey ?? nextKey('inviteMember'));
+      return withRetainedKey('inviteMember', familyId, idempotencyKey, (key) =>
+        deps.client.inviteMember(token, familyId, key),
+      );
     },
 
     async revokeInvitation(invitationId: string) {
@@ -140,7 +185,9 @@ export function createFamilyUseCases(deps: {
 
     async acceptInvitation(code: string, idempotencyKey?: string) {
       const token = await requireSession();
-      return deps.client.acceptInvitation(token, code, idempotencyKey ?? nextKey('acceptInvitation'));
+      return withRetainedKey('acceptInvitation', code, idempotencyKey, (key) =>
+        deps.client.acceptInvitation(token, code, key),
+      );
     },
 
     async leaveFamily() {

@@ -62,6 +62,11 @@ export function findActiveMembership(store: FamilyStore, familyId: string, userI
   );
 }
 
+export function findActiveCreator(store: FamilyStore, familyId: string, userId: string) {
+  const membership = findActiveMembership(store, familyId, userId);
+  return membership?.role === 'creator' ? membership : null;
+}
+
 export function listActiveMembers(store: FamilyStore, familyId: string) {
   return store.memberships.filter((row) => row.familyId === familyId && row.status === 'active');
 }
