@@ -2,54 +2,54 @@
 
 机器：macOS 26.6，Xcode 26.6，Node v24.7.0。日期：2026-09-25。
 
-本轮是媒体失败与权限拒绝恢复（分支 `ios/media-failure-recovery`）。基线 `origin/main` = `92272ff`。
+本轮是「当时的感受」（分支 `ios/emotion-moment`）。基线 `origin/main` = `c5264c4`。
 
 | 命令 | 工作目录 | 结果 |
 | --- | --- | --- |
 | `npx tsc --noEmit` | `apps/ios` | **通过**（exit 0） |
 | `npx expo lint` | `apps/ios` | **通过**（exit 0） |
-| `npm test` | `apps/ios` | **通过**。18 suites / 89 tests |
+| `npm test` | `apps/ios` | **通过**。22 suites / 110 tests |
 | `npx expo run:ios --device "iPhone 17"` | `apps/ios` | **通过**。Build Succeeded，已装上模拟器 |
-| `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testCameraDeniedKeepsDraft test` | `apps/ios/ios`（本地，不入库） | **通过**。iPhone 17 Simulator |
-| `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testCameraRetryAfterSettingsGrant test` | `apps/ios/ios`（本地，不入库） | **通过**。先 `simctl privacy grant camera`，再打开相机 |
+| `xcodebuild ... -only-testing:LampyUITests/ClosedLoopTests/testFeelingSelectRestoreSaveRecentDetail test` | `apps/ios/ios`（本地，不入库） | **通过**。iPhone 17 Simulator，26.4s |
 | `git diff --check` | 仓库根 | **通过** |
 
 ## 自动化覆盖
 
-- 相册 / 相机 / 麦克风拒绝后草稿保留；从设置恢复权限后可重试，不丢草稿
-- 磁盘不足、复制失败与 SQLite 写入失败分别分类；失败后旧 Moment 不变
-- 文件已复制但 Asset / 草稿写入失败时回滚未提交 Asset，重试不重复创建
-- 部分照片缺失与解码失败分开说明；声音缺失与无法播放分开说明
-- 媒体错误不把 Moment 标成不存在；损坏行进隔离表且不覆盖原文
-- 无法确认引用时保留应用自有文件；不删除系统相册原片
-- 选图 / 录音 / 保存保持串行；保存失败后重试幂等
-- 重启后仍能读回失败前已写入的草稿文字与已留下的照片
+- 未选择感受时，纯文字、仅照片、仅声音和混合内容均可保存
+- 选择、改选、清除感受；只选感受不能保存
+- 选择感受不改 `recordedAt` / `occurredAt` / Asset / 个人范围
+- 草稿重启后恢复同一 draft id 与已选感受
+- 保存失败后感受仍在草稿，重试不重复创建 Moment
+- 未知旧值（如微信词表「喜悦」）在最近、详情和 SQLite 重开后原样显示，不改写存储
+- 词表映射不做趋势、评分或诊断
 
-## 模拟器失败→重试（合并前已点通）
+## 模拟器选择→恢复→保存（合并前已点通）
 
 在 iPhone 17 Simulator 上由 XCUITest 驱动真实页面，不是只读库：
 
-1. `simctl privacy revoke camera` 后点「留下」，写入「相机拒绝后还在可以再试」；
-2. 点「拍摄」，界面说明没有打开相机，草稿文字仍在，相册和留下仍可用；
-3. `simctl privacy grant camera` 模拟从系统设置恢复权限；
-4. 重新进入留下页，同一句草稿还在；再点「拍摄」打开相机，不再出现拒绝说明。
+1. 点「留下」，词表出现且默认不选中；
+2. 选「平静」，写下「感受闭环…」；
+3. 返回「最近」，未保存的草稿不出现在列表；
+4. 再进「留下」，恢复横幅出现，同一句和「平静，已选中」还在；
+5. 点「留下」保存后，「最近」与只读详情都显示「当时的感受 · 平静」，文字仍是主内容。
 
-`TEST SUCCEEDED`（拒绝 55.0s；恢复后重试 58.2s）。
+`TEST SUCCEEDED`（26.4s）。
 
-系统相册 PHPicker 在原生路径上仍可打开，不依赖完整相册权限。相册拒绝与设置恢复由可注入 `ImageSource` 覆盖。
+本基线没有回看页（回看仍在独立 PR #5）。感受已进入 Recent / Detail ViewModel，回看合并后可复用同一 `projectFeeling`，本轮未走回看 UI。
 
 ## 未验证
 
 | 项 | 说明 |
 | --- | --- |
-| 真机相机 / 相册 / 麦克风权限弹窗、拒绝后仍写字、从设置恢复后再试 | **未验证** |
-| 真机磁盘空间不足、复制失败、SQLite 写入失败 | **未验证** |
-| 真机杀进程后草稿与正式记录仍在 | **未验证** |
-| 真机来电打断录制或播放 | **未验证** |
+| 回看年/月/日页展示感受 | **未验证**。回看不在 `origin/main` / 本 PR |
+| 真机选择、清除、草稿恢复与详情展示 | **未验证** |
+| 真机 VoiceOver 读出选中状态 | **未验证**。自动化已写 `accessibilityState.selected` 与「已选中」标签 |
+| 真机超大字号换行 | **未验证**。词表 `flexWrap` |
+| 真机杀进程后草稿感受仍在 | **未验证**。自动化已覆盖新 Use Case 实例与 SQLite 关文件重开 |
 | App Store / 签名发布 | **未验证** |
 
-以上真机项不能用编译或模拟器结果代替。
+以上真机项与回看页不能用编译或本轮模拟器结果代替。
 
 ## 根目录领域回归（只读，未改代码）
 
-本轮未改微信领域文件，未重跑根目录 `npm test`。
+本轮未改微信领域文件，未重跑根目录 `npm test`。`content.emotion` 仍是可选自由字符串，词表只在 iOS 展示层映射。

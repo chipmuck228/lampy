@@ -1,6 +1,6 @@
 # Lampy iOS
 
-Expo SDK 57 Development Build。当前可运行范围是本机个人 Moment：文字、最多三张照片、一段现场录音、草稿恢复、最近、精确 id 详情。权限拒绝、磁盘不足、复制失败和部分媒体不可用时保留已写文字与可恢复草稿。
+Expo SDK 57 Development Build。当前可运行范围是本机个人 Moment：文字、最多三张照片、一段现场录音、可选的当时感受、草稿恢复、最近、精确 id 详情。权限拒绝、磁盘不足、复制失败和部分媒体不可用时保留已写文字与可恢复草稿。
 
 ```bash
 npm run check-env

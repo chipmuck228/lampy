@@ -13,6 +13,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { getUseCases } from '../application/container';
 import type { RecentLifeViewModel } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
+import { MomentFeeling } from '../screens/moment-feeling';
 import { MomentImages } from '../screens/moment-images';
 import { useSoundPlayer } from '../screens/use-sound-player';
 
@@ -78,9 +79,16 @@ export default function RecentScreen() {
             key={item.id}
             accessibilityRole="button"
             accessibilityLabel={
-              item.note
-                ? `${item.dateLabel}，${item.note}`
-                : `${item.dateLabel}，${[...item.images.map((image) => image.label), item.audio?.label || '', ...(item.unknownMedia ?? []).map((media) => media.label)].filter(Boolean).join('，') || '一条记录'}`
+              [
+                item.dateLabel,
+                item.note,
+                ...item.images.map((image) => image.label),
+                item.audio?.label || '',
+                ...(item.unknownMedia ?? []).map((media) => media.label),
+                item.feeling ? `当时的感受，${item.feeling.label}` : '',
+              ]
+                .filter(Boolean)
+                .join('，') || `${item.dateLabel}，一条记录`
             }
             testID={`recent-item-${item.id}`}
             onPress={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
@@ -105,6 +113,7 @@ export default function RecentScreen() {
               testIDPrefix={`recent-sound-${item.id}`}
               compact
             />
+            <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
           </Pressable>
         ))}
       </ScrollView>

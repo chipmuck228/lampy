@@ -26,6 +26,7 @@ jest.mock('../application/container', () => ({
       audio: null,
     }),
     updateDraftNote: async () => undefined,
+    updateDraftEmotion: async () => undefined,
     addLibraryImages: async () => undefined,
     addCameraImage: async () => undefined,
     saveTextMoment: async () => ({ id: 'moment_restored' }),
@@ -49,6 +50,8 @@ describe('leave screen', () => {
       expect(view.getByText('上次还有一些内容没保存，已经为你放回来了。')).toBeTruthy();
     });
     expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
+    expect(view.getByLabelText('当时的感受')).toBeTruthy();
+    expect(view.getByLabelText('当时的感受，高兴').props.accessibilityState.selected).toBe(false);
     expect(view.getByLabelText('照片 1/1')).toBeTruthy();
     expect(view.getByLabelText('拍摄')).toBeTruthy();
     expect(view.getByLabelText('照片')).toBeTruthy();
