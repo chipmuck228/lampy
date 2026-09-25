@@ -31,6 +31,13 @@ function roleLabel(role: 'creator' | 'member') {
   return role === 'creator' ? '创建者' : '成员';
 }
 
+function needsAppleSignIn(membership: FamilyMembershipView | null) {
+  return (
+    membership?.kind === 'unauthenticated' ||
+    (membership?.kind === 'unconfirmed' && membership.reason === 'unauthenticated')
+  );
+}
+
 export default function FamilyScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -48,10 +55,10 @@ export default function FamilyScreen() {
     setInvites([]);
   }
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<'ok' | 'invites-failed'> => {
     hideFamilyContent();
     if (!configured) {
-      return;
+      return 'ok';
     }
     const apple = createExpoAppleIdentityTokenSource();
     setAppleAvailable(await apple.isAvailable());
@@ -59,10 +66,16 @@ export default function FamilyScreen() {
     const next = await family.getMembership();
     setMembership(next);
     if (next.kind === 'ready' && next.role === 'creator') {
-      setInvites(await family.listPendingInvitations(next.familyId));
+      try {
+        setInvites(await family.listPendingInvitations(next.familyId));
+      } catch {
+        setInvites([]);
+        return 'invites-failed';
+      }
     } else {
       setInvites([]);
     }
+    return 'ok';
   }, [configured]);
 
   useFocusEffect(
@@ -70,8 +83,9 @@ export default function FamilyScreen() {
       let cancelled = false;
       hideFamilyContent();
       refresh()
-        .then(() => {
-          if (!cancelled) setMessage(null);
+        .then((result) => {
+          if (cancelled) return;
+          setMessage(result === 'invites-failed' ? '邀请列表暂时读不出来，家里的成员已经确认。' : null);
         })
         .catch((error) => {
           if (!cancelled) {
@@ -92,8 +106,8 @@ export default function FamilyScreen() {
     try {
       const family = await getFamilyUseCases();
       await work(family);
-      await refresh();
-      setMessage(null);
+      const result = await refresh();
+      setMessage(result === 'invites-failed' ? '邀请列表暂时读不出来，家里的成员已经确认。' : null);
     } catch (error) {
       setMessage(errorText(error));
     } finally {
@@ -129,9 +143,13 @@ export default function FamilyScreen() {
           <Text style={styles.body}>现在连不上家庭服务，不能确认家里有谁。</Text>
         ) : null}
 
-        {configured && membership?.kind === 'unauthenticated' && appleAvailable ? (
+        {configured && needsAppleSignIn(membership) && appleAvailable ? (
           <>
-            <Text style={styles.body}>登录之后才能建立或加入家庭。登录成功还不等于已经在一个家里。</Text>
+            <Text style={styles.body}>
+              {membership?.kind === 'unconfirmed'
+                ? '这次登录已经失效，需要重新用 Apple 登录。登录成功还不等于已经在一个家里。'
+                : '登录之后才能建立或加入家庭。登录成功还不等于已经在一个家里。'}
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="用 Apple 登录"
@@ -282,7 +300,7 @@ export default function FamilyScreen() {
           </>
         ) : null}
 
-        {configured && membership && membership.kind !== 'unauthenticated' ? (
+        {configured && membership && !needsAppleSignIn(membership) ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="退出登录"

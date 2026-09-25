@@ -103,6 +103,36 @@ describe('family screen', () => {
     expect(view.queryByText(/假送达|家庭时间线/)).toBeNull();
   });
 
+  it('offers Apple sign-in again after a stored session is rejected', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({ kind: 'unconfirmed', reason: 'unauthenticated' });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByText('这次登录已经失效，需要重新用 Apple 登录。登录成功还不等于已经在一个家里。')).toBeTruthy();
+    });
+    expect(view.getByLabelText('用 Apple 登录')).toBeTruthy();
+    expect(view.queryByLabelText('退出登录')).toBeNull();
+    expect(view.queryByText('家里现在有这些人。')).toBeNull();
+  });
+
+  it('keeps confirmed members if only the pending-invite list fails', async () => {
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      role: 'creator',
+      members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+    });
+    mockFamily.listPendingInvitations.mockRejectedValue(new ApplicationError('INTERNAL', 'invite list failed'));
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByText('usr_alice')).toBeTruthy();
+      expect(view.getByText('邀请列表暂时读不出来，家里的成员已经确认。')).toBeTruthy();
+    });
+    expect(view.getByLabelText('解散这个家')).toBeTruthy();
+    expect(view.getByLabelText('邀请')).toBeTruthy();
+  });
+
   it('hides previous members and admin actions when re-entering and revalidation fails', async () => {
     jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
