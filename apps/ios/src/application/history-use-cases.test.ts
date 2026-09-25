@@ -11,7 +11,14 @@ import {
   rememberLookbackScroll,
   resetLookbackSessionForTests,
 } from './lookback-session';
-import { createUseCases } from './use-cases';
+import {
+  AUDIO_MISSING_LABEL,
+  AUDIO_UNPLAYABLE_LABEL,
+  IMAGE_MISSING_LABEL,
+  IMAGE_UNDECODABLE_LABEL,
+  UNKNOWN_UNAVAILABLE_LABEL,
+  createUseCases,
+} from './use-cases';
 
 function clockAt(iso: string) {
   return { now: () => new Date(iso) };
@@ -224,6 +231,8 @@ describe('history lookback use cases', () => {
     expect(day.items[0].images).toHaveLength(2);
     expect(day.items[0].images[0].status).toBe('available');
     expect(day.items[0].images[1].status).toBe('unavailable');
+    expect(day.items[0].images[1].reason).toBe('missing');
+    expect(day.items[0].images[1].unavailableLabel).toBe(IMAGE_MISSING_LABEL);
   });
 
   it('keeps missing and unreadable details as different states', async () => {
@@ -395,6 +404,121 @@ describe('history lookback use cases', () => {
     if ('invalid' in after) throw new Error('expected day after missing audio');
     expect(after.items[0].note).toBe('回看还有声音');
     expect(after.items[0].audio?.status).toBe('unavailable');
+    expect(after.items[0].audio?.reason).toBe('missing');
+    expect(after.items[0].audio?.unavailableLabel).toBe(AUDIO_MISSING_LABEL);
+  });
+
+  it('keeps day and unconfirmed lookback items when photos or sound fail in place', async () => {
+    const repos = createMemoryRepositories();
+    const media = createMemoryMediaStore();
+    const assetIds = [
+      'asset_day_ok',
+      'asset_day_gone',
+      'asset_day_broken',
+      'asset_day_voice',
+      'asset_unknown_ok',
+      'asset_unknown_voice',
+    ];
+    let next = 0;
+    const app = createUseCases({
+      ...repos,
+      media,
+      clock: clockAt('2026-09-24T12:00:00.000Z'),
+      timezoneOffsetMinutes: 0,
+      assetId: () => assetIds[next++] || `asset_extra_${next}`,
+    });
+
+    const dayDraft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(dayDraft.draftId, '日页字还在');
+    await app.addPickedImages(dayDraft.draftId, [
+      { sourceUri: 'memory://source/ok.jpg', mimeType: 'image/jpeg', width: 800, height: 600 },
+      { sourceUri: 'memory://source/gone.jpg', mimeType: 'image/jpeg', width: 400, height: 400 },
+      { sourceUri: 'memory://source/broken.jpg', mimeType: 'image/jpeg', width: 200, height: 200 },
+    ]);
+    await app.addRecordedAudio(dayDraft.draftId, {
+      sourceUri: 'memory://source/day.m4a',
+      durationMs: 1800,
+      mimeType: 'audio/mp4',
+    });
+    const dayStored = await repos.drafts.loadActive();
+    if (!dayStored) throw new Error('expected day draft');
+    dayStored.assetIds.push('asset_vanished');
+    await repos.drafts.save(dayStored);
+    const daySaved = await app.saveTextMoment(dayDraft.draftId);
+    const dayFound = await repos.moments.findById(daySaved.id);
+    if (dayFound.kind !== 'ready') throw new Error('expected day moment');
+    dayFound.moment.time.occurredAt = '2026-05-04T12:00:00.000Z';
+    dayFound.moment.time.occurredAtPrecision = 'day';
+    await repos.moments.save(dayFound.moment);
+
+    const unknownDraft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(unknownDraft.draftId, '未确认字还在');
+    await app.addPickedImages(unknownDraft.draftId, [
+      { sourceUri: 'memory://source/unknown.jpg', mimeType: 'image/jpeg', width: 800, height: 600 },
+    ]);
+    await app.addRecordedAudio(unknownDraft.draftId, {
+      sourceUri: 'memory://source/unknown.m4a',
+      durationMs: 2200,
+      mimeType: 'audio/mp4',
+    });
+    const unknownSaved = await app.saveTextMoment(unknownDraft.draftId);
+
+    media.markMissing('memory://assets/asset_day_gone.jpg');
+    media.markUndecodable('memory://assets/asset_day_broken.jpg');
+    media.markMissing('memory://assets/asset_day_voice.m4a');
+    media.markUnplayable('memory://assets/asset_unknown_voice.m4a');
+
+    const day = await app.getHistoryDay(2026, 5, 4);
+    if ('invalid' in day) throw new Error('expected day');
+    expect(day.items[0].id).toBe(daySaved.id);
+    expect(day.items[0].note).toBe('日页字还在');
+    expect(day.items[0].images.map((item) => item.status)).toEqual(['available', 'unavailable', 'unavailable']);
+    expect(day.items[0].images[0].reason).toBeUndefined();
+    expect(day.items[0].images[1]).toMatchObject({
+      reason: 'missing',
+      unavailableLabel: IMAGE_MISSING_LABEL,
+    });
+    expect(day.items[0].images[2]).toMatchObject({
+      reason: 'undecodable',
+      unavailableLabel: IMAGE_UNDECODABLE_LABEL,
+    });
+    expect(day.items[0].audio).toMatchObject({
+      status: 'unavailable',
+      reason: 'missing',
+      unavailableLabel: AUDIO_MISSING_LABEL,
+    });
+    expect(day.items[0].unknownMedia).toEqual([
+      {
+        id: 'asset_vanished',
+        status: 'unavailable',
+        label: '这份内容',
+        unavailableLabel: UNKNOWN_UNAVAILABLE_LABEL,
+      },
+    ]);
+    expect(await app.getMomentDetail(daySaved.id)).toMatchObject({
+      kind: 'ready',
+      id: daySaved.id,
+      note: '日页字还在',
+    });
+
+    const unknown = await app.getHistoryUnknown();
+    expect(unknown.items[0].id).toBe(unknownSaved.id);
+    expect(unknown.items[0].note).toBe('未确认字还在');
+    expect(unknown.items[0].images[0].status).toBe('available');
+    expect(unknown.items[0].audio).toMatchObject({
+      status: 'unavailable',
+      reason: 'unplayable',
+      unavailableLabel: AUDIO_UNPLAYABLE_LABEL,
+    });
+    expect(await app.getMomentDetail(unknownSaved.id)).toMatchObject({
+      kind: 'ready',
+      id: unknownSaved.id,
+      note: '未确认字还在',
+    });
+    expect(await app.getMomentDetail('moment_does_not_exist')).toEqual({
+      kind: 'missing',
+      requestedId: 'moment_does_not_exist',
+    });
   });
 
   it('remembers in-process scroll and documents cold-start restore', () => {

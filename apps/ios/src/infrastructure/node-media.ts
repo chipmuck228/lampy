@@ -1,7 +1,13 @@
 import { copyFile, mkdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import { extensionForAudioMime, extensionForMime, type MediaStore } from './media';
+import {
+  classifyCopyError,
+  extensionForAudioMime,
+  extensionForMime,
+  MediaPersistError,
+  type MediaStore,
+} from './media';
 
 export function createNodeMediaStore(rootDir: string): MediaStore {
   async function persist(dest: string, sourceUri: string) {
@@ -9,10 +15,30 @@ export function createNodeMediaStore(rootDir: string): MediaStore {
     try {
       await stat(dest);
       return { localUri: dest };
-    } catch {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw classifyCopyError(error);
+      }
+    }
+    try {
       await copyFile(sourceUri, dest);
+    } catch (error) {
+      try {
+        await unlink(dest);
+      } catch {
+        // Only a dest this copy started may be a partial file.
+      }
+      throw classifyCopyError(error);
+    }
+    try {
       const info = await stat(dest);
+      if (!info.isFile()) {
+        throw new MediaPersistError('COPY_FAILED', 'copied dest could not be confirmed');
+      }
       return { localUri: dest, sizeBytes: info.size };
+    } catch (error) {
+      if (error instanceof MediaPersistError) throw error;
+      throw classifyCopyError(error);
     }
   }
 

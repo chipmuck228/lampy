@@ -115,6 +115,10 @@ export default function LeaveScreen() {
     return () => sub.remove();
   }, [sound]);
 
+  function shownError(error: unknown, fallback: string) {
+    return isApplicationError(error) ? error.message : fallback;
+  }
+
   function persistNote(next: string) {
     setNote(next);
     const id = draftIdRef.current;
@@ -122,8 +126,8 @@ export default function LeaveScreen() {
     void enqueue(async () => {
       const app = await getUseCases();
       await app.updateDraftNote(id, next);
-    }).catch(() => {
-      setMessage('草稿暂时写不进去。已经写的字还在屏幕上。');
+    }).catch((error) => {
+      setMessage(shownError(error, '草稿暂时写不进去。已经写的字还在屏幕上。'));
     });
   }
 
@@ -148,11 +152,20 @@ export default function LeaveScreen() {
           setMessage('每条最多三张照片');
           return;
         }
-        if (isApplicationError(error) && (error.code === 'LIBRARY_DENIED' || error.code === 'CAMERA_DENIED')) {
+        if (
+          isApplicationError(error) &&
+          (error.code === 'LIBRARY_DENIED' ||
+            error.code === 'CAMERA_DENIED' ||
+            error.code === 'DISK_FULL' ||
+            error.code === 'COPY_FAILED' ||
+            error.code === 'REPOSITORY_WRITE_FAILED' ||
+            error.code === 'REPOSITORY_INVALID_RECORD' ||
+            error.code === 'MEDIA_UNAVAILABLE')
+        ) {
           setMessage(error.message);
           return;
         }
-        setMessage('这张照片没有留下。已经写的字和已有的照片还在。');
+        setMessage(shownError(error, '这张照片没有留下。可以再试，也可以继续写字。'));
       })
       .finally(() => {
         busyRef.current = false;
@@ -190,7 +203,7 @@ export default function LeaveScreen() {
           return;
         }
         setRecordPhase('failed');
-        setMessage('这次没有录下声音。已经写的字和照片还在。');
+        setMessage(shownError(error, '这次没有录下声音。可以再试，也可以继续写字。'));
       });
   }
 
@@ -207,9 +220,9 @@ export default function LeaveScreen() {
         setRecordPhase(next.audio ? 'stopped' : 'failed');
         setMessage(null);
       })
-      .catch(() => {
+      .catch((error) => {
         setRecordPhase('failed');
-        setMessage('这次没有录下声音。已经写的字和照片还在，可以再试。');
+        setMessage(shownError(error, '这次没有录下声音。可以再试，也可以继续写字。'));
       })
       .finally(() => {
         busyRef.current = false;
@@ -235,9 +248,9 @@ export default function LeaveScreen() {
             : '录音被打断。这一次没有留下声音，文字和照片还在。',
         );
       })
-      .catch(() => {
+      .catch((error) => {
         setRecordPhase('failed');
-        setMessage('录音被打断。已经写的字和照片还在。');
+        setMessage(shownError(error, '录音被打断。可以再试，也可以继续写字。'));
       })
       .finally(() => {
         busyRef.current = false;
@@ -264,8 +277,8 @@ export default function LeaveScreen() {
         setRecordPhase('ready');
         setMessage(null);
       })
-      .catch(() => {
-        setMessage('这段声音还在草稿里，可以再试着移除。');
+      .catch((error) => {
+        setMessage(shownError(error, '这段声音还没从草稿里拿掉。可以再试。'));
       })
       .finally(() => {
         busyRef.current = false;
@@ -304,7 +317,7 @@ export default function LeaveScreen() {
           setMessage(error.message);
           return;
         }
-        setMessage('这次没有重新录上。原来的声音还在，可以再试。');
+        setMessage(shownError(error, '这次没有重新录上。可以再试。'));
       });
   }
 
@@ -324,7 +337,7 @@ export default function LeaveScreen() {
       setMessage(
         isApplicationError(error) && error.code === 'MOMENT_EMPTY'
           ? '写一句、留下一张照片或一段声音。已经写的草稿还在。'
-          : '这次没有留下。草稿还在，可以再试。',
+          : shownError(error, '这次没有留下正式记录。可以再试。'),
       );
     } finally {
       busyRef.current = false;

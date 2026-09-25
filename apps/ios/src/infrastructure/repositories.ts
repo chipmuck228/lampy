@@ -63,6 +63,7 @@ export type AssetRead =
 export interface AssetRepository {
   save(asset: AssetRecord): Promise<void>;
   findById(id: string): Promise<AssetRead>;
+  remove(assetId: string): Promise<void>;
 }
 
 function lookupInRecords(
@@ -251,6 +252,9 @@ export function createMemoryRepositories(): {
         return validateAsset(found).ok
           ? { kind: 'ready', asset: structuredClone(found) }
           : { kind: 'unreadable', type: typeof found.type === 'string' ? found.type : undefined };
+      },
+      async remove(assetId) {
+        storedAssets.delete(assetId);
       },
     },
   };

@@ -201,7 +201,10 @@ describe('image personal moment use cases', () => {
     expect(detail.id).toBe(saved.id);
     expect(detail.note).toBe('字还在');
     expect(detail.images.map((item) => item.status)).toEqual(['unavailable', 'unavailable']);
+    expect(detail.images[0].reason).toBe('missing');
     expect(detail.images[0].unavailableLabel).toBe('这张照片暂时找不到了，但这条记录还在。');
+    expect(detail.images[1].reason).toBe('undecodable');
+    expect(detail.images[1].unavailableLabel).toBe('这张照片打不开了，但这条记录还在。');
 
     const missing = await app.getMomentDetail('moment_does_not_exist');
     expect(missing).toEqual({ kind: 'missing', requestedId: 'moment_does_not_exist' });

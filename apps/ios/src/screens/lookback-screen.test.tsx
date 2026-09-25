@@ -2,14 +2,21 @@ import type { ReactElement } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import {
+  readLookbackScroll,
+  rememberLookbackScroll,
+  resetLookbackSessionForTests,
+} from '../application/lookback-session';
 import LookbackIndexScreen from '../app/lookback/index';
 import LookbackYearScreen from '../app/lookback/[year]/index';
 import LookbackDayScreen from '../app/lookback/[year]/[month]/[day]';
+import LookbackUnconfirmedScreen from '../app/lookback/unconfirmed';
 
 const mockPush = jest.fn();
 const mockGetHistoryYears = jest.fn();
 const mockGetHistoryYear = jest.fn();
 const mockGetHistoryDay = jest.fn();
+const mockGetHistoryUnknown = jest.fn();
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -28,6 +35,7 @@ jest.mock('../application/container', () => ({
     getHistoryYears: mockGetHistoryYears,
     getHistoryYear: mockGetHistoryYear,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: mockGetHistoryUnknown,
   }),
 }));
 
@@ -50,6 +58,8 @@ describe('lookback screens', () => {
     mockGetHistoryYears.mockReset();
     mockGetHistoryYear.mockReset();
     mockGetHistoryDay.mockReset();
+    mockGetHistoryUnknown.mockReset();
+    resetLookbackSessionForTests();
   });
 
   it('opens a year from the lookback entrance', async () => {
@@ -99,7 +109,8 @@ describe('lookback screens', () => {
     expect(mockPush).toHaveBeenCalledWith('/lookback/2026/01');
   });
 
-  it('keeps sound and missing media on a lookback day and opens the exact id', async () => {
+  it('keeps failed photos and sound on a lookback day, then returns to the same date', async () => {
+    rememberLookbackScroll('/lookback/2026/01/02', 240);
     mockGetHistoryDay.mockResolvedValue({
       year: 2026,
       month: 1,
@@ -113,14 +124,38 @@ describe('lookback screens', () => {
           precision: 'exact',
           timeLabel: '2026年1月2日 08:15',
           usedRecordedAtFallback: false,
-          images: [],
+          images: [
+            {
+              id: 'asset_ok',
+              status: 'available',
+              uri: 'memory://assets/asset_ok.jpg',
+              width: 800,
+              height: 600,
+              label: '照片 1/3',
+            },
+            {
+              id: 'asset_gone',
+              status: 'unavailable',
+              label: '照片 2/3',
+              unavailableLabel: '这张照片暂时找不到了，但这条记录还在。',
+              reason: 'missing',
+            },
+            {
+              id: 'asset_broken',
+              status: 'unavailable',
+              label: '照片 3/3',
+              unavailableLabel: '这张照片打不开了，但这条记录还在。',
+              reason: 'undecodable',
+            },
+          ],
           audio: {
             id: 'asset_voice_lookback',
-            status: 'available',
-            uri: 'memory://assets/asset_voice_lookback.m4a',
+            status: 'unavailable',
             durationMs: 1800,
             durationLabel: '2秒',
-            label: '一段声音',
+            label: '当时的声音',
+            unavailableLabel: '这段声音暂时找不到了，其他内容仍然保留。',
+            reason: 'missing',
           },
           unknownMedia: [
             {
@@ -139,12 +174,77 @@ describe('lookback screens', () => {
     await waitFor(() => {
       expect(day.getByText('门口的风')).toBeTruthy();
     });
-    expect(day.getByText('一段声音 · 2秒')).toBeTruthy();
+    expect(day.getByText('2026年1月2日')).toBeTruthy();
+    expect(day.getByLabelText('照片 1/3')).toBeTruthy();
+    expect(day.getByText('这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
+    expect(day.getByText('这张照片打不开了，但这条记录还在。')).toBeTruthy();
+    expect(day.getByText('这段声音暂时找不到了，其他内容仍然保留。')).toBeTruthy();
     expect(day.getByText('这份内容暂时无法打开。')).toBeTruthy();
     expect(day.queryByText('这条记录现在无法找到')).toBeNull();
     fireEvent.press(day.getByTestId('lookback-moment-m_exact'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_exact' } });
-    await day.unmount();
+    expect(day.getByText('2026年1月2日')).toBeTruthy();
+    expect(readLookbackScroll('/lookback/2026/01/02')).toBe(240);
+  });
+
+  it('keeps failed media on the unconfirmed shelf and returns to the same place', async () => {
+    rememberLookbackScroll('/lookback/unconfirmed', 120);
+    mockGetHistoryUnknown.mockResolvedValue({
+      title: '时间未确认',
+      explanation: '这些记录还没有确认发生的日子。',
+      items: [
+        {
+          id: 'm_unknown',
+          note: '未确认的一句',
+          precision: 'unknown',
+          timeLabel: '记录于 9月24日',
+          usedRecordedAtFallback: true,
+          images: [
+            {
+              id: 'asset_unknown_ok',
+              status: 'available',
+              uri: 'memory://assets/asset_unknown_ok.jpg',
+              width: 800,
+              height: 600,
+              label: '照片 1/1',
+            },
+          ],
+          audio: {
+            id: 'asset_unknown_voice',
+            status: 'unavailable',
+            durationMs: 2200,
+            durationLabel: '3秒',
+            label: '当时的声音',
+            unavailableLabel: '这段声音暂时无法播放，其他内容仍然保留。',
+            reason: 'unplayable',
+          },
+          unknownMedia: [
+            {
+              id: 'asset_unknown_vanished',
+              status: 'unavailable',
+              label: '这份内容',
+              unavailableLabel: '这份内容暂时无法打开。',
+            },
+          ],
+        },
+      ],
+      hasMore: false,
+    });
+
+    const shelf = await render(wrap(<LookbackUnconfirmedScreen />));
+    await waitFor(() => {
+      expect(mockGetHistoryUnknown).toHaveBeenCalled();
+      expect(shelf.getByText('未确认的一句')).toBeTruthy();
+    });
+    expect(shelf.getByText('时间未确认')).toBeTruthy();
+    expect(shelf.getByLabelText('照片 1/1')).toBeTruthy();
+    expect(shelf.getByText('这段声音暂时无法播放，其他内容仍然保留。')).toBeTruthy();
+    expect(shelf.getByText('这份内容暂时无法打开。')).toBeTruthy();
+    expect(shelf.queryByText('这条记录现在无法找到')).toBeNull();
+    fireEvent.press(shelf.getByTestId('lookback-moment-m_unknown'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_unknown' } });
+    expect(shelf.getByText('时间未确认')).toBeTruthy();
+    expect(readLookbackScroll('/lookback/unconfirmed')).toBe(120);
   });
 
 });

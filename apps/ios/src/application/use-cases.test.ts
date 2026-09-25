@@ -144,7 +144,10 @@ describe('text-only personal moment use cases', () => {
     failNext = true;
     const secondDraft = await app.restoreOrCreateDraft();
     await app.updateDraftNote(secondDraft.draftId, '这次失败');
-    await expect(app.saveTextMoment(secondDraft.draftId)).rejects.toThrow('disk full');
+    await expect(app.saveTextMoment(secondDraft.draftId)).rejects.toMatchObject({
+      code: 'DISK_FULL',
+      message: '这次没有留下正式记录。草稿还在，可以清出空间后再试。',
+    });
     expect((await app.getRecentLife()).items.map((item) => item.id)).toEqual([saved.id]);
   });
 

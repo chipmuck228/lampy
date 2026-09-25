@@ -100,7 +100,10 @@ describe('leave image actions', () => {
 
   it('keeps the written words after the album permission is refused', async () => {
     mockAddLibraryImages.mockRejectedValueOnce(
-      new ApplicationError('LIBRARY_DENIED', '没有打开相册。还可以写字，草稿还在。'),
+      new ApplicationError(
+        'LIBRARY_DENIED',
+        '没有打开相册。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许照片后，可以再试。',
+      ),
     );
 
     const view = await render(wrap());
@@ -109,7 +112,11 @@ describe('leave image actions', () => {
     });
     fireEvent.press(view.getByTestId('composer-library'));
     await waitFor(() => {
-      expect(view.getByText('没有打开相册。还可以写字，草稿还在。')).toBeTruthy();
+      expect(
+        view.getByText(
+          '没有打开相册。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许照片后，可以再试。',
+        ),
+      ).toBeTruthy();
     });
     expect(view.getByDisplayValue('还可以写字')).toBeTruthy();
   });
