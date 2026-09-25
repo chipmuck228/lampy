@@ -5,7 +5,7 @@
 ## 仓库事实（相对 `c6b8d4b`）
 
 - 无独立 `apps/server`、无家庭数据库、无生产 Apple / API 密钥。
-- iOS SQLite 仅个人表。无家庭路由。
+- iOS SQLite 有个人表和 `family_pending_operations`。无家庭路由。
 - 因此 F1 **不能** 假装已有公网家庭后端。可交付：可测试的服务端模块 + iOS 适配 + 配置清单。未部署 / 未真机 Apple 标 **NOT VERIFIED**。
 
 ## F0 共享领域（本轮不做）

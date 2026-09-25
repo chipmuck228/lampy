@@ -1,15 +1,25 @@
 import { createUseCases } from './use-cases';
+import {
+  createFamilyUseCases,
+  createMemoryFamilySessionStore,
+  type FamilySessionStore,
+  type FamilyUseCases,
+} from './family-use-cases';
 import { createExpoAudioCapture } from '../infrastructure/expo-audio';
+import { familyApiBaseUrl } from '../infrastructure/family-config';
+import { createFamilyApiClient, createFamilyHttpTransport, type FamilyApiClient } from '../infrastructure/family-http-client';
+import { createSqlitePendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
 import {
   createExpoCameraSource,
   createExpoLibrarySource,
   createExpoMediaStore,
 } from '../infrastructure/expo-media';
 import { createSqliteRepositories, openLampyDatabase } from '../infrastructure/sqlite';
+import type { SqlDatabase } from '../infrastructure/sql';
 
-export function createUseCaseLoader(load: () => Promise<ReturnType<typeof createUseCases>>) {
-  let ready: ReturnType<typeof createUseCases> | null = null;
-  let opening: Promise<ReturnType<typeof createUseCases>> | null = null;
+export function createUseCaseLoader<T>(load: () => Promise<T>) {
+  let ready: T | null = null;
+  let opening: Promise<T> | null = null;
 
   async function getUseCases() {
     if (ready) return ready;
@@ -51,4 +61,35 @@ export function getUseCases() {
 
 export function resetUseCasesForTests() {
   defaultLoader.reset();
+}
+
+export function createIosFamilyUseCases(deps: {
+  db: SqlDatabase;
+  client: FamilyApiClient;
+  session: FamilySessionStore;
+  idempotencyKey?: (prefix: string) => string;
+}): FamilyUseCases {
+  return createFamilyUseCases({
+    client: deps.client,
+    session: deps.session,
+    pending: createSqlitePendingFamilyOperationStore(deps.db),
+    idempotencyKey: deps.idempotencyKey,
+  });
+}
+
+const familyLoader = createUseCaseLoader(async () => {
+  const db = await openLampyDatabase();
+  return createIosFamilyUseCases({
+    db,
+    client: createFamilyApiClient(createFamilyHttpTransport({ baseUrl: familyApiBaseUrl() })),
+    session: createMemoryFamilySessionStore(),
+  });
+});
+
+export function getFamilyUseCases() {
+  return familyLoader.getUseCases();
+}
+
+export function resetFamilyUseCasesForTests() {
+  familyLoader.reset();
 }

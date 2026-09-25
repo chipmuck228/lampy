@@ -1,8 +1,6 @@
 import { ApplicationError } from './errors';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
 import {
-  createPendingFamilyOperationDisk,
-  createPendingFamilyOperationStore,
   pendingAcceptOperationId,
   pendingCreateFamilyOperationId,
   pendingInviteFingerprint,
@@ -92,14 +90,14 @@ export function createMemoryFamilyCache(): FamilyCache & { readonly clearCount: 
 export function createFamilyUseCases(deps: {
   client: FamilyApiClient;
   session: FamilySessionStore;
+  pending: PendingFamilyOperationStore;
   cache?: FamilyCache;
-  pending?: PendingFamilyOperationStore;
   idempotencyKey?: (prefix: string) => string;
   operationId?: (prefix: string) => string;
   clock?: { now: () => Date };
 }) {
   const cache = deps.cache ?? createNoopFamilyCache();
-  const pending = deps.pending ?? createPendingFamilyOperationStore(createPendingFamilyOperationDisk());
+  const pending = deps.pending;
   const nextKey = deps.idempotencyKey ?? newIdempotencyKey;
   const nextOperationId = deps.operationId ?? newOperationId;
   const clock = deps.clock ?? { now: () => new Date() };
@@ -127,6 +125,12 @@ export function createFamilyUseCases(deps: {
   }): Promise<T> {
     const { userId } = await requireAccount();
     const existing = await pending.find(userId, input.command, input.operationId);
+    if (existing && existing.requestFingerprint !== input.requestFingerprint) {
+      throw new ApplicationError(
+        'PENDING_CONFLICT',
+        'This operation id is already bound to a different family request.',
+      );
+    }
     const idempotencyKey = existing?.idempotencyKey ?? input.idempotencyKey ?? nextKey(input.command);
     if (!existing) {
       await pending.save({

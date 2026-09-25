@@ -53,6 +53,8 @@
 | `FAMILY_DISSOLVED` | 家庭已解散 |
 | `MEMBER_NOT_FOUND` | 移除目标不存在或已非 active |
 | `NETWORK` / `SERVER_UNREACHABLE` | 客户端达不到服务端 |
+| `PENDING_CONFLICT` | 客户端：同一 operationId 已绑定不同请求指纹；未发请求，保留原记录 |
+| `PENDING_NOT_FOUND` | 客户端：重试邀请时找不到对应 pending |
 | `CONFLICT` | 违背前置且不宜更细的码 |
 
 个人库错误码（`DRAFT_NOT_FOUND` 等）与上表分离。家庭失败不得触发个人 Moment 写入。
@@ -62,7 +64,7 @@
 ## 4. 重试
 
 - 写命令带客户端 `idempotencyKey`。服务端按 `userId + command + key` 记住结果，并绑定规范化请求指纹（CreateFamily 固定；InviteMember 绑 `familyId`；AcceptInvitation 绑 invitation code 的稳定摘要）。指纹相同只表示「是同一请求」；重放必须再核验当前家庭、成员资格与邀请状态，返回符合当前状态的结果，或 `CONFLICT` / `FAMILY_DISSOLVED` / `NOT_IN_FAMILY` / `FORBIDDEN`。不得在撤销、退出、移除或解散后原样回放旧 body。
-- 客户端在发请求前把待确认操作写入本机持久层（`family_pending_operations` 或等价可重建存储）：命令、规范化请求指纹、operationId、幂等键、Lampy `userId`、创建时间。成功或明确业务失败后删除；网络失败或无法判断服务端是否处理时保留。切换账号不得复用另一 `userId` 的键。
+- 客户端在发请求前把待确认操作写入本机持久层（`family_pending_operations` 或等价可重建存储）：命令、规范化请求指纹、operationId、幂等键、Lampy `userId`、创建时间。成功或明确业务失败后删除；网络失败或无法判断服务端是否处理时保留。切换账号不得复用另一 `userId` 的键。已有 `operationId` 的指纹与本次请求不一致时，发请求前拒绝（`PENDING_CONFLICT`），保留原记录供原参数重试，不得用旧键发新参数。
 - 邀请：`inviteMember` 默认是新操作（新 `operationId`）。重试必须走 `retryInviteMember(operationId)` 或 `intent: 'retry'`，不能只用 `familyId` 永久占槽。不把邀请原文、session token、Apple token 写入该表或日志；accept 用 code 的稳定摘要作 operationId，重试由调用方再次传入 code。
 - 仅 `SERVER_UNREACHABLE` / `NETWORK` 时复用未确认键。不得每次重试都新生成 key。
 - 不得把 session token、Apple token 或邀请原文写入日志或指纹明文。

@@ -20,6 +20,10 @@ function clockAt(iso: string) {
   return { now: () => new Date(iso) };
 }
 
+function testPending() {
+  return createPendingFamilyOperationStore(createPendingFamilyOperationDisk());
+}
+
 function createHarness(nowIso = '2026-09-25T02:00:00.000Z') {
   const store = createFamilyStore();
   const clock = clockAt(nowIso);
@@ -42,6 +46,7 @@ function createHarness(nowIso = '2026-09-25T02:00:00.000Z') {
   const family = createFamilyUseCases({
     client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
     session: createMemoryFamilySessionStore(),
+    pending: testPending(),
     idempotencyKey: (prefix) => {
       keys.n += 1;
       return `${prefix}-${keys.n}`;
@@ -76,6 +81,7 @@ describe('family use cases against a real in-process API', () => {
         },
       }),
       session: unreachableSession,
+      pending: testPending(),
     });
     await expect(unreachable.signInWithApple('unused')).rejects.toMatchObject({
       code: 'SERVER_UNREACHABLE',
@@ -143,16 +149,19 @@ describe('family use cases against a real in-process API', () => {
     const alice = createFamilyUseCases({
       client: createFamilyApiClient(transport),
       session: createMemoryFamilySessionStore(),
+      pending: testPending(),
       idempotencyKey: nextKey,
     });
     const bob = createFamilyUseCases({
       client: createFamilyApiClient(transport),
       session: bobSession,
+      pending: testPending(),
       idempotencyKey: nextKey,
     });
     const cara = createFamilyUseCases({
       client: createFamilyApiClient(transport),
       session: caraSession,
+      pending: testPending(),
       idempotencyKey: nextKey,
     });
     const personal = createUseCases({
@@ -207,11 +216,13 @@ describe('family use cases against a real in-process API', () => {
     const alice = createFamilyUseCases({
       client: createFamilyApiClient(transport),
       session: createMemoryFamilySessionStore(),
+      pending: testPending(),
       idempotencyKey: () => 'alice-create',
     });
     const bob = createFamilyUseCases({
       client: createFamilyApiClient(transport),
       session: createMemoryFamilySessionStore(),
+      pending: testPending(),
       idempotencyKey: (prefix) => `bob-${prefix}`,
     });
     await alice.signInWithApple('apple_alice');
@@ -249,11 +260,13 @@ describe('passive membership loss and family cache', () => {
     const alice = createFamilyUseCases({
       client: createFamilyApiClient(transport),
       session: aliceSession,
+      pending: testPending(),
     });
     const bob = createFamilyUseCases({
       client: createFamilyApiClient(transport),
       session: bobSession,
       cache: bobCache,
+      pending: testPending(),
     });
     return { commands, personal, personalRepos, alice, bob, bobSession, bobCache, transport };
   }
@@ -332,6 +345,7 @@ describe('passive membership loss and family cache', () => {
       }),
       session,
       cache,
+      pending: testPending(),
     });
 
     const view = await family.getMembership();
@@ -363,6 +377,7 @@ describe('passive membership loss and family cache', () => {
       }),
       session: bobSession,
       cache,
+      pending: testPending(),
     });
     const view = await unreachable.getMembership();
     expect(view).toEqual({ kind: 'unconfirmed', reason: 'unreachable' });
@@ -515,5 +530,39 @@ describe('client idempotency key retention', () => {
     expect(transport.keys[3]).toBe('inviteMember-1');
     expect(transport.keys[4]).toBe('inviteMember-3');
     expect(disk.read().some((row) => row.operationId === 'op-old')).toBe(false);
+  });
+
+  it('rejects the same operationId with different params and keeps the original pending row', async () => {
+    const disk = createPendingFamilyOperationDisk();
+    const session = createMemoryFamilySessionStore();
+    await session.setSession({ userId: 'usr_alice', sessionToken: 'ses_alice' });
+    const keys: string[] = [];
+    const family = createFamilyUseCases({
+      client: createFamilyApiClient({
+        async request(input) {
+          keys.push(`${input.path}:${input.idempotencyKey}`);
+          throw new Error('network down');
+        },
+      }),
+      session,
+      pending: createPendingFamilyOperationStore(disk),
+      idempotencyKey: () => 'invite-kept',
+    });
+
+    await expect(family.inviteMember('fam_1', { operationId: 'op-shared' })).rejects.toMatchObject({
+      code: 'SERVER_UNREACHABLE',
+    });
+    await expect(family.inviteMember('fam_2', { operationId: 'op-shared', intent: 'new' })).rejects.toMatchObject({
+      code: 'PENDING_CONFLICT',
+    });
+    expect(keys).toEqual(['/v1/families/fam_1/invitations:invite-kept']);
+    expect(disk.read()).toEqual([
+      expect.objectContaining({
+        operationId: 'op-shared',
+        familyId: 'fam_1',
+        idempotencyKey: 'invite-kept',
+        userId: 'usr_alice',
+      }),
+    ]);
   });
 });

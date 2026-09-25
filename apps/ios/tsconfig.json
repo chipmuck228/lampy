@@ -19,6 +19,7 @@
     "src/infrastructure/node-media.ts",
     "src/infrastructure/node-media.test.ts",
     "src/infrastructure/sqlite-preservation.test.ts",
+    "src/infrastructure/pending-family-sqlite.test.ts",
     "src/family-api/apple-node.ts",
     "src/family-api/listen.ts"
   ]
