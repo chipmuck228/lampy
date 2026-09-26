@@ -617,4 +617,47 @@ describe('sqlite file preservation', () => {
       await db.close();
     });
   });
+
+  it('does not restore an abandoned draft after closing the database file', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const source = path.join(path.dirname(file), 'source.jpg');
+      await writeFile(source, TINY_JPEG);
+      const media = createNodeMediaStore(mediaRoot);
+      const firstDb = await openPreparedNodeSqliteDatabase(file);
+      let nextId = 0;
+      const ids = ['moment_old_file', 'moment_new_file'];
+      const first = createUseCases({
+        ...createSqliteRepositories(firstDb),
+        media,
+        clock: clockAt('2026-09-26T18:00:00.000Z'),
+        id: () => ids[nextId++] || `moment_file_${nextId}`,
+        assetId: () => 'asset_abandoned',
+      });
+      const draft = await first.restoreOrCreateDraft();
+      await first.updateDraftNote(draft.draftId, '关掉也不该回来');
+      await first.updateDraftEmotion(draft.draftId, '平静');
+      await first.addPickedImages(draft.draftId, [
+        { sourceUri: source, mimeType: 'image/jpeg', width: 1, height: 1 },
+      ]);
+      const abandoned = await first.abandonActiveDraft(draft.draftId);
+      expect(abandoned.composer.draftId).toBe('moment_new_file');
+      expect(abandoned.composer.note).toBe('');
+      await firstDb.close();
+
+      const secondDb = await openPreparedNodeSqliteDatabase(file);
+      const second = createUseCases({
+        ...createSqliteRepositories(secondDb),
+        media,
+        clock: clockAt('2026-09-26T18:01:00.000Z'),
+      });
+      const restored = await second.restoreOrCreateDraft();
+      expect(restored.draftId).toBe('moment_new_file');
+      expect(restored.note).toBe('');
+      expect(restored.emotion).toBe('');
+      expect(restored.images).toHaveLength(0);
+      expect((await second.getRecentLife()).items).toHaveLength(0);
+      await secondDb.close();
+    });
+  });
 });

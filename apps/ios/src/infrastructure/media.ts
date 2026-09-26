@@ -115,6 +115,7 @@ export function createMemoryMediaStore(): MediaStore & {
   markUnplayable(localUri: string): void;
   failNextPersist(code: MediaPersistCode): void;
   failNextConfirm(): void;
+  failNextRemove(): void;
   persisted: Map<string, { sourceUri: string; exists: boolean; decodable: boolean; playable: boolean }>;
   removed: string[];
 } {
@@ -125,6 +126,7 @@ export function createMemoryMediaStore(): MediaStore & {
   const removed: string[] = [];
   const persistFaults: MediaPersistCode[] = [];
   let confirmFaults = 0;
+  let removeFaults = 0;
 
   async function persist(
     dest: string,
@@ -165,6 +167,10 @@ export function createMemoryMediaStore(): MediaStore & {
       return !!file && file.exists && file.playable;
     },
     async removeAppOwned(localUri) {
+      if (removeFaults > 0) {
+        removeFaults -= 1;
+        throw new Error('remove failed');
+      }
       if (!localUri.startsWith('memory://assets/')) return false;
       const file = persisted.get(localUri);
       if (!file) return false;
@@ -189,6 +195,9 @@ export function createMemoryMediaStore(): MediaStore & {
     },
     failNextConfirm() {
       confirmFaults += 1;
+    },
+    failNextRemove() {
+      removeFaults += 1;
     },
   };
 }
