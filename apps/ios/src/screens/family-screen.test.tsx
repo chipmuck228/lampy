@@ -16,6 +16,8 @@ const mockFamily = {
   inviteMember: jest.fn(),
   revokeInvitation: jest.fn(),
   leaveFamily: jest.fn(),
+  recoverFamilyCache: jest.fn(async () => ({ hidden: true, diskCleared: true })),
+  inspectFamilyReceiveCache: jest.fn(async () => ({ pendingCount: 0, fileCount: 0 })),
   removeMember: jest.fn(),
   dissolveFamily: jest.fn(),
   signOut: jest.fn(),
@@ -60,6 +62,19 @@ jest.mock('../infrastructure/family-test-driver', () => ({
   }),
   armFamilyTestNextRequestFailure: jest.fn(),
   consumeFamilyTestNextRequestFailure: jest.fn(),
+  armFamilyTestCacheDeleteFailure: jest.fn(),
+  formatFamilyTestCacheCleanup: (input: {
+    hidden: boolean;
+    diskCleared: boolean;
+    pendingCount: number;
+    fileCount: number;
+  }) => [
+    '缓存状态',
+    input.hidden ? '已隐藏' : '未隐藏',
+    input.diskCleared ? '磁盘已清' : '磁盘未清',
+    `待清理 ${input.pendingCount}`,
+    `家庭缓存文件 ${input.fileCount}`,
+  ].join(' '),
 }));
 
 jest.mock('../infrastructure/expo-apple-auth', () => ({
@@ -103,6 +118,9 @@ describe('family screen', () => {
       status: 'pending',
       expiresAt: '2026-09-25T07:00:00.000Z',
     });
+    mockFamily.leaveFamily.mockReset().mockResolvedValue({ left: true });
+    mockFamily.recoverFamilyCache.mockReset().mockResolvedValue({ hidden: true, diskCleared: true });
+    mockFamily.inspectFamilyReceiveCache.mockReset().mockResolvedValue({ pendingCount: 0, fileCount: 0 });
   });
 
   it('shows an accurate unavailable state when the family API is not configured', async () => {
@@ -154,6 +172,9 @@ describe('family screen', () => {
     expect(view.queryByTestId('family-test-sign-in-bob')).toBeTruthy();
     expect(view.getByTestId('family-test-create')).toBeTruthy();
     expect(view.getByTestId('family-test-invite')).toBeTruthy();
+    expect(view.getByTestId('family-test-fail-cache-isolate')).toBeTruthy();
+    expect(view.getByTestId('family-test-recover-cache')).toBeTruthy();
+    expect(view.getByTestId('family-test-leave')).toBeTruthy();
   });
 
   it('stores the pending invite code when the creator invites from the family screen', async () => {

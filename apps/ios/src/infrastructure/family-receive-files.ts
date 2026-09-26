@@ -1,5 +1,13 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { consumeFamilyTestCacheDeleteFailure } from './family-test-driver';
+
+function throwIfTestCacheDeleteArmed() {
+  if (consumeFamilyTestCacheDeleteFailure()) {
+    throw new Error('test-cache-delete-failed');
+  }
+}
+
 export type FamilyReceiveFileStore = {
   write(storageKey: string, bytes: Uint8Array): Promise<void>;
   read(storageKey: string): Promise<Uint8Array>;
@@ -51,10 +59,12 @@ export function createExpoFamilyReceiveFiles(rootDir?: string): FamilyReceiveFil
       return base64ToBytes(await FileSystem.readAsStringAsync(file, { encoding: 'base64' }));
     },
     async remove(storageKey) {
+      throwIfTestCacheDeleteArmed();
       await FileSystem.deleteAsync(dest(storageKey), { idempotent: true });
       await FileSystem.deleteAsync(`${dest(storageKey)}.part`, { idempotent: true });
     },
     async removePrefix(prefix) {
+      throwIfTestCacheDeleteArmed();
       await FileSystem.deleteAsync(dest(prefix), { idempotent: true });
     },
     async listKeys() {
