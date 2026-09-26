@@ -17,7 +17,12 @@ import {
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
 import type { ShareView } from '../family-api/types';
 import { sha256MediaBytes } from '../family-api/media-validate';
-import type { FamilyReceiveCache, ReceivedShareRecord, ReceivedShareStatus } from '../infrastructure/family-receive-cache';
+import type {
+  FamilyCacheCleanup,
+  FamilyReceiveCache,
+  ReceivedShareRecord,
+  ReceivedShareStatus,
+} from '../infrastructure/family-receive-cache';
 import { DEFAULT_SESSION_TTL_MS } from '../family-api/ids';
 import type { FamilyMemberView, FamilyView, InvitationView, MediaObjectView } from '../family-api/types';
 
@@ -203,9 +208,9 @@ export function createFamilyUseCases(deps: {
   let shareConfirm: ShareConfirmState = { status: 'idle' };
   let shareRevoke: ShareRevokeState = { status: 'idle' };
 
-  async function safeIsolateAccount(userId: string) {
+  async function safeIsolateAccount(userId: string): Promise<FamilyCacheCleanup | undefined> {
     try {
-      await deps.receiveCache?.isolateAccount(userId);
+      return await deps.receiveCache?.isolateAccount(userId);
     } catch {
       return undefined;
     }
@@ -503,8 +508,18 @@ export function createFamilyUseCases(deps: {
       const { sessionToken, userId } = await requireAccount();
       const result = await deps.client.leaveFamily(sessionToken);
       await cache.clear();
-      await safeIsolateAccount(userId);
-      return result;
+      const cleanup = await safeIsolateAccount(userId);
+      return { ...result, cleanup };
+    },
+
+    async recoverFamilyCache() {
+      if (!deps.receiveCache) return { hidden: true as const, diskCleared: true };
+      return deps.receiveCache.recoverDisk();
+    },
+
+    async inspectFamilyReceiveCache() {
+      if (!deps.receiveCache) return { pendingCount: 0, fileCount: 0 };
+      return deps.receiveCache.inspectCache();
     },
 
     async removeMember(familyId: string, userId: string) {

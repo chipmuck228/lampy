@@ -2,6 +2,13 @@ import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'node:fs/p
 import path from 'node:path';
 
 import type { FamilyReceiveFileStore } from './family-receive-files';
+import { consumeFamilyTestCacheDeleteFailure } from './family-test-driver';
+
+function throwIfTestCacheDeleteArmed() {
+  if (consumeFamilyTestCacheDeleteFailure()) {
+    throw new Error('test-cache-delete-failed');
+  }
+}
 
 export function createNodeFamilyReceiveFiles(rootDir: string): FamilyReceiveFileStore {
   const dest = (storageKey: string) => path.join(rootDir, ...storageKey.split('/').filter(Boolean));
@@ -19,10 +26,12 @@ export function createNodeFamilyReceiveFiles(rootDir: string): FamilyReceiveFile
       return new Uint8Array(await readFile(dest(storageKey)));
     },
     async remove(storageKey) {
+      throwIfTestCacheDeleteArmed();
       await unlink(dest(storageKey)).catch(() => undefined);
       await unlink(`${dest(storageKey)}.part`).catch(() => undefined);
     },
     async removePrefix(prefix) {
+      throwIfTestCacheDeleteArmed();
       await rm(dest(prefix), { recursive: true, force: true });
     },
     async listKeys() {

@@ -15,6 +15,7 @@ import {
   createSqliteFamilyReceiveCache,
 } from '../infrastructure/family-receive-cache';
 import { createNodeFamilyReceiveFiles } from '../infrastructure/family-receive-files-node';
+import { armFamilyTestCacheDeleteFailure } from '../infrastructure/family-test-driver';
 import { createPendingFamilyOperationDisk, createPendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 import { openPreparedNodeSqliteDatabase } from '../infrastructure/node-sqlite';
@@ -623,5 +624,61 @@ describe('family receive cache use cases', () => {
       diskCleared: true,
     });
     expect(familyOrphan.files.size).toBe(0);
+  });
+
+  it('injects one isolate cache-delete failure without claiming disk cleared, then recover clears only leftover files', async () => {
+    const previous = process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
+    process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
+    const dir = await mkdtemp(path.join(tmpdir(), 'lampy-f5-inject-'));
+    try {
+      const file = path.join(dir, 'lampy.db');
+      const cacheDir = path.join(dir, 'family-cache');
+      const files = createNodeFamilyReceiveFiles(cacheDir);
+      const commands = createCommands();
+      const aliceCmd = await commands.signInWithApple('apple_alice');
+      const family = await commands.createFamily(aliceCmd.sessionToken, 'fam-1');
+      const invite = await commands.inviteMember(aliceCmd.sessionToken, family.familyId, 'inv-1');
+      await commands.acceptInvitation((await commands.signInWithApple('apple_bob')).sessionToken, invite.code, 'accept-1');
+      const media = await commands.uploadMedia(aliceCmd.sessionToken, {
+        bytes: sampleJpegBytes(),
+        mimeType: 'image/jpeg',
+      });
+      const shared = await commands.shareMoment(aliceCmd.sessionToken, family.familyId, {
+        sourceMomentId: 'moment_inject',
+        sourceRevision: 1,
+        note: '门口的风',
+        emotion: '',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [media.objectId],
+        expectedMediaCount: 1,
+      });
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const cache = createSqliteFamilyReceiveCache(db, files);
+      const session = createMemoryFamilySessionStore();
+      const bob = createFamilyUseCases({
+        client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
+        session,
+        pending: testPending(),
+        receiveCache: cache,
+      });
+      await bob.signInWithApple('apple_bob');
+      armFamilyTestCacheDeleteFailure('isolate');
+      await bob.receiveShare(shared.shareId);
+      expect((await files.listKeys()).length).toBeGreaterThan(0);
+      const left = await bob.leaveFamily();
+      expect(left.cleanup).toEqual({ hidden: true, diskCleared: false });
+      expect(left.cleanup?.diskCleared).not.toBe(true);
+      const afterLeave = await bob.inspectFamilyReceiveCache();
+      expect(afterLeave.pendingCount).toBeGreaterThan(0);
+      expect(afterLeave.fileCount).toBeGreaterThan(0);
+      const recovered = await bob.recoverFamilyCache();
+      expect(recovered).toEqual({ hidden: true, diskCleared: true });
+      expect(await bob.inspectFamilyReceiveCache()).toEqual({ pendingCount: 0, fileCount: 0 });
+      await db.close();
+    } finally {
+      if (previous === undefined) delete process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
+      else process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = previous;
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

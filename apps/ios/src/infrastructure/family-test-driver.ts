@@ -138,5 +138,51 @@ export function consumeFamilyTestLibraryPick() {
   return pick;
 }
 
+export type FamilyTestCacheDeleteTarget = 'isolate' | 'recover';
+
+let armedCacheDelete: FamilyTestCacheDeleteTarget | null = null;
+let currentCacheDeleteAction: FamilyTestCacheDeleteTarget | null = null;
+let usedCacheDelete = false;
+
+export function armFamilyTestCacheDeleteFailure(target: FamilyTestCacheDeleteTarget) {
+  if (!isFamilyTestDriverEnabled()) return;
+  armedCacheDelete = target;
+  usedCacheDelete = false;
+}
+
+export function beginFamilyTestCacheDeleteAction(target: FamilyTestCacheDeleteTarget) {
+  if (!isFamilyTestDriverEnabled()) return;
+  currentCacheDeleteAction = target;
+}
+
+export function endFamilyTestCacheDeleteAction() {
+  if (usedCacheDelete) armedCacheDelete = null;
+  usedCacheDelete = false;
+  currentCacheDeleteAction = null;
+}
+
+export function consumeFamilyTestCacheDeleteFailure() {
+  if (!isFamilyTestDriverEnabled() || !armedCacheDelete || armedCacheDelete !== currentCacheDeleteAction) {
+    return false;
+  }
+  usedCacheDelete = true;
+  return true;
+}
+
+export function formatFamilyTestCacheCleanup(input: {
+  hidden: boolean;
+  diskCleared: boolean;
+  pendingCount: number;
+  fileCount: number;
+}) {
+  return [
+    '缓存状态',
+    input.hidden ? '已隐藏' : '未隐藏',
+    input.diskCleared ? '磁盘已清' : '磁盘未清',
+    `待清理 ${input.pendingCount}`,
+    `家庭缓存文件 ${input.fileCount}`,
+  ].join(' ');
+}
+
 export const FAMILY_TEST_JPEG_BASE64 =
   '/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAAEAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAEAAQAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMFBgUFBQUGCAYGBgYGCAoICAgICAgKCgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgICBAQEBwQEBxALCQsQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEP/dAAQAAf/aAAwDAQACEQMRAD8A4+iiivgz8XP/2Q==';

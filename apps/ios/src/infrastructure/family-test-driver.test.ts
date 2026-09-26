@@ -1,11 +1,16 @@
 import {
+  armFamilyTestCacheDeleteFailure,
   armFamilyTestNextRequestFailure,
+  beginFamilyTestCacheDeleteAction,
   clearFamilyTestInviteCode,
   clearFamilyTestLastRequest,
+  consumeFamilyTestCacheDeleteFailure,
   consumeFamilyTestNextRequestFailure,
+  endFamilyTestCacheDeleteAction,
   familyTestIdentityToken,
   familyTestInviteCode,
   familyTestInviteSource,
+  formatFamilyTestCacheCleanup,
   formatFamilyTestLastRequest,
   isFamilyTestDriverEnabled,
   recordFamilyTestLastRequest,
@@ -100,5 +105,42 @@ describe('family test driver', () => {
     armFamilyTestNextRequestFailure();
     expect(consumeFamilyTestNextRequestFailure()).toBe(false);
     expect(familyTestInviteCode('336dec6f90ed4d56927a325198ad0384')).toBe('');
+  });
+
+  it('fails every family-cache delete only during the armed isolate or recover action', () => {
+    process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
+    armFamilyTestCacheDeleteFailure('isolate');
+    expect(consumeFamilyTestCacheDeleteFailure()).toBe(false);
+    beginFamilyTestCacheDeleteAction('recover');
+    expect(consumeFamilyTestCacheDeleteFailure()).toBe(false);
+    endFamilyTestCacheDeleteAction();
+    beginFamilyTestCacheDeleteAction('isolate');
+    expect(consumeFamilyTestCacheDeleteFailure()).toBe(true);
+    expect(consumeFamilyTestCacheDeleteFailure()).toBe(true);
+    endFamilyTestCacheDeleteAction();
+    beginFamilyTestCacheDeleteAction('isolate');
+    expect(consumeFamilyTestCacheDeleteFailure()).toBe(false);
+    endFamilyTestCacheDeleteAction();
+    armFamilyTestCacheDeleteFailure('recover');
+    beginFamilyTestCacheDeleteAction('isolate');
+    expect(consumeFamilyTestCacheDeleteFailure()).toBe(false);
+    endFamilyTestCacheDeleteAction();
+    beginFamilyTestCacheDeleteAction('recover');
+    expect(consumeFamilyTestCacheDeleteFailure()).toBe(true);
+    endFamilyTestCacheDeleteAction();
+    expect(formatFamilyTestCacheCleanup({
+      hidden: true,
+      diskCleared: false,
+      pendingCount: 1,
+      fileCount: 2,
+    })).toBe('缓存状态 已隐藏 磁盘未清 待清理 1 家庭缓存文件 2');
+  });
+
+  it('does not arm cache-delete failures when the test driver is off', () => {
+    delete process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
+    armFamilyTestCacheDeleteFailure('isolate');
+    beginFamilyTestCacheDeleteAction('isolate');
+    expect(consumeFamilyTestCacheDeleteFailure()).toBe(false);
+    endFamilyTestCacheDeleteAction();
   });
 });

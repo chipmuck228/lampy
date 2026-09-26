@@ -10,11 +10,13 @@ import type { InvitationView } from '../family-api/types';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
 import {
+  armFamilyTestCacheDeleteFailure,
   armFamilyTestNextRequestFailure,
   familyTestIdentityToken,
   familyTestInviteCode,
   familyTestInviteSource,
   familyTestLastRequest,
+  formatFamilyTestCacheCleanup,
   formatFamilyTestLastRequest,
   isFamilyTestDriverEnabled,
   recordFamilyTestLastRequest,
@@ -81,6 +83,7 @@ export default function FamilyScreen() {
   const [inbox, setInbox] = useState<FamilyInboxView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [testDiag, setTestDiag] = useState<string | null>(null);
+  const [cacheStatus, setCacheStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const refreshGate = useRef(createFamilyRefreshGate()).current;
 
@@ -170,6 +173,33 @@ export default function FamilyScreen() {
       };
     }, [refresh]),
   );
+
+  async function reportLeaveCleanup(
+    family: FamilyUseCases,
+    result: { cleanup?: { diskCleared?: boolean } },
+  ) {
+    const inspect = await family.inspectFamilyReceiveCache();
+    setCacheStatus(formatFamilyTestCacheCleanup({
+      hidden: true,
+      diskCleared: result.cleanup?.diskCleared === true,
+      pendingCount: inspect.pendingCount,
+      fileCount: inspect.fileCount,
+    }));
+  }
+
+  async function reportRecoverCleanup(
+    family: FamilyUseCases,
+    cleanup: { diskCleared: boolean },
+    visible: boolean,
+  ) {
+    const inspect = await family.inspectFamilyReceiveCache();
+    setCacheStatus(formatFamilyTestCacheCleanup({
+      hidden: !visible,
+      diskCleared: cleanup.diskCleared,
+      pendingCount: inspect.pendingCount,
+      fileCount: inspect.fileCount,
+    }));
+  }
 
   async function run(work: (family: FamilyUseCases) => Promise<void>) {
     if (busy) return;
@@ -292,9 +322,27 @@ export default function FamilyScreen() {
       setMessage('下一笔刷新会失败。收下和撤回还没动。');
       return;
     }
+    if (action === 'fail-cache-isolate') {
+      armFamilyTestCacheDeleteFailure('isolate');
+      setMessage('下一次离开清理的家庭缓存删除会失败。个人媒体不会动。');
+      return;
+    }
+    if (action === 'fail-cache-recover') {
+      armFamilyTestCacheDeleteFailure('recover');
+      setMessage('下一次恢复清理的家庭缓存删除会失败。个人媒体不会动。');
+      return;
+    }
+    if (action === 'recover') {
+      void run(async (family) => {
+        const cleanup = await family.recoverFamilyCache();
+        const next = await family.getMembership();
+        await reportRecoverCleanup(family, cleanup, next.kind === 'ready');
+      });
+      return;
+    }
     if (action === 'leave') {
       void run(async (family) => {
-        await family.leaveFamily();
+        await reportLeaveCleanup(family, await family.leaveFamily());
       });
       return;
     }
@@ -399,6 +447,11 @@ export default function FamilyScreen() {
                     .join(' · ')}
               </Text>
             ) : null}
+            {cacheStatus ? (
+              <Text style={styles.body} testID="family-test-cache-status">
+                {cacheStatus}
+              </Text>
+            ) : null}
             <View style={styles.testRow}>
               <Pressable
                 accessibilityRole="button"
@@ -498,6 +551,53 @@ export default function FamilyScreen() {
                 style={styles.testHit}
               >
                 <Text style={styles.action}>发出测试邀请</Text>
+              </Pressable>
+            </View>
+            <View style={styles.testRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="让离开缓存删除失败"
+                testID="family-test-fail-cache-isolate"
+                disabled={busy}
+                onPress={() => {
+                  armFamilyTestCacheDeleteFailure('isolate');
+                  setMessage('下一次离开清理的家庭缓存删除会失败。个人媒体不会动。');
+                }}
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>让离开缓存删除失败</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="恢复家庭缓存清理"
+                testID="family-test-recover-cache"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    const cleanup = await family.recoverFamilyCache();
+                    const next = await family.getMembership();
+                    await reportRecoverCleanup(family, cleanup, next.kind === 'ready');
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>恢复家庭缓存清理</Text>
+              </Pressable>
+            </View>
+            <View style={styles.testRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="离开测试家庭"
+                testID="family-test-leave"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    await reportLeaveCleanup(family, await family.leaveFamily());
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>离开测试家庭</Text>
               </Pressable>
             </View>
           </>
@@ -705,7 +805,12 @@ export default function FamilyScreen() {
                 accessibilityLabel="离开这个家"
                 testID="family-leave"
                 disabled={busy}
-                onPress={() => run(async (family) => { await family.leaveFamily(); })}
+                onPress={() =>
+                  run(async (family) => {
+                    const result = await family.leaveFamily();
+                    if (testDriver) await reportLeaveCleanup(family, result);
+                  })
+                }
                 style={styles.hit}
               >
                 <Text style={styles.action}>离开这个家</Text>

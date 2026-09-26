@@ -2,6 +2,22 @@ import { sha256MediaBytes } from '../family-api/media-validate';
 import type { ShareSnapshot, ShareView } from '../family-api/types';
 import type { FamilyReceiveFileStore } from './family-receive-files';
 import type { SqlDatabase } from './sql';
+import {
+  beginFamilyTestCacheDeleteAction,
+  endFamilyTestCacheDeleteAction,
+} from './family-test-driver';
+
+async function withCacheDeleteAction<T>(
+  target: 'isolate' | 'recover',
+  work: () => Promise<T>,
+): Promise<T> {
+  beginFamilyTestCacheDeleteAction(target);
+  try {
+    return await work();
+  } finally {
+    endFamilyTestCacheDeleteAction();
+  }
+}
 
 export type ReceivedShareStatus = 'listed' | 'receiving' | 'received' | 'failed';
 
@@ -50,6 +66,7 @@ export type FamilyReceiveCache = {
   replaceVisible(userId: string, familyId: string, shares: ShareView[]): Promise<FamilyCacheCleanup>;
   recoverDisk(): Promise<FamilyCacheCleanup>;
   pendingCleanupPrefixes(): Promise<string[]>;
+  inspectCache(): Promise<{ pendingCount: number; fileCount: number }>;
 };
 
 function snapshotFrom(share: ShareView): ShareSnapshot {
@@ -188,6 +205,9 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
         if (key.startsWith(`${userId}/${familyId}/${shareId}/`) && key.endsWith('.part')) files.delete(key);
       }
       return replaceShare({ ...existing, receiveStatus: 'failed' });
+    },
+    async inspectCache() {
+      return { pendingCount: pending.size, fileCount: files.size };
     },
     async isolateAccount(userId) {
       const doomed = shares.filter((row) => row.userId === userId).map(sharePrefixOf);
@@ -621,39 +641,45 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
       return saveShare({ ...existing, receiveStatus: 'failed' });
     },
     async isolateAccount(userId) {
-      const doomed = (
-        await db.getAll<{ family_id: string; share_id: string }>(
-          'SELECT family_id, share_id FROM family_received_shares WHERE user_id = ?',
-          [userId],
-        )
-      ).map((row) => `${userId}/${row.family_id}/${row.share_id}`);
-      return isolateRowsThenFiles(doomed, userId, async () => {
-        await db.run('DELETE FROM family_received_media WHERE user_id = ?', [userId]);
-        await db.run('DELETE FROM family_received_shares WHERE user_id = ?', [userId]);
+      return withCacheDeleteAction('isolate', async () => {
+        const doomed = (
+          await db.getAll<{ family_id: string; share_id: string }>(
+            'SELECT family_id, share_id FROM family_received_shares WHERE user_id = ?',
+            [userId],
+          )
+        ).map((row) => `${userId}/${row.family_id}/${row.share_id}`);
+        return isolateRowsThenFiles(doomed, userId, async () => {
+          await db.run('DELETE FROM family_received_media WHERE user_id = ?', [userId]);
+          await db.run('DELETE FROM family_received_shares WHERE user_id = ?', [userId]);
+        });
       });
     },
     async isolateFamily(userId, familyId) {
-      const doomed = (
-        await db.getAll<{ share_id: string }>(
-          'SELECT share_id FROM family_received_shares WHERE user_id = ? AND family_id = ?',
-          [userId, familyId],
-        )
-      ).map((row) => `${userId}/${familyId}/${row.share_id}`);
-      return isolateRowsThenFiles(doomed, `${userId}/${familyId}`, async () => {
-        await db.run('DELETE FROM family_received_media WHERE user_id = ? AND family_id = ?', [userId, familyId]);
-        await db.run('DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ?', [userId, familyId]);
+      return withCacheDeleteAction('isolate', async () => {
+        const doomed = (
+          await db.getAll<{ share_id: string }>(
+            'SELECT share_id FROM family_received_shares WHERE user_id = ? AND family_id = ?',
+            [userId, familyId],
+          )
+        ).map((row) => `${userId}/${familyId}/${row.share_id}`);
+        return isolateRowsThenFiles(doomed, `${userId}/${familyId}`, async () => {
+          await db.run('DELETE FROM family_received_media WHERE user_id = ? AND family_id = ?', [userId, familyId]);
+          await db.run('DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ?', [userId, familyId]);
+        });
       });
     },
     async isolateShare(userId, familyId, shareId) {
-      await db.run(
-        `DELETE FROM family_received_media WHERE user_id = ? AND family_id = ? AND share_id = ?`,
-        [userId, familyId, shareId],
-      );
-      await db.run(
-        `DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ? AND share_id = ?`,
-        [userId, familyId, shareId],
-      );
-      return { hidden: true as const, diskCleared: await removeTracked(`${userId}/${familyId}/${shareId}`) };
+      return withCacheDeleteAction('isolate', async () => {
+        await db.run(
+          `DELETE FROM family_received_media WHERE user_id = ? AND family_id = ? AND share_id = ?`,
+          [userId, familyId, shareId],
+        );
+        await db.run(
+          `DELETE FROM family_received_shares WHERE user_id = ? AND family_id = ? AND share_id = ?`,
+          [userId, familyId, shareId],
+        );
+        return { hidden: true as const, diskCleared: await removeTracked(`${userId}/${familyId}/${shareId}`) };
+      });
     },
     async replaceVisible(userId, familyId, visible) {
       const keep = new Set(visible.map((share) => share.shareId));
@@ -673,11 +699,17 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
       }
       return { hidden: true as const, diskCleared };
     },
-    recoverDisk,
+    recoverDisk: () => withCacheDeleteAction('recover', recoverDisk),
     async pendingCleanupPrefixes() {
       return (await db.getAll<{ prefix: string }>('SELECT prefix FROM family_receive_pending_cleanup')).map(
         (row) => row.prefix,
       );
+    },
+    async inspectCache() {
+      return {
+        pendingCount: (await db.getAll<{ prefix: string }>('SELECT prefix FROM family_receive_pending_cleanup')).length,
+        fileCount: (await files.listKeys()).length,
+      };
     },
   };
 }
