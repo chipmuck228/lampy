@@ -33,6 +33,17 @@ jest.mock('../application/container', () => ({
     }),
     updateDraftNote: async () => undefined,
     updateDraftEmotion: async () => undefined,
+    abandonActiveDraft: async () => ({
+      composer: {
+        draftId: 'moment_new',
+        note: '',
+        emotion: '',
+        isRestored: false,
+        images: [],
+        audio: null,
+      },
+      cleanup: { removed: 0, kept: 0, failed: 0 },
+    }),
     addLibraryImages: async () => undefined,
     addCameraImage: async () => undefined,
     saveTextMoment: async () => ({ id: 'moment_restored' }),
@@ -61,5 +72,7 @@ describe('leave screen', () => {
     expect(view.getByLabelText('照片 1/1')).toBeTruthy();
     expect(view.getByLabelText('拍摄')).toBeTruthy();
     expect(view.getByLabelText('照片')).toBeTruthy();
+    expect(view.getByTestId('composer-note').props.editable).toBe(true);
+    expect(view.getByLabelText('放弃这份草稿')).toBeTruthy();
   });
 });

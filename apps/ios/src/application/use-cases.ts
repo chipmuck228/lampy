@@ -63,6 +63,9 @@ const AUDIO_WRITE_FAILED_MESSAGE =
   '这段声音还没写进草稿。已经写的字和已留下的内容还在，可以再试。';
 const SAVE_DISK_FULL_MESSAGE = '这次没有留下正式记录。草稿还在，可以清出空间后再试。';
 const SAVE_WRITE_FAILED_MESSAGE = '这次没有留下正式记录。草稿还在，可以再试。';
+const DRAFT_CLEAR_FAILED_MESSAGE = '这份草稿还没拿掉。原来的内容还在，可以再试。';
+export const DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE =
+  '草稿已经拿掉。有些本地副本还没删掉，没有从这台设备上清除。';
 
 export type Clock = { now: () => Date };
 
@@ -125,6 +128,17 @@ export type InterruptRecordingResult = {
   composer: ComposerViewModel;
   kept: boolean;
   hadSession: boolean;
+};
+
+export type DraftMediaCleanup = {
+  removed: number;
+  kept: number;
+  failed: number;
+};
+
+export type AbandonDraftResult = {
+  composer: ComposerViewModel;
+  cleanup: DraftMediaCleanup;
 };
 
 export type MomentDetailViewModel =
@@ -621,6 +635,22 @@ export function createUseCases(deps: {
     return toComposer(next, true);
   }
 
+  function createEmptyDraftRecord(): MomentRecord {
+    const instant = clock.now();
+    return createDraftMoment(
+      {
+        ownerId,
+        content: { note: '' },
+        time: {
+          recordedAt: instant.toISOString(),
+          occurredAtPrecision: 'unknown',
+        },
+        origin: { type: 'created' },
+      },
+      { now: () => instant, ownerId, id: nextId },
+    );
+  }
+
   async function restoreOrCreateDraft(): Promise<ComposerViewModel> {
     if (restoreInFlight) return restoreInFlight;
     restoreInFlight = (async () => {
@@ -628,25 +658,101 @@ export function createUseCases(deps: {
       if (existing) {
         return toComposer(existing, true);
       }
-      const instant = clock.now();
-      const draft = createDraftMoment(
-        {
-          ownerId,
-          content: { note: '' },
-          time: {
-            recordedAt: instant.toISOString(),
-            occurredAtPrecision: 'unknown',
-          },
-          origin: { type: 'created' },
-        },
-        { now: () => instant, ownerId, id: nextId },
-      );
+      const draft = createEmptyDraftRecord();
       await deps.drafts.save(draft);
       return toComposer(draft, false);
     })().finally(() => {
       restoreInFlight = null;
     });
     return restoreInFlight;
+  }
+
+  async function snapshotDraftAssets(
+    draft: MomentRecord,
+  ): Promise<{ id: string; localUri?: string }[]> {
+    const snapshots: { id: string; localUri?: string }[] = [];
+    for (const assetId of draft.assetIds) {
+      const asset = await loadAsset(assetId);
+      snapshots.push({ id: assetId, localUri: asset?.localUri });
+    }
+    return snapshots;
+  }
+
+  async function cleanupAbandonedAssets(
+    snapshots: { id: string; localUri?: string }[],
+  ): Promise<DraftMediaCleanup> {
+    let removed = 0;
+    let kept = 0;
+    let failed = 0;
+    for (const snapshot of snapshots) {
+      if (await isAssetReferenced(snapshot.id)) {
+        kept += 1;
+        continue;
+      }
+      if (!snapshot.localUri || !deps.media) {
+        kept += 1;
+        continue;
+      }
+      try {
+        const deleted = await deps.media.removeAppOwned(snapshot.localUri);
+        if (!deleted) {
+          kept += 1;
+          continue;
+        }
+      } catch {
+        failed += 1;
+        continue;
+      }
+      const existing = deps.assets ? await deps.assets.findById(snapshot.id) : { kind: 'missing' as const };
+      if (existing.kind !== 'unreadable') {
+        try {
+          await deps.assets?.remove(snapshot.id);
+        } catch {
+          // File is already gone; keep the leftover row rather than claiming a second delete.
+        }
+      }
+      removed += 1;
+    }
+    return { removed, kept, failed };
+  }
+
+  async function abandonActiveDraft(draftId: string): Promise<AbandonDraftResult> {
+    const draft = await requireDraft(draftId);
+    if (deps.capture?.isRecording()) {
+      try {
+        await deps.capture.interrupt();
+      } catch {
+        throw new ApplicationError('DRAFT_CLEAR_FAILED', DRAFT_CLEAR_FAILED_MESSAGE);
+      }
+    }
+    const snapshots = await snapshotDraftAssets(draft);
+    try {
+      await deps.drafts.clear(draftId);
+    } catch {
+      throw new ApplicationError('DRAFT_CLEAR_FAILED', DRAFT_CLEAR_FAILED_MESSAGE);
+    }
+    const leftover = await deps.drafts.loadActive();
+    if (leftover && leftover.id === draftId) {
+      throw new ApplicationError('DRAFT_CLEAR_FAILED', DRAFT_CLEAR_FAILED_MESSAGE);
+    }
+
+    const next = createEmptyDraftRecord();
+    try {
+      await deps.drafts.save(next);
+    } catch {
+      try {
+        await deps.drafts.save(draft);
+      } catch {
+        // Keep the in-memory page as-is; the caller must not show 已放弃.
+      }
+      throw new ApplicationError('DRAFT_CLEAR_FAILED', DRAFT_CLEAR_FAILED_MESSAGE);
+    }
+
+    const cleanup = await cleanupAbandonedAssets(snapshots);
+    return {
+      composer: await toComposer(next, false),
+      cleanup,
+    };
   }
 
   async function updateDraftNote(draftId: string, note: string): Promise<void> {
@@ -884,6 +990,7 @@ export function createUseCases(deps: {
 
   return {
     restoreOrCreateDraft,
+    abandonActiveDraft,
     updateDraftNote,
     updateDraftEmotion,
     addLibraryImages,

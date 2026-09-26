@@ -17,7 +17,12 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
-import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
+import {
+  DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE,
+  type AudioView,
+  type ImageView,
+  type UnknownMediaView,
+} from '../application/use-cases';
 import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/moment-audio';
 import { FeelingPicker } from '../screens/moment-feeling';
 import { MomentImages } from '../screens/moment-images';
@@ -42,14 +47,25 @@ export default function LeaveScreen() {
   const [phase, setPhase] = useState<RecordPhase>('ready');
   const [elapsedMs, setElapsedMs] = useState(0);
   const [restored, setRestored] = useState(false);
+  const [confirmingAbandon, setConfirmingAbandon] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'idle' | 'photo' | 'record' | 'audio' | 'save'>('idle');
+  const [busy, setBusy] = useState<'idle' | 'photo' | 'record' | 'audio' | 'save' | 'abandon'>('idle');
   const draftIdRef = useRef<string | null>(null);
   const busyRef = useRef(false);
+  const abandoningRef = useRef(false);
+  const writeEpochRef = useRef(0);
   const phaseRef = useRef<RecordPhase>('ready');
   const persistChain = useRef(Promise.resolve());
   const interruptRef = useRef<() => void>(() => {});
+  const mountedRef = useRef(true);
   const sound = useSoundPlayer();
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   function setRecordPhase(next: RecordPhase) {
     phaseRef.current = next;
@@ -80,7 +96,7 @@ export default function LeaveScreen() {
     getUseCases()
       .then((app) => app.restoreOrCreateDraft())
       .then((draft) => {
-        if (cancelled) return;
+        if (cancelled || !mountedRef.current) return;
         draftIdRef.current = draft.draftId;
         setDraftId(draft.draftId);
         setNote(draft.note);
@@ -90,7 +106,7 @@ export default function LeaveScreen() {
         setRecordPhase(draft.audio ? 'stopped' : 'ready');
       })
       .catch(() => {
-        if (!cancelled) setMessage('草稿暂时读不出来，原来的内容没有被改写。');
+        if (!cancelled && mountedRef.current) setMessage('草稿暂时读不出来，原来的内容没有被改写。');
       });
     return () => {
       cancelled = true;
@@ -132,11 +148,23 @@ export default function LeaveScreen() {
   function persistNote(next: string) {
     setNote(next);
     const id = draftIdRef.current;
-    if (!id) return;
+    const epoch = writeEpochRef.current;
+    if (!id || abandoningRef.current) return;
     void enqueue(async () => {
+      if (writeEpochRef.current !== epoch || draftIdRef.current !== id) {
+        return;
+      }
       const app = await getUseCases();
       await app.updateDraftNote(id, next);
     }).catch((error) => {
+      if (
+        !mountedRef.current ||
+        writeEpochRef.current !== epoch ||
+        draftIdRef.current !== id ||
+        abandoningRef.current
+      ) {
+        return;
+      }
       setMessage(shownError(error, '草稿暂时写不进去。已经写的字还在屏幕上。'));
     });
   }
@@ -144,18 +172,30 @@ export default function LeaveScreen() {
   function persistEmotion(next: string) {
     setEmotion(next);
     const id = draftIdRef.current;
-    if (!id) return;
+    const epoch = writeEpochRef.current;
+    if (!id || abandoningRef.current) return;
     void enqueue(async () => {
+      if (writeEpochRef.current !== epoch || draftIdRef.current !== id) {
+        return;
+      }
       const app = await getUseCases();
       await app.updateDraftEmotion(id, next);
     }).catch((error) => {
+      if (
+        !mountedRef.current ||
+        writeEpochRef.current !== epoch ||
+        draftIdRef.current !== id ||
+        abandoningRef.current
+      ) {
+        return;
+      }
       setMessage(shownError(error, '草稿暂时写不进去。已经选的感受还在屏幕上。'));
     });
   }
 
   function applyImageAction(action: 'library' | 'camera') {
     const id = draftIdRef.current;
-    if (!id || busyRef.current) return;
+    if (!id || busyRef.current || abandoningRef.current) return;
     busyRef.current = true;
     setBusy('photo');
     void enqueue(async () => {
@@ -190,6 +230,7 @@ export default function LeaveScreen() {
         setMessage(shownError(error, '这张照片没有留下。可以再试，也可以继续写字。'));
       })
       .finally(() => {
+        if (abandoningRef.current || !mountedRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -197,7 +238,7 @@ export default function LeaveScreen() {
 
   function startRecording() {
     const id = draftIdRef.current;
-    if (!id || busyRef.current) return;
+    if (!id || busyRef.current || abandoningRef.current) return;
     busyRef.current = true;
     setBusy('record');
     setElapsedMs(0);
@@ -247,6 +288,7 @@ export default function LeaveScreen() {
         setMessage(shownError(error, '这次没有录下声音。可以再试，也可以继续写字。'));
       })
       .finally(() => {
+        if (abandoningRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -275,6 +317,7 @@ export default function LeaveScreen() {
         setMessage(shownError(error, '录音被打断。可以再试，也可以继续写字。'));
       })
       .finally(() => {
+        if (abandoningRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -286,7 +329,7 @@ export default function LeaveScreen() {
 
   function removeAudio() {
     const id = draftIdRef.current;
-    if (!id || busyRef.current) return;
+    if (!id || busyRef.current || abandoningRef.current) return;
     busyRef.current = true;
     setBusy('audio');
     void sound.stop();
@@ -303,6 +346,7 @@ export default function LeaveScreen() {
         setMessage(shownError(error, '这段声音还没从草稿里拿掉。可以再试。'));
       })
       .finally(() => {
+        if (abandoningRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -310,7 +354,7 @@ export default function LeaveScreen() {
 
   function rerecord() {
     const id = draftIdRef.current;
-    if (!id || busyRef.current) return;
+    if (!id || busyRef.current || abandoningRef.current) return;
     busyRef.current = true;
     setBusy('audio');
     void sound.stop();
@@ -345,27 +389,82 @@ export default function LeaveScreen() {
 
   async function onSave() {
     const id = draftIdRef.current;
-    if (!id || busyRef.current) return;
+    if (!id || busyRef.current || abandoningRef.current) return;
     busyRef.current = true;
     setBusy('save');
     try {
       await enqueue(async () => {
+        if (abandoningRef.current || draftIdRef.current !== id) {
+          throw new Error('abandoned');
+        }
         const app = await getUseCases();
         await app.updateDraftNote(id, note);
         await app.updateDraftEmotion(id, emotion);
         await app.saveTextMoment(id);
       });
+      if (abandoningRef.current || draftIdRef.current !== id) return;
       router.replace('/');
     } catch (error) {
+      if (abandoningRef.current || draftIdRef.current !== id) return;
       setMessage(
         isApplicationError(error) && error.code === 'MOMENT_EMPTY'
           ? '写一句、留下一张照片或一段声音。已经写的草稿还在。'
           : shownError(error, '这次没有留下正式记录。可以再试。'),
       );
     } finally {
+      if (abandoningRef.current) return;
       busyRef.current = false;
       setBusy('idle');
     }
+  }
+
+  function requestAbandon() {
+    if (!draftIdRef.current || abandoningRef.current || busy === 'save') return;
+    setConfirmingAbandon(true);
+  }
+
+  function cancelAbandon() {
+    if (abandoningRef.current) return;
+    setConfirmingAbandon(false);
+  }
+
+  function confirmAbandon() {
+    const id = draftIdRef.current;
+    if (!id || abandoningRef.current) return;
+    abandoningRef.current = true;
+    setConfirmingAbandon(false);
+    setBusy('abandon');
+    void sound.stop();
+    void enqueue(async () => {
+      writeEpochRef.current += 1;
+      const epoch = writeEpochRef.current;
+      const app = await getUseCases();
+      const result = await app.abandonActiveDraft(id);
+      return { result, epoch };
+    })
+      .then(({ result, epoch }) => {
+        if (!mountedRef.current || writeEpochRef.current !== epoch) return;
+        writeEpochRef.current += 1;
+        draftIdRef.current = result.composer.draftId;
+        setDraftId(result.composer.draftId);
+        setNote(result.composer.note);
+        setEmotion(result.composer.emotion ?? '');
+        applyComposer(result.composer);
+        setRestored(false);
+        setRecordPhase('ready');
+        setElapsedMs(0);
+        setMessage(result.cleanup.failed > 0 ? DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE : null);
+      })
+      .catch((error) => {
+        if (!mountedRef.current) return;
+        setMessage(shownError(error, '这份草稿还没拿掉。原来的内容还在，可以再试。'));
+      })
+      .finally(() => {
+        abandoningRef.current = false;
+        busyRef.current = false;
+        if (!mountedRef.current) return;
+        setBusy('idle');
+      });
   }
 
   const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
@@ -407,9 +506,21 @@ export default function LeaveScreen() {
     }
   }, [testAction, testNonce, draftId]);
 
+  const draftHasContent =
+    !!note.trim() || !!emotion.trim() || images.length > 0 || !!audio || unknownMedia.length > 0;
+  const showAbandon = !!draftId && draftHasContent && busy !== 'save';
   const actionsLocked = !draftId || busy !== 'idle';
+  const composerLocked = actionsLocked || confirmingAbandon;
   const saveLabel =
-    busy === 'save' ? '正在留下…' : busy === 'photo' ? '正在加入照片…' : busy === 'audio' || busy === 'record' ? '正在留下声音…' : '留下';
+    busy === 'save'
+      ? '正在留下…'
+      : busy === 'photo'
+        ? '正在加入照片…'
+        : busy === 'audio' || busy === 'record'
+          ? '正在留下声音…'
+          : busy === 'abandon'
+            ? '正在拿掉这份草稿…'
+            : '留下';
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="留下">
@@ -432,11 +543,50 @@ export default function LeaveScreen() {
           {restored ? (
             <Text style={styles.restore}>上次还有一些内容没保存，已经为你放回来了。</Text>
           ) : null}
+          {showAbandon && !confirmingAbandon ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="放弃这份草稿"
+              testID="composer-abandon"
+              onPress={requestAbandon}
+              disabled={busy === 'abandon'}
+              style={styles.abandonHit}
+            >
+              <Text style={styles.abandon}>放弃这份草稿</Text>
+            </Pressable>
+          ) : null}
+          {confirmingAbandon ? (
+            <View testID="composer-abandon-confirm">
+              <Text style={styles.restore}>
+                这份草稿里的文字、感受、照片和录音会从这里拿掉。相册原片和已经留下的记录不会动。
+              </Text>
+              <View style={styles.confirmRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="取消放弃草稿"
+                  testID="composer-abandon-cancel"
+                  onPress={cancelAbandon}
+                  style={styles.abandonHit}
+                >
+                  <Text style={styles.back}>取消</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="确认放弃这份草稿"
+                  testID="composer-abandon-confirm-button"
+                  onPress={confirmAbandon}
+                  style={styles.abandonHit}
+                >
+                  <Text style={styles.abandon}>确认放弃</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
           <TextInput
             accessibilityLabel="要留下的一句话"
             testID="composer-note"
             value={note}
-            editable={!!draftId}
+            editable={!!draftId && busy !== 'abandon' && !confirmingAbandon}
             onChangeText={(value) => {
               void persistNote(value);
             }}
@@ -454,7 +604,7 @@ export default function LeaveScreen() {
             audio={audio}
             playbackStatus={sound.failed ? 'unavailable' : sound.status}
             currentTimeMs={sound.currentTimeMs}
-            disabled={actionsLocked}
+            disabled={composerLocked}
             onStart={startRecording}
             onStop={stopRecording}
             onPlay={() => {
@@ -468,7 +618,7 @@ export default function LeaveScreen() {
           />
           <FeelingPicker
             value={emotion}
-            disabled={!draftId}
+            disabled={!draftId || composerLocked}
             onChange={(next) => {
               persistEmotion(next);
             }}
@@ -482,7 +632,7 @@ export default function LeaveScreen() {
               onPress={() => {
                 applyImageAction('camera');
               }}
-              disabled={actionsLocked}
+              disabled={composerLocked}
               style={styles.mediaHit}
             >
               <Text style={styles.media}>拍摄</Text>
@@ -494,7 +644,7 @@ export default function LeaveScreen() {
               onPress={() => {
                 applyImageAction('library');
               }}
-              disabled={actionsLocked}
+              disabled={composerLocked}
               style={styles.mediaHit}
             >
               <Text style={styles.media}>照片</Text>
@@ -506,7 +656,7 @@ export default function LeaveScreen() {
               onPress={() => {
                 void onSave();
               }}
-              disabled={actionsLocked}
+              disabled={composerLocked}
               style={styles.saveHit}
             >
               <Text style={styles.save}>{saveLabel}</Text>
@@ -532,6 +682,9 @@ const styles = StyleSheet.create({
   backHit: { minHeight: 44, justifyContent: 'center' },
   back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
   restore: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
+  abandonHit: { minHeight: 44, justifyContent: 'center' },
+  abandon: { fontSize: 16, lineHeight: 22, color: '#87513D' },
+  confirmRow: { flexDirection: 'row', gap: 24, marginTop: 8 },
   input: {
     minHeight: 160,
     fontSize: 22,
