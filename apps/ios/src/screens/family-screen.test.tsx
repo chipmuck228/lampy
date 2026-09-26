@@ -30,6 +30,7 @@ jest.mock('expo-router', () => {
   const { useEffect } = require('react');
   return {
     useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+    useLocalSearchParams: () => ({}),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
@@ -50,6 +51,10 @@ jest.mock('../infrastructure/family-test-driver', () => ({
   isFamilyTestDriverEnabled: () => mockTestDriver.enabled,
   familyTestIdentityToken: (account: 'alice' | 'bob') => (account === 'alice' ? 'apple_alice' : 'apple_bob'),
   familyTestInviteCode: () => mockTestDriver.inviteCode,
+  familyTestInviteSource: () => (mockTestDriver.inviteCode ? 'stored' : 'none'),
+  familyTestLastRequest: () => null,
+  formatFamilyTestLastRequest: () => null,
+  recordFamilyTestLastRequest: jest.fn(),
   storeFamilyTestInviteCode: jest.fn((code: string) => {
     mockTestDriver.inviteCode = code;
   }),

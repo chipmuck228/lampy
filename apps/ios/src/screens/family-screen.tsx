@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getFamilyUseCases } from '../application/container';
 import type { FamilyInboxView, FamilyMembershipView, FamilyUseCases } from '../application/family-use-cases';
@@ -13,7 +13,11 @@ import {
   armFamilyTestNextRequestFailure,
   familyTestIdentityToken,
   familyTestInviteCode,
+  familyTestInviteSource,
+  familyTestLastRequest,
+  formatFamilyTestLastRequest,
   isFamilyTestDriverEnabled,
+  recordFamilyTestLastRequest,
   storeFamilyTestInviteCode,
 } from '../infrastructure/family-test-driver';
 import { createFamilyRefreshGate } from './family-refresh';
@@ -62,6 +66,7 @@ function refreshMessage(result: 'ok' | 'invites-failed' | 'revoke-unconfirmed') 
 
 export default function FamilyScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
   const { width } = useWindowDimensions();
   const readingWidth = Math.min(width, 720);
   const configured = isFamilyApiConfigured();
@@ -72,6 +77,7 @@ export default function FamilyScreen() {
   const [inviteCode, setInviteCode] = useState('');
   const [inbox, setInbox] = useState<FamilyInboxView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [testDiag, setTestDiag] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const refreshGate = useRef(createFamilyRefreshGate()).current;
 
@@ -172,8 +178,15 @@ export default function FamilyScreen() {
       if (result === 'stale') return;
       setMessage(refreshMessage(result));
     } catch (error) {
+      if (testDriver && isApplicationError(error)) {
+        recordFamilyTestLastRequest({
+          action: familyTestLastRequest()?.action || 'unknown',
+          errorCode: error.code,
+        });
+      }
       setMessage(errorText(error));
     } finally {
+      if (testDriver) setTestDiag(formatFamilyTestLastRequest());
       setBusy(false);
     }
   }
@@ -202,6 +215,106 @@ export default function FamilyScreen() {
       setBusy(false);
     }
   }
+
+  function runTestDriverAction(action: string) {
+    if (!testDriver) return;
+    if (action === 'alice') {
+      void run(async (family) => {
+        await family.signInWithApple(familyTestIdentityToken('alice'));
+      });
+      return;
+    }
+    if (action === 'bob') {
+      void run(async (family) => {
+        await family.signInWithApple(familyTestIdentityToken('bob'));
+      });
+      return;
+    }
+    if (action === 'create') {
+      void run(async (family) => {
+        await family.createFamily();
+      });
+      return;
+    }
+    if (action === 'invite') {
+      void run(async (family) => {
+        const next = await family.getMembership();
+        if (next.kind !== 'ready' || next.role !== 'creator') {
+          throw new Error('test-invite-missing');
+        }
+        const invited = await family.inviteMember(next.familyId);
+        if (invited.code) storeFamilyTestInviteCode(invited.code);
+      });
+      return;
+    }
+    if (action === 'accept') {
+      void run(async (family) => {
+        const source = familyTestInviteSource();
+        const code = familyTestInviteCode();
+        const before = await family.getMembership();
+        recordFamilyTestLastRequest({
+          action: 'accept',
+          sent: false,
+          inviteSource: source,
+          membershipBefore: before.kind,
+        });
+        if (!code) {
+          throw new Error('test-invite-missing');
+        }
+        await family.acceptInvitation(code);
+      });
+      return;
+    }
+    if (action === 'signout') {
+      void signOutNow();
+      return;
+    }
+    if (action === 'fail-next') {
+      armFamilyTestNextRequestFailure();
+      setMessage('下一笔家庭请求会失败，可以用来试撤回重试。');
+      return;
+    }
+    if (action === 'leave') {
+      void run(async (family) => {
+        await family.leaveFamily();
+      });
+      return;
+    }
+    if (action === 'revoke') {
+      void run(async (family) => {
+        const nextInbox = await family.refreshFamilyInbox();
+        const item = nextInbox.kind === 'ready' ? nextInbox.items.find((row) => row.canRevoke) : undefined;
+        if (!item) throw new Error('revoke-retry');
+        const next = await family.revokeShare(item.shareId);
+        if (next.status === 'failed') throw new Error('revoke-retry');
+      });
+      return;
+    }
+    if (action === 'receive') {
+      void run(async (family) => {
+        const nextInbox = await family.refreshFamilyInbox();
+        const item = nextInbox.kind === 'ready' ? nextInbox.items[0] : undefined;
+        if (!item) throw new Error('test-invite-missing');
+        await family.receiveShare(item.shareId);
+      });
+    }
+  }
+
+  const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
+  const testNonce = Array.isArray(params.n) ? params.n[0] : params.n;
+  const ranTestAction = useRef('');
+  useEffect(() => {
+    if (!testDriver || !testAction || membership === null) return;
+    const key = `${testAction}:${testNonce || ''}`;
+    if (ranTestAction.current === key) return;
+    ranTestAction.current = key;
+    const timer = setTimeout(() => {
+      runTestDriverAction(testAction);
+    }, 200);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [testAction, testDriver, membership]);
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="家庭">
@@ -232,6 +345,27 @@ export default function FamilyScreen() {
             <Text style={styles.body}>
               仅测试环境。这些是本机测试账号，不是真实 Apple，也不是公网家庭服务。
             </Text>
+            <Text style={styles.body} testID="family-test-account-state">
+              当前账号 {membership?.kind || '未知'}
+              {membership?.kind === 'ready' ? ` ${membership.role}` : ''}
+            </Text>
+            <Text style={styles.body} testID="family-test-invite-source">
+              {familyTestInviteSource() === 'stored'
+                ? '本轮已记下邀请'
+                : familyTestInviteSource() === 'env'
+                  ? '环境里有旧邀请码，不会用来加入'
+                  : '还没有本轮邀请'}
+            </Text>
+            {testDiag ? (
+              <Text style={styles.body} testID="family-test-last-error">
+                {testDiag}
+              </Text>
+            ) : null}
+            {message ? (
+              <Text style={styles.message} testID="family-test-message">
+                {message}
+              </Text>
+            ) : null}
             <View style={styles.testRow}>
               <Pressable
                 accessibilityRole="button"
@@ -283,7 +417,14 @@ export default function FamilyScreen() {
                 disabled={busy}
                 onPress={() =>
                   run(async (family) => {
+                    const source = familyTestInviteSource();
                     const code = familyTestInviteCode();
+                    recordFamilyTestLastRequest({
+                      action: 'accept',
+                      sent: false,
+                      inviteSource: source,
+                      membershipBefore: membership?.kind || 'unknown',
+                    });
                     if (!code) {
                       throw new Error('test-invite-missing');
                     }

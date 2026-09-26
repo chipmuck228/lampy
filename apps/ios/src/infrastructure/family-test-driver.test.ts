@@ -1,10 +1,14 @@
 import {
   armFamilyTestNextRequestFailure,
   clearFamilyTestInviteCode,
+  clearFamilyTestLastRequest,
   consumeFamilyTestNextRequestFailure,
   familyTestIdentityToken,
   familyTestInviteCode,
+  familyTestInviteSource,
+  formatFamilyTestLastRequest,
   isFamilyTestDriverEnabled,
+  recordFamilyTestLastRequest,
   storeFamilyTestInviteCode,
 } from './family-test-driver';
 
@@ -15,6 +19,7 @@ describe('family test driver', () => {
     process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
     consumeFamilyTestNextRequestFailure();
     clearFamilyTestInviteCode();
+    clearFamilyTestLastRequest();
     if (previous === undefined) delete process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
     else process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = previous;
   });
@@ -31,9 +36,7 @@ describe('family test driver', () => {
     process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
     expect(familyTestIdentityToken('alice')).toBe('apple_alice');
     expect(familyTestIdentityToken('bob')).toBe('apple_bob');
-    expect(familyTestInviteCode('336dec6f90ed4d56927a325198ad0384')).toBe(
-      '336dec6f90ed4d56927a325198ad0384',
-    );
+    expect(familyTestInviteCode('336dec6f90ed4d56927a325198ad0384')).toBe('');
     expect(familyTestInviteCode('')).toBe('');
     storeFamilyTestInviteCode('live-invite-from-creator');
     expect(familyTestInviteCode('env-fallback')).toBe('live-invite-from-creator');
@@ -41,6 +44,25 @@ describe('family test driver', () => {
     armFamilyTestNextRequestFailure();
     expect(consumeFamilyTestNextRequestFailure()).toBe(true);
     expect(consumeFamilyTestNextRequestFailure()).toBe(false);
+  });
+
+  it('reports a safe last-request snapshot without invite or session values', () => {
+    process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
+    expect(familyTestInviteSource('')).toBe('none');
+    expect(familyTestInviteSource('env-code')).toBe('env');
+    storeFamilyTestInviteCode('live-invite-from-creator');
+    expect(familyTestInviteSource('env-code')).toBe('stored');
+    recordFamilyTestLastRequest({
+      action: 'accept',
+      sent: true,
+      status: 409,
+      errorCode: 'ALREADY_IN_FAMILY',
+      inviteSource: 'stored',
+      membershipBefore: 'none',
+    });
+    expect(formatFamilyTestLastRequest()).toBe(
+      '测试诊断：accept 已发出 HTTP 409 ALREADY_IN_FAMILY 邀请来源 stored 加入前 none',
+    );
   });
 
   it('does not arm failures when the test driver is off', () => {
