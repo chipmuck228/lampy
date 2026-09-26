@@ -35,6 +35,9 @@ function errorText(error: unknown) {
   if (error instanceof Error && error.message === 'revoke-retry') {
     return '撤回还没完成，可以再试。';
   }
+  if (error instanceof Error && error.message === 'test-invite-missing') {
+    return '还没有记下邀请码。创建者先邀请，再让加入的人按用测试邀请码加入。';
+  }
   return '家庭这件事没有做成。个人记录还在这台设备上。';
 }
 
@@ -135,7 +138,7 @@ export default function FamilyScreen() {
       hideFamilyContent();
       throw error;
     }
-  }, [configured, refreshGate]);
+  }, [configured, refreshGate, testDriver]);
 
   useFocusEffect(
     useCallback(() => {
@@ -229,48 +232,50 @@ export default function FamilyScreen() {
             <Text style={styles.body}>
               仅测试环境。这些是本机测试账号，不是真实 Apple，也不是公网家庭服务。
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="测试登录 alice"
-              testID="family-test-sign-in-alice"
-              disabled={busy}
-              onPress={() =>
-                run(async (family) => {
-                  await family.signInWithApple(familyTestIdentityToken('alice'));
-                })
-              }
-              style={styles.hit}
-            >
-              <Text style={styles.action}>测试登录 alice</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="测试登录 bob"
-              testID="family-test-sign-in-bob"
-              disabled={busy}
-              onPress={() =>
-                run(async (family) => {
-                  await family.signInWithApple(familyTestIdentityToken('bob'));
-                })
-              }
-              style={styles.hit}
-            >
-              <Text style={styles.action}>测试登录 bob</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="让下一笔家庭请求失败"
-              testID="family-test-fail-next"
-              disabled={busy}
-              onPress={() => {
-                armFamilyTestNextRequestFailure();
-                setMessage('下一笔家庭请求会失败，可以用来试撤回重试。');
-              }}
-              style={styles.hit}
-            >
-              <Text style={styles.action}>让下一笔家庭请求失败</Text>
-            </Pressable>
-            {familyTestInviteCode() ? (
+            <View style={styles.testRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="测试登录 alice"
+                testID="family-test-sign-in-alice"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    await family.signInWithApple(familyTestIdentityToken('alice'));
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>测试登录 alice</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="测试登录 bob"
+                testID="family-test-sign-in-bob"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    await family.signInWithApple(familyTestIdentityToken('bob'));
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>测试登录 bob</Text>
+              </Pressable>
+            </View>
+            <View style={styles.testRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="让下一笔家庭请求失败"
+                testID="family-test-fail-next"
+                disabled={busy}
+                onPress={() => {
+                  armFamilyTestNextRequestFailure();
+                  setMessage('下一笔家庭请求会失败，可以用来试撤回重试。');
+                }}
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>让下一笔家庭请求失败</Text>
+              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="用测试邀请码加入"
@@ -278,14 +283,49 @@ export default function FamilyScreen() {
                 disabled={busy}
                 onPress={() =>
                   run(async (family) => {
-                    await family.acceptInvitation(familyTestInviteCode());
+                    const code = familyTestInviteCode();
+                    if (!code) {
+                      throw new Error('test-invite-missing');
+                    }
+                    await family.acceptInvitation(code);
                   })
                 }
-                style={styles.hit}
+                style={styles.testHit}
               >
                 <Text style={styles.action}>用测试邀请码加入</Text>
               </Pressable>
-            ) : null}
+            </View>
+            <View style={styles.testRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="建立测试家庭"
+                testID="family-test-create"
+                disabled={busy}
+                onPress={() => run(async (family) => { await family.createFamily(); })}
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>建立测试家庭</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="发出测试邀请"
+                testID="family-test-invite"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    const next = await family.getMembership();
+                    if (next.kind !== 'ready' || next.role !== 'creator') {
+                      throw new Error('test-invite-missing');
+                    }
+                    const invited = await family.inviteMember(next.familyId);
+                    if (invited.code) storeFamilyTestInviteCode(invited.code);
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>发出测试邀请</Text>
+              </Pressable>
+            </View>
           </>
         ) : null}
 
@@ -397,6 +437,7 @@ export default function FamilyScreen() {
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="收下这条分享"
+                        testID={`family-receive-share-${item.shareId}`}
                         disabled={busy}
                         onPress={() =>
                           run(async (family) => {
@@ -440,7 +481,10 @@ export default function FamilyScreen() {
                   disabled={busy}
                   onPress={() =>
                     run(async (family) => {
-                      await family.inviteMember(membership.familyId);
+                      const invited = await family.inviteMember(membership.familyId);
+                      if (testDriver && invited.code) {
+                        storeFamilyTestInviteCode(invited.code);
+                      }
                     })
                   }
                   style={styles.hit}
@@ -532,6 +576,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, lineHeight: 34, color: '#25231F' },
   body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
   hit: { minHeight: 44, justifyContent: 'center' },
+  testRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
+  testHit: { flex: 1, minHeight: 44, justifyContent: 'center' },
   action: { fontSize: 18, lineHeight: 24, color: '#53604F' },
   input: {
     minHeight: 44,

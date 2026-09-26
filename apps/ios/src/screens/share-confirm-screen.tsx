@@ -54,6 +54,7 @@ export function ShareConfirmScreen(props: {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="确认分享"
+          testID="share-confirm"
           disabled={!props.preview.canConfirm || props.status.status === 'confirming' || props.status.status === 'stored'}
           onPress={props.onConfirm}
         >
