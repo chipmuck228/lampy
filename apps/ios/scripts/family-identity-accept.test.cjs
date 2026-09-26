@@ -227,8 +227,18 @@ test('first invite failure still dissolves the family created in this run', asyn
 
 test('inventory reports media path presence without values', () => {
   const { collectInventory } = require('./family-identity-lib.cjs');
-  const inventory = collectInventory();
-  const raw = (process.env.LAMPY_FAMILY_MEDIA_PATH || '').trim();
-  assert.equal(inventory.env.LAMPY_FAMILY_MEDIA_PATH, raw ? 'SET' : 'UNSET');
-  if (raw) assert.equal(JSON.stringify(inventory.env).includes(raw), false);
+  const previous = process.env.LAMPY_FAMILY_MEDIA_PATH;
+  const fakePath = '/tmp/lampy-fake-family-media-not-a-real-volume';
+  try {
+    process.env.LAMPY_FAMILY_MEDIA_PATH = fakePath;
+    const whenSet = collectInventory();
+    assert.equal(whenSet.env.LAMPY_FAMILY_MEDIA_PATH, 'SET');
+    assert.equal(JSON.stringify(whenSet).includes(fakePath), false);
+    delete process.env.LAMPY_FAMILY_MEDIA_PATH;
+    const whenUnset = collectInventory();
+    assert.equal(whenUnset.env.LAMPY_FAMILY_MEDIA_PATH, 'UNSET');
+  } finally {
+    if (previous === undefined) delete process.env.LAMPY_FAMILY_MEDIA_PATH;
+    else process.env.LAMPY_FAMILY_MEDIA_PATH = previous;
+  }
 });
