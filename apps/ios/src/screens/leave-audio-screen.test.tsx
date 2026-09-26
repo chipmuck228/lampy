@@ -14,6 +14,12 @@ const mockElapsed = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+  useLocalSearchParams: () => ({}),
+}));
+
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  writeAsStringAsync: jest.fn(async () => undefined),
 }));
 
 jest.mock('../application/container', () => ({

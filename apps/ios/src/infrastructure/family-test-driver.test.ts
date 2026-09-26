@@ -32,6 +32,24 @@ describe('family test driver', () => {
     expect(isFamilyTestDriverEnabled('1')).toBe(true);
   });
 
+  it('only consumes an armed failure for the targeted family request', () => {
+    process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
+    armFamilyTestNextRequestFailure('receive');
+    expect(consumeFamilyTestNextRequestFailure('membership')).toBe(false);
+    expect(consumeFamilyTestNextRequestFailure('shares')).toBe(false);
+    expect(consumeFamilyTestNextRequestFailure('receive')).toBe(true);
+    expect(consumeFamilyTestNextRequestFailure('receive')).toBe(false);
+    armFamilyTestNextRequestFailure('revoke');
+    expect(consumeFamilyTestNextRequestFailure('shares')).toBe(false);
+    expect(consumeFamilyTestNextRequestFailure('revoke-share')).toBe(true);
+    armFamilyTestNextRequestFailure('receive-media');
+    expect(consumeFamilyTestNextRequestFailure('receive')).toBe(false);
+    expect(consumeFamilyTestNextRequestFailure('receive-media')).toBe(true);
+    armFamilyTestNextRequestFailure('refresh');
+    expect(consumeFamilyTestNextRequestFailure('receive')).toBe(false);
+    expect(consumeFamilyTestNextRequestFailure('shares')).toBe(true);
+  });
+
   it('only maps the local test tokens and arms a single request failure', () => {
     process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
     expect(familyTestIdentityToken('alice')).toBe('apple_alice');
@@ -63,6 +81,18 @@ describe('family test driver', () => {
     expect(formatFamilyTestLastRequest()).toBe(
       '测试诊断：accept 已发出 HTTP 409 ALREADY_IN_FAMILY 邀请来源 stored 加入前 none',
     );
+    recordFamilyTestLastRequest({
+      action: 'receive',
+      sent: false,
+      errorCode: 'NETWORK',
+    });
+    expect(formatFamilyTestLastRequest()).toBe('测试诊断：receive 目标收下 未发出 无HTTP NETWORK');
+    recordFamilyTestLastRequest({
+      action: 'shares',
+      sent: false,
+      errorCode: 'NETWORK',
+    });
+    expect(formatFamilyTestLastRequest()).toBe('测试诊断：shares 刷新 未发出 无HTTP NETWORK');
   });
 
   it('does not arm failures when the test driver is off', () => {

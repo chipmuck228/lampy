@@ -42,6 +42,9 @@ function errorText(error: unknown) {
   if (error instanceof Error && error.message === 'test-invite-missing') {
     return '还没有记下邀请码。创建者先邀请，再让加入的人按用测试邀请码加入。';
   }
+  if (error instanceof Error && error.message === 'test-refresh-failed') {
+    return '刷新没有做成，还没有动收下或撤回。';
+  }
   return '家庭这件事没有做成。个人记录还在这台设备上。';
 }
 
@@ -269,9 +272,24 @@ export default function FamilyScreen() {
       void signOutNow();
       return;
     }
-    if (action === 'fail-next') {
-      armFamilyTestNextRequestFailure();
-      setMessage('下一笔家庭请求会失败，可以用来试撤回重试。');
+    if (action === 'fail-next' || action === 'fail-revoke') {
+      armFamilyTestNextRequestFailure('revoke');
+      setMessage('下一笔撤回请求会失败。刷新不会用掉这次失败。');
+      return;
+    }
+    if (action === 'fail-receive') {
+      armFamilyTestNextRequestFailure('receive');
+      setMessage('下一笔收下请求会失败。刷新不会用掉这次失败。');
+      return;
+    }
+    if (action === 'fail-receive-media') {
+      armFamilyTestNextRequestFailure('receive-media');
+      setMessage('下一笔收下媒体会失败。刷新不会用掉这次失败。');
+      return;
+    }
+    if (action === 'fail-refresh') {
+      armFamilyTestNextRequestFailure('refresh');
+      setMessage('下一笔刷新会失败。收下和撤回还没动。');
       return;
     }
     if (action === 'leave') {
@@ -283,7 +301,10 @@ export default function FamilyScreen() {
     if (action === 'revoke') {
       void run(async (family) => {
         const nextInbox = await family.refreshFamilyInbox();
-        const item = nextInbox.kind === 'ready' ? nextInbox.items.find((row) => row.canRevoke) : undefined;
+        if (nextInbox.kind !== 'ready') {
+          throw new Error('test-refresh-failed');
+        }
+        const item = nextInbox.items.find((row) => row.canRevoke);
         if (!item) throw new Error('revoke-retry');
         const next = await family.revokeShare(item.shareId);
         if (next.status === 'failed') throw new Error('revoke-retry');
@@ -293,7 +314,10 @@ export default function FamilyScreen() {
     if (action === 'receive') {
       void run(async (family) => {
         const nextInbox = await family.refreshFamilyInbox();
-        const item = nextInbox.kind === 'ready' ? nextInbox.items[0] : undefined;
+        if (nextInbox.kind !== 'ready') {
+          throw new Error('test-refresh-failed');
+        }
+        const item = nextInbox.items.find((row) => row.receiveStatus !== 'received') ?? nextInbox.items[0];
         if (!item) throw new Error('test-invite-missing');
         await family.receiveShare(item.shareId);
       });
@@ -366,6 +390,15 @@ export default function FamilyScreen() {
                 {message}
               </Text>
             ) : null}
+            {inbox?.kind === 'ready' ? (
+              <Text style={styles.body} testID="family-test-inbox-status">
+                {inbox.items.length === 0
+                  ? '核权后可见列表没有分享'
+                  : inbox.items
+                    .map((item) => `核权后 ${item.receiveStatus}${item.canRevoke ? ' 可撤回' : ''}`)
+                    .join(' · ')}
+              </Text>
+            ) : null}
             <View style={styles.testRow}>
               <Pressable
                 accessibilityRole="button"
@@ -403,8 +436,8 @@ export default function FamilyScreen() {
                 testID="family-test-fail-next"
                 disabled={busy}
                 onPress={() => {
-                  armFamilyTestNextRequestFailure();
-                  setMessage('下一笔家庭请求会失败，可以用来试撤回重试。');
+                  armFamilyTestNextRequestFailure('revoke');
+                  setMessage('下一笔撤回请求会失败。刷新不会用掉这次失败。');
                 }}
                 style={styles.testHit}
               >

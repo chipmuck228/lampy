@@ -13,14 +13,18 @@ import type {
 import { isSafeFamilyApiBaseUrl } from './family-config';
 import { consumeFamilyTestNextRequestFailure, recordFamilyTestLastRequest } from './family-test-driver';
 
-function testPathKind(path: string) {
+export function familyTestPathKind(method: string, path: string) {
+  const verb = method.toUpperCase();
   if (path === '/v1/invitations/accept') return 'accept';
   if (path === '/v1/auth/apple') return 'sign-in';
   if (path === '/v1/families') return 'create';
   if (path === '/v1/me/membership') return 'membership';
   if (path.includes('/invitations') && !path.includes('/revoke')) return 'invite';
   if (path.includes('/shares') && path.endsWith('/revoke')) return 'revoke-share';
-  if (path.includes('/shares')) return 'shares';
+  if (path.includes('/shares/') && path.includes('/media')) return 'receive-media';
+  if (verb === 'GET' && /\/shares\/[^/]+$/.test(path)) return 'receive';
+  if (verb === 'GET' && /\/shares$/.test(path)) return 'shares';
+  if (verb === 'POST' && /\/shares$/.test(path)) return 'share';
   return 'other';
 }
 
@@ -94,7 +98,7 @@ function throwIfFailed(status: number, body: unknown): void {
 
 export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClient {
   async function send<T>(input: Parameters<FamilyTransport['request']>[0]): Promise<T> {
-    const action = testPathKind(input.path);
+    const action = familyTestPathKind(input.method, input.path);
     let response: { status: number; body: unknown };
     try {
       response = await transport.request(input);
@@ -231,9 +235,20 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
           expectBytes: true,
         });
       } catch (error) {
+        const appError = error instanceof ApplicationError ? error : undefined;
+        recordFamilyTestLastRequest({
+          action: 'receive-media',
+          sent: false,
+          errorCode: appError?.code || 'SERVER_UNREACHABLE',
+        });
         const message = error instanceof Error ? error.message : 'Family server is unreachable.';
-        throw new ApplicationError('SERVER_UNREACHABLE', message);
+        throw new ApplicationError(appError?.code || 'SERVER_UNREACHABLE', message);
       }
+      recordFamilyTestLastRequest({
+        action: 'receive-media',
+        sent: true,
+        status: response.status,
+      });
       throwIfFailed(response.status, response.body);
       if (!response.bytes) {
         throw new ApplicationError('SHARE_MEDIA_UNAVAILABLE', 'A selected media object is not available.');
@@ -284,7 +299,7 @@ export function createFamilyHttpTransport(deps: {
       if (!fetchImpl) {
         throw new ApplicationError('SERVER_UNREACHABLE', 'No HTTP fetch is available.');
       }
-      if (consumeFamilyTestNextRequestFailure()) {
+      if (consumeFamilyTestNextRequestFailure(familyTestPathKind(input.method, input.path))) {
         throw new ApplicationError('NETWORK', 'The test driver armed a single request failure.');
       }
       const headers: Record<string, string> = { accept: input.expectBytes ? '*/*' : 'application/json' };
