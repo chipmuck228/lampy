@@ -140,6 +140,21 @@ export default function FamilyScreen() {
       } else {
         setInbox(null);
       }
+      if (testDriver) {
+        if (mode === 'revalidate') {
+          await family.recoverFamilyCache();
+        }
+        const inspect = await family.inspectFamilyReceiveCache();
+        if (!refreshGate.isCurrent(generation)) return 'stale';
+        setCacheStatus(formatFamilyTestCacheCleanup({
+          hidden: next.kind !== 'ready',
+          diskCleared: next.kind === 'ready'
+            ? inspect.pendingCount === 0
+            : inspect.pendingCount === 0 && inspect.fileCount === 0,
+          pendingCount: inspect.pendingCount,
+          fileCount: inspect.fileCount,
+        }));
+      }
       if (needsAppleSignIn(next) && (await family.hasUnconfirmedSessionRevoke())) {
         if (!refreshGate.isCurrent(generation)) return 'stale';
         return 'revoke-unconfirmed';
@@ -330,6 +345,22 @@ export default function FamilyScreen() {
     if (action === 'fail-cache-recover') {
       armFamilyTestCacheDeleteFailure('recover');
       setMessage('下一次恢复清理的家庭缓存删除会失败。个人媒体不会动。');
+      return;
+    }
+    if (action === 'refresh') {
+      void (async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+          const result = await refresh('revalidate');
+          if (result === 'stale') return;
+          setMessage(refreshMessage(result));
+        } catch (error) {
+          setMessage(errorText(error));
+        } finally {
+          setBusy(false);
+        }
+      })();
       return;
     }
     if (action === 'recover') {

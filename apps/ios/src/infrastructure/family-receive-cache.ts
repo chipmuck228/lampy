@@ -120,6 +120,12 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
     return pathValue === prefix || pathValue.startsWith(`${prefix}/`);
   }
 
+  function clearPendingUnder(prefix: string) {
+    for (const item of [...pending]) {
+      if (isUnderPrefix(item, prefix)) pending.delete(item);
+    }
+  }
+
   function deleteUnauthorized(prefix: string, allowed: Set<string>) {
     for (const key of [...files.keys()]) {
       if (!isUnderPrefix(key, prefix)) continue;
@@ -225,6 +231,8 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       if (!diskCleared) {
         if (targets.length) targets.forEach((prefix) => pending.add(prefix));
         else pending.add(userId);
+      } else if (![...allowedPrefixes()].some((share) => isUnderPrefix(share, userId))) {
+        clearPendingUnder(userId);
       } else {
         doomed.forEach((prefix) => pending.delete(prefix));
       }
@@ -249,6 +257,8 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       if (!diskCleared) {
         if (targets.length) targets.forEach((item) => pending.add(item));
         else pending.add(prefix);
+      } else if (![...allowedPrefixes()].some((share) => isUnderPrefix(share, prefix))) {
+        clearPendingUnder(prefix);
       } else {
         doomed.forEach((item) => pending.delete(item));
       }
@@ -365,6 +375,13 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     await db.run(`DELETE FROM family_receive_pending_cleanup WHERE prefix = ?`, [prefix]);
   }
 
+  async function clearPendingUnder(prefix: string) {
+    const rows = await db.getAll<{ prefix: string }>('SELECT prefix FROM family_receive_pending_cleanup');
+    for (const row of rows) {
+      if (isUnderPrefix(row.prefix, prefix)) await clearPending(row.prefix);
+    }
+  }
+
   function isUnderPrefix(pathValue: string, prefix: string) {
     return pathValue === prefix || pathValue.startsWith(`${prefix}/`);
   }
@@ -382,7 +399,7 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
   async function tryRemovePrefix(prefix: string) {
     try {
       await files.removePrefix(prefix);
-      await clearPending(prefix);
+      await clearPendingUnder(prefix);
       return true;
     } catch {
       return false;
@@ -449,7 +466,6 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
       return { hidden: true, diskCleared: diskCleared && (await leftoverTargetsUnder(broadPrefix)).size === 0 };
     }
     if (await tryRemovePrefix(broadPrefix)) {
-      for (const prefix of doomed) await clearPending(prefix);
       if ((await leftoverTargetsUnder(broadPrefix)).size === 0) {
         return { hidden: true, diskCleared: true };
       }
@@ -466,6 +482,9 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     if ((await leftoverTargetsUnder(broadPrefix)).size > 0) {
       diskCleared = false;
       if (targets.size === 0) await markPending(broadPrefix);
+    } else if (![...allowed].some((share) => isUnderPrefix(share, broadPrefix))) {
+      await clearPendingUnder(broadPrefix);
+      diskCleared = true;
     }
     return { hidden: true, diskCleared };
   }

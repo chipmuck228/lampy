@@ -681,4 +681,85 @@ describe('family receive cache use cases', () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it('clears stale pending under an account directory after the files are gone and no authorized rows remain', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'lampy-f5-stale-pending-'));
+    try {
+      const file = path.join(dir, 'lampy.db');
+      const cacheDir = path.join(dir, 'family-cache');
+      const files = createNodeFamilyReceiveFiles(cacheDir);
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const cache = createSqliteFamilyReceiveCache(db, files);
+      const userId = 'usr_bob';
+      const stale = `${userId}/fam_old/shr_old`;
+      await files.write(`${userId}/fam_left/shr_now/obj`, sampleJpegBytes());
+      await db.run('INSERT OR REPLACE INTO family_receive_pending_cleanup (prefix, created_at) VALUES (?, ?)', [
+        stale,
+        '2026-09-25T06:00:00.000Z',
+      ]);
+      expect(await cache.pendingCleanupPrefixes()).toContain(stale);
+      await expect(cache.isolateAccount(userId)).resolves.toEqual({ hidden: true, diskCleared: true });
+      expect(await files.listKeys()).toEqual([]);
+      expect(await cache.pendingCleanupPrefixes()).toEqual([]);
+      await db.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('clears leftover files and stale pending on the next refresh after an isolate delete failure', async () => {
+    const previous = process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
+    process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = '1';
+    const dir = await mkdtemp(path.join(tmpdir(), 'lampy-f5-refresh-'));
+    try {
+      const file = path.join(dir, 'lampy.db');
+      const cacheDir = path.join(dir, 'family-cache');
+      const files = createNodeFamilyReceiveFiles(cacheDir);
+      const commands = createCommands();
+      const aliceCmd = await commands.signInWithApple('apple_alice');
+      const family = await commands.createFamily(aliceCmd.sessionToken, 'fam-1');
+      const invite = await commands.inviteMember(aliceCmd.sessionToken, family.familyId, 'inv-1');
+      await commands.acceptInvitation((await commands.signInWithApple('apple_bob')).sessionToken, invite.code, 'accept-1');
+      const media = await commands.uploadMedia(aliceCmd.sessionToken, {
+        bytes: sampleJpegBytes(),
+        mimeType: 'image/jpeg',
+      });
+      const shared = await commands.shareMoment(aliceCmd.sessionToken, family.familyId, {
+        sourceMomentId: 'moment_refresh',
+        sourceRevision: 1,
+        note: '门口的风',
+        emotion: '',
+        occurredAtPrecision: 'day',
+        mediaObjectIds: [media.objectId],
+        expectedMediaCount: 1,
+      });
+      const db = await openPreparedNodeSqliteDatabase(file);
+      const cache = createSqliteFamilyReceiveCache(db, files);
+      const session = createMemoryFamilySessionStore();
+      const bob = createFamilyUseCases({
+        client: createFamilyApiClient(createDispatchTransport((request) => dispatchFamilyApi(commands, request))),
+        session,
+        pending: testPending(),
+        receiveCache: cache,
+      });
+      await bob.signInWithApple('apple_bob');
+      armFamilyTestCacheDeleteFailure('isolate');
+      await bob.receiveShare(shared.shareId);
+      const left = await bob.leaveFamily();
+      expect(left.cleanup).toEqual({ hidden: true, diskCleared: false });
+      const afterLeave = await bob.inspectFamilyReceiveCache();
+      expect(afterLeave.pendingCount).toBeGreaterThan(0);
+      expect(afterLeave.fileCount).toBeGreaterThan(0);
+      const refreshed = await bob.recoverFamilyCache();
+      expect(refreshed).toEqual({ hidden: true, diskCleared: true });
+      expect(await files.listKeys()).toEqual([]);
+      expect(await cache.pendingCleanupPrefixes()).toEqual([]);
+      expect(await bob.inspectFamilyReceiveCache()).toEqual({ pendingCount: 0, fileCount: 0 });
+      await db.close();
+    } finally {
+      if (previous === undefined) delete process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
+      else process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = previous;
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
