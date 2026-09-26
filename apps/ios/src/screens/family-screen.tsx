@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getFamilyUseCases } from '../application/container';
 import type { FamilyInboxView, FamilyMembershipView, FamilyUseCases } from '../application/family-use-cases';
@@ -9,6 +9,17 @@ import { isApplicationError } from '../application/errors';
 import type { InvitationView } from '../family-api/types';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import {
+  armFamilyTestNextRequestFailure,
+  familyTestIdentityToken,
+  familyTestInviteCode,
+  familyTestInviteSource,
+  familyTestLastRequest,
+  formatFamilyTestLastRequest,
+  isFamilyTestDriverEnabled,
+  recordFamilyTestLastRequest,
+  storeFamilyTestInviteCode,
+} from '../infrastructure/family-test-driver';
 import { createFamilyRefreshGate } from './family-refresh';
 
 function errorText(error: unknown) {
@@ -27,6 +38,12 @@ function errorText(error: unknown) {
   }
   if (error instanceof Error && error.message === 'revoke-retry') {
     return '撤回还没完成，可以再试。';
+  }
+  if (error instanceof Error && error.message === 'test-invite-missing') {
+    return '还没有记下邀请码。创建者先邀请，再让加入的人按用测试邀请码加入。';
+  }
+  if (error instanceof Error && error.message === 'test-refresh-failed') {
+    return '刷新没有做成，还没有动收下或撤回。';
   }
   return '家庭这件事没有做成。个人记录还在这台设备上。';
 }
@@ -52,15 +69,18 @@ function refreshMessage(result: 'ok' | 'invites-failed' | 'revoke-unconfirmed') 
 
 export default function FamilyScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
   const { width } = useWindowDimensions();
   const readingWidth = Math.min(width, 720);
   const configured = isFamilyApiConfigured();
+  const testDriver = isFamilyTestDriverEnabled();
   const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
   const [membership, setMembership] = useState<FamilyMembershipView | null>(null);
   const [invites, setInvites] = useState<InvitationView[]>([]);
   const [inviteCode, setInviteCode] = useState('');
   const [inbox, setInbox] = useState<FamilyInboxView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [testDiag, setTestDiag] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const refreshGate = useRef(createFamilyRefreshGate()).current;
 
@@ -94,6 +114,9 @@ export default function FamilyScreen() {
           const listed = await family.listPendingInvitations(next.familyId);
           if (!refreshGate.isCurrent(generation)) return 'stale';
           setInvites(listed);
+          if (testDriver && listed[0]?.code) {
+            storeFamilyTestInviteCode(listed[0].code);
+          }
         } catch {
           if (!refreshGate.isCurrent(generation)) return 'stale';
           setInvites([]);
@@ -124,7 +147,7 @@ export default function FamilyScreen() {
       hideFamilyContent();
       throw error;
     }
-  }, [configured, refreshGate]);
+  }, [configured, refreshGate, testDriver]);
 
   useFocusEffect(
     useCallback(() => {
@@ -158,8 +181,15 @@ export default function FamilyScreen() {
       if (result === 'stale') return;
       setMessage(refreshMessage(result));
     } catch (error) {
+      if (testDriver && isApplicationError(error)) {
+        recordFamilyTestLastRequest({
+          action: familyTestLastRequest()?.action || 'unknown',
+          errorCode: error.code,
+        });
+      }
       setMessage(errorText(error));
     } finally {
+      if (testDriver) setTestDiag(formatFamilyTestLastRequest());
       setBusy(false);
     }
   }
@@ -189,6 +219,127 @@ export default function FamilyScreen() {
     }
   }
 
+  function runTestDriverAction(action: string) {
+    if (!testDriver) return;
+    if (action === 'alice') {
+      void run(async (family) => {
+        await family.signInWithApple(familyTestIdentityToken('alice'));
+      });
+      return;
+    }
+    if (action === 'bob') {
+      void run(async (family) => {
+        await family.signInWithApple(familyTestIdentityToken('bob'));
+      });
+      return;
+    }
+    if (action === 'create') {
+      void run(async (family) => {
+        await family.createFamily();
+      });
+      return;
+    }
+    if (action === 'invite') {
+      void run(async (family) => {
+        const next = await family.getMembership();
+        if (next.kind !== 'ready' || next.role !== 'creator') {
+          throw new Error('test-invite-missing');
+        }
+        const invited = await family.inviteMember(next.familyId);
+        if (invited.code) storeFamilyTestInviteCode(invited.code);
+      });
+      return;
+    }
+    if (action === 'accept') {
+      void run(async (family) => {
+        const source = familyTestInviteSource();
+        const code = familyTestInviteCode();
+        const before = await family.getMembership();
+        recordFamilyTestLastRequest({
+          action: 'accept',
+          sent: false,
+          inviteSource: source,
+          membershipBefore: before.kind,
+        });
+        if (!code) {
+          throw new Error('test-invite-missing');
+        }
+        await family.acceptInvitation(code);
+      });
+      return;
+    }
+    if (action === 'signout') {
+      void signOutNow();
+      return;
+    }
+    if (action === 'fail-next' || action === 'fail-revoke') {
+      armFamilyTestNextRequestFailure('revoke');
+      setMessage('下一笔撤回请求会失败。刷新不会用掉这次失败。');
+      return;
+    }
+    if (action === 'fail-receive') {
+      armFamilyTestNextRequestFailure('receive');
+      setMessage('下一笔收下请求会失败。刷新不会用掉这次失败。');
+      return;
+    }
+    if (action === 'fail-receive-media') {
+      armFamilyTestNextRequestFailure('receive-media');
+      setMessage('下一笔收下媒体会失败。刷新不会用掉这次失败。');
+      return;
+    }
+    if (action === 'fail-refresh') {
+      armFamilyTestNextRequestFailure('refresh');
+      setMessage('下一笔刷新会失败。收下和撤回还没动。');
+      return;
+    }
+    if (action === 'leave') {
+      void run(async (family) => {
+        await family.leaveFamily();
+      });
+      return;
+    }
+    if (action === 'revoke') {
+      void run(async (family) => {
+        const nextInbox = await family.refreshFamilyInbox();
+        if (nextInbox.kind !== 'ready') {
+          throw new Error('test-refresh-failed');
+        }
+        const item = nextInbox.items.find((row) => row.canRevoke);
+        if (!item) throw new Error('revoke-retry');
+        const next = await family.revokeShare(item.shareId);
+        if (next.status === 'failed') throw new Error('revoke-retry');
+      });
+      return;
+    }
+    if (action === 'receive') {
+      void run(async (family) => {
+        const nextInbox = await family.refreshFamilyInbox();
+        if (nextInbox.kind !== 'ready') {
+          throw new Error('test-refresh-failed');
+        }
+        const item = nextInbox.items.find((row) => row.receiveStatus !== 'received') ?? nextInbox.items[0];
+        if (!item) throw new Error('test-invite-missing');
+        await family.receiveShare(item.shareId);
+      });
+    }
+  }
+
+  const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
+  const testNonce = Array.isArray(params.n) ? params.n[0] : params.n;
+  const ranTestAction = useRef('');
+  useEffect(() => {
+    if (!testDriver || !testAction || membership === null) return;
+    const key = `${testAction}:${testNonce || ''}`;
+    if (ranTestAction.current === key) return;
+    ranTestAction.current = key;
+    const timer = setTimeout(() => {
+      runTestDriverAction(testAction);
+    }, 200);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [testAction, testDriver, membership]);
+
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="家庭">
       <ScrollView contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}>
@@ -209,8 +360,147 @@ export default function FamilyScreen() {
           <Text style={styles.body}>还没有接到能用的家庭服务。个人记录还在这台设备上。</Text>
         ) : null}
 
-        {configured && appleAvailable === false ? (
+        {configured && appleAvailable === false && !testDriver ? (
           <Text style={styles.body}>这台设备现在不能用 Apple 登录。个人记录还在这台设备上。</Text>
+        ) : null}
+
+        {configured && testDriver ? (
+          <>
+            <Text style={styles.body}>
+              仅测试环境。这些是本机测试账号，不是真实 Apple，也不是公网家庭服务。
+            </Text>
+            <Text style={styles.body} testID="family-test-account-state">
+              当前账号 {membership?.kind || '未知'}
+              {membership?.kind === 'ready' ? ` ${membership.role}` : ''}
+            </Text>
+            <Text style={styles.body} testID="family-test-invite-source">
+              {familyTestInviteSource() === 'stored'
+                ? '本轮已记下邀请'
+                : familyTestInviteSource() === 'env'
+                  ? '环境里有旧邀请码，不会用来加入'
+                  : '还没有本轮邀请'}
+            </Text>
+            {testDiag ? (
+              <Text style={styles.body} testID="family-test-last-error">
+                {testDiag}
+              </Text>
+            ) : null}
+            {message ? (
+              <Text style={styles.message} testID="family-test-message">
+                {message}
+              </Text>
+            ) : null}
+            {inbox?.kind === 'ready' ? (
+              <Text style={styles.body} testID="family-test-inbox-status">
+                {inbox.items.length === 0
+                  ? '核权后可见列表没有分享'
+                  : inbox.items
+                    .map((item) => `核权后 ${item.receiveStatus}${item.canRevoke ? ' 可撤回' : ''}`)
+                    .join(' · ')}
+              </Text>
+            ) : null}
+            <View style={styles.testRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="测试登录 alice"
+                testID="family-test-sign-in-alice"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    await family.signInWithApple(familyTestIdentityToken('alice'));
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>测试登录 alice</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="测试登录 bob"
+                testID="family-test-sign-in-bob"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    await family.signInWithApple(familyTestIdentityToken('bob'));
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>测试登录 bob</Text>
+              </Pressable>
+            </View>
+            <View style={styles.testRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="让下一笔家庭请求失败"
+                testID="family-test-fail-next"
+                disabled={busy}
+                onPress={() => {
+                  armFamilyTestNextRequestFailure('revoke');
+                  setMessage('下一笔撤回请求会失败。刷新不会用掉这次失败。');
+                }}
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>让下一笔家庭请求失败</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="用测试邀请码加入"
+                testID="family-test-accept-invite"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    const source = familyTestInviteSource();
+                    const code = familyTestInviteCode();
+                    recordFamilyTestLastRequest({
+                      action: 'accept',
+                      sent: false,
+                      inviteSource: source,
+                      membershipBefore: membership?.kind || 'unknown',
+                    });
+                    if (!code) {
+                      throw new Error('test-invite-missing');
+                    }
+                    await family.acceptInvitation(code);
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>用测试邀请码加入</Text>
+              </Pressable>
+            </View>
+            <View style={styles.testRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="建立测试家庭"
+                testID="family-test-create"
+                disabled={busy}
+                onPress={() => run(async (family) => { await family.createFamily(); })}
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>建立测试家庭</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="发出测试邀请"
+                testID="family-test-invite"
+                disabled={busy}
+                onPress={() =>
+                  run(async (family) => {
+                    const next = await family.getMembership();
+                    if (next.kind !== 'ready' || next.role !== 'creator') {
+                      throw new Error('test-invite-missing');
+                    }
+                    const invited = await family.inviteMember(next.familyId);
+                    if (invited.code) storeFamilyTestInviteCode(invited.code);
+                  })
+                }
+                style={styles.testHit}
+              >
+                <Text style={styles.action}>发出测试邀请</Text>
+              </Pressable>
+            </View>
+          </>
         ) : null}
 
         {configured && membership?.kind === 'unconfirmed' && membership.reason === 'unreachable' ? (
@@ -321,6 +611,7 @@ export default function FamilyScreen() {
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="收下这条分享"
+                        testID={`family-receive-share-${item.shareId}`}
                         disabled={busy}
                         onPress={() =>
                           run(async (family) => {
@@ -364,7 +655,10 @@ export default function FamilyScreen() {
                   disabled={busy}
                   onPress={() =>
                     run(async (family) => {
-                      await family.inviteMember(membership.familyId);
+                      const invited = await family.inviteMember(membership.familyId);
+                      if (testDriver && invited.code) {
+                        storeFamilyTestInviteCode(invited.code);
+                      }
                     })
                   }
                   style={styles.hit}
@@ -456,6 +750,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, lineHeight: 34, color: '#25231F' },
   body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
   hit: { minHeight: 44, justifyContent: 'center' },
+  testRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
+  testHit: { flex: 1, minHeight: 44, justifyContent: 'center' },
   action: { fontSize: 18, lineHeight: 24, color: '#53604F' },
   input: {
     minHeight: 44,

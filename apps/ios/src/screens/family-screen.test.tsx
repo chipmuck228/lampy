@@ -30,6 +30,7 @@ jest.mock('expo-router', () => {
   const { useEffect } = require('react');
   return {
     useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+    useLocalSearchParams: () => ({}),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
@@ -42,6 +43,23 @@ jest.mock('../application/container', () => ({
 
 jest.mock('../infrastructure/family-config', () => ({
   isFamilyApiConfigured: jest.fn(() => false),
+}));
+
+const mockTestDriver = { enabled: false, inviteCode: '' };
+
+jest.mock('../infrastructure/family-test-driver', () => ({
+  isFamilyTestDriverEnabled: () => mockTestDriver.enabled,
+  familyTestIdentityToken: (account: 'alice' | 'bob') => (account === 'alice' ? 'apple_alice' : 'apple_bob'),
+  familyTestInviteCode: () => mockTestDriver.inviteCode,
+  familyTestInviteSource: () => (mockTestDriver.inviteCode ? 'stored' : 'none'),
+  familyTestLastRequest: () => null,
+  formatFamilyTestLastRequest: () => null,
+  recordFamilyTestLastRequest: jest.fn(),
+  storeFamilyTestInviteCode: jest.fn((code: string) => {
+    mockTestDriver.inviteCode = code;
+  }),
+  armFamilyTestNextRequestFailure: jest.fn(),
+  consumeFamilyTestNextRequestFailure: jest.fn(),
 }));
 
 jest.mock('../infrastructure/expo-apple-auth', () => ({
@@ -66,6 +84,12 @@ function wrap(ui: ReactElement) {
 
 describe('family screen', () => {
   beforeEach(() => {
+    mockTestDriver.enabled = false;
+    mockTestDriver.inviteCode = '';
+    const { storeFamilyTestInviteCode } = jest.requireMock('../infrastructure/family-test-driver') as {
+      storeFamilyTestInviteCode: jest.Mock;
+    };
+    storeFamilyTestInviteCode.mockClear();
     jest.mocked(isFamilyApiConfigured).mockReturnValue(false);
     mockFamily.getMembership.mockReset();
     mockFamily.listPendingInvitations.mockReset().mockResolvedValue([]);
@@ -116,6 +140,42 @@ describe('family screen', () => {
     expect(view.getByText('usr_alice')).toBeTruthy();
     expect(view.getByLabelText('邀请')).toBeTruthy();
     expect(view.queryByText(/假送达|家庭时间线|家人已收到/)).toBeNull();
+  });
+
+  it('keeps the test-only join control visible so bob can accept after the creator invite is stored', async () => {
+    mockTestDriver.enabled = true;
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({ kind: 'none' });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('family-test-accept-invite')).toBeTruthy();
+    });
+    expect(view.queryByTestId('family-test-sign-in-alice')).toBeTruthy();
+    expect(view.queryByTestId('family-test-sign-in-bob')).toBeTruthy();
+    expect(view.getByTestId('family-test-create')).toBeTruthy();
+    expect(view.getByTestId('family-test-invite')).toBeTruthy();
+  });
+
+  it('stores the pending invite code when the creator invites from the family screen', async () => {
+    const { storeFamilyTestInviteCode } = jest.requireMock('../infrastructure/family-test-driver') as {
+      storeFamilyTestInviteCode: jest.Mock;
+    };
+    mockTestDriver.enabled = true;
+    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    mockFamily.getMembership.mockResolvedValue({
+      kind: 'ready',
+      familyId: 'fam_1',
+      role: 'creator',
+      members: [{ userId: 'usr_alice', role: 'creator', joinedAt: '2026-09-25T03:00:00.000Z' }],
+    });
+    const view = await render(wrap(<FamilyScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('邀请')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('family-invite'));
+    await waitFor(() => {
+      expect(storeFamilyTestInviteCode).toHaveBeenCalledWith('CODE');
+    });
   });
 
   it('lists a received share as household content and never says family received it', async () => {

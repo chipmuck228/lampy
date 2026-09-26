@@ -320,7 +320,15 @@ export function createFamilyUseCases(deps: {
       const asset = deps.personal ? await deps.personal.assets.findById(assetId) : { kind: 'missing' as const };
       const objectId = mediaByAsset?.[assetId];
       const localUri = asset.kind === 'ready' ? asset.asset.localUri : '';
-      const canReadLocal = Boolean(localUri && deps.personal?.readAssetBytes);
+      let canReadLocal = false;
+      if (localUri && deps.personal?.readAssetBytes) {
+        try {
+          const bytes = await deps.personal.readAssetBytes(localUri);
+          canReadLocal = bytes.byteLength > 0;
+        } catch {
+          canReadLocal = false;
+        }
+      }
       media.push({
         assetId,
         objectId,

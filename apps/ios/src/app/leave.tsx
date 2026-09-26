@@ -12,7 +12,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
@@ -21,9 +22,15 @@ import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/
 import { FeelingPicker } from '../screens/moment-feeling';
 import { MomentImages } from '../screens/moment-images';
 import { useSoundPlayer } from '../screens/use-sound-player';
+import {
+  FAMILY_TEST_JPEG_BASE64,
+  armFamilyTestLibraryPick,
+  isFamilyTestDriverEnabled,
+} from '../infrastructure/family-test-driver';
 
 export default function LeaveScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
   const { width } = useWindowDimensions();
   const readingWidth = Math.min(width, 720);
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -360,6 +367,45 @@ export default function LeaveScreen() {
       setBusy('idle');
     }
   }
+
+  const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
+  const testNonce = Array.isArray(params.n) ? params.n[0] : params.n;
+  const ranTestAction = useRef('');
+  useEffect(() => {
+    if (!isFamilyTestDriverEnabled() || !testAction || !draftId) return;
+    const key = `${testAction}:${testNonce || ''}`;
+    if (ranTestAction.current === key) return;
+    ranTestAction.current = key;
+    if (testAction === 'photo') {
+      persistNote('本轮媒体闭环');
+      persistEmotion('平静');
+      const root = FileSystem.cacheDirectory;
+      if (!root) {
+        setMessage('这次没有留下照片。可以再试，也可以继续写字。');
+        return;
+      }
+      const path = `${root}family-test-photo.jpg`;
+      void FileSystem.writeAsStringAsync(path, FAMILY_TEST_JPEG_BASE64, {
+        encoding: 'base64',
+      })
+        .then(() => {
+          armFamilyTestLibraryPick({
+            sourceUri: path,
+            mimeType: 'image/jpeg',
+            width: 16,
+            height: 16,
+          });
+          applyImageAction('library');
+        })
+        .catch(() => {
+          setMessage('这次没有留下照片。可以再试，也可以继续写字。');
+        });
+      return;
+    }
+    if (testAction === 'save') {
+      void onSave();
+    }
+  }, [testAction, testNonce, draftId]);
 
   const actionsLocked = !draftId || busy !== 'idle';
   const saveLabel =

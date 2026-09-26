@@ -99,6 +99,7 @@ export default function MomentDetailScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="分享给家里"
+                testID="moment-share-to-family"
                 onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)}
                 style={styles.shareHit}
               >

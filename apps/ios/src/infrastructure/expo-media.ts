@@ -11,6 +11,7 @@ import {
   type MediaStore,
   type PickedImage,
 } from './media';
+import { consumeFamilyTestLibraryPick } from './family-test-driver';
 
 const ASSET_DIR = 'lampy-assets';
 
@@ -47,6 +48,15 @@ export function createExpoLibrarySource(): ImageSource {
     },
     async pick(remaining) {
       if (remaining <= 0) return [];
+      const testPick = consumeFamilyTestLibraryPick();
+      if (testPick) {
+        return [{
+          sourceUri: testPick.sourceUri,
+          mimeType: testPick.mimeType,
+          width: testPick.width,
+          height: testPick.height,
+        }];
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsMultipleSelection: remaining > 1,

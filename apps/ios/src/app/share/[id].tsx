@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -7,6 +7,7 @@ import { getFamilyUseCases } from '../../application/container';
 import { isApplicationError } from '../../application/errors';
 import type { ShareConfirmState, SharePreview } from '../../application/family-use-cases';
 import { isFamilyApiConfigured } from '../../infrastructure/family-config';
+import { isFamilyTestDriverEnabled } from '../../infrastructure/family-test-driver';
 import { ShareConfirmScreen } from '../../screens/share-confirm-screen';
 
 function shareLoadMessage(error: unknown) {
@@ -25,8 +26,9 @@ export default function ShareConfirmRoute() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const readingWidth = Math.min(width, 720);
-  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const params = useLocalSearchParams<{ id?: string | string[]; td?: string | string[] }>();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
   const momentId = rawId ? decodeURIComponent(rawId) : '';
   const configured = isFamilyApiConfigured();
   const [preview, setPreview] = useState<SharePreview | null>(null);
@@ -72,6 +74,14 @@ export default function ShareConfirmRoute() {
     });
     setStatus(next);
   }
+
+  const ranConfirm = useRef(false);
+  useEffect(() => {
+    if (!isFamilyTestDriverEnabled() || testAction !== 'confirm' || !preview || ranConfirm.current) return;
+    if (!preview.canConfirm) return;
+    ranConfirm.current = true;
+    void confirm();
+  }, [testAction, preview]);
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="分享确认页">
