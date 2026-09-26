@@ -224,3 +224,11 @@ test('first invite failure still dissolves the family created in this run', asyn
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('inventory reports media path presence without values', () => {
+  const { collectInventory } = require('./family-identity-lib.cjs');
+  const inventory = collectInventory();
+  const raw = (process.env.LAMPY_FAMILY_MEDIA_PATH || '').trim();
+  assert.equal(inventory.env.LAMPY_FAMILY_MEDIA_PATH, raw ? 'SET' : 'UNSET');
+  if (raw) assert.equal(JSON.stringify(inventory.env).includes(raw), false);
+});
