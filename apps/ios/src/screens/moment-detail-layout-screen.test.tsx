@@ -1,7 +1,13 @@
-import { render, waitFor } from '@testing-library/react-native';
+import { render, waitFor, within } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import MomentDetailScreen from '../app/moment/[id]';
+
+Dimensions.set({
+  window: { width: 390, height: 844, scale: 3, fontScale: 1 },
+  screen: { width: 390, height: 844, scale: 3, fontScale: 1 },
+});
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
@@ -76,7 +82,12 @@ describe('moment detail long layout', () => {
     });
     expect(view.getByTestId('detail-scroll')).toBeTruthy();
     expect(view.getByLabelText('返回原来的位置')).toBeTruthy();
+    expect(within(view.getByTestId('detail-scroll')).queryByLabelText('返回原来的位置')).toBeNull();
     expect(view.getByText('2026年9月24日')).toBeTruthy();
+    expect(view.getByTestId('detail-precision').props.children).toBe('大约是这一天');
+    expect(view.getByTestId('detail-scroll').props.contentContainerStyle).toEqual(
+      expect.arrayContaining([expect.objectContaining({ maxWidth: 390, paddingHorizontal: 24 })]),
+    );
     expect(view.getByLabelText('照片 1/3')).toBeTruthy();
     expect(view.getByText('这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
     expect(view.getByLabelText('照片 3/3')).toBeTruthy();
