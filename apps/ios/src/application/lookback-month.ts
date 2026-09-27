@@ -1,6 +1,10 @@
 import type { HistoryMonthView } from '../projections/history-projection';
 
 export const LOOKBACK_WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
+export const LOOKBACK_PAGE_GUTTER = 24;
+export const LOOKBACK_MONTH_COLUMNS = 7;
+export const LOOKBACK_MONTH_MIN_CELL = 44;
+const LOOKBACK_READING_MAX = 720;
 
 export function weekdayMondayIndex(year: number, month: number, day: number): number {
   const sundayIndex = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
@@ -9,6 +13,25 @@ export function weekdayMondayIndex(year: number, month: number, day: number): nu
 
 export function shouldStackMonthCalendar(fontScale: number): boolean {
   return fontScale >= 1.3;
+}
+
+export function monthCalendarContentWidth(windowWidth: number, horizontalInset = 0): number {
+  const afterSafe = Math.max(0, windowWidth - horizontalInset);
+  const column = Math.min(afterSafe, LOOKBACK_READING_MAX);
+  return Math.max(0, column - LOOKBACK_PAGE_GUTTER * 2);
+}
+
+export function shouldShowMonthCalendarGrid({
+  fontScale,
+  windowWidth,
+  horizontalInset = 0,
+}: {
+  fontScale: number;
+  windowWidth: number;
+  horizontalInset?: number;
+}): boolean {
+  if (shouldStackMonthCalendar(fontScale)) return false;
+  return monthCalendarContentWidth(windowWidth, horizontalInset) / LOOKBACK_MONTH_COLUMNS >= LOOKBACK_MONTH_MIN_CELL;
 }
 
 export type LookbackMonthWeekCell =

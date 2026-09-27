@@ -1,6 +1,8 @@
 import { projectHistoryMonthFromCounts } from '../projections/history-projection';
 import {
   lookbackMonthPage,
+  monthCalendarContentWidth,
+  shouldShowMonthCalendarGrid,
   shouldStackMonthCalendar,
   weekdayMondayIndex,
 } from './lookback-month';
@@ -70,5 +72,21 @@ describe('lookback month calendar', () => {
     expect(shouldStackMonthCalendar(1.29)).toBe(false);
     expect(shouldStackMonthCalendar(1.3)).toBe(true);
     expect(shouldStackMonthCalendar(3.1)).toBe(true);
+  });
+
+  it('hides the seven-column grid when a 320pt page cannot give each cell 44pt', () => {
+    expect(monthCalendarContentWidth(320)).toBe(272);
+    expect(shouldShowMonthCalendarGrid({ fontScale: 1, windowWidth: 320 })).toBe(false);
+    expect(shouldShowMonthCalendarGrid({ fontScale: 1, windowWidth: 390, horizontalInset: 80 })).toBe(
+      false,
+    );
+  });
+
+  it('shows the grid when content width is enough and type is regular', () => {
+    expect(monthCalendarContentWidth(390)).toBe(342);
+    expect(shouldShowMonthCalendarGrid({ fontScale: 1, windowWidth: 390 })).toBe(true);
+    expect(shouldShowMonthCalendarGrid({ fontScale: 1, windowWidth: 356 })).toBe(true);
+    expect(shouldShowMonthCalendarGrid({ fontScale: 1.3, windowWidth: 390 })).toBe(false);
+    expect(shouldShowMonthCalendarGrid({ fontScale: 3.1, windowWidth: 768 })).toBe(false);
   });
 });

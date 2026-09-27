@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Text, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { lookbackMonthPage } from '../../../../application/lookback-month';
 import { getUseCases } from '../../../../application/container';
+import { lookbackMonthPage, shouldShowMonthCalendarGrid } from '../../../../application/lookback-month';
 import { pad2 } from '../../../../domain-adapters/calendar';
 import type { HistoryMonthView } from '../../../../projections/history-projection';
 import {
@@ -11,13 +12,18 @@ import {
   LookbackScaffold,
   lookbackHref,
   lookbackStyles,
-  useLookbackLayout,
 } from '../../../../screens/lookback-chrome';
 import { LookbackMonthCalendar, LookbackMonthEntries } from '../../../../screens/lookback-month';
 
 export default function LookbackMonthScreen() {
   const router = useRouter();
-  const { stackMonthCalendar } = useLookbackLayout();
+  const { width, fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const showGrid = shouldShowMonthCalendarGrid({
+    fontScale,
+    windowWidth: width,
+    horizontalInset: insets.left + insets.right,
+  });
   const params = useLocalSearchParams<{ year?: string | string[]; month?: string | string[] }>();
   const year = Number(Array.isArray(params.year) ? params.year[0] : params.year);
   const month = Number(Array.isArray(params.month) ? params.month[0] : params.month);
@@ -70,7 +76,7 @@ export default function LookbackMonthScreen() {
           </Text>
         </Pressable>
       ) : null}
-      {page && !stackMonthCalendar ? (
+      {page && showGrid ? (
         <LookbackMonthCalendar page={page} year={year} month={month} onOpenDay={openDay} />
       ) : null}
       {page ? <LookbackMonthEntries page={page} year={year} month={month} onOpenDay={openDay} /> : null}
