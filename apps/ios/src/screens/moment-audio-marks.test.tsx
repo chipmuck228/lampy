@@ -86,6 +86,48 @@ describe('MomentAudio action marks', () => {
     ).toEqual(expect.objectContaining({ width: '23%' }));
   });
 
+  it('shows heard progress on compact Recent sound without the scene title', async () => {
+    const idle = await render(
+      <MomentAudio audio={audio} playbackStatus="idle" testIDPrefix="voice-idle" compact progressWhenHeard />,
+    );
+    expect(idle.queryByTestId('voice-idle-progress-asset_voice')).toBeNull();
+    expect(idle.queryByTestId('voice-idle-scene-asset_voice')).toBeNull();
+    expect(idle.getByText('一段声音 · 4秒')).toBeTruthy();
+
+    const playing = await render(
+      <MomentAudio
+        audio={audio}
+        playbackStatus="playing"
+        currentTimeMs={1200}
+        testIDPrefix="voice-play"
+        compact
+        progressWhenHeard
+      />,
+    );
+    expect(playing.queryByTestId('voice-play-scene-asset_voice')).toBeNull();
+    expect(playing.getByText('正在播放 · 1秒 / 4秒')).toBeTruthy();
+    expect(StyleSheet.flatten(playing.getByTestId('voice-play-progress-asset_voice').props.style)).toEqual(
+      expect.objectContaining({ width: '100%', height: 3, backgroundColor: 'rgba(79,98,109,0.18)' }),
+    );
+
+    const paused = await render(
+      <MomentAudio
+        audio={audio}
+        playbackStatus="paused"
+        currentTimeMs={800}
+        testIDPrefix="voice-pause"
+        compact
+        progressWhenHeard
+      />,
+    );
+    expect(paused.queryByTestId('voice-pause-scene-asset_voice')).toBeNull();
+    expect(paused.getByText('已暂停 · 1秒 / 4秒')).toBeTruthy();
+    expect(paused.getByTestId('voice-pause-progress-asset_voice')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(paused.getByTestId('voice-pause-progress-asset_voice').props.children.props.style),
+    ).toEqual(expect.objectContaining({ width: '23%' }));
+  });
+
   it('keeps the detail idle track when the Recent option is not passed', async () => {
     const detail = await render(<MomentAudio audio={audio} playbackStatus="idle" testIDPrefix="detail" scene />);
     expect(detail.getByTestId('detail-progress-asset_voice')).toBeTruthy();

@@ -128,7 +128,9 @@ export function MomentAudio({
   const actionLabel = playing ? '暂停' : playbackStatus === 'finished' ? '再听一次' : preparing ? '正在准备' : '播放';
   const progress =
     audio.durationMs > 0 ? Math.min(1, Math.max(0, currentTimeMs / audio.durationMs)) : 0;
-  const showProgress = scene && (!progressWhenHeard || shouldShowHeardProgress(playbackStatus, currentTimeMs));
+  const showProgress = progressWhenHeard
+    ? shouldShowHeardProgress(playbackStatus, currentTimeMs)
+    : scene;
 
   return (
     <View style={styles.block}>

@@ -32,8 +32,8 @@ Liuz17（iPhone 17 Pro / iOS 26.2）本轮 **连不上**（Core Device 超时）
 | 场景 | 结果 | 证据 |
 | --- | --- | --- |
 | 图＋声 idle | **PASS** | `shots/iphone16-idle-mix.png`、`shots/iphone16-idle-mix-crop.png`。「一段声音 · 3秒」与「▶ 播放」之间无线。 |
-| 仅声音 idle | **PASS** | `shots/iphone16-idle-voice.png`。meta 与播放之间无线；同日短线只出现在两条记录之间。 |
-| 播放／暂停进度 | **NOT VERIFIED** | 运行中 App 未点到「暂停」态。Jest 覆盖 heard 轨样式与百分比。 |
+| 仅声音 idle | **PASS** | `shots/iphone16-idle-voice.png`。紧凑：无「当时的声音」标题；meta 与播放之间无线。 |
+| 仅声音／混排 playing、paused | **NOT VERIFIED** | 运行中 App 未见到暂停态。Jest 覆盖紧凑与 scene 两种 heard 轨。 |
 | 同日 72pt 细线 | **PASS** | `shots/iphone16-idle-mix.png`、`shots/iphone16-rule-gap-crop.png`。线在「看这条」与下一条正文之间，不贴住下一句。 |
 | 缺失媒体 | **PASS** | `shots/iphone16-recent-missing.png` |
 | 三图长记录 | **PASS** | `shots/iphone16-recent-glyphs.png` |

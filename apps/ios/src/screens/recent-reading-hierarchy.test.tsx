@@ -190,6 +190,7 @@ describe('recent reading hierarchy', () => {
     expect(view.getAllByText('▶').length).toBeGreaterThanOrEqual(2);
     expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('看这条');
     expect(view.queryByTestId('recent-sound-moment_voice-scene-asset_voice')).toBeNull();
+    expect(view.queryByTestId('recent-sound-moment_voice-progress-asset_voice')).toBeNull();
     expect(view.getByTestId('recent-open-label-moment_voice').props.children).toBe('看这条');
     expect(view.queryByTestId('recent-day-rule-moment_mix')).toBeNull();
     expect(view.getByTestId('recent-day-rule-moment_voice')).toBeTruthy();
