@@ -7,14 +7,26 @@ import { getUseCases } from '../../application/container';
 import type { MomentDetailViewModel } from '../../application/use-cases';
 import { isFamilyApiConfigured } from '../../infrastructure/family-config';
 import { MomentAudio, MomentUnknownMedia } from '../../screens/moment-audio';
+import { detailPrecisionLine } from '../../screens/moment-detail-entry';
 import { MomentFeeling } from '../../screens/moment-feeling';
 import { MomentImages } from '../../screens/moment-images';
+import {
+  ink,
+  inkSoft,
+  isCompactHeight,
+  pageGutter,
+  paper,
+  readingPageWidth,
+  sage,
+} from '../../screens/life-page';
 import { useSoundPlayer } from '../../screens/use-sound-player';
 
 export default function MomentDetailScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const readingWidth = Math.min(width, 720);
+  const { width, height } = useWindowDimensions();
+  const gutter = pageGutter(width, height);
+  const pageWidth = readingPageWidth(width, height);
+  const compact = isCompactHeight(height);
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const momentId = rawId ? decodeURIComponent(rawId) : '';
@@ -39,11 +51,15 @@ export default function MomentDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="记录">
-      <ScrollView
-        testID="detail-scroll"
-        style={styles.scroll}
-        contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}
-        keyboardShouldPersistTaps="handled"
+      <View
+        style={[
+          styles.chrome,
+          {
+            maxWidth: pageWidth,
+            paddingHorizontal: gutter,
+            paddingTop: compact ? 4 : 8,
+          },
+        ]}
       >
         <Pressable
           accessibilityRole="button"
@@ -53,7 +69,20 @@ export default function MomentDetailScreen() {
         >
           <Text style={styles.back}>返回原来的位置</Text>
         </Pressable>
-
+      </View>
+      <ScrollView
+        testID="detail-scroll"
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.column,
+          {
+            maxWidth: pageWidth,
+            paddingHorizontal: gutter,
+            paddingTop: compact ? 8 : 16,
+          },
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
         {view?.kind === 'missing' ? (
           <View style={styles.block}>
             <Text style={styles.title}>这条记录现在无法找到。</Text>
@@ -77,14 +106,23 @@ export default function MomentDetailScreen() {
         ) : null}
 
         {view?.kind === 'ready' ? (
-          <View style={styles.block}>
-            <Text style={styles.date}>{view.dateLabel}</Text>
+          <View style={styles.page}>
+            <View style={styles.entry}>
+              <Text accessibilityRole="header" style={styles.date}>
+                {view.dateLabel}
+              </Text>
+              {detailPrecisionLine(view.precision) ? (
+                <Text testID="detail-precision" style={styles.precision}>
+                  {detailPrecisionLine(view.precision)}
+                </Text>
+              ) : null}
+            </View>
             {view.note ? (
               <Text testID="detail-note" style={styles.note}>
                 {view.note}
               </Text>
             ) : null}
-            <MomentImages images={view.images} testIDPrefix="detail-image" />
+            <MomentImages images={view.images} testIDPrefix="detail-image" rhythm />
             <MomentUnknownMedia items={view.unknownMedia ?? []} testIDPrefix="detail-unknown" />
             <MomentAudio
               audio={view.audio}
@@ -97,9 +135,12 @@ export default function MomentDetailScreen() {
                 void sound.pause();
               }}
               testIDPrefix="detail-sound"
+              scene
             />
-            <MomentFeeling feeling={view.feeling} testID="detail-feeling" />
-            <Text style={styles.meta}>{view.sourceLabel}</Text>
+            <View style={styles.secondary}>
+              <MomentFeeling feeling={view.feeling} testID="detail-feeling" />
+              <Text style={styles.meta}>{view.sourceLabel}</Text>
+            </View>
             {isFamilyApiConfigured() ? (
               <Pressable
                 accessibilityRole="button"
@@ -119,27 +160,35 @@ export default function MomentDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  safe: { flex: 1, backgroundColor: paper },
+  chrome: {
+    width: '100%',
+    alignSelf: 'center',
+    flexShrink: 0,
+  },
   scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,
     width: '100%',
     maxWidth: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    gap: 20,
+    paddingBottom: 48,
+    gap: 24,
   },
-  backHit: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
-  back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
+  backHit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  back: { fontSize: 16, lineHeight: 22, color: sage },
   block: { gap: 12, width: '100%', maxWidth: '100%', minWidth: 0 },
-  title: { fontSize: 22, lineHeight: 32, color: '#25231F', flexShrink: 0 },
-  body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
-  date: { fontSize: 16, lineHeight: 24, color: '#53604F', flexShrink: 0 },
-  note: { fontSize: 24, lineHeight: 36, color: '#25231F' },
-  meta: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
+  page: { gap: 24, width: '100%', maxWidth: '100%', minWidth: 0 },
+  entry: { gap: 4, width: '100%' },
+  title: { fontSize: 22, lineHeight: 32, color: ink, flexShrink: 0 },
+  body: { fontSize: 16, lineHeight: 24, color: inkSoft },
+  date: { fontSize: 22, lineHeight: 32, color: sage, flexShrink: 0 },
+  precision: { fontSize: 15, lineHeight: 22, color: inkSoft },
+  note: { fontSize: 21, lineHeight: 32, color: ink },
+  secondary: { gap: 8, width: '100%' },
+  meta: { fontSize: 14, lineHeight: 20, color: inkSoft },
   retryHit: { minHeight: 44, justifyContent: 'center' },
-  retry: { fontSize: 18, lineHeight: 24, color: '#53604F' },
+  retry: { fontSize: 18, lineHeight: 24, color: sage },
   shareHit: { minHeight: 44, justifyContent: 'center' },
-  share: { fontSize: 18, lineHeight: 24, color: '#53604F' },
+  share: { fontSize: 18, lineHeight: 24, color: sage },
 });

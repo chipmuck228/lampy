@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatSoundDuration } from '../application/duration';
 import type { AudioView, UnknownMediaView } from '../application/use-cases';
 import type { PlaybackStatus } from '../infrastructure/media';
+import { hairline, inkSoft, sage, sound } from './life-page';
 
 export type RecordPhase = 'ready' | 'recording' | 'stopped' | 'processing' | 'failed';
 
@@ -30,6 +31,7 @@ export function MomentAudio({
   onPause,
   testIDPrefix,
   compact = false,
+  scene = false,
 }: {
   audio: AudioView | null;
   playbackStatus?: PlaybackStatus;
@@ -38,6 +40,7 @@ export function MomentAudio({
   onPause?: () => void;
   testIDPrefix: string;
   compact?: boolean;
+  scene?: boolean;
 }) {
   if (!audio) return null;
 
@@ -60,9 +63,16 @@ export function MomentAudio({
   const durationLabel = audio.durationLabel || formatSoundDuration(audio.durationMs);
   const playing = playbackStatus === 'playing';
   const actionLabel = playing ? '暂停' : playbackStatus === 'finished' ? '再听一次' : '播放';
+  const progress =
+    audio.durationMs > 0 ? Math.min(1, Math.max(0, currentTimeMs / audio.durationMs)) : 0;
 
   return (
     <View style={styles.block}>
+      {scene ? (
+        <Text style={styles.sceneTitle} testID={`${testIDPrefix}-scene-${audio.id}`}>
+          {audio.label}
+        </Text>
+      ) : null}
       <Text
         style={compact ? styles.compactMeta : styles.meta}
         accessibilityLabel={playbackLabel(playbackStatus, durationLabel, currentTimeMs)}
@@ -75,6 +85,15 @@ export function MomentAudio({
               ? `已播完 · ${durationLabel}`
               : `一段声音 · ${durationLabel}`}
       </Text>
+      {scene ? (
+        <View
+          accessible={false}
+          testID={`${testIDPrefix}-progress-${audio.id}`}
+          style={styles.track}
+        >
+          <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
+        </View>
+      ) : null}
       {onPlay || onPause ? (
         <Pressable
           accessibilityRole="button"
@@ -256,9 +275,17 @@ const styles = StyleSheet.create({
   block: { gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   hit: { minHeight: 44, justifyContent: 'center' },
-  action: { fontSize: 18, lineHeight: 24, color: '#53604F' },
-  recording: { fontSize: 18, lineHeight: 24, color: '#4F626D' },
-  meta: { fontSize: 16, lineHeight: 24, color: '#4F626D' },
-  compactMeta: { fontSize: 14, lineHeight: 20, color: '#4F626D' },
-  missing: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
+  action: { fontSize: 18, lineHeight: 24, color: sage },
+  recording: { fontSize: 18, lineHeight: 24, color: sound },
+  meta: { fontSize: 16, lineHeight: 24, color: sound },
+  compactMeta: { fontSize: 14, lineHeight: 20, color: sound },
+  sceneTitle: { fontSize: 18, lineHeight: 26, color: sound },
+  track: {
+    height: 1,
+    width: '100%',
+    backgroundColor: hairline,
+    overflow: 'hidden',
+  },
+  fill: { height: 1, backgroundColor: sound },
+  missing: { fontSize: 16, lineHeight: 24, color: inkSoft },
 });

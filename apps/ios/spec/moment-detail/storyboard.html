@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>Moment 详情 · 多状态版面</title>
+  <style>
+    :root { --paper: #F3F0E9; --ink: #25231F; --ink-soft: #5C5851; --sage: #53604F; --clay: #87513D; --sound: #4F626D; --hair: rgba(37,35,31,0.16); }
+    body { margin: 0; font: 16px/24px "Songti SC", "Source Han Serif SC", serif; background: #d8d2c6; color: var(--ink); }
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 24px 72px; }
+    h1 { font-size: 28px; line-height: 36px; font-weight: 600; }
+    h2 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 40px 0 12px; }
+    p, li { color: var(--ink-soft); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .row, .row3 { grid-template-columns: 1fr; } }
+    .phone { background: var(--paper); border-radius: 20px; padding: 22px 20px 28px; min-height: 360px; }
+    .cap { font: 13px/18px ui-sans-serif, system-ui; color: var(--sage); margin: 0 0 14px; }
+    .back { color: var(--sage); font-size: 16px; margin: 0 0 18px; }
+    .date-old { color: var(--sage); font-size: 16px; line-height: 24px; }
+    .date { color: var(--sage); font-size: 22px; line-height: 32px; }
+    .prec { color: var(--ink-soft); font-size: 15px; line-height: 22px; margin: 4px 0 18px; }
+    .note { font-size: 21px; line-height: 32px; margin: 0 0 20px; max-width: 26em; }
+    .note-old { font-size: 24px; line-height: 36px; margin: 8px 0 12px; }
+    .meta { color: var(--ink-soft); font-size: 14px; line-height: 20px; margin: 16px 0 0; }
+    .share { color: var(--sage); font-size: 18px; margin-top: 20px; }
+    .photo { background: #c9c2b4; height: 140px; margin: 10px 0; }
+    .photo.tall { height: 190px; }
+    .photo.miss { background: transparent; color: var(--clay); font: 15px/22px ui-sans-serif, system-ui; display: flex; align-items: center; min-height: 72px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+    .pair .photo { height: 120px; margin: 0; }
+    .sound { color: var(--sound); margin: 8px 0; }
+    .sound-title { font-size: 18px; line-height: 26px; color: var(--sound); margin-top: 8px; }
+    .track { height: 1px; background: var(--hair); margin: 10px 0 6px; position: relative; }
+    .track i { display: block; width: 28%; height: 1px; background: var(--sound); }
+    .err { color: var(--clay); }
+    .title { font-size: 22px; line-height: 32px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>详情：日期进入，按内容组页</h1>
+    <p>左列为 f9416d9 等权清单。右列按 §10.5：日期与精度作进入点，阅读宽度 520，返回钉住，图按比例组带，声音是场景。</p>
+
+    <h2>纯文字</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">改前</p>
+        <div class="back">返回原来的位置</div>
+        <div class="date-old">2026年9月24日</div>
+        <div class="note-old">门口的风</div>
+        <div class="meta">你留下的记录</div>
+        <div class="share">分享给家里</div>
+      </section>
+      <section class="phone">
+        <p class="cap">改后</p>
+        <div class="back">返回原来的位置</div>
+        <div class="date">2026年9月24日</div>
+        <div class="prec">大约是这一天</div>
+        <div class="note">门口的风</div>
+        <div class="meta">你留下的记录</div>
+        <div class="share">分享给家里</div>
+      </section>
+    </div>
+
+    <h2>单图 · 三图</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">改前 · 一律全宽叠</p>
+        <div class="back">返回原来的位置</div>
+        <div class="date-old">2026年9月24日</div>
+        <div class="photo tall"></div>
+        <div class="photo"></div>
+        <div class="photo"></div>
+        <div class="meta">你留下的记录</div>
+      </section>
+      <section class="phone">
+        <p class="cap">改后 · 首张全宽，后两张并排</p>
+        <div class="back">返回原来的位置</div>
+        <div class="date">2026年9月24日</div>
+        <div class="prec">大约是这一天</div>
+        <div class="photo tall"></div>
+        <div class="pair"><div class="photo"></div><div class="photo"></div></div>
+        <div class="meta">你留下的记录</div>
+      </section>
+    </div>
+
+    <h2>仅声音 · 图 + 声</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">改前 · 附件句</p>
+        <div class="back">返回原来的位置</div>
+        <div class="date-old">记录于 9月24日</div>
+        <div class="sound">一段声音 · 4秒</div>
+        <div class="share" style="margin-top:8px">播放</div>
+        <div class="meta">你留下的记录</div>
+      </section>
+      <section class="phone">
+        <p class="cap">改后 · 当时的声音</p>
+        <div class="back">返回原来的位置</div>
+        <div class="date">记录于 9月24日</div>
+        <div class="prec">时间未确认</div>
+        <div class="sound-title">当时的声音</div>
+        <div class="sound">一段声音 · 4秒</div>
+        <div class="track"><i></i></div>
+        <div class="share" style="margin-top:8px">播放</div>
+        <div class="meta">你留下的记录</div>
+      </section>
+    </div>
+
+    <h2>缺失 · 未知 · 读失败</h2>
+    <div class="row3">
+      <section class="phone">
+        <p class="cap">照片缺失，记录还在</p>
+        <div class="back">返回原来的位置</div>
+        <div class="date">2026年9月24日</div>
+        <div class="prec">大约是这一天</div>
+        <div class="note">字还在</div>
+        <div class="photo miss">这张照片暂时找不到了，但这条记录还在。</div>
+      </section>
+      <section class="phone">
+        <p class="cap">未知媒介，不当成照片</p>
+        <div class="back">返回原来的位置</div>
+        <div class="date">2026年9月24日</div>
+        <div class="prec">时间未确认</div>
+        <div class="note">字还在</div>
+        <div class="photo"></div>
+        <div class="meta err">这份内容暂时无法打开。</div>
+      </section>
+      <section class="phone">
+        <p class="cap">读失败，可再试</p>
+        <div class="back">返回原来的位置</div>
+        <div class="title">这条记录暂时读不出来。</div>
+        <p>原来的内容还在，可以再试。没有把它当成已经丢失。</p>
+        <div class="share">再试一次</div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
