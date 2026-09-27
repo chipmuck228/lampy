@@ -33,7 +33,12 @@ import {
   type ImageView,
   type UnknownMediaView,
 } from '../application/use-cases';
-import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/moment-audio';
+import {
+  DraftSoundBar,
+  MomentUnknownMedia,
+  draftPreviewStatus,
+  type RecordPhase,
+} from '../screens/moment-audio';
 import { FeelingPicker } from '../screens/moment-feeling';
 import { OccurredDatePicker } from '../screens/moment-occurred';
 import { MomentImages } from '../screens/moment-images';
@@ -100,6 +105,8 @@ export default function LeaveScreen() {
   const occurredEpochRef = useRef(0);
   const pendingTodaySeedRef = useRef<string | null>(null);
   const sound = useSoundPlayer();
+  const [previewBoundId, setPreviewBoundId] = useState<string | null>(null);
+  const audioId = audio?.id;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -107,6 +114,11 @@ export default function LeaveScreen() {
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    setPreviewBoundId(null);
+    void sound.stop();
+  }, [audioId]);
 
   function setRecordPhase(next: RecordPhase) {
     phaseRef.current = next;
@@ -202,15 +214,12 @@ export default function LeaveScreen() {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') {
-        void sound.stop();
-        if (phaseRef.current === 'recording') {
-          interruptRef.current();
-        }
+      if (state !== 'active' && phaseRef.current === 'recording') {
+        interruptRef.current();
       }
     });
     return () => sub.remove();
-  }, [sound]);
+  }, []);
 
   function shownError(error: unknown, fallback: string) {
     return isApplicationError(error) ? error.message : fallback;
@@ -361,6 +370,7 @@ export default function LeaveScreen() {
     setBusy('record');
     setElapsedMs(0);
     setRecordPhase('processing');
+    setPreviewBoundId(null);
     void sound.stop();
     void enqueue(async () => {
       const app = await getUseCases();
@@ -428,6 +438,7 @@ export default function LeaveScreen() {
         if (abandoningRef.current || draftIdRef.current !== id) return;
         applyComposer(result.composer);
         setRecordPhase(result.composer.audio ? 'stopped' : 'ready');
+        void sound.stop();
         if (!result.hadSession) return;
         setMessage(
           result.kept
@@ -514,6 +525,7 @@ export default function LeaveScreen() {
     if (!id || busyRef.current || abandoningRef.current) return;
     busyRef.current = true;
     setBusy('audio');
+    setPreviewBoundId(null);
     void sound.stop();
     void enqueue(async () => {
       const app = await getUseCases();
@@ -799,14 +811,21 @@ export default function LeaveScreen() {
             phase={phase}
             elapsedMs={elapsedMs}
             audio={audio}
-            playbackStatus={sound.failed ? 'unavailable' : sound.status}
-            currentTimeMs={sound.currentTimeMs}
+            playbackStatus={draftPreviewStatus(
+              sound.status,
+              sound.failed,
+              audio?.id,
+              previewBoundId,
+            )}
+            currentTimeMs={previewBoundId === audio?.id ? sound.currentTimeMs : 0}
             disabled={composerLocked}
             removeDisabled={busy !== 'idle' || confirmingAbandon}
             onStart={startRecording}
             onStop={stopRecording}
             onPlay={() => {
-              if (audio?.uri) void sound.play(audio.uri);
+              if (!audio?.uri) return;
+              setPreviewBoundId(audio.id);
+              void sound.play(audio.uri);
             }}
             onPause={() => {
               void sound.pause();

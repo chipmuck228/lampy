@@ -1,4 +1,5 @@
 import { act, fireEvent, render, renderHook, waitFor } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { createMemoryAudioPlayback, type AudioPlayback, type PlaybackStatus } from '../infrastructure/media';
 import { MomentAudio } from './moment-audio';
@@ -80,6 +81,65 @@ describe('useSoundPlayer state sync', () => {
     expect(result.current.status).toBe('playing');
     expect(result.current.currentTimeMs).toBe(1200);
     expect(playback.loadedUri).toBe(VOICE);
+  });
+
+  it('does not keep showing paused after the first resume tap', async () => {
+    const playback = createDeferredPlayback();
+    const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    playback.reportPlaying(2000);
+    await waitFor(() => {
+      expect(result.current.status).toBe('playing');
+    });
+
+    await act(async () => {
+      await result.current.pause();
+    });
+    expect(result.current.status).toBe('paused');
+    expect(result.current.currentTimeMs).toBe(2000);
+
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    expect(result.current.status).toBe('preparing');
+    expect(result.current.status).not.toBe('paused');
+    expect(result.current.currentTimeMs).toBe(2000);
+    expect(playback.plays).toBe(2);
+
+    playback.reportPlaying(2300);
+    await waitFor(() => {
+      expect(result.current.status).toBe('playing');
+    });
+    expect(result.current.currentTimeMs).toBe(2300);
+    expect(playback.loads).toBe(1);
+  });
+
+  it('clears a finished preview so a kept interrupt is not shown as already played', async () => {
+    const playback = createDeferredPlayback();
+    const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    playback.reportPlaying(3500);
+    await waitFor(() => {
+      expect(result.current.status).toBe('playing');
+    });
+    playback.reportFinished();
+    await waitFor(() => {
+      expect(result.current.status).toBe('finished');
+    });
+
+    await act(async () => {
+      await result.current.stop();
+    });
+
+    expect(result.current.status).toBe('idle');
+    expect(result.current.currentTimeMs).toBe(0);
+    expect(result.current.failed).toBe(false);
   });
 
   it('ignores a second tap while the same uri is still starting', async () => {
@@ -264,6 +324,304 @@ describe('useSoundPlayer state sync', () => {
     expect(result.current.status).toBe('unavailable');
     expect(result.current.failed).toBe(true);
     expect(result.current.currentTimeMs).toBe(0);
+  });
+
+  it('pauses at the heard position when the app leaves the foreground, then resumes there', async () => {
+    const handlers: ((state: AppStateStatus) => void)[] = [];
+    const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') handlers.push(handler);
+      return { remove: jest.fn() };
+    });
+    try {
+      const playback = createDeferredPlayback();
+      const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      playback.reportPlaying(1200);
+      await waitFor(() => {
+        expect(result.current.status).toBe('playing');
+      });
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('background'));
+      });
+
+      expect(result.current.status).toBe('paused');
+      expect(result.current.currentTimeMs).toBe(1200);
+      expect(result.current.failed).toBe(false);
+      expect(playback.releases).toBe(0);
+      expect(playback.getStatus().status).not.toBe('finished');
+
+      playback.deferPlaying = false;
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+
+      expect(result.current.status).toBe('playing');
+      expect(result.current.currentTimeMs).toBe(1200);
+      expect(playback.loads).toBe(1);
+      expect(playback.plays).toBe(2);
+    } finally {
+      add.mockRestore();
+    }
+  });
+
+  it('does not ignite a late load after background; play waits for another tap', async () => {
+    const handlers: ((state: AppStateStatus) => void)[] = [];
+    const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') handlers.push(handler);
+      return { remove: jest.fn() };
+    });
+    try {
+      let finishLoad: (() => void) | undefined;
+      let holdLoad = true;
+      const playback = createDeferredPlayback();
+      const originalLoad = playback.load.bind(playback);
+      playback.load = async (uri: string) => {
+        if (holdLoad) {
+          holdLoad = false;
+          playback.loads += 1;
+          playback.loadedUri = uri;
+          playback.durationMs = 3500;
+          await new Promise<void>((resolve) => {
+            finishLoad = resolve;
+          });
+          return;
+        }
+        await originalLoad(uri);
+      };
+      const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+      let pendingPlay = Promise.resolve();
+      await act(async () => {
+        pendingPlay = result.current.play(VOICE);
+      });
+      expect(result.current.status).toBe('preparing');
+      expect(playback.loads).toBe(1);
+      expect(playback.plays).toBe(0);
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('background'));
+      });
+      await act(async () => {
+        finishLoad?.();
+        await pendingPlay;
+      });
+
+      expect(playback.plays).toBe(0);
+      expect(result.current.status).not.toBe('playing');
+      expect(result.current.status).not.toBe('preparing');
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('active'));
+      });
+      expect(playback.plays).toBe(0);
+      expect(result.current.status).not.toBe('playing');
+
+      playback.deferPlaying = false;
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      expect(playback.plays).toBe(1);
+      expect(result.current.status).toBe('playing');
+    } finally {
+      add.mockRestore();
+    }
+  });
+
+  it('does not ignite a late mode switch after background; play waits for another tap', async () => {
+    const handlers: ((state: AppStateStatus) => void)[] = [];
+    const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') handlers.push(handler);
+      return { remove: jest.fn() };
+    });
+    try {
+      let finishPlay: (() => void) | undefined;
+      let holdPlay = true;
+      const playback = createDeferredPlayback();
+      const originalPlay = playback.play.bind(playback);
+      playback.play = async () => {
+        if (holdPlay) {
+          holdPlay = false;
+          await new Promise<void>((resolve) => {
+            finishPlay = resolve;
+          });
+        }
+        return originalPlay();
+      };
+      const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+      let pendingPlay = Promise.resolve();
+      await act(async () => {
+        pendingPlay = result.current.play(VOICE);
+      });
+      expect(result.current.status).toBe('preparing');
+      expect(playback.plays).toBe(0);
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('background'));
+      });
+      await act(async () => {
+        finishPlay?.();
+        await pendingPlay;
+      });
+
+      expect(result.current.status).not.toBe('playing');
+      expect(result.current.status).not.toBe('preparing');
+      expect(playback.getStatus().status).not.toBe('playing');
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('active'));
+      });
+      expect(result.current.status).not.toBe('playing');
+      expect(playback.getStatus().status).not.toBe('playing');
+
+      playback.deferPlaying = false;
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      expect(playback.plays).toBeGreaterThan(0);
+      expect(result.current.status).toBe('playing');
+    } finally {
+      add.mockRestore();
+    }
+  });
+
+  it('does not let a stale mode switch pause a newer play after background', async () => {
+    const handlers: ((state: AppStateStatus) => void)[] = [];
+    const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') handlers.push(handler);
+      return { remove: jest.fn() };
+    });
+    try {
+      let finishFirst: (() => void) | undefined;
+      let holdFirst = true;
+      let starts = 0;
+      let pauses = 0;
+      const playback = createDeferredPlayback();
+      const originalPlay = playback.play.bind(playback);
+      const originalPause = playback.pause.bind(playback);
+      playback.play = async () => {
+        const mine = ++starts;
+        if (holdFirst) {
+          holdFirst = false;
+          await new Promise<void>((resolve) => {
+            finishFirst = resolve;
+          });
+        }
+        if (mine !== starts) return;
+        return originalPlay();
+      };
+      playback.pause = async () => {
+        pauses += 1;
+        return originalPause();
+      };
+      const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+      let stalePlay = Promise.resolve();
+      await act(async () => {
+        stalePlay = result.current.play(VOICE);
+      });
+      expect(result.current.status).toBe('preparing');
+      expect(playback.plays).toBe(0);
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('background'));
+      });
+      expect(pauses).toBe(1);
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('active'));
+      });
+      playback.deferPlaying = false;
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      expect(result.current.status).toBe('playing');
+      expect(playback.getStatus().status).toBe('playing');
+      const pausesAfterLatest = pauses;
+      const playsAfterLatest = playback.plays;
+
+      await act(async () => {
+        finishFirst?.();
+        await stalePlay;
+      });
+
+      expect(pauses).toBe(pausesAfterLatest);
+      expect(playback.plays).toBe(playsAfterLatest);
+      expect(result.current.status).toBe('playing');
+      expect(playback.getStatus().status).toBe('playing');
+    } finally {
+      add.mockRestore();
+    }
+  });
+
+  it('does not let a late park overwrite or pause a newer play', async () => {
+    const handlers: ((state: AppStateStatus) => void)[] = [];
+    const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') handlers.push(handler);
+      return { remove: jest.fn() };
+    });
+    try {
+      let finishPause: (() => void) | undefined;
+      let holdPause = true;
+      let pauses = 0;
+      const playback = createDeferredPlayback();
+      const originalPause = playback.pause.bind(playback);
+      playback.pause = async () => {
+        pauses += 1;
+        if (holdPause) {
+          holdPause = false;
+          await new Promise<void>((resolve) => {
+            finishPause = resolve;
+          });
+        }
+        return originalPause();
+      };
+      const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      playback.reportPlaying(1200);
+      await waitFor(() => {
+        expect(result.current.status).toBe('playing');
+      });
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('background'));
+      });
+      expect(result.current.status).toBe('paused');
+      expect(result.current.currentTimeMs).toBe(1200);
+      expect(pauses).toBe(1);
+      expect(playback.plays).toBe(1);
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('active'));
+      });
+      playback.deferPlaying = false;
+      let latestPlay = Promise.resolve();
+      await act(async () => {
+        latestPlay = result.current.play(VOICE);
+      });
+      expect(result.current.status).toBe('preparing');
+      expect(playback.plays).toBe(1);
+      expect(playback.getStatus().status).not.toBe('paused');
+
+      await act(async () => {
+        finishPause?.();
+        await latestPlay;
+      });
+
+      expect(pauses).toBe(1);
+      expect(playback.plays).toBe(2);
+      expect(result.current.status).toBe('playing');
+      expect(playback.getStatus().status).toBe('playing');
+    } finally {
+      add.mockRestore();
+    }
   });
 });
 

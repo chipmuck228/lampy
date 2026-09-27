@@ -902,7 +902,7 @@ export function createUseCases(deps: {
 
   async function interruptDraftRecording(draftId: string): Promise<InterruptRecordingResult> {
     const draft = await requireDraft(draftId);
-    if (!deps.capture || !deps.capture.isRecording()) {
+    if (!deps.capture) {
       return { composer: await toComposer(draft, true), kept: false, hadSession: false };
     }
     const recorded = await deps.capture.interrupt();

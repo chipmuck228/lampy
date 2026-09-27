@@ -14,6 +14,7 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
   const playInFlightRef = useRef(false);
+  const pauseInFlightRef = useRef<Promise<void> | null>(null);
   const statusRef = useRef<PlaybackStatus>('idle');
   const [status, setStatus] = useState<PlaybackStatus>('idle');
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
@@ -77,19 +78,62 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
     }
   }, []);
 
+  const park = useCallback(async () => {
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    playInFlightRef.current = false;
+    pendingUriRef.current = null;
+    const current = playerRef.current;
+    const before = current?.getStatus();
+    const heard = before?.currentTimeMs ?? 0;
+
+    function settleFrom(snapshot: { status: PlaybackStatus; currentTimeMs: number } | undefined, fallbackMs: number) {
+      if (!mountedRef.current || generation !== generationRef.current) return;
+      const kept = (snapshot?.currentTimeMs ?? 0) > 0 ? snapshot!.currentTimeMs : fallbackMs;
+      if (snapshot?.status === 'unavailable') {
+        setFailed(true);
+        writeStatus('unavailable');
+        setCurrentTimeMs(0);
+        return;
+      }
+      setFailed(false);
+      if (kept > 0 && statusRef.current !== 'idle' && statusRef.current !== 'finished') {
+        writeStatus('paused');
+        setCurrentTimeMs(kept);
+        return;
+      }
+      writeStatus('idle');
+      setCurrentTimeMs(0);
+    }
+
+    settleFrom(before, heard);
+    if (current) {
+      const pauseWork = current.pause().catch(() => {});
+      pauseInFlightRef.current = pauseWork;
+      try {
+        await pauseWork;
+      } finally {
+        if (pauseInFlightRef.current === pauseWork) {
+          pauseInFlightRef.current = null;
+        }
+      }
+    }
+    settleFrom(current?.getStatus(), heard);
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     const app = AppState.addEventListener('change', (state) => {
       if (state !== 'active') {
-        void teardown(true);
+        void park();
       }
     });
     return () => {
       mountedRef.current = false;
-      app.remove();
+      app?.remove?.();
       void teardown(false);
     };
-  }, [teardown]);
+  }, [park, teardown]);
 
   useEffect(() => {
     if (status !== 'playing' && status !== 'preparing') return undefined;
@@ -132,6 +176,11 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
 
       try {
         const current = player();
+        const pendingPause = pauseInFlightRef.current;
+        if (pendingPause) {
+          await pendingPause;
+          if (!mountedRef.current || generation !== generationRef.current) return;
+        }
         const alreadyLoaded = loadedUriRef.current === uri;
         if (!alreadyLoaded) {
           await current.load(uri);
@@ -161,10 +210,17 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
       sync();
     },
     async stop() {
-      if (!playerRef.current) return;
-      await playerRef.current.stop();
+      if (playerRef.current) {
+        try {
+          await playerRef.current.stop();
+        } catch {
+          // Still clear the UI so a leftover finished state cannot stick to a new clip.
+        }
+      }
       if (!mountedRef.current) return;
-      sync();
+      setFailed(false);
+      writeStatus('idle');
+      setCurrentTimeMs(0);
     },
   };
 }

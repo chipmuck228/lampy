@@ -333,7 +333,10 @@ export function createMemoryAudioPlayback(): AudioPlayback & {
       }
       if (!playback.loadedUri) throw new Error('no source');
       playback.plays += 1;
-      if (playback.deferPlaying) return;
+      if (playback.deferPlaying) {
+        playback.status = 'preparing';
+        return;
+      }
       playback.status = 'playing';
     },
     async pause() {
@@ -342,8 +345,8 @@ export function createMemoryAudioPlayback(): AudioPlayback & {
       }
     },
     async stop() {
-      playback.status = playback.loadedUri ? 'finished' : 'idle';
-      playback.currentTimeMs = playback.durationMs;
+      playback.status = 'idle';
+      playback.currentTimeMs = 0;
     },
     async release() {
       playback.releases += 1;

@@ -7,6 +7,16 @@ import { hairline, inkSoft, sage, sound } from './life-page';
 
 export type RecordPhase = 'ready' | 'recording' | 'stopped' | 'processing' | 'failed';
 
+export function draftPreviewStatus(
+  status: PlaybackStatus,
+  failed: boolean,
+  audioId: string | undefined,
+  boundId: string | null,
+): PlaybackStatus {
+  if (!audioId || boundId !== audioId) return 'idle';
+  return failed ? 'unavailable' : status;
+}
+
 function playbackLabel(status: PlaybackStatus, durationLabel: string, currentMs: number): string {
   if (status === 'preparing') {
     return `正在准备这段声音，共${durationLabel}`;
