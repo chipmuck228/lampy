@@ -39,6 +39,8 @@ describe('recent home', () => {
     const view = await render(wrap(<RecentScreen />));
     expect(view.getByLabelText('最近')).toBeTruthy();
     expect(view.getByLabelText('回看')).toBeTruthy();
+    expect(view.getByLabelText('留下')).toBeTruthy();
+    expect(view.getByTestId('recent-scroll')).toBeTruthy();
     await waitFor(() => {
       expect(view.getByText('最近还没有留下什么。')).toBeTruthy();
     });

@@ -253,6 +253,91 @@ describe('lookback screens', () => {
     expect(readLookbackScroll('/lookback/unconfirmed')).toBe(120);
   });
 
+  it('keeps a long day page scrollable and restores the previous offset', async () => {
+    rememberLookbackScroll('/lookback/2026/01/02', 180);
+    const longNote =
+      '同一天的第二条，文字很长，用来确认三张照片和声音提示都在标题下面，并且能滚到末尾。'.repeat(8);
+    mockGetHistoryDay.mockResolvedValue({
+      year: 2026,
+      month: 1,
+      day: 2,
+      title: '2026年1月2日',
+      isEmpty: false,
+      items: [
+        {
+          id: 'm_first',
+          note: '先留下的一句',
+          precision: 'day',
+          timeLabel: '2026年1月2日',
+          usedRecordedAtFallback: false,
+          feeling: { value: '高兴', label: '高兴', known: true },
+          images: [
+            {
+              id: 'asset_a',
+              status: 'available',
+              uri: 'memory://assets/asset_a.jpg',
+              width: 1200,
+              height: 1600,
+              label: '照片 1/3',
+            },
+            {
+              id: 'asset_b',
+              status: 'available',
+              uri: 'memory://assets/asset_b.jpg',
+              width: 1200,
+              height: 1600,
+              label: '照片 2/3',
+            },
+            {
+              id: 'asset_c',
+              status: 'unavailable',
+              label: '照片 3/3',
+              unavailableLabel: '这张照片暂时找不到了，但这条记录还在。',
+            },
+          ],
+          audio: null,
+          unknownMedia: [],
+        },
+        {
+          id: 'm_second',
+          note: longNote,
+          precision: 'day',
+          timeLabel: '2026年1月2日',
+          usedRecordedAtFallback: false,
+          feeling: null,
+          images: [],
+          audio: {
+            id: 'asset_voice_long',
+            status: 'unavailable',
+            durationMs: 4000,
+            durationLabel: '4秒',
+            label: '当时的声音',
+            unavailableLabel: '这段声音暂时找不到了，其他内容仍然保留。',
+            reason: 'missing',
+          },
+          unknownMedia: [],
+        },
+      ],
+      hasMore: true,
+    });
+    const day = await render(wrap(<LookbackDayScreen />));
+    await waitFor(() => {
+      expect(day.getByText('先留下的一句')).toBeTruthy();
+    });
+    expect(day.getByTestId('lookback-scroll')).toBeTruthy();
+    expect(day.getByLabelText('返回原来的位置')).toBeTruthy();
+    expect(day.getAllByText('2026年1月2日').length).toBeGreaterThan(0);
+    expect(day.getByLabelText('照片 1/3')).toBeTruthy();
+    expect(day.getByLabelText('照片 3/3。这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
+    expect(day.getByText(longNote)).toBeTruthy();
+    expect(day.getByText('这段声音暂时找不到了，其他内容仍然保留。')).toBeTruthy();
+    expect(day.getByLabelText('继续往下看')).toBeTruthy();
+    expect(readLookbackScroll('/lookback/2026/01/02')).toBe(180);
+    fireEvent.press(day.getByTestId('lookback-moment-m_second'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_second' } });
+    expect(day.getByLabelText('返回原来的位置')).toBeTruthy();
+  });
+
   it('hides feeling on lookback day when none was chosen', async () => {
     mockGetHistoryDay.mockResolvedValue({
       year: 2026,

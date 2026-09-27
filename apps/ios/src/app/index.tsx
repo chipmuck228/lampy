@@ -22,8 +22,9 @@ import { useSoundPlayer } from '../screens/use-sound-player';
 
 export default function RecentScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const readingWidth = Math.min(width, 720);
+  const stackChrome = width < 420 || fontScale >= 1.3;
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -51,12 +52,16 @@ export default function RecentScreen() {
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="最近">
-      <ScrollView contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}>
-        <View style={styles.top}>
+      <ScrollView
+        testID="recent-scroll"
+        style={styles.scroll}
+        contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}
+      >
+        <View style={[styles.top, stackChrome && styles.topStacked]}>
           <Text style={styles.wordmark} accessibilityRole="header">
             最近
           </Text>
-          <View style={styles.actions}>
+          <View style={[styles.actions, stackChrome && styles.actionsWrapped]}>
             {isFamilyApiConfigured() ? (
               <Pressable
                 accessibilityRole="button"
@@ -150,9 +155,11 @@ export default function RecentScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,
     width: '100%',
+    maxWidth: '100%',
     alignSelf: 'center',
     paddingHorizontal: 24,
     paddingBottom: 32,
@@ -160,13 +167,17 @@ const styles = StyleSheet.create({
   },
   top: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     minHeight: 44,
     paddingTop: 12,
+    gap: 8,
   },
-  wordmark: { fontSize: 28, lineHeight: 34, color: '#25231F' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  topStacked: { flexDirection: 'column', alignItems: 'flex-start' },
+  wordmark: { fontSize: 28, lineHeight: 36, color: '#25231F', flexShrink: 0 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16, minWidth: 0 },
+  actionsWrapped: { alignSelf: 'stretch' },
   leaveHit: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
   leave: { fontSize: 18, lineHeight: 24, color: '#53604F' },
   empty: { gap: 8, paddingTop: 24 },
