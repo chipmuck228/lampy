@@ -50,5 +50,6 @@ describe('moment detail missing image', () => {
     expect(view.getByText('这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
     expect(view.queryByText('这条记录现在无法找到。')).toBeNull();
     expect(view.getByLabelText('照片 1/1。这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
+    expect(view.queryByLabelText(/移除这张照片/)).toBeNull();
   });
 });

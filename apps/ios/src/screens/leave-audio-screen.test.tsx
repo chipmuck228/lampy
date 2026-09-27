@@ -168,6 +168,19 @@ describe('leave audio actions', () => {
     expect(mockBegin).toHaveBeenCalledWith('moment_draft', { replace: true });
   });
 
+  it('shows an enabled remove control on a restored recording', async () => {
+    mockRestore.mockResolvedValue(recordedDraft);
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByLabelText('移除这段声音')).toBeTruthy();
+    });
+    expect(view.getByLabelText('移除这段声音').props.accessibilityState?.disabled).toBeFalsy();
+    fireEvent.press(view.getByLabelText('移除这段声音'));
+    await waitFor(() => {
+      expect(mockRemove).toHaveBeenCalledWith('moment_draft');
+    });
+  });
+
   it('shows a stopped recording that can be previewed without autoplay', async () => {
     mockBegin.mockResolvedValueOnce(undefined);
     mockFinish.mockResolvedValueOnce(recordedDraft);

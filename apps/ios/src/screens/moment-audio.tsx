@@ -125,6 +125,7 @@ export function DraftSoundBar({
   playbackStatus,
   currentTimeMs,
   disabled,
+  removeDisabled,
   onStart,
   onStop,
   onPlay,
@@ -138,6 +139,7 @@ export function DraftSoundBar({
   playbackStatus: PlaybackStatus;
   currentTimeMs: number;
   disabled: boolean;
+  removeDisabled?: boolean;
   onStart: () => void;
   onStop: () => void;
   onPlay: () => void;
@@ -178,27 +180,12 @@ export function DraftSoundBar({
     );
   }
 
-  if (phase === 'failed') {
+  if (audio) {
     return (
       <View style={styles.block}>
-        <Text style={styles.missing}>这次没有录下声音。已经写的字和照片还在。</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="声音"
-          testID="composer-sound"
-          onPress={onStart}
-          disabled={disabled}
-          style={styles.hit}
-        >
-          <Text style={styles.action}>声音</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  if (phase === 'stopped' && audio) {
-    return (
-      <View style={styles.block}>
+        {phase === 'failed' ? (
+          <Text style={styles.missing}>这次没有录下声音。已经写的字和照片还在。</Text>
+        ) : null}
         <MomentAudio
           audio={audio}
           playbackStatus={playbackStatus}
@@ -223,12 +210,30 @@ export function DraftSoundBar({
             accessibilityLabel="移除这段声音"
             testID="composer-remove-sound"
             onPress={onRemove}
-            disabled={disabled}
+            disabled={removeDisabled ?? disabled}
             style={styles.hit}
           >
-            <Text style={styles.action}>移除</Text>
+            <Text style={styles.action}>移除这段声音</Text>
           </Pressable>
         </View>
+      </View>
+    );
+  }
+
+  if (phase === 'failed') {
+    return (
+      <View style={styles.block}>
+        <Text style={styles.missing}>这次没有录下声音。已经写的字和照片还在。</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="声音"
+          testID="composer-sound"
+          onPress={onStart}
+          disabled={disabled}
+          style={styles.hit}
+        >
+          <Text style={styles.action}>声音</Text>
+        </Pressable>
       </View>
     );
   }

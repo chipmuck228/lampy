@@ -71,6 +71,7 @@ describe('moment detail missing audio', () => {
     });
     expect(view.getByText('这段声音暂时无法播放，其他内容仍然保留。')).toBeTruthy();
     expect(view.getByLabelText('照片 1/1')).toBeTruthy();
+    expect(view.queryByLabelText('移除这张照片，照片 1/1')).toBeNull();
     expect(view.queryByText('这条记录现在无法找到。')).toBeNull();
     fireEvent.press(view.getByText('这段声音暂时无法播放，其他内容仍然保留。'));
     expect(mockPlay).not.toHaveBeenCalled();
