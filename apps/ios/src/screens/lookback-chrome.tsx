@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
 import type { FeelingView } from '../application/feeling';
+import { LOOKBACK_PAGE_GUTTER } from '../application/lookback-month';
 import { rememberLookbackScroll, readLookbackScroll } from '../application/lookback-session';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: LOOKBACK_PAGE_GUTTER,
     paddingBottom: 32,
     gap: 16,
   },
