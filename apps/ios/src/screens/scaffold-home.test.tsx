@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { resetStartupBrandForTests } from '../application/startup-brand';
 import RecentScreen from '../app/index';
 
 jest.mock('expo-router', () => {
@@ -35,6 +36,10 @@ function wrap(ui: ReactElement) {
 }
 
 describe('recent home', () => {
+  beforeEach(() => {
+    resetStartupBrandForTests();
+  });
+
   it('renders the empty recent state without inventing moments', async () => {
     const view = await render(wrap(<RecentScreen />));
     expect(view.getByLabelText('最近')).toBeTruthy();

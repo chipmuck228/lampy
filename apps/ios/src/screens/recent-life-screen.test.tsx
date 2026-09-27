@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { resetStartupBrandForTests } from '../application/startup-brand';
 import RecentScreen from '../app/index';
 
 jest.mock('expo-router', () => {
@@ -74,6 +75,7 @@ function life(items: ReturnType<typeof item>[]) {
 describe('recent life page', () => {
   beforeEach(() => {
     mockGetRecentLife.mockReset();
+    resetStartupBrandForTests();
   });
 
   it('shares one date heading for several records on the same day', async () => {
@@ -148,9 +150,16 @@ describe('recent life page', () => {
   it('keeps a read error without inventing records', async () => {
     mockGetRecentLife.mockRejectedValue(new Error('disk'));
     const view = await render(wrap(<RecentScreen />));
+    expect(view.getByTestId('startup-brand-layer')).toBeTruthy();
     await waitFor(() => {
       expect(view.getByText('最近的记录暂时读不出来，原来的内容还在这台设备上。')).toBeTruthy();
     });
+    expect(view.getByLabelText('最近')).toBeTruthy();
     expect(view.queryByTestId(/recent-item-/)).toBeNull();
+    fireEvent.press(view.getByTestId('startup-brand-skip'));
+    await waitFor(() => {
+      expect(view.queryByTestId('startup-brand-layer')).toBeNull();
+    });
+    expect(view.getByText('最近的记录暂时读不出来，原来的内容还在这台设备上。')).toBeTruthy();
   });
 });
