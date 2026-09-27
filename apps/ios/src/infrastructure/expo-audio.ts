@@ -81,6 +81,10 @@ function hasReachedEnd(currentTimeMs: number, lastHeardTimeMs: number, durationM
   return Math.max(currentTimeMs, lastHeardTimeMs) + END_SLOP_MS >= durationMs;
 }
 
+function positionsDiverge(currentTimeMs: number, lastHeardTimeMs: number): boolean {
+  return Math.abs(currentTimeMs - lastHeardTimeMs) > END_SLOP_MS;
+}
+
 function disposeNativePlayer(player: ReturnType<ExpoAudioModule['createAudioPlayer']> | null) {
   if (!player) return;
   try {
@@ -259,11 +263,14 @@ export function createExpoAudioPlayback(): AudioPlayback {
       if (!player) throw new Error('no source');
       try {
         const status = player.currentStatus;
+        const currentTimeMs = secondsToMs(status.currentTime);
         if (finished || status.didJustFinish) {
           await player.seekTo(0);
           finished = false;
           heardPlaying = false;
           lastHeardTimeMs = 0;
+        } else if (lastHeardTimeMs > 0 && positionsDiverge(currentTimeMs, lastHeardTimeMs)) {
+          await player.seekTo(lastHeardTimeMs / 1000);
         }
         startRequested = true;
         player.play();
@@ -271,6 +278,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
         failed = true;
         startRequested = false;
         heardPlaying = false;
+        lastHeardTimeMs = 0;
         throw new Error('play failed');
       }
     },

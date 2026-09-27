@@ -1,6 +1,6 @@
 import { act, fireEvent, render, renderHook, waitFor } from '@testing-library/react-native';
 
-import { createMemoryAudioPlayback } from '../infrastructure/media';
+import { createMemoryAudioPlayback, type AudioPlayback, type PlaybackStatus } from '../infrastructure/media';
 import { MomentAudio } from './moment-audio';
 import { useSoundPlayer } from './use-sound-player';
 
@@ -188,6 +188,82 @@ describe('useSoundPlayer state sync', () => {
     expect(result.current.failed).toBe(false);
     expect(playback.loads).toBe(2);
     expect(playback.plays).toBe(1);
+  });
+
+  it('resumes from 1s after the native playhead resets, or becomes retryable if restore fails', async () => {
+    const restore = { ok: true };
+    const seeks: number[] = [];
+    let status: PlaybackStatus = 'idle';
+    let nativeTimeMs = 0;
+    let lastHeardMs = 0;
+    const playback: AudioPlayback = {
+      async load() {},
+      async play() {
+        if (lastHeardMs > 0 && nativeTimeMs === 0) {
+          if (!restore.ok) {
+            status = 'unavailable';
+            lastHeardMs = 0;
+            throw new Error('play failed');
+          }
+          nativeTimeMs = lastHeardMs;
+          seeks.push(lastHeardMs);
+        }
+        status = 'playing';
+      },
+      async pause() {
+        status = 'paused';
+      },
+      async stop() {},
+      async release() {},
+      getStatus() {
+        if (status === 'unavailable') {
+          return { status, currentTimeMs: 0, durationMs: 0 };
+        }
+        const shown = status === 'paused' && nativeTimeMs === 0 ? lastHeardMs : nativeTimeMs;
+        return { status, currentTimeMs: shown, durationMs: 3500 };
+      },
+    };
+
+    const { result } = await renderHook(() => useSoundPlayer(() => playback));
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    lastHeardMs = 1000;
+    nativeTimeMs = 1000;
+    status = 'playing';
+    await waitFor(() => {
+      expect(result.current.status).toBe('playing');
+      expect(result.current.currentTimeMs).toBe(1000);
+    });
+
+    nativeTimeMs = 0;
+    status = 'paused';
+    await waitFor(() => {
+      expect(result.current.status).toBe('paused');
+    });
+    expect(result.current.currentTimeMs).toBe(1000);
+    expect(result.current.failed).toBe(false);
+
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    expect(seeks).toEqual([1000]);
+    expect(result.current.status).toBe('playing');
+    expect(result.current.currentTimeMs).toBe(1000);
+
+    nativeTimeMs = 0;
+    status = 'paused';
+    lastHeardMs = 1000;
+    restore.ok = false;
+    await waitFor(() => {
+      expect(result.current.status).toBe('paused');
+    });
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    expect(result.current.status).toBe('unavailable');
+    expect(result.current.failed).toBe(true);
+    expect(result.current.currentTimeMs).toBe(0);
   });
 });
 

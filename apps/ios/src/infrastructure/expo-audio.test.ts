@@ -53,7 +53,9 @@ describe('expo audio playback with a delayed native player', () => {
   const player = {
     play: jest.fn(() => undefined),
     pause: jest.fn(() => undefined),
-    seekTo: jest.fn(async () => undefined),
+    seekTo: jest.fn(async (seconds: number) => {
+      native.currentTime = seconds;
+    }),
     release: jest.fn(() => undefined),
     get currentStatus() {
       return { ...native };
@@ -212,5 +214,57 @@ describe('expo audio playback with a delayed native player', () => {
     expect(second).toEqual(first);
     expect(second.status).not.toBe('idle');
     expect(second.status).not.toBe('finished');
+  });
+
+  it('resumes from about 1s after the native playhead resets to 0', async () => {
+    const playback = loadPlayback();
+    await playback.load('file://leave.m4a');
+    await playback.play();
+    native.playing = true;
+    native.currentTime = 1;
+    expect(playback.getStatus().status).toBe('playing');
+
+    native.playing = false;
+    native.didJustFinish = false;
+    native.currentTime = 0;
+    expect(playback.getStatus()).toEqual({
+      status: 'paused',
+      currentTimeMs: 1000,
+      durationMs: 3500,
+    });
+
+    await playback.play();
+    expect(player.seekTo).toHaveBeenCalledWith(1);
+    expect(native.currentTime).toBe(1);
+    native.playing = true;
+    expect(playback.getStatus()).toEqual({
+      status: 'playing',
+      currentTimeMs: 1000,
+      durationMs: 3500,
+    });
+  });
+
+  it('shows a retryable failure when the 1s position cannot be restored', async () => {
+    player.seekTo.mockRejectedValueOnce(new Error('seek failed'));
+    const playback = loadPlayback();
+    await playback.load('file://leave.m4a');
+    await playback.play();
+    native.playing = true;
+    native.currentTime = 1;
+    expect(playback.getStatus().status).toBe('playing');
+
+    native.playing = false;
+    native.didJustFinish = false;
+    native.currentTime = 0;
+    expect(playback.getStatus().status).toBe('paused');
+    expect(playback.getStatus().currentTimeMs).toBe(1000);
+
+    await expect(playback.play()).rejects.toThrow('play failed');
+    expect(playback.getStatus()).toEqual({
+      status: 'unavailable',
+      currentTimeMs: 0,
+      durationMs: 0,
+    });
+    expect(playback.getStatus().status).not.toBe('paused');
   });
 });

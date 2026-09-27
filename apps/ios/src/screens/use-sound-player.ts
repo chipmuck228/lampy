@@ -146,6 +146,7 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
         loadedUriRef.current = null;
         setFailed(true);
         writeStatus('unavailable');
+        setCurrentTimeMs(0);
       } finally {
         if (generation === generationRef.current) {
           playInFlightRef.current = false;
