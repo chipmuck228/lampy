@@ -85,9 +85,9 @@
         <div class="indent">
           <div class="hit soft">9月24日 · 有1条记录</div>
         </div>
-        <p class="meta">1月不可点，不展开成空说明。</p>
+        <p class="meta">1月无日记录、无日子未确认，不可点。</p>
       </div>
-      <p class="cap"><strong>B 采用。</strong> 空月不展开。9 月在年页拉出有记录的日子，不铺安静格。</p>
+      <p class="cap"><strong>B 采用。</strong> 空月不展开。有日记录的 9 月在年页拉出日期，不铺安静格。</p>
     </section>
   </div>
 
@@ -135,11 +135,11 @@
     </section>
   </div>
 
-  <h2>时间未确认</h2>
+  <h2>月份未确认（年精度，在月份区域外）</h2>
   <div class="pair">
     <section>
       <img class="shot" src="../lookback-month/shots/iphone16-lookback-years.png" alt="回看根时间未确认" />
-      <p class="cap"><strong>A</strong> 根上独立一行。注意：此图是 #34 之前的回看根（顶上返回）。合入后回看根是底带，不是这根返回条。</p>
+      <p class="cap"><strong>A</strong> 根上「时间未确认」。此图是 #34 之前的回看根。年页上的「月份未确认」同理：在月份格外面。</p>
     </section>
     <section>
       <div class="phone future">
@@ -154,12 +154,90 @@
           <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
         </div>
         <div class="hit">9月 · 有1条记录</div>
+        <p class="ban">「月份未确认」不进 9 月展开区。</p>
+      </div>
+      <p class="cap"><strong>B</strong> 年精度入口仍在月份格和「有记录的月份」<em>之外</em>，<code>push</code> <code>/lookback/2026/unconfirmed</code>。</p>
+    </section>
+  </div>
+
+  <h2>只有月精度 · 没有具体日期</h2>
+  <div class="pair">
+    <section>
+      <div class="phone">
+        <div class="back">返回原来的位置</div>
+        <p class="title">2026年3月</p>
+        <div class="hit">日子未确认 · 3条</div>
+        <p class="meta">这个月还没有留下什么。</p>
+        <p class="meta">年页上 3 月常被画成安静格。</p>
+      </div>
+      <p class="cap"><strong>A</strong> 结构稿：月精度只出现在月页顶。本库无此实拍，<span class="nv">不是 PASS</span>。</p>
+    </section>
+    <section>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">2026年</p>
+        <div class="months">
+          <div class="quiet">1月</div><div class="quiet">2月</div>
+          <div class="cell live">3月<div class="dot"></div></div>
+          <div class="quiet">4月</div><div class="quiet">5月</div><div class="quiet">6月</div>
+          <div class="quiet">7月</div><div class="quiet">8月</div><div class="quiet">9月</div>
+          <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
+        </div>
+        <div class="hit">3月</div>
+        <div class="indent">
+          <div class="hit">日子未确认 · 3条</div>
+        </div>
+        <p class="meta">没有「3月1日」。不补空月说明。</p>
+      </div>
+      <p class="cap"><strong>B</strong> 3 月可展开（有日子未确认）。展开后只有这一行，进 <code>/lookback/2026/03/unconfirmed</code>。</p>
+    </section>
+  </div>
+
+  <h2>展开后：日子未确认与日期分开</h2>
+  <section>
+    <div class="phone future tall">
+      <div class="back">返回原来的位置</div>
+      <p class="title">2026年</p>
+      <div class="hit">月份未确认 · 1条</div>
+      <div class="months">
+        <div class="quiet">1月</div><div class="quiet">2月</div><div class="quiet">3月</div>
+        <div class="quiet">4月</div><div class="quiet">5月</div><div class="quiet">6月</div>
+        <div class="quiet">7月</div><div class="quiet">8月</div>
+        <div class="cell live">9月<div class="dot"></div></div>
+        <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
+      </div>
+      <div class="hit">9月 · 有1条记录</div>
+      <div class="indent">
+        <div class="hit">日子未确认 · 2条</div>
+        <p class="meta">—— 与日期分开 ——</p>
+        <div class="hit soft">9月24日 · 有1条记录</div>
+      </div>
+    </div>
+    <p class="cap">年精度在月份区域外。月精度在展开区内单独一行，在具体日期上面。点未确认进原月未确认页；点 24 日进日页。</p>
+  </section>
+
+  <h2>月深链与返回</h2>
+  <div class="pair">
+    <section>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">2026年</p>
+        <div class="hit">9月 · 有1条记录</div>
         <div class="indent">
           <div class="hit soft">9月24日 · 有1条记录</div>
         </div>
-        <p class="ban">展开的 9 月里没有未确认。</p>
+        <p class="meta">打开 <code>/lookback/2026/09</code></p>
       </div>
-      <p class="cap"><strong>B</strong> 未确认仍是年页顶上的独立行，<code>push</code> 原 unconfirmed 页。</p>
+      <p class="cap">深链 <code>replace</code> 成 <code>/lookback/2026</code>，9 月已展开。不是一张月历页。</p>
+    </section>
+    <section>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <div class="hit soft">2026年</div>
+        <p class="meta">从年页再按返回：<code>back()</code> 到打开深链之前（通常是回看根）。不经过月历。</p>
+      </div>
+      <p class="cap">从展开区进日页或「日子未确认」再返回：仍停在年页，9 月仍开。</p>
     </section>
   </div>
 
@@ -175,6 +253,8 @@
         <p class="title" style="font-size:34px;line-height:42px">2026年</p>
         <div class="hit" style="font-size:22px">9月 · 有1条记录</div>
         <div class="indent">
+          <div class="hit" style="font-size:22px">日子未确认 · 2条</div>
+          <p class="meta">与日期分开</p>
           <div class="hit soft" style="font-size:22px">9月24日 · 有1条记录</div>
         </div>
       </div>
@@ -189,7 +269,7 @@
   </section>
 
   <h2>不画</h2>
-  <p>年页展开一条 Moment。回看根展开所有年。把未确认塞进某月。用热力长度表示条数。把 #34 横屏 / iPad / VoiceOver 标成已通过。</p>
+  <p>年页展开一条 Moment。回看根展开所有年。把「日子未确认」写成某一天。把「月份未确认」塞进某个展开月。用热力长度表示条数。把 #34 横屏 / iPad / VoiceOver 标成已通过。</p>
 </main>
 </body>
 </html>
