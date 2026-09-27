@@ -15,6 +15,15 @@ export function isPortraitLikeImage(image: { width?: number; height?: number }):
   return momentImageAspectRatio(image) <= 1;
 }
 
+export function canPairDetailImages(left: ImageView, right: ImageView): boolean {
+  return (
+    left.status === 'available' &&
+    right.status === 'available' &&
+    isPortraitLikeImage(left) &&
+    isPortraitLikeImage(right)
+  );
+}
+
 export type DetailImageBand = {
   kind: 'solo' | 'pair';
   images: ImageView[];
@@ -24,7 +33,7 @@ export function detailImageBands(images: ImageView[]): DetailImageBand[] {
   if (images.length === 0) return [];
   if (images.length === 1) return [{ kind: 'solo', images }];
   if (images.length === 2) {
-    if (isPortraitLikeImage(images[0]) && isPortraitLikeImage(images[1])) {
+    if (canPairDetailImages(images[0], images[1])) {
       return [{ kind: 'pair', images }];
     }
     return images.map((image) => ({ kind: 'solo' as const, images: [image] }));
@@ -32,7 +41,7 @@ export function detailImageBands(images: ImageView[]): DetailImageBand[] {
 
   const bands: DetailImageBand[] = [{ kind: 'solo', images: [images[0]] }];
   const rest = images.slice(1);
-  if (rest.length === 2 && isPortraitLikeImage(rest[0]) && isPortraitLikeImage(rest[1])) {
+  if (rest.length === 2 && canPairDetailImages(rest[0], rest[1])) {
     bands.push({ kind: 'pair', images: rest });
     return bands;
   }
@@ -54,18 +63,19 @@ function ImageSlot({
   paired?: boolean;
 }) {
   const ratio = momentImageAspectRatio(image);
+  const available = image.status === 'available' && !!image.uri;
   return (
     <View style={[styles.item, paired && styles.pairedItem]}>
       <View
         accessible
         accessibilityRole="image"
         accessibilityLabel={
-          image.status === 'available' ? image.label : `${image.label}。${image.unavailableLabel}`
+          available ? image.label : `${image.label}。${image.unavailableLabel}`
         }
         testID={`${testIDPrefix}-frame-${image.id}`}
-        style={[styles.frame, { aspectRatio: ratio }]}
+        style={available ? [styles.frame, { aspectRatio: ratio }] : styles.missingFrame}
       >
-        {image.status === 'available' && image.uri ? (
+        {available ? (
           <Image
             testID={`${testIDPrefix}-${image.id}`}
             source={{ uri: image.uri }}
@@ -157,6 +167,14 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     position: 'relative',
     overflow: 'hidden',
+  },
+  missingFrame: {
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    alignSelf: 'stretch',
+    minHeight: 88,
+    overflow: 'visible',
   },
   image: {
     width: '100%',

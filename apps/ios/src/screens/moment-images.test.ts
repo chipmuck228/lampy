@@ -12,6 +12,17 @@ function photo(id: string, width: number, height: number): ImageView {
   };
 }
 
+function missingPortrait(id: string): ImageView {
+  return {
+    id,
+    status: 'unavailable',
+    width: 900,
+    height: 1200,
+    label: id,
+    unavailableLabel: '这张照片暂时找不到了，但这条记录还在。',
+  };
+}
+
 describe('moment image layout', () => {
   it('keeps the stored aspect ratio so portrait photos stay in document flow', () => {
     expect(momentImageAspectRatio({ width: 1200, height: 1600 })).toBe(0.75);
@@ -40,6 +51,19 @@ describe('moment image layout', () => {
     expect(detailImageBands([one, two, three])).toEqual([
       { kind: 'solo', images: [one] },
       { kind: 'pair', images: [two, three] },
+    ]);
+  });
+
+  it('stacks a readable portrait and a missing portrait that still has size, in the same order', () => {
+    const ready = photo('ready', 900, 1200);
+    const gone = missingPortrait('gone');
+    expect(detailImageBands([ready, gone])).toEqual([
+      { kind: 'solo', images: [ready] },
+      { kind: 'solo', images: [gone] },
+    ]);
+    expect(detailImageBands([gone, ready])).toEqual([
+      { kind: 'solo', images: [gone] },
+      { kind: 'solo', images: [ready] },
     ]);
   });
 });
