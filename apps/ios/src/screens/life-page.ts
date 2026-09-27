@@ -64,3 +64,7 @@ export function shouldStackRecentDay(windowWidth: number, windowHeight: number, 
 export function recentColumnWidth(windowWidth: number, windowHeight: number, fontScale: number): number {
   return isLargeType(fontScale) ? readingPageWidth(windowWidth, windowHeight) : pageColumnWidth(windowWidth, windowHeight);
 }
+
+export function shouldShowSameDayRule(indexInDay: number): boolean {
+  return indexInDay > 0;
+}
