@@ -14,6 +14,7 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
   const playInFlightRef = useRef(false);
+  const pauseInFlightRef = useRef<Promise<void> | null>(null);
   const statusRef = useRef<PlaybackStatus>('idle');
   const [status, setStatus] = useState<PlaybackStatus>('idle');
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
@@ -107,10 +108,14 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
 
     settleFrom(before, heard);
     if (current) {
+      const pauseWork = current.pause().catch(() => {});
+      pauseInFlightRef.current = pauseWork;
       try {
-        await current.pause();
-      } catch {
-        // Native player may already be interrupted.
+        await pauseWork;
+      } finally {
+        if (pauseInFlightRef.current === pauseWork) {
+          pauseInFlightRef.current = null;
+        }
       }
     }
     settleFrom(current?.getStatus(), heard);
@@ -171,6 +176,11 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
 
       try {
         const current = player();
+        const pendingPause = pauseInFlightRef.current;
+        if (pendingPause) {
+          await pendingPause;
+          if (!mountedRef.current || generation !== generationRef.current) return;
+        }
         const alreadyLoaded = loadedUriRef.current === uri;
         if (!alreadyLoaded) {
           await current.load(uri);

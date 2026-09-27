@@ -578,7 +578,6 @@ describe('useSoundPlayer state sync', () => {
             finishPause = resolve;
           });
         }
-        if (playback.getStatus().status === 'playing') return;
         return originalPause();
       };
       const { result } = await renderHook(() => useSoundPlayer(() => playback));
@@ -597,26 +596,28 @@ describe('useSoundPlayer state sync', () => {
       expect(result.current.status).toBe('paused');
       expect(result.current.currentTimeMs).toBe(1200);
       expect(pauses).toBe(1);
+      expect(playback.plays).toBe(1);
 
       await act(async () => {
         handlers.forEach((handler) => handler('active'));
       });
       playback.deferPlaying = false;
+      let latestPlay = Promise.resolve();
       await act(async () => {
-        await result.current.play(VOICE);
+        latestPlay = result.current.play(VOICE);
       });
-      expect(result.current.status).toBe('playing');
-      expect(playback.getStatus().status).toBe('playing');
-      const pausesAfterLatest = pauses;
+      expect(result.current.status).toBe('preparing');
+      expect(playback.plays).toBe(1);
+      expect(playback.getStatus().status).not.toBe('paused');
 
       await act(async () => {
         finishPause?.();
+        await latestPlay;
       });
 
-      expect(pauses).toBe(pausesAfterLatest);
+      expect(pauses).toBe(1);
+      expect(playback.plays).toBe(2);
       expect(result.current.status).toBe('playing');
-      expect(result.current.status).not.toBe('paused');
-      expect(result.current.status).not.toBe('idle');
       expect(playback.getStatus().status).toBe('playing');
     } finally {
       add.mockRestore();
