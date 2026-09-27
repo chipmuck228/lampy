@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -39,7 +39,12 @@ export default function MomentDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="记录">
-      <View style={[styles.column, { maxWidth: readingWidth }]}>
+      <ScrollView
+        testID="detail-scroll"
+        style={styles.scroll}
+        contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="返回原来的位置"
@@ -108,27 +113,30 @@ export default function MomentDetailScreen() {
             ) : null}
           </View>
         ) : null}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  scroll: { flex: 1, width: '100%' },
   column: {
-    flex: 1,
+    flexGrow: 1,
     width: '100%',
+    maxWidth: '100%',
     alignSelf: 'center',
     paddingHorizontal: 24,
+    paddingBottom: 32,
     gap: 20,
   },
-  backHit: { minHeight: 44, justifyContent: 'center' },
+  backHit: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
   back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
-  block: { gap: 12 },
-  title: { fontSize: 22, lineHeight: 30, color: '#25231F' },
+  block: { gap: 12, width: '100%', maxWidth: '100%', minWidth: 0 },
+  title: { fontSize: 22, lineHeight: 32, color: '#25231F', flexShrink: 0 },
   body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
-  date: { fontSize: 16, lineHeight: 22, color: '#53604F' },
-  note: { fontSize: 24, lineHeight: 34, color: '#25231F' },
+  date: { fontSize: 16, lineHeight: 24, color: '#53604F', flexShrink: 0 },
+  note: { fontSize: 24, lineHeight: 36, color: '#25231F' },
   meta: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
   retryHit: { minHeight: 44, justifyContent: 'center' },
   retry: { fontSize: 18, lineHeight: 24, color: '#53604F' },

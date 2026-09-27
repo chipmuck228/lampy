@@ -3,6 +3,13 @@ import { Image } from 'expo-image';
 
 import type { ImageView } from '../application/use-cases';
 
+export function momentImageAspectRatio(image: { width?: number; height?: number }): number {
+  if (image.width && image.height && image.width > 0 && image.height > 0) {
+    return image.width / image.height;
+  }
+  return 4 / 3;
+}
+
 export function MomentImages({
   images,
   testIDPrefix,
@@ -17,10 +24,7 @@ export function MomentImages({
   return (
     <View style={styles.stack}>
       {images.map((image) => {
-        const ratio =
-          image.width && image.height && image.width > 0 && image.height > 0
-            ? image.width / image.height
-            : 4 / 3;
+        const ratio = momentImageAspectRatio(image);
         return (
           <View key={image.id} style={styles.item}>
             <View
@@ -31,13 +35,14 @@ export function MomentImages({
                   ? image.label
                   : `${image.label}。${image.unavailableLabel}`
               }
+              testID={`${testIDPrefix}-frame-${image.id}`}
               style={[styles.frame, { aspectRatio: ratio }]}
             >
               {image.status === 'available' && image.uri ? (
                 <Image
                   testID={`${testIDPrefix}-${image.id}`}
                   source={{ uri: image.uri }}
-                  style={styles.image}
+                  style={[styles.image, { aspectRatio: ratio }]}
                   contentFit="cover"
                   accessible={false}
                 />
@@ -70,17 +75,25 @@ export function MomentImages({
 }
 
 const styles = StyleSheet.create({
-  stack: { gap: 16 },
-  item: { gap: 8 },
+  stack: { gap: 16, width: '100%', maxWidth: '100%', minWidth: 0 },
+  item: { gap: 8, width: '100%', maxWidth: '100%', minWidth: 0 },
   frame: {
     width: '100%',
-    maxHeight: 520,
+    maxWidth: '100%',
+    minWidth: 0,
+    alignSelf: 'stretch',
+    position: 'relative',
     overflow: 'hidden',
   },
-  image: { width: '100%', height: '100%' },
+  image: {
+    width: '100%',
+    maxWidth: '100%',
+    alignSelf: 'stretch',
+  },
   missing: {
-    flex: 1,
+    width: '100%',
     justifyContent: 'center',
+    paddingVertical: 24,
     minHeight: 88,
   },
   missingText: { fontSize: 16, lineHeight: 24, color: '#5C5851' },

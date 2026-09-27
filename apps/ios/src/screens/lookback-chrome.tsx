@@ -60,6 +60,8 @@ export function LookbackScaffold({
     <SafeAreaView style={styles.safe} accessible={false}>
       <ScrollView
         ref={scrollRef}
+        testID="lookback-scroll"
+        style={styles.scroll}
         contentContainerStyle={[
           styles.column,
           { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16 },
@@ -170,21 +172,33 @@ export const lookbackStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  scroll: { flex: 1, width: '100%' },
   column: {
+    flexGrow: 1,
     width: '100%',
+    maxWidth: '100%',
     alignSelf: 'center',
     paddingHorizontal: 24,
     paddingBottom: 32,
     gap: 16,
   },
-  backHit: { minHeight: 44, justifyContent: 'center' },
+  backHit: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
   back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
-  title: { fontSize: 28, lineHeight: 34, color: '#25231F' },
+  title: { fontSize: 28, lineHeight: 36, color: '#25231F', flexShrink: 0 },
   body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
   meta: { fontSize: 14, lineHeight: 20, color: '#53604F' },
   fallback: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
   note: { fontSize: 20, lineHeight: 28, color: '#25231F' },
-  row: { gap: 8, paddingVertical: 8, minHeight: 44, flexGrow: 0, alignSelf: 'stretch' },
+  row: {
+    gap: 8,
+    paddingVertical: 8,
+    minHeight: 44,
+    flexGrow: 0,
+    alignSelf: 'stretch',
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+  },
   bandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 20 },
   band: { height: 6, borderRadius: 3, backgroundColor: '#8A9384' },
 });
