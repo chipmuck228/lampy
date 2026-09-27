@@ -36,6 +36,11 @@ function playbackLabel(status: PlaybackStatus, durationLabel: string, currentMs:
   return `一段声音，${durationLabel}，未播放`;
 }
 
+export function shouldShowHeardProgress(status: PlaybackStatus, currentTimeMs: number): boolean {
+  if (status === 'playing') return true;
+  return status === 'paused' && currentTimeMs > 0;
+}
+
 function playbackMeta(status: PlaybackStatus, durationLabel: string, currentMs: number): string {
   if (status === 'preparing') return `正在准备 · ${durationLabel}`;
   if (status === 'playing') return `正在播放 · ${formatSoundDuration(currentMs)} / ${durationLabel}`;
@@ -54,6 +59,7 @@ export function MomentAudio({
   compact = false,
   scene = false,
   markedActions = false,
+  progressWhenHeard = false,
 }: {
   audio: AudioView | null;
   playbackStatus?: PlaybackStatus;
@@ -64,6 +70,7 @@ export function MomentAudio({
   compact?: boolean;
   scene?: boolean;
   markedActions?: boolean;
+  progressWhenHeard?: boolean;
 }) {
   if (!audio) return null;
 
@@ -121,6 +128,7 @@ export function MomentAudio({
   const actionLabel = playing ? '暂停' : playbackStatus === 'finished' ? '再听一次' : preparing ? '正在准备' : '播放';
   const progress =
     audio.durationMs > 0 ? Math.min(1, Math.max(0, currentTimeMs / audio.durationMs)) : 0;
+  const showProgress = scene && (!progressWhenHeard || shouldShowHeardProgress(playbackStatus, currentTimeMs));
 
   return (
     <View style={styles.block}>
@@ -135,13 +143,15 @@ export function MomentAudio({
       >
         {playbackMeta(playbackStatus, durationLabel, currentTimeMs)}
       </Text>
-      {scene ? (
+      {showProgress ? (
         <View
           accessible={false}
           testID={`${testIDPrefix}-progress-${audio.id}`}
-          style={styles.track}
+          style={progressWhenHeard ? styles.heardTrack : styles.track}
         >
-          <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
+          <View
+            style={[progressWhenHeard ? styles.heardFill : styles.fill, { width: `${Math.round(progress * 100)}%` }]}
+          />
         </View>
       ) : null}
       {onPlay || onPause ? (
@@ -349,5 +359,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fill: { height: 1, backgroundColor: sound },
+  heardTrack: {
+    height: 3,
+    width: '100%',
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(79,98,109,0.18)',
+    overflow: 'hidden',
+    borderRadius: 2,
+  },
+  heardFill: { height: 3, backgroundColor: sound },
   missing: { fontSize: 16, lineHeight: 24, color: inkSoft },
 });

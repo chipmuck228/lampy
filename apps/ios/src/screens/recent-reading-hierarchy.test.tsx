@@ -27,9 +27,17 @@ jest.mock('../application/container', () => ({
   }),
 }));
 
+function styleOf(node: { props: { style?: unknown } }): { minHeight?: number; flexDirection?: string; alignItems?: string } {
+  return (StyleSheet.flatten(node.props.style as object) ?? {}) as {
+    minHeight?: number;
+    flexDirection?: string;
+    alignItems?: string;
+  };
+}
+
 function minHeightOf(node: { props: { style?: unknown } }): number {
-  const flat = (StyleSheet.flatten(node.props.style as object) ?? {}) as { minHeight?: number };
-  return typeof flat.minHeight === 'number' ? flat.minHeight : 0;
+  const minHeight = styleOf(node).minHeight;
+  return typeof minHeight === 'number' ? minHeight : 0;
 }
 
 type HostNode = {
@@ -176,7 +184,7 @@ describe('recent reading hierarchy', () => {
       expect(view.getByText('门口的风')).toBeTruthy();
     });
     expect(view.getByTestId('recent-sound-moment_mix-scene-asset_voice').props.children).toBe('当时的声音');
-    expect(view.getByTestId('recent-sound-moment_mix-progress-asset_voice')).toBeTruthy();
+    expect(view.queryByTestId('recent-sound-moment_mix-progress-asset_voice')).toBeNull();
     expect(view.getAllByText('一段声音 · 4秒').length).toBeGreaterThanOrEqual(2);
     expect(view.getAllByLabelText('播放，4秒')).toHaveLength(2);
     expect(view.getAllByText('▶').length).toBeGreaterThanOrEqual(2);
@@ -190,7 +198,14 @@ describe('recent reading hierarchy', () => {
     expect(minHeightOf(view.getByTestId('home-lookback'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('recent-sound-moment_mix-play-asset_voice'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('recent-open-moment_mix'))).toBeGreaterThanOrEqual(48);
-    expect(minHeightOf(view.getByTestId('recent-open-label-moment_mix'))).toBeGreaterThanOrEqual(48);
+    expect(styleOf(view.getByTestId('recent-open-label-moment_mix')).minHeight).toBeUndefined();
+    expect(styleOf(view.getByTestId('recent-open-row-moment_mix'))).toEqual(
+      expect.objectContaining({ flexDirection: 'row', alignItems: 'center' }),
+    );
+    expect(styleOf(view.getByTestId('recent-open-row-moment_mix')).minHeight).toBeUndefined();
+    expect(view.getByTestId('recent-open-mark-moment_mix').props.accessible).toBe(false);
+    expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).toContain('看这条');
+    expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).not.toContain('›');
     expect(view.queryByTestId('home-family')).toBeNull();
   });
 

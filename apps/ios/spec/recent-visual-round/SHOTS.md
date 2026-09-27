@@ -12,20 +12,32 @@ Liuz17（iPhone 17 Pro / iOS 26.2）本轮 **连不上**（Core Device 超时）
 
 | 页面 | 结果 | 证据 |
 | --- | --- | --- |
-| 最近 | **PASS** | `shots/iphone16-recent-play-target.png`：`▶ 播放` + `看这条 ›` |
+| 最近 | **PASS** | `shots/iphone16-idle-mix.png`：`▶ 播放` + `看这条 ›` |
 | 详情 | **PASS** | `shots/iphone16-detail-mix-play.png`：同一控件只有「播放」，无符号 |
 | 留下草稿条 / 回看 | **NOT VERIFIED** | 未打开这两页；二者未传 `markedActions`，与详情同默认 |
 
-## iPhone 16 / iOS 18.6 · 运行中 App
+## 「看这条 ›」
+
+外层 `Pressable` ≥ 48pt；文字与 `›` 同一行、同一字号行高，文字不再用 `minHeight: 48` 撑高。
 
 | 场景 | 结果 | 证据 |
 | --- | --- | --- |
-| 同日 72pt 细线 | **PASS** | `shots/iphone16-rule-gap-crop.png`、`shots/iphone16-recent-play-target.png`。线在「看这条」与下一条正文之间，短、左缘、不是卡片描边。 |
-| 细线是否贴住下一条 | **PASS** | 同上。线下方到「图加声走查」有一段留白，不像贴在下一句上。 |
-| 符号 + 文字 | **PASS** | `shots/iphone16-recent-play-target.png`：`▶ 播放`；`看这条 ›`。符号不单独出现。 |
-| 缺失媒体 | **PASS** | `shots/iphone16-recent-missing.png`：整句「这张照片暂时找不到了，但这条记录还在。」后是「看这条」和同日下一条。 |
-| 三图长记录 | **PASS** | `shots/iphone16-recent-glyphs.png`：真页面「三张照片走查」，首张全宽，后续图起头可见。 |
-| 最大字号换行 | **PASS** | `shots/iphone16-xxxl-home.png`、`shots/iphone16-xxxl-scroll2.png`、`shots/iphone16-xxxl-actions.png`、`shots/iphone16-xxxl-sound.png`。日期轨已收起；「缺失竖图走查」「发生于…」「一段声音 · 3秒」「▶ 播放」「看这条 ›」换行可读，不互相重叠。XXXL 下细线相对字号更轻，但仍不贴下一条标题。 |
+| 常规字号 | **PASS** | `shots/iphone16-open-regular-crop.png`、`shots/iphone16-idle-mix.png`。`›` 与「看这条」同一行视觉居中，不再落在右下角。 |
+| AX XXXL | **PASS** | `shots/iphone16-open-xxxl.png`。大字号下仍同行；「一段声音 · 3秒」自然换行，无裁切。 |
+
+## 空进度轨与同日短线
+
+「最近」idle 不画空轨。真正播放／暂停且有进度后才画 3pt、青色、通栏的 heard 轨，与 72pt 浅发丝同日线区分。详情默认仍画 scene 轨。
+
+| 场景 | 结果 | 证据 |
+| --- | --- | --- |
+| 图＋声 idle | **PASS** | `shots/iphone16-idle-mix.png`、`shots/iphone16-idle-mix-crop.png`。「一段声音 · 3秒」与「▶ 播放」之间无线。 |
+| 仅声音 idle | **PASS** | `shots/iphone16-idle-voice.png`。meta 与播放之间无线；同日短线只出现在两条记录之间。 |
+| 播放／暂停进度 | **NOT VERIFIED** | 运行中 App 未点到「暂停」态。Jest 覆盖 heard 轨样式与百分比。 |
+| 同日 72pt 细线 | **PASS** | `shots/iphone16-idle-mix.png`、`shots/iphone16-rule-gap-crop.png`。线在「看这条」与下一条正文之间，不贴住下一句。 |
+| 缺失媒体 | **PASS** | `shots/iphone16-recent-missing.png` |
+| 三图长记录 | **PASS** | `shots/iphone16-recent-glyphs.png` |
+| 最大字号换行 | **PASS** | `shots/iphone16-xxxl-home.png`、`shots/iphone16-xxxl-scroll2.png`、`shots/iphone16-open-xxxl.png` |
 | 横屏 | **NOT VERIFIED** | 本轮未转屏 |
 | iPad | **NOT VERIFIED** | 未走 |
 | Liuz17 真机画面 | **NOT VERIFIED** | 设备配对但通道超时 |
@@ -36,7 +48,7 @@ Liuz17（iPhone 17 Pro / iOS 26.2）本轮 **连不上**（Core Device 超时）
 
 | 路径 | 结果 |
 | --- | --- |
-| iPhone 16 模拟器点播 | **NOT VERIFIED**。控件在（`▶ 播放`），合成点击后文案未变成「暂停」，与 #27 模拟器听音限制相同。不能凭此记续播 PASS。 |
+| iPhone 16 模拟器点播 | **NOT VERIFIED**。合成点击落到「看这条」进了详情，未听到、未见「暂停」。不能凭 Jest 记续播 PASS。 |
 | Liuz17 真机听音 | **NOT VERIFIED**。本轮未装上、未听。 |
 
 因此 #30＋#31 合并后的 A→B→A **仍不能记 PASS**。

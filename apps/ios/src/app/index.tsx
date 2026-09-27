@@ -225,6 +225,7 @@ function RecentMoment({
         compact={!mixed}
         scene={mixed}
         markedActions
+        progressWhenHeard
       />
       <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
       <Pressable
@@ -244,11 +245,11 @@ function RecentMoment({
         onPress={onOpen}
         style={styles.open}
       >
-        <View style={styles.openRow}>
+        <View style={styles.openRow} testID={`recent-open-row-${item.id}`}>
           <Text style={styles.openAction} testID={`recent-open-label-${item.id}`}>
             看这条
           </Text>
-          <Text accessible={false} style={styles.openMark}>
+          <Text accessible={false} style={styles.openMark} testID={`recent-open-mark-${item.id}`}>
             ›
           </Text>
         </View>
@@ -310,10 +311,16 @@ const styles = StyleSheet.create({
   moment: { gap: 8, minHeight: 48 },
   momentMixed: { gap: 16 },
   momentBody: { gap: 8 },
-  open: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  openRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 48 },
-  openAction: { fontSize: 17, lineHeight: 24, color: sage, minHeight: 48, textAlignVertical: 'center' },
-  openMark: { fontSize: 20, lineHeight: 24, color: sage, opacity: 0.55 },
+  open: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start', maxWidth: '100%' },
+  openRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: '100%',
+  },
+  openAction: { fontSize: 17, lineHeight: 24, color: sage, flexShrink: 1 },
+  openMark: { fontSize: 17, lineHeight: 24, color: sage, opacity: 0.55 },
   note: { fontSize: 21, lineHeight: 32, color: ink },
   occurred: { fontSize: 15, lineHeight: 22, color: inkSoft },
 });
