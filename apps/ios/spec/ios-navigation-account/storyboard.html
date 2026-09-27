@@ -30,16 +30,18 @@
       background: var(--paper);
       width: 280px;
       min-height: 560px;
-      padding: 22px 20px 96px;
-      position: relative;
+      height: 580px;
+      padding: 22px 20px 0;
       box-sizing: border-box;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     .phone.future { outline: 1px dashed var(--sage); outline-offset: 2px; }
     .phone.short { min-height: 420px; height: 420px; }
     .phone.narrow { width: 220px; }
     .phone.land { width: 520px; min-height: 340px; height: 340px; }
-    .phone.end { display: flex; flex-direction: column; }
+    .phone.plain { height: auto; min-height: 280px; padding-bottom: 22px; display: block; }
     .end-spacer { flex: 1; min-height: 12px; }
     .title { font-size: 28px; line-height: 36px; margin: 0 0 20px; }
     .back { color: var(--sage); min-height: 48px; display: flex; align-items: center; font-size: 17px; }
@@ -50,7 +52,9 @@
     .year b { font-weight: 500; font-size: 18px; color: var(--ink); }
     .meta { font-size: 14px; color: var(--sage); }
     .band {
-      position: absolute; left: 0; right: 0; bottom: 0;
+      position: static;
+      margin-top: auto;
+      flex-shrink: 0;
       background: var(--band);
       padding: 8px 16px 0;
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
@@ -86,19 +90,21 @@
     .legend { font-size: 12px; color: var(--sage); }
     .annot {
       width: 280px; height: 580px; box-sizing: border-box;
-      background: var(--paper); position: relative; overflow: hidden;
+      background: var(--paper); overflow: hidden;
+      display: flex; flex-direction: column;
     }
-    .annot .safe-top { height: 47px; margin: 0; }
+    .annot .safe-top { height: 47px; margin: 0; flex-shrink: 0; }
     .annot .scroll {
-      position: absolute; top: 47px; left: 0; right: 0; bottom: 90px;
+      flex: 1; min-height: 0;
       padding: 16px 20px 8px; overflow: hidden;
+      position: relative;
     }
-    .annot .band { height: 90px; box-sizing: border-box; }
+    .annot .band { margin-top: 0; flex-shrink: 0; }
     .ruler {
-      position: absolute; right: 4px; width: 3px; background: var(--sage);
+      position: absolute; right: 4px; top: 8px; bottom: 8px; width: 3px; background: var(--sage);
     }
     .ruler span {
-      position: absolute; right: 8px; white-space: nowrap;
+      position: absolute; right: 8px; top: 40%; white-space: nowrap;
       font-size: 10px; color: var(--sage); background: var(--paper);
       padding: 0 3px;
     }
@@ -120,7 +126,7 @@
     <h2>改前问题 · 四项并列菜单</h2>
     <p>这不是方案 A。方案 A 是「页顶标题＋另一处目的地」，见下一节同一画幅对照。</p>
     <section>
-      <div class="phone" style="min-height:240px;height:240px;padding-bottom:22px">
+      <div class="phone plain" style="min-height:240px;height:240px">
         <div class="row4">最近　回看　留下　家庭</div>
         <p class="note" style="margin-top:24px">门口的风还在。</p>
       </div>
@@ -164,38 +170,40 @@
       </section>
     </div>
     <div class="callout">
-      <p>选 B：阅读从标题下开始，当前位置可读，大字号可纵排，账户槽在带尾、现在空着。代价：底部少一段阅读高度；留下要低头才看见（空态用「留下第一条」补一次）；实现必须按带的实高垫内容，不能缩小系统字。</p>
+      <p>选 B：阅读从标题下开始，当前位置可读，大字号可纵排，账户槽在带尾、现在空着。代价：底带是滚动区外的兄弟，带变高则滚动区变矮；留下要低头才看见（空态用「留下第一条」补一次）；不能缩小系统字。</p>
     </div>
 
     <h2>路由序列（与 README §3 一致）</h2>
-    <p>根页只有 <code>/</code> 与 <code>/lookback</code> 有底带。子页一条「返回原来的位置」，<code>back()</code>。</p>
+    <p><code>canGoBack()</code> 只表示有历史，不能证明上一页是最近。从最近 <code>push</code> 回看时记下 <code>openedFrom = 'recent'</code>；来源不明用 <code>dismissTo('/')</code>，不猜。</p>
     <div class="seq">
-      <div><b>1 根页互切 · 禁止叠重复根</b></div>
-      冷启动 <code>/</code><br />
-      底带「回看」→ <code>push('/lookback')</code>　栈：<code>/</code> , <code>/lookback</code><br />
-      底带「最近」→ <code>back()</code>　栈：<code>/</code>（同一最近实例，滚动在）<br />
-      底带「回看」→ <code>push('/lookback')</code>　栈：<code>/</code> , <code>/lookback</code><br />
-      禁止 <code>push('/')</code>。不得变成 <code>/</code> , <code>/lookback</code> , <code>/</code> , <code>/lookback</code>。
+      <div><b>甲 · 从最近进入回看</b></div>
+      冷启动 <code>[/]</code><br />
+      底带「回看」→ 记下从最近来 → <code>push('/lookback')</code>　<code>[/ , /lookback]</code><br />
+      底带「最近」→ 因来源是最近 → <code>back()</code>　<code>[/]</code>（同一最近，滚动在）<br />
+      再「回看」→ 再记来源 → <code>push('/lookback')</code>　<code>[/ , /lookback]</code><br />
+      禁止 <code>push('/')</code>。不得变成 <code>[/ , /lookback , / , /lookback]</code>。
     </div>
     <div class="seq" style="margin-top:12px">
-      <div><b>2 子页返回 · 打开它的那一页</b></div>
-      <code>/</code> → push 回看根 → 年 → 月 → 日 → 详情<br />
-      详情 <code>back()</code> → 日（path 滚动）→ 月 → 年 → 回看根<br />
-      稿上子页返回一律写「返回原来的位置」，不写「最近」。
+      <div><b>乙 · 回看根深链（来源不明）</b></div>
+      冷启动或深链 <code>[/lookback]</code>　<code>openedFrom</code> 空<br />
+      即使 <code>canGoBack()</code> 为真，底带「最近」也不 <code>back()</code><br />
+      <code>dismissTo('/')</code> → 停在已有的 <code>/</code>，或栈无 <code>/</code> 时替换当前页为最近<br />
+      没有「原来的最近滚动」。符合 ADR 0005。须实测「无 <code>/</code>」不是 <code>push</code>。
     </div>
     <div class="seq" style="margin-top:12px">
-      <div><b>3 冷启动或深链只有回看根</b></div>
-      栈：<code>/lookback</code>　<code>canGoBack()</code> 假<br />
-      底带「最近」→ <code>replace('/')</code>　得到单独的最近<br />
-      没有「原来的最近滚动」。符合 ADR 0005。
+      <div><b>丙 · 从回看进入留下再保存</b></div>
+      <code>[/]</code> → 记来源 → <code>[/ , /lookback]</code> → <code>[/ , /lookback , /leave]</code><br />
+      保存 → <code>dismissTo('/')</code> → <code>[/]</code>　回看与留下都收掉<br />
+      再按返回：不进回看、不进留下<br />
+      现码 <code>replace('/')</code> 只换 <code>/leave</code>，会变成 <code>[/ , /lookback , /]</code>。规格不写「栈里只有 <code>/</code>」。
     </div>
     <div class="seq" style="margin-top:12px">
-      <div><b>4 留下 · 未保存看从哪来；保存一律 replace('/')</b></div>
-      从最近：可见「最近」→ <code>back()</code> → <code>/</code>　草稿仍走现有恢复<br />
-      从回看根：可见「返回原来的位置」→ <code>back()</code> → <code>/lookback</code>　草稿同上<br />
-      保存成功：现码 <code>leave.tsx</code> <code>router.replace('/')</code>。从回看进来也落到最近，回看栈被换掉。本稿保持这条语义。
+      <div><b>未保存的留下 · 文案看从哪来</b></div>
+      从最近：可见「最近」→ <code>back()</code> → <code>/</code><br />
+      从回看根：可见「返回原来的位置」→ <code>back()</code> → <code>/lookback</code><br />
+      子页返回一律「返回原来的位置」。草稿仍走现有恢复。
     </div>
-    <p class="nv">§3 各序列在 Expo Router 上的 <code>canGoBack</code> / 深链：NOT VERIFIED（实现切片必须走完）。</p>
+    <p class="nv">甲 / 乙 / 丙与 <code>dismissTo</code> 冷启动回退：NOT VERIFIED（实现切片必须走完）。</p>
 
     <h2>当前可用 · 最近</h2>
     <div class="grid">
@@ -247,7 +255,7 @@
             <div class="hi">Home Indicator</div>
           </div>
         </div>
-        <p class="cap">回看根。当前处是「回看」。能返回则 <code>back()</code> 到最近；不能则 <code>replace('/')</code>。禁止 <code>push('/')</code>。</p>
+        <p class="cap">回看根。从最近进来才 <code>back()</code>；来源不明则 <code>dismissTo('/')</code>，不读 <code>canGoBack()</code>。禁止 <code>push('/')</code>。</p>
       </section>
       <section>
         <div class="phone">
@@ -279,7 +287,7 @@
     </div>
 
     <h2>当前可用 · 详情与留下</h2>
-    <p>留下的可见返回按入口变。保存成功不按入口变：一律 <code>replace('/')</code>。</p>
+    <p>留下的可见返回按入口变。保存成功落到最近：<code>dismissTo('/')</code>，不是 <code>replace('/')</code>。</p>
     <div class="grid">
       <section>
         <div class="phone">
@@ -307,12 +315,12 @@
           <p class="meta" style="margin-top:80px">拍摄　照片　声音</p>
           <div class="leave" style="position:static;margin-top:12px">留下</div>
         </div>
-        <p class="cap">从 <code>/lookback</code> 根页进来。可见「返回原来的位置」，<code>back()</code> 回回看根。保存仍 <code>replace('/')</code>，落到最近。</p>
+        <p class="cap">从回看根进来。未保存：可见「返回原来的位置」，<code>back()</code> 回回看。保存：<code>dismissTo('/')</code>；若从最近进的回看，再按返回不回回看。</p>
       </section>
     </div>
 
-    <h2>底带空间 · 常规画幅（设计量，非真机）</h2>
-    <p>底带在文档流底栏，不盖在滚动上。内容 <code>paddingBottom</code> = 带的当前外接高度（含 Home Indicator）。带变高，垫跟着变。</p>
+    <h2>底带空间 · 兄弟节点（说明、稿、实现同一条）</h2>
+    <p>底带在滚动区<strong>下面</strong>，不盖住内容。滚动区已经变矮，<strong>不再</strong>垫一条带高。带变高，滚动区再矮。验收盯最后一条的播放和「看这条」。</p>
     <section>
       <div class="annot">
         <div class="safe-top">安全区顶 · 约 47 · 标题在区内</div>
@@ -323,20 +331,18 @@
           <p class="meta">一段声音 · 3秒</p>
           <div class="open">▶ 播放</div>
           <div class="open">看这条 <span>›</span></div>
-          <p class="legend" style="margin-top:12px">内容滚动区 · 底垫 = 带高</p>
+          <p class="legend" style="margin-top:12px">滚动区（flex 1）· 不含带高底垫</p>
+          <div class="ruler"><span>滚动区</span></div>
         </div>
         <div class="band">
           <span class="here">最近</span>
           <span class="go">回看</span>
           <span class="leave">留下</span>
-          <div class="hi">Home Indicator · 约 34 · 算在带高里</div>
-        </div>
-        <div class="ruler" style="top:47px;bottom:90px">
-          <span style="top:40%">滚动区</span>
+          <div class="hi">Home Indicator · 约 34 · 算在带高里，从而算进滚动区变矮</div>
         </div>
       </div>
-      <p class="cap">点击行 ≥48，上内边 8，Indicator 在点击行之下。常规带高约 8+48+34。不得缩小系统字号来塞带。</p>
-      <p class="nv">Home Indicator 实距、paddingBottom 随带高变化：NOT VERIFIED</p>
+      <p class="cap">列：安全区顶 → 滚动区 → 底带。点击行 ≥48，上内边 8。覆盖层才需要按带高垫内容；本稿不是覆盖层。</p>
+      <p class="nv">Home Indicator 实距、带变高后滚动区变矮：NOT VERIFIED</p>
     </section>
 
     <h2>同日多条 · 滚到末尾</h2>
@@ -359,7 +365,7 @@
           <div class="hi">Home Indicator</div>
         </div>
       </div>
-      <p class="cap">上一条已滚出。末条「看这条」在带沿之上。实现用 spacer / paddingBottom，不用把字缩小。</p>
+      <p class="cap">上一条已滚出。末条播放和「看这条」在滚动区下沿、带的上沿。不按带高加底垫，不缩小字。</p>
       <p class="nv">最后一条不被挡住：NOT VERIFIED（实现后必须滚到底确认）</p>
     </section>
 
@@ -423,7 +429,7 @@
 
     <h2>最大系统字号 · 底带纵排</h2>
     <section>
-      <div class="phone end" style="height:720px;padding-bottom:210px">
+      <div class="phone end" style="height:720px">
         <div class="title" style="font-size:34px;line-height:42px">最近</div>
         <div class="date" style="font-size:19px">记录于 9月27日</div>
         <p class="note" style="font-size:26px;line-height:36px">门口的风还在。</p>
@@ -434,10 +440,10 @@
           <span class="here" style="font-size:22px">最近</span>
           <span class="go" style="font-size:22px">回看</span>
           <span class="leave" style="font-size:24px">留下</span>
-          <div class="hi">Home Indicator · 带变高，内容底垫同步加大</div>
+          <div class="hi">Home Indicator · 带变高，滚动区变矮</div>
         </div>
       </div>
-      <p class="cap">XXXL：三项各 ≥48，整列。禁止缩小 <code>fontScale</code>。垫高 = 3×48 + 间隙 + Indicator。</p>
+      <p class="cap">XXXL：三项各 ≥48，整列。禁止缩小 <code>fontScale</code>。带变高，滚动区变矮，仍不垫一条带高。</p>
       <p class="nv">最大字号纵排：NOT VERIFIED</p>
     </section>
 
@@ -453,7 +459,7 @@
           <span class="here">最近</span>
           <span class="go">回看</span>
           <span class="leave">留下</span>
-          <div class="hi">横屏安全区（左右 inset + 底 Indicator）· 带随实高垫内容</div>
+          <div class="hi">横屏安全区（左右 inset + 底 Indicator）· 带是兄弟，滚动区变矮</div>
         </div>
       </div>
       <p class="cap wide">横屏：带仍在底，不改成顶栏。左右安全区留给内容，不缩小字。与内容争高则换行，不裁切末条。</p>
@@ -545,7 +551,7 @@
         <p class="cap">未交付同步之前，禁止画备份完成。空管理页不准上。</p>
       </section>
       <section>
-        <div class="phone" style="min-height:280px;padding-bottom:22px">
+        <div class="phone plain">
           <div class="title">最近</div>
           <div class="ghost">（不画未登录头像）</div>
           <p class="ban">禁止：假注册用户、灰色剪影、空的「账号与同步」表。</p>
