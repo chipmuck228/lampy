@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AppState,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,7 +12,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -36,6 +37,19 @@ import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/
 import { FeelingPicker } from '../screens/moment-feeling';
 import { OccurredDatePicker } from '../screens/moment-occurred';
 import { MomentImages } from '../screens/moment-images';
+import {
+  clay,
+  hairline,
+  ink,
+  inkSoft,
+  isCompactHeight,
+  pageGutter,
+  paper,
+  placeholder,
+  readingPageWidth,
+  readingWidth,
+  sage,
+} from '../screens/life-page';
 import { useSoundPlayer } from '../screens/use-sound-player';
 import {
   FAMILY_TEST_JPEG_BASE64,
@@ -46,8 +60,14 @@ import {
 export default function LeaveScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
-  const { width } = useWindowDimensions();
-  const readingWidth = Math.min(width, 720);
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const reading = readingWidth(width, height);
+  const gutter = pageGutter(width, height);
+  const pageWidth = readingPageWidth(width, height);
+  const compact = isCompactHeight(height);
+  const stackActions = compact || reading < 320;
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [emotion, setEmotion] = useState('');
@@ -111,6 +131,21 @@ export default function LeaveScreen() {
     );
     return run;
   }
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setKeyboardOpen(true),
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardOpen(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -609,17 +644,22 @@ export default function LeaveScreen() {
   const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
   const testNonce = Array.isArray(params.n) ? params.n[0] : params.n;
   const ranTestAction = useRef('');
+  /* eslint-disable react-hooks/set-state-in-effect -- family test driver on main */
   useEffect(() => {
     if (!isFamilyTestDriverEnabled() || !testAction || !draftId) return;
     const key = `${testAction}:${testNonce || ''}`;
     if (ranTestAction.current === key) return;
     ranTestAction.current = key;
     if (testAction === 'photo') {
-      persistNote('本轮媒体闭环');
-      persistEmotion('平静');
+      void Promise.resolve().then(() => {
+        persistNote('本轮媒体闭环');
+        persistEmotion('平静');
+      });
       const root = FileSystem.cacheDirectory;
       if (!root) {
-        setMessage('这次没有留下照片。可以再试，也可以继续写字。');
+        void Promise.resolve().then(() => {
+          setMessage('这次没有留下照片。可以再试，也可以继续写字。');
+        });
         return;
       }
       const path = `${root}family-test-photo.jpg`;
@@ -644,6 +684,7 @@ export default function LeaveScreen() {
       void onSave();
     }
   }, [testAction, testNonce, draftId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const draftHasContent =
     !!note.trim() || !!emotion.trim() || images.length > 0 || !!audio || unknownMedia.length > 0;
@@ -662,14 +703,25 @@ export default function LeaveScreen() {
             : '留下';
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="留下">
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']} accessibilityLabel="留下">
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}
+          style={styles.flex}
+          contentContainerStyle={[
+            styles.column,
+            {
+              maxWidth: pageWidth,
+              paddingHorizontal: gutter,
+              paddingTop: compact ? 4 : 8,
+              paddingBottom: 24,
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={false}
         >
           <Pressable
             accessibilityRole="button"
@@ -730,7 +782,7 @@ export default function LeaveScreen() {
               void persistNote(value);
             }}
             placeholder="写一句就可以，也可以只留下照片或声音。"
-            placeholderTextColor="#777168"
+            placeholderTextColor={placeholder}
             multiline
             textAlignVertical="top"
             style={styles.input}
@@ -777,32 +829,61 @@ export default function LeaveScreen() {
               persistOccurred(next);
             }}
           />
-          {message ? <Text style={styles.message}>{message}</Text> : null}
-          <View style={styles.actions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="拍摄"
-              testID="composer-camera"
-              onPress={() => {
-                applyImageAction('camera');
-              }}
-              disabled={composerLocked}
-              style={styles.mediaHit}
+        </ScrollView>
+        <View
+          testID="composer-action-band"
+          style={[
+            styles.band,
+            {
+              paddingHorizontal: gutter,
+              paddingTop: compact || stackActions ? 8 : 12,
+              paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 8),
+            },
+          ]}
+        >
+          {message ? (
+            <Text
+              testID="composer-feedback"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              style={[styles.message, { maxWidth: reading }]}
             >
-              <Text style={styles.media}>拍摄</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="照片"
-              testID="composer-library"
-              onPress={() => {
-                applyImageAction('library');
-              }}
-              disabled={composerLocked}
-              style={styles.mediaHit}
-            >
-              <Text style={styles.media}>照片</Text>
-            </Pressable>
+              {message}
+            </Text>
+          ) : null}
+          <View
+            style={[
+              styles.actions,
+              { maxWidth: reading },
+              stackActions && styles.actionsStacked,
+            ]}
+          >
+            <View style={styles.mediaRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="拍摄"
+                testID="composer-camera"
+                onPress={() => {
+                  applyImageAction('camera');
+                }}
+                disabled={composerLocked}
+                style={styles.mediaHit}
+              >
+                <Text style={styles.media}>拍摄</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="照片"
+                testID="composer-library"
+                onPress={() => {
+                  applyImageAction('library');
+                }}
+                disabled={composerLocked}
+                style={styles.mediaHit}
+              >
+                <Text style={styles.media}>照片</Text>
+              </Pressable>
+            </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="留下"
@@ -811,45 +892,76 @@ export default function LeaveScreen() {
                 void onSave();
               }}
               disabled={composerLocked}
-              style={styles.saveHit}
+              style={[styles.saveHit, stackActions && styles.saveHitStacked]}
             >
               <Text style={styles.save}>{saveLabel}</Text>
             </Pressable>
           </View>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  safe: { flex: 1, backgroundColor: paper },
   flex: { flex: 1 },
   column: {
     flexGrow: 1,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    gap: 16,
+    gap: 20,
   },
   backHit: { minHeight: 44, justifyContent: 'center' },
-  back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
-  restore: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
+  back: { fontSize: 16, lineHeight: 22, color: sage },
+  restore: { fontSize: 16, lineHeight: 24, color: inkSoft },
   abandonHit: { minHeight: 44, justifyContent: 'center' },
-  abandon: { fontSize: 16, lineHeight: 22, color: '#87513D' },
+  abandon: { fontSize: 16, lineHeight: 22, color: clay },
   confirmRow: { flexDirection: 'row', gap: 24, marginTop: 8 },
   input: {
-    minHeight: 160,
+    minHeight: 88,
     fontSize: 22,
     lineHeight: 32,
-    color: '#25231F',
+    color: ink,
     padding: 0,
   },
-  message: { fontSize: 16, lineHeight: 24, color: '#87513D' },
-  actions: { gap: 8, paddingBottom: 8 },
-  mediaHit: { minHeight: 44, justifyContent: 'center' },
-  media: { fontSize: 18, lineHeight: 24, color: '#53604F' },
-  saveHit: { minHeight: 44, justifyContent: 'center' },
-  save: { fontSize: 18, lineHeight: 24, color: '#53604F' },
+  message: {
+    fontSize: 17,
+    lineHeight: 26,
+    color: clay,
+    paddingBottom: 8,
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    alignSelf: 'center',
+  },
+  band: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: hairline,
+    backgroundColor: paper,
+    minWidth: 0,
+  },
+  actions: {
+    width: '100%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+  },
+  actionsStacked: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  mediaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 20,
+  },
+  mediaHit: { minHeight: 48, minWidth: 48, justifyContent: 'center' },
+  media: { fontSize: 18, lineHeight: 24, color: sage },
+  saveHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', marginLeft: 'auto' },
+  saveHitStacked: { marginLeft: 0, alignSelf: 'flex-start' },
+  save: { fontSize: 18, lineHeight: 24, color: ink },
 });

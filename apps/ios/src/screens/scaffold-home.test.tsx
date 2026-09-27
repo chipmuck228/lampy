@@ -17,7 +17,7 @@ jest.mock('expo-router', () => {
 
 jest.mock('../application/container', () => ({
   getUseCases: async () => ({
-    getRecentLife: async () => ({ isFirstUse: true, items: [] }),
+    getRecentLife: async () => ({ isFirstUse: true, items: [], days: [] }),
   }),
 }));
 
@@ -42,8 +42,10 @@ describe('recent home', () => {
     expect(view.getByLabelText('留下')).toBeTruthy();
     expect(view.getByTestId('recent-scroll')).toBeTruthy();
     await waitFor(() => {
-      expect(view.getByText('最近还没有留下什么。')).toBeTruthy();
+      expect(view.getByText('这里，留下自己的生活。')).toBeTruthy();
     });
+    expect(view.getByText('写一句，拍一张，或留一段声音。以后再回来听见、看见。')).toBeTruthy();
+    expect(view.getByLabelText('留下第一条')).toBeTruthy();
     expect(view.queryByText(/假数据|mock moment/i)).toBeNull();
   });
 });

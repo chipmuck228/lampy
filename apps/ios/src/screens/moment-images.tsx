@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import type { ImageView } from '../application/use-cases';
+import { clay } from './life-page';
 
 export function momentImageAspectRatio(image: { width?: number; height?: number }): number {
   if (image.width && image.height && image.width > 0 && image.height > 0) {
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     minHeight: 88,
   },
-  missingText: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
+  missingText: { fontSize: 17, lineHeight: 26, color: clay },
   removeHit: { minHeight: 44, justifyContent: 'center' },
-  remove: { fontSize: 16, lineHeight: 22, color: '#87513D' },
+  remove: { fontSize: 16, lineHeight: 22, color: clay },
 });

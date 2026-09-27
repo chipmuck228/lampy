@@ -14,21 +14,38 @@ import { lookbackHref } from '../screens/lookback-chrome';
 
 import { getUseCases } from '../application/container';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
-import type { RecentLifeViewModel } from '../application/use-cases';
+import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
 import { MomentFeeling } from '../screens/moment-feeling';
 import { MomentImages } from '../screens/moment-images';
 import { useSoundPlayer } from '../screens/use-sound-player';
+import {
+  clay,
+  ink,
+  inkSoft,
+  isCompactHeight,
+  isRegularWidth,
+  DATE_RAIL_WIDTH,
+  READING_MAX,
+  pageColumnWidth,
+  pageGutter,
+  paper,
+  sage,
+} from '../screens/life-page';
 
 export default function RecentScreen() {
   const router = useRouter();
-  const { width, fontScale } = useWindowDimensions();
-  const readingWidth = Math.min(width, 720);
+  const { width, height, fontScale } = useWindowDimensions();
+  const columnWidth = pageColumnWidth(width, height);
+  const gutter = pageGutter(width, height);
+  const regular = isRegularWidth(width, height);
+  const compact = isCompactHeight(height);
   const stackChrome = width < 420 || fontScale >= 1.3;
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const sound = useSoundPlayer();
+  const days = view?.days ?? [];
 
   useFocusEffect(
     useCallback(() => {
@@ -55,136 +72,207 @@ export default function RecentScreen() {
       <ScrollView
         testID="recent-scroll"
         style={styles.scroll}
-        contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}
+        contentContainerStyle={[
+          styles.column,
+          {
+            maxWidth: columnWidth,
+            paddingHorizontal: gutter,
+            paddingTop: compact ? 4 : 12,
+            paddingBottom: compact ? 20 : 40,
+          },
+        ]}
       >
-        <View style={[styles.top, stackChrome && styles.topStacked]}>
+        <View style={[styles.chrome, compact && styles.chromeCompact, stackChrome && styles.chromeStacked]}>
           <Text style={styles.wordmark} accessibilityRole="header">
             最近
           </Text>
-          <View style={[styles.actions, stackChrome && styles.actionsWrapped]}>
+          <View style={[styles.secondary, stackChrome && styles.secondaryWrapped]}>
             {isFamilyApiConfigured() ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="家庭"
                 testID="home-family"
-                hitSlop={8}
                 onPress={() => router.push('/family')}
-                style={styles.leaveHit}
+                style={styles.navHit}
               >
-                <Text style={styles.leave}>家庭</Text>
+                <Text style={styles.nav}>家庭</Text>
               </Pressable>
             ) : null}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="回看"
               testID="home-lookback"
-              hitSlop={8}
               onPress={() => router.push(lookbackHref('/lookback'))}
-              style={styles.leaveHit}
+              style={styles.navHit}
             >
-              <Text style={styles.leave}>回看</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="留下"
-              testID="home-leave"
-              hitSlop={8}
-              onPress={() => router.push('/leave')}
-              style={styles.leaveHit}
-            >
-              <Text style={styles.leave}>留下</Text>
+              <Text style={styles.nav}>回看</Text>
             </Pressable>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="留下"
+            testID="home-leave"
+            onPress={() => router.push('/leave')}
+            style={styles.leaveHit}
+          >
+            <Text style={styles.leaveAction}>留下</Text>
+          </Pressable>
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {view?.isFirstUse ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>最近还没有留下什么。</Text>
-            <Text style={styles.body}>写一句、留下照片或一段声音就可以。</Text>
+            <Text style={styles.emptyTitle}>这里，留下自己的生活。</Text>
+            <Text style={styles.body}>写一句，拍一张，或留一段声音。以后再回来听见、看见。</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="留下第一条"
+              testID="home-leave-first"
+              onPress={() => router.push('/leave')}
+              style={styles.firstHit}
+            >
+              <Text style={styles.first}>留下第一条</Text>
+            </Pressable>
           </View>
         ) : null}
 
-        {view?.items.map((item) => (
-          <Pressable
-            key={item.id}
-            accessibilityRole="button"
-            accessibilityLabel={
-              [
-                item.dateLabel,
-                item.note,
-                ...item.images.map((image) => image.label),
-                item.audio?.label || '',
-                ...(item.unknownMedia ?? []).map((media) => media.label),
-                item.feeling ? `当时的感受，${item.feeling.label}` : '',
-              ]
-                .filter(Boolean)
-                .join('，') || `${item.dateLabel}，一条记录`
-            }
-            testID={`recent-item-${item.id}`}
-            onPress={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
-            style={styles.row}
+        {days.map((day) => (
+          <View
+            key={day.key}
+            style={[styles.day, regular && styles.dayRegular]}
+            accessibilityLabel={`${day.label}，${day.items.length}条记录`}
           >
-            <Text style={styles.date}>{item.dateLabel}</Text>
-            {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
-            <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
-            <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
-            <MomentAudio
-              audio={item.audio}
-              playbackStatus={playingId === item.audio?.id ? (sound.failed ? 'unavailable' : sound.status) : 'idle'}
-              currentTimeMs={playingId === item.audio?.id ? sound.currentTimeMs : 0}
-              onPlay={() => {
-                if (!item.audio?.uri) return;
-                setPlayingId(item.audio.id);
-                void sound.play(item.audio.uri);
-              }}
-              onPause={() => {
-                void sound.pause();
-              }}
-              testIDPrefix={`recent-sound-${item.id}`}
-              compact
-            />
-            <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
-          </Pressable>
+            <Text style={[styles.date, regular && styles.dateRail]} accessibilityRole="header">
+              {day.label}
+            </Text>
+            <View style={[styles.dayItems, regular && styles.dayItemsRegular]}>
+              {day.items.map((item) => (
+                <RecentMoment
+                  key={item.id}
+                  item={item}
+                  playingId={playingId}
+                  sound={sound}
+                  onOpen={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
+                  onPlay={() => {
+                    if (!item.audio?.uri) return;
+                    setPlayingId(item.audio.id);
+                    void sound.play(item.audio.uri);
+                  }}
+                  onPause={() => {
+                    void sound.pause();
+                  }}
+                />
+              ))}
+            </View>
+          </View>
         ))}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function RecentMoment({
+  item,
+  playingId,
+  sound,
+  onOpen,
+  onPlay,
+  onPause,
+}: {
+  item: RecentLifeItem;
+  playingId: string | null;
+  sound: ReturnType<typeof useSoundPlayer>;
+  onOpen: () => void;
+  onPlay: () => void;
+  onPause: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        [
+          item.dateLabel,
+          item.occurredLabel,
+          item.note,
+          ...item.images.map((image) => image.label),
+          item.audio?.label || '',
+          ...(item.unknownMedia ?? []).map((media) => media.label),
+          item.feeling ? `当时的感受，${item.feeling.label}` : '',
+        ]
+          .filter(Boolean)
+          .join('，') || `${item.dateLabel}，一条记录`
+      }
+      testID={`recent-item-${item.id}`}
+      onPress={onOpen}
+      style={styles.moment}
+    >
+      {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+      {item.occurredLabel ? (
+        <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
+          {item.occurredLabel}
+        </Text>
+      ) : null}
+      <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
+      <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
+      <MomentAudio
+        audio={item.audio}
+        playbackStatus={playingId === item.audio?.id ? (sound.failed ? 'unavailable' : sound.status) : 'idle'}
+        currentTimeMs={playingId === item.audio?.id ? sound.currentTimeMs : 0}
+        onPlay={onPlay}
+        onPause={onPause}
+        testIDPrefix={`recent-sound-${item.id}`}
+        compact
+      />
+      <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  safe: { flex: 1, backgroundColor: paper },
   scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,
     width: '100%',
     maxWidth: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    gap: 20,
+    gap: 40,
   },
-  top: {
+  chrome: {
+    alignItems: 'flex-start',
+    gap: 4,
+    paddingBottom: 8,
+    minWidth: 0,
+  },
+  chromeCompact: { paddingBottom: 0 },
+  chromeStacked: { alignSelf: 'stretch' },
+  wordmark: { fontSize: 28, lineHeight: 36, color: ink, flexShrink: 0 },
+  secondary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    minHeight: 44,
-    paddingTop: 12,
+    alignItems: 'center',
     gap: 8,
+    minWidth: 0,
   },
-  topStacked: { flexDirection: 'column', alignItems: 'flex-start' },
-  wordmark: { fontSize: 28, lineHeight: 36, color: '#25231F', flexShrink: 0 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16, minWidth: 0 },
-  actionsWrapped: { alignSelf: 'stretch' },
-  leaveHit: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
-  leave: { fontSize: 18, lineHeight: 24, color: '#53604F' },
-  empty: { gap: 8, paddingTop: 24 },
-  emptyTitle: { fontSize: 22, lineHeight: 30, color: '#25231F' },
-  body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
-  error: { fontSize: 16, lineHeight: 24, color: '#87513D' },
-  row: { gap: 8, paddingVertical: 8, minHeight: 44 },
-  date: { fontSize: 14, lineHeight: 20, color: '#53604F' },
-  note: { fontSize: 20, lineHeight: 28, color: '#25231F' },
+  secondaryWrapped: { alignSelf: 'stretch' },
+  navHit: { minWidth: 48, minHeight: 48, justifyContent: 'center', paddingRight: 12 },
+  nav: { fontSize: 17, lineHeight: 24, color: sage },
+  leaveHit: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  leaveAction: { fontSize: 20, lineHeight: 28, color: ink },
+  empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
+  emptyTitle: { fontSize: 28, lineHeight: 38, color: ink },
+  body: { fontSize: 17, lineHeight: 26, color: inkSoft },
+  firstHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  first: { fontSize: 20, lineHeight: 28, color: ink },
+  error: { fontSize: 17, lineHeight: 26, color: clay, paddingVertical: 8 },
+  day: { gap: 12 },
+  dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
+  date: { fontSize: 16, lineHeight: 22, color: sage, paddingBottom: 4 },
+  dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
+  dayItems: { gap: 36 },
+  dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
+  moment: { gap: 8, minHeight: 44 },
+  note: { fontSize: 21, lineHeight: 32, color: ink },
+  occurred: { fontSize: 15, lineHeight: 22, color: inkSoft },
 });

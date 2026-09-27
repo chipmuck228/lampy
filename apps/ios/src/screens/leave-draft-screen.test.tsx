@@ -306,6 +306,33 @@ describe('leave draft restore and abandon', () => {
     expect(view.getByLabelText('放弃这份草稿')).toBeTruthy();
   });
 
+  it('can abandon after restoring and removing one photo', async () => {
+    mockRemoveImage.mockResolvedValueOnce({
+      ...restoredDraft,
+      images: [],
+    });
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByLabelText('移除这张照片，照片 1/1')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('移除这张照片，照片 1/1'));
+    await waitFor(() => {
+      expect(view.queryByLabelText('照片 1/1')).toBeNull();
+      expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('放弃这份草稿'));
+    await waitFor(() => {
+      expect(view.getByTestId('composer-abandon-confirm-button')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('composer-abandon-confirm-button'));
+    await waitFor(() => {
+      expect(mockAbandon).toHaveBeenCalledWith('moment_restored');
+      expect(view.getByTestId('composer-note').props.value).toBe('');
+    });
+    expect(view.queryByDisplayValue('还没留下的一句')).toBeNull();
+    expect(view.queryByLabelText('一段声音，2秒，未播放')).toBeNull();
+  });
+
   it('removes restored audio and keeps the rest of the draft', async () => {
     mockRemoveAudio.mockResolvedValueOnce({
       ...restoredDraft,
