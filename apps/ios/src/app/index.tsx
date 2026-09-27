@@ -24,24 +24,26 @@ import {
   ink,
   inkSoft,
   isCompactHeight,
-  isRegularWidth,
+  isLargeType,
   DATE_RAIL_WIDTH,
   READING_MAX,
-  pageColumnWidth,
   pageGutter,
   paper,
+  recentColumnWidth,
   sage,
+  shouldStackRecentDay,
 } from '../screens/life-page';
 import { StartupBrandLayer } from '../screens/startup-brand-layer';
 
 export default function RecentScreen() {
   const router = useRouter();
   const { width, height, fontScale } = useWindowDimensions();
-  const columnWidth = pageColumnWidth(width, height);
   const gutter = pageGutter(width, height);
-  const regular = isRegularWidth(width, height);
   const compact = isCompactHeight(height);
-  const stackChrome = width < 420 || fontScale >= 1.3;
+  const largeType = isLargeType(fontScale);
+  const stackChrome = width < 420 || largeType;
+  const stackDay = shouldStackRecentDay(width, height, fontScale);
+  const columnWidth = recentColumnWidth(width, height, fontScale);
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -142,13 +144,13 @@ export default function RecentScreen() {
         {days.map((day) => (
           <View
             key={day.key}
-            style={[styles.day, regular && styles.dayRegular]}
+            style={[styles.day, !stackDay && styles.dayRegular]}
             accessibilityLabel={`${day.label}，${day.items.length}条记录`}
           >
-            <Text style={[styles.date, regular && styles.dateRail]} accessibilityRole="header">
+            <Text style={[styles.date, !stackDay && styles.dateRail]} accessibilityRole="header">
               {day.label}
             </Text>
-            <View style={[styles.dayItems, regular && styles.dayItemsRegular]}>
+            <View style={[styles.dayItems, !stackDay && styles.dayItemsRegular]}>
               {day.items.map((item) => (
                 <RecentMoment
                   key={item.id}
@@ -189,34 +191,45 @@ function RecentMoment({
   onPlay: () => void;
   onPause: () => void;
 }) {
+  const mixed = !!(
+    item.audio &&
+    (item.note || item.images.length > 0 || (item.unknownMedia?.length ?? 0) > 0 || item.feeling)
+  );
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        [
-          item.dateLabel,
-          item.occurredLabel,
-          item.note,
-          ...item.images.map((image) => image.label),
-          item.audio?.label || '',
-          ...(item.unknownMedia ?? []).map((media) => media.label),
-          item.feeling ? `当时的感受，${item.feeling.label}` : '',
-        ]
-          .filter(Boolean)
-          .join('，') || `${item.dateLabel}，一条记录`
-      }
-      testID={`recent-item-${item.id}`}
-      onPress={onOpen}
-      style={styles.moment}
-    >
-      {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
-      {item.occurredLabel ? (
-        <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
-          {item.occurredLabel}
+    <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          [
+            item.dateLabel,
+            item.occurredLabel,
+            item.note,
+            ...item.images.map((image) => image.label),
+            ...(item.unknownMedia ?? []).map((media) => media.label),
+            item.feeling ? `当时的感受，${item.feeling.label}` : '',
+            '看这条',
+          ]
+            .filter(Boolean)
+            .join('，') || `${item.dateLabel}，一条记录`
+        }
+        accessibilityHint="打开这条记录"
+        testID={`recent-open-${item.id}`}
+        onPress={onOpen}
+        style={styles.open}
+      >
+        {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+        {item.occurredLabel ? (
+          <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
+            {item.occurredLabel}
+          </Text>
+        ) : null}
+        <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
+        <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
+        <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
+        <Text style={styles.openAction} testID={`recent-open-label-${item.id}`}>
+          看这条
         </Text>
-      ) : null}
-      <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
-      <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
+      </Pressable>
       <MomentAudio
         audio={item.audio}
         playbackStatus={playingId === item.audio?.id ? (sound.failed ? 'unavailable' : sound.status) : 'idle'}
@@ -224,10 +237,10 @@ function RecentMoment({
         onPlay={onPlay}
         onPause={onPause}
         testIDPrefix={`recent-sound-${item.id}`}
-        compact
+        compact={!mixed}
+        scene={mixed}
       />
-      <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
-    </Pressable>
+    </View>
   );
 }
 
@@ -249,7 +262,7 @@ const styles = StyleSheet.create({
   },
   chromeCompact: { paddingBottom: 0 },
   chromeStacked: { alignSelf: 'stretch' },
-  wordmark: { fontSize: 28, lineHeight: 36, color: ink, flexShrink: 0 },
+  wordmark: { fontSize: 28, lineHeight: 36, color: ink, flexShrink: 1 },
   secondary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -274,7 +287,10 @@ const styles = StyleSheet.create({
   dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
   dayItems: { gap: 36 },
   dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
-  moment: { gap: 8, minHeight: 44 },
+  moment: { gap: 8, minHeight: 48 },
+  momentMixed: { gap: 16 },
+  open: { gap: 8, minHeight: 48 },
+  openAction: { fontSize: 17, lineHeight: 24, color: sage, minHeight: 48, textAlignVertical: 'center' },
   note: { fontSize: 21, lineHeight: 32, color: ink },
   occurred: { fontSize: 15, lineHeight: 22, color: inkSoft },
 });

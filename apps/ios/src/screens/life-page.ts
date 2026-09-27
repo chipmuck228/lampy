@@ -13,6 +13,7 @@ export const DATE_RAIL_WIDTH = 120;
 export const DATE_RAIL_GAP = 32;
 export const COMPACT_HEIGHT = 500;
 export const REGULAR_WIDTH = 768;
+export const LARGE_TYPE = 1.3;
 
 export function pageGutter(windowWidth: number, windowHeight?: number): number {
   return isRegularWidth(windowWidth, windowHeight) ? 48 : 24;
@@ -50,4 +51,16 @@ export function isRegularWidth(windowWidth: number, windowHeight?: number): bool
 
 export function isCompactHeight(windowHeight: number): boolean {
   return windowHeight < COMPACT_HEIGHT;
+}
+
+export function isLargeType(fontScale: number): boolean {
+  return fontScale >= LARGE_TYPE;
+}
+
+export function shouldStackRecentDay(windowWidth: number, windowHeight: number, fontScale: number): boolean {
+  return !isRegularWidth(windowWidth, windowHeight) || isLargeType(fontScale);
+}
+
+export function recentColumnWidth(windowWidth: number, windowHeight: number, fontScale: number): number {
+  return isLargeType(fontScale) ? readingPageWidth(windowWidth, windowHeight) : pageColumnWidth(windowWidth, windowHeight);
 }

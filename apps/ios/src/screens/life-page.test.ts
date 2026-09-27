@@ -3,11 +3,14 @@ import {
   DATE_RAIL_WIDTH,
   READING_MAX,
   isCompactHeight,
+  isLargeType,
   isRegularWidth,
   pageColumnWidth,
   pageGutter,
   readingPageWidth,
   readingWidth,
+  recentColumnWidth,
+  shouldStackRecentDay,
 } from './life-page';
 
 describe('life page measures', () => {
@@ -36,5 +39,17 @@ describe('life page measures', () => {
     expect(isRegularWidth(390, 844)).toBe(false);
     expect(isCompactHeight(390)).toBe(true);
     expect(isCompactHeight(844)).toBe(false);
+  });
+
+  it('treats accessibility extra-large and above as stacked reading, not a date rail', () => {
+    expect(isLargeType(1)).toBe(false);
+    expect(isLargeType(1.3)).toBe(true);
+    expect(isLargeType(3.1)).toBe(true);
+    expect(shouldStackRecentDay(1024, 1366, 1)).toBe(false);
+    expect(shouldStackRecentDay(1024, 1366, 3.1)).toBe(true);
+    expect(shouldStackRecentDay(390, 844, 1)).toBe(true);
+    expect(recentColumnWidth(1024, 1366, 1)).toBe(768);
+    expect(recentColumnWidth(1024, 1366, 3.1)).toBe(616);
+    expect(recentColumnWidth(390, 844, 3.1)).toBe(390);
   });
 });
