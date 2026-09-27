@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { resetStartupBrandForTests } from '../application/startup-brand';
 import RecentScreen from '../app/index';
+import { resetLookbackOriginsForTests } from './lookback-origin';
 
 const mockPush = jest.fn();
 const mockGetRecentLife = jest.fn();
@@ -101,6 +102,7 @@ describe('root navigation band', () => {
     mockPush.mockReset();
     mockGetRecentLife.mockReset();
     resetStartupBrandForTests();
+    resetLookbackOriginsForTests();
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 2, fontScale: 1 },
@@ -124,8 +126,9 @@ describe('root navigation band', () => {
     expect(view.getByLabelText('播放，3秒')).toBeTruthy();
     expect(view.getByTestId('recent-open-label-moment_wind').props.children).toBe('看这条');
     fireEvent.press(view.getByTestId('home-lookback'));
-    expect(mockPush).toHaveBeenCalledWith('/lookback?from=recent');
+    expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/lookback\?o=[^&]+$/));
     fireEvent.press(view.getByTestId('home-leave'));
     expect(mockPush).toHaveBeenCalledWith('/leave?from=recent');
+    await view.unmount();
   });
 });

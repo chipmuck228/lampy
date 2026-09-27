@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
-import { leaveHref, lookbackRootHref } from '../screens/lookback-origin';
+import { leaveHref, lookbackRootHrefFromRecent } from '../screens/lookback-origin';
 import { RootNavBand, RootReadingLayout } from '../screens/root-nav-band';
 import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
@@ -79,7 +79,7 @@ export default function RecentScreen() {
         band={
           <RootNavBand
             here="recent"
-            onOther={() => router.push(lookbackRootHref(true))}
+            onOther={() => router.push(lookbackRootHrefFromRecent())}
             onLeave={() => router.push(leaveHref('recent'))}
             onFamily={isFamilyApiConfigured() ? () => router.push('/family') : undefined}
           />

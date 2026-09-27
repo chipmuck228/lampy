@@ -16,6 +16,7 @@ import LookbackUnconfirmedScreen from '../app/lookback/unconfirmed';
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockDismissTo = jest.fn();
+const mockGetState = jest.fn();
 const mockGetHistoryYears = jest.fn();
 const mockGetHistoryYear = jest.fn();
 const mockGetHistoryDay = jest.fn();
@@ -41,6 +42,9 @@ jest.mock('expo-router', () => {
       useEffect(effect, [effect]);
     },
     useLocalSearchParams: () => mockSearchParams,
+    useNavigation: () => ({
+      getState: mockGetState,
+    }),
   };
 });
 
@@ -75,7 +79,10 @@ describe('lookback screens', () => {
     mockGetHistoryUnknown.mockReset();
     mockBack.mockReset();
     mockDismissTo.mockReset();
-    mockSearchParams.from = '';
+    mockGetState.mockReset();
+    mockGetState.mockReturnValue({ index: 0, routes: [{ name: 'lookback/index' }] });
+    delete mockSearchParams.from;
+    delete mockSearchParams.o;
     resetLookbackSessionForTests();
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
@@ -529,45 +536,4 @@ describe('lookback screens', () => {
     });
     expect(day.queryByText(/当时的感受/)).toBeNull();
   });
-
-  it('uses the lookback href origin instead of canGoBack when returning to Recent', async () => {
-    mockGetHistoryYears.mockResolvedValue({
-      years: [
-        {
-          year: 2026,
-          monthCounts: Array.from({ length: 12 }, () => 0),
-          filledMonths: 0,
-          quietMonths: 12,
-          yearUnconfirmedCount: 0,
-          momentCount: 2,
-        },
-      ],
-      unknownCount: 0,
-      isEmpty: false,
-    });
-    mockSearchParams.from = 'recent';
-    const fromRecent = await render(wrap(<LookbackIndexScreen />));
-    await waitFor(() => {
-      expect(fromRecent.getByTestId('lookback-year-2026')).toBeTruthy();
-    });
-    expect(fromRecent.queryByTestId('lookback-back')).toBeNull();
-    expect(fromRecent.getByTestId('root-nav-band')).toBeTruthy();
-    fireEvent.press(fromRecent.getByTestId('lookback-go-recent'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockDismissTo).not.toHaveBeenCalled();
-    fromRecent.unmount();
-
-    mockSearchParams.from = '';
-    mockBack.mockReset();
-    const deepLink = await render(wrap(<LookbackIndexScreen />));
-    await waitFor(() => {
-      expect(deepLink.getByTestId('lookback-year-2026')).toBeTruthy();
-    });
-    fireEvent.press(deepLink.getByTestId('lookback-go-recent'));
-    expect(mockDismissTo).toHaveBeenCalledWith('/');
-    expect(mockBack).not.toHaveBeenCalled();
-    fireEvent.press(deepLink.getByTestId('lookback-leave'));
-    expect(mockPush).toHaveBeenCalledWith('/leave?from=lookback');
-  });
-
 });

@@ -28,7 +28,8 @@ export function RootNavBand({
 }) {
   const { width, height, fontScale } = useWindowDimensions();
   const rail = shouldUseNavRail(width, height, fontScale);
-  const stacked = shouldStackNavBand(width, fontScale);
+  const itemCount = onFamily ? 4 : 3;
+  const stacked = !rail && shouldStackNavBand(width, fontScale, itemCount);
   const hereLabel = here === 'recent' ? '最近' : '回看';
   const otherLabel = here === 'recent' ? '回看' : '最近';
 
@@ -38,20 +39,22 @@ export function RootNavBand({
       style={[styles.band, rail && styles.rail, stacked && styles.stacked]}
       accessibilityRole="none"
     >
-      <Text
-        testID="root-nav-here"
-        style={styles.here}
-        accessibilityRole="text"
-        accessibilityLabel={`${hereLabel}，当前页`}
-      >
-        {hereLabel}
-      </Text>
+      <View testID="root-nav-here-wrap" style={styles.item}>
+        <Text
+          testID="root-nav-here"
+          style={styles.here}
+          accessibilityRole="text"
+          accessibilityLabel={`${hereLabel}，当前页`}
+        >
+          {hereLabel}
+        </Text>
+      </View>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={otherLabel}
         testID={here === 'recent' ? 'home-lookback' : 'lookback-go-recent'}
         onPress={onOther}
-        style={styles.hit}
+        style={styles.item}
       >
         <Text style={styles.go}>{otherLabel}</Text>
       </Pressable>
@@ -60,7 +63,7 @@ export function RootNavBand({
         accessibilityLabel="留下"
         testID={here === 'recent' ? 'home-leave' : 'lookback-leave'}
         onPress={onLeave}
-        style={styles.leaveHit}
+        style={styles.item}
       >
         <Text style={styles.leave}>留下</Text>
       </Pressable>
@@ -70,7 +73,7 @@ export function RootNavBand({
           accessibilityLabel="家庭"
           testID="home-family"
           onPress={onFamily}
-          style={styles.hit}
+          style={styles.item}
         >
           <Text style={styles.go}>家庭</Text>
         </Pressable>
@@ -127,11 +130,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper },
   column: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
-  scroll: { flex: 1, width: '100%' },
+  scroll: { flex: 1, minWidth: 0 },
   band: {
     flexShrink: 0,
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     gap: 8,
     paddingTop: 8,
@@ -140,6 +143,8 @@ const styles = StyleSheet.create({
   },
   rail: {
     width: 112,
+    flexGrow: 0,
+    flexShrink: 0,
     flexDirection: 'column',
     alignItems: 'flex-start',
     paddingHorizontal: 16,
@@ -147,11 +152,17 @@ const styles = StyleSheet.create({
   },
   stacked: {
     flexDirection: 'column',
+    flexWrap: 'nowrap',
     alignItems: 'flex-start',
   },
-  here: { minHeight: 48, fontSize: 17, lineHeight: 24, color: ink, textAlignVertical: 'center' },
-  hit: { minWidth: 48, minHeight: 48, justifyContent: 'center', paddingRight: 8 },
+  item: {
+    flexGrow: 0,
+    flexShrink: 0,
+    minWidth: 48,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  here: { fontSize: 17, lineHeight: 24, color: ink },
   go: { fontSize: 17, lineHeight: 24, color: sage },
-  leaveHit: { minWidth: 48, minHeight: 48, justifyContent: 'center' },
   leave: { fontSize: 20, lineHeight: 28, color: ink },
 });

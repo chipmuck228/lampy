@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../application/container';
 import { isFamilyApiConfigured } from '../../infrastructure/family-config';
@@ -12,12 +12,19 @@ import {
   lookbackStyles,
   useLookbackLayout,
 } from '../../screens/lookback-chrome';
-import { goToRecentFromLookbackRoot, leaveHref, lookbackOpenedFromRecent } from '../../screens/lookback-origin';
+import {
+  firstSearchParam,
+  forgetLookbackOrigin,
+  goToRecentFromLookbackRoot,
+  leaveHref,
+  shouldBackToRecent,
+} from '../../screens/lookback-origin';
 
 export default function LookbackIndexScreen() {
   const router = useRouter();
-  const { from } = useLocalSearchParams<{ from?: string | string[] }>();
-  const openedFromRecent = lookbackOpenedFromRecent(from);
+  const navigation = useNavigation();
+  const { o } = useLocalSearchParams<{ o?: string | string[] }>();
+  const originToken = firstSearchParam(o);
   const { verticalTime } = useLookbackLayout();
   const [view, setView] = useState<HistoryYearsView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +54,14 @@ export default function LookbackIndexScreen() {
       title="回看"
       path="/lookback"
       root
-      onGoRecent={() => goToRecentFromLookbackRoot(router, openedFromRecent)}
+      onGoRecent={() => {
+        const openedFromRecent = shouldBackToRecent({
+          originToken,
+          navigationState: navigation.getState?.(),
+        });
+        goToRecentFromLookbackRoot(router, openedFromRecent);
+        forgetLookbackOrigin(originToken);
+      }}
       onLeave={() => router.push(leaveHref('lookback'))}
       onFamily={isFamilyApiConfigured() ? () => router.push('/family') : undefined}
     >

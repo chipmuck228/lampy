@@ -1,26 +1,91 @@
 import {
   finishLeaveToRecent,
+  firstSearchParam,
+  forgetLookbackOrigin,
   goToRecentFromLookbackRoot,
+  issueLookbackOrigin,
   leaveHref,
   leaveOpenedFromLookback,
-  lookbackOpenedFromRecent,
-  lookbackRootHref,
+  lookbackOriginWasIssued,
+  lookbackRootHrefFromRecent,
+  previousRouteIsRecent,
+  resetLookbackOriginsForTests,
+  shouldBackToRecent,
 } from './lookback-origin';
 
-describe('lookback origin is bound to the route, not a process flag', () => {
-  it('treats only this lookback href as opened from Recent', () => {
-    expect(lookbackRootHref(true)).toBe('/lookback?from=recent');
-    expect(lookbackRootHref(false)).toBe('/lookback');
-    expect(lookbackOpenedFromRecent('recent')).toBe(true);
-    expect(lookbackOpenedFromRecent(['recent'])).toBe(true);
-    expect(lookbackOpenedFromRecent(undefined)).toBe(false);
-    expect(lookbackOpenedFromRecent('family')).toBe(false);
+const recentThenLookback = {
+  index: 1,
+  routes: [{ name: 'index' }, { name: 'lookback/index' }],
+};
+
+describe('lookback origin is bound to this push, not a URL guess', () => {
+  beforeEach(() => {
+    resetLookbackOriginsForTests();
   });
 
-  it('does not leak a previous visit into the next lookback root', () => {
-    expect(lookbackOpenedFromRecent('recent')).toBe(true);
-    expect(lookbackOpenedFromRecent(undefined)).toBe(false);
-    expect(lookbackOpenedFromRecent(undefined)).toBe(false);
+  it('issues a token only when Recent actually opens lookback', () => {
+    const href = lookbackRootHrefFromRecent();
+    expect(href).toMatch(/^\/lookback\?o=[^&]+$/);
+    const token = firstSearchParam(href.slice('/lookback?o='.length));
+    expect(lookbackOriginWasIssued(token)).toBe(true);
+    expect(lookbackOriginWasIssued('stolen')).toBe(false);
+    expect(lookbackOriginWasIssued(undefined)).toBe(false);
+  });
+
+  it('does not treat lampy://lookback?from=recent as opened from Recent', () => {
+    expect(
+      shouldBackToRecent({
+        originToken: undefined,
+        navigationState: recentThenLookback,
+      }),
+    ).toBe(false);
+    expect(
+      shouldBackToRecent({
+        originToken: 'recent',
+        navigationState: recentThenLookback,
+      }),
+    ).toBe(false);
+    expect(lookbackOriginWasIssued('recent')).toBe(false);
+  });
+
+  it('backs only when the token was issued and the previous stack route is Recent', () => {
+    const token = issueLookbackOrigin();
+    expect(
+      shouldBackToRecent({
+        originToken: token,
+        navigationState: recentThenLookback,
+      }),
+    ).toBe(true);
+    expect(
+      shouldBackToRecent({
+        originToken: token,
+        navigationState: { index: 0, routes: [{ name: 'lookback/index' }] },
+      }),
+    ).toBe(false);
+    expect(
+      shouldBackToRecent({
+        originToken: token,
+        navigationState: {
+          index: 1,
+          routes: [{ name: 'family' }, { name: 'lookback/index' }],
+        },
+      }),
+    ).toBe(false);
+    expect(previousRouteIsRecent(recentThenLookback)).toBe(true);
+    expect(previousRouteIsRecent({ index: 0, routes: [{ name: 'index' }] })).toBe(false);
+  });
+
+  it('forgets this visit so the next lookback root cannot reuse it', () => {
+    const token = issueLookbackOrigin();
+    expect(lookbackOriginWasIssued(token)).toBe(true);
+    forgetLookbackOrigin(token);
+    expect(lookbackOriginWasIssued(token)).toBe(false);
+    expect(
+      shouldBackToRecent({
+        originToken: token,
+        navigationState: recentThenLookback,
+      }),
+    ).toBe(false);
   });
 
   it('goes back only when this instance was opened from Recent', () => {

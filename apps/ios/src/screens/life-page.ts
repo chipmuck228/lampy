@@ -61,8 +61,17 @@ export function shouldUseNavRail(windowWidth: number, windowHeight: number, font
   return isRegularWidth(windowWidth, windowHeight) && !isLargeType(fontScale);
 }
 
-export function shouldStackNavBand(windowWidth: number, fontScale: number): boolean {
-  return isLargeType(fontScale) || windowWidth < 360;
+export function shouldStackNavBand(
+  windowWidth: number,
+  fontScale: number,
+  itemCount = 3,
+): boolean {
+  if (isLargeType(fontScale)) return true;
+  const padding = 32;
+  const gap = 8;
+  const item = 72;
+  const needed = padding + itemCount * item + Math.max(0, itemCount - 1) * gap;
+  return windowWidth < needed;
 }
 
 export function shouldStackRecentDay(windowWidth: number, windowHeight: number, fontScale: number): boolean {
