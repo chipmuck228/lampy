@@ -28,10 +28,12 @@ import {
   isLargeType,
   DATE_RAIL_WIDTH,
   READING_MAX,
+  hairline,
   pageGutter,
   paper,
   recentColumnWidth,
   sage,
+  shouldShowSameDayRule,
   shouldStackRecentDay,
 } from '../screens/life-page';
 import { StartupBrandLayer } from '../screens/startup-brand-layer';
@@ -151,22 +153,26 @@ export default function RecentScreen() {
               {day.label}
             </Text>
             <View style={[styles.dayItems, !stackDay && styles.dayItemsRegular]}>
-              {day.items.map((item) => (
-                <RecentMoment
-                  key={item.id}
-                  item={item}
-                  listen={
-                    item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
-                  }
-                  onOpen={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
-                  onPlay={() => {
-                    if (!item.audio?.uri) return;
-                    void clips.play(item.audio.id, item.audio.uri);
-                  }}
-                  onPause={() => {
-                    void clips.pause();
-                  }}
-                />
+              {day.items.map((item, index) => (
+                <View key={item.id}>
+                  {shouldShowSameDayRule(index) ? (
+                    <View testID={`recent-day-rule-${item.id}`} style={styles.sameDayRule} />
+                  ) : null}
+                  <RecentMoment
+                    item={item}
+                    listen={
+                      item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
+                    }
+                    onOpen={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
+                    onPlay={() => {
+                      if (!item.audio?.uri) return;
+                      void clips.play(item.audio.id, item.audio.uri);
+                    }}
+                    onPause={() => {
+                      void clips.pause();
+                    }}
+                  />
+                </View>
               ))}
             </View>
           </View>
@@ -237,9 +243,14 @@ function RecentMoment({
         onPress={onOpen}
         style={styles.open}
       >
-        <Text style={styles.openAction} testID={`recent-open-label-${item.id}`}>
-          看这条
-        </Text>
+        <View style={styles.openRow}>
+          <Text style={styles.openAction} testID={`recent-open-label-${item.id}`}>
+            看这条
+          </Text>
+          <Text accessible={false} style={styles.openMark}>
+            ›
+          </Text>
+        </View>
       </Pressable>
     </View>
   );
@@ -286,13 +297,21 @@ const styles = StyleSheet.create({
   dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
   date: { fontSize: 16, lineHeight: 22, color: sage, paddingBottom: 4 },
   dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
-  dayItems: { gap: 36 },
+  dayItems: { gap: 32 },
   dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
+  sameDayRule: {
+    width: 72,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: hairline,
+    marginBottom: 4,
+  },
   moment: { gap: 8, minHeight: 48 },
   momentMixed: { gap: 16 },
   momentBody: { gap: 8 },
   open: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  openRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 48 },
   openAction: { fontSize: 17, lineHeight: 24, color: sage, minHeight: 48, textAlignVertical: 'center' },
+  openMark: { fontSize: 20, lineHeight: 24, color: sage, opacity: 0.55 },
   note: { fontSize: 21, lineHeight: 32, color: ink },
   occurred: { fontSize: 15, lineHeight: 22, color: inkSoft },
 });

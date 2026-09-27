@@ -156,7 +156,12 @@ export function MomentAudio({
           }}
           style={styles.hit}
         >
-          <Text style={styles.action}>{actionLabel}</Text>
+          <View style={styles.actionRow}>
+            <Text accessible={false} style={styles.mark}>
+              {playing ? '❚❚' : playbackStatus === 'finished' ? '↺' : preparing ? '·' : '▶'}
+            </Text>
+            <Text style={styles.action}>{actionLabel}</Text>
+          </View>
         </Pressable>
       ) : null}
     </View>
@@ -326,6 +331,8 @@ const styles = StyleSheet.create({
   block: { gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   hit: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 },
+  mark: { fontSize: 13, lineHeight: 18, color: sage, minWidth: 14 },
   action: { fontSize: 18, lineHeight: 24, color: sage },
   recording: { fontSize: 18, lineHeight: 24, color: sound },
   meta: { fontSize: 16, lineHeight: 24, color: sound },

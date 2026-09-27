@@ -97,6 +97,9 @@ describe('recent life page', () => {
     expect(view.getByLabelText('留下')).toBeTruthy();
     expect(view.getByLabelText('回看')).toBeTruthy();
     expect(view.getByLabelText('最近')).toBeTruthy();
+    expect(view.queryByTestId('recent-day-rule-moment_one')).toBeNull();
+    expect(view.getByTestId('recent-day-rule-moment_two')).toBeTruthy();
+    expect(view.queryByTestId('recent-day-rule-moment_older')).toBeNull();
   });
 
   it('keeps last year’s same month-day on its own heading', async () => {

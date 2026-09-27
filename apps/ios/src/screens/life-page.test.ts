@@ -10,6 +10,7 @@ import {
   readingPageWidth,
   readingWidth,
   recentColumnWidth,
+  shouldShowSameDayRule,
   shouldStackRecentDay,
 } from './life-page';
 
@@ -51,5 +52,11 @@ describe('life page measures', () => {
     expect(recentColumnWidth(1024, 1366, 1)).toBe(768);
     expect(recentColumnWidth(1024, 1366, 3.1)).toBe(616);
     expect(recentColumnWidth(390, 844, 3.1)).toBe(390);
+  });
+
+  it('draws a same-day rule only between siblings, never around a day', () => {
+    expect(shouldShowSameDayRule(0)).toBe(false);
+    expect(shouldShowSameDayRule(1)).toBe(true);
+    expect(shouldShowSameDayRule(2)).toBe(true);
   });
 });

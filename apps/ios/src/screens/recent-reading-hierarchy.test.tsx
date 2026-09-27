@@ -182,6 +182,8 @@ describe('recent reading hierarchy', () => {
     expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('看这条');
     expect(view.queryByTestId('recent-sound-moment_voice-scene-asset_voice')).toBeNull();
     expect(view.getByTestId('recent-open-label-moment_voice').props.children).toBe('看这条');
+    expect(view.queryByTestId('recent-day-rule-moment_mix')).toBeNull();
+    expect(view.getByTestId('recent-day-rule-moment_voice')).toBeTruthy();
     expectBefore(testIdsInTree(view.getByTestId('recent-item-moment_voice')), 'recent-sound-moment_voice-play-asset_voice', 'recent-open-label-moment_voice');
     expect(minHeightOf(view.getByTestId('home-leave'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('home-lookback'))).toBeGreaterThanOrEqual(48);
