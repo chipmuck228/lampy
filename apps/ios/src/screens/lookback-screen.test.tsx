@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import {
@@ -60,6 +61,10 @@ describe('lookback screens', () => {
     mockGetHistoryDay.mockReset();
     mockGetHistoryUnknown.mockReset();
     resetLookbackSessionForTests();
+    Dimensions.set({
+      window: { width: 390, height: 844, scale: 2, fontScale: 1 },
+      screen: { width: 390, height: 844, scale: 2, fontScale: 1 },
+    });
   });
 
   it('opens a year from the lookback entrance', async () => {
@@ -102,11 +107,87 @@ describe('lookback screens', () => {
     });
     const view = await render(wrap(<LookbackYearScreen />));
     await waitFor(() => {
-      expect(view.getByLabelText('2026年1月，有2条记录')).toBeTruthy();
+      expect(view.getByTestId('lookback-month-2026-01')).toBeTruthy();
     });
+    expect(view.getAllByLabelText('2026年1月，有2条记录').length).toBeGreaterThan(0);
     expect(view.getByLabelText('2026年4月，安静')).toBeTruthy();
+    expect(view.queryByTestId('lookback-month-2026-04')).toBeNull();
+    expect(view.getByTestId('lookback-month-quiet-2026-04')).toBeTruthy();
+    expect(view.getByText('1月 · 有2条记录')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-month-2026-01'));
     expect(mockPush).toHaveBeenCalledWith('/lookback/2026/01');
+  });
+
+  it('keeps month-precision-unconfirmed records off the year grid', async () => {
+    mockGetHistoryYear.mockResolvedValue({
+      year: 2026,
+      title: '2026年',
+      yearUnconfirmedCount: 1,
+      yearUnconfirmedLabel: '这一年，月份未确认',
+      months: Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        label: `2026年${index + 1}月`,
+        count: 0,
+        status: 'quiet',
+        summary: '安静',
+      })),
+    });
+    const view = await render(wrap(<LookbackYearScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('这一年，月份未确认，有1条记录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('lookback-year-unconfirmed-2026'));
+    expect(mockPush).toHaveBeenCalledWith('/lookback/2026/unconfirmed');
+    expect(view.queryByTestId('lookback-year-entries')).toBeNull();
+  });
+
+  it('shows a quiet empty year without inventing month buttons', async () => {
+    mockGetHistoryYear.mockResolvedValue({
+      year: 2026,
+      title: '2026年',
+      yearUnconfirmedCount: 0,
+      yearUnconfirmedLabel: '这一年，月份未确认',
+      months: Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        label: `2026年${index + 1}月`,
+        count: 0,
+        status: 'quiet',
+        summary: '安静',
+      })),
+    });
+    const view = await render(wrap(<LookbackYearScreen />));
+    await waitFor(() => {
+      expect(view.getByText('这一年还没有留下什么。')).toBeTruthy();
+    });
+    expect(view.queryByTestId('lookback-year-entries')).toBeNull();
+    expect(view.queryByTestId('lookback-month-2026-01')).toBeNull();
+  });
+
+  it('hides the year grid at large type and still opens a filled month from the list', async () => {
+    Dimensions.set({
+      window: { width: 768, height: 1024, scale: 2, fontScale: 1.3 },
+      screen: { width: 768, height: 1024, scale: 2, fontScale: 1.3 },
+    });
+    mockGetHistoryYear.mockResolvedValue({
+      year: 2026,
+      title: '2026年',
+      yearUnconfirmedCount: 0,
+      yearUnconfirmedLabel: '这一年，月份未确认',
+      months: Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        label: `2026年${index + 1}月`,
+        count: index === 8 ? 1 : 0,
+        status: index === 8 ? 'filled' : 'quiet',
+        summary: index === 8 ? '有1条记录' : '安静',
+      })),
+    });
+    const view = await render(wrap(<LookbackYearScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-year-entries')).toBeTruthy();
+    });
+    expect(view.queryByTestId('lookback-year-months')).toBeNull();
+    fireEvent.press(view.getByTestId('lookback-month-entry-2026-09'));
+    expect(mockPush).toHaveBeenCalledWith('/lookback/2026/09');
   });
 
   it('keeps failed photos and sound on a lookback day, then returns to the same date', async () => {
@@ -176,6 +257,7 @@ describe('lookback screens', () => {
       expect(day.getByText('门口的风')).toBeTruthy();
     });
     expect(day.getByText('当时的感受 · 平静')).toBeTruthy();
+    expect(day.getByText('08:15')).toBeTruthy();
     expect(day.getByText('2026年1月2日')).toBeTruthy();
     expect(day.getByLabelText('照片 1/3')).toBeTruthy();
     expect(day.queryByLabelText('移除这张照片，照片 1/3')).toBeNull();
@@ -336,6 +418,67 @@ describe('lookback screens', () => {
     fireEvent.press(day.getByTestId('lookback-moment-m_second'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_second' } });
     expect(day.getByLabelText('返回原来的位置')).toBeTruthy();
+  });
+
+  it('keeps an empty day neutral and does not invent a moment', async () => {
+    mockGetHistoryDay.mockResolvedValue({
+      year: 2026,
+      month: 4,
+      day: 3,
+      title: '2026年4月3日',
+      isEmpty: true,
+      items: [],
+      hasMore: false,
+    });
+    const day = await render(wrap(<LookbackDayScreen />));
+    await waitFor(() => {
+      expect(day.getByText('这一天还没有留下什么。')).toBeTruthy();
+    });
+    expect(day.queryByTestId(/lookback-moment-/)).toBeNull();
+  });
+
+  it('shows a clock only on the exact item when the same day also has date precision', async () => {
+    mockGetHistoryDay.mockResolvedValue({
+      year: 2026,
+      month: 9,
+      day: 24,
+      title: '2026年9月24日',
+      isEmpty: false,
+      items: [
+        {
+          id: 'm_exact',
+          note: '门口的风',
+          precision: 'exact',
+          timeLabel: '2026年9月24日 08:15',
+          usedRecordedAtFallback: false,
+          feeling: null,
+          images: [],
+          audio: null,
+          unknownMedia: [],
+        },
+        {
+          id: 'm_day',
+          note: '后来又写了一句',
+          precision: 'day',
+          timeLabel: '2026年9月24日',
+          usedRecordedAtFallback: false,
+          feeling: null,
+          images: [],
+          audio: null,
+          unknownMedia: [],
+        },
+      ],
+      hasMore: false,
+    });
+    const day = await render(wrap(<LookbackDayScreen />));
+    await waitFor(() => {
+      expect(day.getByText('门口的风')).toBeTruthy();
+    });
+    expect(day.getByText('08:15')).toBeTruthy();
+    expect(day.getByText('后来又写了一句')).toBeTruthy();
+    expect(day.getAllByText('08:15')).toHaveLength(1);
+    fireEvent.press(day.getByTestId('lookback-moment-m_day'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_day' } });
   });
 
   it('hides feeling on lookback day when none was chosen', async () => {

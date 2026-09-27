@@ -4,14 +4,15 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../../../application/container';
 import { HISTORY_PAGE_SIZE, type HistoryDayViewModel } from '../../../../application/history-use-cases';
+import { lookbackDayEntries } from '../../../../application/lookback-day';
 import { pad2 } from '../../../../domain-adapters/calendar';
 import {
-  HistoryMomentRow,
   LookbackMessage,
   LookbackScaffold,
   lookbackStyles,
   momentHref,
 } from '../../../../screens/lookback-chrome';
+import { LookbackDayMoment } from '../../../../screens/lookback-day';
 
 export default function LookbackDayScreen() {
   const router = useRouter();
@@ -58,20 +59,15 @@ export default function LookbackDayScreen() {
       {error ? <LookbackMessage>{error}</LookbackMessage> : null}
       {view && 'invalid' in view ? <LookbackMessage>日历上没有这一天。</LookbackMessage> : null}
       {ready?.isEmpty ? <LookbackMessage>这一天还没有留下什么。</LookbackMessage> : null}
-      {ready?.items.map((item) => (
-        <HistoryMomentRow
-          key={item.id}
-          id={item.id}
-          note={item.note}
-          timeLabel={item.timeLabel}
-          recordedFallbackLabel={item.recordedFallbackLabel}
-          feeling={item.feeling}
-          images={item.images}
-          audio={item.audio}
-          unknownMedia={item.unknownMedia}
-          onPress={() => router.push(momentHref(item.id))}
-        />
-      ))}
+      {ready
+        ? lookbackDayEntries(ready.items).map((entry) => (
+            <LookbackDayMoment
+              key={entry.id}
+              entry={entry}
+              onPress={() => router.push(momentHref(entry.id))}
+            />
+          ))
+        : null}
       {ready?.hasMore ? (
         <Pressable
           accessibilityRole="button"
