@@ -197,27 +197,12 @@ function RecentMoment({
   );
   return (
     <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          [
-            item.dateLabel,
-            item.occurredLabel,
-            item.note,
-            ...item.images.map((image) => image.label),
-            ...(item.unknownMedia ?? []).map((media) => media.label),
-            item.feeling ? `当时的感受，${item.feeling.label}` : '',
-            '看这条',
-          ]
-            .filter(Boolean)
-            .join('，') || `${item.dateLabel}，一条记录`
-        }
-        accessibilityHint="打开这条记录"
-        testID={`recent-open-${item.id}`}
-        onPress={onOpen}
-        style={styles.open}
-      >
-        {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+      <View style={styles.momentBody}>
+        {item.note ? (
+          <Text style={styles.note} testID={`recent-note-${item.id}`}>
+            {item.note}
+          </Text>
+        ) : null}
         {item.occurredLabel ? (
           <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
             {item.occurredLabel}
@@ -225,11 +210,7 @@ function RecentMoment({
         ) : null}
         <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
         <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
-        <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
-        <Text style={styles.openAction} testID={`recent-open-label-${item.id}`}>
-          看这条
-        </Text>
-      </Pressable>
+      </View>
       <MomentAudio
         audio={item.audio}
         playbackStatus={playingId === item.audio?.id ? (sound.failed ? 'unavailable' : sound.status) : 'idle'}
@@ -240,6 +221,28 @@ function RecentMoment({
         compact={!mixed}
         scene={mixed}
       />
+      <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          [
+            item.dateLabel,
+            item.occurredLabel,
+            item.note,
+            '看这条',
+          ]
+            .filter(Boolean)
+            .join('，') || `${item.dateLabel}，一条记录`
+        }
+        accessibilityHint="打开这条记录"
+        testID={`recent-open-${item.id}`}
+        onPress={onOpen}
+        style={styles.open}
+      >
+        <Text style={styles.openAction} testID={`recent-open-label-${item.id}`}>
+          看这条
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -289,7 +292,8 @@ const styles = StyleSheet.create({
   dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
   moment: { gap: 8, minHeight: 48 },
   momentMixed: { gap: 16 },
-  open: { gap: 8, minHeight: 48 },
+  momentBody: { gap: 8 },
+  open: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   openAction: { fontSize: 17, lineHeight: 24, color: sage, minHeight: 48, textAlignVertical: 'center' },
   note: { fontSize: 21, lineHeight: 32, color: ink },
   occurred: { fontSize: 15, lineHeight: 22, color: inkSoft },
