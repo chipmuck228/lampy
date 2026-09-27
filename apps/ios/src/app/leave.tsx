@@ -829,9 +829,9 @@ export default function LeaveScreen() {
               persistOccurred(next);
             }}
           />
-          {message ? <Text style={styles.message}>{message}</Text> : null}
         </ScrollView>
         <View
+          testID="composer-action-band"
           style={[
             styles.band,
             {
@@ -841,6 +841,16 @@ export default function LeaveScreen() {
             },
           ]}
         >
+          {message ? (
+            <Text
+              testID="composer-feedback"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              style={[styles.message, { maxWidth: reading }]}
+            >
+              {message}
+            </Text>
+          ) : null}
           <View
             style={[
               styles.actions,
@@ -915,11 +925,21 @@ const styles = StyleSheet.create({
     color: ink,
     padding: 0,
   },
-  message: { fontSize: 17, lineHeight: 26, color: clay, paddingVertical: 4 },
+  message: {
+    fontSize: 17,
+    lineHeight: 26,
+    color: clay,
+    paddingBottom: 8,
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    alignSelf: 'center',
+  },
   band: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: hairline,
     backgroundColor: paper,
+    minWidth: 0,
   },
   actions: {
     width: '100%',
