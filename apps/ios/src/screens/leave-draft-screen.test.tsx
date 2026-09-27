@@ -3,12 +3,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LeaveScreen from '../app/leave';
 import { ApplicationError } from '../application/errors';
-import { DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE } from '../application/use-cases';
+import {
+  DRAFT_IMAGE_REMOVE_FAILED_MESSAGE,
+  DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE,
+} from '../application/use-cases';
 
 const mockRestore = jest.fn();
 const mockUpdateDraftNote = jest.fn();
 const mockUpdateDraftEmotion = jest.fn();
 const mockAbandon = jest.fn();
+const mockRemoveImage = jest.fn();
+const mockRemoveAudio = jest.fn();
 const mockSaveTextMoment = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -27,6 +32,8 @@ jest.mock('../application/container', () => ({
     updateDraftNote: mockUpdateDraftNote,
     updateDraftEmotion: mockUpdateDraftEmotion,
     abandonActiveDraft: mockAbandon,
+    removeDraftImage: mockRemoveImage,
+    removeDraftAudio: mockRemoveAudio,
     addLibraryImages: async () => undefined,
     addCameraImage: async () => undefined,
     saveTextMoment: mockSaveTextMoment,
@@ -86,6 +93,8 @@ describe('leave draft restore and abandon', () => {
     mockUpdateDraftNote.mockReset();
     mockUpdateDraftEmotion.mockReset();
     mockAbandon.mockReset();
+    mockRemoveImage.mockReset();
+    mockRemoveAudio.mockReset();
     mockSaveTextMoment.mockReset();
     mockRestore.mockResolvedValue(restoredDraft);
     mockUpdateDraftNote.mockResolvedValue(undefined);
@@ -93,6 +102,14 @@ describe('leave draft restore and abandon', () => {
     mockAbandon.mockResolvedValue({
       composer: emptyDraft,
       cleanup: { removed: 2, kept: 0, failed: 0 },
+    });
+    mockRemoveImage.mockResolvedValue({
+      ...restoredDraft,
+      images: [],
+    });
+    mockRemoveAudio.mockResolvedValue({
+      ...restoredDraft,
+      audio: null,
     });
     mockSaveTextMoment.mockResolvedValue({ id: 'moment_restored' });
   });
@@ -111,6 +128,9 @@ describe('leave draft restore and abandon', () => {
     expect(view.getByLabelText('一段声音，2秒，未播放')).toBeTruthy();
 
     expect(view.getByLabelText('放弃这份草稿')).toBeTruthy();
+    expect(view.getByLabelText('移除这张照片，照片 1/1')).toBeTruthy();
+    expect(view.getByLabelText('移除这段声音')).toBeTruthy();
+    expect(view.getByLabelText('移除这段声音').props.accessibilityState?.disabled).toBeFalsy();
     expect(view.queryByText('已放弃')).toBeNull();
   });
 
@@ -257,6 +277,62 @@ describe('leave draft restore and abandon', () => {
       expect(mockUpdateDraftNote).toHaveBeenCalledWith('moment_new', '新草稿');
     });
     expect(mockUpdateDraftNote).not.toHaveBeenCalledWith('moment_restored', expect.anything());
+  });
+
+  it('removes one restored photo without abandoning the draft', async () => {
+    mockRemoveImage.mockResolvedValueOnce({
+      ...restoredDraft,
+      images: [],
+    });
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByLabelText('移除这张照片，照片 1/1')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('移除这张照片，照片 1/1'));
+    await waitFor(() => {
+      expect(mockRemoveImage).toHaveBeenCalledWith('moment_restored', 'asset_restored');
+    });
+    expect(mockAbandon).not.toHaveBeenCalled();
+    expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
+    expect(view.getByLabelText('当时的感受，平静，已选中')).toBeTruthy();
+    expect(view.queryByLabelText('照片 1/1')).toBeNull();
+    expect(view.getByLabelText('一段声音，2秒，未播放')).toBeTruthy();
+    expect(view.getByLabelText('放弃这份草稿')).toBeTruthy();
+  });
+
+  it('removes restored audio and keeps the rest of the draft', async () => {
+    mockRemoveAudio.mockResolvedValueOnce({
+      ...restoredDraft,
+      audio: null,
+    });
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByLabelText('移除这段声音')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('移除这段声音'));
+    await waitFor(() => {
+      expect(mockRemoveAudio).toHaveBeenCalledWith('moment_restored');
+    });
+    expect(mockAbandon).not.toHaveBeenCalled();
+    expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
+    expect(view.queryByLabelText('一段声音，2秒，未播放')).toBeNull();
+    expect(view.getByLabelText('照片 1/1')).toBeTruthy();
+  });
+
+  it('keeps media when a photo detach fails', async () => {
+    mockRemoveImage.mockRejectedValueOnce(
+      new ApplicationError('REPOSITORY_WRITE_FAILED', DRAFT_IMAGE_REMOVE_FAILED_MESSAGE),
+    );
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByLabelText('移除这张照片，照片 1/1')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('移除这张照片，照片 1/1'));
+    await waitFor(() => {
+      expect(view.getByText(DRAFT_IMAGE_REMOVE_FAILED_MESSAGE)).toBeTruthy();
+    });
+    expect(view.getByLabelText('照片 1/1')).toBeTruthy();
+    expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
   });
 
   it('persists edits on a restored draft', async () => {

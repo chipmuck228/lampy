@@ -178,6 +178,7 @@ describe('lookback screens', () => {
     expect(day.getByText('当时的感受 · 平静')).toBeTruthy();
     expect(day.getByText('2026年1月2日')).toBeTruthy();
     expect(day.getByLabelText('照片 1/3')).toBeTruthy();
+    expect(day.queryByLabelText('移除这张照片，照片 1/3')).toBeNull();
     expect(day.getByText('这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
     expect(day.getByText('这张照片打不开了，但这条记录还在。')).toBeTruthy();
     expect(day.getByText('这段声音暂时找不到了，其他内容仍然保留。')).toBeTruthy();
@@ -242,6 +243,7 @@ describe('lookback screens', () => {
     expect(shelf.getByText('当时的感受 · 喜悦')).toBeTruthy();
     expect(shelf.getByText('时间未确认')).toBeTruthy();
     expect(shelf.getByLabelText('照片 1/1')).toBeTruthy();
+    expect(shelf.queryByLabelText('移除这张照片，照片 1/1')).toBeNull();
     expect(shelf.getByText('这段声音暂时无法播放，其他内容仍然保留。')).toBeTruthy();
     expect(shelf.getByText('这份内容暂时无法打开。')).toBeTruthy();
     expect(shelf.queryByText('这条记录现在无法找到')).toBeNull();

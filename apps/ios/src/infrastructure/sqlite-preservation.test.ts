@@ -660,4 +660,46 @@ describe('sqlite file preservation', () => {
       await secondDb.close();
     });
   });
+
+  it('does not put a removed draft photo back after closing the database file', async () => {
+    await withDatabase(async (file) => {
+      const mediaRoot = path.join(path.dirname(file), 'assets');
+      const firstSource = path.join(path.dirname(file), 'one.jpg');
+      const secondSource = path.join(path.dirname(file), 'two.jpg');
+      await writeFile(firstSource, TINY_JPEG);
+      await writeFile(secondSource, TINY_JPEG);
+      const media = createNodeMediaStore(mediaRoot);
+      const firstDb = await openPreparedNodeSqliteDatabase(file);
+      let nextAsset = 0;
+      const assetIds = ['asset_keep_file', 'asset_drop_file'];
+      const first = createUseCases({
+        ...createSqliteRepositories(firstDb),
+        media,
+        clock: clockAt('2026-09-26T19:00:00.000Z'),
+        assetId: () => assetIds[nextAsset++] || `asset_file_${nextAsset}`,
+      });
+      const draft = await first.restoreOrCreateDraft();
+      await first.updateDraftNote(draft.draftId, '只拿掉一张');
+      await first.updateDraftEmotion(draft.draftId, '平静');
+      await first.addPickedImages(draft.draftId, [
+        { sourceUri: firstSource, mimeType: 'image/jpeg', width: 1, height: 1 },
+        { sourceUri: secondSource, mimeType: 'image/jpeg', width: 1, height: 1 },
+      ]);
+      await first.removeDraftImage(draft.draftId, 'asset_drop_file');
+      await firstDb.close();
+
+      const secondDb = await openPreparedNodeSqliteDatabase(file);
+      const second = createUseCases({
+        ...createSqliteRepositories(secondDb),
+        media,
+        clock: clockAt('2026-09-26T19:01:00.000Z'),
+      });
+      const restored = await second.restoreOrCreateDraft();
+      expect(restored.draftId).toBe(draft.draftId);
+      expect(restored.note).toBe('只拿掉一张');
+      expect(restored.emotion).toBe('平静');
+      expect(restored.images.map((item) => item.id)).toEqual(['asset_keep_file']);
+      await secondDb.close();
+    });
+  });
 });

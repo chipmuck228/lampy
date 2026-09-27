@@ -18,6 +18,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
 import {
+  DRAFT_AUDIO_REMOVE_FAILED_MESSAGE,
+  DRAFT_IMAGE_REMOVE_FAILED_MESSAGE,
   DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE,
   type AudioView,
   type ImageView,
@@ -49,10 +51,13 @@ export default function LeaveScreen() {
   const [restored, setRestored] = useState(false);
   const [confirmingAbandon, setConfirmingAbandon] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'idle' | 'photo' | 'record' | 'audio' | 'save' | 'abandon'>('idle');
+  const [busy, setBusy] = useState<
+    'idle' | 'photo' | 'record' | 'audio' | 'save' | 'abandon' | 'remove'
+  >('idle');
   const draftIdRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   const abandoningRef = useRef(false);
+  const removingRef = useRef(false);
   const writeEpochRef = useRef(0);
   const phaseRef = useRef<RecordPhase>('ready');
   const persistChain = useRef(Promise.resolve());
@@ -230,7 +235,7 @@ export default function LeaveScreen() {
         setMessage(shownError(error, '这张照片没有留下。可以再试，也可以继续写字。'));
       })
       .finally(() => {
-        if (abandoningRef.current || !mountedRef.current) return;
+        if (abandoningRef.current || removingRef.current || !mountedRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -288,7 +293,7 @@ export default function LeaveScreen() {
         setMessage(shownError(error, '这次没有录下声音。可以再试，也可以继续写字。'));
       })
       .finally(() => {
-        if (abandoningRef.current) return;
+        if (abandoningRef.current || removingRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -317,7 +322,7 @@ export default function LeaveScreen() {
         setMessage(shownError(error, '录音被打断。可以再试，也可以继续写字。'));
       })
       .finally(() => {
-        if (abandoningRef.current) return;
+        if (abandoningRef.current || removingRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -327,26 +332,59 @@ export default function LeaveScreen() {
     interruptRef.current = interruptRecording;
   });
 
+  function removeImage(assetId: string) {
+    const id = draftIdRef.current;
+    if (!id || abandoningRef.current || busy === 'save' || busy === 'abandon') return;
+    void enqueue(async () => {
+      if (abandoningRef.current || draftIdRef.current !== id) return null;
+      removingRef.current = true;
+      busyRef.current = true;
+      setBusy('remove');
+      const app = await getUseCases();
+      return app.removeDraftImage(id, assetId);
+    })
+      .then((next) => {
+        if (!next || !mountedRef.current) return;
+        applyComposer(next);
+        setMessage(null);
+      })
+      .catch((error) => {
+        if (!mountedRef.current || abandoningRef.current) return;
+        setMessage(shownError(error, DRAFT_IMAGE_REMOVE_FAILED_MESSAGE));
+      })
+      .finally(() => {
+        removingRef.current = false;
+        if (abandoningRef.current || !mountedRef.current) return;
+        busyRef.current = false;
+        setBusy('idle');
+      });
+  }
+
   function removeAudio() {
     const id = draftIdRef.current;
-    if (!id || busyRef.current || abandoningRef.current) return;
-    busyRef.current = true;
-    setBusy('audio');
+    if (!id || abandoningRef.current || busy === 'save' || busy === 'abandon') return;
     void sound.stop();
     void enqueue(async () => {
+      if (abandoningRef.current || draftIdRef.current !== id) return null;
+      removingRef.current = true;
+      busyRef.current = true;
+      setBusy('remove');
       const app = await getUseCases();
       return app.removeDraftAudio(id);
     })
       .then((next) => {
+        if (!next || !mountedRef.current) return;
         applyComposer(next);
         setRecordPhase('ready');
         setMessage(null);
       })
       .catch((error) => {
-        setMessage(shownError(error, '这段声音还没从草稿里拿掉。可以再试。'));
+        if (!mountedRef.current || abandoningRef.current) return;
+        setMessage(shownError(error, DRAFT_AUDIO_REMOVE_FAILED_MESSAGE));
       })
       .finally(() => {
-        if (abandoningRef.current) return;
+        removingRef.current = false;
+        if (abandoningRef.current || !mountedRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -596,7 +634,13 @@ export default function LeaveScreen() {
             textAlignVertical="top"
             style={styles.input}
           />
-          <MomentImages images={images} testIDPrefix="composer-image" />
+          <MomentImages
+            images={images}
+            testIDPrefix="composer-image"
+            onRemoveImage={
+              draftId && !confirmingAbandon && busy !== 'abandon' ? removeImage : undefined
+            }
+          />
           <MomentUnknownMedia items={unknownMedia} testIDPrefix="composer-unknown" />
           <DraftSoundBar
             phase={phase}
@@ -605,6 +649,7 @@ export default function LeaveScreen() {
             playbackStatus={sound.failed ? 'unavailable' : sound.status}
             currentTimeMs={sound.currentTimeMs}
             disabled={composerLocked}
+            removeDisabled={busy === 'save' || busy === 'abandon' || confirmingAbandon}
             onStart={startRecording}
             onStop={stopRecording}
             onPlay={() => {

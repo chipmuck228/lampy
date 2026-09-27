@@ -327,6 +327,42 @@ describe('audio personal moment use cases', () => {
     expect(media.removed).toEqual(['memory://assets/asset_remove.m4a']);
   });
 
+  it('keeps text and photos when draft audio is removed, and does not write the sound back', async () => {
+    const { app, media } = createAudioApp({ assetIds: ['asset_photo', 'asset_voice'] });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '字还在');
+    await app.updateDraftEmotion(draft.draftId, '高兴');
+    await app.addPickedImages(draft.draftId, [photo('still')]);
+    await app.addRecordedAudio(draft.draftId, clip('remove'));
+    const removed = await app.removeDraftAudio(draft.draftId);
+    expect(removed.note).toBe('字还在');
+    expect(removed.emotion).toBe('高兴');
+    expect(removed.images.map((item) => item.id)).toEqual(['asset_photo']);
+    expect(removed.audio).toBeNull();
+    const restored = await app.restoreOrCreateDraft();
+    expect(restored.audio).toBeNull();
+    expect(restored.note).toBe('字还在');
+    expect(restored.images).toHaveLength(1);
+    expect(media.removed).toEqual(['memory://assets/asset_voice.m4a']);
+  });
+
+  it('keeps the draft sound when detach cannot be written', async () => {
+    const { app, repos, media } = createAudioApp({ assetIds: ['asset_voice'] });
+    const draft = await app.restoreOrCreateDraft();
+    await app.addRecordedAudio(draft.draftId, clip('keep'));
+    const innerSave = repos.drafts.save.bind(repos.drafts);
+    repos.drafts.save = async () => {
+      throw new Error('disk locked');
+    };
+    await expect(app.removeDraftAudio(draft.draftId)).rejects.toMatchObject({
+      code: 'REPOSITORY_WRITE_FAILED',
+      message: '这段声音还没从草稿里拿掉。原来的内容还在，可以再试。',
+    });
+    repos.drafts.save = innerSave;
+    expect((await app.restoreOrCreateDraft()).audio?.id).toBe('asset_voice');
+    expect(media.persisted.has('memory://assets/asset_voice.m4a')).toBe(true);
+  });
+
   it('keeps the previous draft sound when a replacement recording cannot start', async () => {
     const capture = createMemoryAudioCapture({ permission: 'denied' });
     const { app, media } = createAudioApp({ capture, assetIds: ['asset_kept'] });

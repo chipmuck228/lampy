@@ -1,3 +1,5 @@
+import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
+import { attachAsset } from '../domain-adapters/moment-commands';
 import { createUseCases } from './use-cases';
 import { ApplicationError } from './errors';
 import { createQueuedImageSource, createMemoryMediaStore } from '../infrastructure/media';
@@ -238,5 +240,97 @@ describe('image personal moment use cases', () => {
       expect(detail.note).toBe('关掉再打开还有照片');
       expect(detail.images[0].status).toBe('available');
     }
+  });
+
+  it('removes one draft photo by id and frees a slot without touching the rest', async () => {
+    const { app, media } = createImageApp({
+      assetIds: ['asset_a', 'asset_b', 'asset_c', 'asset_d'],
+    });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '门口的光');
+    await app.updateDraftEmotion(draft.draftId, '平静');
+    await app.addPickedImages(draft.draftId, [photo('a'), photo('b'), photo('c')]);
+    await expect(
+      app.addPickedImages(draft.draftId, [photo('blocked')]),
+    ).rejects.toMatchObject({ code: 'IMAGE_LIMIT' });
+
+    const afterRemove = await app.removeDraftImage(draft.draftId, 'asset_b');
+    expect(afterRemove.note).toBe('门口的光');
+    expect(afterRemove.emotion).toBe('平静');
+    expect(afterRemove.images.map((item) => item.id)).toEqual(['asset_a', 'asset_c']);
+    expect(afterRemove.images.map((item) => item.label)).toEqual(['照片 1/2', '照片 2/2']);
+    expect(media.removed).toEqual(['memory://assets/asset_b.jpg']);
+    expect(media.persisted.has('memory://assets/asset_a.jpg')).toBe(true);
+    expect(media.persisted.has('memory://assets/asset_c.jpg')).toBe(true);
+
+    const restored = await app.restoreOrCreateDraft();
+    expect(restored.images.map((item) => item.id)).toEqual(['asset_a', 'asset_c']);
+    expect(restored.note).toBe('门口的光');
+
+    await app.addPickedImages(draft.draftId, [photo('d')]);
+    expect((await app.restoreOrCreateDraft()).images.map((item) => item.id)).toEqual([
+      'asset_a',
+      'asset_c',
+      'asset_d',
+    ]);
+  });
+
+  it('keeps the draft when detaching a photo cannot be written', async () => {
+    const { app, repos, media } = createImageApp({ assetIds: ['asset_keep'] });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '还在');
+    await app.addPickedImages(draft.draftId, [photo('keep')]);
+    const innerSave = repos.drafts.save.bind(repos.drafts);
+    repos.drafts.save = async () => {
+      throw new Error('disk locked');
+    };
+    await expect(app.removeDraftImage(draft.draftId, 'asset_keep')).rejects.toMatchObject({
+      code: 'REPOSITORY_WRITE_FAILED',
+      message: '这张照片还没从草稿里拿掉。原来的内容还在，可以再试。',
+    });
+    repos.drafts.save = innerSave;
+    expect(media.persisted.has('memory://assets/asset_keep.jpg')).toBe(true);
+    const kept = await app.restoreOrCreateDraft();
+    expect(kept.note).toBe('还在');
+    expect(kept.images.map((item) => item.id)).toEqual(['asset_keep']);
+  });
+
+  it('does not delete a photo still referenced by a saved moment', async () => {
+    const first = createImageApp({ assetIds: ['asset_shared', 'asset_other'] });
+    const savedDraft = await first.app.restoreOrCreateDraft();
+    await first.app.updateDraftNote(savedDraft.draftId, '已经留下');
+    await first.app.addPickedImages(savedDraft.draftId, [photo('shared')]);
+    const saved = await first.app.saveTextMoment(savedDraft.draftId);
+
+    const draft = await first.app.restoreOrCreateDraft();
+    await first.app.updateDraftNote(draft.draftId, '草稿');
+    const stored = await first.repos.drafts.loadActive();
+    if (!stored) throw new Error('expected draft');
+    await first.repos.drafts.save(
+      attachAsset(stored, 'asset_shared', LOCAL_OWNER_ID, new Date('2026-09-24T12:00:00.000Z')),
+    );
+    await first.app.removeDraftImage(draft.draftId, 'asset_shared');
+    expect(first.media.removed).toEqual([]);
+    expect(first.media.persisted.has('memory://assets/asset_shared.jpg')).toBe(true);
+    const detail = await first.app.getMomentDetail(saved.id);
+    expect(detail.kind).toBe('ready');
+    if (detail.kind === 'ready') {
+      expect(detail.images[0].id).toBe('asset_shared');
+    }
+  });
+
+  it('does not delete a file when removeAppOwned refuses a non-app copy', async () => {
+    const { app, media } = createImageApp({ assetIds: ['asset_album'] });
+    const draft = await app.restoreOrCreateDraft();
+    await app.addPickedImages(draft.draftId, [photo('album')]);
+    const original = media.removeAppOwned.bind(media);
+    media.removeAppOwned = async (localUri) => {
+      if (localUri === 'memory://assets/asset_album.jpg') return false;
+      return original(localUri);
+    };
+    await app.removeDraftImage(draft.draftId, 'asset_album');
+    expect((await app.restoreOrCreateDraft()).images).toHaveLength(0);
+    expect(media.persisted.has('memory://assets/asset_album.jpg')).toBe(true);
+    expect(media.removed).toEqual([]);
   });
 });

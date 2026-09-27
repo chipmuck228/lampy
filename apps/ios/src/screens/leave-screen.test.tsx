@@ -74,5 +74,6 @@ describe('leave screen', () => {
     expect(view.getByLabelText('照片')).toBeTruthy();
     expect(view.getByTestId('composer-note').props.editable).toBe(true);
     expect(view.getByLabelText('放弃这份草稿')).toBeTruthy();
+    expect(view.getByLabelText('移除这张照片，照片 1/1')).toBeTruthy();
   });
 });

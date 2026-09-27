@@ -66,6 +66,8 @@ const SAVE_WRITE_FAILED_MESSAGE = '这次没有留下正式记录。草稿还在
 const DRAFT_CLEAR_FAILED_MESSAGE = '这份草稿还没拿掉。原来的内容还在，可以再试。';
 export const DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE =
   '草稿已经拿掉。有些本地副本还没删掉，没有从这台设备上清除。';
+export const DRAFT_IMAGE_REMOVE_FAILED_MESSAGE = '这张照片还没从草稿里拿掉。原来的内容还在，可以再试。';
+export const DRAFT_AUDIO_REMOVE_FAILED_MESSAGE = '这段声音还没从草稿里拿掉。原来的内容还在，可以再试。';
 
 export type Clock = { now: () => Date };
 
@@ -848,17 +850,46 @@ export function createUseCases(deps: {
     return { composer: await toComposer(next, true), kept: true, hadSession: true };
   }
 
+  async function detachDraftAsset(
+    draftId: string,
+    assetId: string,
+    failedMessage: string,
+  ): Promise<ComposerViewModel> {
+    const draft = await requireDraft(draftId);
+    if (!draft.assetIds.includes(assetId)) {
+      return toComposer(draft, true);
+    }
+    const asset = await loadAsset(assetId);
+    const next = detachAsset(draft, assetId, ownerId, clock.now());
+    try {
+      await deps.drafts.save(next);
+    } catch {
+      throw new ApplicationError('REPOSITORY_WRITE_FAILED', failedMessage);
+    }
+    try {
+      await cleanupOrphan(assetId, asset?.localUri);
+    } catch {
+      // The draft no longer references this file; keep the composer without it.
+    }
+    return toComposer(next, true);
+  }
+
+  async function removeDraftImage(draftId: string, assetId: string): Promise<ComposerViewModel> {
+    const draft = await requireDraft(draftId);
+    const { imageIds } = await classify(draft.assetIds);
+    if (!imageIds.includes(assetId)) {
+      return toComposer(draft, true);
+    }
+    return detachDraftAsset(draftId, assetId, DRAFT_IMAGE_REMOVE_FAILED_MESSAGE);
+  }
+
   async function removeDraftAudio(draftId: string): Promise<ComposerViewModel> {
     const draft = await requireDraft(draftId);
     const { audioId } = await classify(draft.assetIds);
     if (!audioId) {
       return toComposer(draft, true);
     }
-    const asset = await loadAsset(audioId);
-    const next = detachAsset(draft, audioId, ownerId, clock.now());
-    await deps.drafts.save(next);
-    await cleanupOrphan(audioId, asset?.localUri);
-    return toComposer(next, true);
+    return detachDraftAsset(draftId, audioId, DRAFT_AUDIO_REMOVE_FAILED_MESSAGE);
   }
 
   async function saveTextMoment(draftId: string): Promise<{ id: string }> {
@@ -1000,6 +1031,7 @@ export function createUseCases(deps: {
     finishDraftRecording,
     interruptDraftRecording,
     addRecordedAudio,
+    removeDraftImage,
     removeDraftAudio,
     saveTextMoment,
     getRecordingElapsedMs() {
