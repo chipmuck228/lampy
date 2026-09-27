@@ -1,22 +1,29 @@
 import { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../../application/container';
+import { lookbackYearPage, shouldShowYearMonthGrid } from '../../../application/lookback-year';
 import { pad2 } from '../../../domain-adapters/calendar';
 import type { HistoryYearView } from '../../../projections/history-projection';
 import {
-  DensityBand,
   LookbackMessage,
   LookbackScaffold,
   lookbackHref,
   lookbackStyles,
-  useLookbackLayout,
 } from '../../../screens/lookback-chrome';
+import { LookbackYearEntries, LookbackYearMonths } from '../../../screens/lookback-year';
 
 export default function LookbackYearScreen() {
   const router = useRouter();
-  const { verticalTime } = useLookbackLayout();
+  const { width, fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const showGrid = shouldShowYearMonthGrid({
+    fontScale,
+    windowWidth: width,
+    horizontalInset: insets.left + insets.right,
+  });
   const params = useLocalSearchParams<{ year?: string | string[] }>();
   const year = Number(Array.isArray(params.year) ? params.year[0] : params.year);
   const [view, setView] = useState<HistoryYearView | { invalid: true } | null>(null);
@@ -43,23 +50,24 @@ export default function LookbackYearScreen() {
   );
 
   const ready = view && !('invalid' in view) ? view : null;
-  const max = ready ? Math.max(1, ...ready.months.map((month) => month.count)) : 1;
+  const page = ready ? lookbackYearPage(ready) : null;
+  const path = `/lookback/${year}`;
+
+  function openMonth(month: number) {
+    router.push(lookbackHref(`${path}/${pad2(month)}`));
+  }
 
   return (
-    <LookbackScaffold title={ready?.title || `${year}年`} path={`/lookback/${year}`}>
+    <LookbackScaffold title={ready?.title || `${year}年`} path={path}>
       {error ? <LookbackMessage>{error}</LookbackMessage> : null}
       {view && 'invalid' in view ? <LookbackMessage>没有这一年。</LookbackMessage> : null}
-      {ready ? (
-        <LookbackMessage>
-          有记录的月份留下痕迹，安静的月份仍占着位置。不会把记录时间当成发生时间。
-        </LookbackMessage>
-      ) : null}
+      {page?.isEmpty ? <LookbackMessage>这一年还没有留下什么。</LookbackMessage> : null}
       {ready && ready.yearUnconfirmedCount > 0 ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${ready.yearUnconfirmedLabel}，有${ready.yearUnconfirmedCount}条记录`}
           testID={`lookback-year-unconfirmed-${year}`}
-          onPress={() => router.push(lookbackHref(`/lookback/${year}/unconfirmed`))}
+          onPress={() => router.push(lookbackHref(`${path}/unconfirmed`))}
           style={lookbackStyles.hit}
         >
           <Text style={lookbackStyles.action}>
@@ -67,21 +75,8 @@ export default function LookbackYearScreen() {
           </Text>
         </Pressable>
       ) : null}
-      <View style={verticalTime ? lookbackStyles.stack : lookbackStyles.grid}>
-        {ready?.months.map((month) => (
-          <Pressable
-            key={month.month}
-            accessibilityRole="button"
-            accessibilityLabel={`${month.label}，${month.summary}`}
-            testID={`lookback-month-${year}-${pad2(month.month)}`}
-            onPress={() => router.push(lookbackHref(`/lookback/${year}/${pad2(month.month)}`))}
-            style={lookbackStyles.cell}
-          >
-            <Text style={lookbackStyles.action}>{month.label}</Text>
-            <DensityBand count={month.count} max={max} label={month.summary} />
-          </Pressable>
-        ))}
-      </View>
+      {page && showGrid ? <LookbackYearMonths page={page} onOpenMonth={openMonth} /> : null}
+      {page ? <LookbackYearEntries page={page} onOpenMonth={openMonth} /> : null}
     </LookbackScaffold>
   );
 }

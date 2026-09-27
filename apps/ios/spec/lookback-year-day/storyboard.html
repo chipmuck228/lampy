@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>回看年页与日页对照</title>
+  <style>
+    :root {
+      --paper: #F3F0E9;
+      --ink: #25231F;
+      --ink-soft: #5C5851;
+      --sage: #53604F;
+    }
+    body { margin: 0; font: 16px/24px "Songti SC", "Source Han Serif SC", serif; background: #d8d2c6; color: var(--ink); }
+    main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+    h1 { font-size: 28px; line-height: 36px; font-weight: 600; }
+    h2 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 36px 0 12px; }
+    p, li { color: var(--ink-soft); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 800px) { .row { grid-template-columns: 1fr; } }
+    .phone { background: var(--paper); border-radius: 20px; padding: 20px 22px 28px; min-height: 360px; }
+    .cap { font: 13px/18px ui-sans-serif, system-ui; color: var(--sage); margin: 0 0 8px; }
+    .title { font-size: 26px; line-height: 34px; margin: 8px 0 12px; }
+    .muted { color: var(--ink-soft); font-size: 15px; line-height: 22px; }
+    .old { padding: 8px 0; border-bottom: 1px solid rgba(37,35,31,0.08); }
+    .band { display: inline-block; height: 6px; background: #8A9384; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+    .months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin: 12px 0; }
+    .m { min-height: 44px; padding-top: 8px; color: #9a958c; font-size: 16px; }
+    .m.filled { color: var(--ink); }
+    .m.filled::after { content: ""; display: block; width: 5px; height: 5px; margin: 6px auto 0; border-radius: 50%; background: var(--sage); }
+    .entry { min-height: 44px; display: flex; align-items: center; color: var(--sage); }
+    .clock { font-size: 14px; line-height: 20px; color: var(--sage); }
+    .note { font-size: 20px; line-height: 28px; color: var(--ink); margin: 4px 0 16px; }
+    .xxxl .title { font-size: 34px; line-height: 42px; }
+    .xxxl .entry { font-size: 22px; line-height: 30px; min-height: 56px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>回看年页 / 日页：改前 / 改后</h1>
+    <p>年页与 #24 月历同一节奏：安静占位但不可点，有记录用克制圆点加可读列表。日页共享日期，只在精确精度写时刻。</p>
+
+    <h2>稀疏年 · 2026 只有 1 月和 9 月</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">改前</p>
+        <div class="title">2026年</div>
+        <div class="old"><strong>2026年1月</strong> <span class="band" style="width:80px"></span>有2条记录</div>
+        <div class="old"><strong>2026年2月</strong> 安静</div>
+        <div class="old muted">……十二个等权按钮，空月也能点进去</div>
+      </section>
+      <section class="phone">
+        <p class="cap">改后 · 三列真实月份</p>
+        <div class="title">2026年</div>
+        <div class="months">
+          <span class="m filled">1月</span><span class="m">2月</span><span class="m">3月</span>
+          <span class="m">4月</span><span class="m">5月</span><span class="m">6月</span>
+          <span class="m">7月</span><span class="m">8月</span><span class="m filled">9月</span>
+          <span class="m">10月</span><span class="m">11月</span><span class="m">12月</span>
+        </div>
+        <p class="muted">有记录的月份</p>
+        <div class="entry">1月 · 有2条记录</div>
+        <div class="entry">9月 · 有1条记录</div>
+      </section>
+    </div>
+
+    <h2>密集年 · 圆点同权</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">改前</p>
+        <div class="muted">条数多的月份密度带更长，像完成率。</div>
+      </section>
+      <section class="phone">
+        <p class="cap">改后</p>
+        <div class="months">
+          <span class="m filled">1月</span><span class="m filled">2月</span><span class="m filled">3月</span>
+          <span class="m filled">4月</span><span class="m">5月</span><span class="m filled">6月</span>
+          <span class="m filled">7月</span><span class="m filled">8月</span><span class="m filled">9月</span>
+          <span class="m">10月</span><span class="m filled">11月</span><span class="m">12月</span>
+        </div>
+        <div class="entry">1月 · 有1条记录</div>
+        <div class="entry">2月 · 有4条记录</div>
+        <p class="muted">圆点一样大。条数只写在句子里。</p>
+      </section>
+    </div>
+
+    <h2>月份未确认</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">改前 / 改后相同入口</p>
+        <div class="title">2026年</div>
+        <div class="entry">这一年，月份未确认 · 1条</div>
+        <p class="muted">只知道发生在这一年，不放进某一月的格子。</p>
+      </section>
+      <section class="phone">
+        <p class="cap">改后 · 月格仍按公历</p>
+        <div class="months">
+          <span class="m">1月</span><span class="m filled">2月</span><span class="m">3月</span>
+        </div>
+        <div class="entry">2月 · 有2条记录</div>
+      </section>
+    </div>
+
+    <h2>同日多条 · 精确时刻与日期精度</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">改前</p>
+        <div class="title">2026年9月24日</div>
+        <div class="old"><span class="muted">2026年9月24日 08:15</span><br>门口的风</div>
+        <div class="old"><span class="muted">2026年9月24日</span><br>后来又写了一句</div>
+      </section>
+      <section class="phone">
+        <p class="cap">改后 · 日期只在标题</p>
+        <div class="title">2026年9月24日</div>
+        <div class="clock">08:15</div>
+        <div class="note">门口的风</div>
+        <div class="note">后来又写了一句</div>
+        <p class="muted">第二条只有日期精度，不伪造时刻。</p>
+      </section>
+    </div>
+
+    <h2>空日 · 不催每天留下</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">改前 / 改后</p>
+        <div class="title">2026年4月3日</div>
+        <p class="muted">这一天还没有留下什么。</p>
+      </section>
+      <section class="phone xxxl">
+        <p class="cap">年页最大字号 · 不画三列</p>
+        <div class="title">2026年</div>
+        <p class="muted">有记录的月份</p>
+        <div class="entry">9月 · 有1条记录</div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
