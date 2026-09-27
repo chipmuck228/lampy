@@ -1,22 +1,23 @@
 import { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { lookbackMonthPage } from '../../../../application/lookback-month';
 import { getUseCases } from '../../../../application/container';
 import { pad2 } from '../../../../domain-adapters/calendar';
 import type { HistoryMonthView } from '../../../../projections/history-projection';
 import {
-  DensityBand,
   LookbackMessage,
   LookbackScaffold,
   lookbackHref,
   lookbackStyles,
   useLookbackLayout,
 } from '../../../../screens/lookback-chrome';
+import { LookbackMonthCalendar, LookbackMonthEntries } from '../../../../screens/lookback-month';
 
 export default function LookbackMonthScreen() {
   const router = useRouter();
-  const { verticalTime } = useLookbackLayout();
+  const { stackMonthCalendar } = useLookbackLayout();
   const params = useLocalSearchParams<{ year?: string | string[]; month?: string | string[] }>();
   const year = Number(Array.isArray(params.year) ? params.year[0] : params.year);
   const month = Number(Array.isArray(params.month) ? params.month[0] : params.month);
@@ -44,8 +45,12 @@ export default function LookbackMonthScreen() {
   );
 
   const ready = view && !('invalid' in view) ? view : null;
-  const max = ready ? Math.max(1, ...ready.days.map((day) => day.count)) : 1;
+  const page = ready ? lookbackMonthPage(ready) : null;
   const path = `/lookback/${year}/${pad2(month)}`;
+
+  function openDay(day: number) {
+    router.push(lookbackHref(`${path}/${pad2(day)}`));
+  }
 
   return (
     <LookbackScaffold title={ready?.title || `${year}年${month}月`} path={path}>
@@ -65,21 +70,10 @@ export default function LookbackMonthScreen() {
           </Text>
         </Pressable>
       ) : null}
-      <View style={verticalTime ? lookbackStyles.stack : lookbackStyles.grid}>
-        {ready?.days.map((day) => (
-          <Pressable
-            key={day.day}
-            accessibilityRole="button"
-            accessibilityLabel={`${ready.title}${day.day}日，${day.summary}`}
-            testID={`lookback-day-${year}-${pad2(month)}-${pad2(day.day)}`}
-            onPress={() => router.push(lookbackHref(`${path}/${pad2(day.day)}`))}
-            style={lookbackStyles.cell}
-          >
-            <Text style={lookbackStyles.action}>{day.label}</Text>
-            <DensityBand count={day.count} max={max} label={day.summary} />
-          </Pressable>
-        ))}
-      </View>
+      {page && !stackMonthCalendar ? (
+        <LookbackMonthCalendar page={page} year={year} month={month} onOpenDay={openDay} />
+      ) : null}
+      {page ? <LookbackMonthEntries page={page} year={year} month={month} onOpenDay={openDay} /> : null}
     </LookbackScaffold>
   );
 }

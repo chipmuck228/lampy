@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
 import type { FeelingView } from '../application/feeling';
+import { shouldStackMonthCalendar } from '../application/lookback-month';
 import { rememberLookbackScroll, readLookbackScroll } from '../application/lookback-session';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
@@ -30,6 +31,7 @@ export function useLookbackLayout() {
   return {
     readingWidth: Math.min(width, 720),
     verticalTime: width < 600 || fontScale >= 1.3,
+    stackMonthCalendar: shouldStackMonthCalendar(fontScale),
     shortHeight: height < 500,
     maxBar: Math.min(width, 720) - 48,
   };

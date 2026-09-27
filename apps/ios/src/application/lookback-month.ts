@@ -1,0 +1,88 @@
+import type { HistoryMonthView } from '../projections/history-projection';
+
+export const LOOKBACK_WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
+
+export function weekdayMondayIndex(year: number, month: number, day: number): number {
+  const sundayIndex = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return (sundayIndex + 6) % 7;
+}
+
+export function shouldStackMonthCalendar(fontScale: number): boolean {
+  return fontScale >= 1.3;
+}
+
+export type LookbackMonthWeekCell =
+  | { kind: 'pad'; key: string }
+  | { kind: 'quiet'; key: string; day: number; numeral: string }
+  | { kind: 'filled'; key: string; day: number; numeral: string; count: number; summary: string };
+
+export type LookbackMonthEntry = {
+  day: number;
+  label: string;
+  count: number;
+  summary: string;
+};
+
+export type LookbackMonthPage = {
+  year: number;
+  month: number;
+  title: string;
+  weekdayLabels: readonly string[];
+  weeks: LookbackMonthWeekCell[][];
+  entries: LookbackMonthEntry[];
+  dayUnconfirmedCount: number;
+  dayUnconfirmedLabel: string;
+  isEmpty: boolean;
+};
+
+export function lookbackMonthPage(view: HistoryMonthView): LookbackMonthPage {
+  const lead = weekdayMondayIndex(view.year, view.month, 1);
+  const cells: LookbackMonthWeekCell[] = [];
+  for (let index = 0; index < lead; index += 1) {
+    cells.push({ kind: 'pad', key: `pad-lead-${index}` });
+  }
+  for (const day of view.days) {
+    if (day.status === 'filled') {
+      cells.push({
+        kind: 'filled',
+        key: `day-${day.day}`,
+        day: day.day,
+        numeral: String(day.day),
+        count: day.count,
+        summary: day.summary,
+      });
+    } else {
+      cells.push({
+        kind: 'quiet',
+        key: `day-${day.day}`,
+        day: day.day,
+        numeral: String(day.day),
+      });
+    }
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push({ kind: 'pad', key: `pad-tail-${cells.length}` });
+  }
+  const weeks: LookbackMonthWeekCell[][] = [];
+  for (let index = 0; index < cells.length; index += 7) {
+    weeks.push(cells.slice(index, index + 7));
+  }
+  return {
+    year: view.year,
+    month: view.month,
+    title: view.title,
+    weekdayLabels: LOOKBACK_WEEKDAY_LABELS,
+    weeks,
+    entries: view.days
+      .filter((day) => day.status === 'filled')
+      .map((day) => ({
+        day: day.day,
+        label: day.label,
+        count: day.count,
+        summary: day.summary,
+      })),
+    dayUnconfirmedCount: view.dayUnconfirmedCount,
+    dayUnconfirmedLabel: view.dayUnconfirmedLabel,
+    isEmpty: view.isEmpty,
+  };
+}
