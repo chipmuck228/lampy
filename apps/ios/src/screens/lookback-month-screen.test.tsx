@@ -16,7 +16,7 @@ jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useEffect } = require('react');
   return {
-    useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
+    useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },

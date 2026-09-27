@@ -14,20 +14,37 @@ import LookbackDayScreen from '../app/lookback/[year]/[month]/[day]';
 import LookbackUnconfirmedScreen from '../app/lookback/unconfirmed';
 
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockDismissTo = jest.fn();
+const mockGetState = jest.fn();
 const mockGetHistoryYears = jest.fn();
 const mockGetHistoryYear = jest.fn();
 const mockGetHistoryDay = jest.fn();
 const mockGetHistoryUnknown = jest.fn();
+const mockSearchParams: Record<string, string> = {
+  year: '2026',
+  month: '01',
+  day: '02',
+  id: 'm_exact',
+};
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useEffect } = require('react');
   return {
-    useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
+    useRouter: () => ({
+      push: mockPush,
+      back: mockBack,
+      replace: jest.fn(),
+      dismissTo: mockDismissTo,
+    }),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
-    useLocalSearchParams: () => ({ year: '2026', month: '01', day: '02', id: 'm_exact' }),
+    useLocalSearchParams: () => mockSearchParams,
+    useNavigation: () => ({
+      getState: mockGetState,
+    }),
   };
 });
 
@@ -60,6 +77,12 @@ describe('lookback screens', () => {
     mockGetHistoryYear.mockReset();
     mockGetHistoryDay.mockReset();
     mockGetHistoryUnknown.mockReset();
+    mockBack.mockReset();
+    mockDismissTo.mockReset();
+    mockGetState.mockReset();
+    mockGetState.mockReturnValue({ index: 0, routes: [{ name: 'lookback/index' }] });
+    delete mockSearchParams.from;
+    delete mockSearchParams.o;
     resetLookbackSessionForTests();
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
@@ -89,6 +112,8 @@ describe('lookback screens', () => {
     expect(view.getByLabelText('时间未确认，有1条记录')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-year-2026'));
     expect(mockPush).toHaveBeenCalledWith('/lookback/2026');
+    expect(view.getByTestId('root-nav-band')).toBeTruthy();
+    expect(view.queryByTestId('lookback-back')).toBeNull();
   });
 
   it('keeps empty months and opens the selected month', async () => {
@@ -116,6 +141,8 @@ describe('lookback screens', () => {
     expect(view.getByText('1月 · 有2条记录')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-month-2026-01'));
     expect(mockPush).toHaveBeenCalledWith('/lookback/2026/01');
+    expect(view.queryByTestId('root-nav-band')).toBeNull();
+    expect(view.getByTestId('lookback-back')).toBeTruthy();
   });
 
   it('keeps month-precision-unconfirmed records off the year grid', async () => {
@@ -509,5 +536,4 @@ describe('lookback screens', () => {
     });
     expect(day.queryByText(/当时的感受/)).toBeNull();
   });
-
 });
