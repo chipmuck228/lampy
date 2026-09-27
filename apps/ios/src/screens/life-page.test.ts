@@ -10,6 +10,9 @@ import {
   readingPageWidth,
   readingWidth,
   recentColumnWidth,
+  chooseNavBandLayout,
+  navBandItemMinWidth,
+  navBandItemsFor,
   shouldShowSameDayRule,
   shouldStackNavBand,
   shouldStackRecentDay,
@@ -56,17 +59,30 @@ describe('life page measures', () => {
     expect(recentColumnWidth(390, 844, 3.1)).toBe(390);
   });
 
-  it('uses a left rail on tablet regular type and stacks the band for large type or a narrow phone', () => {
+  it('uses a left rail on tablet regular type, not on a phone or large type', () => {
     expect(shouldUseNavRail(1024, 1366, 1)).toBe(true);
     expect(shouldUseNavRail(1024, 1366, 3.1)).toBe(false);
     expect(shouldUseNavRail(390, 844, 1)).toBe(false);
     expect(shouldUseNavRail(852, 393, 1)).toBe(false);
-    expect(shouldStackNavBand(390, 1)).toBe(false);
-    expect(shouldStackNavBand(390, 1, 4)).toBe(false);
-    expect(shouldStackNavBand(320, 1)).toBe(false);
-    expect(shouldStackNavBand(320, 1, 4)).toBe(false);
-    expect(shouldStackNavBand(200, 1, 4)).toBe(true);
-    expect(shouldStackNavBand(1024, 3.1)).toBe(true);
+  });
+
+  it('picks a band layout from available width and label size, not from fontScale alone', () => {
+    const four = navBandItemsFor('recent', true);
+    const three = navBandItemsFor('lookback', false);
+    expect(navBandItemMinWidth('留下', 20, 1)).toBe(48);
+    expect(navBandItemMinWidth('留下', 20, 1.3)).toBe(60);
+    expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 1, items: four })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 1, items: three })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 1.3, items: four })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 1.3, items: three })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 200, fontScale: 1, items: four })).toBe('grid');
+    expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 3.1, items: four })).toBe('grid');
+    expect(chooseNavBandLayout({ windowWidth: 200, fontScale: 3.1, items: four })).toBe('stack');
+    expect(chooseNavBandLayout({ windowWidth: 200, fontScale: 3.1, items: three })).toBe('stack');
+    expect(chooseNavBandLayout({ windowWidth: 1024, fontScale: 3.1, items: four })).toBe('row');
+    expect(shouldStackNavBand(390, 1.3, 4)).toBe(false);
+    expect(shouldStackNavBand(200, 1, 4)).toBe(false);
+    expect(shouldStackNavBand(200, 3.1, 4)).toBe(true);
   });
 
   it('draws a same-day rule only between siblings, never around a day', () => {

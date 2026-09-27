@@ -13,7 +13,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ink, paper, paperDeep, sage, shouldStackNavBand, shouldUseNavRail } from './life-page';
+import {
+  chooseNavBandLayout,
+  ink,
+  navBandItemsFor,
+  paper,
+  paperDeep,
+  sage,
+  shouldUseNavRail,
+} from './life-page';
 
 export function RootNavBand({
   here,
@@ -28,57 +36,96 @@ export function RootNavBand({
 }) {
   const { width, height, fontScale } = useWindowDimensions();
   const rail = shouldUseNavRail(width, height, fontScale);
-  const itemCount = onFamily ? 4 : 3;
-  const stacked = !rail && shouldStackNavBand(width, fontScale, itemCount);
+  const layout = rail
+    ? 'rail'
+    : chooseNavBandLayout({
+        windowWidth: width,
+        fontScale,
+        items: navBandItemsFor(here, !!onFamily),
+      });
   const hereLabel = here === 'recent' ? '最近' : '回看';
   const otherLabel = here === 'recent' ? '回看' : '最近';
-  const itemStyle = [styles.item, rail ? styles.railItem : stacked ? styles.stackItem : styles.columnItem];
+  const itemStyle = [
+    styles.item,
+    layout === 'rail' ? styles.railItem : layout === 'stack' ? styles.stackItem : styles.columnItem,
+  ];
+
+  const hereItem = (
+    <View testID="root-nav-here-wrap" style={itemStyle}>
+      <Text
+        testID="root-nav-here"
+        style={styles.here}
+        accessibilityRole="text"
+        accessibilityLabel={`${hereLabel}，当前页`}
+      >
+        {hereLabel}
+      </Text>
+    </View>
+  );
+  const otherItem = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={otherLabel}
+      testID={here === 'recent' ? 'home-lookback' : 'lookback-go-recent'}
+      onPress={onOther}
+      style={itemStyle}
+    >
+      <Text style={styles.go}>{otherLabel}</Text>
+    </Pressable>
+  );
+  const leaveItem = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="留下"
+      testID={here === 'recent' ? 'home-leave' : 'lookback-leave'}
+      onPress={onLeave}
+      style={itemStyle}
+    >
+      <Text style={styles.leave}>留下</Text>
+    </Pressable>
+  );
+  const familyItem = onFamily ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="家庭"
+      testID="home-family"
+      onPress={onFamily}
+      style={itemStyle}
+    >
+      <Text style={styles.go}>家庭</Text>
+    </Pressable>
+  ) : null;
 
   return (
     <View
       testID="root-nav-band"
-      style={[styles.band, rail && styles.rail, stacked && styles.stacked]}
+      style={[
+        styles.band,
+        layout === 'rail' && styles.rail,
+        layout === 'stack' && styles.stacked,
+        layout === 'grid' && styles.grid,
+      ]}
       accessibilityRole="none"
     >
-      <View testID="root-nav-here-wrap" style={itemStyle}>
-        <Text
-          testID="root-nav-here"
-          style={styles.here}
-          accessibilityRole="text"
-          accessibilityLabel={`${hereLabel}，当前页`}
-        >
-          {hereLabel}
-        </Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={otherLabel}
-        testID={here === 'recent' ? 'home-lookback' : 'lookback-go-recent'}
-        onPress={onOther}
-        style={itemStyle}
-      >
-        <Text style={styles.go}>{otherLabel}</Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="留下"
-        testID={here === 'recent' ? 'home-leave' : 'lookback-leave'}
-        onPress={onLeave}
-        style={itemStyle}
-      >
-        <Text style={styles.leave}>留下</Text>
-      </Pressable>
-      {onFamily ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="家庭"
-          testID="home-family"
-          onPress={onFamily}
-          style={itemStyle}
-        >
-          <Text style={styles.go}>家庭</Text>
-        </Pressable>
-      ) : null}
+      {layout === 'grid' ? (
+        <>
+          <View testID="root-nav-grid-row-1" style={styles.gridRow}>
+            {hereItem}
+            {otherItem}
+          </View>
+          <View testID="root-nav-grid-row-2" style={styles.gridRow}>
+            {leaveItem}
+            {familyItem}
+          </View>
+        </>
+      ) : (
+        <>
+          {hereItem}
+          {otherItem}
+          {leaveItem}
+          {familyItem}
+        </>
+      )}
     </View>
   );
 }
@@ -155,6 +202,17 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     flexWrap: 'nowrap',
     alignItems: 'stretch',
+  },
+  grid: {
+    flexDirection: 'column',
+    flexWrap: 'nowrap',
+    alignItems: 'stretch',
+  },
+  gridRow: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'stretch',
+    alignSelf: 'stretch',
   },
   item: {
     minWidth: 48,

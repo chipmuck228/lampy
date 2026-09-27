@@ -61,15 +61,63 @@ export function shouldUseNavRail(windowWidth: number, windowHeight: number, font
   return isRegularWidth(windowWidth, windowHeight) && !isLargeType(fontScale);
 }
 
+export const NAV_BAND_PAD_X = 32;
+export const NAV_BAND_HIT = 48;
+export const NAV_BAND_LABEL_PAD = 8;
+export const NAV_BAND_HERE_SIZE = 17;
+export const NAV_BAND_LEAVE_SIZE = 20;
+
+export type NavBandLayout = 'row' | 'grid' | 'stack';
+
+export function navBandItemMinWidth(label: string, fontSize: number, fontScale: number): number {
+  const textWidth = [...label].length * fontSize * fontScale;
+  return Math.max(NAV_BAND_HIT, textWidth + NAV_BAND_LABEL_PAD);
+}
+
+export function navBandItemsFor(
+  here: 'recent' | 'lookback',
+  hasFamily: boolean,
+): { label: string; fontSize: number }[] {
+  const hereLabel = here === 'recent' ? '最近' : '回看';
+  const otherLabel = here === 'recent' ? '回看' : '最近';
+  const items = [
+    { label: hereLabel, fontSize: NAV_BAND_HERE_SIZE },
+    { label: otherLabel, fontSize: NAV_BAND_HERE_SIZE },
+    { label: '留下', fontSize: NAV_BAND_LEAVE_SIZE },
+  ];
+  if (hasFamily) items.push({ label: '家庭', fontSize: NAV_BAND_HERE_SIZE });
+  return items;
+}
+
+export function chooseNavBandLayout(input: {
+  windowWidth: number;
+  fontScale: number;
+  items: { label: string; fontSize: number }[];
+}): NavBandLayout {
+  const available = input.windowWidth - NAV_BAND_PAD_X;
+  const widest = Math.max(
+    NAV_BAND_HIT,
+    ...input.items.map((item) => navBandItemMinWidth(item.label, item.fontSize, input.fontScale)),
+  );
+  const count = input.items.length;
+  if (count < 1) return 'row';
+  if (available >= count * widest) return 'row';
+  if (count === 4 && available >= 2 * widest) return 'grid';
+  return 'stack';
+}
+
 export function shouldStackNavBand(
   windowWidth: number,
   fontScale: number,
   itemCount = 3,
 ): boolean {
-  if (isLargeType(fontScale)) return true;
-  const padding = 32;
-  const minColumn = 48;
-  return windowWidth - padding < itemCount * minColumn;
+  return (
+    chooseNavBandLayout({
+      windowWidth,
+      fontScale,
+      items: navBandItemsFor('recent', itemCount >= 4),
+    }) === 'stack'
+  );
 }
 
 export function shouldStackRecentDay(windowWidth: number, windowHeight: number, fontScale: number): boolean {
