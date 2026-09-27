@@ -44,7 +44,11 @@ import {
   type OccurredChoiceView,
   type OccurredDraftInput,
 } from './occurred-date';
-import { groupRecentLifeDays, recordedDayForRecent } from './recent-life';
+import {
+  groupRecentLifeDays,
+  recordedDayForRecent,
+  recordedHeadingForRecent,
+} from './recent-life';
 
 export type { OccurredChoiceView, OccurredDraftInput };
 
@@ -123,6 +127,7 @@ export type RecentLifeItem = {
   dayKey: string;
   dayLabel: string;
   dateLabel: string;
+  occurredLabel: string | null;
   feeling: FeelingView | null;
   images: ImageView[];
   audio: AudioView | null;
@@ -204,17 +209,17 @@ function viewerOffsetAt(iso: string | undefined, clock: HistoryClock): number {
   return millis === null ? 0 : offsetMinutesAt(millis, clock);
 }
 
-function recentDateLabel(
-  moment: { time: { occurredAt?: string; occurredAtPrecision: string; recordedAt: string } },
+function recentOccurredLabel(
+  moment: { time: { occurredAt?: string; occurredAtPrecision: string } },
   clock: HistoryClock,
-): string {
+): string | null {
   const precision = moment.time.occurredAtPrecision;
-  if (precision === 'unknown' || !moment.time.occurredAt) return '时间未确认';
-  return formatCalendarDate(
+  if (precision === 'unknown' || !moment.time.occurredAt) return null;
+  return `发生于 ${formatCalendarDate(
     moment.time.occurredAt,
     precision,
     viewerOffsetAt(moment.time.occurredAt, clock),
-  );
+  )}`;
 }
 
 
@@ -1011,7 +1016,8 @@ export function createUseCases(deps: {
         recordedAt: moment.time.recordedAt,
         dayKey: day.dayKey,
         dayLabel: day.dayLabel,
-        dateLabel: day.dayLabel,
+        dateLabel: recordedHeadingForRecent(day.dayLabel),
+        occurredLabel: recentOccurredLabel(moment, viewerClock),
         feeling: projectFeeling(moment.content.emotion),
         images: await resolveImages(moment.assetIds),
         audio: await resolveAudio(moment.assetIds),

@@ -9,9 +9,9 @@ describe('groupRecentDays', () => {
     ]);
     expect(groups).toHaveLength(2);
     expect(groups[0].key).toBe('2026-09-27');
-    expect(groups[0].label).toBe('9月27日');
+    expect(groups[0].label).toBe('记录于 9月27日');
     expect(groups[0].items.map((item) => item.id)).toEqual(['a', 'b']);
     expect(groups[1].key).toBe('2025-09-27');
-    expect(groups[1].label).toBe('2025年9月27日');
+    expect(groups[1].label).toBe('记录于 2025年9月27日');
   });
 });

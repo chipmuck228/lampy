@@ -192,7 +192,8 @@ function RecentMoment({
       accessibilityRole="button"
       accessibilityLabel={
         [
-          item.dayLabel || item.dateLabel,
+          item.dateLabel,
+          item.occurredLabel,
           item.note,
           ...item.images.map((image) => image.label),
           item.audio?.label || '',
@@ -200,13 +201,18 @@ function RecentMoment({
           item.feeling ? `当时的感受，${item.feeling.label}` : '',
         ]
           .filter(Boolean)
-          .join('，') || `${item.dayLabel || item.dateLabel}，一条记录`
+          .join('，') || `${item.dateLabel}，一条记录`
       }
       testID={`recent-item-${item.id}`}
       onPress={onOpen}
       style={styles.moment}
     >
       {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+      {item.occurredLabel ? (
+        <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
+          {item.occurredLabel}
+        </Text>
+      ) : null}
       <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
       <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
       <MomentAudio
@@ -268,4 +274,5 @@ const styles = StyleSheet.create({
   dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
   moment: { gap: 8, minHeight: 44 },
   note: { fontSize: 21, lineHeight: 32, color: ink },
+  occurred: { fontSize: 15, lineHeight: 22, color: inkSoft },
 });

@@ -19,6 +19,10 @@ export type RecentDayGroup<T extends RecentDayStamp> = {
   items: T[];
 };
 
+export function recordedHeadingForRecent(dayLabel: string): string {
+  return dayLabel.startsWith('记录于') ? dayLabel : `记录于 ${dayLabel}`;
+}
+
 export function recordedDayForRecent(
   recordedAt: string,
   now: Date,
@@ -43,7 +47,7 @@ export function groupRecentLifeDays<T extends RecentDayStamp>(items: T[]): Recen
     if (last && last.key === item.dayKey) {
       last.items.push(item);
     } else {
-      groups.push({ key: item.dayKey, label: item.dayLabel, items: [item] });
+      groups.push({ key: item.dayKey, label: recordedHeadingForRecent(item.dayLabel), items: [item] });
     }
   }
   return groups;

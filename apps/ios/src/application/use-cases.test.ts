@@ -30,7 +30,9 @@ describe('text-only personal moment use cases', () => {
     expect(recent.items[0].dayLabel).toBe('9月24日');
     expect(recent.days).toHaveLength(1);
     expect(recent.days[0].key).toBe('2026-09-24');
-    expect(recent.days[0].label).toBe('9月24日');
+    expect(recent.days[0].label).toBe('记录于 9月24日');
+    expect(recent.items[0].dateLabel).toBe('记录于 9月24日');
+    expect(recent.items[0].occurredLabel).toBeNull();
 
     const detail = await app.getMomentDetail(saved.id);
     expect(detail.kind).toBe('ready');
@@ -110,7 +112,10 @@ describe('text-only personal moment use cases', () => {
     }).getRecentLife();
     expect(recent.items[0].dayKey).toBe('2026-09-24');
     expect(recent.items[0].dayLabel).toBe('9月24日');
+    expect(recent.items[0].dateLabel).toBe('记录于 9月24日');
+    expect(recent.items[0].occurredLabel).toBeNull();
     expect(recent.days[0].key).toBe('2026-09-24');
+    expect(recent.days[0].label).toBe('记录于 9月24日');
   });
 
   it('leaves stored moments untouched when save fails on an empty note', async () => {
@@ -211,7 +216,9 @@ describe('leave occurred date', () => {
     expect(stored.moment.time.recordedAt).toBe('2026-09-26T16:30:00.000Z');
 
     const recent = await app.getRecentLife();
-    expect(recent.items[0].dateLabel).toBe('2026年9月27日');
+    expect(recent.items[0].dateLabel).toBe('记录于 9月27日');
+    expect(recent.items[0].occurredLabel).toBe('发生于 2026年9月27日');
+    expect(recent.days[0].label).toBe('记录于 9月27日');
     const detail = await app.getMomentDetail(saved.id);
     expect(detail.kind).toBe('ready');
     if (detail.kind === 'ready') {
@@ -262,8 +269,54 @@ describe('leave occurred date', () => {
     expect(unknown.items.map((item) => item.id)).toEqual([unsureSaved.id]);
     expect(unknown.items[0].timeLabel).toBe('时间未确认');
     const recent = await app.getRecentLife();
-    expect(recent.items.find((item) => item.id === pastSaved.id)?.dateLabel).toBe('2026年9月20日');
-    expect(recent.items.find((item) => item.id === unsureSaved.id)?.dateLabel).toBe('时间未确认');
+    const pastRecent = recent.items.find((item) => item.id === pastSaved.id);
+    const unsureRecent = recent.items.find((item) => item.id === unsureSaved.id);
+    expect(pastRecent?.dateLabel).toBe('记录于 9月27日');
+    expect(pastRecent?.occurredLabel).toBe('发生于 2026年9月20日');
+    expect(unsureRecent?.dateLabel).toBe('记录于 9月27日');
+    expect(unsureRecent?.occurredLabel).toBeNull();
+    expect(recent.days).toHaveLength(1);
+    expect(recent.days[0].label).toBe('记录于 9月27日');
+    expect(recent.days[0].items.map((item) => item.id).sort()).toEqual(
+      [pastSaved.id, unsureSaved.id].sort(),
+    );
+  });
+
+  it('keeps a later write under the recorded day while showing the confirmed occurrence', async () => {
+    const repos = createMemoryRepositories();
+    const app = createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-27T03:00:00.000Z'),
+      timezoneOffsetMinutes: 480,
+    });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '门口的风');
+    await app.updateDraftOccurred(draft.draftId, { kind: 'day', year: 2026, month: 9, day: 24 });
+    const saved = await app.saveTextMoment(draft.draftId);
+    const stored = await repos.moments.findById(saved.id);
+    expect(stored.kind).toBe('ready');
+    if (stored.kind === 'ready') {
+      expect(stored.moment.time.occurredAt).toBe('2026-09-23T16:00:00.000Z');
+      expect(stored.moment.time.recordedAt).toBe('2026-09-27T03:00:00.000Z');
+    }
+
+    const recent = await app.getRecentLife();
+    expect(recent.days[0].key).toBe('2026-09-27');
+    expect(recent.days[0].label).toBe('记录于 9月27日');
+    expect(recent.items[0].dateLabel).toBe('记录于 9月27日');
+    expect(recent.items[0].occurredLabel).toBe('发生于 2026年9月24日');
+    expect(recent.items[0].note).toBe('门口的风');
+
+    const detail = await app.getMomentDetail(saved.id);
+    expect(detail.kind).toBe('ready');
+    if (detail.kind === 'ready') {
+      expect(detail.dateLabel).toBe('2026年9月24日');
+      expect(detail.usedRecordedAtFallback).toBe(false);
+    }
+    const day = await app.getHistoryDay(2026, 9, 24);
+    expect('invalid' in day ? day : day.items.map((item) => item.id)).toEqual([saved.id]);
+    const recordedDay = await app.getHistoryDay(2026, 9, 27);
+    expect('invalid' in recordedDay ? recordedDay : recordedDay.items.map((item) => item.id)).toEqual([]);
   });
 
   it('restores the chosen date and keeps it when save fails', async () => {
@@ -359,7 +412,8 @@ describe('leave occurred date', () => {
     const recent = await app.getRecentLife();
     const detail = await app.getMomentDetail(saved.id);
     const day = await app.getHistoryDay(2026, 9, 27);
-    expect(recent.items[0].dateLabel).toBe('2026年9月27日');
+    expect(recent.items[0].dateLabel).toBe('记录于 9月27日');
+    expect(recent.items[0].occurredLabel).toBe('发生于 2026年9月27日');
     expect(detail.kind).toBe('ready');
     if (detail.kind === 'ready') expect(detail.dateLabel).toBe('2026年9月27日');
     expect('invalid' in day ? '' : day.title).toBe('2026年9月27日');

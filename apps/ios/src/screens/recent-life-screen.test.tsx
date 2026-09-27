@@ -36,14 +36,22 @@ function wrap(ui: ReactElement) {
   );
 }
 
-function item(id: string, note: string, dayLabel: string, recordedAt: string, dayKey: string) {
+function item(
+  id: string,
+  note: string,
+  dayLabel: string,
+  recordedAt: string,
+  dayKey: string,
+  occurredLabel: string | null = null,
+) {
   return {
     id,
     note,
     recordedAt,
     dayKey,
     dayLabel,
-    dateLabel: dayLabel,
+    dateLabel: `记录于 ${dayLabel}`,
+    occurredLabel,
     feeling: null,
     images: [],
     audio: null,
@@ -57,7 +65,7 @@ function life(items: ReturnType<typeof item>[]) {
   >((groups, next) => {
     const last = groups[groups.length - 1];
     if (last && last.key === next.dayKey) last.items.push(next);
-    else groups.push({ key: next.dayKey, label: next.dayLabel, items: [next] });
+    else groups.push({ key: next.dayKey, label: next.dateLabel, items: [next] });
     return groups;
   }, []);
   return { isFirstUse: false, items, days };
@@ -80,10 +88,10 @@ describe('recent life page', () => {
     await waitFor(() => {
       expect(view.getByText('门口的风')).toBeTruthy();
     });
-    expect(view.getAllByText('9月27日')).toHaveLength(1);
-    expect(view.getByLabelText('9月27日，2条记录')).toBeTruthy();
+    expect(view.getAllByText('记录于 9月27日')).toHaveLength(1);
+    expect(view.getByLabelText('记录于 9月27日，2条记录')).toBeTruthy();
     expect(view.getByText('同一天的第二句')).toBeTruthy();
-    expect(view.getByText('9月24日')).toBeTruthy();
+    expect(view.getByText('记录于 9月24日')).toBeTruthy();
     expect(view.getByLabelText('留下')).toBeTruthy();
     expect(view.getByLabelText('回看')).toBeTruthy();
     expect(view.getByLabelText('最近')).toBeTruthy();
@@ -101,8 +109,40 @@ describe('recent life page', () => {
       expect(view.getByText('今年的一句')).toBeTruthy();
     });
     expect(view.getByText('去年的一句')).toBeTruthy();
-    expect(view.getByLabelText('9月27日，1条记录')).toBeTruthy();
-    expect(view.getByLabelText('2025年9月27日，1条记录')).toBeTruthy();
+    expect(view.getByLabelText('记录于 9月27日，1条记录')).toBeTruthy();
+    expect(view.getByLabelText('记录于 2025年9月27日，1条记录')).toBeTruthy();
+  });
+
+  it('shows a confirmed occurrence under the recorded-day heading', async () => {
+    mockGetRecentLife.mockResolvedValue(
+      life([
+        item(
+          'moment_later',
+          '门口的风',
+          '9月27日',
+          new Date(2026, 8, 27, 10).toISOString(),
+          '2026-09-27',
+          '发生于 2026年9月24日',
+        ),
+        item(
+          'moment_unsure',
+          '想不起来哪天',
+          '9月27日',
+          new Date(2026, 8, 27, 16).toISOString(),
+          '2026-09-27',
+        ),
+      ]),
+    );
+    const view = await render(wrap(<RecentScreen />));
+    await waitFor(() => {
+      expect(view.getByText('门口的风')).toBeTruthy();
+    });
+    expect(view.getByLabelText('记录于 9月27日，2条记录')).toBeTruthy();
+    expect(view.getByText('发生于 2026年9月24日')).toBeTruthy();
+    expect(view.getByLabelText(/记录于 9月27日，发生于 2026年9月24日，门口的风/)).toBeTruthy();
+    expect(view.getByText('想不起来哪天')).toBeTruthy();
+    expect(view.queryByTestId('recent-occurred-moment_unsure')).toBeNull();
+    expect(view.queryByText('发生于 2026年9月27日')).toBeNull();
   });
 
   it('keeps a read error without inventing records', async () => {

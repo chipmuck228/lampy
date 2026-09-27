@@ -1,4 +1,4 @@
-import { groupRecentLifeDays, recordedDayForRecent } from './recent-life';
+import { groupRecentLifeDays, recordedDayForRecent, recordedHeadingForRecent } from './recent-life';
 
 const SHANGHAI = { timeZone: 'Asia/Shanghai' };
 const NEW_YORK = { timeZone: 'America/New_York' };
@@ -55,12 +55,18 @@ describe('groupRecentLifeDays', () => {
       { id: 'c', dayKey: '2025-09-27', dayLabel: '2025年9月27日' },
     ]);
     expect(groups.map((group) => ({ key: group.key, label: group.label, ids: group.items.map((item) => item.id) }))).toEqual([
-      { key: '2026-09-27', label: '9月27日', ids: ['a', 'b'] },
-      { key: '2025-09-27', label: '2025年9月27日', ids: ['c'] },
+      { key: '2026-09-27', label: '记录于 9月27日', ids: ['a', 'b'] },
+      { key: '2025-09-27', label: '记录于 2025年9月27日', ids: ['c'] },
     ]);
   });
 
   it('does not invent a day when the list is empty', () => {
     expect(groupRecentLifeDays([])).toEqual([]);
+  });
+
+  it('marks group headings as recorded days without changing the key', () => {
+    expect(recordedHeadingForRecent('9月27日')).toBe('记录于 9月27日');
+    expect(recordedHeadingForRecent('记录于 9月27日')).toBe('记录于 9月27日');
+    expect(recordedHeadingForRecent('时间未确认')).toBe('记录于 时间未确认');
   });
 });
