@@ -36,6 +36,18 @@ import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/
 import { FeelingPicker } from '../screens/moment-feeling';
 import { OccurredDatePicker } from '../screens/moment-occurred';
 import { MomentImages } from '../screens/moment-images';
+import {
+  clay,
+  hairline,
+  ink,
+  inkSoft,
+  isCompactHeight,
+  pageGutter,
+  paper,
+  placeholder,
+  readingWidth,
+  sage,
+} from '../screens/life-page';
 import { useSoundPlayer } from '../screens/use-sound-player';
 import {
   FAMILY_TEST_JPEG_BASE64,
@@ -46,8 +58,10 @@ import {
 export default function LeaveScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
-  const { width } = useWindowDimensions();
-  const readingWidth = Math.min(width, 720);
+  const { width, height } = useWindowDimensions();
+  const columnWidth = readingWidth(width);
+  const gutter = pageGutter(width);
+  const compact = isCompactHeight(height);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [emotion, setEmotion] = useState('');
@@ -609,17 +623,22 @@ export default function LeaveScreen() {
   const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
   const testNonce = Array.isArray(params.n) ? params.n[0] : params.n;
   const ranTestAction = useRef('');
+  /* eslint-disable react-hooks/set-state-in-effect -- family test driver on main */
   useEffect(() => {
     if (!isFamilyTestDriverEnabled() || !testAction || !draftId) return;
     const key = `${testAction}:${testNonce || ''}`;
     if (ranTestAction.current === key) return;
     ranTestAction.current = key;
     if (testAction === 'photo') {
-      persistNote('本轮媒体闭环');
-      persistEmotion('平静');
+      void Promise.resolve().then(() => {
+        persistNote('本轮媒体闭环');
+        persistEmotion('平静');
+      });
       const root = FileSystem.cacheDirectory;
       if (!root) {
-        setMessage('这次没有留下照片。可以再试，也可以继续写字。');
+        void Promise.resolve().then(() => {
+          setMessage('这次没有留下照片。可以再试，也可以继续写字。');
+        });
         return;
       }
       const path = `${root}family-test-photo.jpg`;
@@ -644,6 +663,7 @@ export default function LeaveScreen() {
       void onSave();
     }
   }, [testAction, testNonce, draftId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const draftHasContent =
     !!note.trim() || !!emotion.trim() || images.length > 0 || !!audio || unknownMedia.length > 0;
@@ -668,7 +688,16 @@ export default function LeaveScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}
+          style={styles.flex}
+          contentContainerStyle={[
+            styles.column,
+            {
+              maxWidth: columnWidth,
+              paddingHorizontal: gutter,
+              paddingTop: compact ? 4 : 8,
+              paddingBottom: 20,
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
         >
           <Pressable
@@ -730,7 +759,7 @@ export default function LeaveScreen() {
               void persistNote(value);
             }}
             placeholder="写一句就可以，也可以只留下照片或声音。"
-            placeholderTextColor="#777168"
+            placeholderTextColor={placeholder}
             multiline
             textAlignVertical="top"
             style={styles.input}
@@ -778,7 +807,14 @@ export default function LeaveScreen() {
             }}
           />
           {message ? <Text style={styles.message}>{message}</Text> : null}
-          <View style={styles.actions}>
+        </ScrollView>
+        <View
+          style={[
+            styles.band,
+            { paddingHorizontal: gutter, paddingTop: compact ? 8 : 12 },
+          ]}
+        >
+          <View style={[styles.actions, { maxWidth: columnWidth }]}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="拍摄"
@@ -816,40 +852,51 @@ export default function LeaveScreen() {
               <Text style={styles.save}>{saveLabel}</Text>
             </Pressable>
           </View>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  safe: { flex: 1, backgroundColor: paper },
   flex: { flex: 1 },
   column: {
     flexGrow: 1,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    gap: 16,
+    gap: 20,
   },
   backHit: { minHeight: 44, justifyContent: 'center' },
-  back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
-  restore: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
+  back: { fontSize: 16, lineHeight: 22, color: sage },
+  restore: { fontSize: 16, lineHeight: 24, color: inkSoft },
   abandonHit: { minHeight: 44, justifyContent: 'center' },
-  abandon: { fontSize: 16, lineHeight: 22, color: '#87513D' },
+  abandon: { fontSize: 16, lineHeight: 22, color: clay },
   confirmRow: { flexDirection: 'row', gap: 24, marginTop: 8 },
   input: {
-    minHeight: 160,
+    minHeight: 88,
     fontSize: 22,
     lineHeight: 32,
-    color: '#25231F',
+    color: ink,
     padding: 0,
   },
-  message: { fontSize: 16, lineHeight: 24, color: '#87513D' },
-  actions: { gap: 8, paddingBottom: 8 },
-  mediaHit: { minHeight: 44, justifyContent: 'center' },
-  media: { fontSize: 18, lineHeight: 24, color: '#53604F' },
-  saveHit: { minHeight: 44, justifyContent: 'center' },
-  save: { fontSize: 18, lineHeight: 24, color: '#53604F' },
+  message: { fontSize: 16, lineHeight: 24, color: clay },
+  band: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: hairline,
+    backgroundColor: paper,
+    paddingBottom: 8,
+  },
+  actions: {
+    width: '100%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 20,
+  },
+  mediaHit: { minHeight: 48, justifyContent: 'center' },
+  media: { fontSize: 18, lineHeight: 24, color: sage },
+  saveHit: { minHeight: 48, justifyContent: 'center', marginLeft: 'auto' },
+  save: { fontSize: 18, lineHeight: 24, color: ink },
 });

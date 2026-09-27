@@ -63,6 +63,7 @@ describe('leave feeling picker', () => {
     await waitFor(() => {
       expect(view.getByLabelText('当时的感受')).toBeTruthy();
     });
+    expect(view.getByText('当时的感受，可选')).toBeTruthy();
     expect(view.getByLabelText('当时的感受，高兴').props.accessibilityState.selected).toBe(false);
     expect(view.queryByLabelText('清除当时的感受')).toBeNull();
     expect(mockUpdateDraftEmotion).not.toHaveBeenCalled();

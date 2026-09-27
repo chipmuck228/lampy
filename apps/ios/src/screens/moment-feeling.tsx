@@ -16,7 +16,7 @@ export function FeelingPicker({
 
   return (
     <View accessibilityLabel="当时的感受" style={styles.block}>
-      <Text style={styles.heading}>当时的感受</Text>
+      <Text style={styles.heading}>当时的感受，可选</Text>
       {unknown ? (
         <Text testID="composer-feeling-unknown" style={styles.unknown}>
           {selected}
