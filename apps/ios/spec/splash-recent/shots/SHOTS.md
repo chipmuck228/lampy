@@ -28,6 +28,7 @@
 | 首次空库 | PASS。卸装后重装。 |
 | 已有记录 | PASS。 |
 | 读取失败 | Jest：错误句在首页出现后可卸品牌层，不编造记录。模拟器未注入坏库。 |
+| `getRecentLife` 永不返回 | Jest：4s 超时后无需触摸卸层；再挂载不重播。晚到的读取仍更新首页。 |
 | 触摸跳过品牌层 | Jest。 |
 | Reduce Motion | PASS。`defaults write com.apple.Accessibility ReduceMotionEnabled`。 |
 | Expo Dev Client 拉包 | 开发包可能短暂出现白底 “Downloading 100%”。Release 没有 Dev Client。产品 Launch Screen 与 JS 首帧均为纸色，未叠第二套 Logo。 |

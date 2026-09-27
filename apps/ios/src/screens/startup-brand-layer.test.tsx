@@ -1,7 +1,7 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
-import { resetStartupBrandForTests } from '../application/startup-brand';
+import { resetStartupBrandForTests, setBrandReadyTimeoutForTests } from '../application/startup-brand';
 import { StartupBrandLayer } from './startup-brand-layer';
 
 describe('startup brand layer', () => {
@@ -25,6 +25,19 @@ describe('startup brand layer', () => {
     view.unmount();
     const again = await render(<StartupBrandLayer homeSettled />);
     expect(again.queryByTestId('startup-brand-layer')).toBeNull();
+    again.unmount();
+  });
+
+  it('leaves after the ready timeout without a tap and does not replay', async () => {
+    setBrandReadyTimeoutForTests(200);
+    const view = await render(<StartupBrandLayer homeSettled={false} />);
+    await waitFor(() => {
+      expect(view.queryByTestId('startup-brand-layer')).toBeNull();
+    });
+    view.unmount();
+    const again = await render(<StartupBrandLayer homeSettled={false} />);
+    expect(again.queryByTestId('startup-brand-layer')).toBeNull();
+    again.unmount();
   });
 
   it('drops immediately under Reduce Motion once the home has settled', async () => {

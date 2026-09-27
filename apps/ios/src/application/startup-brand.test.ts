@@ -1,7 +1,10 @@
 import {
   BRAND_FADE_MS,
+  BRAND_READY_TIMEOUT_MS,
+  brandReadyTimeoutMs,
   consumeStartupBrand,
   resetStartupBrandForTests,
+  setBrandReadyTimeoutForTests,
   shouldShowStartupBrand,
   shouldSkipBrandFade,
 } from './startup-brand';
@@ -24,5 +27,12 @@ describe('startup brand session', () => {
     expect(shouldSkipBrandFade(true)).toBe(true);
     expect(BRAND_FADE_MS).toBeGreaterThanOrEqual(300);
     expect(BRAND_FADE_MS).toBeLessThanOrEqual(450);
+    expect(BRAND_READY_TIMEOUT_MS).toBeGreaterThan(BRAND_FADE_MS);
+    expect(BRAND_READY_TIMEOUT_MS).toBe(4000);
+    expect(brandReadyTimeoutMs()).toBe(BRAND_READY_TIMEOUT_MS);
+    setBrandReadyTimeoutForTests(200);
+    expect(brandReadyTimeoutMs()).toBe(200);
+    resetStartupBrandForTests();
+    expect(brandReadyTimeoutMs()).toBe(BRAND_READY_TIMEOUT_MS);
   });
 });

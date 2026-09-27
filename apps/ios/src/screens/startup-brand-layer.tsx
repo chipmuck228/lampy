@@ -11,6 +11,8 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import {
   BRAND_FADE_MS,
+  brandReadyTimeoutMs,
+  brandTimeoutGeneration,
   consumeStartupBrand,
   shouldShowStartupBrand,
   shouldSkipBrandFade,
@@ -41,6 +43,17 @@ export function StartupBrandLayer({ homeSettled }: { homeSettled: boolean }) {
   useEffect(() => {
     void SplashScreen.hideAsync().catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!visible || homeSettled) return;
+    const generation = brandTimeoutGeneration();
+    const timer = setTimeout(() => {
+      if (generation !== brandTimeoutGeneration()) return;
+      consumeStartupBrand();
+      setVisible(false);
+    }, brandReadyTimeoutMs());
+    return () => clearTimeout(timer);
+  }, [homeSettled, visible]);
 
   useEffect(() => {
     if (!visible || !homeSettled) return;

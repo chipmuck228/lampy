@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { resetStartupBrandForTests } from '../application/startup-brand';
+import { resetStartupBrandForTests, setBrandReadyTimeoutForTests } from '../application/startup-brand';
 import RecentScreen from '../app/index';
 
 jest.mock('expo-router', () => {
@@ -161,5 +161,46 @@ describe('recent life page', () => {
       expect(view.queryByTestId('startup-brand-layer')).toBeNull();
     });
     expect(view.getByText('最近的记录暂时读不出来，原来的内容还在这台设备上。')).toBeTruthy();
+  });
+
+  it('leaves the brand layer without a tap when getRecentLife never resolves', async () => {
+    setBrandReadyTimeoutForTests(200);
+    mockGetRecentLife.mockReturnValue(new Promise(() => undefined));
+    const view = await render(wrap(<RecentScreen />));
+    expect(view.getByTestId('startup-brand-layer')).toBeTruthy();
+    expect(view.getByLabelText('最近')).toBeTruthy();
+    expect(view.queryByTestId(/recent-item-/)).toBeNull();
+    await waitFor(() => {
+      expect(view.queryByTestId('startup-brand-layer')).toBeNull();
+    });
+    expect(view.getByLabelText('最近')).toBeTruthy();
+    expect(view.queryByTestId(/recent-item-/)).toBeNull();
+    view.unmount();
+    const resumed = await render(wrap(<RecentScreen />));
+    expect(resumed.queryByTestId('startup-brand-layer')).toBeNull();
+    expect(resumed.getByLabelText('最近')).toBeTruthy();
+    resumed.unmount();
+  });
+
+  it('still paints recent life after the brand layer has timed out', async () => {
+    setBrandReadyTimeoutForTests(200);
+    let finishRead: (value: ReturnType<typeof life>) => void = () => undefined;
+    mockGetRecentLife.mockReturnValue(
+      new Promise((resolve) => {
+        finishRead = resolve;
+      }),
+    );
+    const view = await render(wrap(<RecentScreen />));
+    await waitFor(() => {
+      expect(view.queryByTestId('startup-brand-layer')).toBeNull();
+    });
+    expect(view.queryByText('门口的风')).toBeNull();
+    finishRead(
+      life([item('moment_late', '门口的风', '9月27日', new Date(2026, 8, 27, 10).toISOString(), '2026-09-27')]),
+    );
+    await waitFor(() => {
+      expect(view.getByText('门口的风')).toBeTruthy();
+    });
+    expect(view.queryByTestId('startup-brand-layer')).toBeNull();
   });
 });
