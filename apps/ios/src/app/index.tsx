@@ -224,6 +224,7 @@ function RecentMoment({
         testIDPrefix={`recent-sound-${item.id}`}
         compact={!mixed}
         scene={mixed}
+        markedActions
       />
       <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
       <Pressable
@@ -303,7 +304,8 @@ const styles = StyleSheet.create({
     width: 72,
     height: StyleSheet.hairlineWidth,
     backgroundColor: hairline,
-    marginBottom: 4,
+    marginTop: -16,
+    marginBottom: 16,
   },
   moment: { gap: 8, minHeight: 48 },
   momentMixed: { gap: 16 },

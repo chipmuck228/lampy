@@ -21,20 +21,24 @@
 
 ## 操作
 
-- 播放／暂停／再听一次：简洁符号 **配文字**。VoiceOver 仍读「播放，4秒」，符号 `accessible={false}`。
+- 播放／暂停／再听一次：简洁符号 **配文字**。只由「最近」传 `markedActions`；详情／留下／回看默认仍是纯文字。VoiceOver 仍读「播放，4秒」，符号 `accessible={false}`。
 - 「看这条」保留文字，右侧低强调 `›`。符号不单独承担含义。
 - 播放与打开仍是两个控件，触达 ≥ 48pt。
 
 ## 走查
 
+示意对照：`storyboard.html`。运行中 App 实拍：`SHOTS.md`。
+
 | 状态 | 结果 |
 | --- | --- |
 | 同日两条纯文字 | Jest：第二条有 `recent-day-rule`，第一条没有 |
 | 稀疏不同日 | Jest：新日第一条无线 |
-| 文字＋照片＋声音＋感受 | Jest：层次顺序仍在；短线规则同上 |
-| 仅声音、媒体缺失 | Jest：占位与紧凑声音仍在 |
-| 最大字号收日期轨 | Jest：`shouldStackRecentDay` / `isLargeType` |
+| 文字＋照片＋声音＋感受 | Jest + iPhone 16 实拍：层次顺序仍在；短线在「看这条」与下一条正文之间，不贴住下一句 |
+| 仅声音、媒体缺失 | Jest + iPhone 16 实拍：占位句与 `▶ 播放` 仍在 |
+| 三图长记录真页面 | iPhone 16：**PASS**（`shots/iphone16-recent-glyphs.png`） |
+| 最大字号换行 | iPhone 16：**PASS**（日期／占位／播放／看这条换行；细线不贴下一条） |
+| 符号未漏到详情 | iPhone 16：**PASS**（详情「播放」无 ▶） |
 | 横屏 | **NOT VERIFIED** |
 | iPad | **NOT VERIFIED** |
-| Liuz17 真机画面 | **NOT VERIFIED** |
-| 三图长记录真页面 | **NOT VERIFIED**（对照稿有，未实拍） |
+| Liuz17 真机画面 | **NOT VERIFIED**（设备通道超时） |
+| #30＋#31 A→B→A 最终界面听音 | **NOT VERIFIED**（模拟器点播无状态变化；真机未听） |

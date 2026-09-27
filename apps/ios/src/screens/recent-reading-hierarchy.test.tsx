@@ -179,6 +179,7 @@ describe('recent reading hierarchy', () => {
     expect(view.getByTestId('recent-sound-moment_mix-progress-asset_voice')).toBeTruthy();
     expect(view.getAllByText('一段声音 · 4秒').length).toBeGreaterThanOrEqual(2);
     expect(view.getAllByLabelText('播放，4秒')).toHaveLength(2);
+    expect(view.getAllByText('▶').length).toBeGreaterThanOrEqual(2);
     expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('看这条');
     expect(view.queryByTestId('recent-sound-moment_voice-scene-asset_voice')).toBeNull();
     expect(view.getByTestId('recent-open-label-moment_voice').props.children).toBe('看这条');

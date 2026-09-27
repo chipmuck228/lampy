@@ -53,6 +53,7 @@ export function MomentAudio({
   testIDPrefix,
   compact = false,
   scene = false,
+  markedActions = false,
 }: {
   audio: AudioView | null;
   playbackStatus?: PlaybackStatus;
@@ -62,6 +63,7 @@ export function MomentAudio({
   testIDPrefix: string;
   compact?: boolean;
   scene?: boolean;
+  markedActions?: boolean;
 }) {
   if (!audio) return null;
 
@@ -157,9 +159,11 @@ export function MomentAudio({
           style={styles.hit}
         >
           <View style={styles.actionRow}>
-            <Text accessible={false} style={styles.mark}>
-              {playing ? '❚❚' : playbackStatus === 'finished' ? '↺' : preparing ? '·' : '▶'}
-            </Text>
+            {markedActions ? (
+              <Text accessible={false} style={styles.mark}>
+                {playing ? '❚❚' : playbackStatus === 'finished' ? '↺' : preparing ? '·' : '▶'}
+              </Text>
+            ) : null}
             <Text style={styles.action}>{actionLabel}</Text>
           </View>
         </Pressable>
