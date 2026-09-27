@@ -557,6 +557,71 @@ describe('useSoundPlayer state sync', () => {
       add.mockRestore();
     }
   });
+
+  it('does not let a late park overwrite or pause a newer play', async () => {
+    const handlers: ((state: AppStateStatus) => void)[] = [];
+    const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') handlers.push(handler);
+      return { remove: jest.fn() };
+    });
+    try {
+      let finishPause: (() => void) | undefined;
+      let holdPause = true;
+      let pauses = 0;
+      const playback = createDeferredPlayback();
+      const originalPause = playback.pause.bind(playback);
+      playback.pause = async () => {
+        pauses += 1;
+        if (holdPause) {
+          holdPause = false;
+          await new Promise<void>((resolve) => {
+            finishPause = resolve;
+          });
+        }
+        if (playback.getStatus().status === 'playing') return;
+        return originalPause();
+      };
+      const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      playback.reportPlaying(1200);
+      await waitFor(() => {
+        expect(result.current.status).toBe('playing');
+      });
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('background'));
+      });
+      expect(result.current.status).toBe('paused');
+      expect(result.current.currentTimeMs).toBe(1200);
+      expect(pauses).toBe(1);
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('active'));
+      });
+      playback.deferPlaying = false;
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      expect(result.current.status).toBe('playing');
+      expect(playback.getStatus().status).toBe('playing');
+      const pausesAfterLatest = pauses;
+
+      await act(async () => {
+        finishPause?.();
+      });
+
+      expect(pauses).toBe(pausesAfterLatest);
+      expect(result.current.status).toBe('playing');
+      expect(result.current.status).not.toBe('paused');
+      expect(result.current.status).not.toBe('idle');
+      expect(playback.getStatus().status).toBe('playing');
+    } finally {
+      add.mockRestore();
+    }
+  });
 });
 
 describe('moment audio follows the player, not the button copy', () => {

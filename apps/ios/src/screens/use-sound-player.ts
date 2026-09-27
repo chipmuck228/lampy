@@ -78,12 +78,34 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
   }, []);
 
   const park = useCallback(async () => {
-    generationRef.current += 1;
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
     playInFlightRef.current = false;
     pendingUriRef.current = null;
     const current = playerRef.current;
     const before = current?.getStatus();
     const heard = before?.currentTimeMs ?? 0;
+
+    function settleFrom(snapshot: { status: PlaybackStatus; currentTimeMs: number } | undefined, fallbackMs: number) {
+      if (!mountedRef.current || generation !== generationRef.current) return;
+      const kept = (snapshot?.currentTimeMs ?? 0) > 0 ? snapshot!.currentTimeMs : fallbackMs;
+      if (snapshot?.status === 'unavailable') {
+        setFailed(true);
+        writeStatus('unavailable');
+        setCurrentTimeMs(0);
+        return;
+      }
+      setFailed(false);
+      if (kept > 0 && statusRef.current !== 'idle' && statusRef.current !== 'finished') {
+        writeStatus('paused');
+        setCurrentTimeMs(kept);
+        return;
+      }
+      writeStatus('idle');
+      setCurrentTimeMs(0);
+    }
+
+    settleFrom(before, heard);
     if (current) {
       try {
         await current.pause();
@@ -91,23 +113,7 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
         // Native player may already be interrupted.
       }
     }
-    if (!mountedRef.current) return;
-    const after = current?.getStatus();
-    const kept = (after?.currentTimeMs ?? 0) > 0 ? after!.currentTimeMs : heard;
-    if (after?.status === 'unavailable') {
-      setFailed(true);
-      writeStatus('unavailable');
-      setCurrentTimeMs(0);
-      return;
-    }
-    setFailed(false);
-    if (kept > 0 && statusRef.current !== 'idle' && statusRef.current !== 'finished') {
-      writeStatus('paused');
-      setCurrentTimeMs(kept);
-      return;
-    }
-    writeStatus('idle');
-    setCurrentTimeMs(0);
+    settleFrom(current?.getStatus(), heard);
   }, []);
 
   useEffect(() => {
