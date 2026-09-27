@@ -183,10 +183,17 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
       sync();
     },
     async stop() {
-      if (!playerRef.current) return;
-      await playerRef.current.stop();
+      if (playerRef.current) {
+        try {
+          await playerRef.current.stop();
+        } catch {
+          // Still clear the UI so a leftover finished state cannot stick to a new clip.
+        }
+      }
       if (!mountedRef.current) return;
-      sync();
+      setFailed(false);
+      writeStatus('idle');
+      setCurrentTimeMs(0);
     },
   };
 }

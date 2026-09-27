@@ -425,6 +425,7 @@ export default function LeaveScreen() {
         if (abandoningRef.current || draftIdRef.current !== id) return;
         applyComposer(result.composer);
         setRecordPhase(result.composer.audio ? 'stopped' : 'ready');
+        void sound.stop();
         if (!result.hadSession) return;
         setMessage(
           result.kept

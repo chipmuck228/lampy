@@ -145,6 +145,25 @@ describe('expo audio playback with a delayed native player', () => {
     expect(playback.getStatus().currentTimeMs).toBe(1200);
   });
 
+  it('resets to idle when stopped, so a later clip is not shown as finished', async () => {
+    const playback = loadPlayback();
+    await playback.load('file://leave.m4a');
+    await playback.play();
+    native.playing = true;
+    native.currentTime = 2;
+    expect(playback.getStatus().status).toBe('playing');
+
+    await playback.stop();
+    native.playing = false;
+    native.currentTime = 0;
+    expect(playback.getStatus()).toEqual({
+      status: 'idle',
+      currentTimeMs: 0,
+      durationMs: 3500,
+    });
+    expect(playback.getStatus().status).not.toBe('finished');
+  });
+
   it('stays preparing after a user pause until native playing is heard again', async () => {
     const playback = loadPlayback();
     await playback.load('file://leave.m4a');

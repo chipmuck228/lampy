@@ -345,8 +345,8 @@ export function createMemoryAudioPlayback(): AudioPlayback & {
       }
     },
     async stop() {
-      playback.status = playback.loadedUri ? 'finished' : 'idle';
-      playback.currentTimeMs = playback.durationMs;
+      playback.status = 'idle';
+      playback.currentTimeMs = 0;
     },
     async release() {
       playback.releases += 1;

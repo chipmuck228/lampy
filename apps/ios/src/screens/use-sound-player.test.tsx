@@ -117,6 +117,31 @@ describe('useSoundPlayer state sync', () => {
     expect(playback.loads).toBe(1);
   });
 
+  it('clears a finished preview so a kept interrupt is not shown as already played', async () => {
+    const playback = createDeferredPlayback();
+    const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    playback.reportPlaying(3500);
+    await waitFor(() => {
+      expect(result.current.status).toBe('playing');
+    });
+    playback.reportFinished();
+    await waitFor(() => {
+      expect(result.current.status).toBe('finished');
+    });
+
+    await act(async () => {
+      await result.current.stop();
+    });
+
+    expect(result.current.status).toBe('idle');
+    expect(result.current.currentTimeMs).toBe(0);
+    expect(result.current.failed).toBe(false);
+  });
+
   it('ignores a second tap while the same uri is still starting', async () => {
     let finishLoad: ((value?: void) => void) | undefined;
     const playback = createDeferredPlayback();

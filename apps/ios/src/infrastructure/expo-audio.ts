@@ -362,10 +362,10 @@ export function createExpoAudioPlayback(): AudioPlayback {
       startRequested = false;
       heardPlaying = false;
       lastHeardTimeMs = 0;
+      finished = false;
       if (!player) return;
       player.pause();
       await player.seekTo(0);
-      finished = true;
     },
     async release() {
       disposeNativePlayer(player);
