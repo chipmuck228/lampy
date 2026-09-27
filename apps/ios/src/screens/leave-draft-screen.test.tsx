@@ -15,6 +15,7 @@ const mockAbandon = jest.fn();
 const mockRemoveImage = jest.fn();
 const mockRemoveAudio = jest.fn();
 const mockSaveTextMoment = jest.fn();
+const mockBeginRecording = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
@@ -37,6 +38,8 @@ jest.mock('../application/container', () => ({
     addLibraryImages: async () => undefined,
     addCameraImage: async () => undefined,
     saveTextMoment: mockSaveTextMoment,
+    beginDraftRecording: mockBeginRecording,
+    getRecordingElapsedMs: () => 0,
   }),
 }));
 
@@ -96,7 +99,9 @@ describe('leave draft restore and abandon', () => {
     mockRemoveImage.mockReset();
     mockRemoveAudio.mockReset();
     mockSaveTextMoment.mockReset();
+    mockBeginRecording.mockReset();
     mockRestore.mockResolvedValue(restoredDraft);
+    mockBeginRecording.mockResolvedValue(undefined);
     mockUpdateDraftNote.mockResolvedValue(undefined);
     mockUpdateDraftEmotion.mockResolvedValue(undefined);
     mockAbandon.mockResolvedValue({
@@ -333,6 +338,49 @@ describe('leave draft restore and abandon', () => {
     });
     expect(view.getByLabelText('照片 1/1')).toBeTruthy();
     expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
+  });
+
+  it('does not detach a photo or sound while save is in flight', async () => {
+    let releaseSave: () => void = () => {};
+    mockSaveTextMoment.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseSave = () => resolve({ momentId: 'moment_saved', leftover: false });
+        }),
+    );
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByTestId('composer-save')).toBeTruthy();
+      expect(view.getByLabelText('移除这张照片，照片 1/1')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('composer-save'));
+    await waitFor(() => {
+      expect(view.queryByLabelText('移除这张照片，照片 1/1')).toBeNull();
+      expect(view.getByLabelText('移除这段声音').props.accessibilityState?.disabled).toBe(true);
+    });
+    fireEvent.press(view.getByLabelText('移除这段声音'));
+    expect(mockRemoveAudio).not.toHaveBeenCalled();
+    expect(mockRemoveImage).not.toHaveBeenCalled();
+    releaseSave();
+    await waitFor(() => {
+      expect(mockSaveTextMoment).toHaveBeenCalled();
+    });
+  });
+
+  it('does not detach a photo or sound while rerecording', async () => {
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByLabelText('重录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('重录'));
+    await waitFor(() => {
+      expect(mockBeginRecording).toHaveBeenCalled();
+      expect(view.getByLabelText('停止录音，已经录了0秒')).toBeTruthy();
+    });
+    expect(view.queryByLabelText('移除这张照片，照片 1/1')).toBeNull();
+    expect(view.queryByLabelText('移除这段声音')).toBeNull();
+    expect(mockRemoveAudio).not.toHaveBeenCalled();
+    expect(mockRemoveImage).not.toHaveBeenCalled();
   });
 
   it('persists edits on a restored draft', async () => {

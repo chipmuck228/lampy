@@ -208,13 +208,17 @@ export default function LeaveScreen() {
       return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id);
     })
       .then((next) => {
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         applyComposer(next);
         setMessage(null);
       })
       .catch(async (error) => {
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         if (isApplicationError(error) && error.code === 'IMAGE_LIMIT') {
+          if (abandoningRef.current || draftIdRef.current !== id) return;
           const app = await getUseCases();
           const draft = await app.restoreOrCreateDraft();
+          if (abandoningRef.current || draftIdRef.current !== id) return;
           applyComposer(draft);
           setMessage('每条最多三张照片');
           return;
@@ -254,12 +258,14 @@ export default function LeaveScreen() {
       await app.beginDraftRecording(id);
     })
       .then(() => {
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         setRecordPhase('recording');
         setMessage(null);
       })
       .catch((error) => {
         busyRef.current = false;
         setBusy('idle');
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         if (isApplicationError(error) && error.code === 'MIC_DENIED') {
           setRecordPhase('ready');
           setMessage(error.message);
@@ -277,18 +283,20 @@ export default function LeaveScreen() {
 
   function stopRecording() {
     const id = draftIdRef.current;
-    if (!id || phaseRef.current !== 'recording') return;
+    if (!id || abandoningRef.current || phaseRef.current !== 'recording') return;
     setRecordPhase('processing');
     void enqueue(async () => {
       const app = await getUseCases();
       return app.finishDraftRecording(id);
     })
       .then((next) => {
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         applyComposer(next);
         setRecordPhase(next.audio ? 'stopped' : 'failed');
         setMessage(null);
       })
       .catch((error) => {
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         setRecordPhase('failed');
         setMessage(shownError(error, '这次没有录下声音。可以再试，也可以继续写字。'));
       })
@@ -301,13 +309,14 @@ export default function LeaveScreen() {
 
   function interruptRecording() {
     const id = draftIdRef.current;
-    if (!id || phaseRef.current !== 'recording') return;
+    if (!id || abandoningRef.current || phaseRef.current !== 'recording') return;
     setRecordPhase('processing');
     void enqueue(async () => {
       const app = await getUseCases();
       return app.interruptDraftRecording(id);
     })
       .then((result) => {
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         applyComposer(result.composer);
         setRecordPhase(result.composer.audio ? 'stopped' : 'ready');
         if (!result.hadSession) return;
@@ -318,6 +327,7 @@ export default function LeaveScreen() {
         );
       })
       .catch((error) => {
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         setRecordPhase('failed');
         setMessage(shownError(error, '录音被打断。可以再试，也可以继续写字。'));
       })
@@ -334,7 +344,7 @@ export default function LeaveScreen() {
 
   function removeImage(assetId: string) {
     const id = draftIdRef.current;
-    if (!id || abandoningRef.current || busy === 'save' || busy === 'abandon') return;
+    if (!id || abandoningRef.current || busyRef.current || busy !== 'idle') return;
     void enqueue(async () => {
       if (abandoningRef.current || draftIdRef.current !== id) return null;
       removingRef.current = true;
@@ -362,7 +372,7 @@ export default function LeaveScreen() {
 
   function removeAudio() {
     const id = draftIdRef.current;
-    if (!id || abandoningRef.current || busy === 'save' || busy === 'abandon') return;
+    if (!id || abandoningRef.current || busyRef.current || busy !== 'idle') return;
     void sound.stop();
     void enqueue(async () => {
       if (abandoningRef.current || draftIdRef.current !== id) return null;
@@ -409,12 +419,15 @@ export default function LeaveScreen() {
       .catch(async (error) => {
         busyRef.current = false;
         setBusy('idle');
+        if (abandoningRef.current || draftIdRef.current !== id) return;
         try {
           const app = await getUseCases();
           const draft = await app.restoreOrCreateDraft();
+          if (abandoningRef.current || draftIdRef.current !== id) return;
           applyComposer(draft);
           setRecordPhase(draft.audio ? 'stopped' : 'ready');
         } catch {
+          if (abandoningRef.current || draftIdRef.current !== id) return;
           setRecordPhase(audio ? 'stopped' : 'failed');
         }
         if (isApplicationError(error) && error.code === 'MIC_DENIED') {
@@ -638,7 +651,7 @@ export default function LeaveScreen() {
             images={images}
             testIDPrefix="composer-image"
             onRemoveImage={
-              draftId && !confirmingAbandon && busy !== 'abandon' ? removeImage : undefined
+              draftId && !confirmingAbandon && busy === 'idle' ? removeImage : undefined
             }
           />
           <MomentUnknownMedia items={unknownMedia} testIDPrefix="composer-unknown" />
@@ -649,7 +662,7 @@ export default function LeaveScreen() {
             playbackStatus={sound.failed ? 'unavailable' : sound.status}
             currentTimeMs={sound.currentTimeMs}
             disabled={composerLocked}
-            removeDisabled={busy === 'save' || busy === 'abandon' || confirmingAbandon}
+            removeDisabled={busy !== 'idle' || confirmingAbandon}
             onStart={startRecording}
             onStop={stopRecording}
             onPlay={() => {
