@@ -69,9 +69,16 @@ export function resetExpoAudioForTests() {
   loaded = undefined;
 }
 
+const END_SLOP_MS = 250;
+
 function secondsToMs(value: number | undefined): number {
   if (!Number.isFinite(value) || (value ?? 0) < 0) return 0;
   return Math.round((value as number) * 1000);
+}
+
+function hasReachedEnd(currentTimeMs: number, lastHeardTimeMs: number, durationMs: number): boolean {
+  if (durationMs <= 0) return false;
+  return Math.max(currentTimeMs, lastHeardTimeMs) + END_SLOP_MS >= durationMs;
 }
 
 function disposeNativePlayer(player: ReturnType<ExpoAudioModule['createAudioPlayer']> | null) {
@@ -230,12 +237,14 @@ export function createExpoAudioPlayback(): AudioPlayback {
   let failed = false;
   let startRequested = false;
   let heardPlaying = false;
+  let lastHeardTimeMs = 0;
 
   function resetSession() {
     finished = false;
     failed = false;
     startRequested = false;
     heardPlaying = false;
+    lastHeardTimeMs = 0;
   }
 
   return {
@@ -254,6 +263,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
           await player.seekTo(0);
           finished = false;
           heardPlaying = false;
+          lastHeardTimeMs = 0;
         }
         startRequested = true;
         player.play();
@@ -271,6 +281,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
     async stop() {
       startRequested = false;
       heardPlaying = false;
+      lastHeardTimeMs = 0;
       if (!player) return;
       player.pause();
       await player.seekTo(0);
@@ -296,17 +307,26 @@ export function createExpoAudioPlayback(): AudioPlayback {
         finished = true;
         startRequested = false;
         heardPlaying = false;
-        return { status: 'finished', currentTimeMs: durationMs || currentTimeMs, durationMs };
+        return { status: 'finished', currentTimeMs: durationMs || currentTimeMs || lastHeardTimeMs, durationMs };
       }
       if (status.playing) {
         heardPlaying = true;
+        lastHeardTimeMs = currentTimeMs;
         return { status: 'playing', currentTimeMs, durationMs };
       }
       if (startRequested && heardPlaying) {
-        finished = true;
         startRequested = false;
         heardPlaying = false;
-        return { status: 'finished', currentTimeMs: durationMs || currentTimeMs, durationMs };
+        if (hasReachedEnd(currentTimeMs, lastHeardTimeMs, durationMs)) {
+          finished = true;
+          return { status: 'finished', currentTimeMs: durationMs || currentTimeMs || lastHeardTimeMs, durationMs };
+        }
+        const pausedAt = currentTimeMs > 0 ? currentTimeMs : lastHeardTimeMs;
+        if (pausedAt > 0) {
+          return { status: 'paused', currentTimeMs: pausedAt, durationMs };
+        }
+        failed = true;
+        return { status: 'unavailable', currentTimeMs: 0, durationMs };
       }
       if (startRequested) {
         return { status: 'preparing', currentTimeMs, durationMs };
