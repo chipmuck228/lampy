@@ -46,5 +46,6 @@ describe('startup brand layer', () => {
     await waitFor(() => {
       expect(view.queryByTestId('startup-brand-layer')).toBeNull();
     });
+    view.unmount();
   });
 });

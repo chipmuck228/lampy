@@ -11,11 +11,13 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import {
   BRAND_FADE_MS,
+  type BrandMotionPref,
   brandReadyTimeoutMs,
   brandTimeoutGeneration,
   consumeStartupBrand,
   shouldShowStartupBrand,
   shouldSkipBrandFade,
+  shouldStartBrandExit,
 } from '../application/startup-brand';
 import { paper } from './life-page';
 
@@ -23,17 +25,21 @@ const mark = require('../../assets/images/splash-icon.png');
 
 export function StartupBrandLayer({ homeSettled }: { homeSettled: boolean }) {
   const [visible, setVisible] = useState(shouldShowStartupBrand);
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const [motionPref, setMotionPref] = useState<BrandMotionPref>('pending');
   const [opacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     let alive = true;
     AccessibilityInfo.isReduceMotionEnabled()
       .then((value) => {
-        if (alive) setReduceMotion(value);
+        if (alive) setMotionPref(value ? 'reduce' : 'allow');
       })
-      .catch(() => undefined);
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+      .catch(() => {
+        if (alive) setMotionPref('failed');
+      });
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (value) => {
+      setMotionPref(value ? 'reduce' : 'allow');
+    });
     return () => {
       alive = false;
       sub.remove();
@@ -45,7 +51,7 @@ export function StartupBrandLayer({ homeSettled }: { homeSettled: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (!visible || homeSettled) return;
+    if (!visible) return;
     const generation = brandTimeoutGeneration();
     const timer = setTimeout(() => {
       if (generation !== brandTimeoutGeneration()) return;
@@ -53,14 +59,14 @@ export function StartupBrandLayer({ homeSettled }: { homeSettled: boolean }) {
       setVisible(false);
     }, brandReadyTimeoutMs());
     return () => clearTimeout(timer);
-  }, [homeSettled, visible]);
+  }, [visible]);
 
   useEffect(() => {
-    if (!visible || !homeSettled) return;
+    if (!visible || !homeSettled || !shouldStartBrandExit(motionPref)) return;
     consumeStartupBrand();
     const animation = Animated.timing(opacity, {
       toValue: 0,
-      duration: shouldSkipBrandFade(reduceMotion) ? 0 : BRAND_FADE_MS,
+      duration: shouldSkipBrandFade(motionPref) ? 0 : BRAND_FADE_MS,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     });
@@ -70,7 +76,7 @@ export function StartupBrandLayer({ homeSettled }: { homeSettled: boolean }) {
     return () => {
       animation.stop();
     };
-  }, [homeSettled, opacity, reduceMotion, visible]);
+  }, [homeSettled, motionPref, opacity, visible]);
 
   if (!visible) return null;
 

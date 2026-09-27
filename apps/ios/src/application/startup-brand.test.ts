@@ -7,6 +7,7 @@ import {
   setBrandReadyTimeoutForTests,
   shouldShowStartupBrand,
   shouldSkipBrandFade,
+  shouldStartBrandExit,
 } from './startup-brand';
 
 describe('startup brand session', () => {
@@ -23,8 +24,14 @@ describe('startup brand session', () => {
   });
 
   it('skips the fade only when Reduce Motion is on', () => {
-    expect(shouldSkipBrandFade(false)).toBe(false);
-    expect(shouldSkipBrandFade(true)).toBe(true);
+    expect(shouldStartBrandExit('pending')).toBe(false);
+    expect(shouldStartBrandExit('allow')).toBe(true);
+    expect(shouldStartBrandExit('reduce')).toBe(true);
+    expect(shouldStartBrandExit('failed')).toBe(true);
+    expect(shouldSkipBrandFade('pending')).toBe(true);
+    expect(shouldSkipBrandFade('allow')).toBe(false);
+    expect(shouldSkipBrandFade('reduce')).toBe(true);
+    expect(shouldSkipBrandFade('failed')).toBe(true);
     expect(BRAND_FADE_MS).toBeGreaterThanOrEqual(300);
     expect(BRAND_FADE_MS).toBeLessThanOrEqual(450);
     expect(BRAND_READY_TIMEOUT_MS).toBeGreaterThan(BRAND_FADE_MS);

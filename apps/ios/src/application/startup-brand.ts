@@ -31,6 +31,12 @@ export function consumeStartupBrand(): void {
   consumedThisProcess = true;
 }
 
-export function shouldSkipBrandFade(reduceMotion: boolean): boolean {
-  return reduceMotion;
+export type BrandMotionPref = 'pending' | 'allow' | 'reduce' | 'failed';
+
+export function shouldStartBrandExit(pref: BrandMotionPref): boolean {
+  return pref !== 'pending';
+}
+
+export function shouldSkipBrandFade(pref: BrandMotionPref): boolean {
+  return pref !== 'allow';
 }
