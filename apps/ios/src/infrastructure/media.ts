@@ -83,6 +83,7 @@ export interface AudioPlayback {
   pause(): Promise<void>;
   stop(): Promise<void>;
   release(): Promise<void>;
+  seekTo(positionMs: number): Promise<void>;
   getStatus(): { status: PlaybackStatus; currentTimeMs: number; durationMs: number };
 }
 
@@ -298,9 +299,11 @@ export function createMemoryAudioCapture(options?: {
 export function createMemoryAudioPlayback(): AudioPlayback & {
   loadedUri: string | null;
   failNextPlay: boolean;
+  failNextSeek: boolean;
   deferPlaying: boolean;
   plays: number;
   loads: number;
+  seeks: number[];
   releases: number;
   currentTimeMs: number;
   durationMs: number;
@@ -310,9 +313,11 @@ export function createMemoryAudioPlayback(): AudioPlayback & {
   const playback = {
     loadedUri: null as string | null,
     failNextPlay: false,
+    failNextSeek: false,
     deferPlaying: false,
     plays: 0,
     loads: 0,
+    seeks: [] as number[],
     releases: 0,
     status: 'idle' as PlaybackStatus,
     currentTimeMs: 0,
@@ -338,6 +343,14 @@ export function createMemoryAudioPlayback(): AudioPlayback & {
         return;
       }
       playback.status = 'playing';
+    },
+    async seekTo(positionMs: number) {
+      if (playback.failNextSeek) {
+        playback.failNextSeek = false;
+        throw new Error('seek failed');
+      }
+      playback.seeks.push(positionMs);
+      playback.currentTimeMs = positionMs;
     },
     async pause() {
       if (playback.status === 'playing' || playback.status === 'preparing') {

@@ -162,7 +162,7 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
     status,
     currentTimeMs,
     failed,
-    async play(uri: string) {
+    async play(uri: string, resumeAtMs = 0) {
       if (!mountedRef.current) return;
       if (loadedUriRef.current === uri && statusRef.current === 'playing') return;
       if (playInFlightRef.current && pendingUriRef.current === uri) return;
@@ -186,6 +186,10 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
           await current.load(uri);
           if (!mountedRef.current || generation !== generationRef.current) return;
           loadedUriRef.current = uri;
+        }
+        if (resumeAtMs > 0) {
+          await current.seekTo(resumeAtMs);
+          if (!mountedRef.current || generation !== generationRef.current) return;
         }
         await current.play();
         if (!mountedRef.current || generation !== generationRef.current) return;

@@ -142,6 +142,32 @@ describe('useSoundPlayer state sync', () => {
     expect(result.current.failed).toBe(false);
   });
 
+  it('seeks to a remembered position after the shared player loaded another uri', async () => {
+    const playback = createDeferredPlayback();
+    playback.deferPlaying = false;
+    const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    playback.reportPlaying(1200);
+    await act(async () => {
+      await result.current.pause();
+    });
+
+    await act(async () => {
+      await result.current.play('file://documents/other.m4a');
+    });
+    await act(async () => {
+      await result.current.play(VOICE, 1200);
+    });
+
+    expect(playback.loadedUri).toBe(VOICE);
+    expect(playback.seeks).toContain(1200);
+    expect(result.current.currentTimeMs).toBe(1200);
+    expect(result.current.status).toBe('playing');
+  });
+
   it('ignores a second tap while the same uri is still starting', async () => {
     let finishLoad: ((value?: void) => void) | undefined;
     const playback = createDeferredPlayback();
@@ -275,6 +301,11 @@ describe('useSoundPlayer state sync', () => {
       },
       async stop() {},
       async release() {},
+      async seekTo(positionMs: number) {
+        nativeTimeMs = positionMs;
+        lastHeardMs = positionMs;
+        seeks.push(positionMs);
+      },
       getStatus() {
         if (status === 'unavailable') {
           return { status, currentTimeMs: 0, durationMs: 0 };

@@ -320,6 +320,29 @@ describe('expo audio playback with a delayed native player', () => {
     });
     expect(playback.getStatus().status).not.toBe('paused');
   });
+
+  it('seeks to a remembered position after loading a different uri', async () => {
+    const playback = loadPlayback();
+    await playback.load('file://a.m4a');
+    await playback.play();
+    native.playing = true;
+    native.currentTime = 1.2;
+    expect(playback.getStatus().currentTimeMs).toBe(1200);
+
+    await playback.load('file://b.m4a');
+    native.currentTime = 0;
+    native.playing = false;
+    await playback.seekTo(1200);
+    expect(player.seekTo).toHaveBeenCalledWith(1.2);
+    expect(native.currentTime).toBe(1.2);
+    await playback.play();
+    native.playing = true;
+    expect(playback.getStatus()).toEqual({
+      status: 'playing',
+      currentTimeMs: 1200,
+      durationMs: 3500,
+    });
+  });
 });
 
 describe('expo audio session routing', () => {

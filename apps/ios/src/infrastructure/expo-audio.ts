@@ -181,6 +181,9 @@ function createUnavailablePlayback(): AudioPlayback {
     async pause() {},
     async stop() {},
     async release() {},
+    async seekTo() {
+      throw new Error("Cannot find native module 'ExpoAudio'");
+    },
     getStatus() {
       return { status: 'unavailable' as PlaybackStatus, currentTimeMs: 0, durationMs: 0 };
     },
@@ -364,6 +367,12 @@ export function createExpoAudioPlayback(): AudioPlayback {
         lastHeardTimeMs = 0;
         throw new Error('play failed');
       }
+    },
+    async seekTo(positionMs: number) {
+      if (!player) throw new Error('no source');
+      await player.seekTo(Math.max(0, positionMs) / 1000);
+      lastHeardTimeMs = positionMs;
+      finished = false;
     },
     async pause() {
       invalidateStart();
