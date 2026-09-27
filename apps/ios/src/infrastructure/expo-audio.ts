@@ -334,6 +334,9 @@ export function createExpoAudioPlayback(): AudioPlayback {
       if (currentTimeMs > 0) {
         return { status: 'paused', currentTimeMs, durationMs };
       }
+      if (lastHeardTimeMs > 0) {
+        return { status: 'paused', currentTimeMs: lastHeardTimeMs, durationMs };
+      }
       return { status: 'idle', currentTimeMs, durationMs };
     },
   };

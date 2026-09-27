@@ -12,7 +12,7 @@
 
 同一条路径里，每次点「播放」都会 `load(uri)` 并 `release` + 重建播放器，暂停后再播会从头开始。
 
-播完后如果错过一次性的 `didJustFinish`，`startRequested` 仍为 true，状态会回到 `preparing`，8 秒后被误判为失败。补完「曾 playing 即 finished」之后，中途停在 1 秒（无 `didJustFinish`）也会被误报「已播完」；现在只有位置接近总时长，或明确的结束事件，才报 finished。无法确认结束时保持暂停可继续，或失败可重试。
+播完后如果错过一次性的 `didJustFinish`，`startRequested` 仍为 true，状态会回到 `preparing`，8 秒后被误判为失败。补完「曾 playing 即 finished」之后，中途停在 1 秒（无 `didJustFinish`）也会被误报「已播完」；现在只有位置接近总时长，或明确的结束事件，才报 finished。无法确认结束时保持暂停可继续，或失败可重试。原生把 1 秒位置归零后，后续 getStatus 仍保持同一次暂停，不会掉回「未播放」。
 
 ## 走查（iPhone 16 / iOS 18.6）
 

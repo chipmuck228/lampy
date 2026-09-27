@@ -189,4 +189,28 @@ describe('expo audio playback with a delayed native player', () => {
     expect(player.play).toHaveBeenCalledTimes(2);
     expect(playback.getStatus().currentTimeMs).toBe(1000);
   });
+
+  it('keeps the same resumable status when native stops at 1s and the playhead resets to 0', async () => {
+    const playback = loadPlayback();
+    await playback.load('file://leave.m4a');
+    await playback.play();
+    native.playing = true;
+    native.currentTime = 1;
+    expect(playback.getStatus().status).toBe('playing');
+
+    native.playing = false;
+    native.didJustFinish = false;
+    native.currentTime = 0;
+    const first = playback.getStatus();
+    const second = playback.getStatus();
+
+    expect(first).toEqual({
+      status: 'paused',
+      currentTimeMs: 1000,
+      durationMs: 3500,
+    });
+    expect(second).toEqual(first);
+    expect(second.status).not.toBe('idle');
+    expect(second.status).not.toBe('finished');
+  });
 });
