@@ -1,54 +1,72 @@
 # 「最近」视觉走查帧
 
 PR #32 / `ios/recent-visual`。范围仍只改「最近」展示层。
-走查机：iPhone 16 Simulator / iOS 18.6。本轮 JS 由已装 Dev Client + Metro 8081 载入，未重新 `expo run:ios`。
-媒体是本机库里 #27 走查留下的记录，没有改 Moment / Asset。
+收尾核对：head `74fbe43`，base `origin/main` @ `469b7c5`（最新）。未沿用 #30 合并前听音。
 
-Liuz17（iPhone 17 Pro / iOS 26.2）本轮 **连不上**（Core Device 超时），画面与听音均 **NOT VERIFIED**。
+## 本轮安装
 
-## 符号范围
+| 项 | 值 |
+| --- | --- |
+| JS / 构建 SHA | `74fbe43`（Dev Client + Metro 8081，未重新 `expo run:ios`） |
+| iPhone 16 Simulator | iOS 18.6 · UDID `5A7769A7-45B7-4A6E-8C17-938F6618BD56` |
+| Liuz17 | iPhone 17 Pro / iOS 26.2 · 已 `devicectl` 启动 `app.lampy.ios`（pid 2832），屏幕亮、竖屏。本机无法点控件、无法听筒 |
 
-播放／暂停／再听一次的 ▶❚❚↺ 只由「最近」传入 `markedActions`。`MomentAudio` 默认仍是纯文字。
+媒体仍是本机库里 #27 走查留下的记录。家庭入口、照片权限、Moment/Asset、播放器状态语义未改。
+
+## 1. 运行中进度轨（#32 最新 JS）
+
+| 路径 | 仅声音 | 图＋声 |
+| --- | --- | --- |
+| idle：无空轨 | **PASS**（本轮 `shots/iphone16-closeout-idle-voice.png`：紧凑标题，「一段声音 · 3秒」与「▶ 播放」之间无线） | **PASS**（本轮 `shots/iphone16-closeout-idle-mix.png`：有「当时的声音」，meta 与播放之间无线） |
+| 点播放：听到声音、进入播放态、进度前进 | **NOT VERIFIED** | **NOT VERIFIED** |
+| 点暂停：停声、轨与位置保留 | **NOT VERIFIED** | **NOT VERIFIED** |
+| 再播：从暂停点续 | **NOT VERIFIED** | **NOT VERIFIED** |
+| 播完：真实结束、无空轨当分隔线 | **NOT VERIFIED** | **NOT VERIFIED** |
+
+阻碍：模拟器合成点击会落到「看这条」或无法进入「暂停」；此处听不到扬声器。Liuz17 已打开 App，但没有 HID / 听音通道。Jest 与模拟点击不代替听音。
+
+常规字号下「▶ 播放」与「看这条 ›」本轮 idle 画面不遮挡、不串行。最大字号本轮未重走，沿用既有 XXXL 帧，播放态 XXXL **NOT VERIFIED**。
+
+## 符号与详情
 
 | 页面 | 结果 | 证据 |
 | --- | --- | --- |
-| 最近 | **PASS** | `shots/iphone16-idle-mix.png`：`▶ 播放` + `看这条 ›` |
-| 详情 | **PASS** | `shots/iphone16-detail-mix-play.png`：同一控件只有「播放」，无符号 |
-| 留下草稿条 / 回看 | **NOT VERIFIED** | 未打开这两页；二者未传 `markedActions`，与详情同默认 |
+| 最近 | idle **PASS** | 上表 closeout 帧 |
+| 详情 | 符号未漏：**PASS**（既有 `iphone16-detail-mix-play.png`） | 本轮未重开详情 |
+| 留下 / 回看 | **NOT VERIFIED** | 未打开 |
 
-## 「看这条 ›」
+## 其它画面
 
-外层 `Pressable` ≥ 48pt；文字与 `›` 同一行、同一字号行高，文字不再用 `minHeight: 48` 撑高。
+| 场景 | 结果 |
+| --- | --- |
+| 同日 72pt 细线只在两条之间 | **PASS**（closeout 图＋声 / 仅声音均可见短线在「看这条」与下一条之间） |
+| 横屏 | **NOT VERIFIED** |
+| iPad | **NOT VERIFIED** |
+| 外接音频 | **NOT VERIFIED** |
+| Liuz17 真机画面 / 听音 | **NOT VERIFIED**（已启动，未操作、未听） |
 
-| 场景 | 结果 | 证据 |
-| --- | --- | --- |
-| 常规字号 | **PASS** | `shots/iphone16-open-regular-crop.png`、`shots/iphone16-idle-mix.png`。`›` 与「看这条」同一行视觉居中，不再落在右下角。 |
-| AX XXXL | **PASS** | `shots/iphone16-open-xxxl.png`。大字号下仍同行；「一段声音 · 3秒」自然换行，无裁切。 |
-
-## 空进度轨与同日短线
-
-「最近」idle 不画空轨。真正播放／暂停且有进度后才画 3pt、青色、通栏的 heard 轨，与 72pt 浅发丝同日线区分。详情默认仍画 scene 轨。
-
-| 场景 | 结果 | 证据 |
-| --- | --- | --- |
-| 图＋声 idle | **PASS** | `shots/iphone16-idle-mix.png`、`shots/iphone16-idle-mix-crop.png`。「一段声音 · 3秒」与「▶ 播放」之间无线。 |
-| 仅声音 idle | **PASS** | `shots/iphone16-idle-voice.png`。紧凑：无「当时的声音」标题；meta 与播放之间无线。 |
-| 仅声音／混排 playing、paused | **NOT VERIFIED** | 运行中 App 未见到暂停态。Jest 覆盖紧凑与 scene 两种 heard 轨。 |
-| 同日 72pt 细线 | **PASS** | `shots/iphone16-idle-mix.png`、`shots/iphone16-rule-gap-crop.png`。线在「看这条」与下一条正文之间，不贴住下一句。 |
-| 缺失媒体 | **PASS** | `shots/iphone16-recent-missing.png` |
-| 三图长记录 | **PASS** | `shots/iphone16-recent-glyphs.png` |
-| 最大字号换行 | **PASS** | `shots/iphone16-xxxl-home.png`、`shots/iphone16-xxxl-scroll2.png`、`shots/iphone16-open-xxxl.png` |
-| 横屏 | **NOT VERIFIED** | 本轮未转屏 |
-| iPad | **NOT VERIFIED** | 未走 |
-| Liuz17 真机画面 | **NOT VERIFIED** | 设备配对但通道超时 |
-
-## #30＋#31 集成听音（最终界面）
-
-#32 未改播放状态机。A 暂停 → B 暂停 → 再听 A / 再听 B，以及后台返回，须在**最终界面**上听过才能记 PASS。
+## 2. #30＋#31＋#32 同一安装集成听音
 
 | 路径 | 结果 |
 | --- | --- |
-| iPhone 16 模拟器点播 | **NOT VERIFIED**。合成点击落到「看这条」进了详情，未听到、未见「暂停」。不能凭 Jest 记续播 PASS。 |
-| Liuz17 真机听音 | **NOT VERIFIED**。本轮未装上、未听。 |
+| A 暂停 → B 暂停 → 再播 A → 再播 B | **NOT VERIFIED**。未听到各自录音，未见各自暂停点续播。不用 #30 合并前真机、Jest 或模拟点击记 PASS。 |
+| B 播放中切后台再返回 | **NOT VERIFIED** |
 
-因此 #30＋#31 合并后的 A→B→A **仍不能记 PASS**。
+## 3. 检查（本轮实跑）
+
+在 `apps/ios`、head `74fbe43`：
+
+- `npx tsc --noEmit`：**PASS**
+- 全量 Jest：**465 passed / 78 suites**
+- 改动文件 eslint：**PASS**
+- `git diff --check`：**PASS**（工作区无已暂存/未暂存的 `apps/ios` 源码改动）
+
+PR 相对最新 `origin/main` **MERGEABLE**。Bugbot 旧评（`80280e5`）：「看这条」撑高已在后续提交去掉；`▶` 在 idle 实拍里是低强调三角，未当本轮阻塞。
+
+## 下一次可执行的走查
+
+在 Liuz17（或能听的真机）打开已连 Metro 的 Lampy，确认 bundle 为 `74fbe43` 或更新 head：
+
+1. 「最近」找一条仅声音、一条图＋声：idle → 播放（听）→ 暂停（听停）→ 再播（听续）→ 听完；拍 idle / 播放 / 暂停。
+2. 同一安装做 A→B→A / 再播 B，再在 B 播放中切后台返回。
+3. 两组都听到并观察后再把对应行改 PASS 或 FAIL；未听完不要改写成 PASS。

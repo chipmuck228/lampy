@@ -6,7 +6,7 @@
 
 依据：`LAMPY_APP_PRODUCT_DESIGN_GUIDE.md` §0、§10.2、§12–13；`ui-round-1` 的去 Card 与阅读宽度。
 
-#30+#31 合并后的 A→B→A 真机听音仍 **NOT VERIFIED**，本轮不声称已回归。
+收尾（`74fbe43`）：idle 无空轨已在最新 JS 上重拍。播放／暂停听音与 #30＋#31 集成听音仍 **NOT VERIFIED**，不合并。
 
 ## 对照两种同日分隔
 
@@ -40,10 +40,9 @@
 | 最大字号换行 | iPhone 16：**PASS**（日期／占位／播放／看这条换行；细线不贴下一条） |
 | 符号未漏到详情 | iPhone 16：**PASS**（详情「播放」无 ▶） |
 | 「看这条 ›」同行居中 | iPhone 16 常规 + XXXL：**PASS** |
-| idle 无空进度轨 | iPhone 16 图＋声 / 仅声音（紧凑、无场景标题）：**PASS** |
-| 纯声音 playing／paused 进度 | Jest：**PASS**；运行中 App：**NOT VERIFIED** |
-| 播放／暂停 heard 轨 | Jest：**PASS**；运行中 App：**NOT VERIFIED** |
-| 横屏 | **NOT VERIFIED** |
-| iPad | **NOT VERIFIED** |
-| Liuz17 真机画面 | **NOT VERIFIED**（设备通道超时） |
-| #30＋#31 A→B→A 最终界面听音 | **NOT VERIFIED**（模拟器未听成；真机未听） |
+| idle 无空进度轨 | 本轮 iPhone 16 最新 JS 图＋声 / 仅声音：**PASS**（`iphone16-closeout-idle-*.png`） |
+| 点播放听到、进度前进 | **NOT VERIFIED** |
+| 暂停停声、位置保留、再续、播完 | **NOT VERIFIED** |
+| #30＋#31＋#32 同一安装 A→B→A / 后台 | **NOT VERIFIED** |
+| 横屏 / iPad / 外接音频 | **NOT VERIFIED** |
+| Liuz17 听音 | **NOT VERIFIED**（已启动 App，未点、未听） |
