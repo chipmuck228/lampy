@@ -2,7 +2,7 @@
 
 设备：iPhone 16 Simulator（iOS 18.6）、iPad Pro 11-inch M4 Simulator（iOS 18.6）
 构建：Expo development build `app.lampy.ios`，Metro `127.0.0.1:8081`
-SHA：见本 PR head（提交本清单的那次 commit）
+SHA：`c5a294d34411dfe48ec9dad3111131305115da94`
 家庭入口按现有 URL 配置显示，未为截图改开关。
 
 | 文件 | 设备 / 系统 | 页面状态 | 结果 |
