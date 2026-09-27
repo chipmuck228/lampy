@@ -21,6 +21,7 @@ jest.mock('../application/container', () => ({
     restoreOrCreateDraft: mockRestore,
     updateDraftNote: async () => undefined,
     updateDraftEmotion: mockUpdateDraftEmotion,
+    updateDraftOccurred: async () => undefined,
     addLibraryImages: async () => undefined,
     addCameraImage: async () => undefined,
     saveTextMoment: async () => ({ id: 'moment_draft' }),

@@ -1,3 +1,4 @@
+import { deviceTimezoneOffsetMinutes } from '../domain-adapters/calendar';
 import { createUseCases } from './use-cases';
 import {
   createFamilyUseCases,
@@ -56,6 +57,8 @@ const defaultLoader = createUseCaseLoader(async () => {
     library: createExpoLibrarySource(),
     camera: createExpoCameraSource(),
     capture: createExpoAudioCapture(),
+    timezoneOffsetMinutes: deviceTimezoneOffsetMinutes(),
+    timezone: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' },
   });
 });
 

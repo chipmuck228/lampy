@@ -18,6 +18,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
 import {
+  occurredInputFromChoice,
+  optimisticOccurredChoice,
+  type CalendarDayParts,
+  type OccurredChoiceView,
+  type OccurredDraftInput,
+} from '../application/occurred-date';
+import {
   DRAFT_AUDIO_REMOVE_FAILED_MESSAGE,
   DRAFT_IMAGE_REMOVE_FAILED_MESSAGE,
   DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE,
@@ -27,6 +34,7 @@ import {
 } from '../application/use-cases';
 import { DraftSoundBar, MomentUnknownMedia, type RecordPhase } from '../screens/moment-audio';
 import { FeelingPicker } from '../screens/moment-feeling';
+import { OccurredDatePicker } from '../screens/moment-occurred';
 import { MomentImages } from '../screens/moment-images';
 import { useSoundPlayer } from '../screens/use-sound-player';
 import {
@@ -50,6 +58,11 @@ export default function LeaveScreen() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [restored, setRestored] = useState(false);
   const [confirmingAbandon, setConfirmingAbandon] = useState(false);
+  const [occurred, setOccurred] = useState<OccurredChoiceView>({ kind: 'today', label: '今天' });
+  const [todayParts, setTodayParts] = useState<CalendarDayParts>(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<
     'idle' | 'photo' | 'record' | 'audio' | 'save' | 'abandon' | 'remove'
@@ -63,6 +76,9 @@ export default function LeaveScreen() {
   const persistChain = useRef(Promise.resolve());
   const interruptRef = useRef<() => void>(() => {});
   const mountedRef = useRef(true);
+  const seededTodayRef = useRef(false);
+  const occurredEpochRef = useRef(0);
+  const pendingTodaySeedRef = useRef<string | null>(null);
   const sound = useSoundPlayer();
 
   useEffect(() => {
@@ -108,7 +124,22 @@ export default function LeaveScreen() {
         setEmotion(draft.emotion ?? '');
         applyComposer(draft);
         setRestored(draft.isRestored);
+        if (draft.today) setTodayParts(draft.today);
+        const nextOccurred =
+          draft.occurred ??
+          (draft.isRestored
+            ? { kind: 'unknown' as const, label: '时间不确定' }
+            : { kind: 'today' as const, label: '今天' });
+        setOccurred(nextOccurred);
         setRecordPhase(draft.audio ? 'stopped' : 'ready');
+        if (
+          !draft.isRestored &&
+          (!draft.occurred || draft.occurred.kind === 'unknown') &&
+          !seededTodayRef.current
+        ) {
+          seededTodayRef.current = true;
+          persistOccurred({ kind: 'today' }, draft.draftId);
+        }
       })
       .catch(() => {
         if (!cancelled && mountedRef.current) setMessage('草稿暂时读不出来，原来的内容没有被改写。');
@@ -171,6 +202,49 @@ export default function LeaveScreen() {
         return;
       }
       setMessage(shownError(error, '草稿暂时写不进去。已经写的字还在屏幕上。'));
+    });
+  }
+
+  function persistOccurred(input: OccurredDraftInput, draftId?: string) {
+    if (abandoningRef.current) return;
+    setOccurred(optimisticOccurredChoice(input, todayParts));
+    const id = draftId || draftIdRef.current;
+    if (!id) return;
+    occurredEpochRef.current += 1;
+    const occurredEpoch = occurredEpochRef.current;
+    const writeEpoch = writeEpochRef.current;
+    void enqueue(async () => {
+      if (
+        occurredEpochRef.current !== occurredEpoch ||
+        writeEpochRef.current !== writeEpoch ||
+        draftIdRef.current !== id ||
+        abandoningRef.current
+      ) {
+        return;
+      }
+      const app = await getUseCases();
+      const next = await app.updateDraftOccurred(id, input);
+      if (
+        occurredEpochRef.current !== occurredEpoch ||
+        writeEpochRef.current !== writeEpoch ||
+        draftIdRef.current !== id ||
+        abandoningRef.current
+      ) {
+        return;
+      }
+      if (next?.occurred) setOccurred(next.occurred);
+      if (next?.today) setTodayParts(next.today);
+    }).catch((error) => {
+      if (
+        !mountedRef.current ||
+        occurredEpochRef.current !== occurredEpoch ||
+        writeEpochRef.current !== writeEpoch ||
+        draftIdRef.current !== id ||
+        abandoningRef.current
+      ) {
+        return;
+      }
+      setMessage(shownError(error, '发生日期暂时写不进去。已经选的日期还在屏幕上。'));
     });
   }
 
@@ -451,6 +525,7 @@ export default function LeaveScreen() {
         const app = await getUseCases();
         await app.updateDraftNote(id, note);
         await app.updateDraftEmotion(id, emotion);
+        await app.updateDraftOccurred(id, occurredInputFromChoice(occurred));
         await app.saveTextMoment(id);
       });
       if (abandoningRef.current || draftIdRef.current !== id) return;
@@ -501,6 +576,14 @@ export default function LeaveScreen() {
         setNote(result.composer.note);
         setEmotion(result.composer.emotion ?? '');
         applyComposer(result.composer);
+        occurredEpochRef.current += 1;
+        setOccurred(
+          result.composer.occurred ?? { kind: 'today', label: '今天' },
+        );
+        if (result.composer.today) setTodayParts(result.composer.today);
+        if (!result.composer.occurred || result.composer.occurred.kind === 'unknown') {
+          pendingTodaySeedRef.current = result.composer.draftId;
+        }
         setRestored(false);
         setRecordPhase('ready');
         setElapsedMs(0);
@@ -515,6 +598,11 @@ export default function LeaveScreen() {
         busyRef.current = false;
         if (!mountedRef.current) return;
         setBusy('idle');
+        const seedId = pendingTodaySeedRef.current;
+        pendingTodaySeedRef.current = null;
+        if (seedId && draftIdRef.current === seedId) {
+          persistOccurred({ kind: 'today' }, seedId);
+        }
       });
   }
 
@@ -679,6 +767,14 @@ export default function LeaveScreen() {
             disabled={!draftId || composerLocked}
             onChange={(next) => {
               persistEmotion(next);
+            }}
+          />
+          <OccurredDatePicker
+            value={occurred}
+            today={todayParts}
+            disabled={!draftId || composerLocked}
+            onChange={(next) => {
+              persistOccurred(next);
             }}
           />
           {message ? <Text style={styles.message}>{message}</Text> : null}
