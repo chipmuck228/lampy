@@ -32,7 +32,6 @@ import {
   paper,
   sage,
 } from '../screens/life-page';
-import { groupRecentDays } from '../screens/recent-days';
 
 export default function RecentScreen() {
   const router = useRouter();
@@ -46,7 +45,7 @@ export default function RecentScreen() {
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const sound = useSoundPlayer();
-  const days = view ? groupRecentDays(view.items) : [];
+  const days = view?.days ?? [];
 
   useFocusEffect(
     useCallback(() => {
@@ -83,17 +82,16 @@ export default function RecentScreen() {
           },
         ]}
       >
-        <View style={[styles.top, compact && styles.topCompact, stackChrome && styles.topStacked]}>
+        <View style={[styles.chrome, compact && styles.chromeCompact, stackChrome && styles.chromeStacked]}>
           <Text style={styles.wordmark} accessibilityRole="header">
             最近
           </Text>
-          <View style={[styles.actions, stackChrome && styles.actionsWrapped]}>
+          <View style={[styles.secondary, stackChrome && styles.secondaryWrapped]}>
             {isFamilyApiConfigured() ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="家庭"
                 testID="home-family"
-                hitSlop={8}
                 onPress={() => router.push('/family')}
                 style={styles.navHit}
               >
@@ -104,23 +102,21 @@ export default function RecentScreen() {
               accessibilityRole="button"
               accessibilityLabel="回看"
               testID="home-lookback"
-              hitSlop={8}
               onPress={() => router.push(lookbackHref('/lookback'))}
               style={styles.navHit}
             >
               <Text style={styles.nav}>回看</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="留下"
-              testID="home-leave"
-              hitSlop={8}
-              onPress={() => router.push('/leave')}
-              style={styles.navHit}
-            >
-              <Text style={styles.nav}>留下</Text>
-            </Pressable>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="留下"
+            testID="home-leave"
+            onPress={() => router.push('/leave')}
+            style={styles.leaveHit}
+          >
+            <Text style={styles.leaveAction}>留下</Text>
+          </Pressable>
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -145,12 +141,12 @@ export default function RecentScreen() {
           <View
             key={day.key}
             style={[styles.day, regular && styles.dayRegular]}
-            accessibilityLabel={`${day.dateLabel}，${day.items.length}条记录`}
+            accessibilityLabel={`${day.label}，${day.items.length}条记录`}
           >
             <Text style={[styles.date, regular && styles.dateRail]} accessibilityRole="header">
-              {day.dateLabel}
+              {day.label}
             </Text>
-            <View style={styles.dayItems}>
+            <View style={[styles.dayItems, regular && styles.dayItemsRegular]}>
               {day.items.map((item) => (
                 <RecentMoment
                   key={item.id}
@@ -196,7 +192,7 @@ function RecentMoment({
       accessibilityRole="button"
       accessibilityLabel={
         [
-          item.dateLabel,
+          item.dayLabel || item.dateLabel,
           item.note,
           ...item.images.map((image) => image.label),
           item.audio?.label || '',
@@ -204,7 +200,7 @@ function RecentMoment({
           item.feeling ? `当时的感受，${item.feeling.label}` : '',
         ]
           .filter(Boolean)
-          .join('，') || `${item.dateLabel}，一条记录`
+          .join('，') || `${item.dayLabel || item.dateLabel}，一条记录`
       }
       testID={`recent-item-${item.id}`}
       onPress={onOpen}
@@ -235,34 +231,41 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: '100%',
     alignSelf: 'center',
-    gap: 28,
+    gap: 40,
   },
-  top: {
+  chrome: {
+    alignItems: 'flex-start',
+    gap: 4,
+    paddingBottom: 8,
+    minWidth: 0,
+  },
+  chromeCompact: { paddingBottom: 0 },
+  chromeStacked: { alignSelf: 'stretch' },
+  wordmark: { fontSize: 28, lineHeight: 36, color: ink, flexShrink: 0 },
+  secondary: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-    minHeight: 44,
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
   },
-  topCompact: { marginBottom: 0 },
-  topStacked: { flexDirection: 'column', alignItems: 'flex-start' },
-  wordmark: { fontSize: 28, lineHeight: 36, color: ink, flexShrink: 0 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16, minWidth: 0 },
-  actionsWrapped: { alignSelf: 'stretch' },
-  navHit: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
-  nav: { fontSize: 18, lineHeight: 24, color: sage },
-  empty: { gap: 12, paddingTop: 32, paddingBottom: 16 },
-  emptyTitle: { fontSize: 26, lineHeight: 34, color: ink },
+  secondaryWrapped: { alignSelf: 'stretch' },
+  navHit: { minWidth: 48, minHeight: 48, justifyContent: 'center', paddingRight: 12 },
+  nav: { fontSize: 17, lineHeight: 24, color: sage },
+  leaveHit: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  leaveAction: { fontSize: 20, lineHeight: 28, color: ink },
+  empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
+  emptyTitle: { fontSize: 28, lineHeight: 38, color: ink },
   body: { fontSize: 17, lineHeight: 26, color: inkSoft },
   firstHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  first: { fontSize: 20, lineHeight: 28, color: sage },
-  error: { fontSize: 16, lineHeight: 24, color: clay },
-  day: { gap: 16 },
+  first: { fontSize: 20, lineHeight: 28, color: ink },
+  error: { fontSize: 17, lineHeight: 26, color: clay, paddingVertical: 8 },
+  day: { gap: 12 },
   dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
-  date: { fontSize: 16, lineHeight: 22, color: sage },
-  dateRail: { width: DATE_RAIL_WIDTH, paddingTop: 4 },
-  dayItems: { flex: 1, maxWidth: READING_MAX, gap: 28 },
-  moment: { gap: 10, minHeight: 44 },
-  note: { fontSize: 21, lineHeight: 30, color: ink },
+  date: { fontSize: 16, lineHeight: 22, color: sage, paddingBottom: 4 },
+  dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
+  dayItems: { gap: 36 },
+  dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
+  moment: { gap: 8, minHeight: 44 },
+  note: { fontSize: 21, lineHeight: 32, color: ink },
 });

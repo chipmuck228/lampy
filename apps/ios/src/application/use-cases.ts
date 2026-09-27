@@ -29,6 +29,7 @@ import type {
 } from '../infrastructure/repositories';
 import {
   calendarPartsAt,
+  deviceTimeZone,
   formatCalendarDate,
   offsetMinutesAt,
   parseMillis,
@@ -43,6 +44,7 @@ import {
   type OccurredChoiceView,
   type OccurredDraftInput,
 } from './occurred-date';
+import { groupRecentLifeDays, recordedDayForRecent } from './recent-life';
 
 export type { OccurredChoiceView, OccurredDraftInput };
 
@@ -118,6 +120,8 @@ export type RecentLifeItem = {
   id: string;
   note: string;
   recordedAt: string;
+  dayKey: string;
+  dayLabel: string;
   dateLabel: string;
   feeling: FeelingView | null;
   images: ImageView[];
@@ -125,9 +129,16 @@ export type RecentLifeItem = {
   unknownMedia: UnknownMediaView[];
 };
 
+export type RecentDayView = {
+  key: string;
+  label: string;
+  items: RecentLifeItem[];
+};
+
 export type RecentLifeViewModel = {
   isFirstUse: boolean;
   items: RecentLifeItem[];
+  days: RecentDayView[];
 };
 
 export type ComposerViewModel = {
@@ -205,6 +216,7 @@ function recentDateLabel(
     viewerOffsetAt(moment.time.occurredAt, clock),
   );
 }
+
 
 function photoLabel(index: number, total: number): string {
   return `照片 ${index}/${total}`;
@@ -986,13 +998,20 @@ export function createUseCases(deps: {
 
   async function getRecentLife(): Promise<RecentLifeViewModel> {
     const moments = await deps.moments.listRecent(50);
+    const viewerClock: HistoryClock = deps.timezone ?? deps.timezoneOffsetMinutes ?? {
+      timeZone: deviceTimeZone(),
+    };
+    const viewedAt = clock.now();
     const items: RecentLifeItem[] = [];
     for (const moment of moments) {
+      const day = recordedDayForRecent(moment.time.recordedAt, viewedAt, viewerClock);
       items.push({
         id: moment.id,
         note: moment.content.note,
         recordedAt: moment.time.recordedAt,
-        dateLabel: recentDateLabel(moment, viewerClock),
+        dayKey: day.dayKey,
+        dayLabel: day.dayLabel,
+        dateLabel: day.dayLabel,
         feeling: projectFeeling(moment.content.emotion),
         images: await resolveImages(moment.assetIds),
         audio: await resolveAudio(moment.assetIds),
@@ -1002,6 +1021,7 @@ export function createUseCases(deps: {
     return {
       isFirstUse: moments.length === 0,
       items,
+      days: groupRecentLifeDays(items),
     };
   }
 

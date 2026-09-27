@@ -17,7 +17,7 @@ jest.mock('expo-router', () => {
 
 jest.mock('../application/container', () => ({
   getUseCases: async () => ({
-    getRecentLife: async () => ({ isFirstUse: true, items: [] }),
+    getRecentLife: async () => ({ isFirstUse: true, items: [], days: [] }),
   }),
 }));
 

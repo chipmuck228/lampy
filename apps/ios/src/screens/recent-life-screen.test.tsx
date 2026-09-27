@@ -36,17 +36,31 @@ function wrap(ui: ReactElement) {
   );
 }
 
-function item(id: string, note: string, dateLabel: string, recordedAt: string) {
+function item(id: string, note: string, dayLabel: string, recordedAt: string, dayKey: string) {
   return {
     id,
     note,
     recordedAt,
-    dateLabel,
+    dayKey,
+    dayLabel,
+    dateLabel: dayLabel,
     feeling: null,
     images: [],
     audio: null,
     unknownMedia: [],
   };
+}
+
+function life(items: ReturnType<typeof item>[]) {
+  const days = items.reduce<
+    { key: string; label: string; items: ReturnType<typeof item>[] }[]
+  >((groups, next) => {
+    const last = groups[groups.length - 1];
+    if (last && last.key === next.dayKey) last.items.push(next);
+    else groups.push({ key: next.dayKey, label: next.dayLabel, items: [next] });
+    return groups;
+  }, []);
+  return { isFirstUse: false, items, days };
 }
 
 describe('recent life page', () => {
@@ -55,14 +69,13 @@ describe('recent life page', () => {
   });
 
   it('shares one date heading for several records on the same day', async () => {
-    mockGetRecentLife.mockResolvedValue({
-      isFirstUse: false,
-      items: [
-        item('moment_one', '门口的风', '9月27日', new Date(2026, 8, 27, 10).toISOString()),
-        item('moment_two', '同一天的第二句', '9月27日', new Date(2026, 8, 27, 16).toISOString()),
-        item('moment_older', '更早的一句', '9月24日', new Date(2026, 8, 24, 12).toISOString()),
-      ],
-    });
+    mockGetRecentLife.mockResolvedValue(
+      life([
+        item('moment_one', '门口的风', '9月27日', new Date(2026, 8, 27, 10).toISOString(), '2026-09-27'),
+        item('moment_two', '同一天的第二句', '9月27日', new Date(2026, 8, 27, 16).toISOString(), '2026-09-27'),
+        item('moment_older', '更早的一句', '9月24日', new Date(2026, 8, 24, 12).toISOString(), '2026-09-24'),
+      ]),
+    );
     const view = await render(wrap(<RecentScreen />));
     await waitFor(() => {
       expect(view.getByText('门口的风')).toBeTruthy();
@@ -73,16 +86,16 @@ describe('recent life page', () => {
     expect(view.getByText('9月24日')).toBeTruthy();
     expect(view.getByLabelText('留下')).toBeTruthy();
     expect(view.getByLabelText('回看')).toBeTruthy();
+    expect(view.getByLabelText('最近')).toBeTruthy();
   });
 
   it('keeps last year’s same month-day on its own heading', async () => {
-    mockGetRecentLife.mockResolvedValue({
-      isFirstUse: false,
-      items: [
-        item('moment_this', '今年的一句', '9月27日', new Date(2026, 8, 27, 10).toISOString()),
-        item('moment_last', '去年的一句', '9月27日', new Date(2025, 8, 27, 10).toISOString()),
-      ],
-    });
+    mockGetRecentLife.mockResolvedValue(
+      life([
+        item('moment_this', '今年的一句', '9月27日', new Date(2026, 8, 27, 10).toISOString(), '2026-09-27'),
+        item('moment_last', '去年的一句', '2025年9月27日', new Date(2025, 8, 27, 10).toISOString(), '2025-09-27'),
+      ]),
+    );
     const view = await render(wrap(<RecentScreen />));
     await waitFor(() => {
       expect(view.getByText('今年的一句')).toBeTruthy();

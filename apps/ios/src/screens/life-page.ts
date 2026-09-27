@@ -18,15 +18,29 @@ export function pageGutter(windowWidth: number, windowHeight?: number): number {
   return isRegularWidth(windowWidth, windowHeight) ? 48 : 24;
 }
 
-export function readingWidth(windowWidth: number): number {
-  return Math.min(windowWidth, READING_MAX);
+export function readingWidth(windowWidth: number, windowHeight?: number): number {
+  const inner = windowWidth - 2 * pageGutter(windowWidth, windowHeight);
+  return Math.min(Math.max(inner, 0), READING_MAX);
+}
+
+export function readingPageWidth(windowWidth: number, windowHeight?: number): number {
+  return pageGutter(windowWidth, windowHeight) * 2 + readingWidth(windowWidth, windowHeight);
+}
+
+export function railPageWidth(windowWidth: number, windowHeight?: number): number {
+  return (
+    pageGutter(windowWidth, windowHeight) * 2 +
+    DATE_RAIL_WIDTH +
+    DATE_RAIL_GAP +
+    readingWidth(windowWidth, windowHeight)
+  );
 }
 
 export function pageColumnWidth(windowWidth: number, windowHeight?: number): number {
   if (isRegularWidth(windowWidth, windowHeight)) {
-    return DATE_RAIL_WIDTH + DATE_RAIL_GAP + READING_MAX;
+    return railPageWidth(windowWidth, windowHeight);
   }
-  return readingWidth(windowWidth);
+  return readingPageWidth(windowWidth, windowHeight);
 }
 
 export function isRegularWidth(windowWidth: number, windowHeight?: number): boolean {

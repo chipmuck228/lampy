@@ -12,6 +12,7 @@ describe('text-only personal moment use cases', () => {
     const app = createUseCases({
       ...repos,
       clock: clockAt('2026-09-24T02:00:00.000Z'),
+      timezoneOffsetMinutes: 0,
     });
 
     const draft = await app.restoreOrCreateDraft();
@@ -25,6 +26,11 @@ describe('text-only personal moment use cases', () => {
     expect(recent.items[0].id).toBe(saved.id);
     expect(recent.items[0].note).toBe('门口的风');
     expect(recent.items[0].feeling).toBeNull();
+    expect(recent.items[0].dayKey).toBe('2026-09-24');
+    expect(recent.items[0].dayLabel).toBe('9月24日');
+    expect(recent.days).toHaveLength(1);
+    expect(recent.days[0].key).toBe('2026-09-24');
+    expect(recent.days[0].label).toBe('9月24日');
 
     const detail = await app.getMomentDetail(saved.id);
     expect(detail.kind).toBe('ready');
@@ -97,6 +103,14 @@ describe('text-only personal moment use cases', () => {
     expect(stored.moment.time.importedAt).toBeUndefined();
     expect(stored.moment.time.recordedAt).toBe('2026-09-24T06:00:00.000Z');
     expect(stored.moment.audit.createdAt).toBe('2026-09-24T06:00:00.000Z');
+    const recent = await createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-24T06:00:00.000Z'),
+      timezoneOffsetMinutes: 0,
+    }).getRecentLife();
+    expect(recent.items[0].dayKey).toBe('2026-09-24');
+    expect(recent.items[0].dayLabel).toBe('9月24日');
+    expect(recent.days[0].key).toBe('2026-09-24');
   });
 
   it('leaves stored moments untouched when save fails on an empty note', async () => {

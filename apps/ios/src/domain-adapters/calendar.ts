@@ -31,6 +31,10 @@ export const { parseMillis } = time;
 
 export type HistoryClock = number | { timeZone: string };
 
+export function deviceTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
 export function offsetMinutesAt(atMillis: number, clock: HistoryClock): number {
   if (typeof clock === 'number') return clock;
   return timezoneOffsetMinutesAt(atMillis, clock.timeZone);
