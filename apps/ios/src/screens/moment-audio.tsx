@@ -8,6 +8,9 @@ import { hairline, inkSoft, sage, sound } from './life-page';
 export type RecordPhase = 'ready' | 'recording' | 'stopped' | 'processing' | 'failed';
 
 function playbackLabel(status: PlaybackStatus, durationLabel: string, currentMs: number): string {
+  if (status === 'preparing') {
+    return `正在准备这段声音，共${durationLabel}`;
+  }
   if (status === 'playing') {
     return `正在播放，${formatSoundDuration(currentMs)}，共${durationLabel}`;
   }
@@ -18,9 +21,17 @@ function playbackLabel(status: PlaybackStatus, durationLabel: string, currentMs:
     return `已播完，共${durationLabel}`;
   }
   if (status === 'unavailable') {
-    return `这段声音暂时无法播放，共${durationLabel}`;
+    return `这段声音这次没有播出，共${durationLabel}`;
   }
   return `一段声音，${durationLabel}，未播放`;
+}
+
+function playbackMeta(status: PlaybackStatus, durationLabel: string, currentMs: number): string {
+  if (status === 'preparing') return `正在准备 · ${durationLabel}`;
+  if (status === 'playing') return `正在播放 · ${formatSoundDuration(currentMs)} / ${durationLabel}`;
+  if (status === 'paused') return `已暂停 · ${formatSoundDuration(currentMs)} / ${durationLabel}`;
+  if (status === 'finished') return `已播完 · ${durationLabel}`;
+  return `一段声音 · ${durationLabel}`;
 }
 
 export function MomentAudio({
@@ -44,7 +55,7 @@ export function MomentAudio({
 }) {
   if (!audio) return null;
 
-  if (audio.status !== 'available' || playbackStatus === 'unavailable') {
+  if (audio.status !== 'available') {
     return (
       <View
         accessible
@@ -61,8 +72,41 @@ export function MomentAudio({
   }
 
   const durationLabel = audio.durationLabel || formatSoundDuration(audio.durationMs);
+
+  if (playbackStatus === 'unavailable') {
+    return (
+      <View style={styles.block}>
+        {scene ? (
+          <Text style={styles.sceneTitle} testID={`${testIDPrefix}-scene-${audio.id}`}>
+            {audio.label}
+          </Text>
+        ) : null}
+        <Text
+          accessibilityRole="text"
+          accessibilityLabel={playbackLabel('unavailable', durationLabel, 0)}
+          testID={`${testIDPrefix}-failed-${audio.id}`}
+          style={styles.missing}
+        >
+          这段声音这次没有播出。可以再试一次。
+        </Text>
+        {onPlay ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`再试一次，${durationLabel}`}
+            testID={`${testIDPrefix}-retry-${audio.id}`}
+            onPress={onPlay}
+            style={styles.hit}
+          >
+            <Text style={styles.action}>再试一次</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
   const playing = playbackStatus === 'playing';
-  const actionLabel = playing ? '暂停' : playbackStatus === 'finished' ? '再听一次' : '播放';
+  const preparing = playbackStatus === 'preparing';
+  const actionLabel = playing ? '暂停' : playbackStatus === 'finished' ? '再听一次' : preparing ? '正在准备' : '播放';
   const progress =
     audio.durationMs > 0 ? Math.min(1, Math.max(0, currentTimeMs / audio.durationMs)) : 0;
 
@@ -77,13 +121,7 @@ export function MomentAudio({
         style={compact ? styles.compactMeta : styles.meta}
         accessibilityLabel={playbackLabel(playbackStatus, durationLabel, currentTimeMs)}
       >
-        {playbackStatus === 'playing'
-          ? `正在播放 · ${formatSoundDuration(currentTimeMs)} / ${durationLabel}`
-          : playbackStatus === 'paused'
-            ? `已暂停 · ${formatSoundDuration(currentTimeMs)} / ${durationLabel}`
-            : playbackStatus === 'finished'
-              ? `已播完 · ${durationLabel}`
-              : `一段声音 · ${durationLabel}`}
+        {playbackMeta(playbackStatus, durationLabel, currentTimeMs)}
       </Text>
       {scene ? (
         <View
@@ -98,8 +136,11 @@ export function MomentAudio({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${actionLabel}，${durationLabel}`}
+          accessibilityState={{ disabled: preparing }}
           testID={`${testIDPrefix}-play-${audio.id}`}
+          disabled={preparing}
           onPress={() => {
+            if (preparing) return;
             if (playing) onPause?.();
             else onPlay?.();
           }}

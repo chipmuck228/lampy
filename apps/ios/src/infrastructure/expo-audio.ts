@@ -21,7 +21,8 @@ type ExpoAudioModule = {
     play(): void;
     pause(): void;
     seekTo(position: number): Promise<void>;
-    release(): void;
+    release?: () => void;
+    remove?: () => void;
     currentStatus: {
       playing: boolean;
       currentTime: number;
@@ -71,6 +72,25 @@ export function resetExpoAudioForTests() {
 function secondsToMs(value: number | undefined): number {
   if (!Number.isFinite(value) || (value ?? 0) < 0) return 0;
   return Math.round((value as number) * 1000);
+}
+
+function disposeNativePlayer(player: ReturnType<ExpoAudioModule['createAudioPlayer']> | null) {
+  if (!player) return;
+  try {
+    player.pause();
+  } catch {
+    // Player may already be gone.
+  }
+  try {
+    player.release?.();
+  } catch {
+    // Fall through to remove().
+  }
+  try {
+    player.remove?.();
+  } catch {
+    // Already released.
+  }
 }
 
 function createUnavailableCapture(): AudioCapture {
@@ -205,14 +225,25 @@ export function createExpoAudioPlayback(): AudioPlayback {
   const audio: ExpoAudioModule = loadedNative;
 
   let player: ReturnType<ExpoAudioModule['createAudioPlayer']> | null = null;
+  let loadedUri: string | null = null;
   let finished = false;
   let failed = false;
+  let startRequested = false;
+  let heardPlaying = false;
+
+  function resetSession() {
+    finished = false;
+    failed = false;
+    startRequested = false;
+    heardPlaying = false;
+  }
 
   return {
     async load(uri) {
-      player?.release();
-      finished = false;
-      failed = false;
+      if (player && loadedUri === uri && !failed) return;
+      disposeNativePlayer(player);
+      resetSession();
+      loadedUri = uri;
       player = audio.createAudioPlayer({ uri }, { updateInterval: 250 });
     },
     async play() {
@@ -222,27 +253,34 @@ export function createExpoAudioPlayback(): AudioPlayback {
         if (finished || status.didJustFinish) {
           await player.seekTo(0);
           finished = false;
+          heardPlaying = false;
         }
+        startRequested = true;
         player.play();
       } catch {
         failed = true;
+        startRequested = false;
+        heardPlaying = false;
         throw new Error('play failed');
       }
     },
     async pause() {
+      startRequested = false;
       player?.pause();
     },
     async stop() {
+      startRequested = false;
+      heardPlaying = false;
       if (!player) return;
       player.pause();
       await player.seekTo(0);
       finished = true;
     },
     async release() {
-      player?.release();
+      disposeNativePlayer(player);
       player = null;
-      finished = false;
-      failed = false;
+      loadedUri = null;
+      resetSession();
     },
     getStatus() {
       if (failed) {
@@ -256,10 +294,22 @@ export function createExpoAudioPlayback(): AudioPlayback {
       const durationMs = secondsToMs(status.duration);
       if (finished || status.didJustFinish) {
         finished = true;
-        return { status: 'finished', currentTimeMs: durationMs, durationMs };
+        startRequested = false;
+        heardPlaying = false;
+        return { status: 'finished', currentTimeMs: durationMs || currentTimeMs, durationMs };
       }
       if (status.playing) {
+        heardPlaying = true;
         return { status: 'playing', currentTimeMs, durationMs };
+      }
+      if (startRequested && heardPlaying) {
+        finished = true;
+        startRequested = false;
+        heardPlaying = false;
+        return { status: 'finished', currentTimeMs: durationMs || currentTimeMs, durationMs };
+      }
+      if (startRequested) {
+        return { status: 'preparing', currentTimeMs, durationMs };
       }
       if (currentTimeMs > 0) {
         return { status: 'paused', currentTimeMs, durationMs };
