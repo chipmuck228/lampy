@@ -13,6 +13,22 @@
 
 Lampy `0.1.0`（`app.lampy.ios`），Expo Dev Client + Metro reload。外接音频未接。Jest 不替代真机听音。
 
+## Liuz17 听音（2026-09-27）
+
+- 设备：Liuz17，iPhone 17 Pro（iPhone18,1），UDID `00008150-0016696E1EBA401C`
+- iOS：26.2
+- 构建 SHA：`6a206f3`（#29 HEAD）
+- 外接音频（蓝牙 / 有线）：**NOT VERIFIED**
+
+| 路径 | 结果 |
+| --- | --- |
+| A 播放并暂停 → B 播放并暂停 → 再点 A，从 A 的暂停处继续 | **PASS** |
+| 再点 B，声音和进度都属于 B | **PASS** |
+| 切后台再返回 | **PASS** |
+| 离开「最近」再进入 | **PASS** |
+
+用户确认以上听音完全正常。
+
 ## 走查（Liuz17 / iOS 26.2）
 
 | # | 路径 | 结果 | 说明 |
@@ -42,6 +58,6 @@ Lampy `0.1.0`（`app.lampy.ios`），Expo Dev Client + Metro reload。外接音�
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | PASS |
-| 相关 Jest（expo-audio / use-sound-player / leave-audio / audio-use-cases / draft-preview） | 63 passed |
+| 相关 Jest | 全量 444 passed |
 | `npx expo lint` | 本轮无新增 error；`share/[id].tsx` L42、L83 是 main 原有 |
 | `git diff --check` | PASS |
