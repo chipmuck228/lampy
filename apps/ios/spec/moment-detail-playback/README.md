@@ -30,12 +30,14 @@
 | 离开详情 | 回到「最近」；不再显示播放中 | — | **PASS** |
 | 实际有声音 | 用户在真机听到了 Leave 录制的回放 | — | **PASS** |
 | 正确输出路由（修复前） | 声音从听筒播出，不是设备扬声器 | — | **FAIL** |
-| 正确输出路由（修复后真机） | 待在设备扬声器 / 外接音频上听 | — | **NOT VERIFIED**（模拟器与 Jest 不能替代） |
+| 正确输出路由（修复后真机） | Liuz17 / iOS 26.2，设备扬声器听到回放 | 扬声器 | **PASS** |
 | 外接音频系统路由 | 蓝牙或有线接入时跟系统走，不抢路由 | — | **NOT VERIFIED** |
 | 录音后再录音 | 会话应回到录音模式 | — | **NOT VERIFIED** |
 | 后台停止 | 未单独切后台 | — | **NOT VERIFIED** |
-| iOS 26.2 真机 | 已连接 iPhone 13 / 18.7.3；无 26.2 | — | **NOT VERIFIED** |
+| iOS 26.2 真机 | Liuz17 / iOS 26.2，扬声器听音 | 扬声器 | **PASS** |
 
 帧：`shots/iphone16-idle.png`、`iphone16-playing.png`、`iphone16-paused.png`、`iphone16-resume.png`、`iphone16-finished.png`、`iphone16-replay.png`。
+
+真机听音：Liuz17，iOS 26.2，Leave 录音从**设备扬声器**播出，**PASS**。外接音频路由未走。模拟器与 Jest 不替代这次听音。
 
 原生：本 PR 只改 JS。走查用已安装的 Expo Dev Client + Metro reload，没有重新 `expo run:ios`。
