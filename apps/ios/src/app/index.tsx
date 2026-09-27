@@ -1,19 +1,11 @@
 import { useCallback, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-
-import { lookbackHref } from '../screens/lookback-chrome';
 
 import { getUseCases } from '../application/container';
 import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { leaveHref, lookbackRootHref } from '../screens/lookback-origin';
+import { RootNavBand, RootReadingLayout } from '../screens/root-nav-band';
 import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
 import { MomentFeeling } from '../screens/moment-feeling';
@@ -25,7 +17,6 @@ import {
   ink,
   inkSoft,
   isCompactHeight,
-  isLargeType,
   DATE_RAIL_WIDTH,
   READING_MAX,
   hairline,
@@ -43,8 +34,6 @@ export default function RecentScreen() {
   const { width, height, fontScale } = useWindowDimensions();
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
-  const largeType = isLargeType(fontScale);
-  const stackChrome = width < 420 || largeType;
   const stackDay = shouldStackRecentDay(width, height, fontScale);
   const columnWidth = recentColumnWidth(width, height, fontScale);
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
@@ -73,57 +62,32 @@ export default function RecentScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="最近">
+    <View style={styles.safe}>
       <StartupBrandLayer homeSettled={view !== null || error !== null} />
-      <ScrollView
-        testID="recent-scroll"
-        style={styles.scroll}
+      <RootReadingLayout
+        accessibilityLabel="最近"
+        scrollTestID="recent-scroll"
         contentContainerStyle={[
           styles.column,
           {
             maxWidth: columnWidth,
             paddingHorizontal: gutter,
             paddingTop: compact ? 4 : 12,
-            paddingBottom: compact ? 20 : 40,
+            paddingBottom: 8,
           },
         ]}
+        band={
+          <RootNavBand
+            here="recent"
+            onOther={() => router.push(lookbackRootHref(true))}
+            onLeave={() => router.push(leaveHref('recent'))}
+            onFamily={isFamilyApiConfigured() ? () => router.push('/family') : undefined}
+          />
+        }
       >
-        <View style={[styles.chrome, compact && styles.chromeCompact, stackChrome && styles.chromeStacked]}>
-          <Text style={styles.wordmark} accessibilityRole="header">
-            最近
-          </Text>
-          <View style={[styles.secondary, stackChrome && styles.secondaryWrapped]}>
-            {isFamilyApiConfigured() ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="家庭"
-                testID="home-family"
-                onPress={() => router.push('/family')}
-                style={styles.navHit}
-              >
-                <Text style={styles.nav}>家庭</Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="回看"
-              testID="home-lookback"
-              onPress={() => router.push(lookbackHref('/lookback'))}
-              style={styles.navHit}
-            >
-              <Text style={styles.nav}>回看</Text>
-            </Pressable>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="留下"
-            testID="home-leave"
-            onPress={() => router.push('/leave')}
-            style={styles.leaveHit}
-          >
-            <Text style={styles.leaveAction}>留下</Text>
-          </Pressable>
-        </View>
+        <Text style={styles.wordmark} accessibilityRole="header">
+          最近
+        </Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -135,7 +99,7 @@ export default function RecentScreen() {
               accessibilityRole="button"
               accessibilityLabel="留下第一条"
               testID="home-leave-first"
-              onPress={() => router.push('/leave')}
+              onPress={() => router.push(leaveHref('recent'))}
               style={styles.firstHit}
             >
               <Text style={styles.first}>留下第一条</Text>
@@ -177,8 +141,8 @@ export default function RecentScreen() {
             </View>
           </View>
         ))}
-      </ScrollView>
-    </SafeAreaView>
+      </RootReadingLayout>
+    </View>
   );
 }
 
@@ -268,27 +232,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     gap: 40,
   },
-  chrome: {
-    alignItems: 'flex-start',
-    gap: 4,
-    paddingBottom: 8,
-    minWidth: 0,
-  },
-  chromeCompact: { paddingBottom: 0 },
-  chromeStacked: { alignSelf: 'stretch' },
   wordmark: { fontSize: 28, lineHeight: 36, color: ink, flexShrink: 1 },
-  secondary: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-    minWidth: 0,
-  },
-  secondaryWrapped: { alignSelf: 'stretch' },
-  navHit: { minWidth: 48, minHeight: 48, justifyContent: 'center', paddingRight: 12 },
-  nav: { fontSize: 17, lineHeight: 24, color: sage },
-  leaveHit: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  leaveAction: { fontSize: 20, lineHeight: 28, color: ink },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
   emptyTitle: { fontSize: 28, lineHeight: 38, color: ink },
   body: { fontSize: 17, lineHeight: 26, color: inkSoft },

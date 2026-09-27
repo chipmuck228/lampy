@@ -10,6 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
+import { RootNavBand, RootReadingLayout } from './root-nav-band';
+
 import type { FeelingView } from '../application/feeling';
 import { LOOKBACK_PAGE_GUTTER } from '../application/lookback-month';
 import { rememberLookbackScroll, readLookbackScroll } from '../application/lookback-session';
@@ -41,11 +43,19 @@ export function LookbackScaffold({
   path,
   children,
   footer,
+  root,
+  onGoRecent,
+  onLeave,
+  onFamily,
 }: {
   title: string;
   path: string;
   children: ReactNode;
   footer?: ReactNode;
+  root?: boolean;
+  onGoRecent?: () => void;
+  onLeave?: () => void;
+  onFamily?: () => void;
 }) {
   const router = useRouter();
   const { readingWidth, shortHeight } = useLookbackLayout();
@@ -57,6 +67,58 @@ export function LookbackScaffold({
     return undefined;
   });
 
+  const content = (
+    <>
+      {root ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="返回原来的位置"
+          testID="lookback-back"
+          onPress={() => router.back()}
+          style={styles.backHit}
+        >
+          <Text style={styles.back}>返回原来的位置</Text>
+        </Pressable>
+      )}
+      <Text style={styles.title} accessibilityRole="header">
+        {title}
+      </Text>
+      {children}
+      {footer}
+    </>
+  );
+
+  const scrollProps = {
+    onContentSizeChange: () => {
+      if (restoreOnce.current) return;
+      restoreOnce.current = true;
+      scrollRef.current?.scrollTo({ y: readLookbackScroll(path), animated: false });
+    },
+    onScroll: (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+      rememberLookbackScroll(path, event.nativeEvent.contentOffset.y);
+    },
+  };
+
+  if (root && onGoRecent && onLeave) {
+    return (
+      <RootReadingLayout
+        scrollTestID="lookback-scroll"
+        scrollRef={scrollRef}
+        contentContainerStyle={[
+          styles.column,
+          { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16, paddingBottom: 8 },
+        ]}
+        onContentSizeChange={scrollProps.onContentSizeChange}
+        onScroll={scrollProps.onScroll}
+        band={
+          <RootNavBand here="lookback" onOther={onGoRecent} onLeave={onLeave} onFamily={onFamily} />
+        }
+      >
+        {content}
+      </RootReadingLayout>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} accessible={false}>
       <ScrollView
@@ -67,31 +129,12 @@ export function LookbackScaffold({
           styles.column,
           { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16 },
         ]}
-        onContentSizeChange={() => {
-          if (restoreOnce.current) return;
-          restoreOnce.current = true;
-          scrollRef.current?.scrollTo({ y: readLookbackScroll(path), animated: false });
-        }}
-        onScroll={(event) => {
-          rememberLookbackScroll(path, event.nativeEvent.contentOffset.y);
-        }}
+        onContentSizeChange={scrollProps.onContentSizeChange}
+        onScroll={scrollProps.onScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回原来的位置"
-          testID="lookback-back"
-          onPress={() => router.back()}
-          style={styles.backHit}
-        >
-          <Text style={styles.back}>返回原来的位置</Text>
-        </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
-        {children}
-        {footer}
+        {content}
       </ScrollView>
     </SafeAreaView>
   );

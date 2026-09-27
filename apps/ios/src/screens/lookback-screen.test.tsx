@@ -14,20 +14,33 @@ import LookbackDayScreen from '../app/lookback/[year]/[month]/[day]';
 import LookbackUnconfirmedScreen from '../app/lookback/unconfirmed';
 
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockDismissTo = jest.fn();
 const mockGetHistoryYears = jest.fn();
 const mockGetHistoryYear = jest.fn();
 const mockGetHistoryDay = jest.fn();
 const mockGetHistoryUnknown = jest.fn();
+const mockSearchParams: Record<string, string> = {
+  year: '2026',
+  month: '01',
+  day: '02',
+  id: 'm_exact',
+};
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useEffect } = require('react');
   return {
-    useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
+    useRouter: () => ({
+      push: mockPush,
+      back: mockBack,
+      replace: jest.fn(),
+      dismissTo: mockDismissTo,
+    }),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
-    useLocalSearchParams: () => ({ year: '2026', month: '01', day: '02', id: 'm_exact' }),
+    useLocalSearchParams: () => mockSearchParams,
   };
 });
 
@@ -60,6 +73,9 @@ describe('lookback screens', () => {
     mockGetHistoryYear.mockReset();
     mockGetHistoryDay.mockReset();
     mockGetHistoryUnknown.mockReset();
+    mockBack.mockReset();
+    mockDismissTo.mockReset();
+    mockSearchParams.from = '';
     resetLookbackSessionForTests();
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
@@ -89,6 +105,8 @@ describe('lookback screens', () => {
     expect(view.getByLabelText('时间未确认，有1条记录')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-year-2026'));
     expect(mockPush).toHaveBeenCalledWith('/lookback/2026');
+    expect(view.getByTestId('root-nav-band')).toBeTruthy();
+    expect(view.queryByTestId('lookback-back')).toBeNull();
   });
 
   it('keeps empty months and opens the selected month', async () => {
@@ -116,6 +134,8 @@ describe('lookback screens', () => {
     expect(view.getByText('1月 · 有2条记录')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-month-2026-01'));
     expect(mockPush).toHaveBeenCalledWith('/lookback/2026/01');
+    expect(view.queryByTestId('root-nav-band')).toBeNull();
+    expect(view.getByTestId('lookback-back')).toBeTruthy();
   });
 
   it('keeps month-precision-unconfirmed records off the year grid', async () => {
@@ -508,6 +528,46 @@ describe('lookback screens', () => {
       expect(day.getByText('只写字')).toBeTruthy();
     });
     expect(day.queryByText(/当时的感受/)).toBeNull();
+  });
+
+  it('uses the lookback href origin instead of canGoBack when returning to Recent', async () => {
+    mockGetHistoryYears.mockResolvedValue({
+      years: [
+        {
+          year: 2026,
+          monthCounts: Array.from({ length: 12 }, () => 0),
+          filledMonths: 0,
+          quietMonths: 12,
+          yearUnconfirmedCount: 0,
+          momentCount: 2,
+        },
+      ],
+      unknownCount: 0,
+      isEmpty: false,
+    });
+    mockSearchParams.from = 'recent';
+    const fromRecent = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(fromRecent.getByTestId('lookback-year-2026')).toBeTruthy();
+    });
+    expect(fromRecent.queryByTestId('lookback-back')).toBeNull();
+    expect(fromRecent.getByTestId('root-nav-band')).toBeTruthy();
+    fireEvent.press(fromRecent.getByTestId('lookback-go-recent'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    fromRecent.unmount();
+
+    mockSearchParams.from = '';
+    mockBack.mockReset();
+    const deepLink = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(deepLink.getByTestId('lookback-year-2026')).toBeTruthy();
+    });
+    fireEvent.press(deepLink.getByTestId('lookback-go-recent'));
+    expect(mockDismissTo).toHaveBeenCalledWith('/');
+    expect(mockBack).not.toHaveBeenCalled();
+    fireEvent.press(deepLink.getByTestId('lookback-leave'));
+    expect(mockPush).toHaveBeenCalledWith('/leave?from=lookback');
   });
 
 });

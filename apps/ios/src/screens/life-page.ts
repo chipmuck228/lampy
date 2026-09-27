@@ -57,6 +57,14 @@ export function isLargeType(fontScale: number): boolean {
   return fontScale >= LARGE_TYPE;
 }
 
+export function shouldUseNavRail(windowWidth: number, windowHeight: number, fontScale: number): boolean {
+  return isRegularWidth(windowWidth, windowHeight) && !isLargeType(fontScale);
+}
+
+export function shouldStackNavBand(windowWidth: number, fontScale: number): boolean {
+  return isLargeType(fontScale) || windowWidth < 360;
+}
+
 export function shouldStackRecentDay(windowWidth: number, windowHeight: number, fontScale: number): boolean {
   return !isRegularWidth(windowWidth, windowHeight) || isLargeType(fontScale);
 }

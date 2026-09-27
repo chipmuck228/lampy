@@ -61,10 +61,12 @@ import {
   armFamilyTestLibraryPick,
   isFamilyTestDriverEnabled,
 } from '../infrastructure/family-test-driver';
+import { finishLeaveToRecent, leaveOpenedFromLookback } from '../screens/lookback-origin';
 
 export default function LeaveScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
+  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[] }>();
+  const fromLookback = leaveOpenedFromLookback(params.from);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const reading = readingWidth(width, height);
@@ -576,7 +578,7 @@ export default function LeaveScreen() {
         await app.saveTextMoment(id);
       });
       if (abandoningRef.current || draftIdRef.current !== id) return;
-      router.replace('/');
+      finishLeaveToRecent(router);
     } catch (error) {
       if (abandoningRef.current || draftIdRef.current !== id) return;
       setMessage(
@@ -737,11 +739,12 @@ export default function LeaveScreen() {
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="返回最近"
+            accessibilityLabel={fromLookback ? '返回原来的位置' : '返回最近'}
+            testID="leave-back"
             onPress={() => router.back()}
             style={styles.backHit}
           >
-            <Text style={styles.back}>最近</Text>
+            <Text style={styles.back}>{fromLookback ? '返回原来的位置' : '最近'}</Text>
           </Pressable>
           {restored ? (
             <Text style={styles.restore}>上次还有一些内容没保存，已经为你放回来了。</Text>

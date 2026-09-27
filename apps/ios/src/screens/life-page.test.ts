@@ -11,7 +11,9 @@ import {
   readingWidth,
   recentColumnWidth,
   shouldShowSameDayRule,
+  shouldStackNavBand,
   shouldStackRecentDay,
+  shouldUseNavRail,
 } from './life-page';
 
 describe('life page measures', () => {
@@ -52,6 +54,16 @@ describe('life page measures', () => {
     expect(recentColumnWidth(1024, 1366, 1)).toBe(768);
     expect(recentColumnWidth(1024, 1366, 3.1)).toBe(616);
     expect(recentColumnWidth(390, 844, 3.1)).toBe(390);
+  });
+
+  it('uses a left rail on tablet regular type and stacks the band for large type or a narrow phone', () => {
+    expect(shouldUseNavRail(1024, 1366, 1)).toBe(true);
+    expect(shouldUseNavRail(1024, 1366, 3.1)).toBe(false);
+    expect(shouldUseNavRail(390, 844, 1)).toBe(false);
+    expect(shouldUseNavRail(852, 393, 1)).toBe(false);
+    expect(shouldStackNavBand(390, 1)).toBe(false);
+    expect(shouldStackNavBand(320, 1)).toBe(true);
+    expect(shouldStackNavBand(1024, 3.1)).toBe(true);
   });
 
   it('draws a same-day rule only between siblings, never around a day', () => {

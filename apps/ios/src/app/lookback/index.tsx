@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../application/container';
+import { isFamilyApiConfigured } from '../../infrastructure/family-config';
 import type { HistoryYearsView } from '../../projections/history-projection';
 import {
   LookbackMessage,
@@ -11,9 +12,12 @@ import {
   lookbackStyles,
   useLookbackLayout,
 } from '../../screens/lookback-chrome';
+import { goToRecentFromLookbackRoot, leaveHref, lookbackOpenedFromRecent } from '../../screens/lookback-origin';
 
 export default function LookbackIndexScreen() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string | string[] }>();
+  const openedFromRecent = lookbackOpenedFromRecent(from);
   const { verticalTime } = useLookbackLayout();
   const [view, setView] = useState<HistoryYearsView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +43,14 @@ export default function LookbackIndexScreen() {
   );
 
   return (
-    <LookbackScaffold title="回看" path="/lookback">
+    <LookbackScaffold
+      title="回看"
+      path="/lookback"
+      root
+      onGoRecent={() => goToRecentFromLookbackRoot(router, openedFromRecent)}
+      onLeave={() => router.push(leaveHref('lookback'))}
+      onFamily={isFamilyApiConfigured() ? () => router.push('/family') : undefined}
+    >
       {error ? <LookbackMessage>{error}</LookbackMessage> : null}
       {view?.isEmpty ? (
         <LookbackMessage>还没有可以按时间回看的记录。</LookbackMessage>

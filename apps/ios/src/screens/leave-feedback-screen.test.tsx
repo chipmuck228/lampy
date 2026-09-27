@@ -9,7 +9,7 @@ const mockAddLibraryImages = jest.fn();
 const mockSaveTextMoment = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
   useLocalSearchParams: () => ({}),
 }));
 
