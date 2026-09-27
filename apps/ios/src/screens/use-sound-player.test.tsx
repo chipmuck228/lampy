@@ -83,6 +83,40 @@ describe('useSoundPlayer state sync', () => {
     expect(playback.loadedUri).toBe(VOICE);
   });
 
+  it('does not keep showing paused after the first resume tap', async () => {
+    const playback = createDeferredPlayback();
+    const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    playback.reportPlaying(2000);
+    await waitFor(() => {
+      expect(result.current.status).toBe('playing');
+    });
+
+    await act(async () => {
+      await result.current.pause();
+    });
+    expect(result.current.status).toBe('paused');
+    expect(result.current.currentTimeMs).toBe(2000);
+
+    await act(async () => {
+      await result.current.play(VOICE);
+    });
+    expect(result.current.status).toBe('preparing');
+    expect(result.current.status).not.toBe('paused');
+    expect(result.current.currentTimeMs).toBe(2000);
+    expect(playback.plays).toBe(2);
+
+    playback.reportPlaying(2300);
+    await waitFor(() => {
+      expect(result.current.status).toBe('playing');
+    });
+    expect(result.current.currentTimeMs).toBe(2300);
+    expect(playback.loads).toBe(1);
+  });
+
   it('ignores a second tap while the same uri is still starting', async () => {
     let finishLoad: ((value?: void) => void) | undefined;
     const playback = createDeferredPlayback();

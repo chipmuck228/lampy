@@ -333,7 +333,10 @@ export function createMemoryAudioPlayback(): AudioPlayback & {
       }
       if (!playback.loadedUri) throw new Error('no source');
       playback.plays += 1;
-      if (playback.deferPlaying) return;
+      if (playback.deferPlaying) {
+        playback.status = 'preparing';
+        return;
+      }
       playback.status = 'playing';
     },
     async pause() {

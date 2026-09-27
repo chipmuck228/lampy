@@ -145,6 +145,40 @@ describe('expo audio playback with a delayed native player', () => {
     expect(playback.getStatus().currentTimeMs).toBe(1200);
   });
 
+  it('stays preparing after a user pause until native playing is heard again', async () => {
+    const playback = loadPlayback();
+    await playback.load('file://leave.m4a');
+    await playback.play();
+    native.playing = true;
+    native.currentTime = 2;
+    expect(playback.getStatus().status).toBe('playing');
+
+    await playback.pause();
+    native.playing = false;
+    expect(playback.getStatus()).toEqual({
+      status: 'paused',
+      currentTimeMs: 2000,
+      durationMs: 3500,
+    });
+
+    await playback.play();
+    expect(player.play).toHaveBeenCalledTimes(2);
+    expect(playback.getStatus()).toEqual({
+      status: 'preparing',
+      currentTimeMs: 2000,
+      durationMs: 3500,
+    });
+    expect(playback.getStatus().status).not.toBe('paused');
+
+    native.playing = true;
+    native.currentTime = 2.3;
+    expect(playback.getStatus()).toEqual({
+      status: 'playing',
+      currentTimeMs: 2300,
+      durationMs: 3500,
+    });
+  });
+
   it('treats a natural end as finished even if native never sets didJustFinish', async () => {
     const playback = loadPlayback();
     await playback.load('file://leave.m4a');

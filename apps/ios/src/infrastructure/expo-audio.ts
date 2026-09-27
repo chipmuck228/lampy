@@ -343,6 +343,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
           await player.seekTo(lastHeardTimeMs / 1000);
         }
         startRequested = true;
+        heardPlaying = false;
         player.play();
       } catch {
         failed = true;
@@ -354,6 +355,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
     },
     async pause() {
       startRequested = false;
+      heardPlaying = false;
       player?.pause();
     },
     async stop() {
