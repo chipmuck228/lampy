@@ -64,7 +64,8 @@ describe('life page measures', () => {
     expect(shouldStackNavBand(390, 1)).toBe(false);
     expect(shouldStackNavBand(390, 1, 4)).toBe(false);
     expect(shouldStackNavBand(320, 1)).toBe(false);
-    expect(shouldStackNavBand(320, 1, 4)).toBe(true);
+    expect(shouldStackNavBand(320, 1, 4)).toBe(false);
+    expect(shouldStackNavBand(200, 1, 4)).toBe(true);
     expect(shouldStackNavBand(1024, 3.1)).toBe(true);
   });
 

@@ -32,6 +32,7 @@ export function RootNavBand({
   const stacked = !rail && shouldStackNavBand(width, fontScale, itemCount);
   const hereLabel = here === 'recent' ? '最近' : '回看';
   const otherLabel = here === 'recent' ? '回看' : '最近';
+  const itemStyle = [styles.item, rail ? styles.railItem : stacked ? styles.stackItem : styles.columnItem];
 
   return (
     <View
@@ -39,7 +40,7 @@ export function RootNavBand({
       style={[styles.band, rail && styles.rail, stacked && styles.stacked]}
       accessibilityRole="none"
     >
-      <View testID="root-nav-here-wrap" style={styles.item}>
+      <View testID="root-nav-here-wrap" style={itemStyle}>
         <Text
           testID="root-nav-here"
           style={styles.here}
@@ -54,7 +55,7 @@ export function RootNavBand({
         accessibilityLabel={otherLabel}
         testID={here === 'recent' ? 'home-lookback' : 'lookback-go-recent'}
         onPress={onOther}
-        style={styles.item}
+        style={itemStyle}
       >
         <Text style={styles.go}>{otherLabel}</Text>
       </Pressable>
@@ -63,7 +64,7 @@ export function RootNavBand({
         accessibilityLabel="留下"
         testID={here === 'recent' ? 'home-leave' : 'lookback-leave'}
         onPress={onLeave}
-        style={styles.item}
+        style={itemStyle}
       >
         <Text style={styles.leave}>留下</Text>
       </Pressable>
@@ -73,7 +74,7 @@ export function RootNavBand({
           accessibilityLabel="家庭"
           testID="home-family"
           onPress={onFamily}
-          style={styles.item}
+          style={itemStyle}
         >
           <Text style={styles.go}>家庭</Text>
         </Pressable>
@@ -132,11 +133,11 @@ const styles = StyleSheet.create({
   row: { flex: 1, flexDirection: 'row' },
   scroll: { flex: 1, minWidth: 0 },
   band: {
+    alignSelf: 'stretch',
     flexShrink: 0,
     flexDirection: 'row',
     flexWrap: 'nowrap',
     alignItems: 'center',
-    gap: 8,
     paddingTop: 8,
     paddingHorizontal: 16,
     backgroundColor: paperDeep,
@@ -153,16 +154,31 @@ const styles = StyleSheet.create({
   stacked: {
     flexDirection: 'column',
     flexWrap: 'nowrap',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
   },
   item: {
-    flexGrow: 0,
-    flexShrink: 0,
     minWidth: 48,
     minHeight: 48,
     justifyContent: 'center',
   },
-  here: { fontSize: 17, lineHeight: 24, color: ink },
-  go: { fontSize: 17, lineHeight: 24, color: sage },
-  leave: { fontSize: 20, lineHeight: 28, color: ink },
+  columnItem: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    alignItems: 'center',
+  },
+  stackItem: {
+    flexGrow: 0,
+    flexShrink: 0,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  railItem: {
+    flexGrow: 0,
+    flexShrink: 0,
+    alignItems: 'flex-start',
+  },
+  here: { fontSize: 17, lineHeight: 24, color: ink, textAlign: 'center' },
+  go: { fontSize: 17, lineHeight: 24, color: sage, textAlign: 'center' },
+  leave: { fontSize: 20, lineHeight: 28, color: ink, textAlign: 'center' },
 });

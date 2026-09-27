@@ -69,7 +69,7 @@ describe('lookback origin on the root screen', () => {
     });
   });
 
-  it('does not treat lampy://lookback?from=recent as a Recent push', async () => {
+  it('does not treat lampy://lookback?from=recent or ?o=invalid as a Recent push', async () => {
     mockGetHistoryYears.mockResolvedValue({
       years: [
         {
@@ -85,6 +85,7 @@ describe('lookback origin on the root screen', () => {
       isEmpty: false,
     });
     mockSearchParams.from = 'recent';
+    mockSearchParams.o = 'invalid';
     mockGetState.mockReturnValue({
       index: 1,
       routes: [{ name: 'index' }, { name: 'lookback/index' }],

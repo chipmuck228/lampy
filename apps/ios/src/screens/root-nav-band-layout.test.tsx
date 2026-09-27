@@ -26,8 +26,8 @@ describe('root nav band layout', () => {
     });
   });
 
-  it('keeps four items on one row when they fit, and stacks on purpose when they do not', async () => {
-    const row = await render(
+  it('spreads three or four items across the available width, and stacks on purpose when a column would be under 48', async () => {
+    const four = await render(
       wrap(
         <RootNavBand
           here="recent"
@@ -37,14 +37,35 @@ describe('root nav band layout', () => {
         />,
       ),
     );
-    expect(StyleSheet.flatten(row.getByTestId('root-nav-band').props.style)).toEqual(
-      expect.objectContaining({ flexDirection: 'row', flexWrap: 'nowrap' }),
+    expect(StyleSheet.flatten(four.getByTestId('root-nav-band').props.style)).toEqual(
+      expect.objectContaining({ flexDirection: 'row', flexWrap: 'nowrap', alignSelf: 'stretch' }),
     );
-    await row.unmount();
+    expect(StyleSheet.flatten(four.getByTestId('root-nav-here-wrap').props.style)).toEqual(
+      expect.objectContaining({ flexGrow: 1, flexBasis: 0, minWidth: 48, minHeight: 48, alignItems: 'center' }),
+    );
+    expect(StyleSheet.flatten(four.getByTestId('home-lookback').props.style)).toEqual(
+      expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
+    );
+    expect(StyleSheet.flatten(four.getByTestId('home-leave').props.style)).toEqual(
+      expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
+    );
+    expect(StyleSheet.flatten(four.getByTestId('home-family').props.style)).toEqual(
+      expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
+    );
+    await four.unmount();
+
+    const three = await render(
+      wrap(<RootNavBand here="lookback" onOther={() => undefined} onLeave={() => undefined} />),
+    );
+    expect(StyleSheet.flatten(three.getByTestId('root-nav-here-wrap').props.style)).toEqual(
+      expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
+    );
+    expect(three.queryByTestId('home-family')).toBeNull();
+    await three.unmount();
 
     Dimensions.set({
-      window: { width: 320, height: 568, scale: 2, fontScale: 1 },
-      screen: { width: 320, height: 568, scale: 2, fontScale: 1 },
+      window: { width: 200, height: 568, scale: 2, fontScale: 1 },
+      screen: { width: 200, height: 568, scale: 2, fontScale: 1 },
     });
     const stacked = await render(
       wrap(
@@ -57,10 +78,10 @@ describe('root nav band layout', () => {
       ),
     );
     expect(StyleSheet.flatten(stacked.getByTestId('root-nav-band').props.style)).toEqual(
-      expect.objectContaining({ flexDirection: 'column', flexWrap: 'nowrap' }),
+      expect.objectContaining({ flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch' }),
     );
     expect(StyleSheet.flatten(stacked.getByTestId('root-nav-here-wrap').props.style)).toEqual(
-      expect.objectContaining({ minWidth: 48, minHeight: 48 }),
+      expect.objectContaining({ minWidth: 48, minHeight: 48, alignItems: 'center' }),
     );
     await stacked.unmount();
   });

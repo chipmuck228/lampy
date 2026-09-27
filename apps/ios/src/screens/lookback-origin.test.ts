@@ -48,6 +48,16 @@ describe('lookback origin is bound to this push, not a URL guess', () => {
     expect(lookbackOriginWasIssued('recent')).toBe(false);
   });
 
+  it('does not treat lampy://lookback?o=invalid as opened from Recent', () => {
+    expect(lookbackOriginWasIssued('invalid')).toBe(false);
+    expect(
+      shouldBackToRecent({
+        originToken: 'invalid',
+        navigationState: recentThenLookback,
+      }),
+    ).toBe(false);
+  });
+
   it('backs only when the token was issued and the previous stack route is Recent', () => {
     const token = issueLookbackOrigin();
     expect(

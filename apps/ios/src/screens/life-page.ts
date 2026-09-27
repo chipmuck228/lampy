@@ -68,10 +68,8 @@ export function shouldStackNavBand(
 ): boolean {
   if (isLargeType(fontScale)) return true;
   const padding = 32;
-  const gap = 8;
-  const item = 72;
-  const needed = padding + itemCount * item + Math.max(0, itemCount - 1) * gap;
-  return windowWidth < needed;
+  const minColumn = 48;
+  return windowWidth - padding < itemCount * minColumn;
 }
 
 export function shouldStackRecentDay(windowWidth: number, windowHeight: number, fontScale: number): boolean {
