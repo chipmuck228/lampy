@@ -14,7 +14,7 @@ export type RecordedAudio = {
 
 export type MediaPermission = 'granted' | 'denied';
 
-export type PlaybackStatus = 'idle' | 'playing' | 'paused' | 'finished' | 'unavailable';
+export type PlaybackStatus = 'idle' | 'preparing' | 'playing' | 'paused' | 'finished' | 'unavailable';
 
 export type MediaPersistCode = 'DISK_FULL' | 'COPY_FAILED';
 
@@ -298,16 +298,28 @@ export function createMemoryAudioCapture(options?: {
 export function createMemoryAudioPlayback(): AudioPlayback & {
   loadedUri: string | null;
   failNextPlay: boolean;
+  deferPlaying: boolean;
   plays: number;
+  loads: number;
+  releases: number;
+  currentTimeMs: number;
+  durationMs: number;
+  reportPlaying(currentTimeMs?: number): void;
+  reportFinished(): void;
 } {
   const playback = {
     loadedUri: null as string | null,
     failNextPlay: false,
+    deferPlaying: false,
     plays: 0,
+    loads: 0,
+    releases: 0,
     status: 'idle' as PlaybackStatus,
     currentTimeMs: 0,
     durationMs: 0,
     async load(uri: string) {
+      playback.loads += 1;
+      if (playback.loadedUri === uri) return;
       playback.loadedUri = uri;
       playback.status = 'idle';
       playback.currentTimeMs = 0;
@@ -321,19 +333,31 @@ export function createMemoryAudioPlayback(): AudioPlayback & {
       }
       if (!playback.loadedUri) throw new Error('no source');
       playback.plays += 1;
+      if (playback.deferPlaying) return;
       playback.status = 'playing';
     },
     async pause() {
-      if (playback.status === 'playing') playback.status = 'paused';
+      if (playback.status === 'playing' || playback.status === 'preparing') {
+        playback.status = 'paused';
+      }
     },
     async stop() {
       playback.status = playback.loadedUri ? 'finished' : 'idle';
       playback.currentTimeMs = playback.durationMs;
     },
     async release() {
+      playback.releases += 1;
       playback.loadedUri = null;
       playback.status = 'idle';
       playback.currentTimeMs = 0;
+    },
+    reportPlaying(currentTimeMs = 0) {
+      playback.status = 'playing';
+      playback.currentTimeMs = currentTimeMs;
+    },
+    reportFinished() {
+      playback.status = 'finished';
+      playback.currentTimeMs = playback.durationMs;
     },
     getStatus() {
       return {
