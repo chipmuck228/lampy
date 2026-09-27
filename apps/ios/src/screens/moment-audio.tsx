@@ -325,7 +325,7 @@ export function DraftSoundBar({
 const styles = StyleSheet.create({
   block: { gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  hit: { minHeight: 44, justifyContent: 'center' },
+  hit: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   action: { fontSize: 18, lineHeight: 24, color: sage },
   recording: { fontSize: 18, lineHeight: 24, color: sound },
   meta: { fontSize: 16, lineHeight: 24, color: sound },
