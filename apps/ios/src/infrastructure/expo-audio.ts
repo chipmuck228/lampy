@@ -311,7 +311,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
   let startRequested = false;
   let heardPlaying = false;
   let lastHeardTimeMs = 0;
-  let startCancelled = false;
+  let startEpoch = 0;
 
   function resetSession() {
     finished = false;
@@ -319,7 +319,13 @@ export function createExpoAudioPlayback(): AudioPlayback {
     startRequested = false;
     heardPlaying = false;
     lastHeardTimeMs = 0;
-    startCancelled = false;
+    startEpoch += 1;
+  }
+
+  function invalidateStart() {
+    startEpoch += 1;
+    startRequested = false;
+    heardPlaying = false;
   }
 
   return {
@@ -332,14 +338,10 @@ export function createExpoAudioPlayback(): AudioPlayback {
     },
     async play() {
       if (!player) throw new Error('no source');
-      startCancelled = false;
+      const mine = ++startEpoch;
       try {
         await applyAudioMode(audio, PLAYBACK_AUDIO_MODE);
-        if (startCancelled) {
-          startRequested = false;
-          heardPlaying = false;
-          return;
-        }
+        if (mine !== startEpoch) return;
         const status = player.currentStatus;
         const currentTimeMs = secondsToMs(status.currentTime);
         if (finished || status.didJustFinish) {
@@ -350,15 +352,12 @@ export function createExpoAudioPlayback(): AudioPlayback {
         } else if (lastHeardTimeMs > 0 && positionsDiverge(currentTimeMs, lastHeardTimeMs)) {
           await player.seekTo(lastHeardTimeMs / 1000);
         }
-        if (startCancelled) {
-          startRequested = false;
-          heardPlaying = false;
-          return;
-        }
+        if (mine !== startEpoch) return;
         startRequested = true;
         heardPlaying = false;
         player.play();
       } catch {
+        if (mine !== startEpoch) return;
         failed = true;
         startRequested = false;
         heardPlaying = false;
@@ -367,15 +366,11 @@ export function createExpoAudioPlayback(): AudioPlayback {
       }
     },
     async pause() {
-      startCancelled = true;
-      startRequested = false;
-      heardPlaying = false;
+      invalidateStart();
       player?.pause();
     },
     async stop() {
-      startCancelled = true;
-      startRequested = false;
-      heardPlaying = false;
+      invalidateStart();
       lastHeardTimeMs = 0;
       finished = false;
       if (!player) return;

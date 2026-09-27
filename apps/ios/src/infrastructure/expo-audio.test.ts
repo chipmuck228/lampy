@@ -501,6 +501,36 @@ describe('expo audio session routing', () => {
     expect(player.play).toHaveBeenCalledTimes(1);
   });
 
+  it('does not let a stale mode switch ignite or pause after a newer play starts', async () => {
+    const finishPlaybackMode: (() => void)[] = [];
+    setAudioModeAsync.mockImplementation(async (mode: { allowsRecording: boolean }) => {
+      if (!mode.allowsRecording) {
+        await new Promise<void>((resolve) => {
+          finishPlaybackMode.push(resolve);
+        });
+      }
+      sessionOrder.push(mode.allowsRecording ? 'record' : 'playback');
+    });
+    const { playback } = loadAdapters();
+    await playback.load('file://leave.m4a');
+    const stale = playback.play();
+    await playback.pause();
+    const latest = playback.play();
+    expect(finishPlaybackMode).toHaveLength(2);
+
+    finishPlaybackMode[0]();
+    await stale;
+    expect(player.play).not.toHaveBeenCalled();
+    expect(player.pause).toHaveBeenCalledTimes(1);
+
+    finishPlaybackMode[1]();
+    await latest;
+    expect(player.play).toHaveBeenCalledTimes(1);
+    expect(player.pause).toHaveBeenCalledTimes(1);
+    expect(playback.getStatus().status).not.toBe('idle');
+    expect(playback.getStatus().status).not.toBe('paused');
+  });
+
   it('does not ignite play when the playback session is applied after a background pause', async () => {
     let finishMode: (() => void) | undefined;
     setAudioModeAsync.mockImplementation(async (mode: { allowsRecording: boolean }) => {

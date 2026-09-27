@@ -172,14 +172,7 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
           loadedUriRef.current = uri;
         }
         await current.play();
-        if (!mountedRef.current || generation !== generationRef.current) {
-          try {
-            await current.pause();
-          } catch {
-            // Background already cancelled this start.
-          }
-          return;
-        }
+        if (!mountedRef.current || generation !== generationRef.current) return;
         sync();
       } catch {
         if (!mountedRef.current || generation !== generationRef.current) return;

@@ -488,6 +488,75 @@ describe('useSoundPlayer state sync', () => {
       add.mockRestore();
     }
   });
+
+  it('does not let a stale mode switch pause a newer play after background', async () => {
+    const handlers: ((state: AppStateStatus) => void)[] = [];
+    const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') handlers.push(handler);
+      return { remove: jest.fn() };
+    });
+    try {
+      let finishFirst: (() => void) | undefined;
+      let holdFirst = true;
+      let starts = 0;
+      let pauses = 0;
+      const playback = createDeferredPlayback();
+      const originalPlay = playback.play.bind(playback);
+      const originalPause = playback.pause.bind(playback);
+      playback.play = async () => {
+        const mine = ++starts;
+        if (holdFirst) {
+          holdFirst = false;
+          await new Promise<void>((resolve) => {
+            finishFirst = resolve;
+          });
+        }
+        if (mine !== starts) return;
+        return originalPlay();
+      };
+      playback.pause = async () => {
+        pauses += 1;
+        return originalPause();
+      };
+      const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+      let stalePlay = Promise.resolve();
+      await act(async () => {
+        stalePlay = result.current.play(VOICE);
+      });
+      expect(result.current.status).toBe('preparing');
+      expect(playback.plays).toBe(0);
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('background'));
+      });
+      expect(pauses).toBe(1);
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('active'));
+      });
+      playback.deferPlaying = false;
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      expect(result.current.status).toBe('playing');
+      expect(playback.getStatus().status).toBe('playing');
+      const pausesAfterLatest = pauses;
+      const playsAfterLatest = playback.plays;
+
+      await act(async () => {
+        finishFirst?.();
+        await stalePlay;
+      });
+
+      expect(pauses).toBe(pausesAfterLatest);
+      expect(playback.plays).toBe(playsAfterLatest);
+      expect(result.current.status).toBe('playing');
+      expect(playback.getStatus().status).toBe('playing');
+    } finally {
+      add.mockRestore();
+    }
+  });
 });
 
 describe('moment audio follows the player, not the button copy', () => {
