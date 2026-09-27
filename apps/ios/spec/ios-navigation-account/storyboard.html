@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>导航与账户入口 · 页面对照</title>
+  <style>
+    :root {
+      --paper: #F3F0E9;
+      --ink: #25231F;
+      --soft: #5C5851;
+      --sage: #53604F;
+      --line: rgba(37, 35, 31, 0.16);
+      --band: #EDE8DC;
+      --mark: #87513D;
+      --safe: rgba(83, 96, 79, 0.12);
+      --hi: rgba(135, 81, 61, 0.14);
+    }
+    body { margin: 0; background: #e4dfd4; color: var(--ink); font: 16px/1.45 -apple-system, BlinkMacSystemFont, sans-serif; }
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 24px 96px; }
+    h1 { font-size: 28px; font-weight: 500; }
+    h2 { font-size: 20px; font-weight: 500; margin-top: 48px; }
+    h3 { font-size: 16px; font-weight: 500; margin: 28px 0 8px; }
+    p, li { color: var(--soft); }
+    code { font-size: 13px; color: var(--ink); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+    @media (max-width: 800px) { .pair { grid-template-columns: 1fr; } }
+    .same { width: 280px; height: 580px; box-sizing: border-box; }
+    .phone {
+      background: var(--paper);
+      width: 280px;
+      min-height: 560px;
+      height: 580px;
+      padding: 22px 20px 0;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .phone.future { outline: 1px dashed var(--sage); outline-offset: 2px; }
+    .phone.short { min-height: 420px; height: 420px; }
+    .phone.narrow { width: 220px; }
+    .phone.land { width: 520px; min-height: 340px; height: 340px; }
+    .phone.plain { height: auto; min-height: 280px; padding-bottom: 22px; display: block; }
+    .end-spacer { flex: 1; min-height: 12px; }
+    .title { font-size: 28px; line-height: 36px; margin: 0 0 20px; }
+    .back { color: var(--sage); min-height: 48px; display: flex; align-items: center; font-size: 17px; }
+    .date { color: var(--sage); font-size: 15px; margin: 20px 0 8px; }
+    .note { font-size: 21px; line-height: 32px; margin: 0 0 10px; }
+    .open { color: var(--sage); min-height: 48px; display: flex; align-items: center; gap: 4px; }
+    .year { color: var(--sage); min-height: 48px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+    .year b { font-weight: 500; font-size: 18px; color: var(--ink); }
+    .meta { font-size: 14px; color: var(--sage); }
+    .band {
+      position: static;
+      margin-top: auto;
+      flex-shrink: 0;
+      background: var(--band);
+      padding: 8px 16px 0;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    }
+    .band .hi {
+      flex: 0 0 100%;
+      height: 34px;
+      margin: 0 -16px;
+      background: var(--hi);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; letter-spacing: 0.04em; color: var(--mark);
+    }
+    .here { color: var(--ink); min-height: 48px; display: flex; align-items: center; font-size: 17px; }
+    .go { color: var(--sage); min-height: 48px; display: flex; align-items: center; font-size: 17px; }
+    .leave { color: var(--ink); min-height: 48px; display: flex; align-items: center; font-size: 20px; }
+    .ghost { color: var(--soft); opacity: .45; min-height: 48px; display: flex; align-items: center; font-size: 15px; }
+    .cap { font-size: 13px; color: var(--sage); margin: 8px 0 0; max-width: 280px; }
+    .cap.wide { max-width: 520px; }
+    .ban { font-size: 13px; color: var(--mark); }
+    .nv { font-size: 12px; color: var(--mark); letter-spacing: 0.04em; }
+    .row4 { display: flex; flex-wrap: wrap; gap: 12px; color: var(--sage); min-height: 48px; align-items: center; }
+    .topbar { display: flex; flex-wrap: wrap; gap: 8px 16px; min-height: 48px; align-items: center; margin: -8px 0 12px; }
+    .safe-top {
+      height: 47px; margin: -22px -20px 8px;
+      background: var(--safe);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; letter-spacing: 0.04em; color: var(--sage);
+    }
+    .dim { opacity: .35; }
+    .seq { font: 13px/1.55 ui-monospace, Menlo, monospace; color: var(--ink); background: var(--paper); padding: 12px 16px; }
+    .seq b { font-weight: 600; }
+    .callout { border-left: 3px solid var(--sage); padding: 0 0 0 12px; margin: 8px 0 20px; }
+    .legend { font-size: 12px; color: var(--sage); }
+    .annot {
+      width: 280px; height: 580px; box-sizing: border-box;
+      background: var(--paper); overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .annot .safe-top { height: 47px; margin: 0; flex-shrink: 0; }
+    .annot .scroll {
+      flex: 1; min-height: 0;
+      padding: 16px 20px 8px; overflow: hidden;
+      position: relative;
+    }
+    .annot .band { margin-top: 0; flex-shrink: 0; }
+    .ruler {
+      position: absolute; right: 4px; top: 8px; bottom: 8px; width: 3px; background: var(--sage);
+    }
+    .ruler span {
+      position: absolute; right: 8px; top: 40%; white-space: nowrap;
+      font-size: 10px; color: var(--sage); background: var(--paper);
+      padding: 0 3px;
+    }
+    .ipad {
+      width: 640px; min-height: 400px; height: 400px;
+      display: grid; grid-template-columns: 112px 1fr; gap: 0; padding: 0;
+    }
+    .ipad .rail { background: var(--band); padding: 22px 16px; }
+    .ipad .pane { padding: 22px 24px; }
+    .xxxl-band { flex-direction: column; align-items: flex-start; padding-bottom: 0; }
+    .xxxl-band .hi { flex: 0 0 auto; width: calc(100% + 32px); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>翻阅自己的生活：导航对照</h1>
+    <p>基线 <code>origin/main</code> @ <code>217d5b9</code>。本稿是设计验证，<strong>未改运行中导航</strong>。路由规则见同目录 README §3。标 <span class="nv">NOT VERIFIED</span> 的项未在原生 App 实测。</p>
+
+    <h2>改前问题 · 四项并列菜单</h2>
+    <p>这不是方案 A。方案 A 是「页顶标题＋另一处目的地」，见下一节同一画幅对照。</p>
+    <section>
+      <div class="phone plain" style="min-height:240px;height:240px">
+        <div class="row4">最近　回看　留下　家庭</div>
+        <p class="note" style="margin-top:24px">门口的风还在。</p>
+      </div>
+      <p class="cap">不采用。每页四个字并排，留下和家庭都像空间；「最近」既是标题又是按钮。</p>
+    </section>
+
+    <h2>方案 A / 方案 B · 同一内容、同一画幅</h2>
+    <p>两框均为 <code>280 × 580</code>。正文都是「门口的风还在。」、9月27日、一段声音、播放、「看这条」。家庭未配置，不画第四项。</p>
+    <div class="pair">
+      <section>
+        <div class="phone same" style="height:580px">
+          <div class="title">最近</div>
+          <div class="topbar">
+            <span class="go">回看</span>
+            <span class="leave">留下</span>
+          </div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <p class="meta">一段声音 · 3秒</p>
+          <div class="open">▶ 播放</div>
+          <div class="open">看这条 <span>›</span></div>
+        </div>
+        <p class="cap"><strong>方案 A · 页顶标题＋另一处目的地。</strong> 标题表示你在哪。顶栏只有另一处「回看」和动词「留下」。当前页不再放同名按钮。无底带。</p>
+      </section>
+      <section>
+        <div class="phone same" style="height:580px">
+          <div class="title">最近</div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <p class="meta">一段声音 · 3秒</p>
+          <div class="open">▶ 播放</div>
+          <div class="open">看这条 <span>›</span></div>
+          <div class="band">
+            <span class="here">最近</span>
+            <span class="go">回看</span>
+            <span class="leave">留下</span>
+            <div class="hi">Home Indicator</div>
+          </div>
+        </div>
+        <p class="cap"><strong>方案 B · 阅读对＋安静底带（采用）。</strong> 日子紧跟标题。「最近」是当前处文字，不是按钮。另一处和「留下」在带上。</p>
+      </section>
+    </div>
+    <div class="callout">
+      <p>选 B：阅读从标题下开始，当前位置可读，大字号可纵排，账户槽在带尾、现在空着。代价：底带是滚动区外的兄弟，带变高则滚动区变矮；留下要低头才看见（空态用「留下第一条」补一次）；不能缩小系统字。</p>
+    </div>
+
+    <h2>路由序列（与 README §3 一致）</h2>
+    <p><code>canGoBack()</code> 只表示有历史，不能证明上一页是最近。从最近 <code>push</code> 回看时记下 <code>openedFrom = 'recent'</code>；来源不明用 <code>dismissTo('/')</code>，不猜。</p>
+    <div class="seq">
+      <div><b>甲 · 从最近进入回看</b></div>
+      冷启动 <code>[/]</code><br />
+      底带「回看」→ 记下从最近来 → <code>push('/lookback')</code>　<code>[/ , /lookback]</code><br />
+      底带「最近」→ 因来源是最近 → <code>back()</code>　<code>[/]</code>（同一最近，滚动在）<br />
+      再「回看」→ 再记来源 → <code>push('/lookback')</code>　<code>[/ , /lookback]</code><br />
+      禁止 <code>push('/')</code>。不得变成 <code>[/ , /lookback , / , /lookback]</code>。
+    </div>
+    <div class="seq" style="margin-top:12px">
+      <div><b>乙 · 回看根深链（来源不明）</b></div>
+      冷启动或深链 <code>[/lookback]</code>　<code>openedFrom</code> 空<br />
+      即使 <code>canGoBack()</code> 为真，底带「最近」也不 <code>back()</code><br />
+      <code>dismissTo('/')</code> → 停在已有的 <code>/</code>，或栈无 <code>/</code> 时替换当前页为最近<br />
+      没有「原来的最近滚动」。符合 ADR 0005。须实测「无 <code>/</code>」不是 <code>push</code>。
+    </div>
+    <div class="seq" style="margin-top:12px">
+      <div><b>丙 · 从回看进入留下再保存</b></div>
+      <code>[/]</code> → 记来源 → <code>[/ , /lookback]</code> → <code>[/ , /lookback , /leave]</code><br />
+      保存 → <code>dismissTo('/')</code> → <code>[/]</code>　回看与留下都收掉<br />
+      再按返回：不进回看、不进留下<br />
+      现码 <code>replace('/')</code> 只换 <code>/leave</code>，会变成 <code>[/ , /lookback , /]</code>。规格不写「栈里只有 <code>/</code>」。
+    </div>
+    <div class="seq" style="margin-top:12px">
+      <div><b>未保存的留下 · 文案看从哪来</b></div>
+      从最近：可见「最近」→ <code>back()</code> → <code>/</code><br />
+      从回看根：可见「返回原来的位置」→ <code>back()</code> → <code>/lookback</code><br />
+      子页返回一律「返回原来的位置」。草稿仍走现有恢复。
+    </div>
+    <p class="nv">甲 / 乙 / 丙与 <code>dismissTo</code> 冷启动回退：NOT VERIFIED（实现切片必须走完）。</p>
+
+    <h2>当前可用 · 最近</h2>
+    <div class="grid">
+      <section>
+        <div class="phone">
+          <div class="title">最近</div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <p class="meta">一段声音 · 3秒</p>
+          <div class="open">▶ 播放</div>
+          <div class="open">看这条 <span>›</span></div>
+          <div class="band">
+            <span class="here">最近</span>
+            <span class="go">回看</span>
+            <span class="leave">留下</span>
+            <div class="hi">Home Indicator</div>
+          </div>
+        </div>
+        <p class="cap">无家庭 API、无账户。底带没有第四项。生活从标题下开始。</p>
+      </section>
+      <section>
+        <div class="phone">
+          <div class="title">最近</div>
+          <p class="note" style="font-size:26px;line-height:36px;margin-top:8px">这里，留下自己的生活。</p>
+          <p class="meta">写一句，拍一张，或留一段声音。</p>
+          <div class="leave" style="position:static">留下第一条</div>
+          <div class="band">
+            <span class="here">最近</span>
+            <span class="go">回看</span>
+            <span class="leave">留下</span>
+            <div class="hi">Home Indicator</div>
+          </div>
+        </div>
+        <p class="cap">第一次。空态主句仍在内容里；底带「留下」与「留下第一条」进同一 <code>/leave</code>。</p>
+      </section>
+    </div>
+
+    <h2>当前可用 · 回看</h2>
+    <div class="grid">
+      <section>
+        <div class="phone">
+          <div class="title">回看</div>
+          <div class="year"><b>2026年</b><span class="meta">有 10 条记录</span></div>
+          <div class="year"><b>2025年</b><span class="meta">有 2 条记录</span></div>
+          <div class="band">
+            <span class="go">最近</span>
+            <span class="here">回看</span>
+            <span class="leave">留下</span>
+            <div class="hi">Home Indicator</div>
+          </div>
+        </div>
+        <p class="cap">回看根。从最近进来才 <code>back()</code>；来源不明则 <code>dismissTo('/')</code>，不读 <code>canGoBack()</code>。禁止 <code>push('/')</code>。</p>
+      </section>
+      <section>
+        <div class="phone">
+          <div class="back">返回原来的位置</div>
+          <div class="title">2026年</div>
+          <div class="year"><b>9月</b><span class="meta">有记录的日子</span></div>
+          <div class="year"><b>8月</b><span class="meta">安静</span></div>
+        </div>
+        <p class="cap">年页。无底带。返回恢复回看根的滚动（进程内 <code>lookback-session</code>）。</p>
+      </section>
+      <section>
+        <div class="phone">
+          <div class="back">返回原来的位置</div>
+          <div class="title">9月</div>
+          <div class="year"><b>27日</b><span class="meta">有 3 条</span></div>
+          <div class="year"><b>24日</b><span class="meta">有 1 条</span></div>
+        </div>
+        <p class="cap">月页。格子仍按发生日。无主导航菜单。</p>
+      </section>
+      <section>
+        <div class="phone">
+          <div class="back">返回原来的位置</div>
+          <div class="title">9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <p class="meta">看这一条，进入详情</p>
+        </div>
+        <p class="cap">日页。进详情；返回仍在这一天。</p>
+      </section>
+    </div>
+
+    <h2>当前可用 · 详情与留下</h2>
+    <p>留下的可见返回按入口变。保存成功落到最近：<code>dismissTo('/')</code>，不是 <code>replace('/')</code>。</p>
+    <div class="grid">
+      <section>
+        <div class="phone">
+          <div class="back">返回原来的位置</div>
+          <div class="date">2026年9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <p class="meta">一段声音 · 3秒</p>
+          <div class="open">播放</div>
+        </div>
+        <p class="cap">详情。返回打开它的那一页（最近或回看日）。无底带。分享仍走家庭门控，本稿不画。</p>
+      </section>
+      <section>
+        <div class="phone">
+          <div class="back">最近</div>
+          <p class="note" style="color:var(--soft);font-size:21px">要留下的一句话</p>
+          <p class="meta" style="margin-top:80px">拍摄　照片　声音</p>
+          <div class="leave" style="position:static;margin-top:12px">留下</div>
+        </div>
+        <p class="cap">从 <code>/</code> 进来。可见「最近」，无障碍「返回最近」，<code>back()</code> 回最近。草稿不删，再进仍走现有恢复。</p>
+      </section>
+      <section>
+        <div class="phone">
+          <div class="back">返回原来的位置</div>
+          <p class="note" style="color:var(--soft);font-size:21px">要留下的一句话</p>
+          <p class="meta" style="margin-top:80px">拍摄　照片　声音</p>
+          <div class="leave" style="position:static;margin-top:12px">留下</div>
+        </div>
+        <p class="cap">从回看根进来。未保存：可见「返回原来的位置」，<code>back()</code> 回回看。保存：<code>dismissTo('/')</code>；若从最近进的回看，再按返回不回回看。</p>
+      </section>
+    </div>
+
+    <h2>底带空间 · 兄弟节点（说明、稿、实现同一条）</h2>
+    <p>底带在滚动区<strong>下面</strong>，不盖住内容。滚动区已经变矮，<strong>不再</strong>垫一条带高。带变高，滚动区再矮。验收盯最后一条的播放和「看这条」。</p>
+    <section>
+      <div class="annot">
+        <div class="safe-top">安全区顶 · 约 47 · 标题在区内</div>
+        <div class="scroll">
+          <div class="title">最近</div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <p class="meta">一段声音 · 3秒</p>
+          <div class="open">▶ 播放</div>
+          <div class="open">看这条 <span>›</span></div>
+          <p class="legend" style="margin-top:12px">滚动区（flex 1）· 不含带高底垫</p>
+          <div class="ruler"><span>滚动区</span></div>
+        </div>
+        <div class="band">
+          <span class="here">最近</span>
+          <span class="go">回看</span>
+          <span class="leave">留下</span>
+          <div class="hi">Home Indicator · 约 34 · 算在带高里，从而算进滚动区变矮</div>
+        </div>
+      </div>
+      <p class="cap">列：安全区顶 → 滚动区 → 底带。点击行 ≥48，上内边 8。覆盖层才需要按带高垫内容；本稿不是覆盖层。</p>
+      <p class="nv">Home Indicator 实距、带变高后滚动区变矮：NOT VERIFIED</p>
+    </section>
+
+    <h2>同日多条 · 滚到末尾</h2>
+    <p>最后一条的播放和「看这条」必须停在带的上方，不能被带挡住。</p>
+    <section>
+      <div class="phone end" style="height:580px">
+        <div class="title dim">最近</div>
+        <div class="date dim">记录于 9月27日</div>
+        <p class="note dim">中午的光。</p>
+        <div class="end-spacer"></div>
+        <div class="date">记录于 9月27日</div>
+        <p class="note">门口的风还在。</p>
+        <p class="meta">一段声音 · 3秒</p>
+        <div class="open">▶ 播放</div>
+        <div class="open">看这条 <span>›</span></div>
+        <div class="band">
+          <span class="here">最近</span>
+          <span class="go">回看</span>
+          <span class="leave">留下</span>
+          <div class="hi">Home Indicator</div>
+        </div>
+      </div>
+      <p class="cap">上一条已滚出。末条播放和「看这条」在滚动区下沿、带的上沿。不按带高加底垫，不缩小字。</p>
+      <p class="nv">最后一条不被挡住：NOT VERIFIED（实现后必须滚到底确认）</p>
+    </section>
+
+    <h2>回看 · 长年列表滚到末尾</h2>
+    <section>
+      <div class="phone end" style="height:580px">
+        <div class="title dim">回看</div>
+        <div class="year dim"><b>2022年</b><span class="meta">有记录</span></div>
+        <div class="end-spacer"></div>
+        <div class="year"><b>2021年</b><span class="meta">有 1 条记录</span></div>
+        <div class="year"><b>2020年</b><span class="meta">有 4 条记录</span></div>
+        <div class="year"><b>2019年</b><span class="meta">有 2 条记录</span></div>
+        <div class="band">
+          <span class="go">最近</span>
+          <span class="here">回看</span>
+          <span class="leave">留下</span>
+          <div class="hi">Home Indicator</div>
+        </div>
+      </div>
+      <p class="cap">最末一年的整行（标题＋条数）在带上方。年页、月页、日页无底带，不额外垫这一段。</p>
+      <p class="nv">长列表末项：NOT VERIFIED</p>
+    </section>
+
+    <h2>窄屏 · 短屏</h2>
+    <div class="grid">
+      <section>
+        <div class="phone narrow" style="height:580px">
+          <div class="title">最近</div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <p class="meta">一段声音 · 3秒</p>
+          <div class="open">▶ 播放</div>
+          <div class="open">看这条 <span>›</span></div>
+          <div class="band">
+            <span class="here">最近</span>
+            <span class="go">回看</span>
+            <span class="leave">留下</span>
+            <div class="hi">Home Indicator</div>
+          </div>
+        </div>
+        <p class="cap">窄屏 220 宽。带内可换行，点击行仍 ≥48。不缩小字。</p>
+        <p class="nv">窄屏：NOT VERIFIED</p>
+      </section>
+      <section>
+        <div class="phone short">
+          <div class="title">最近</div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <div class="open">看这条 <span>›</span></div>
+          <div class="band">
+            <span class="here">最近</span>
+            <span class="go">回看</span>
+            <span class="leave">留下</span>
+            <div class="hi">Home Indicator</div>
+          </div>
+        </div>
+        <p class="cap wide">短屏。带高度不变，内容少一段。最后一条仍要能滚到带上沿。</p>
+        <p class="nv">短屏：NOT VERIFIED</p>
+      </section>
+    </div>
+
+    <h2>最大系统字号 · 底带纵排</h2>
+    <section>
+      <div class="phone end" style="height:720px">
+        <div class="title" style="font-size:34px;line-height:42px">最近</div>
+        <div class="date" style="font-size:19px">记录于 9月27日</div>
+        <p class="note" style="font-size:26px;line-height:36px">门口的风还在。</p>
+        <div class="end-spacer"></div>
+        <div class="open" style="font-size:22px">▶ 播放</div>
+        <div class="open" style="font-size:22px">看这条 <span>›</span></div>
+        <div class="band xxxl-band">
+          <span class="here" style="font-size:22px">最近</span>
+          <span class="go" style="font-size:22px">回看</span>
+          <span class="leave" style="font-size:24px">留下</span>
+          <div class="hi">Home Indicator · 带变高，滚动区变矮</div>
+        </div>
+      </div>
+      <p class="cap">XXXL：三项各 ≥48，整列。禁止缩小 <code>fontScale</code>。带变高，滚动区变矮，仍不垫一条带高。</p>
+      <p class="nv">最大字号纵排：NOT VERIFIED</p>
+    </section>
+
+    <h2>横屏</h2>
+    <section>
+      <div class="phone land end">
+        <div class="title">最近</div>
+        <div class="date">记录于 9月27日</div>
+        <p class="note">门口的风还在。</p>
+        <div class="end-spacer"></div>
+        <div class="open">看这条 <span>›</span></div>
+        <div class="band">
+          <span class="here">最近</span>
+          <span class="go">回看</span>
+          <span class="leave">留下</span>
+          <div class="hi">横屏安全区（左右 inset + 底 Indicator）· 带是兄弟，滚动区变矮</div>
+        </div>
+      </div>
+      <p class="cap wide">横屏：带仍在底，不改成顶栏。左右安全区留给内容，不缩小字。与内容争高则换行，不裁切末条。</p>
+      <p class="nv">横屏：NOT VERIFIED</p>
+    </section>
+
+    <h2>iPad · 左栏</h2>
+    <section>
+      <div class="phone ipad future">
+        <div class="rail">
+          <div class="here">最近</div>
+          <div class="go">回看</div>
+          <div class="leave">留下</div>
+        </div>
+        <div class="pane">
+          <div class="title">最近</div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <p class="meta">一段声音 · 3秒</p>
+          <div class="open">▶ 播放</div>
+          <div class="open">看这条 <span>›</span></div>
+        </div>
+      </div>
+      <p class="cap wide">左栏是根页导航的位置，不是把手机底带拉宽。右栏生活不垫底带高度。虚线：稿，未实拍。</p>
+      <p class="nv">iPad 左栏：NOT VERIFIED</p>
+    </section>
+
+    <h2>未来 · 家庭门控打开之后（能力已在，入口才出现）</h2>
+    <div class="grid">
+      <section>
+        <div class="phone future">
+          <div class="title">最近</div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <div class="band">
+            <span class="here">最近</span>
+            <span class="go">回看</span>
+            <span class="leave">留下</span>
+            <span class="go">家庭</span>
+            <div class="hi">Home Indicator</div>
+          </div>
+        </div>
+        <p class="cap">仅 <code>isFamilyApiConfigured()</code> 为真。家庭是第三处目的地，不是默认 Tab。</p>
+      </section>
+      <section>
+        <div class="phone future">
+          <div class="back">返回原来的位置</div>
+          <div class="title">家庭</div>
+          <p class="meta">这里只放明确分享或收到的内容。家庭身份不是个人日记账号。</p>
+        </div>
+        <p class="cap">现有 <code>/family</code>。导航方案不得在未配置时画出这一页的入口。</p>
+      </section>
+    </div>
+
+    <h2>未来 · 本机 / 账户（有真实句子才画槽位）</h2>
+    <div class="grid">
+      <section>
+        <div class="phone future">
+          <div class="title">最近</div>
+          <div class="date">记录于 9月27日</div>
+          <p class="note">门口的风还在。</p>
+          <div class="band">
+            <span class="here">最近</span>
+            <span class="go">回看</span>
+            <span class="leave">留下</span>
+            <span class="go">本机</span>
+            <div class="hi">Home Indicator</div>
+          </div>
+        </div>
+        <p class="cap">「本机」是文字，不是头像。现在这条不出现，也不画空按钮占位。</p>
+      </section>
+      <section>
+        <div class="phone future">
+          <div class="back">返回原来的位置</div>
+          <div class="title">本机</div>
+          <p class="note" style="font-size:18px;line-height:28px">个人记录保存在这台 iPhone 上。</p>
+          <p class="meta">Lampy 只在你留下时使用相机、相册或麦克风。权限在系统设置里。</p>
+          <div class="open">打开系统设置</div>
+        </div>
+        <p class="cap">只写已存在的事实。没有云、没有「已同步」、没有空的设备列表。</p>
+      </section>
+      <section>
+        <div class="phone future">
+          <div class="back">返回原来的位置</div>
+          <div class="title">账户</div>
+          <p class="meta">仅当未来真有个人账号能力时，底带「本机」改名「账户」。</p>
+          <p class="note" style="font-size:17px;line-height:26px">家庭所用的登录（若已上线）写在这里或家庭页，并写明：这不是个人生活已经上传。</p>
+        </div>
+        <p class="cap">未交付同步之前，禁止画备份完成。空管理页不准上。</p>
+      </section>
+      <section>
+        <div class="phone plain">
+          <div class="title">最近</div>
+          <div class="ghost">（不画未登录头像）</div>
+          <p class="ban">禁止：假注册用户、灰色剪影、空的「账号与同步」表。</p>
+        </div>
+        <p class="cap">当前产品：槽位空着。比画一个假入口更诚实。</p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
