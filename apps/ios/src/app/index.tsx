@@ -18,7 +18,8 @@ import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cas
 import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
 import { MomentFeeling } from '../screens/moment-feeling';
 import { MomentImages } from '../screens/moment-images';
-import { useSoundPlayer } from '../screens/use-sound-player';
+import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
+import type { PlaybackStatus } from '../infrastructure/media';
 import {
   clay,
   ink,
@@ -46,8 +47,7 @@ export default function RecentScreen() {
   const columnWidth = recentColumnWidth(width, height, fontScale);
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const sound = useSoundPlayer();
+  const clips = useRecentClipPlayback();
   const days = view?.days ?? [];
 
   useFocusEffect(
@@ -155,16 +155,16 @@ export default function RecentScreen() {
                 <RecentMoment
                   key={item.id}
                   item={item}
-                  playingId={playingId}
-                  sound={sound}
+                  listen={
+                    item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
+                  }
                   onOpen={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
                   onPlay={() => {
                     if (!item.audio?.uri) return;
-                    setPlayingId(item.audio.id);
-                    void sound.play(item.audio.uri);
+                    void clips.play(item.audio.id, item.audio.uri);
                   }}
                   onPause={() => {
-                    void sound.pause();
+                    void clips.pause();
                   }}
                 />
               ))}
@@ -178,15 +178,13 @@ export default function RecentScreen() {
 
 function RecentMoment({
   item,
-  playingId,
-  sound,
+  listen,
   onOpen,
   onPlay,
   onPause,
 }: {
   item: RecentLifeItem;
-  playingId: string | null;
-  sound: ReturnType<typeof useSoundPlayer>;
+  listen: { status: PlaybackStatus; currentTimeMs: number };
   onOpen: () => void;
   onPlay: () => void;
   onPause: () => void;
@@ -213,8 +211,8 @@ function RecentMoment({
       </View>
       <MomentAudio
         audio={item.audio}
-        playbackStatus={playingId === item.audio?.id ? (sound.failed ? 'unavailable' : sound.status) : 'idle'}
-        currentTimeMs={playingId === item.audio?.id ? sound.currentTimeMs : 0}
+        playbackStatus={listen.status}
+        currentTimeMs={listen.currentTimeMs}
         onPlay={onPlay}
         onPause={onPause}
         testIDPrefix={`recent-sound-${item.id}`}
