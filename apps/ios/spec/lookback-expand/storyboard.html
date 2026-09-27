@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>回看 · 跳转与同页展开</title>
+  <style>
+    :root {
+      --paper: #F3F0E9;
+      --ink: #25231F;
+      --soft: #5C5851;
+      --sage: #53604F;
+      --line: rgba(37, 35, 31, 0.16);
+      --band: #EDE8DC;
+      --mark: #87513D;
+    }
+    body { margin: 0; background: #e4dfd4; color: var(--ink); font: 16px/1.45 -apple-system, BlinkMacSystemFont, sans-serif; }
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 24px 96px; }
+    h1 { font-size: 28px; font-weight: 500; }
+    h2 { font-size: 20px; font-weight: 500; margin-top: 48px; }
+    p, li { color: var(--soft); }
+    code { font-size: 13px; color: var(--ink); }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+    @media (max-width: 800px) { .pair { grid-template-columns: 1fr; } }
+    .phone {
+      background: var(--paper);
+      width: 280px;
+      min-height: 560px;
+      height: 580px;
+      padding: 22px 20px 0;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .phone.tall { height: auto; min-height: 560px; padding-bottom: 22px; }
+    .phone.future { outline: 1px dashed var(--sage); outline-offset: 2px; }
+    .title { font-size: 28px; line-height: 36px; margin: 0 0 16px; }
+    .back { color: var(--sage); min-height: 48px; display: flex; align-items: center; font-size: 17px; }
+    .meta { font-size: 14px; color: var(--sage); }
+    .hit { min-height: 48px; display: flex; align-items: center; font-size: 17px; color: var(--ink); }
+    .hit.soft { color: var(--sage); }
+    .quiet { color: var(--soft); opacity: .45; min-height: 36px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 0; margin: 8px 0 16px; }
+    .cell { min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 15px; color: var(--soft); }
+    .cell.live { color: var(--ink); }
+    .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); margin-top: 4px; }
+    .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; margin: 8px 0 12px; }
+    .indent { padding-left: 16px; border-left: 1px solid var(--line); margin: 0 0 8px 4px; }
+    .cap { font-size: 13px; color: var(--sage); margin: 8px 0 0; max-width: 280px; }
+    .ban { font-size: 13px; color: var(--mark); }
+    .nv { font-size: 12px; color: var(--mark); letter-spacing: 0.04em; }
+    .shot { width: 280px; border: 0; display: block; }
+    .note { font-size: 21px; line-height: 32px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>回看 · 跳转与同页展开</h1>
+  <p>基线 <code>61b1876</code>。左列方案 A 用已拍的真页面；右列方案 B 是定稿（虚线）。横屏、iPad、VoiceOver：#34 未验证，<strong>不算通过</strong>。</p>
+
+  <h2>本库真年页（A）</h2>
+  <section>
+    <img class="shot" src="../lookback-year-day/shots/iphone16-year.png" alt="2026年三列，仅9月有点" />
+    <p class="cap">十一空月安静不可点。有记录的只有 9 月。还要再跳进整月月历。</p>
+  </section>
+
+  <h2>空月 · 稀疏月（本库 2026-09）</h2>
+  <div class="pair">
+    <section>
+      <img class="shot" src="../lookback-month/shots/iphone16-lookback-month.png" alt="9月整页月历" />
+      <p class="cap"><strong>A</strong> 为看 9月24日，先铺 29 个安静格。</p>
+    </section>
+    <section>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">2026年</p>
+        <div class="months">
+          <div class="quiet">1月</div><div class="quiet">2月</div><div class="quiet">3月</div>
+          <div class="quiet">4月</div><div class="quiet">5月</div><div class="quiet">6月</div>
+          <div class="quiet">7月</div><div class="quiet">8月</div>
+          <div class="cell live">9月<div class="dot"></div></div>
+          <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
+        </div>
+        <div class="hit">9月 · 有1条记录</div>
+        <div class="indent">
+          <div class="hit soft">9月24日 · 有1条记录</div>
+        </div>
+        <p class="meta">1月不可点，不展开成空说明。</p>
+      </div>
+      <p class="cap"><strong>B 采用。</strong> 空月不展开。9 月在年页拉出有记录的日子，不铺安静格。</p>
+    </section>
+  </div>
+
+  <h2>密集月</h2>
+  <div class="pair">
+    <section>
+      <div class="phone">
+        <div class="back">返回原来的位置</div>
+        <p class="title">2026年9月</p>
+        <p class="meta">一　二　三　四　五　六　日</p>
+        <div class="days">
+          <div class="quiet"></div><div class="quiet">1</div><div class="quiet">2</div>
+          <div class="quiet">3</div><div class="cell live">4<div class="dot"></div></div>
+          <div class="quiet">5</div><div class="quiet">6</div>
+          <div class="quiet">7</div><div class="cell live">8<div class="dot"></div></div>
+          <div class="quiet">9</div><div class="quiet">10</div><div class="cell live">11<div class="dot"></div></div>
+          <div class="quiet">12</div><div class="quiet">13</div>
+          <div class="quiet">14</div><div class="quiet">15</div><div class="quiet">16</div>
+          <div class="cell live">17<div class="dot"></div></div><div class="quiet">18</div>
+          <div class="quiet">19</div><div class="quiet">20</div>
+          <div class="cell live">21<div class="dot"></div></div><div class="quiet">22</div>
+          <div class="quiet">23</div><div class="cell live">24<div class="dot"></div></div>
+          <div class="quiet">25</div><div class="quiet">26</div><div class="quiet">27</div>
+        </div>
+        <p class="meta">有记录的日子（一天一行）</p>
+      </div>
+      <p class="cap"><strong>A</strong> 星期位置清楚。本库尚无密集月实拍，此帧是结构稿，<span class="nv">不是 PASS</span>。</p>
+    </section>
+    <section>
+      <div class="phone future tall">
+        <div class="back">返回原来的位置</div>
+        <p class="title">2026年</p>
+        <div class="hit">9月 · 有12条记录</div>
+        <div class="indent">
+          <div class="hit soft">9月4日 · 有1条记录</div>
+          <div class="hit soft">9月8日 · 有2条记录</div>
+          <div class="hit soft">9月11日 · 有1条记录</div>
+          <div class="hit soft">9月17日 · 有3条记录</div>
+          <div class="hit soft">9月21日 · 有1条记录</div>
+          <div class="hit soft">9月24日 · 有4条记录</div>
+        </div>
+        <p class="meta">不嵌七列。一天一行，圆点不随条数变大。</p>
+      </div>
+      <p class="cap"><strong>B</strong> 与现 XXXL 月页同一信息，少一次切页。星期位置交给日页标题。</p>
+    </section>
+  </div>
+
+  <h2>时间未确认</h2>
+  <div class="pair">
+    <section>
+      <img class="shot" src="../lookback-month/shots/iphone16-lookback-years.png" alt="回看根时间未确认" />
+      <p class="cap"><strong>A</strong> 根上独立一行。注意：此图是 #34 之前的回看根（顶上返回）。合入后回看根是底带，不是这根返回条。</p>
+    </section>
+    <section>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">2026年</p>
+        <div class="hit">月份未确认 · 2条</div>
+        <div class="months">
+          <div class="quiet">1月</div><div class="quiet">2月</div><div class="quiet">3月</div>
+          <div class="quiet">4月</div><div class="quiet">5月</div><div class="quiet">6月</div>
+          <div class="quiet">7月</div><div class="quiet">8月</div>
+          <div class="cell live">9月<div class="dot"></div></div>
+          <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
+        </div>
+        <div class="hit">9月 · 有1条记录</div>
+        <div class="indent">
+          <div class="hit soft">9月24日 · 有1条记录</div>
+        </div>
+        <p class="ban">展开的 9 月里没有未确认。</p>
+      </div>
+      <p class="cap"><strong>B</strong> 未确认仍是年页顶上的独立行，<code>push</code> 原 unconfirmed 页。</p>
+    </section>
+  </div>
+
+  <h2>大字号</h2>
+  <div class="pair">
+    <section>
+      <img class="shot" src="../lookback-year-day/shots/iphone16-year-xxxl.png" alt="XXXL 年页只留列表" />
+      <p class="cap"><strong>A</strong> 已不画三列，但仍要再进月页（月页 XXXL 也不画七列）。</p>
+    </section>
+    <section>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title" style="font-size:34px;line-height:42px">2026年</p>
+        <div class="hit" style="font-size:22px">9月 · 有1条记录</div>
+        <div class="indent">
+          <div class="hit soft" style="font-size:22px">9月24日 · 有1条记录</div>
+        </div>
+      </div>
+      <p class="cap"><strong>B</strong> 列表下直接出日子。不因大字号恢复格子，也不多跳一页只含一行的月。</p>
+    </section>
+  </div>
+
+  <h2>点日子之后（两案相同）</h2>
+  <section>
+    <img class="shot" src="../lookback-year-day/shots/iphone16-day.png" alt="日页" />
+    <p class="cap">日页留下。不在年页展开正文或照片。返回年页时，B 要求 9 月仍展开。</p>
+  </section>
+
+  <h2>不画</h2>
+  <p>年页展开一条 Moment。回看根展开所有年。把未确认塞进某月。用热力长度表示条数。把 #34 横屏 / iPad / VoiceOver 标成已通过。</p>
+</main>
+</body>
+</html>
