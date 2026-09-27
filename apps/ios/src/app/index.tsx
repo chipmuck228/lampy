@@ -32,6 +32,7 @@ import {
   paper,
   sage,
 } from '../screens/life-page';
+import { StartupBrandLayer } from '../screens/startup-brand-layer';
 
 export default function RecentScreen() {
   const router = useRouter();
@@ -69,6 +70,7 @@ export default function RecentScreen() {
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="最近">
+      <StartupBrandLayer homeSettled={view !== null || error !== null} />
       <ScrollView
         testID="recent-scroll"
         style={styles.scroll}

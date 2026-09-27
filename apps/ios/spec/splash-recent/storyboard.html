@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>Splash → 最近</title>
+  <style>
+    :root { --paper: #F3F0E9; --ink: #25231F; --ink-soft: #5C5851; --sage: #53604F; }
+    body { margin: 0; font: 16px/24px "Songti SC", "Source Han Serif SC", serif; background: #d8d2c6; color: var(--ink); }
+    main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+    h1 { font-size: 28px; line-height: 36px; font-weight: 600; }
+    h2 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 36px 0 12px; }
+    p, li { color: var(--ink-soft); }
+    .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+    .phone { background: var(--paper); border-radius: 20px; padding: 28px 22px; min-height: 380px; position: relative; }
+    .cap { font: 13px/18px ui-sans-serif, system-ui; color: var(--sage); margin: 0 0 12px; }
+    .mark { width: 76px; height: 76px; margin: 120px auto 0; border: 2px solid var(--ink); border-top: 0; border-radius: 0 0 4px 4px; clip-path: polygon(50% 8%, 100% 92%, 0 92%); }
+    .title { font-size: 28px; line-height: 36px; }
+    .nav { color: var(--sage); margin: 4px 0 24px; }
+    .date { color: var(--sage); font-size: 16px; }
+    .note { font-size: 21px; line-height: 32px; margin: 8px 0 28px; }
+    .empty { font-size: 28px; line-height: 38px; margin-top: 28px; }
+    .err { color: #87513D; margin-top: 12px; }
+    .ghost { position: absolute; inset: 0; background: var(--paper); display: flex; align-items: center; justify-content: center; opacity: 0.45; border-radius: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Splash 与「最近」：同一纸色，品牌层淡出</h1>
+    <p>白标在 #F3F0E9 上几乎看不见。改用同一 A 形的墨色。首页结构在淡出前已在最终位置。</p>
+
+    <h2>冷启动 · 有记录</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">1 · 原生 Launch</p>
+        <div class="mark" aria-hidden="true"></div>
+      </section>
+      <section class="phone">
+        <p class="cap">2 · JS 首帧，品牌叠在已排好的最近上</p>
+        <div class="title">最近</div>
+        <div class="nav">回看　留下</div>
+        <div class="date">记录于 9月27日</div>
+        <div class="note">门口的风</div>
+        <div class="ghost"><div class="mark"></div></div>
+      </section>
+      <section class="phone">
+        <p class="cap">3 · 380ms 后</p>
+        <div class="title">最近</div>
+        <div class="nav">回看　留下</div>
+        <div class="date">记录于 9月27日</div>
+        <div class="note">门口的风</div>
+      </section>
+    </div>
+
+    <h2>空库 · 读取失败 · Reduce Motion</h2>
+    <div class="row">
+      <section class="phone">
+        <p class="cap">首次 / 空库</p>
+        <div class="title">最近</div>
+        <div class="empty">这里，留下自己的生活。</div>
+      </section>
+      <section class="phone">
+        <p class="cap">读取失败</p>
+        <div class="title">最近</div>
+        <p class="err">最近的记录暂时读不出来，原来的内容还在这台设备上。</p>
+      </section>
+      <section class="phone">
+        <p class="cap">Reduce Motion / 触摸 / 返回</p>
+        <div class="title">最近</div>
+        <div class="date">记录于 9月27日</div>
+        <div class="note">门口的风</div>
+        <p class="nav">不播品牌层</p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,3 +1,8 @@
+jest.mock('expo-splash-screen', () => ({
+  preventAutoHideAsync: jest.fn(async () => undefined),
+  hideAsync: jest.fn(async () => undefined),
+}));
+
 jest.mock('expo-secure-store', () => {
   const memory = new Map();
   return {
