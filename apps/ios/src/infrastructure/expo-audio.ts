@@ -8,6 +8,7 @@ type NativeRecorder = {
   prepareToRecordAsync(options?: object): Promise<void>;
   record(): void;
   stop(): Promise<void>;
+  release?: () => void;
   getStatus(): { durationMillis: number; isRecording: boolean };
 };
 
@@ -139,6 +140,15 @@ function disposeNativePlayer(player: ReturnType<ExpoAudioModule['createAudioPlay
   }
 }
 
+function disposeNativeRecorder(recorder: NativeRecorder | null) {
+  if (!recorder) return;
+  try {
+    recorder.release?.();
+  } catch {
+    // Recorder is already gone.
+  }
+}
+
 function createUnavailableCapture(): AudioCapture {
   return {
     async requestPermission() {
@@ -190,34 +200,45 @@ export function createExpoAudioCapture(): AudioCapture {
   let recorder: NativeRecorder | null = null;
   let startedAt = 0;
 
+  function harvest(current: NativeRecorder, elapsedMs: number): RecordedAudio | null {
+    const status = current.getStatus();
+    const durationMs = Math.max(
+      0,
+      status.durationMillis || secondsToMs(current.currentTime) || elapsedMs,
+    );
+    const uri = current.uri;
+    if (!uri || durationMs <= 0) return null;
+    return {
+      sourceUri: uri,
+      durationMs,
+      mimeType: 'audio/mp4',
+    };
+  }
+
+  async function releaseRecorder(current: NativeRecorder | null) {
+    recorder = null;
+    disposeNativeRecorder(current);
+    await restorePlaybackAudioMode(native);
+  }
+
   async function finish(): Promise<RecordedAudio> {
     if (!recorder) {
       throw new Error('not recording');
     }
     const current = recorder;
     const elapsedMs = startedAt ? Date.now() - startedAt : 0;
-    let uri: string | null = null;
-    let durationMs = 0;
     try {
-      await current.stop();
-      const status = current.getStatus();
-      durationMs = Math.max(
-        0,
-        status.durationMillis || secondsToMs(current.currentTime) || elapsedMs,
-      );
-      uri = current.uri;
+      if (current.isRecording) {
+        await current.stop();
+      }
+      const recorded = harvest(current, elapsedMs);
+      if (!recorded) {
+        throw new Error(current.uri ? 'recording is empty' : 'recording has no file');
+      }
+      return recorded;
     } finally {
-      recorder = null;
-      await restorePlaybackAudioMode(native);
+      await releaseRecorder(current);
     }
-    if (!uri) {
-      throw new Error('recording has no file');
-    }
-    return {
-      sourceUri: uri,
-      durationMs,
-      mimeType: 'audio/mp4',
-    };
   }
 
   return {
@@ -229,13 +250,21 @@ export function createExpoAudioCapture(): AudioCapture {
       if (recorder?.isRecording) {
         throw new Error('already recording');
       }
+      if (recorder) {
+        await releaseRecorder(recorder);
+      }
       await applyAudioMode(native, RECORDING_AUDIO_MODE);
       try {
         const next = new Recorder(RECORDING_OPTIONS);
-        await next.prepareToRecordAsync(RECORDING_OPTIONS);
-        next.record();
-        recorder = next;
-        startedAt = Date.now();
+        try {
+          await next.prepareToRecordAsync(RECORDING_OPTIONS);
+          next.record();
+          recorder = next;
+          startedAt = Date.now();
+        } catch (error) {
+          disposeNativeRecorder(next);
+          throw error;
+        }
       } catch (error) {
         await restorePlaybackAudioMode(native);
         throw error;
@@ -243,13 +272,19 @@ export function createExpoAudioCapture(): AudioCapture {
     },
     stop: finish,
     async interrupt() {
-      if (!recorder?.isRecording) return null;
+      if (!recorder) return null;
+      const current = recorder;
+      const elapsedMs = startedAt ? Date.now() - startedAt : 0;
       try {
-        const recorded = await finish();
-        return recorded.durationMs > 0 ? recorded : null;
+        if (current.isRecording) {
+          const recorded = await finish();
+          return recorded.durationMs > 0 ? recorded : null;
+        }
+        const recorded = harvest(current, elapsedMs);
+        await releaseRecorder(current);
+        return recorded;
       } catch {
-        recorder = null;
-        await restorePlaybackAudioMode(native);
+        await releaseRecorder(current);
         return null;
       }
     },

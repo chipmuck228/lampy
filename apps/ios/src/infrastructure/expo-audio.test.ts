@@ -290,6 +290,7 @@ describe('expo audio session routing', () => {
   const createAudioPlayer = jest.fn(() => player);
   const setAudioModeAsync = jest.fn(async (_mode: { allowsRecording: boolean }) => undefined);
   const sessionOrder: string[] = [];
+  const createdRecorders: AudioRecorder[] = [];
   let failPrepare = false;
   let failStop = false;
   let failMode: 'none' | 'next' | 'playback-only' = 'none';
@@ -298,6 +299,10 @@ describe('expo audio session routing', () => {
     isRecording = false;
     currentTime = 1.5;
     uri: string | null = null;
+    release = jest.fn();
+    constructor() {
+      createdRecorders.push(this);
+    }
     async prepareToRecordAsync() {
       if (failPrepare) throw new Error('prepare failed');
     }
@@ -323,6 +328,7 @@ describe('expo audio session routing', () => {
     failStop = false;
     failMode = 'none';
     sessionOrder.length = 0;
+    createdRecorders.length = 0;
     player.play.mockClear();
     player.pause.mockClear();
     player.seekTo.mockClear();
@@ -483,6 +489,46 @@ describe('expo audio session routing', () => {
     await playback.release();
     expect(player.release).toHaveBeenCalled();
     expect(playback.getStatus().status).toBe('idle');
+  });
+
+  it('releases an interrupted recorder so a second recording can play', async () => {
+    const { capture, playback } = loadAdapters();
+    await capture.start();
+    expect(createdRecorders).toHaveLength(1);
+
+    const first = await capture.interrupt();
+    expect(first?.sourceUri).toBe('file://leave.m4a');
+    expect(createdRecorders[0].release).toHaveBeenCalled();
+    expect(capture.isRecording()).toBe(false);
+
+    await capture.start();
+    expect(createdRecorders).toHaveLength(2);
+    const second = await capture.stop();
+    expect(createdRecorders[1].release).toHaveBeenCalled();
+    expect(sessionOrder.at(-1)).toBe('playback');
+
+    await playback.load(second.sourceUri);
+    await playback.play();
+    expect(player.play).toHaveBeenCalledTimes(1);
+    expect(playback.getStatus().status).not.toBe('unavailable');
+  });
+
+  it('harvests a leftover file after the system already stopped the recorder, then can record and play again', async () => {
+    const { capture, playback } = loadAdapters();
+    await capture.start();
+    createdRecorders[0].isRecording = false;
+
+    const leftover = await capture.interrupt();
+    expect(leftover?.sourceUri).toBe('file://leave.m4a');
+    expect(leftover?.durationMs).toBe(1500);
+    expect(createdRecorders[0].release).toHaveBeenCalled();
+    expect(sessionOrder.at(-1)).toBe('playback');
+
+    await capture.start();
+    const second = await capture.stop();
+    await playback.load(second.sourceUri);
+    await playback.play();
+    expect(player.play).toHaveBeenCalledTimes(1);
   });
 
   it('leaves recording mode if prepare fails', async () => {

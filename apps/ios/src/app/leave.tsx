@@ -202,15 +202,12 @@ export default function LeaveScreen() {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') {
-        void sound.stop();
-        if (phaseRef.current === 'recording') {
-          interruptRef.current();
-        }
+      if (state !== 'active' && phaseRef.current === 'recording') {
+        interruptRef.current();
       }
     });
     return () => sub.remove();
-  }, [sound]);
+  }, []);
 
   function shownError(error: unknown, fallback: string) {
     return isApplicationError(error) ? error.message : fallback;

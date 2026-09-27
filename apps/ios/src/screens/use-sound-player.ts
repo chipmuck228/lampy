@@ -77,19 +77,41 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
     }
   }, []);
 
+  const park = useCallback(async () => {
+    const current = playerRef.current;
+    if (!current) return;
+    const before = current.getStatus();
+    const heard = before.currentTimeMs;
+    playInFlightRef.current = false;
+    pendingUriRef.current = null;
+    try {
+      await current.pause();
+    } catch {
+      // Native player may already be interrupted.
+    }
+    if (!mountedRef.current || playerRef.current !== current) return;
+    const after = current.getStatus();
+    const kept = after.currentTimeMs > 0 ? after.currentTimeMs : heard;
+    if (statusRef.current === 'idle' || statusRef.current === 'finished') return;
+    const nextStatus = after.status === 'unavailable' ? 'unavailable' : 'paused';
+    setFailed(nextStatus === 'unavailable');
+    writeStatus(nextStatus);
+    setCurrentTimeMs(kept);
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     const app = AppState.addEventListener('change', (state) => {
       if (state !== 'active') {
-        void teardown(true);
+        void park();
       }
     });
     return () => {
       mountedRef.current = false;
-      app.remove();
+      app?.remove?.();
       void teardown(false);
     };
-  }, [teardown]);
+  }, [park, teardown]);
 
   useEffect(() => {
     if (status !== 'playing' && status !== 'preparing') return undefined;

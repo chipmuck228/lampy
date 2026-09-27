@@ -1,4 +1,5 @@
 import { act, fireEvent, render, renderHook, waitFor } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { createMemoryAudioPlayback, type AudioPlayback, type PlaybackStatus } from '../infrastructure/media';
 import { MomentAudio } from './moment-audio';
@@ -264,6 +265,48 @@ describe('useSoundPlayer state sync', () => {
     expect(result.current.status).toBe('unavailable');
     expect(result.current.failed).toBe(true);
     expect(result.current.currentTimeMs).toBe(0);
+  });
+
+  it('pauses at the heard position when the app leaves the foreground, then resumes there', async () => {
+    const handlers: ((state: AppStateStatus) => void)[] = [];
+    const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+      if (type === 'change') handlers.push(handler);
+      return { remove: jest.fn() };
+    });
+    try {
+      const playback = createDeferredPlayback();
+      const { result } = await renderHook(() => useSoundPlayer(() => playback));
+
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+      playback.reportPlaying(1200);
+      await waitFor(() => {
+        expect(result.current.status).toBe('playing');
+      });
+
+      await act(async () => {
+        handlers.forEach((handler) => handler('background'));
+      });
+
+      expect(result.current.status).toBe('paused');
+      expect(result.current.currentTimeMs).toBe(1200);
+      expect(result.current.failed).toBe(false);
+      expect(playback.releases).toBe(0);
+      expect(playback.getStatus().status).not.toBe('finished');
+
+      playback.deferPlaying = false;
+      await act(async () => {
+        await result.current.play(VOICE);
+      });
+
+      expect(result.current.status).toBe('playing');
+      expect(result.current.currentTimeMs).toBe(1200);
+      expect(playback.loads).toBe(1);
+      expect(playback.plays).toBe(2);
+    } finally {
+      add.mockRestore();
+    }
   });
 });
 
