@@ -311,6 +311,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
   let startRequested = false;
   let heardPlaying = false;
   let lastHeardTimeMs = 0;
+  let startCancelled = false;
 
   function resetSession() {
     finished = false;
@@ -318,6 +319,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
     startRequested = false;
     heardPlaying = false;
     lastHeardTimeMs = 0;
+    startCancelled = false;
   }
 
   return {
@@ -330,8 +332,14 @@ export function createExpoAudioPlayback(): AudioPlayback {
     },
     async play() {
       if (!player) throw new Error('no source');
+      startCancelled = false;
       try {
         await applyAudioMode(audio, PLAYBACK_AUDIO_MODE);
+        if (startCancelled) {
+          startRequested = false;
+          heardPlaying = false;
+          return;
+        }
         const status = player.currentStatus;
         const currentTimeMs = secondsToMs(status.currentTime);
         if (finished || status.didJustFinish) {
@@ -341,6 +349,11 @@ export function createExpoAudioPlayback(): AudioPlayback {
           lastHeardTimeMs = 0;
         } else if (lastHeardTimeMs > 0 && positionsDiverge(currentTimeMs, lastHeardTimeMs)) {
           await player.seekTo(lastHeardTimeMs / 1000);
+        }
+        if (startCancelled) {
+          startRequested = false;
+          heardPlaying = false;
+          return;
         }
         startRequested = true;
         heardPlaying = false;
@@ -354,11 +367,13 @@ export function createExpoAudioPlayback(): AudioPlayback {
       }
     },
     async pause() {
+      startCancelled = true;
       startRequested = false;
       heardPlaying = false;
       player?.pause();
     },
     async stop() {
+      startCancelled = true;
       startRequested = false;
       heardPlaying = false;
       lastHeardTimeMs = 0;

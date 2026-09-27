@@ -78,25 +78,36 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
   }, []);
 
   const park = useCallback(async () => {
-    const current = playerRef.current;
-    if (!current) return;
-    const before = current.getStatus();
-    const heard = before.currentTimeMs;
+    generationRef.current += 1;
     playInFlightRef.current = false;
     pendingUriRef.current = null;
-    try {
-      await current.pause();
-    } catch {
-      // Native player may already be interrupted.
+    const current = playerRef.current;
+    const before = current?.getStatus();
+    const heard = before?.currentTimeMs ?? 0;
+    if (current) {
+      try {
+        await current.pause();
+      } catch {
+        // Native player may already be interrupted.
+      }
     }
-    if (!mountedRef.current || playerRef.current !== current) return;
-    const after = current.getStatus();
-    const kept = after.currentTimeMs > 0 ? after.currentTimeMs : heard;
-    if (statusRef.current === 'idle' || statusRef.current === 'finished') return;
-    const nextStatus = after.status === 'unavailable' ? 'unavailable' : 'paused';
-    setFailed(nextStatus === 'unavailable');
-    writeStatus(nextStatus);
-    setCurrentTimeMs(kept);
+    if (!mountedRef.current) return;
+    const after = current?.getStatus();
+    const kept = (after?.currentTimeMs ?? 0) > 0 ? after!.currentTimeMs : heard;
+    if (after?.status === 'unavailable') {
+      setFailed(true);
+      writeStatus('unavailable');
+      setCurrentTimeMs(0);
+      return;
+    }
+    setFailed(false);
+    if (kept > 0 && statusRef.current !== 'idle' && statusRef.current !== 'finished') {
+      writeStatus('paused');
+      setCurrentTimeMs(kept);
+      return;
+    }
+    writeStatus('idle');
+    setCurrentTimeMs(0);
   }, []);
 
   useEffect(() => {
@@ -161,7 +172,14 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
           loadedUriRef.current = uri;
         }
         await current.play();
-        if (!mountedRef.current || generation !== generationRef.current) return;
+        if (!mountedRef.current || generation !== generationRef.current) {
+          try {
+            await current.pause();
+          } catch {
+            // Background already cancelled this start.
+          }
+          return;
+        }
         sync();
       } catch {
         if (!mountedRef.current || generation !== generationRef.current) return;

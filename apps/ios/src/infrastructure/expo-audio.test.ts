@@ -501,6 +501,27 @@ describe('expo audio session routing', () => {
     expect(player.play).toHaveBeenCalledTimes(1);
   });
 
+  it('does not ignite play when the playback session is applied after a background pause', async () => {
+    let finishMode: (() => void) | undefined;
+    setAudioModeAsync.mockImplementation(async (mode: { allowsRecording: boolean }) => {
+      if (!mode.allowsRecording) {
+        await new Promise<void>((resolve) => {
+          finishMode = resolve;
+        });
+      }
+      sessionOrder.push(mode.allowsRecording ? 'record' : 'playback');
+    });
+    const { playback } = loadAdapters();
+    await playback.load('file://leave.m4a');
+    const pending = playback.play();
+    await playback.pause();
+    finishMode?.();
+    await pending;
+    expect(player.play).not.toHaveBeenCalled();
+    expect(playback.getStatus().status).not.toBe('playing');
+    expect(playback.getStatus().status).not.toBe('preparing');
+  });
+
   it('does not claim playback when the playback session cannot be applied', async () => {
     failMode = 'playback-only';
     const { playback } = loadAdapters();

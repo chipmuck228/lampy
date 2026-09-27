@@ -22,6 +22,7 @@ Lampy `0.1.0`（`app.lampy.ios`），Expo Dev Client + Metro reload。外接音�
 | 2b | 录音中切后台 → 提示打断 → 重录 → 预览和首页都能播 | **PASS** | 修复前重录能录但播不了。打断后释放录音器。 |
 | 2c | 播放 → 暂停 → 再点播放，第一次续播就显示正在播放 | **PASS** | 修复前声音已续、文案仍是「已暂停」。 |
 | 2d | 录音或重录中切后台再回来：打断文案 + 一段声音 / 播放 | **PASS** | 修复前误显示「已播完 / 再听一次」。 |
+| 2e | 点播放 → load / 模式切换未完成 → 切后台 → 异步完成 | **测试覆盖** | 后台取消未完成的 play，不点火；回前台不自动播，须再点播放。未单独真机走。 |
 | 3 | 蓝牙或有线输出跟系统路由 | **NOT VERIFIED** | 本次没有外接设备。 |
 | 4 | 关闭并重开 App，A、B 的记录和声音仍可读取 | **NOT VERIFIED** | 本次没有单独记杀进程再开。 |
 
@@ -39,6 +40,6 @@ Lampy `0.1.0`（`app.lampy.ios`），Expo Dev Client + Metro reload。外接音�
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | PASS |
-| 相关 Jest（expo-audio / use-sound-player / leave-audio / audio-use-cases / draft-preview） | 57 passed |
+| 相关 Jest（expo-audio / use-sound-player / leave-audio / audio-use-cases / draft-preview） | 60 passed |
 | `npx expo lint` | 本轮无新增 error；`share/[id].tsx` L42、L83 是 main 原有 |
 | `git diff --check` | PASS |
