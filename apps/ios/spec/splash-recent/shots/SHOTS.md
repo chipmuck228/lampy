@@ -38,4 +38,4 @@
 | 横屏 / iPad Launch Screen | **NOT VERIFIED** |
 | iOS 26.2 真机 | **NOT VERIFIED** |
 
-检查：`npx tsc --noEmit`、Jest 393、`npx expo lint`（本轮无新增 error；`share/[id].tsx` 两处 error 是 main 原有）、`git diff --check`、`npx expo run:ios` Build Succeeded。
+检查：`npx tsc --noEmit`、Jest 399、`npx expo lint`（本轮无新增 error；`share/[id].tsx` 两处 error 是 main 原有）、`git diff --check`、`npx expo run:ios` Build Succeeded。
