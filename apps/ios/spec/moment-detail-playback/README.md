@@ -14,6 +14,8 @@
 
 播完后如果错过一次性的 `didJustFinish`，`startRequested` 仍为 true，状态会回到 `preparing`，8 秒后被误判为失败。补完「曾 playing 即 finished」之后，中途停在 1 秒（无 `didJustFinish`）也会被误报「已播完」；现在只有位置接近总时长，或明确的结束事件，才报 finished。无法确认结束时保持暂停可继续，或失败可重试。原生把 1 秒位置归零后，后续 getStatus 仍保持同一次暂停，不会掉回「未播放」。再点播放时 seek 回约 1 秒再续播；seek 失败则进入可重试，不再显示一个并不存在的续播位置。
 
+录音用 `allowsRecording: true`（iOS PlayAndRecord，默认听筒）。播放前必须等 `allowsRecording: false` 且 `shouldRouteThroughEarpiece: false` 的媒体会话生效；录音模式只在录音期间打开。不靠调音量，也不覆盖用户已选的蓝牙或有线输出。
+
 ## 走查（iPhone 16 / iOS 18.6）
 
 | 状态 | 按钮 / 文案 | 进度 | 结果 |
@@ -26,9 +28,13 @@
 | finished | 「再听一次，3秒」；「已播完，共3秒」 | 满轨 | **PASS** |
 | replay | 「暂停，3秒」；「正在播放，0秒，共3秒」 | 从头 | **PASS** |
 | 离开详情 | 回到「最近」；不再显示播放中 | — | **PASS** |
-| 实际听到声音 | 进程在播放中打开了该 m4a；本环境听不到模拟器扬声器 | — | **NOT VERIFIED**（不能把 Jest 或 lsof 当成听感 PASS） |
+| 实际有声音 | 用户在真机听到了 Leave 录制的回放 | — | **PASS** |
+| 正确输出路由（修复前） | 声音从听筒播出，不是设备扬声器 | — | **FAIL** |
+| 正确输出路由（修复后真机） | 待在设备扬声器 / 外接音频上听 | — | **NOT VERIFIED**（模拟器与 Jest 不能替代） |
+| 外接音频系统路由 | 蓝牙或有线接入时跟系统走，不抢路由 | — | **NOT VERIFIED** |
+| 录音后再录音 | 会话应回到录音模式 | — | **NOT VERIFIED** |
 | 后台停止 | 未单独切后台 | — | **NOT VERIFIED** |
-| iOS 26.2 真机 | 已连接设备是 iPhone 13 / 18.7.3；无 26.2 | — | **NOT VERIFIED** |
+| iOS 26.2 真机 | 已连接 iPhone 13 / 18.7.3；无 26.2 | — | **NOT VERIFIED** |
 
 帧：`shots/iphone16-idle.png`、`iphone16-playing.png`、`iphone16-paused.png`、`iphone16-resume.png`、`iphone16-finished.png`、`iphone16-replay.png`。
 

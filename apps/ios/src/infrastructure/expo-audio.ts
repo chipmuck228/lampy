@@ -31,8 +31,43 @@ type ExpoAudioModule = {
     };
   };
   requestRecordingPermissionsAsync: () => Promise<{ granted: boolean }>;
-  setAudioModeAsync: (mode: object) => Promise<void>;
+  setAudioModeAsync: (mode: AudioSessionMode) => Promise<void>;
 };
+
+type AudioSessionMode = {
+  allowsRecording: boolean;
+  playsInSilentMode: boolean;
+  interruptionMode: 'doNotMix';
+  shouldPlayInBackground: boolean;
+  allowsBackgroundRecording: boolean;
+  shouldRouteThroughEarpiece: boolean;
+};
+
+const PLAYBACK_AUDIO_MODE: AudioSessionMode = {
+  allowsRecording: false,
+  playsInSilentMode: true,
+  interruptionMode: 'doNotMix',
+  shouldPlayInBackground: false,
+  allowsBackgroundRecording: false,
+  shouldRouteThroughEarpiece: false,
+};
+
+const RECORDING_AUDIO_MODE: AudioSessionMode = {
+  ...PLAYBACK_AUDIO_MODE,
+  allowsRecording: true,
+};
+
+async function applyAudioMode(native: ExpoAudioModule, mode: AudioSessionMode): Promise<void> {
+  await native.setAudioModeAsync(mode);
+}
+
+async function restorePlaybackAudioMode(native: ExpoAudioModule): Promise<void> {
+  try {
+    await applyAudioMode(native, PLAYBACK_AUDIO_MODE);
+  } catch {
+    // Playback will apply the session again before play().
+  }
+}
 
 let loaded: ExpoAudioModule | null | undefined;
 
@@ -161,21 +196,20 @@ export function createExpoAudioCapture(): AudioCapture {
     }
     const current = recorder;
     const elapsedMs = startedAt ? Date.now() - startedAt : 0;
-    await current.stop();
-    const status = current.getStatus();
-    const durationMs = Math.max(
-      0,
-      status.durationMillis || secondsToMs(current.currentTime) || elapsedMs,
-    );
-    const uri = current.uri;
-    recorder = null;
-    await native.setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: true,
-      interruptionMode: 'doNotMix',
-      shouldPlayInBackground: false,
-      allowsBackgroundRecording: false,
-    });
+    let uri: string | null = null;
+    let durationMs = 0;
+    try {
+      await current.stop();
+      const status = current.getStatus();
+      durationMs = Math.max(
+        0,
+        status.durationMillis || secondsToMs(current.currentTime) || elapsedMs,
+      );
+      uri = current.uri;
+    } finally {
+      recorder = null;
+      await restorePlaybackAudioMode(native);
+    }
     if (!uri) {
       throw new Error('recording has no file');
     }
@@ -195,18 +229,17 @@ export function createExpoAudioCapture(): AudioCapture {
       if (recorder?.isRecording) {
         throw new Error('already recording');
       }
-      await native.setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-        interruptionMode: 'doNotMix',
-        shouldPlayInBackground: false,
-        allowsBackgroundRecording: false,
-      });
-      const next = new Recorder(RECORDING_OPTIONS);
-      await next.prepareToRecordAsync(RECORDING_OPTIONS);
-      next.record();
-      recorder = next;
-      startedAt = Date.now();
+      await applyAudioMode(native, RECORDING_AUDIO_MODE);
+      try {
+        const next = new Recorder(RECORDING_OPTIONS);
+        await next.prepareToRecordAsync(RECORDING_OPTIONS);
+        next.record();
+        recorder = next;
+        startedAt = Date.now();
+      } catch (error) {
+        await restorePlaybackAudioMode(native);
+        throw error;
+      }
     },
     stop: finish,
     async interrupt() {
@@ -216,6 +249,7 @@ export function createExpoAudioCapture(): AudioCapture {
         return recorded.durationMs > 0 ? recorded : null;
       } catch {
         recorder = null;
+        await restorePlaybackAudioMode(native);
         return null;
       }
     },
@@ -262,6 +296,7 @@ export function createExpoAudioPlayback(): AudioPlayback {
     async play() {
       if (!player) throw new Error('no source');
       try {
+        await applyAudioMode(audio, PLAYBACK_AUDIO_MODE);
         const status = player.currentStatus;
         const currentTimeMs = secondsToMs(status.currentTime);
         if (finished || status.didJustFinish) {
