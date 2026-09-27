@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lampy UI 第一轮 · 示意图与实机对照</title>
+  <style>
+    :root {
+      --paper: #F3F0E9;
+      --ink: #25231F;
+      --soft: #5C5851;
+      --sage: #53604F;
+      --clay: #87513D;
+      --sound: #4F626D;
+      --line: rgba(37,35,31,0.16);
+    }
+    body { margin: 0; background: #d8d3c8; color: var(--ink); font: 16px/24px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; }
+    h1, h2, p { max-width: 960px; margin: 16px auto; padding: 0 16px; }
+    h1 { font-size: 22px; line-height: 30px; }
+    h2 { font-size: 18px; line-height: 26px; margin-top: 36px; }
+    a { color: var(--sage); }
+    .pair { display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; align-items: flex-start; padding: 16px; }
+    .col { max-width: 430px; }
+    .col.wide { max-width: 720px; }
+    .phone { width: 390px; min-height: 720px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); padding: 47px 24px 34px; box-sizing: border-box; }
+    .pad { width: 720px; min-height: 640px; }
+    .land { width: 720px; min-height: 390px; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+    .word { font-size: 28px; line-height: 34px; }
+    .nav { color: var(--sage); font-size: 18px; line-height: 44px; display: flex; gap: 16px; }
+    .date { color: var(--sage); font-size: 16px; line-height: 22px; }
+    .note { font-size: 21px; line-height: 30px; margin: 10px 0 0; }
+    .body { color: var(--soft); font-size: 17px; line-height: 26px; }
+    .empty { padding-top: 32px; }
+    .empty h3 { font-size: 26px; line-height: 34px; font-weight: 400; margin: 0 0 12px; }
+    .cta { color: var(--sage); font-size: 20px; line-height: 48px; }
+    .photo { margin-top: 12px; background: #c9c2b4; aspect-ratio: 4/3; display: flex; align-items: flex-end; padding: 8px; color: var(--soft); font-size: 14px; }
+    .sound { color: var(--sound); margin-top: 10px; }
+    .feel { color: var(--soft); font-size: 14px; margin-top: 8px; }
+    .gap { height: 28px; }
+    .input { font-size: 22px; line-height: 32px; min-height: 88px; color: #777168; }
+    .band { margin: 16px -24px 0; padding: 12px 24px 8px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+    .save { margin-left: auto; color: var(--ink); line-height: 48px; font-size: 18px; }
+    .media { color: var(--sage); line-height: 48px; font-size: 18px; }
+    .rail { display: flex; gap: 32px; }
+    .rail .date { width: 120px; }
+    .keys { margin-top: 12px; background: #e4e0d8; padding: 16px; color: var(--soft); font-size: 14px; }
+    .shot { width: 390px; height: auto; display: block; box-shadow: 0 0 0 1px var(--line); background: #111; }
+    .shot.land { width: 640px; }
+    .shot.pad { width: 520px; }
+    .cap { font-size: 13px; color: #6b665e; text-align: center; margin: 8px 0 0; }
+  </style>
+</head>
+<body>
+  <h1>示意图与运行中的 App 对照</h1>
+  <p>
+    左列是 <a href="./storyboard.html">storyboard.html</a> 里的版面规则示意。
+    右列是 iPhone 16 / iPad Pro 11 模拟器里、用真实留下内容截的屏。
+    不是整 App UI 完成。真机 Liuz17 未走完。
+  </p>
+
+  <h2>最近空白</h2>
+  <div class="pair">
+    <div class="col">
+      <div class="phone">
+        <div class="top"><div class="word">最近</div><div class="nav"><span>回看</span><span>留下</span></div></div>
+        <div class="empty"><h3>这里，留下自己的生活。</h3><p class="body">写一句，拍一张，或留一段声音。以后再回来听见、看见。</p><div class="cta">留下第一条</div></div>
+      </div>
+      <p class="cap">示意 · 首次使用</p>
+    </div>
+    <div class="col">
+      <img class="shot" src="shots/app/recent-empty.png" alt="运行中的最近空白" />
+      <p class="cap">实机 · iPhone 16 · 首次空白</p>
+    </div>
+  </div>
+
+  <h2>同日两条</h2>
+  <div class="pair">
+    <div class="col">
+      <div class="phone">
+        <div class="top"><div class="word">最近</div><div class="nav"><span>回看</span><span>留下</span></div></div>
+        <div class="date">9月27日</div>
+        <p class="note">门口的风</p>
+        <div class="gap"></div>
+        <p class="note">同一天的第二句</p>
+      </div>
+      <p class="cap">示意 · 日期只出现一次</p>
+    </div>
+    <div class="col">
+      <img class="shot" src="shots/app/recent-same-day.png" alt="运行中的同日两条" />
+      <p class="cap">实机 · 今天阳光很好 + 花田照片，共享 9月27日</p>
+    </div>
+  </div>
+
+  <h2>真实照片</h2>
+  <div class="pair">
+    <div class="col">
+      <div class="phone">
+        <div class="top"><div class="word">最近</div><div class="nav"><span>回看</span><span>留下</span></div></div>
+        <div class="date">9月27日</div>
+        <p class="note">窗台上的光</p>
+        <div class="photo">照片 1/1 · 4:3 占位</div>
+        <div class="feel">当时的感受 · 高兴</div>
+      </div>
+      <p class="cap">示意 · 灰色块不是用户图</p>
+    </div>
+    <div class="col">
+      <img class="shot" src="shots/app/recent-photo.png" alt="运行中的真实照片记录" />
+      <p class="cap">实机 · 模拟器相册花田原图 · 高兴</p>
+    </div>
+  </div>
+
+  <h2>声音</h2>
+  <div class="pair">
+    <div class="col">
+      <div class="phone">
+        <div class="top"><div class="word">最近</div><div class="nav"><span>回看</span><span>留下</span></div></div>
+        <div class="date">9月27日</div>
+        <p class="note">当时的雨</p>
+        <div class="sound">一段声音 · 18秒</div>
+        <div class="media">播放</div>
+      </div>
+      <p class="cap">示意 · 一段声音</p>
+    </div>
+    <div class="col">
+      <img class="shot" src="shots/app/recent-audio.png" alt="运行中的声音记录" />
+      <p class="cap">实机 · 留下页录了 11 秒 · 播放</p>
+    </div>
+  </div>
+
+  <h2>留下页键盘弹出</h2>
+  <div class="pair">
+    <div class="col">
+      <div class="phone">
+        <div class="nav">最近</div>
+        <div class="input">写一句就可以，也可以只留下照片或声音。</div>
+        <div class="media">声音</div>
+        <p class="body">当时的感受，可选</p>
+        <div class="band"><span class="media">拍摄</span><span class="media">照片</span><span class="save">留下</span></div>
+        <div class="keys">软件键盘在操作带下方</div>
+      </div>
+      <p class="cap">示意 · 底栏贴在键盘上沿</p>
+    </div>
+    <div class="col">
+      <img class="shot" src="shots/app/leave-keyboard.png" alt="运行中的留下页键盘" />
+      <p class="cap">实机 · 拍摄 / 照片 / 留下在键盘上方</p>
+    </div>
+  </div>
+
+  <h2>大字号</h2>
+  <div class="pair">
+    <div class="col">
+      <div class="phone">
+        <div class="word" style="font-size:40px;line-height:48px">最近</div>
+        <div class="nav" style="flex-wrap:wrap"><span>家庭</span><span>回看</span><span>留下</span></div>
+        <div class="date" style="font-size:22px;line-height:28px;margin-top:16px">9月27日</div>
+        <p class="note" style="font-size:28px;line-height:38px">今天阳光很好。</p>
+      </div>
+      <p class="cap">示意 · 顶栏可换行，不缩小倍率</p>
+    </div>
+    <div class="col">
+      <img class="shot" src="shots/app/recent-large-type.png" alt="运行中的大字号最近" />
+      <p class="cap">实机 · accessibility-extra-large</p>
+    </div>
+  </div>
+
+  <h2>横屏</h2>
+  <div class="pair">
+    <div class="col wide">
+      <div class="phone land">
+        <div class="top"><div class="word">最近</div><div class="nav"><span>回看</span><span>留下</span></div></div>
+        <div class="date">9月27日</div>
+        <p class="note">横屏时顶距收紧，内容可滚动。不当成平板日期轨。</p>
+      </div>
+      <p class="cap">示意 · 短高度手机页</p>
+    </div>
+    <div class="col wide">
+      <img class="shot land" src="shots/app/recent-landscape.png" alt="运行中的横屏最近" />
+      <p class="cap">实机 · iPhone 16 横屏 · 阅读柱 520，无日期轨</p>
+    </div>
+  </div>
+
+  <h2>iPad</h2>
+  <div class="pair">
+    <div class="col wide">
+      <div class="phone pad">
+        <div class="top"><div class="word">最近</div><div class="nav"><span>回看</span><span>留下</span></div></div>
+        <div class="rail">
+          <div class="date">9月27日</div>
+          <div>
+            <p class="note">门口的风</p>
+            <div class="gap"></div>
+            <p class="note">同一天的第二句</p>
+          </div>
+        </div>
+      </div>
+      <p class="cap">示意 · 日期轨 120 + 阅读柱 520</p>
+    </div>
+    <div class="col wide">
+      <img class="shot pad" src="shots/app/recent-ipad.png" alt="运行中的 iPad 最近" />
+      <p class="cap">实机 · iPad Pro 11 · 首次空白，正文未拉满</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -55,7 +55,8 @@
 | 错误 `clay` | `#87513D` | 失败与权限说明 |
 | 声音 `sound` | `#4F626D` | 录音状态（沿用现有声音组件） |
 | 细线 `hairline` | `rgba(37,35,31,0.16)` | 留下页操作带顶线，仅此一处 |
-| 内容宽度 | `min(窗口, 520)` | 约 28–38 中文字符，iPhone 仍用左右 24 边距 |
+| 阅读柱 | `min(窗口, 520)` | 正文和照片；iPhone 仍用左右 24 边距 |
+| iPad 页宽 | 日期轨 120 + 间距 32 + 阅读柱 520 | 仅宽且够高的页面；横屏手机不当成平板 |
 | 边距 | 窄屏 24 / 常规宽 48 | iPad 不把手机行拉满 |
 | 日期 | 16 / 22，`sage`，一天一次 | 段落起点，不重复贴在每条上 |
 | 记录正文 | 21 / 30，`ink` | 先于控件 |
@@ -117,8 +118,8 @@
 | 路径 | 含义 |
 | --- | --- |
 | `apps/ios/spec/ui-round-1/storyboard.html` | 改前问题 + 改后各状态的可审阅页 |
-| `apps/ios/spec/ui-round-1/shots/before/` | 改前：最近空 / 最近有记录 / 留下空白 |
-| `apps/ios/spec/ui-round-1/shots/after/` | 改后：首次、单条、同日多条、混合、恢复、失败，以及小屏/大字号/横屏/iPad |
+| `apps/ios/spec/ui-round-1/compare.html` | 示意图与运行中 App 截图并排 |
+| `apps/ios/spec/ui-round-1/shots/app/` | 模拟器实拍：空白 / 同日 / 照片 / 声音 / 键盘 / 大字号 / 横屏 / iPad |
 
 未用设备或模拟器实拍的文件在清单里标 **NOT VERIFIED**。详见 `shots/SHOTS.md`。
 
@@ -132,4 +133,5 @@
 | `npx expo lint` 全量 | 仍有 main 上 `share/[id].tsx` 的 set-state-in-effect error，本轮未改该文件 |
 | `git diff --check` | PASS |
 | 真机 最近→留下→保存→详情 | **NOT VERIFIED** |
-| 模拟器小屏/大字号/横屏/iPad | **NOT VERIFIED** |
+| 模拟器空白 / 同日两条 / 真实照片 / 声音 / 键盘 / 大字号 / 横屏 | **PASS**（`shots/app/`） |
+| 模拟器 iPad 首次页宽度 | **PASS**（空状态，日期轨未拍到） |

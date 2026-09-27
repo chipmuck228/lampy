@@ -25,9 +25,11 @@ import {
   inkSoft,
   isCompactHeight,
   isRegularWidth,
+  DATE_RAIL_WIDTH,
+  READING_MAX,
+  pageColumnWidth,
   pageGutter,
   paper,
-  readingWidth,
   sage,
 } from '../screens/life-page';
 import { groupRecentDays } from '../screens/recent-days';
@@ -35,9 +37,9 @@ import { groupRecentDays } from '../screens/recent-days';
 export default function RecentScreen() {
   const router = useRouter();
   const { width, height, fontScale } = useWindowDimensions();
-  const columnWidth = readingWidth(width);
-  const gutter = pageGutter(width);
-  const regular = isRegularWidth(width);
+  const columnWidth = pageColumnWidth(width, height);
+  const gutter = pageGutter(width, height);
+  const regular = isRegularWidth(width, height);
   const compact = isCompactHeight(height);
   const stackChrome = width < 420 || fontScale >= 1.3;
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
@@ -141,7 +143,7 @@ export default function RecentScreen() {
 
         {days.map((day) => (
           <View
-            key={day.dateLabel}
+            key={day.key}
             style={[styles.day, regular && styles.dayRegular]}
             accessibilityLabel={`${day.dateLabel}，${day.items.length}条记录`}
           >
@@ -259,8 +261,8 @@ const styles = StyleSheet.create({
   day: { gap: 16 },
   dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
   date: { fontSize: 16, lineHeight: 22, color: sage },
-  dateRail: { width: 120, paddingTop: 4 },
-  dayItems: { flex: 1, gap: 28 },
+  dateRail: { width: DATE_RAIL_WIDTH, paddingTop: 4 },
+  dayItems: { flex: 1, maxWidth: READING_MAX, gap: 28 },
   moment: { gap: 10, minHeight: 44 },
   note: { fontSize: 21, lineHeight: 30, color: ink },
 });

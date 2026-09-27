@@ -60,7 +60,7 @@ export default function LeaveScreen() {
   const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
   const { width, height } = useWindowDimensions();
   const columnWidth = readingWidth(width);
-  const gutter = pageGutter(width);
+  const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');

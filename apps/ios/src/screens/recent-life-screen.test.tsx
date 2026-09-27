@@ -36,11 +36,11 @@ function wrap(ui: ReactElement) {
   );
 }
 
-function item(id: string, note: string, dateLabel: string) {
+function item(id: string, note: string, dateLabel: string, recordedAt: string) {
   return {
     id,
     note,
-    recordedAt: '2026-09-27T02:00:00.000Z',
+    recordedAt,
     dateLabel,
     feeling: null,
     images: [],
@@ -58,9 +58,9 @@ describe('recent life page', () => {
     mockGetRecentLife.mockResolvedValue({
       isFirstUse: false,
       items: [
-        item('moment_one', '门口的风', '9月27日'),
-        item('moment_two', '同一天的第二句', '9月27日'),
-        item('moment_older', '更早的一句', '9月24日'),
+        item('moment_one', '门口的风', '9月27日', new Date(2026, 8, 27, 10).toISOString()),
+        item('moment_two', '同一天的第二句', '9月27日', new Date(2026, 8, 27, 16).toISOString()),
+        item('moment_older', '更早的一句', '9月24日', new Date(2026, 8, 24, 12).toISOString()),
       ],
     });
     const view = await render(wrap(<RecentScreen />));
@@ -73,6 +73,23 @@ describe('recent life page', () => {
     expect(view.getByText('9月24日')).toBeTruthy();
     expect(view.getByLabelText('留下')).toBeTruthy();
     expect(view.getByLabelText('回看')).toBeTruthy();
+  });
+
+  it('keeps last year’s same month-day on its own heading', async () => {
+    mockGetRecentLife.mockResolvedValue({
+      isFirstUse: false,
+      items: [
+        item('moment_this', '今年的一句', '9月27日', new Date(2026, 8, 27, 10).toISOString()),
+        item('moment_last', '去年的一句', '9月27日', new Date(2025, 8, 27, 10).toISOString()),
+      ],
+    });
+    const view = await render(wrap(<RecentScreen />));
+    await waitFor(() => {
+      expect(view.getByText('今年的一句')).toBeTruthy();
+    });
+    expect(view.getByText('去年的一句')).toBeTruthy();
+    expect(view.getByLabelText('9月27日，1条记录')).toBeTruthy();
+    expect(view.getByLabelText('2025年9月27日，1条记录')).toBeTruthy();
   });
 
   it('keeps a read error without inventing records', async () => {

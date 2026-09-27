@@ -9,18 +9,28 @@ export const hairline = 'rgba(37,35,31,0.16)';
 export const placeholder = '#777168';
 
 export const READING_MAX = 520;
+export const DATE_RAIL_WIDTH = 120;
+export const DATE_RAIL_GAP = 32;
 export const COMPACT_HEIGHT = 500;
 export const REGULAR_WIDTH = 768;
 
-export function pageGutter(windowWidth: number): number {
-  return windowWidth >= REGULAR_WIDTH ? 48 : 24;
+export function pageGutter(windowWidth: number, windowHeight?: number): number {
+  return isRegularWidth(windowWidth, windowHeight) ? 48 : 24;
 }
 
 export function readingWidth(windowWidth: number): number {
   return Math.min(windowWidth, READING_MAX);
 }
 
-export function isRegularWidth(windowWidth: number): boolean {
+export function pageColumnWidth(windowWidth: number, windowHeight?: number): number {
+  if (isRegularWidth(windowWidth, windowHeight)) {
+    return DATE_RAIL_WIDTH + DATE_RAIL_GAP + READING_MAX;
+  }
+  return readingWidth(windowWidth);
+}
+
+export function isRegularWidth(windowWidth: number, windowHeight?: number): boolean {
+  if (windowHeight !== undefined && windowHeight < COMPACT_HEIGHT) return false;
   return windowWidth >= REGULAR_WIDTH;
 }
 
