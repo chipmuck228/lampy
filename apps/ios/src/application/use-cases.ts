@@ -27,10 +27,24 @@ import type {
   DraftRepository,
   MomentRepository,
 } from '../infrastructure/repositories';
+import {
+  calendarPartsAt,
+  formatCalendarDate,
+  offsetMinutesAt,
+  parseMillis,
+  type HistoryClock,
+} from '../domain-adapters/calendar';
 import { formatSoundDuration } from './duration';
-import type { HistoryClock } from '../domain-adapters/calendar';
 import { ApplicationError, toApplicationError } from './errors';
 import { createHistoryUseCases } from './history-use-cases';
+import {
+  projectOccurredChoice,
+  resolveOccurredPatch,
+  type OccurredChoiceView,
+  type OccurredDraftInput,
+} from './occurred-date';
+
+export type { OccurredChoiceView, OccurredDraftInput };
 
 export const MAX_DRAFT_IMAGES = 3;
 export const MAX_DRAFT_AUDIO = 1;
@@ -124,6 +138,8 @@ export type ComposerViewModel = {
   images: ImageView[];
   audio: AudioView | null;
   unknownMedia: UnknownMediaView[];
+  occurred: OccurredChoiceView;
+  today: { year: number; month: number; day: number };
 };
 
 export type InterruptRecordingResult = {
@@ -172,10 +188,22 @@ function defaultAssetId(): string {
   return `asset_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function calendarDateLabel(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '时间未确认';
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
+function viewerOffsetAt(iso: string | undefined, clock: HistoryClock): number {
+  const millis = parseMillis(iso);
+  return millis === null ? 0 : offsetMinutesAt(millis, clock);
+}
+
+function recentDateLabel(
+  moment: { time: { occurredAt?: string; occurredAtPrecision: string; recordedAt: string } },
+  clock: HistoryClock,
+): string {
+  const precision = moment.time.occurredAtPrecision;
+  if (precision === 'unknown' || !moment.time.occurredAt) return '时间未确认';
+  return formatCalendarDate(
+    moment.time.occurredAt,
+    precision,
+    viewerOffsetAt(moment.time.occurredAt, clock),
+  );
 }
 
 function photoLabel(index: number, total: number): string {
@@ -258,6 +286,10 @@ export function createUseCases(deps: {
   const clock = deps.clock || defaultClock();
   const nextId = deps.id || defaultId;
   const nextAssetId = deps.assetId || defaultAssetId;
+  const viewerClock: HistoryClock =
+    deps.timezone ?? deps.timezoneOffsetMinutes ?? {
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    };
   let restoreInFlight: Promise<ComposerViewModel> | null = null;
 
   async function loadAsset(assetId: string): Promise<AssetRecord | null> {
@@ -417,6 +449,7 @@ export function createUseCases(deps: {
     const images = await resolveImages(draft.assetIds);
     const audio = await resolveAudio(draft.assetIds);
     const unknownMedia = await resolveUnknown(draft.assetIds);
+    const now = clock.now();
     return {
       draftId: draft.id,
       note: draft.content.note,
@@ -431,6 +464,8 @@ export function createUseCases(deps: {
       images,
       audio,
       unknownMedia,
+      occurred: projectOccurredChoice(draft.time, now, viewerClock),
+      today: calendarPartsAt(now.getTime(), viewerClock),
     };
   }
 
@@ -771,6 +806,17 @@ export function createUseCases(deps: {
     await deps.drafts.save(next);
   }
 
+  async function updateDraftOccurred(
+    draftId: string,
+    input: OccurredDraftInput,
+  ): Promise<ComposerViewModel> {
+    const draft = await requireDraft(draftId);
+    const instant = clock.now();
+    const next = updateMomentContent(draft, { time: resolveOccurredPatch(input, instant, viewerClock) }, ownerId, instant);
+    await deps.drafts.save(next);
+    return toComposer(next, true);
+  }
+
   async function addLibraryImages(draftId: string): Promise<ComposerViewModel> {
     return pickFromSource(
       draftId,
@@ -919,7 +965,6 @@ export function createUseCases(deps: {
         content: { note },
         time: {
           recordedAt: instant.toISOString(),
-          occurredAtPrecision: 'unknown',
         },
       },
       ownerId,
@@ -947,7 +992,7 @@ export function createUseCases(deps: {
         id: moment.id,
         note: moment.content.note,
         recordedAt: moment.time.recordedAt,
-        dateLabel: calendarDateLabel(moment.time.occurredAt || moment.time.recordedAt),
+        dateLabel: recentDateLabel(moment, viewerClock),
         feeling: projectFeeling(moment.content.emotion),
         images: await resolveImages(moment.assetIds),
         audio: await resolveAudio(moment.assetIds),
@@ -1003,7 +1048,12 @@ export function createUseCases(deps: {
       }
     }
 
-    const view = projectMomentDetailView(found.moment, projectionAssets);
+    const view = projectMomentDetailView(found.moment, projectionAssets, {
+      timezoneOffsetMinutes: viewerOffsetAt(
+        found.moment.time.occurredAt || found.moment.time.recordedAt,
+        viewerClock,
+      ),
+    });
     return {
       kind: 'ready',
       id: view.id,
@@ -1024,6 +1074,7 @@ export function createUseCases(deps: {
     abandonActiveDraft,
     updateDraftNote,
     updateDraftEmotion,
+    updateDraftOccurred,
     addLibraryImages,
     addCameraImage,
     addPickedImages,
@@ -1042,7 +1093,7 @@ export function createUseCases(deps: {
     ...createHistoryUseCases({
       moments: deps.moments,
       timezoneOffsetMinutes: deps.timezoneOffsetMinutes,
-      timezone: deps.timezone,
+      timezone: viewerClock,
       resolveImages,
       resolveAudio,
       resolveUnknown,

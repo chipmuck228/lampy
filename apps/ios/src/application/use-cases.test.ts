@@ -166,3 +166,200 @@ describe('text-only personal moment use cases', () => {
     expect(damaged).toEqual({ kind: 'error', requestedId: 'moment_damaged' });
   });
 });
+
+describe('leave occurred date', () => {
+  it('saves today onto the viewer calendar day and places it in lookback', async () => {
+    const repos = createMemoryRepositories();
+    const app = createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-26T16:30:00.000Z'),
+      timezoneOffsetMinutes: 480,
+    });
+    const draft = await app.restoreOrCreateDraft();
+    expect(draft.occurred.kind).toBe('unknown');
+    expect(draft.today).toEqual({ year: 2026, month: 9, day: 27 });
+    await app.updateDraftNote(draft.draftId, '今天的门口');
+    const composer = await app.updateDraftOccurred(draft.draftId, { kind: 'today' });
+    expect(composer.occurred).toEqual({
+      kind: 'today',
+      year: 2026,
+      month: 9,
+      day: 27,
+      label: '今天',
+    });
+
+    const saved = await app.saveTextMoment(draft.draftId);
+    const stored = await repos.moments.findById(saved.id);
+    expect(stored.kind).toBe('ready');
+    if (stored.kind !== 'ready') return;
+    expect(stored.moment.time.occurredAt).toBe('2026-09-26T16:00:00.000Z');
+    expect(stored.moment.time.occurredAtPrecision).toBe('day');
+    expect(stored.moment.time.recordedAt).toBe('2026-09-26T16:30:00.000Z');
+
+    const recent = await app.getRecentLife();
+    expect(recent.items[0].dateLabel).toBe('2026年9月27日');
+    const detail = await app.getMomentDetail(saved.id);
+    expect(detail.kind).toBe('ready');
+    if (detail.kind === 'ready') {
+      expect(detail.dateLabel).toBe('2026年9月27日');
+      expect(detail.usedRecordedAtFallback).toBe(false);
+    }
+    const day = await app.getHistoryDay(2026, 9, 27);
+    expect('invalid' in day ? day : day.items.map((item) => item.id)).toEqual([saved.id]);
+    expect('invalid' in day ? '' : day.title).toBe('2026年9月27日');
+    expect('invalid' in day ? '' : day.items[0].timeLabel).toBe('2026年9月27日');
+    const unknown = await app.getHistoryUnknown();
+    expect(unknown.items.map((item) => item.id)).toEqual([]);
+  });
+
+  it('places a past day and keeps unknown as unconfirmed', async () => {
+    const repos = createMemoryRepositories();
+    const app = createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-27T02:00:00.000Z'),
+      timezoneOffsetMinutes: 480,
+    });
+    const past = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(past.draftId, '上周的风');
+    await app.updateDraftOccurred(past.draftId, { kind: 'day', year: 2026, month: 9, day: 20 });
+    const pastSaved = await app.saveTextMoment(past.draftId);
+
+    const unsure = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(unsure.draftId, '想不起来哪天');
+    await app.updateDraftOccurred(unsure.draftId, { kind: 'unknown' });
+    const unsureSaved = await app.saveTextMoment(unsure.draftId);
+
+    const pastStored = await repos.moments.findById(pastSaved.id);
+    expect(pastStored.kind).toBe('ready');
+    if (pastStored.kind === 'ready') {
+      expect(pastStored.moment.time.occurredAt).toBe('2026-09-19T16:00:00.000Z');
+      expect(pastStored.moment.time.occurredAtPrecision).toBe('day');
+    }
+    const unsureStored = await repos.moments.findById(unsureSaved.id);
+    expect(unsureStored.kind).toBe('ready');
+    if (unsureStored.kind === 'ready') {
+      expect(unsureStored.moment.time.occurredAt).toBeUndefined();
+      expect(unsureStored.moment.time.occurredAtPrecision).toBe('unknown');
+    }
+
+    const day = await app.getHistoryDay(2026, 9, 20);
+    expect('invalid' in day ? day : day.items.map((item) => item.id)).toEqual([pastSaved.id]);
+    const unknown = await app.getHistoryUnknown();
+    expect(unknown.items.map((item) => item.id)).toEqual([unsureSaved.id]);
+    expect(unknown.items[0].timeLabel).toBe('时间未确认');
+    const recent = await app.getRecentLife();
+    expect(recent.items.find((item) => item.id === pastSaved.id)?.dateLabel).toBe('2026年9月20日');
+    expect(recent.items.find((item) => item.id === unsureSaved.id)?.dateLabel).toBe('时间未确认');
+  });
+
+  it('restores the chosen date and keeps it when save fails', async () => {
+    const repos = createMemoryRepositories();
+    const innerSave = repos.moments.save.bind(repos.moments);
+    repos.moments.save = async () => {
+      throw Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+    };
+    const app = createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-27T03:00:00.000Z'),
+      timezoneOffsetMinutes: 480,
+    });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '先记着日期');
+    await app.updateDraftOccurred(draft.draftId, { kind: 'day', year: 2026, month: 9, day: 18 });
+    await expect(app.saveTextMoment(draft.draftId)).rejects.toMatchObject({ code: 'DISK_FULL' });
+
+    const restored = await app.restoreOrCreateDraft();
+    expect(restored.draftId).toBe(draft.draftId);
+    expect(restored.isRestored).toBe(true);
+    expect(restored.occurred).toEqual({
+      kind: 'day',
+      year: 2026,
+      month: 9,
+      day: 18,
+      label: '9月18日',
+    });
+    const stillDraft = await repos.drafts.loadActive();
+    expect(stillDraft?.time.occurredAt).toBe('2026-09-17T16:00:00.000Z');
+    expect(stillDraft?.time.occurredAtPrecision).toBe('day');
+
+    repos.moments.save = innerSave;
+    const saved = await app.saveTextMoment(draft.draftId);
+    const stored = await repos.moments.findById(saved.id);
+    expect(stored.kind).toBe('ready');
+    if (stored.kind === 'ready') {
+      expect(stored.moment.time.occurredAt).toBe('2026-09-17T16:00:00.000Z');
+      expect(stored.moment.time.occurredAtPrecision).toBe('day');
+    }
+  });
+
+  it('does not migrate already saved unknown records onto today', async () => {
+    const repos = createMemoryRepositories();
+    const older = createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-20T04:00:00.000Z'),
+      timezoneOffsetMinutes: 480,
+    });
+    const oldDraft = await older.restoreOrCreateDraft();
+    await older.updateDraftNote(oldDraft.draftId, '以前没确认过时间');
+    const oldSaved = await older.saveTextMoment(oldDraft.draftId);
+    const before = await repos.moments.findById(oldSaved.id);
+    expect(before.kind).toBe('ready');
+    if (before.kind !== 'ready') return;
+    expect(before.moment.time.occurredAtPrecision).toBe('unknown');
+
+    const app = createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-27T04:00:00.000Z'),
+      timezoneOffsetMinutes: 480,
+    });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '新的今天');
+    await app.updateDraftOccurred(draft.draftId, { kind: 'today' });
+    const saved = await app.saveTextMoment(draft.draftId);
+
+    const stillOld = await repos.moments.findById(oldSaved.id);
+    expect(stillOld.kind).toBe('ready');
+    if (stillOld.kind === 'ready') {
+      expect(stillOld.moment.time.occurredAt).toBeUndefined();
+      expect(stillOld.moment.time.occurredAtPrecision).toBe('unknown');
+      expect(stillOld.moment.time.recordedAt).toBe('2026-09-20T04:00:00.000Z');
+    }
+    const unknown = await app.getHistoryUnknown();
+    expect(unknown.items.map((item) => item.id)).toEqual([oldSaved.id]);
+    const today = await app.getHistoryDay(2026, 9, 27);
+    expect('invalid' in today ? today : today.items.map((item) => item.id)).toEqual([saved.id]);
+  });
+
+  it('keeps recent, detail, and lookback on the same viewer day around midnight', async () => {
+    const repos = createMemoryRepositories();
+    const app = createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-26T16:05:00.000Z'),
+      timezoneOffsetMinutes: 480,
+    });
+    const draft = await app.restoreOrCreateDraft();
+    await app.updateDraftNote(draft.draftId, '刚过午夜');
+    await app.updateDraftOccurred(draft.draftId, { kind: 'today' });
+    const saved = await app.saveTextMoment(draft.draftId);
+
+    const recent = await app.getRecentLife();
+    const detail = await app.getMomentDetail(saved.id);
+    const day = await app.getHistoryDay(2026, 9, 27);
+    expect(recent.items[0].dateLabel).toBe('2026年9月27日');
+    expect(detail.kind).toBe('ready');
+    if (detail.kind === 'ready') expect(detail.dateLabel).toBe('2026年9月27日');
+    expect('invalid' in day ? '' : day.title).toBe('2026年9月27日');
+    expect('invalid' in day ? '' : day.items[0].timeLabel).toBe('2026年9月27日');
+
+    const utcApp = createUseCases({
+      ...repos,
+      clock: clockAt('2026-09-26T16:05:00.000Z'),
+      timezoneOffsetMinutes: 0,
+    });
+    const utcDetail = await utcApp.getMomentDetail(saved.id);
+    expect(utcDetail.kind).toBe('ready');
+    if (utcDetail.kind === 'ready') expect(utcDetail.dateLabel).toBe('2026年9月26日');
+    const utcDay = await utcApp.getHistoryDay(2026, 9, 26);
+    expect('invalid' in utcDay ? utcDay : utcDay.items.map((item) => item.id)).toEqual([saved.id]);
+  });
+});
