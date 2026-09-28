@@ -1,6 +1,6 @@
 # 阶段 B 走查
 
-分支 `ios/lookback-memoir-probe`。基线 `origin/main` `e0c7a99`（#40 merge）。Jest / 模拟器 / generic 编译 **≠** 真机 PASS。PR 保持 OPEN。
+分支 `ios/lookback-memoir-probe`。基线 `origin/main` `e0c7a99`（#40 merge）。Jest / 模拟器 / generic 编译 **≠** 真机 PASS。PR 保持 OPEN。未开始阶段 C。`app.lampy.ios` 的 Sign in with Apple entitlement **未删除**。
 
 ## 本机命令
 
@@ -9,58 +9,71 @@
 - `npx tsc --noEmit`：通过
 - `npx jest --no-coverage`：102 suites / 526 tests
 - `git diff --check`：通过
-- `npx expo-modules-autolinking search --platform apple`：列出 `lampy-foundation-probe`
 
-原生模块变更必须重新 `expo run:ios`。Metro 热更新不能当原生接入结论。
+## 1. 付费会员 Team ID（Apple Developer 账户）
 
-## 编译 SDK 实际 API（Xcode 26.6 / iPhoneOS 26.5）
+**NOT VERIFIED。** 不以 Xcode 显示名 “Zhen Liu” 判断团队类型。
 
-`FoundationModels.swiftinterface` 确认：
+打开 `https://developer.apple.com/account` 被重定向到 Apple ID 登录页：
 
-| API | 可用性 | 本探针 |
-| --- | --- | --- |
-| `SystemLanguageModel.supportsLocale(_:)` | iOS 26.0 | `inspect` 探测 current / zh-Hans / zh-CN / zh-Hant |
-| `SystemLanguageModel.supportedLanguages` | iOS 26.0 | 返回 `Locale.Language.maximalIdentifier` 列表，并标是否含 `zh` |
-| `SystemLanguageModel.contextSize` | iOS 26.0；`@backDeployed(before: iOS 26.4)` 在 26.0–26.3 为 4096 | 写入 `contextCapacityTokens`，不再写“API 不暴露” |
-| `SystemLanguageModel.tokenCount(for:)` | **iOS 26.4+**；compile SDK 26.5 有此符号 | OS < 26.4 记 `null` + 编译限制，不假装测过 |
+- 标题：`登录 - Apple`
+- 界面：`登录 Apple Developer`、Apple Account 输入框、`继续`
+- 截图：`shots/apple-developer-account-signin.png`
 
-Liuz17 是 **iOS 26.2**，因此即使装上，`tokenCount` 仍应报 26.4 限制；`supportsLocale` / `supportedLanguages` / `contextSize` 应能测。
+本环境没有可用的 Developer 门户会话，因此**不能**从 Membership 页确认已生效的付费 Team ID 是否为 `B283NY984J`。
 
-## 检查表
+Xcode 账户同步记录（仍不是门户 Membership 页）里，当前 Apple ID 只挂了一个 team：`B283NY984J`，字段 `isFreeProvisioningTeam = true`、`teamType = Personal Team`。这只能说明 Xcode 此刻拿到的是免费个人开发团队记录，不能代替门户上的付费会员确认。
 
-| 检查 | 环境 | 结果 |
-| --- | --- | --- |
-| TypeScript / Jest | 本机 | **PASS** 102 / 526。含 locale/context 源探测、单次 in-flight、开发页摘录行；`probeLogLine` 仍不含正文 |
-| 模块编进 Dev Client | `xcodebuild` generic iOS，`CODE_SIGNING_ALLOWED=NO` | **PASS（仅编译）**：`LampyFoundationProbeModule.swift` 在 iPhoneOS26.5 链上。**不是**真机运行 |
-| 模拟器 availability / 对照 | iPhone 16 Sim / **iOS 18.6** | 上一轮：**PASS（仅此环境）** `unavailable · osBelow26 · zh_CN`。A 6/6。B 不可用。见 `shots/sim-iphone16-osbelow26.png`。本轮 JS 会多显示合成原文与 A/B 摘录；OS 18 上 locale/context 字段为 n/a 并写明 compile SDK |
-| 模拟器 iOS 26 Foundation Models | 未装本轮探针到 iOS 26 模拟器 | **NOT VERIFIED** |
-| Liuz17 签名安装 | iPhone 17 Pro / iOS 26.2，已配对 `4392B733-…`，UDID `00008150-0016696E1EBA401C` | **BLOCKED（单独记录，未删 capability）** |
-| 同上，availability / 中文 A/B 可读结果 / 取消 / 耗时 | 真机未装上本轮 Dev Client | **NOT VERIFIED** |
-| 阶段 C 是否有足够证据 | 判断 | **没有。** 探针已能回答“SDK 有哪些 API、页面能否做人读对照、取消会不会串线”；仍没有 iOS 26 真机上的模型结果 |
+## 2. App ID 与开发 Profile
 
-## 真机签名（与探针逻辑分开）
+**App ID Sign in with Apple（门户）：NOT VERIFIED** — 同一登录页挡住 Identifiers。
 
-`app.lampy.ios` 正式 entitlements 含 `com.apple.developer.applesignin`（`usesAppleSignIn` / `expo-apple-authentication`）。**未删除。**
-
-本机核对：
-
-- Team `B283NY984J`（Xcode 显示 **Personal development team “Zhen Liu”**）
-- 开发证书：`Apple Development: chipmuck228@gmail.com (H36468MSTC)`
-- 缓存 Profile：`iOS Team Provisioning Profile: app.lampy.ios`（`92c4d577-…`），App ID 名 `XC app lampy ios`，含 Liuz17 UDID，**不含** `com.apple.developer.applesignin`，到期 2026-10-03
-- `xcodebuild … -allowProvisioningUpdates -allowProvisioningDeviceRegistration` 对 Liuz17：
+**刷新/新签发开发 Profile：FAIL。** `xcodebuild -allowProvisioningUpdates` 对 Liuz17：
 
 ```
 Cannot create a iOS App Development provisioning profile for "app.lampy.ios".
 Personal development teams, including "Zhen Liu", do not support the Sign In with Apple capability.
-Provisioning profile "iOS Team Provisioning Profile: app.lampy.ios" doesn't include the Sign In with Apple capability.
 ```
 
-developer.apple.com Identifiers 页需要交互登录，本环境未改 App ID。个人开发团队本身不能为 Sign in with Apple 签发开发 Profile；要在 Liuz17 上装带该 capability 的包，需要 **付费 Apple Developer Program** 团队启用 App ID 的 Sign in with Apple，再下载/刷新含 `applesignin` 的 Development Profile，然后重装。
+现有 Team Profile（不打印内容）：名称 `iOS Team Provisioning Profile: app.lampy.ios`；Team `B283NY984J`；**含** Liuz17 UDID；entitlement **键不含** `com.apple.developer.applesignin`。应用 entitlements 仍要求该键。
 
-generic iOS 无签名编译成功 **≠** 真机运行成功。
+未删正式 App capability。未把 generic 编译当作真机成功。
 
-## 开发页
+## 3. Liuz17 安装
 
-`lampy:///dev/foundation-probe`（仅 `__DEV__`）。`?run=1` 自动对照；`?cancel=1` 启动后按当前 `requestId` 取消。
+| 检查 | 结果 |
+| --- | --- |
+| 用含 UDID + applesignin 的开发 Profile 签名安装 | **FAIL** — 没有这样一份 Profile；个人团队签发被拒。Liuz17 已配对（iPhone 17 Pro / iOS 26.2） |
 
-页面显示：availability、`supportsLocale`、`supportedLanguages`、`contextSize`、compile SDK，以及合成夹具原文与 A/B 摘录。日志仍只有计数。
+## 4. 真机探针（合成数据）
+
+未装上本轮 Dev Client，下列均 **NOT VERIFIED**，不是 PASS。
+
+| 检查 | 结果 |
+| --- | --- |
+| `inspect`（availability、supportsLocale、supportedLanguages、contextSize） | **NOT VERIFIED** |
+| 中文 A/B 摘录出现在开发页 | **NOT VERIFIED** |
+| 人读：模型是否比确定性选取更值得读 | **NOT VERIFIED** |
+| 取消（按 requestId，不串线） | **NOT VERIFIED** |
+| 耗时 | **NOT VERIFIED** |
+
+即使以后模型 `available`，仍要单独判断阅读收益；本轮没有真机摘录可评。
+
+## 门户阻碍与 Apple Developer Support
+
+界面阻碍就是上一节的 **Apple Developer 登录页**，不是 Identifiers 里某条 capability 开关的截图。因此也无法在门户提交 Support 工单。
+
+登录后应核：Membership 是否为已生效的 Apple Developer Program、Team ID 是否为 `B283NY984J`、`app.lampy.ios` 是否已启用并配置 Sign in with Apple，然后重新生成含 Liuz17 UDID 与 `applesignin` 的 Development Profile。
+
+查询入口（登录后）：[developer.apple.com/contact](https://developer.apple.com/contact/)。能力对照：[Supported capabilities (iOS)](https://developer.apple.com/help/account/reference/supported-capabilities-ios) — Sign in with Apple 仅列在付费 ADP / ADEP，不含免费 Apple Developer。
+
+## 其它（非真机）
+
+| 检查 | 环境 | 结果 |
+| --- | --- | --- |
+| TypeScript / Jest | 本机 | **PASS** 102 / 526 |
+| 模块编译 | generic iOS，无签名 | **PASS（仅编译）**，不是真机 |
+| 模拟器 iOS 18.6 | iPhone 16 | 上一轮 `osBelow26`。见 `shots/sim-iphone16-osbelow26.png` |
+| 阶段 C | — | 未开始；证据仍不够 |
+
+开发页：`lampy:///dev/foundation-probe`（仅 `__DEV__`）。
