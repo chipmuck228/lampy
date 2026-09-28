@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>生活回眸 · 书页 / 原件范围 / 端侧短回眸</title>
+  <style>
+    :root {
+      --paper: #F3F0E9;
+      --ink: #25231F;
+      --soft: #5C5851;
+      --sage: #53604F;
+      --line: rgba(37, 35, 31, 0.16);
+      --mark: #87513D;
+      --ok: #3d5340;
+    }
+    body { margin: 0; background: #e4dfd4; color: var(--ink); font: 16px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+    main { max-width: 1280px; margin: 0 auto; padding: 32px 24px 120px; }
+    h1 { font-size: 28px; font-weight: 500; margin: 0 0 8px; }
+    h2 { font-size: 20px; font-weight: 500; margin: 56px 0 12px; }
+    h3 { font-size: 16px; font-weight: 500; margin: 0 0 8px; }
+    p, li { color: var(--soft); }
+    code { font-size: 13px; color: var(--ink); }
+    .lead { font-size: 17px; max-width: 720px; }
+    .trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start; }
+    .row { display: flex; flex-wrap: wrap; gap: 28px; align-items: start; }
+    @media (max-width: 1100px) { .trio { grid-template-columns: 1fr; } }
+    .phone {
+      background: var(--paper);
+      width: 280px;
+      min-height: 560px;
+      height: 580px;
+      padding: 22px 20px 0;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .phone.tall { height: auto; min-height: 560px; padding-bottom: 20px; }
+    .phone.future { outline: 2px dashed var(--sage); outline-offset: 3px; }
+    .title { font-size: 28px; line-height: 36px; margin: 0 0 12px; }
+    .back { color: var(--sage); min-height: 44px; display: flex; align-items: center; font-size: 17px; }
+    .meta { font-size: 14px; color: var(--sage); }
+    .hit { min-height: 44px; display: flex; align-items: center; font-size: 17px; color: var(--ink); }
+    .hit.soft { color: var(--sage); }
+    .note { font-size: 18px; line-height: 26px; margin: 6px 0; color: var(--ink); }
+    .cap { font-size: 13px; color: var(--sage); margin: 8px 0 0; max-width: 280px; }
+    .ban { font-size: 13px; color: var(--mark); }
+    .ok { font-size: 13px; color: var(--ok); }
+    .nv { font-size: 12px; color: var(--mark); letter-spacing: 0.04em; }
+    .tag { display: inline-block; font-size: 11px; letter-spacing: .04em; color: var(--sage); border: 1px solid var(--line); padding: 2px 6px; margin-bottom: 8px; }
+    .band { margin-top: auto; border-top: 1px solid var(--line); display: flex; justify-content: space-between; padding: 10px 0 16px; font-size: 15px; color: var(--sage); }
+    .src { font-size: 15px; color: var(--sage); min-height: 44px; display: flex; align-items: center; }
+    .box { border: 1px solid var(--line); padding: 10px 12px; margin: 8px 0; }
+    .quiet { color: var(--soft); font-size: 15px; line-height: 22px; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; padding: 8px 10px 8px 0; color: var(--soft); }
+    th { color: var(--ink); font-weight: 500; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>生活回眸 · 三个实际方案</h1>
+  <p class="lead">基线 <code>origin/main</code> @ <code>7ff73d2</code>。对照稿，<strong>不是</strong>原生走查。A 是现网书页。B 不使用模型。C 是本机短回眸提案。家庭入口与身份验收未画进改动。</p>
+
+  <h2>1. 同一范围，三种读法</h2>
+  <p class="lead">合成样本：2023 年 8 月有几条写到江边的短句。不是真实用户正文。</p>
+  <div class="trio">
+    <div>
+      <span class="tag">A · 时间书页</span>
+      <div class="phone">
+        <div class="title">回看</div>
+        <div class="meta">2023年</div>
+        <div class="hit">8月 · 有6条记录</div>
+        <div class="hit">8月3日 · 星期四</div>
+        <p class="note">下班路过江边，风很大。</p>
+        <div class="hit soft">看这条</div>
+        <div class="band"><span>最近</span><span>留下</span><span>回看</span></div>
+      </div>
+      <p class="cap">继续直接读原件。回眸不替换这一页。</p>
+    </div>
+    <div>
+      <span class="tag">B · 范围原件</span>
+      <div class="phone future">
+        <div class="back">回到回看</div>
+        <div class="title">2023年8月</div>
+        <p class="quiet">这个月你留下的记录，按时间排列。没有模型。</p>
+        <div class="hit">3日 · 下班路过江边，风很大。</div>
+        <div class="hit">9日 · 自己煮了番茄面。</div>
+        <div class="hit soft">14日 · 2张照片，其中1张现在看不到</div>
+        <div class="band"><span>最近</span><span>留下</span><span>回看</span></div>
+      </div>
+      <p class="cap">C 在模型不可用、文字太少或用户取消时，退回这一页。</p>
+    </div>
+    <div>
+      <span class="tag">C · 端侧短回眸</span>
+      <div class="phone future">
+        <div class="back">回到回看</div>
+        <div class="title">生活回眸</div>
+        <p class="meta">2023年8月 · 读了 5 条有文字的记录</p>
+        <div class="box">
+          <p class="note">这几条记录里多次写到江边。</p>
+          <div class="src">来自 8月2日、11日、19日</div>
+        </div>
+        <div class="box">
+          <p class="note">自己煮了番茄面。</p>
+          <div class="src">看这条原句</div>
+        </div>
+        <div class="hit soft">删掉这份回眸</div>
+        <div class="band"><span>最近</span><span>留下</span><span>回看</span></div>
+      </div>
+      <p class="ok">每段都能回到精确 Moment ID。虚线 = 未实现。</p>
+    </div>
+  </div>
+
+  <h2>2. C 的流程</h2>
+  <div class="row">
+    <div>
+      <span class="tag">选范围</span>
+      <div class="phone future tall">
+        <div class="back">回到回看</div>
+        <div class="title">生活回眸</div>
+        <p class="quiet">选一个月或一年。整理只在这台设备上做。</p>
+        <div class="hit">2023年</div>
+        <div class="hit">2023年8月</div>
+      </div>
+      <p class="cap">从书页某月进来则范围已定，可跳过。</p>
+    </div>
+    <div>
+      <span class="tag">将使用哪些内容</span>
+      <div class="phone future tall">
+        <div class="back">先不整理</div>
+        <div class="title">在开始之前</div>
+        <p class="note" style="font-size:16px;line-height:24px">整理在这台设备上完成，不经过 Lampy 的服务器。</p>
+        <p class="quiet">2023年8月 · 个人记录 8 条，其中有文字 5 条。将阅读这 5 条。<br>2 条只有照片或声音，第一版不识图、不听声。<br>时间未确认的记录不在这次里。<br>其中 2 条你写下了当时的感受。</p>
+        <div class="hit">开始在本机整理</div>
+      </div>
+      <p class="cap">许可全文见 CONSENT.md。未确认不调用模型。</p>
+    </div>
+    <div>
+      <span class="tag">生成中</span>
+      <div class="phone future">
+        <div class="title">生活回眸</div>
+        <p class="quiet" style="margin-top:80px">正在这台设备上整理。</p>
+        <div class="hit soft">取消</div>
+        <div class="band"><span>最近</span><span>留下</span><span>回看</span></div>
+      </div>
+      <p class="cap">取消不留半份。原记录不动。</p>
+    </div>
+  </div>
+
+  <h2>3. 必须能看见的失败与边界</h2>
+  <div class="row">
+    <div>
+      <span class="tag">模型不可用</span>
+      <div class="phone future tall">
+        <div class="back">回到回看</div>
+        <div class="title">生活回眸</div>
+        <p class="quiet">这台设备现在不能在本机整理回眸。</p>
+        <div class="hit">查看这个月的原记录</div>
+      </div>
+      <p class="ban">不转向公用 API，不放密钥。</p>
+    </div>
+    <div>
+      <span class="tag">只有媒体</span>
+      <div class="phone future tall">
+        <div class="title">生活回眸</div>
+        <p class="quiet">这些记录主要是照片或声音。第一版不识图、不听声，所以没有短文。</p>
+        <div class="hit">14日 · 2张照片，1张现在看不到</div>
+        <div class="hit">15日 · 一段 18 秒声音</div>
+      </div>
+      <p class="cap">可点进原件。不编造画面或台词。</p>
+    </div>
+    <div>
+      <span class="tag">部分覆盖</span>
+      <div class="phone future tall">
+        <div class="title">生活回眸</div>
+        <p class="meta">读了 40 / 共 180 条有文字的记录</p>
+        <p class="quiet">这次只根据读到的这些记录整理，不是这一年的全部生活。</p>
+        <div class="box"><p class="note">这几条里写到江边。</p><div class="src">来自 3 条记录</div></div>
+      </div>
+      <p class="ban">禁止「这一年你的生活」。</p>
+    </div>
+    <div>
+      <span class="tag">删除</span>
+      <div class="phone future tall">
+        <div class="title">生活回眸</div>
+        <p class="quiet">删掉这份回眸？原来的记录还在。</p>
+        <div class="hit">删除回眸</div>
+        <div class="hit soft">留下这份</div>
+      </div>
+      <p class="ok">只删衍生物。</p>
+    </div>
+  </div>
+
+  <h2>4. 超大字号 / 横屏（结构示意）</h2>
+  <p class="nv">NOT VERIFIED · 不是原生 PASS</p>
+  <div class="row">
+    <div>
+      <div class="phone future tall" style="width:280px">
+        <div class="title" style="font-size:34px;line-height:42px">生活回眸</div>
+        <p class="note" style="font-size:22px;line-height:32px">这几条记录里多次写到江边。</p>
+        <div class="src" style="font-size:19px">来自 8月2日</div>
+        <div class="hit" style="font-size:19px">看这条</div>
+      </div>
+      <p class="cap">字随系统放大，不缩小来挤按钮。</p>
+    </div>
+    <div>
+      <div class="phone future" style="width:420px;height:320px">
+        <div class="back">回到回看</div>
+        <div class="title">生活回眸</div>
+        <p class="quiet">短高下仍是同一条阅读流，底带仍在。不并排两年。</p>
+        <div class="band"><span>最近</span><span>留下</span><span>回看</span></div>
+      </div>
+      <p class="cap">横屏 / iPad 实页阶段 C 再走。本帧只防「另做一页」。</p>
+    </div>
+  </div>
+
+  <h2>5. 对照摘要</h2>
+  <table>
+    <tr><th></th><th>A 书页</th><th>B 原件范围</th><th>C 短回眸</th></tr>
+    <tr><td>模型</td><td>无</td><td>无</td><td>仅本机；不可用则停</td></tr>
+    <tr><td>媒体</td><td>原件展示</td><td>原件展示</td><td>计数进确认页；字节不进模型；原件仍可打开</td></tr>
+    <tr><td>感受</td><td>有则显示</td><td>有则显示</td><td>只把已填的当上下文</td></tr>
+    <tr><td>空白</td><td>安静，不判未完成</td><td>列出实际有的</td><td>不够证据则不归纳</td></tr>
+    <tr><td>家庭</td><td>底带条件不变</td><td>同左</td><td>同左；不读接收内容</td></tr>
+  </table>
+</main>
+</body>
+</html>
