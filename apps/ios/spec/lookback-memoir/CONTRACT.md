@@ -52,7 +52,7 @@ type MemoirCoverage = {
 };
 ```
 
-`analyzedIds` 必须等于 `moments[].id`，且每条都在 `range` 内。`omittedTextBearingCount > 0` 时，任何输出句子都按「部分覆盖」校验。
+`analyzedIds` 必须等于 `moments[].id`，且每条都在 `range` 内。`omittedTextBearingCount > 0` 时，**Lampy 新写的覆盖说明和概括**按部分覆盖规则校验；`kind === 'quote'` 的 `text` 是用户原文摘录，不因其中恰好含「你一直」等词而拒绝，也不得改写原话。
 
 ### 2.2 每一条
 
@@ -137,9 +137,9 @@ type MemoirSegment = {
 | 空来源或空文 | `sourceIds` 为空，或 `text` 为空 |
 | quote 不在原文 | `kind === 'quote'` 且去掉首尾空白后的 `text` 不是该唯一来源 `note` 的子串 |
 | 第一版种类 | 第一版出现 `careful_summary` 或 `undetermined` |
-| 部分覆盖禁用词 | `omittedTextBearingCount > 0` 且 `text` 含「这一年你的生活」「整年」「你一直」 |
+| 部分覆盖全称（仅新文案） | `omittedTextBearingCount > 0` 且 **非 quote** 的 Lampy 文案（覆盖说明、以后的概括）含「这一年你的生活」「整年」「你一直」 |
 
-`quote` 既是原文子串，就不再用机器去解析其中的日期或专名。
+`quote` 是用户原文子串：不改写，不用禁用词表扫描，也不再解析其中的日期或专名。第一版只产出 quote，因此这条全称规则主要约束界面覆盖说明；不得为了躲词而改原话。
 
 ### 4.2 只能由人审阅（机器不得标 PASS，也不得标「已拒绝」充数）
 
