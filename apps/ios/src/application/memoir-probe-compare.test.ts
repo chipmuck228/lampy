@@ -1,5 +1,5 @@
 import { MEMOIR_PROBE_FIXTURE } from './memoir-probe-fixture';
-import { compareProbeQuotes, probeLogLine } from './memoir-probe-compare';
+import { buildProbeExcerptRows, compareProbeQuotes, probeLogLine } from './memoir-probe-compare';
 import { selectQuotesDeterministic } from './memoir-quote-select';
 
 describe('memoir probe compare', () => {
@@ -17,5 +17,22 @@ describe('memoir probe compare', () => {
     expect(line).not.toContain('江边');
     expect(line).not.toContain('番茄面');
     expect(line).not.toContain('你一直');
+  });
+
+  it('keeps fixture originals and both excerpts for the dev page', () => {
+    const deterministic = selectQuotesDeterministic(MEMOIR_PROBE_FIXTURE);
+    const rows = buildProbeExcerptRows({
+      moments: MEMOIR_PROBE_FIXTURE,
+      deterministicQuotes: deterministic,
+      foundationQuotes: [{ id: 'moment_memoir_eval_s1_a', text: '江边的风让人觉得自由。' }],
+    });
+    const always = rows.find((row) => row.id === 'moment_memoir_eval_s8_always');
+    const river = rows.find((row) => row.id === 'moment_memoir_eval_s1_a');
+    expect(always?.original).toBe('你一直去江边走走。');
+    expect(always?.deterministicText).toBe('你一直去江边走走。');
+    expect(always?.deterministicFlag).toBe('exact');
+    expect(always?.foundationFlag).toBe('omitted');
+    expect(river?.foundationText).toBe('江边的风让人觉得自由。');
+    expect(river?.foundationFlag).toBe('rewritten');
   });
 });

@@ -21,10 +21,12 @@
 
 ## 做什么
 
-- `inspect`：availability、不可用原因、系统 locale、上下文容量（API 未暴露 token 窗口则如实写 null）
+- `inspect`：availability、系统 locale，以及编译 SDK 实际可调用的 `supportsLocale` / `supportedLanguages` / `contextSize`。`tokenCount(for:)` 仅 iOS 26.4+；低版本记录 SDK 与编译限制，不把“API 不暴露”写成缺探测
 - `selectQuotes`：只收白名单 `{ id, note }` 合成行；测摘录、取消、超时/失败
 - 日志：耗时与计数，**不含**正文、令牌、路径、照片、声音
+- 开发页：显示合成夹具原文与 A/B 摘录，供人判断模型选出的内容是否更值得读；正文仍不进日志
 - A：确定性原文选取。B：端侧模型选取。同一夹具 `memoir-probe-fixture.ts`
+- `selectQuotes` / `cancel`：单次 in-flight，取消按 `requestId`，避免超时取消串到后一次请求
 
 ## 不做什么
 

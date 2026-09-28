@@ -65,3 +65,48 @@ export function probeLogLine(metrics: ProbeSideMetrics): string {
     `rewritten=${metrics.rewrittenIds.length}`,
   ].join(' ');
 }
+
+export type ProbeExcerptFlag = 'exact' | 'omitted' | 'rewritten';
+
+export type ProbeExcerptRow = {
+  id: string;
+  original: string;
+  deterministicText: string | null;
+  foundationText: string | null;
+  deterministicFlag: ProbeExcerptFlag;
+  foundationFlag: ProbeExcerptFlag;
+};
+
+function quoteTextForId(quotes: Array<DeterministicQuote | ProbeQuote>, id: string): string | null {
+  for (const quote of quotes) {
+    const quoteId = 'sourceIds' in quote ? quote.sourceIds[0] : quote.id;
+    if (quoteId === id) return quote.text;
+  }
+  return null;
+}
+
+function excerptFlag(text: string | null, note: string): ProbeExcerptFlag {
+  if (text == null) return 'omitted';
+  return quoteIsExactSource(text, note) ? 'exact' : 'rewritten';
+}
+
+export function buildProbeExcerptRows(input: {
+  moments: ProbeMomentInput[];
+  deterministicQuotes?: Array<DeterministicQuote | ProbeQuote>;
+  foundationQuotes?: Array<DeterministicQuote | ProbeQuote>;
+}): ProbeExcerptRow[] {
+  const deterministicQuotes = input.deterministicQuotes ?? [];
+  const foundationQuotes = input.foundationQuotes ?? [];
+  return input.moments.map((moment) => {
+    const deterministicText = quoteTextForId(deterministicQuotes, moment.id);
+    const foundationText = quoteTextForId(foundationQuotes, moment.id);
+    return {
+      id: moment.id,
+      original: moment.note,
+      deterministicText,
+      foundationText,
+      deterministicFlag: excerptFlag(deterministicText, moment.note),
+      foundationFlag: excerptFlag(foundationText, moment.note),
+    };
+  });
+}
