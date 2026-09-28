@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from 'react';
 import {
+  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,6 +23,7 @@ import { RootNavBand, RootReadingLayout } from './root-nav-band';
 
 import type { FeelingView } from '../application/feeling';
 import { LOOKBACK_PAGE_GUTTER } from '../application/lookback-month';
+import { requestLookbackLocate } from '../application/lookback-locate';
 import { rememberLookbackScroll, readLookbackScroll } from '../application/lookback-session';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
@@ -45,6 +47,15 @@ type LookbackLocateApi = {
 
 const LookbackLocateContext = createContext<LookbackLocateApi | null>(null);
 
+type MeasurableNode = {
+  measureInWindow?: (callback: (x: number, y: number, width: number, height: number) => void) => void;
+  measureLayout?: (
+    relativeTo: number,
+    onSuccess: (x: number, y: number, width: number, height: number) => void,
+    onFail: () => void,
+  ) => void;
+};
+
 export function LookbackLocateAnchor({ id }: { id: string }) {
   const api = useContext(LookbackLocateContext);
   const node = useRef<View>(null);
@@ -55,62 +66,35 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
     if (!active) scrolled.current = false;
   }, [active]);
 
-  function complete(y: number) {
-    if (!api || api.locateKey !== id) return;
-    if (!scrolled.current) {
-      scrolled.current = true;
-      api.scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: false });
-    }
-    api.finishLocate(id);
-  }
-
-  function locateFromMeasure(fallbackY: number) {
-    if (!api || api.locateKey !== id) return;
-    if (scrolled.current) {
-      api.finishLocate(id);
-      return;
-    }
-    const scroll = api.scrollRef.current as
-      | (ScrollView & { measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void })
-      | null;
-    const view = node.current;
-    if (!scroll || !view) {
-      complete(fallbackY);
-      return;
-    }
-    let settled = false;
-    if (typeof view.measureInWindow === 'function' && typeof scroll.measureInWindow === 'function') {
-      view.measureInWindow((_x, pageY) => {
-        settled = true;
-        let measured = false;
-        scroll.measureInWindow?.((_sx: number, scrollPageY: number) => {
-          measured = true;
-          complete(api.readOffset() + (pageY - scrollPageY));
-        });
-        if (!measured) complete(fallbackY);
-      });
-    }
-    if (!settled) complete(fallbackY);
+  function tryLocate() {
+    if (!api || api.locateKey !== id || scrolled.current) return;
+    const view = node.current as (View & MeasurableNode) | null;
+    const scroll = api.scrollRef.current as (ScrollView & MeasurableNode) | null;
+    if (!view || !scroll) return;
+    const scrollHandle = findNodeHandle(scroll);
+    requestLookbackLocate({
+      measureAnchorWindow: typeof view.measureInWindow === 'function' ? view.measureInWindow.bind(view) : null,
+      measureScrollWindow: typeof scroll.measureInWindow === 'function' ? scroll.measureInWindow.bind(scroll) : null,
+      measureAnchorInScroll:
+        typeof view.measureLayout === 'function' && scrollHandle != null
+          ? (onSuccess, onFail) => {
+              view.measureLayout?.(scrollHandle, onSuccess, onFail);
+            }
+          : undefined,
+      readOffset: api.readOffset,
+      consume: (y) => {
+        if (scrolled.current || api.locateKey !== id) return;
+        scrolled.current = true;
+        scroll.scrollTo({ y, animated: false });
+        api.finishLocate(id);
+      },
+    });
   }
 
   useEffect(() => {
-    if (!active || !api || scrolled.current) return undefined;
+    if (!active || scrolled.current) return undefined;
     const frame = requestAnimationFrame(() => {
-      const view = node.current;
-      const scroll = api.scrollRef.current as
-        | (ScrollView & { measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void })
-        | null;
-      if (!view || !scroll) return;
-      if (typeof view.measureInWindow !== 'function' || typeof scroll.measureInWindow !== 'function') return;
-      view.measureInWindow((_x, pageY) => {
-        if (scrolled.current || api.locateKey !== id) return;
-        let measured = false;
-        scroll.measureInWindow?.((_sx: number, scrollPageY: number) => {
-          measured = true;
-          complete(api.readOffset() + (pageY - scrollPageY));
-        });
-        if (!measured) return;
-      });
+      tryLocate();
     });
     return () => cancelAnimationFrame(frame);
   }, [active, api, id]);
@@ -120,8 +104,8 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
       ref={node}
       collapsable={false}
       testID={`lookback-book-locate-${id}`}
-      onLayout={(event) => {
-        locateFromMeasure(event.nativeEvent.layout.y);
+      onLayout={() => {
+        tryLocate();
       }}
     />
   );

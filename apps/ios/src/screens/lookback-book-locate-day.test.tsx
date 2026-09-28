@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Dimensions, ScrollView } from 'react-native';
+import { Dimensions, ScrollView, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
@@ -10,6 +10,16 @@ const mockGetLookbackBook = jest.fn();
 const mockGetHistoryMonth = jest.fn();
 const mockGetHistoryDay = jest.fn();
 const mockScrollTo = jest.fn();
+const pendingMeasures: Array<() => void> = [];
+
+function flushMeasures() {
+  let guard = 0;
+  while (pendingMeasures.length > 0 && guard < 16) {
+    const batch = pendingMeasures.splice(0, pendingMeasures.length);
+    batch.forEach((run) => run());
+    guard += 1;
+  }
+}
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -67,7 +77,15 @@ describe('lookback book day locate', () => {
     mockGetHistoryMonth.mockReset();
     mockGetHistoryDay.mockReset();
     mockScrollTo.mockReset();
+    pendingMeasures.length = 0;
     jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(mockScrollTo);
+    jest.spyOn(View.prototype, 'measureInWindow').mockImplementation(function (this: object, callback) {
+      const isScroll = this instanceof ScrollView;
+      pendingMeasures.push(() => {
+        if (isScroll) callback(0, 120, 390, 844);
+        else callback(0, 2200, 390, 48);
+      });
+    });
     resetLookbackSessionForTests();
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
@@ -79,19 +97,19 @@ describe('lookback book day locate', () => {
     cleanup();
   });
 
-  it('clears the locate after one scroll so relayout and a later day do not pull back', async () => {
-    writeLookbackBookIntent({ year: 2026, month: 9, day: 24 });
+  it('scrolls a far day from window measure, then lets relayout and another day stay put', async () => {
+    writeLookbackBookIntent({ year: 2026, month: 9, day: 28 });
     mockGetLookbackBook.mockResolvedValue({
       unknownCount: 0,
       isEmpty: false,
       years: [
         {
           year: 2026,
-          momentCount: 2,
+          momentCount: 28,
           title: '2026年',
           yearUnconfirmedCount: 0,
           yearUnconfirmedLabel: '这一年，月份未确认',
-          months: [{ month: 9, label: '9月', count: 2, summary: '有2条记录' }],
+          months: [{ month: 9, label: '9月', count: 28, summary: '有28条记录' }],
         },
       ],
     });
@@ -102,64 +120,14 @@ describe('lookback book day locate', () => {
       dayUnconfirmedCount: 0,
       dayUnconfirmedLabel: '日子未确认',
       isEmpty: false,
-      days: Array.from({ length: 30 }, (_, index) => ({
+      days: Array.from({ length: 28 }, (_, index) => ({
         day: index + 1,
         label: `9月${index + 1}日`,
-        count: index + 1 === 24 ? 2 : index + 1 === 28 ? 1 : 0,
-        status: index + 1 === 24 || index + 1 === 28 ? 'filled' : 'quiet',
-        summary: index + 1 === 24 ? '有2条记录' : index + 1 === 28 ? '有1条记录' : '安静',
+        count: 1,
+        status: 'filled' as const,
+        summary: '有1条记录',
       })),
     });
-    mockGetHistoryDay.mockResolvedValue({
-      year: 2026,
-      month: 9,
-      day: 24,
-      title: '2026年9月24日',
-      isEmpty: false,
-      items: [
-        {
-          id: 'm_day',
-          note: '冷日回来',
-          precision: 'day',
-          timeLabel: '2026年9月24日',
-          usedRecordedAtFallback: false,
-          feeling: null,
-          images: [],
-          audio: null,
-          unknownMedia: [],
-        },
-      ],
-      hasMore: false,
-    });
-    const view = await render(wrap(<LookbackIndexScreen />));
-    await waitFor(() => {
-      expect(view.getByText('冷日回来')).toBeTruthy();
-    });
-    await waitFor(() => {
-      expect(view.getByTestId('lookback-book-locating')).toBeTruthy();
-    });
-    await act(async () => {
-      fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-24'), 'layout', {
-        nativeEvent: { layout: { x: 0, y: 480, width: 390, height: 80 } },
-      });
-      await Promise.resolve();
-    });
-    await waitFor(() => {
-      expect(view.queryByTestId('lookback-book-locating')).toBeNull();
-    });
-    expect(mockScrollTo).toHaveBeenCalledWith({ y: 480, animated: false });
-    const afterLocate = mockScrollTo.mock.calls.length;
-    fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-24'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 620, width: 390, height: 160 } },
-    });
-    fireEvent.scroll(view.getByTestId('lookback-scroll'), {
-      nativeEvent: {
-        contentOffset: { y: 36, x: 0 },
-        contentSize: { height: 2400, width: 390 },
-        layoutMeasurement: { height: 844, width: 390 },
-      },
-    });
-    expect(mockScrollTo.mock.calls.length).toBe(afterLocate);
     mockGetHistoryDay.mockResolvedValue({
       year: 2026,
       month: 9,
@@ -168,8 +136,8 @@ describe('lookback book day locate', () => {
       isEmpty: false,
       items: [
         {
-          id: 'm_28',
-          note: '换日后的摘录',
+          id: 'm_day',
+          note: '月末这一天',
           precision: 'day',
           timeLabel: '2026年9月28日',
           usedRecordedAtFallback: false,
@@ -181,8 +149,66 @@ describe('lookback book day locate', () => {
       ],
       hasMore: false,
     });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByText('月末这一天')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-locating')).toBeTruthy();
+    });
+    expect(view.getByTestId('lookback-book-day-2026-09-01')).toBeTruthy();
+    expect(view.getByTestId('lookback-book-day-2026-09-28')).toBeTruthy();
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-28'));
+      fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-28'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 8, width: 390, height: 8 } },
+      });
+    });
+    expect(mockScrollTo).not.toHaveBeenCalled();
+    await act(async () => {
+      flushMeasures();
+    });
+    await waitFor(() => {
+      expect(view.queryByTestId('lookback-book-locating')).toBeNull();
+    });
+    expect(mockScrollTo).toHaveBeenCalledTimes(1);
+    expect(mockScrollTo).toHaveBeenCalledWith({ y: 2080, animated: false });
+    expect(mockScrollTo).not.toHaveBeenCalledWith({ y: 8, animated: false });
+    const afterLocate = mockScrollTo.mock.calls.length;
+    fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-28'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 8, width: 390, height: 8 } },
+    });
+    flushMeasures();
+    fireEvent.scroll(view.getByTestId('lookback-scroll'), {
+      nativeEvent: {
+        contentOffset: { y: 36, x: 0 },
+        contentSize: { height: 4200, width: 390 },
+        layoutMeasurement: { height: 844, width: 390 },
+      },
+    });
+    expect(mockScrollTo.mock.calls.length).toBe(afterLocate);
+    mockGetHistoryDay.mockResolvedValue({
+      year: 2026,
+      month: 9,
+      day: 1,
+      title: '2026年9月1日',
+      isEmpty: false,
+      items: [
+        {
+          id: 'm_1',
+          note: '换日后的摘录',
+          precision: 'day',
+          timeLabel: '2026年9月1日',
+          usedRecordedAtFallback: false,
+          feeling: null,
+          images: [],
+          audio: null,
+          unknownMedia: [],
+        },
+      ],
+      hasMore: false,
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-01'));
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
@@ -190,9 +216,10 @@ describe('lookback book day locate', () => {
     await waitFor(() => {
       expect(view.getByText('换日后的摘录')).toBeTruthy();
     });
-    fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-24'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 480, width: 390, height: 80 } },
+    fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-28'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 8, width: 390, height: 8 } },
     });
+    flushMeasures();
     expect(mockScrollTo.mock.calls.length).toBe(afterLocate);
     expect(view.queryByTestId('lookback-book-locating')).toBeNull();
   });

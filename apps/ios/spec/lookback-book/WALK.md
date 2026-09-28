@@ -9,7 +9,7 @@ Jest 与本目录截图 **≠** 原生页面 PASS。下列 PASS 均来自运行�
 在 `apps/ios`：
 
 - `npx tsc --noEmit`：通过
-- `npx jest --no-coverage`：90 suites / 500 tests
+- `npx jest --no-coverage`：92 suites / 504 tests
 - `npx expo lint`：3 errors，均在既有 `leave.tsx` / `share/[id].tsx`
 - `git diff --check`：通过
 
@@ -26,7 +26,7 @@ Jest 与本目录截图 **≠** 原生页面 PASS。下列 PASS 均来自运行�
 | 定位结束后自由操作：收起再展开 9 月，不再拉回 28 日 | **PASS**（`shots/walk-after-locate-reexpand.png`） |
 | 密集月换日：展开后点 27 日，见 27 摘录、28 仍在下面 | **PASS**（`shots/walk-switch-27.png`） |
 | 详情：书页上的 9 月 27 日记录 → 详情 → 返回书页原日 | **PASS**（`shots/walk-detail.png`、`shots/walk-detail-back.png`） |
-| 多年章节滚到目标年 | **隔离测试库 PASS**（`history-use-cases` 写入 2022/2024/2026；`lookback-book-locate` 三年章节滚到 2024）。此设备库只有 2026，**不能**把一年截图记作原生多年 PASS |
+| 多年 / 多日远离首屏的目标定位 | **隔离页面 PASS**：`lookback-book-locate` 九个年份滚到 2018；`lookback-book-locate-day` 28 个有记录日滚到 9 月 28 日；坐标来自异步窗口测量，不是嵌套 `onLayout.y`。此设备库只有 2026 年两天，**一年两天截图不能**证明远处日期定位准确 |
 | 摘录失败重试 | Jest 已覆盖；运行中未注入 `getHistoryDay` 失败 |
 | 最近 → 回看 → 详情 → 返回 | 本轮验了书页 → 详情 → 返回书页。热 `o=` / 底带「最近」仍属 #34 |
 | 稀疏月选日见摘录 | **NOT VERIFIED**（此库 9 月是密月） |
@@ -46,4 +46,6 @@ Jest 与本目录截图 **≠** 原生页面 PASS。下列 PASS 均来自运行�
 
 月/年精度：留下页仍只能写 `day` / `unknown`。
 
-定位：`locateKey` 在一次 `scrollTo` 后清除。之后的 `onLayout` / 换日 / 收起展开不再拉回旧目标。Jest 覆盖重新布局和手动滚动，不只断言调用过 `scrollTo`。
+定位：等锚点与滚动视口的窗口测量都回来后，才按容器坐标 `scrollTo` 并清掉 `locateKey`。测量失败时用相对滚动容器的同一坐标系，**不用**嵌套节点的 `onLayout.y`。`lookback-book-locate-measure` 覆盖「onLayout 先到、测量后到」，只按最终坐标滚一次。一年两天的运行截图仍只说明近处 27/28 日返回后能看见摘录。
+
+长文三图、三种未确认、最大字号、可播放听音仍 **NOT VERIFIED**。
