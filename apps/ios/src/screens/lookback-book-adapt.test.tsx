@@ -5,7 +5,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
 import { resetLookbackSessionForTests } from '../application/lookback-session';
-import { resetLookbackTimingForTests } from '../application/lookback-timing';
 
 const mockGetLookbackBook = jest.fn();
 const mockGetHistoryMonth = jest.fn();
@@ -124,7 +123,6 @@ describe('lookback book adapt surfaces', () => {
     mockGetHistoryMonth.mockReset();
     mockGetHistoryDay.mockReset();
     resetLookbackSessionForTests();
-    resetLookbackTimingForTests();
     armSparseBook();
   });
 

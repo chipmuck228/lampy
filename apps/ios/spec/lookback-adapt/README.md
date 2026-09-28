@@ -13,4 +13,8 @@
 | 远处换日实页 | 同一月里远离首屏的日期，点了之后新日期和摘录进视口 |
 | 性能 | 多年密集库上量首次打开与选日耗时。数字写进走查。不够才考虑限量读取 |
 
-横屏 / iPad 按窗口宽高判断，不按机型名。Jest ≠ 原生 PASS。
+横屏 / iPad 按窗口宽高判断，不按机型名。Jest ≠ 原生 PASS。iPad 实页和 VoiceOver 手势保持 **NOT VERIFIED**，不得用 Jest 改写成 PASS。
+
+走查库必须是独立、可丢弃的 `lookback-adapt.db`（库内 `lookback_adapt_fixture` 身份）。脚本拒绝 `lampy.db`、非空库和身份不符的库，并且只 INSERT、不 UPDATE。不能用「不删除原记录」代替保护个人库。详见 `WALK.md`。
+
+性能栏记录的是 **数据读取完成耗时**（`getLookbackBook` / `getHistoryDay` resolve），不是首帧可见；数字只代表当时那台模拟器及该夹具库。测量代码不进正式运行路径。
