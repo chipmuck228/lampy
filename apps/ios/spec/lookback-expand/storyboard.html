@@ -183,13 +183,13 @@
           <div class="quiet">7月</div><div class="quiet">8月</div><div class="quiet">9月</div>
           <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
         </div>
-        <div class="hit">3月</div>
+        <div class="hit">3月 · 有3条记录</div>
         <div class="indent">
           <div class="hit">日子未确认 · 3条</div>
         </div>
-        <p class="meta">没有「3月1日」。不补空月说明。</p>
+        <p class="meta">没有「3月1日」。不补空月说明。月份行 N 含月精度。</p>
       </div>
-      <p class="cap"><strong>B</strong> 3 月可展开（有日子未确认）。展开后只有这一行，进 <code>/lookback/2026/03/unconfirmed</code>。</p>
+      <p class="cap"><strong>B</strong> 3 月可展开（有日子未确认）。月份行「有3条记录」与年页 <code>count</code> 相同。展开后只有未确认行，进 <code>/lookback/2026/03/unconfirmed</code>。</p>
     </section>
   </div>
 
@@ -206,14 +206,14 @@
         <div class="cell live">9月<div class="dot"></div></div>
         <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
       </div>
-      <div class="hit">9月 · 有1条记录</div>
+      <div class="hit">9月 · 有3条记录</div>
       <div class="indent">
         <div class="hit">日子未确认 · 2条</div>
         <p class="meta">—— 与日期分开 ——</p>
         <div class="hit soft">9月24日 · 有1条记录</div>
       </div>
     </div>
-    <p class="cap">年精度在月份区域外。月精度在展开区内单独一行，在具体日期上面。点未确认进原月未确认页；点 24 日进日页。</p>
+    <p class="cap">年精度在月份区域外。月精度在展开区内单独一行，在具体日期上面。月份行 3 = 未确认 2 + 24 日 1，与 <code>getHistoryYear</code> 的 <code>count</code> 相同。点未确认进原月未确认页；点 24 日进日页。</p>
   </section>
 
   <h2>月深链与返回</h2>
@@ -235,9 +235,9 @@
         <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <div class="hit soft">2026年</div>
-        <p class="meta">从年页再按返回：<code>back()</code> 到打开深链之前（通常是回看根）。不经过月历。</p>
+        <p class="meta">有可信上一页才 <code>back()</code>。冷启动无上一页：<code>dismissTo('/lookback')</code>。不读 <code>canGoBack()</code>。</p>
       </div>
-      <p class="cap">从展开区进日页或「日子未确认」再返回：仍停在年页，9 月仍开。</p>
+      <p class="cap">从展开区进日页或「日子未确认」再返回：仍停在年页，9 月仍开。冷启动月深链的返回落点是回看根，不是最近。</p>
     </section>
   </div>
 
@@ -251,10 +251,10 @@
       <div class="phone future">
         <div class="back">返回原来的位置</div>
         <p class="title" style="font-size:34px;line-height:42px">2026年</p>
-        <div class="hit" style="font-size:22px">9月 · 有1条记录</div>
+        <div class="hit" style="font-size:22px">9月 · 有3条记录</div>
         <div class="indent">
           <div class="hit" style="font-size:22px">日子未确认 · 2条</div>
-          <p class="meta">与日期分开</p>
+          <p class="meta">与日期分开；月份行含月精度</p>
           <div class="hit soft" style="font-size:22px">9月24日 · 有1条记录</div>
         </div>
       </div>
