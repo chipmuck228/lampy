@@ -99,7 +99,6 @@
     <section>
       <span class="tag">C′ · 结构示意 · 不是 PASS</span>
       <div class="phone future tall">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <div class="hit soft">时间未确认 · 4条</div>
         <p class="meta" style="margin:12px 0 4px">2026年</p>
@@ -109,9 +108,9 @@
           <p class="note">门口的风，9月24日发生。</p>
           <div class="hit">看这条</div>
         </div>
-        <div class="band"><span>留下</span><span>最近</span><span>回看</span></div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
-      <p class="cap">根上就是书。展开一个月、一天，正文留在首屏。底带只在这一层。</p>
+      <p class="cap">现网根页壳：无顶返回，有 #34 底带。左两张是 A <strong>子页</strong>真图，保留它们自己的「返回原来的位置」。</p>
     </section>
   </div>
 
@@ -147,22 +146,66 @@
     <section>
       <span class="tag">C′ · 结构示意</span>
       <div class="phone future tall">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <p class="meta">2026年</p>
         <div class="hit">9月 · 有14条记录</div>
         <div class="indent">
           <div class="hit">9月27日 · 星期日 · 有11条</div>
-          <p class="note">第一条可辨认的正文，到此截断。</p>
+          <p class="note">日页同一排序的第 1 条摘录。</p>
           <div class="hit">看这条</div>
-          <p class="note" style="margin-top:12px">第二条也只留可认出的部分。</p>
+          <p class="note" style="margin-top:12px">第 2 条摘录。</p>
           <div class="hit">看这条</div>
           <div class="hit soft">这一天还有 9 条</div>
-          <div class="hit soft">9月28日 · 星期一 · 有3条</div>
+          <div class="hit">9月28日 · 星期一 · 有3条</div>
         </div>
-        <div class="band"><span>留下</span><span>最近</span><span>回看</span></div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
-      <p class="cap">预览最多 2 条。「还有 9 条」进现有日页。28 日未选，只留一行。</p>
+      <p class="cap">摘录紧跟 27 日。28 日未选，只一行。N = 11 − 2 = 9。每条「看这条」用该条 id。不是 PASS。</p>
+    </section>
+  </div>
+
+  <h2>2b. 密集月：摘录跟在选中日下面</h2>
+  <p>无真图。结构只说明位置：预览插在<strong>当前日期行正下方</strong>，上面的日期可以滚走。换日时旧摘录收起，新摘录进入可视区，不必先滚完整个月。</p>
+  <div class="pair">
+    <section>
+      <span class="tag">C′ · 选中月中段 · 结构示意</span>
+      <div class="phone future tall">
+        <p class="title">回看</p>
+        <p class="meta">2026年</p>
+        <div class="hit">3月 · 有12条记录</div>
+        <div class="indent">
+          <div class="hit soft">3月3日 · 星期二 · 有1条</div>
+          <div class="hit soft">3月8日 · 星期日 · 有1条</div>
+          <div class="hit">3月15日 · 星期日 · 有2条</div>
+          <p class="note">摘录贴在 15 日下面，不在列表最底。</p>
+          <div class="hit">看这条</div>
+          <p class="note">第二条。</p>
+          <div class="hit">看这条</div>
+          <div class="hit soft">3月22日 · 星期日 · 有1条</div>
+          <div class="hit soft">3月28日 · 星期六 · 有1条</div>
+        </div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
+      </div>
+      <p class="cap">15 日被选中。3、8 在上，22、28 在摘录之下仍各一行。不是设备 PASS。</p>
+    </section>
+    <section>
+      <span class="tag">换到 22 日之后 · 结构示意</span>
+      <div class="phone future tall">
+        <p class="title">回看</p>
+        <p class="meta">2026年</p>
+        <div class="hit">3月 · 有12条记录</div>
+        <div class="indent">
+          <div class="hit soft">3月3日 · 星期二 · 有1条</div>
+          <div class="hit soft">3月8日 · 星期日 · 有1条</div>
+          <div class="hit soft">3月15日 · 星期日 · 有2条</div>
+          <div class="hit">3月22日 · 星期日 · 有1条</div>
+          <p class="note">15 日的摘录已收起。22 日的摘录滚进这片可视区。</p>
+          <div class="hit">看这条</div>
+          <div class="hit soft">3月28日 · 星期六 · 有1条</div>
+        </div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
+      </div>
+      <p class="cap">同时只开一个日期。实现须把新摘录滚进可视区；本帧不证明滚动已实现。</p>
     </section>
   </div>
 
@@ -172,7 +215,6 @@
     <section>
       <span class="tag">C-cal · 否决 · 结构示意</span>
       <div class="phone drop">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <p class="meta">2026年 · 9月</p>
         <div class="days">
@@ -183,13 +225,13 @@
           <div class="d">29</div><div class="d">30</div>
         </div>
         <p class="note" style="opacity:.55">正文从这里才开始，已经要滚。</p>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
-      <p class="cap ban">稀疏月：安静格税。密集月：星期有用，阅读折下。不定稿。</p>
+      <p class="cap ban">与 C′ 同一根页壳算高度。稀疏月：安静格税。密集月：星期有用，阅读折下。不定稿。</p>
     </section>
     <section>
       <span class="tag">C′ · 推荐 · 结构示意</span>
       <div class="phone future">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <p class="meta">2026年</p>
         <div class="hit">9月 · 有14条记录</div>
@@ -200,6 +242,7 @@
           <div class="row2">一段声音 · 播放</div>
           <div class="hit">看这条</div>
         </div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
       <p class="cap ok">星期写在日期行。高度留给正文、一张图、分开放的声音。</p>
     </section>
@@ -209,25 +252,19 @@
   <h2>4. 空月、只有月精度、多年</h2>
   <div class="trio">
     <section>
-      <span class="tag">空月 · 三案相同</span>
+      <span class="tag">空月 · C′ 根 · 结构示意</span>
       <div class="phone future">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <p class="meta">2026年</p>
-        <div class="months">
-          <div class="quiet">1月</div><div class="quiet">2月</div><div class="quiet">3月</div>
-          <div class="quiet">4月</div><div class="quiet">5月</div><div class="quiet">6月</div>
-          <div class="quiet">7月</div><div class="quiet">8月</div>
-          <div class="cell live">9月<div class="dot"></div></div>
-          <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
-        </div>
-        <p class="cap">C′ 不必在书页重画十二格；章节下列出可展开月即可。空月不可点，不进空页。</p>
+        <div class="hit">9月 · 有1条记录</div>
+        <p class="meta">1–8、10–12 月不可展开</p>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
+      <p class="cap">C′ 不必在书页重画十二格。A／B 的空月是年页安静格（子页真图自带顶返回）。空月不可点，不进空页。</p>
     </section>
     <section>
       <span class="tag">只有月精度 · 结构 · 用户路径 NOT VERIFIED</span>
       <div class="phone future">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <p class="meta">2026年</p>
         <div class="hit soft">月份未确认 · 1条</div>
@@ -235,20 +272,20 @@
         <div class="indent">
           <div class="hit">日子未确认 · 2条</div>
         </div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
       <p class="cap">月份行 N 含月精度。展开后没有日期行。留下页<strong>不能</strong>写出这一态。</p>
     </section>
     <section>
       <span class="tag">多年 · C′ 结构</span>
       <div class="phone future">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <div class="hit soft">时间未确认 · 4条</div>
         <p class="meta" style="margin-top:12px">2026年 · 有14条记录</p>
         <div class="hit">9月 · 有14条记录</div>
         <p class="meta" style="margin-top:16px">2025年 · 有1条记录</p>
         <div class="hit soft">3月 · 有1条记录</div>
-        <div class="band"><span>留下</span><span>最近</span><span>回看</span></div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
       <p class="cap">同时最多展开一个月。2025 收着。不是手风琴墙。</p>
     </section>
@@ -259,34 +296,37 @@
     <section>
       <span class="tag">长文 · C′ 结构</span>
       <div class="phone future">
-        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
         <p class="meta">9月27日 · 星期日</p>
         <p class="note clamp">这一段会比六行更长。书页只留六行，下面的句子在这帧里被挡住，用来表示截断，不是设计花纹。真页面还没有这一态。</p>
         <div class="hit">看这条</div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
-      <p class="cap">继续读 = 看这条 = 该条精确 ID。不在书页拉全文。</p>
+      <p class="cap">六行截断后只留「看这条」→ 该条精确 ID。不在书页拉全文。不是 PASS。</p>
     </section>
     <section>
       <span class="tag">三图 + 声 · C′ 结构</span>
       <div class="phone future">
-        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
         <p class="meta">9月27日 · 星期日</p>
         <p class="note">图文声音混合时，文字在前。</p>
         <div class="thumb">共3张</div>
         <div class="row2">当时的声音 · ▶ 播放</div>
         <p class="meta">当时的感受</p>
         <div class="hit">看这条</div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
       <p class="cap">播放与看这条分列。层次对照最近真图 <code>iphone16-closeout-idle-mix.png</code>，那是最近，不是回看 PASS。</p>
     </section>
     <section>
       <span class="tag">媒体缺失 · C′ 结构</span>
       <div class="phone future">
-        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
         <p class="meta">9月27日 · 星期日</p>
         <p class="note">还留着的那句文字。</p>
         <p class="meta">有一段现在看不了的内容。</p>
         <div class="hit">看这条</div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
       <p class="cap">不拿别的记录或占位图顶上。与日页 / 详情同一中性句。</p>
     </section>
@@ -303,7 +343,6 @@
     <section>
       <span class="tag">XXXL · C′ 结构</span>
       <div class="phone future tall">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <p class="meta">2026年</p>
         <div class="hit" style="font-size:22px;min-height:52px">9月 · 有14条记录</div>
@@ -312,6 +351,7 @@
           <p class="note">大字号仍是章节 + 一天 + 预览，不恢复三列或七列。</p>
           <div class="hit" style="font-size:22px;min-height:52px">看这条</div>
         </div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
     </section>
     <section>
@@ -324,17 +364,16 @@
     <section>
       <span class="tag">横屏 · 结构 · #34 NOT VERIFIED</span>
       <div class="phone future wide">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <p class="meta">2026年 · 9月27日 · 星期日</p>
         <p class="note">仍是一个月、一个日期。不并排两年。</p>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
       <p class="cap wide">不得把这帧当成横屏 PASS。</p>
     </section>
     <section>
       <span class="tag">iPad · 结构 · #34 NOT VERIFIED</span>
       <div class="phone future pad">
-        <div class="back">返回原来的位置</div>
         <p class="title">回看</p>
         <p class="meta">2026年</p>
         <div class="hit">9月 · 有14条记录</div>
@@ -343,6 +382,7 @@
           <p class="note">一本更宽的书，不是双年对照桌面。</p>
           <div class="hit">看这条</div>
         </div>
+        <div class="band"><span>回看</span><span>最近</span><span>留下</span></div>
       </div>
       <p class="cap">不得把这帧当成 iPad PASS。</p>
     </section>
@@ -362,47 +402,55 @@
     </section>
   </div>
 
-  <h2>8. 栈意图（不是设备日志）</h2>
+  <h2>8. 栈意图（与 README §5 同一套，不是设备日志）</h2>
   <table>
     <thead>
-      <tr><th>动作</th><th>A main</th><th>B #36</th><th>C′</th></tr>
+      <tr><th>动作</th><th>A main</th><th>B #36</th><th>C′（定死）</th></tr>
     </thead>
     <tbody>
       <tr>
-        <td>最近 → 回看</td>
-        <td><code>[最近, 回看根]</code> · <code>o=</code></td>
+        <td>最近热进入</td>
+        <td><code>[最近, 回看根]</code> · <code>/lookback?o=</code></td>
         <td>同 A</td>
-        <td><code>[最近, 书页]</code> · 同一套根签发</td>
+        <td><code>[最近, 书页]</code> · <code>/lookback?o=</code> · 无展开。底带「最近」走 <code>shouldBackToRecent</code>，无顶返回</td>
       </tr>
       <tr>
-        <td>旧月深链 <code>/lookback/2026/09</code></td>
-        <td>月历页。冷启动 <code>back()</code> 落点未写死</td>
+        <td>冷启动旧月 <code>/lookback/2026/09</code></td>
+        <td>月历页。<code>back()</code> 落点未写死</td>
         <td><code>replace</code> 年页 + 展开；冷回 <code>/lookback</code></td>
-        <td>书页 + 展开 9 月。不留月历层。冷回：有最近来源回最近，否则按 README §5，<strong>不</strong> <code>canGoBack()</code></td>
+        <td>跳板：指令 <code>{2026,9}</code> 后 <code>replace /lookback</code>。展开 9 月，不选日。底带「最近」→ <code>dismissTo('/')</code>。不留月历层</td>
       </tr>
       <tr>
-        <td>日深链</td>
-        <td>日页</td>
-        <td>日页；从年页回则月仍开</td>
-        <td>日页保留。冷回书页 + 该月开 + 该日选中</td>
+        <td>冷启动日 <code>/lookback/2026/09/24</code></td>
+        <td>日页。<code>back()</code> 落点未写死</td>
+        <td>日页；#36 未把任意冷日链写死</td>
+        <td>落地仍是日页。返回：用<strong>本页</strong> year/month/day 写指令 <code>{2026,9,24}</code>，再 <code>dismissTo('/lookback')</code>。书页展开 9 月、选中 24、摘录跟在 24 日下</td>
+      </tr>
+      <tr>
+        <td>年路径 <code>/lookback/2026</code></td>
+        <td>年页</td>
+        <td>年页</td>
+        <td>跳板：指令 <code>{2026}</code> → <code>/lookback</code>，只滚到 2026，不展开月</td>
       </tr>
       <tr>
         <td>详情返回</td>
         <td>日页</td>
         <td>日页</td>
-        <td>从看这条回书页（月、日仍在）；从日页回日页</td>
+        <td>从「看这条」<code>back()</code> 到 <code>/lookback</code>（进程内选择仍在）；从日页回日页</td>
       </tr>
       <tr>
         <td>未确认路由</td>
         <td>独立列表页</td>
         <td>同 A</td>
-        <td>同 A，不删</td>
+        <td>同 A，不删。冷回无签发则 <code>dismissTo('/lookback')</code>，不带月日指令</td>
       </tr>
     </tbody>
   </table>
-  <pre class="stack">进程内：展开月、选中日、滚动 —— 从日页 / 未确认 / 详情 back() 后仍在。
-冷启动：上述丢掉；只信这一次 URL。音频不写入恢复。
-禁止：用 canGoBack() 在最近 / 回看根 / 退出之间猜。</pre>
+  <pre class="stack">C′ 可见书页 URL 永远是 /lookback。
+年/月路径是跳板，不是第二种书页地址。
+一次性指令来自这一次路由参数，用完即弃。
+冷日链禁止读杀进程前的展开表，禁止 canGoBack()。
+进程内：展开月、选中日、滚动可记。音频不写入恢复。</pre>
 
   <h2>9. 精度：能读 ≠ 能写</h2>
   <p><code>year</code> → 章节外「月份未确认」。<code>month</code> → 展开月里「日子未确认」，不是某日。<code>unknown</code> → 书页最前。「留下」只写 <code>day</code> | <code>unknown</code>。月/年精度用户路径 <strong>NOT VERIFIED</strong>。</p>

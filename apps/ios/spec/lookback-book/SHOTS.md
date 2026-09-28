@@ -6,7 +6,7 @@
 
 | 文件 | 方案 | 库状态 | 结果 |
 | --- | --- | --- | --- |
-| `../lookback-month/shots/iphone16-lookback-years.png` | A 根 | 时间未确认 4 条；2026 有 1 条 | 真页面 · 当时 PASS |
+| `../lookback-month/shots/iphone16-lookback-years.png` | A 根（#34 前） | 时间未确认 4 条；2026 有 1 条；**有顶返回、无底带** | 真页面 · 当时 PASS。现网根页已是无顶返回 + 底带，C′ 按现网壳画，不按这张旧根 |
 | `../lookback-year-day/shots/iphone16-year.png` | A 年 | 稀疏 S：十一空月，9 月一点，列表「有1条记录」 | 真页面 · PASS |
 | `../lookback-year-day/shots/iphone16-year-xxxl.png` | A 年 XXXL | 无三列 | 真页面 · PASS |
 | `../lookback-month/shots/iphone16-lookback-month.png` | A 月 | 稀疏 S：七列 + 24 日一行 | 真页面 · PASS |
@@ -26,7 +26,8 @@ B 真图与 A 年/月真图**不是同一天的库**。并排时看结构，不�
 | --- | --- | --- |
 | 书页根 · 多年章节 | C′ | 无真页面 |
 | 稀疏月展开 + 当天预览 | C′ | 用态 S 的 24 日一条 |
-| 同日多条预览上限 | C′ | 用态 D 的 27 日：2 条 + 「还有 9 条」 |
+| 同日多条预览上限 | C′ | 用态 D 的 27 日：日页排序前 2 条 + 「还有 9 条」（11−2） |
+| 密集月选中中段日期 / 换日 | C′ | 摘录紧跟选中行；换日后旧摘录收起。无真图 |
 | 嵌套月历抢高度 | C-cal | 用来否决，不是推荐稿 |
 | 只有月精度 | A/B/C′ | 用户路径无法从留下创建；**NOT VERIFIED** |
 | 长文 / 三图 / 混合 / 缺失 | C′ | 结构；混合层次对照最近真图 |
