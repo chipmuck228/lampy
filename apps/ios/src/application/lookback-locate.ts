@@ -14,13 +14,17 @@ export function requestLookbackLocate(input: {
     onFail: () => void,
   ) => void;
   readOffset: () => number;
+  isCurrent?: () => boolean;
   consume: (y: number) => void;
 }): void {
   const measureAnchorWindow = input.measureAnchorWindow;
   const measureScrollWindow = input.measureScrollWindow;
+  const stillCurrent = () => !input.isCurrent || input.isCurrent();
   if (typeof measureAnchorWindow === 'function' && typeof measureScrollWindow === 'function') {
     measureAnchorWindow((_x, pageY) => {
+      if (!stillCurrent()) return;
       measureScrollWindow((_sx, scrollPageY) => {
+        if (!stillCurrent()) return;
         input.consume(lookbackLocateScrollY(input.readOffset(), pageY, scrollPageY));
       });
     });
@@ -29,6 +33,7 @@ export function requestLookbackLocate(input: {
   if (typeof input.measureAnchorInScroll === 'function') {
     input.measureAnchorInScroll(
       (_x, relativeY) => {
+        if (!stillCurrent()) return;
         input.consume(lookbackLocateScrollY(input.readOffset(), relativeY, 0));
       },
       () => undefined,

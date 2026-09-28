@@ -42,6 +42,7 @@ type LookbackLocateApi = {
   locateKey: string | null;
   scrollRef: RefObject<ScrollView | null>;
   readOffset: () => number;
+  isCurrent: (id: string) => boolean;
   finishLocate: (id: string) => void;
 };
 
@@ -82,8 +83,9 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
             }
           : undefined,
       readOffset: api.readOffset,
+      isCurrent: () => api.isCurrent(id),
       consume: (y) => {
-        if (scrolled.current || api.locateKey !== id) return;
+        if (scrolled.current || !api.isCurrent(id)) return;
         scrolled.current = true;
         scroll.scrollTo({ y, animated: false });
         api.finishLocate(id);
@@ -159,6 +161,7 @@ export function LookbackScaffold({
       locateKey,
       scrollRef,
       readOffset: () => readLookbackScroll(path),
+      isCurrent: (id: string) => locateKeyRef.current === id,
       finishLocate: (id: string) => {
         if (locateKeyRef.current === id) onLocatedRef.current?.();
       },
@@ -208,6 +211,9 @@ export function LookbackScaffold({
     onScroll: (event: { nativeEvent: { contentOffset: { y: number } } }) => {
       rememberLookbackScroll(path, event.nativeEvent.contentOffset.y);
     },
+    onScrollBeginDrag: () => {
+      if (locateKeyRef.current) onLocatedRef.current?.();
+    },
   };
 
   const body =
@@ -221,6 +227,7 @@ export function LookbackScaffold({
         ]}
         onContentSizeChange={scrollProps.onContentSizeChange}
         onScroll={scrollProps.onScroll}
+        onScrollBeginDrag={scrollProps.onScrollBeginDrag}
         band={
           <RootNavBand here="lookback" onOther={onGoRecent} onLeave={onLeave} onFamily={onFamily} />
         }
@@ -239,6 +246,7 @@ export function LookbackScaffold({
           ]}
           onContentSizeChange={scrollProps.onContentSizeChange}
           onScroll={scrollProps.onScroll}
+          onScrollBeginDrag={scrollProps.onScrollBeginDrag}
           scrollEventThrottle={16}
           keyboardShouldPersistTaps="handled"
         >

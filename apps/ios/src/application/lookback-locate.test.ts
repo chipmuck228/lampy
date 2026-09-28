@@ -30,6 +30,28 @@ describe('lookback locate scroll coordinates', () => {
     expect(consume).toHaveBeenCalledWith(1744);
   });
 
+  it('drops a late measure after the locate is no longer current', () => {
+    const consume = jest.fn();
+    let current = true;
+    let onAnchor: ((x: number, y: number, width: number, height: number) => void) | undefined;
+    let onScroll: ((x: number, y: number, width: number, height: number) => void) | undefined;
+    requestLookbackLocate({
+      measureAnchorWindow: (callback) => {
+        onAnchor = callback;
+      },
+      measureScrollWindow: (callback) => {
+        onScroll = callback;
+      },
+      readOffset: () => 0,
+      isCurrent: () => current,
+      consume,
+    });
+    onAnchor?.(0, 1840, 390, 48);
+    current = false;
+    onScroll?.(0, 120, 390, 844);
+    expect(consume).not.toHaveBeenCalled();
+  });
+
   it('falls back to the same container coordinates when window measure is missing', () => {
     const consume = jest.fn();
     requestLookbackLocate({

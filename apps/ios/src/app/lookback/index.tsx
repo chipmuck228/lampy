@@ -360,7 +360,7 @@ export default function LookbackIndexScreen() {
                             entry={entry}
                             selected={selected}
                             onPress={() => {
-                              void loadDay(chapter.year, month.month, entry.day, entry.count);
+                              void loadDay(chapter.year, month.month, entry.day, entry.count, true);
                             }}
                           />
                           {dayState?.status === 'loading' ? (
@@ -373,7 +373,7 @@ export default function LookbackIndexScreen() {
                               accessibilityRole="button"
                               accessibilityLabel="重试打开这一天"
                               testID="lookback-book-day-retry"
-                              onPress={() => void loadDay(chapter.year, month.month, entry.day, entry.count)}
+                              onPress={() => void loadDay(chapter.year, month.month, entry.day, entry.count, true)}
                               style={lookbackStyles.hit}
                             >
                               <Text style={lookbackStyles.action}>
