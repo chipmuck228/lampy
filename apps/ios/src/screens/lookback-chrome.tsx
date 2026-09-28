@@ -44,6 +44,7 @@ export function LookbackScaffold({
   children,
   footer,
   root,
+  onBack,
   onGoRecent,
   onLeave,
   onFamily,
@@ -53,6 +54,7 @@ export function LookbackScaffold({
   children: ReactNode;
   footer?: ReactNode;
   root?: boolean;
+  onBack?: () => void;
   onGoRecent?: () => void;
   onLeave?: () => void;
   onFamily?: () => void;
@@ -74,7 +76,7 @@ export function LookbackScaffold({
           accessibilityRole="button"
           accessibilityLabel="返回原来的位置"
           testID="lookback-back"
-          onPress={() => router.back()}
+          onPress={() => (onBack ? onBack() : router.back())}
           style={styles.backHit}
         >
           <Text style={styles.back}>返回原来的位置</Text>

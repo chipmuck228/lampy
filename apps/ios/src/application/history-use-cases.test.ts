@@ -115,6 +115,11 @@ describe('history lookback use cases', () => {
     const years = await app.getHistoryYears();
     expect(years.years.map((item) => item.year)).toEqual([2026]);
     expect(years.unknownCount).toBe(1);
+    const book = await app.getLookbackBook();
+    expect(book.unknownCount).toBe(1);
+    expect(book.years[0].months.map((month) => month.month)).toEqual([1]);
+    expect(book.years[0].yearUnconfirmedCount).toBe(1);
+    expect(book.years[0].months[0].count).toBe(3);
 
     const year = await app.getHistoryYear(2026);
     if ('invalid' in year) throw new Error('expected year');

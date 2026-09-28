@@ -25,6 +25,8 @@ import {
   type HistoryListedMoment,
   type HistoryUnconfirmedView,
 } from '../projections/history-projection';
+import type { LookbackBookView } from './lookback-book';
+import { lookbackYearPage } from './lookback-year';
 import { projectFeeling, type FeelingView } from './feeling';
 import type { AudioView, ImageView, UnknownMediaView } from './use-cases';
 
@@ -96,6 +98,29 @@ export function createHistoryUseCases(deps: {
       if (momentCount > 0) years.push({ year, momentCount });
     }
     return projectHistoryYearIndexFromCounts(years, unknownCount);
+  }
+
+  async function getLookbackBook(): Promise<LookbackBookView> {
+    const index = await getHistoryYears();
+    const years = [];
+    for (const row of index.years) {
+      const detail = await getHistoryYear(row.year);
+      if ('invalid' in detail) continue;
+      const page = lookbackYearPage(detail);
+      years.push({
+        year: row.year,
+        momentCount: row.momentCount,
+        title: page.title,
+        yearUnconfirmedCount: page.yearUnconfirmedCount,
+        yearUnconfirmedLabel: page.yearUnconfirmedLabel,
+        months: page.entries,
+      });
+    }
+    return {
+      unknownCount: index.unknownCount,
+      years,
+      isEmpty: index.isEmpty,
+    };
   }
 
   async function getHistoryYear(year: number) {
@@ -205,6 +230,7 @@ export function createHistoryUseCases(deps: {
 
   return {
     getHistoryYears,
+    getLookbackBook,
     getHistoryYear,
     getHistoryMonth,
     getHistoryDay,

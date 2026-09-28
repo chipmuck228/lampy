@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
 import { Pressable, Text } from 'react-native';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../../../application/container';
 import { HISTORY_PAGE_SIZE, type HistoryDayViewModel } from '../../../../application/history-use-cases';
+import { lookbackBookIntentFromParts } from '../../../../application/lookback-book';
 import { lookbackDayEntries } from '../../../../application/lookback-day';
+import { writeLookbackBookIntent } from '../../../../application/lookback-session';
 import { pad2 } from '../../../../domain-adapters/calendar';
 import {
   LookbackMessage,
@@ -13,17 +15,26 @@ import {
   momentHref,
 } from '../../../../screens/lookback-chrome';
 import { LookbackDayMoment } from '../../../../screens/lookback-day';
+import {
+  firstSearchParam,
+  forgetLookbackBookOrigin,
+  goToLookbackBookFromDay,
+  shouldBackToLookbackBook,
+} from '../../../../screens/lookback-origin';
 
 export default function LookbackDayScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{
     year?: string | string[];
     month?: string | string[];
     day?: string | string[];
+    b?: string | string[];
   }>();
   const year = Number(Array.isArray(params.year) ? params.year[0] : params.year);
   const month = Number(Array.isArray(params.month) ? params.month[0] : params.month);
   const day = Number(Array.isArray(params.day) ? params.day[0] : params.day);
+  const bookToken = firstSearchParam(params.b);
   const [view, setView] = useState<HistoryDayViewModel | { invalid: true } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
@@ -54,8 +65,27 @@ export default function LookbackDayScreen() {
 
   const ready = view && !('invalid' in view) ? view : null;
 
+  function leaveDay() {
+    const intent = lookbackBookIntentFromParts({
+      year: String(year),
+      month: String(month),
+      day: String(day),
+    });
+    if (intent) writeLookbackBookIntent(intent);
+    const openedFromBook = shouldBackToLookbackBook({
+      originToken: bookToken,
+      navigationState: navigation.getState?.(),
+    });
+    goToLookbackBookFromDay(router, openedFromBook);
+    forgetLookbackBookOrigin(bookToken);
+  }
+
   return (
-    <LookbackScaffold title={ready?.title || `${year}年${month}月${day}日`} path={path}>
+    <LookbackScaffold
+      title={ready?.title || `${year}年${month}月${day}日`}
+      path={path}
+      onBack={leaveDay}
+    >
       {error ? <LookbackMessage>{error}</LookbackMessage> : null}
       {view && 'invalid' in view ? <LookbackMessage>日历上没有这一天。</LookbackMessage> : null}
       {ready?.isEmpty ? <LookbackMessage>这一天还没有留下什么。</LookbackMessage> : null}
