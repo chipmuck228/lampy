@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -8,17 +8,18 @@ import {
   rememberLookbackScroll,
   resetLookbackSessionForTests,
 } from '../application/lookback-session';
-import LookbackIndexScreen from '../app/lookback/index';
-import LookbackYearScreen from '../app/lookback/[year]/index';
 import LookbackDayScreen from '../app/lookback/[year]/[month]/[day]';
 import LookbackUnconfirmedScreen from '../app/lookback/unconfirmed';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
 const mockDismissTo = jest.fn();
 const mockGetState = jest.fn();
+const mockGetLookbackBook = jest.fn();
 const mockGetHistoryYears = jest.fn();
 const mockGetHistoryYear = jest.fn();
+const mockGetHistoryMonth = jest.fn();
 const mockGetHistoryDay = jest.fn();
 const mockGetHistoryUnknown = jest.fn();
 const mockSearchParams: Record<string, string> = {
@@ -35,7 +36,7 @@ jest.mock('expo-router', () => {
     useRouter: () => ({
       push: mockPush,
       back: mockBack,
-      replace: jest.fn(),
+      replace: mockReplace,
       dismissTo: mockDismissTo,
     }),
     useFocusEffect: (effect: () => void | (() => void)) => {
@@ -50,8 +51,10 @@ jest.mock('expo-router', () => {
 
 jest.mock('../application/container', () => ({
   getUseCases: async () => ({
+    getLookbackBook: mockGetLookbackBook,
     getHistoryYears: mockGetHistoryYears,
     getHistoryYear: mockGetHistoryYear,
+    getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
     getHistoryUnknown: mockGetHistoryUnknown,
   }),
@@ -72,9 +75,13 @@ function wrap(ui: ReactElement) {
 
 describe('lookback screens', () => {
   beforeEach(() => {
+    cleanup();
     mockPush.mockReset();
+    mockReplace.mockReset();
+    mockGetLookbackBook.mockReset();
     mockGetHistoryYears.mockReset();
     mockGetHistoryYear.mockReset();
+    mockGetHistoryMonth.mockReset();
     mockGetHistoryDay.mockReset();
     mockGetHistoryUnknown.mockReset();
     mockBack.mockReset();
@@ -83,138 +90,16 @@ describe('lookback screens', () => {
     mockGetState.mockReturnValue({ index: 0, routes: [{ name: 'lookback/index' }] });
     delete mockSearchParams.from;
     delete mockSearchParams.o;
+    delete mockSearchParams.b;
+    mockSearchParams.year = '2026';
+    mockSearchParams.month = '01';
+    mockSearchParams.day = '02';
+    mockSearchParams.id = 'm_exact';
     resetLookbackSessionForTests();
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 2, fontScale: 1 },
     });
-  });
-
-  it('opens a year from the lookback entrance', async () => {
-    mockGetHistoryYears.mockResolvedValue({
-      years: [
-        {
-          year: 2026,
-          monthCounts: Array.from({ length: 12 }, () => 0),
-          filledMonths: 0,
-          quietMonths: 12,
-          yearUnconfirmedCount: 0,
-          momentCount: 2,
-        },
-      ],
-      unknownCount: 1,
-      isEmpty: false,
-    });
-    const view = await render(wrap(<LookbackIndexScreen />));
-    await waitFor(() => {
-      expect(view.getByLabelText('2026年，有2条记录')).toBeTruthy();
-    });
-    expect(view.getByLabelText('时间未确认，有1条记录')).toBeTruthy();
-    fireEvent.press(view.getByTestId('lookback-year-2026'));
-    expect(mockPush).toHaveBeenCalledWith('/lookback/2026');
-    expect(view.getByTestId('root-nav-band')).toBeTruthy();
-    expect(view.queryByTestId('lookback-back')).toBeNull();
-  });
-
-  it('keeps empty months and opens the selected month', async () => {
-    mockGetHistoryYear.mockResolvedValue({
-      year: 2026,
-      title: '2026年',
-      yearUnconfirmedCount: 0,
-      yearUnconfirmedLabel: '这一年，月份未确认',
-      months: Array.from({ length: 12 }, (_, index) => ({
-        month: index + 1,
-        label: `2026年${index + 1}月`,
-        count: index === 0 ? 2 : 0,
-        status: index === 0 ? 'filled' : 'quiet',
-        summary: index === 0 ? '有2条记录' : '安静',
-      })),
-    });
-    const view = await render(wrap(<LookbackYearScreen />));
-    await waitFor(() => {
-      expect(view.getByTestId('lookback-month-2026-01')).toBeTruthy();
-    });
-    expect(view.getAllByLabelText('2026年1月，有2条记录').length).toBeGreaterThan(0);
-    expect(view.getByLabelText('2026年4月，安静')).toBeTruthy();
-    expect(view.queryByTestId('lookback-month-2026-04')).toBeNull();
-    expect(view.getByTestId('lookback-month-quiet-2026-04')).toBeTruthy();
-    expect(view.getByText('1月 · 有2条记录')).toBeTruthy();
-    fireEvent.press(view.getByTestId('lookback-month-2026-01'));
-    expect(mockPush).toHaveBeenCalledWith('/lookback/2026/01');
-    expect(view.queryByTestId('root-nav-band')).toBeNull();
-    expect(view.getByTestId('lookback-back')).toBeTruthy();
-  });
-
-  it('keeps month-precision-unconfirmed records off the year grid', async () => {
-    mockGetHistoryYear.mockResolvedValue({
-      year: 2026,
-      title: '2026年',
-      yearUnconfirmedCount: 1,
-      yearUnconfirmedLabel: '这一年，月份未确认',
-      months: Array.from({ length: 12 }, (_, index) => ({
-        month: index + 1,
-        label: `2026年${index + 1}月`,
-        count: 0,
-        status: 'quiet',
-        summary: '安静',
-      })),
-    });
-    const view = await render(wrap(<LookbackYearScreen />));
-    await waitFor(() => {
-      expect(view.getByLabelText('这一年，月份未确认，有1条记录')).toBeTruthy();
-    });
-    fireEvent.press(view.getByTestId('lookback-year-unconfirmed-2026'));
-    expect(mockPush).toHaveBeenCalledWith('/lookback/2026/unconfirmed');
-    expect(view.queryByTestId('lookback-year-entries')).toBeNull();
-  });
-
-  it('shows a quiet empty year without inventing month buttons', async () => {
-    mockGetHistoryYear.mockResolvedValue({
-      year: 2026,
-      title: '2026年',
-      yearUnconfirmedCount: 0,
-      yearUnconfirmedLabel: '这一年，月份未确认',
-      months: Array.from({ length: 12 }, (_, index) => ({
-        month: index + 1,
-        label: `2026年${index + 1}月`,
-        count: 0,
-        status: 'quiet',
-        summary: '安静',
-      })),
-    });
-    const view = await render(wrap(<LookbackYearScreen />));
-    await waitFor(() => {
-      expect(view.getByText('这一年还没有留下什么。')).toBeTruthy();
-    });
-    expect(view.queryByTestId('lookback-year-entries')).toBeNull();
-    expect(view.queryByTestId('lookback-month-2026-01')).toBeNull();
-  });
-
-  it('hides the year grid at large type and still opens a filled month from the list', async () => {
-    Dimensions.set({
-      window: { width: 768, height: 1024, scale: 2, fontScale: 1.3 },
-      screen: { width: 768, height: 1024, scale: 2, fontScale: 1.3 },
-    });
-    mockGetHistoryYear.mockResolvedValue({
-      year: 2026,
-      title: '2026年',
-      yearUnconfirmedCount: 0,
-      yearUnconfirmedLabel: '这一年，月份未确认',
-      months: Array.from({ length: 12 }, (_, index) => ({
-        month: index + 1,
-        label: `2026年${index + 1}月`,
-        count: index === 8 ? 1 : 0,
-        status: index === 8 ? 'filled' : 'quiet',
-        summary: index === 8 ? '有1条记录' : '安静',
-      })),
-    });
-    const view = await render(wrap(<LookbackYearScreen />));
-    await waitFor(() => {
-      expect(view.getByTestId('lookback-year-entries')).toBeTruthy();
-    });
-    expect(view.queryByTestId('lookback-year-months')).toBeNull();
-    fireEvent.press(view.getByTestId('lookback-month-entry-2026-09'));
-    expect(mockPush).toHaveBeenCalledWith('/lookback/2026/09');
   });
 
   it('keeps failed photos and sound on a lookback day, then returns to the same date', async () => {

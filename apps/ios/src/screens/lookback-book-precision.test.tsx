@@ -1,18 +1,14 @@
 import type { ReactElement } from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
-import { resetLookbackOriginsForTests } from './lookback-origin';
+import { resetLookbackSessionForTests } from '../application/lookback-session';
 
 const mockPush = jest.fn();
-const mockBack = jest.fn();
-const mockDismissTo = jest.fn();
-const mockGetState = jest.fn();
 const mockGetLookbackBook = jest.fn();
-const mockGetHistoryYears = jest.fn();
-const mockSearchParams: Record<string, string> = {};
+const mockGetHistoryMonth = jest.fn();
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -20,16 +16,16 @@ jest.mock('expo-router', () => {
   return {
     useRouter: () => ({
       push: mockPush,
-      back: mockBack,
+      back: jest.fn(),
       replace: jest.fn(),
-      dismissTo: mockDismissTo,
+      dismissTo: jest.fn(),
     }),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
-    useLocalSearchParams: () => mockSearchParams,
+    useLocalSearchParams: () => ({}),
     useNavigation: () => ({
-      getState: mockGetState,
+      getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
     }),
   };
 });
@@ -37,7 +33,8 @@ jest.mock('expo-router', () => {
 jest.mock('../application/container', () => ({
   getUseCases: async () => ({
     getLookbackBook: mockGetLookbackBook,
-    getHistoryYears: mockGetHistoryYears,
+    getHistoryMonth: mockGetHistoryMonth,
+    getHistoryDay: jest.fn(),
   }),
 }));
 
@@ -62,54 +59,65 @@ function wrap(ui: ReactElement) {
   );
 }
 
-describe('lookback origin on the root screen', () => {
+describe('lookback book precision rows', () => {
   beforeEach(() => {
+    cleanup();
     mockPush.mockReset();
-    mockBack.mockReset();
-    mockDismissTo.mockReset();
     mockGetLookbackBook.mockReset();
-    mockGetHistoryYears.mockReset();
-    mockGetState.mockReset();
-    Object.keys(mockSearchParams).forEach((key) => {
-      delete mockSearchParams[key];
-    });
-    resetLookbackOriginsForTests();
+    mockGetHistoryMonth.mockReset();
+    resetLookbackSessionForTests();
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 2, fontScale: 1 },
     });
   });
 
-  it('does not treat lampy://lookback?from=recent or ?o=invalid as a Recent push', async () => {
+  it('keeps year-precision outside months and month-precision off the date list', async () => {
     mockGetLookbackBook.mockResolvedValue({
       unknownCount: 0,
       isEmpty: false,
       years: [
         {
           year: 2026,
-          momentCount: 2,
+          momentCount: 3,
           title: '2026年',
-          yearUnconfirmedCount: 0,
+          yearUnconfirmedCount: 1,
           yearUnconfirmedLabel: '这一年，月份未确认',
-          months: [],
+          months: [{ month: 4, label: '4月', count: 2, summary: '有2条记录' }],
         },
       ],
     });
-    mockSearchParams.from = 'recent';
-    mockSearchParams.o = 'invalid';
-    mockGetState.mockReturnValue({
-      index: 1,
-      routes: [{ name: 'index' }, { name: 'lookback/index' }],
+    mockGetHistoryMonth.mockResolvedValue({
+      year: 2026,
+      month: 4,
+      title: '2026年4月',
+      dayUnconfirmedCount: 2,
+      dayUnconfirmedLabel: '日子未确认',
+      isEmpty: false,
+      days: Array.from({ length: 30 }, (_, index) => ({
+        day: index + 1,
+        label: `4月${index + 1}日`,
+        count: 0,
+        status: 'quiet',
+        summary: '安静',
+      })),
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-year-2026')).toBeTruthy();
+      expect(view.getByTestId('lookback-book-year-unconfirmed-2026')).toBeTruthy();
     });
-    fireEvent.press(view.getByTestId('lookback-go-recent'));
-    expect(mockDismissTo).toHaveBeenCalledWith('/');
-    expect(mockBack).not.toHaveBeenCalled();
-    fireEvent.press(view.getByTestId('lookback-leave'));
-    expect(mockPush).toHaveBeenCalledWith('/leave?from=lookback');
-    await view.unmount();
+    fireEvent.press(view.getByTestId('lookback-book-year-unconfirmed-2026'));
+    expect(mockPush).toHaveBeenCalledWith('/lookback/2026/unconfirmed');
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-month-2026-04'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-day-unconfirmed-2026-04')).toBeTruthy();
+    });
+    expect(view.queryByTestId(/lookback-book-day-2026-04-/)).toBeNull();
+    view.unmount();
   });
 });

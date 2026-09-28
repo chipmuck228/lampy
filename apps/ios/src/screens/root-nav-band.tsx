@@ -138,6 +138,7 @@ export function RootReadingLayout({
   children,
   scrollRef,
   onScroll,
+  onScrollBeginDrag,
   onContentSizeChange,
 }: {
   accessibilityLabel?: string;
@@ -147,6 +148,7 @@ export function RootReadingLayout({
   children: ReactNode;
   scrollRef?: Ref<ScrollView>;
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onScrollBeginDrag?: () => void;
   onContentSizeChange?: () => void;
 }) {
   const { width, height, fontScale } = useWindowDimensions();
@@ -162,6 +164,7 @@ export function RootReadingLayout({
           style={styles.scroll}
           contentContainerStyle={contentContainerStyle}
           onScroll={onScroll}
+          onScrollBeginDrag={onScrollBeginDrag}
           onContentSizeChange={onContentSizeChange}
           scrollEventThrottle={16}
           keyboardShouldPersistTaps="handled"

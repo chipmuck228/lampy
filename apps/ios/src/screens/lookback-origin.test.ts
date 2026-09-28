@@ -1,15 +1,21 @@
 import {
   finishLeaveToRecent,
   firstSearchParam,
+  forgetLookbackBookOrigin,
   forgetLookbackOrigin,
+  goToLookbackBookFromDay,
   goToRecentFromLookbackRoot,
   issueLookbackOrigin,
   leaveHref,
   leaveOpenedFromLookback,
+  lookbackBookOriginWasIssued,
+  lookbackDayHrefFromBook,
   lookbackOriginWasIssued,
   lookbackRootHrefFromRecent,
+  previousRouteIsLookbackRoot,
   previousRouteIsRecent,
   resetLookbackOriginsForTests,
+  shouldBackToLookbackBook,
   shouldBackToRecent,
 } from './lookback-origin';
 
@@ -118,6 +124,39 @@ describe('lookback origin is bound to this push, not a URL guess', () => {
     expect(router.dismissTo).toHaveBeenCalledWith('/');
     expect(router.replace).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('returns from a day page to the book without guessing canGoBack', () => {
+    const href = lookbackDayHrefFromBook(2026, 9, 24);
+    expect(href).toMatch(/^\/lookback\/2026\/09\/24\?b=/);
+    const token = firstSearchParam(href.slice('/lookback/2026/09/24?b='.length));
+    expect(lookbackBookOriginWasIssued(token)).toBe(true);
+    expect(
+      shouldBackToLookbackBook({
+        originToken: token,
+        navigationState: {
+          index: 1,
+          routes: [{ name: 'lookback/index' }, { name: 'lookback/[year]/[month]/[day]' }],
+        },
+      }),
+    ).toBe(true);
+    expect(
+      shouldBackToLookbackBook({
+        originToken: token,
+        navigationState: { index: 0, routes: [{ name: 'lookback/[year]/[month]/[day]' }] },
+      }),
+    ).toBe(false);
+    expect(previousRouteIsLookbackRoot({ index: 0, routes: [{ name: 'lookback/index' }] })).toBe(false);
+
+    const fromBook = { back: jest.fn(), dismissTo: jest.fn() };
+    goToLookbackBookFromDay(fromBook, true);
+    expect(fromBook.back).toHaveBeenCalledTimes(1);
+    const cold = { back: jest.fn(), dismissTo: jest.fn() };
+    goToLookbackBookFromDay(cold, false);
+    expect(cold.dismissTo).toHaveBeenCalledWith('/lookback');
+    expect(cold.back).not.toHaveBeenCalled();
+    forgetLookbackBookOrigin(token);
+    expect(lookbackBookOriginWasIssued(token)).toBe(false);
   });
 
   it('keeps Leave copy tied to the entry href', () => {

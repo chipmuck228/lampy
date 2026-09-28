@@ -1,4 +1,8 @@
+import type { LookbackBookIntent } from './lookback-book';
+
 const scrollOffsets = new Map<string, number>();
+let pendingBookIntent: LookbackBookIntent | null = null;
+let bookOpen: { year: number; month: number; day?: number } | null = null;
 
 export function lookbackScrollKey(path: string): string {
   return path;
@@ -12,8 +16,32 @@ export function readLookbackScroll(path: string): number {
   return scrollOffsets.get(path) ?? 0;
 }
 
+export function writeLookbackBookIntent(intent: LookbackBookIntent): void {
+  pendingBookIntent = intent;
+}
+
+export function takeLookbackBookIntent(): LookbackBookIntent | null {
+  const intent = pendingBookIntent;
+  pendingBookIntent = null;
+  return intent;
+}
+
+export function peekLookbackBookIntentForTests(): LookbackBookIntent | null {
+  return pendingBookIntent;
+}
+
+export function rememberLookbackBookOpen(open: { year: number; month: number; day?: number } | null): void {
+  bookOpen = open;
+}
+
+export function readLookbackBookOpen(): { year: number; month: number; day?: number } | null {
+  return bookOpen;
+}
+
 export function resetLookbackSessionForTests(): void {
   scrollOffsets.clear();
+  pendingBookIntent = null;
+  bookOpen = null;
 }
 
 /**
