@@ -17,6 +17,7 @@ import {
   forgetLookbackOrigin,
   goToRecentFromLookbackRoot,
   leaveHref,
+  lookbackYearHrefFromRoot,
   shouldBackToRecent,
 } from '../../screens/lookback-origin';
 
@@ -87,7 +88,7 @@ export default function LookbackIndexScreen() {
             accessibilityRole="button"
             accessibilityLabel={`${year.year}年，有${year.momentCount}条记录`}
             testID={`lookback-year-${year.year}`}
-            onPress={() => router.push(lookbackHref(`/lookback/${year.year}`))}
+            onPress={() => router.push(lookbackHref(lookbackYearHrefFromRoot(year.year)))}
             style={lookbackStyles.cell}
           >
             <Text style={lookbackStyles.action}>{year.year}年</Text>

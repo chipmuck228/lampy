@@ -2,6 +2,7 @@ export const LEAVE_FROM_RECENT = 'recent';
 export const LEAVE_FROM_LOOKBACK = 'lookback';
 
 const issuedOrigins = new Set<string>();
+const issuedYearOrigins = new Set<string>();
 
 export function firstSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0];
@@ -10,6 +11,7 @@ export function firstSearchParam(value: string | string[] | undefined): string |
 
 export function resetLookbackOriginsForTests(): void {
   issuedOrigins.clear();
+  issuedYearOrigins.clear();
 }
 
 export function issueLookbackOrigin(): string {
@@ -73,4 +75,57 @@ export function goToRecentFromLookbackRoot(
 
 export function finishLeaveToRecent(router: { dismissTo: (href: '/') => void }): void {
   router.dismissTo('/');
+}
+
+export function issueLookbackYearOrigin(): string {
+  const token = `ly${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  issuedYearOrigins.add(token);
+  return token;
+}
+
+export function forgetLookbackYearOrigin(token: string | string[] | undefined): void {
+  const value = firstSearchParam(token);
+  if (value) issuedYearOrigins.delete(value);
+}
+
+export function lookbackYearOriginWasIssued(token: string | string[] | undefined): boolean {
+  const value = firstSearchParam(token);
+  return !!value && issuedYearOrigins.has(value);
+}
+
+export function lookbackYearHrefFromRoot(year: number): `/lookback/${number}?y=${string}` {
+  return `/lookback/${year}?y=${issueLookbackYearOrigin()}`;
+}
+
+export function isLookbackRootStackRoute(route?: { name?: string }): boolean {
+  const name = route?.name ?? '';
+  return name === 'lookback/index' || name === 'lookback' || name === 'lookback/index.tsx';
+}
+
+export function previousRouteIsLookbackRoot(state?: {
+  index?: number;
+  routes?: { name?: string }[];
+}): boolean {
+  if (!state || typeof state.index !== 'number' || state.index < 1) return false;
+  return isLookbackRootStackRoute(state.routes?.[state.index - 1]);
+}
+
+export function shouldBackToLookbackRoot(input: {
+  originToken?: string | string[];
+  navigationState?: { index?: number; routes?: { name?: string }[] };
+}): boolean {
+  return (
+    lookbackYearOriginWasIssued(input.originToken) && previousRouteIsLookbackRoot(input.navigationState)
+  );
+}
+
+export function goToLookbackRootFromYear(
+  router: { back: () => void; dismissTo: (href: '/lookback') => void },
+  openedFromLookbackRoot: boolean,
+): void {
+  if (openedFromLookbackRoot) {
+    router.back();
+    return;
+  }
+  router.dismissTo('/lookback');
 }

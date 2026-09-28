@@ -7,9 +7,12 @@ import { createMemoryMediaStore } from '../infrastructure/media';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 import {
   LOOKBACK_RESTORE_POLICY,
+  readLookbackExpandedMonth,
   readLookbackScroll,
+  rememberLookbackExpandedMonth,
   rememberLookbackScroll,
   resetLookbackSessionForTests,
+  toggleLookbackExpandedMonth,
 } from './lookback-session';
 import {
   AUDIO_MISSING_LABEL,
@@ -533,8 +536,14 @@ describe('history lookback use cases', () => {
     expect(readLookbackScroll('/lookback/2026/03')).toBe(180);
     expect(LOOKBACK_RESTORE_POLICY).toEqual({
       selectedDate: 'route-params-and-back-stack',
+      expandedMonth: 'in-process-only',
       scrollOffset: 'in-process-only',
       coldStart: 'recent-home',
     });
+    rememberLookbackExpandedMonth(2026, 9);
+    expect(readLookbackExpandedMonth(2026)).toBe(9);
+    expect(toggleLookbackExpandedMonth(2026, 9)).toBeNull();
+    expect(toggleLookbackExpandedMonth(2026, 3)).toBe(3);
+    expect(readLookbackExpandedMonth(2026)).toBe(3);
   });
 });

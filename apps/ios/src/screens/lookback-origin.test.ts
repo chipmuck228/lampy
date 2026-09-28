@@ -2,14 +2,21 @@ import {
   finishLeaveToRecent,
   firstSearchParam,
   forgetLookbackOrigin,
+  forgetLookbackYearOrigin,
+  goToLookbackRootFromYear,
   goToRecentFromLookbackRoot,
   issueLookbackOrigin,
+  issueLookbackYearOrigin,
   leaveHref,
   leaveOpenedFromLookback,
   lookbackOriginWasIssued,
   lookbackRootHrefFromRecent,
+  lookbackYearHrefFromRoot,
+  lookbackYearOriginWasIssued,
+  previousRouteIsLookbackRoot,
   previousRouteIsRecent,
   resetLookbackOriginsForTests,
+  shouldBackToLookbackRoot,
   shouldBackToRecent,
 } from './lookback-origin';
 
@@ -118,6 +125,68 @@ describe('lookback origin is bound to this push, not a URL guess', () => {
     expect(router.dismissTo).toHaveBeenCalledWith('/');
     expect(router.replace).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('backs to lookback root only when the year token was issued and the previous route is lookback', () => {
+    const lookbackThenYear = {
+      index: 1,
+      routes: [{ name: 'lookback/index' }, { name: 'lookback/[year]/index' }],
+    };
+    const href = lookbackYearHrefFromRoot(2026);
+    expect(href).toMatch(/^\/lookback\/2026\?y=[^&]+$/);
+    const token = firstSearchParam(href.slice('/lookback/2026?y='.length));
+    expect(lookbackYearOriginWasIssued(token)).toBe(true);
+    expect(
+      shouldBackToLookbackRoot({
+        originToken: token,
+        navigationState: lookbackThenYear,
+      }),
+    ).toBe(true);
+    expect(
+      shouldBackToLookbackRoot({
+        originToken: token,
+        navigationState: { index: 0, routes: [{ name: 'lookback/[year]/index' }] },
+      }),
+    ).toBe(false);
+    expect(
+      shouldBackToLookbackRoot({
+        originToken: 'stolen',
+        navigationState: lookbackThenYear,
+      }),
+    ).toBe(false);
+    expect(previousRouteIsLookbackRoot(lookbackThenYear)).toBe(true);
+    expect(previousRouteIsLookbackRoot({ index: 0, routes: [{ name: 'lookback/index' }] })).toBe(
+      false,
+    );
+  });
+
+  it('lands on /lookback after a year page with no recorded previous page', () => {
+    const fromRoot = { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn() };
+    goToLookbackRootFromYear(fromRoot, true);
+    expect(fromRoot.back).toHaveBeenCalledTimes(1);
+    expect(fromRoot.dismissTo).not.toHaveBeenCalled();
+
+    const coldMonthLink = { back: jest.fn(), dismissTo: jest.fn(), push: jest.fn() };
+    goToLookbackRootFromYear(coldMonthLink, false);
+    expect(coldMonthLink.dismissTo).toHaveBeenCalledWith('/lookback');
+    expect(coldMonthLink.back).not.toHaveBeenCalled();
+    expect(coldMonthLink.push).not.toHaveBeenCalled();
+  });
+
+  it('forgets the year visit so a later deep link cannot reuse it', () => {
+    const token = issueLookbackYearOrigin();
+    expect(lookbackYearOriginWasIssued(token)).toBe(true);
+    forgetLookbackYearOrigin(token);
+    expect(lookbackYearOriginWasIssued(token)).toBe(false);
+    expect(
+      shouldBackToLookbackRoot({
+        originToken: token,
+        navigationState: {
+          index: 1,
+          routes: [{ name: 'lookback/index' }, { name: 'lookback/[year]/index' }],
+        },
+      }),
+    ).toBe(false);
   });
 
   it('keeps Leave copy tied to the entry href', () => {

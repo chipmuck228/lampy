@@ -47,6 +47,7 @@ export function LookbackScaffold({
   onGoRecent,
   onLeave,
   onFamily,
+  onBack,
 }: {
   title: string;
   path: string;
@@ -56,6 +57,7 @@ export function LookbackScaffold({
   onGoRecent?: () => void;
   onLeave?: () => void;
   onFamily?: () => void;
+  onBack?: () => void;
 }) {
   const router = useRouter();
   const { readingWidth, shortHeight } = useLookbackLayout();
@@ -74,7 +76,7 @@ export function LookbackScaffold({
           accessibilityRole="button"
           accessibilityLabel="返回原来的位置"
           testID="lookback-back"
-          onPress={() => router.back()}
+          onPress={() => (onBack ? onBack() : router.back())}
           style={styles.backHit}
         >
           <Text style={styles.back}>返回原来的位置</Text>
