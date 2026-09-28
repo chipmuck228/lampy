@@ -13,6 +13,7 @@ import {
   type LookbackBookIntent,
   type LookbackBookView,
 } from '../../application/lookback-book';
+import { nextLookbackLocateSeq } from '../../application/lookback-locate';
 import { lookbackMonthPage, type LookbackMonthPage } from '../../application/lookback-month';
 import {
   readLookbackBookOpen,
@@ -67,6 +68,8 @@ export default function LookbackIndexScreen() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [excerpts, setExcerpts] = useState<DayExcerpt | null>(null);
   const [locateKey, setLocateKey] = useState<string | null>(null);
+  const [locateSeq, setLocateSeq] = useState(0);
+  const locateSeqRef = useRef(0);
   const expandGeneration = useRef(0);
   const excerptGeneration = useRef(0);
   const mounted = useRef(true);
@@ -85,6 +88,12 @@ export default function LookbackIndexScreen() {
 
   const persistOpen = useCallback((next: { year: number; month: number; day?: number } | null) => {
     rememberLookbackBookOpen(next);
+  }, []);
+
+  const beginLocate = useCallback((id: string) => {
+    locateSeqRef.current = nextLookbackLocateSeq(locateSeqRef.current);
+    setLocateSeq(locateSeqRef.current);
+    setLocateKey(id);
   }, []);
 
   const clearLocate = useCallback(() => {
@@ -125,16 +134,16 @@ export default function LookbackIndexScreen() {
         if (entry) await loadDayRef.current(year, month, entry.day, entry.count, locate);
         else {
           setSelectedDay(null);
-          if (locate) setLocateKey(lookbackBookLocateId({ year, month }));
+          if (locate) beginLocate(lookbackBookLocateId({ year, month }));
         }
       } else if (locate) {
-        setLocateKey(lookbackBookLocateId({ year, month }));
+        beginLocate(lookbackBookLocateId({ year, month }));
       }
     } catch {
       if (!mounted.current || !lookbackBookResponseIsCurrent(expandGeneration.current, generation)) return;
       setExpand({ year, month, status: 'error' });
     }
-  }, [persistOpen]);
+  }, [beginLocate, persistOpen]);
 
   const loadDay = useCallback(async (
     year: number,
@@ -155,17 +164,17 @@ export default function LookbackIndexScreen() {
       if (!mounted.current || !lookbackBookResponseIsCurrent(excerptGeneration.current, generation)) return;
       if ('invalid' in next) {
         setExcerpts({ day, dayTotal, status: 'ready', items: [] });
-        if (locate) setLocateKey(lookbackBookLocateId({ year, month, day }));
+        if (locate) beginLocate(lookbackBookLocateId({ year, month, day }));
         return;
       }
       setExcerpts({ day, dayTotal, status: 'ready', items: lookbackBookExcerpts(next.items) });
-      if (locate) setLocateKey(lookbackBookLocateId({ year, month, day }));
+      if (locate) beginLocate(lookbackBookLocateId({ year, month, day }));
     } catch {
       if (!mounted.current || !lookbackBookResponseIsCurrent(excerptGeneration.current, generation)) return;
       setExcerpts({ day, dayTotal, status: 'error' });
-      if (locate) setLocateKey(lookbackBookLocateId({ year, month, day }));
+      if (locate) beginLocate(lookbackBookLocateId({ year, month, day }));
     }
-  }, [persistOpen]);
+  }, [beginLocate, persistOpen]);
   useEffect(() => {
     loadDayRef.current = loadDay;
   }, [loadDay]);
@@ -184,12 +193,12 @@ export default function LookbackIndexScreen() {
         setSelectedDay(null);
         setExcerpts(null);
         persistOpen(null);
-        setLocateKey(lookbackBookLocateId(intent));
+        beginLocate(lookbackBookLocateId(intent));
         return;
       }
       if (fallback) await loadMonth(fallback.year, fallback.month, fallback.day);
     },
-    [loadMonth, persistOpen],
+    [beginLocate, loadMonth, persistOpen],
   );
 
   useFocusEffect(
@@ -248,6 +257,7 @@ export default function LookbackIndexScreen() {
       path="/lookback"
       root
       locateKey={locateKey}
+      locateSeq={locateSeq}
       onLocated={clearLocate}
       onGoRecent={() => {
         const openedFromRecent = shouldBackToRecent({

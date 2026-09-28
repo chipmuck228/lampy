@@ -41,7 +41,13 @@ function wrap(ui: ReactElement) {
 function Probe() {
   const [locateKey, setLocateKey] = useState<string | null>('day-2026-09-28');
   return (
-    <LookbackScaffold title="回看" path="/lookback" locateKey={locateKey} onLocated={() => setLocateKey(null)}>
+    <LookbackScaffold
+      title="回看"
+      path="/lookback"
+      locateKey={locateKey}
+      locateSeq={locateKey ? 1 : 0}
+      onLocated={() => setLocateKey(null)}
+    >
       <View>
         <View>
           <LookbackLocateAnchor id="day-2026-09-28" />

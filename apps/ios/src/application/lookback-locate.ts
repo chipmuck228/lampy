@@ -6,6 +6,19 @@ export function lookbackLocateScrollY(offset: number, anchorPageY: number, scrol
   return Math.max(0, offset + (anchorPageY - scrollPageY));
 }
 
+export function nextLookbackLocateSeq(currentSeq: number): number {
+  return currentSeq + 1;
+}
+
+export function lookbackLocateIsCurrent(
+  requestId: string,
+  requestSeq: number,
+  currentId: string | null,
+  currentSeq: number,
+): boolean {
+  return currentId === requestId && currentSeq === requestSeq;
+}
+
 export function requestLookbackLocate(input: {
   measureAnchorWindow?: LookbackWindowMeasure | null;
   measureScrollWindow?: LookbackWindowMeasure | null;

@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type ReactNode,
@@ -23,7 +24,7 @@ import { RootNavBand, RootReadingLayout } from './root-nav-band';
 
 import type { FeelingView } from '../application/feeling';
 import { LOOKBACK_PAGE_GUTTER } from '../application/lookback-month';
-import { requestLookbackLocate } from '../application/lookback-locate';
+import { lookbackLocateIsCurrent, requestLookbackLocate } from '../application/lookback-locate';
 import { rememberLookbackScroll, readLookbackScroll } from '../application/lookback-session';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
@@ -40,10 +41,11 @@ export function momentHref(id: string): Href {
 
 type LookbackLocateApi = {
   locateKey: string | null;
+  generation: number;
   scrollRef: RefObject<ScrollView | null>;
   readOffset: () => number;
-  isCurrent: (id: string) => boolean;
-  finishLocate: (id: string) => void;
+  isCurrent: (id: string, seq: number) => boolean;
+  finishLocate: (id: string, seq: number) => void;
 };
 
 const LookbackLocateContext = createContext<LookbackLocateApi | null>(null);
@@ -69,6 +71,7 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
 
   function tryLocate() {
     if (!api || api.locateKey !== id || scrolled.current) return;
+    const seq = api.generation;
     const view = node.current as (View & MeasurableNode) | null;
     const scroll = api.scrollRef.current as (ScrollView & MeasurableNode) | null;
     if (!view || !scroll) return;
@@ -83,12 +86,12 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
             }
           : undefined,
       readOffset: api.readOffset,
-      isCurrent: () => api.isCurrent(id),
+      isCurrent: () => api.isCurrent(id, seq),
       consume: (y) => {
-        if (scrolled.current || !api.isCurrent(id)) return;
+        if (scrolled.current || !api.isCurrent(id, seq)) return;
         scrolled.current = true;
         scroll.scrollTo({ y, animated: false });
-        api.finishLocate(id);
+        api.finishLocate(id, seq);
       },
     });
   }
@@ -130,6 +133,7 @@ export function LookbackScaffold({
   footer,
   root,
   locateKey = null,
+  locateSeq = 0,
   onLocated,
   onBack,
   onGoRecent,
@@ -142,6 +146,7 @@ export function LookbackScaffold({
   footer?: ReactNode;
   root?: boolean;
   locateKey?: string | null;
+  locateSeq?: number;
   onLocated?: () => void;
   onBack?: () => void;
   onGoRecent?: () => void;
@@ -153,20 +158,28 @@ export function LookbackScaffold({
   const scrollRef = useRef<ScrollView>(null);
   const restoreOnce = useRef(false);
   const locateKeyRef = useRef(locateKey);
+  const locateSeqRef = useRef(locateSeq);
   const onLocatedRef = useRef(onLocated);
-  locateKeyRef.current = locateKey;
-  onLocatedRef.current = onLocated;
+  useLayoutEffect(() => {
+    locateKeyRef.current = locateKey;
+    locateSeqRef.current = locateSeq;
+    onLocatedRef.current = onLocated;
+  });
   const locate = useMemo(
     () => ({
       locateKey,
+      generation: locateKey ? locateSeq : 0,
       scrollRef,
       readOffset: () => readLookbackScroll(path),
-      isCurrent: (id: string) => locateKeyRef.current === id,
-      finishLocate: (id: string) => {
-        if (locateKeyRef.current === id) onLocatedRef.current?.();
+      isCurrent: (id: string, seq: number) =>
+        lookbackLocateIsCurrent(id, seq, locateKeyRef.current, locateSeqRef.current),
+      finishLocate: (id: string, seq: number) => {
+        if (lookbackLocateIsCurrent(id, seq, locateKeyRef.current, locateSeqRef.current)) {
+          onLocatedRef.current?.();
+        }
       },
     }),
-    [locateKey, path],
+    [locateKey, locateSeq, path],
   );
 
   useFocusEffect(() => {

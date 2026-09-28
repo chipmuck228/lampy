@@ -1,4 +1,9 @@
-import { lookbackLocateScrollY, requestLookbackLocate } from './lookback-locate';
+import {
+  lookbackLocateIsCurrent,
+  lookbackLocateScrollY,
+  nextLookbackLocateSeq,
+  requestLookbackLocate,
+} from './lookback-locate';
 
 describe('lookback locate scroll coordinates', () => {
   it('places the anchor in the scroll container from window positions', () => {
@@ -49,6 +54,34 @@ describe('lookback locate scroll coordinates', () => {
     onAnchor?.(0, 1840, 390, 48);
     current = false;
     onScroll?.(0, 120, 390, 844);
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it('drops the first day-10 measure after a staggered 10→28→10', () => {
+    const consume = jest.fn();
+    let currentId: string | null = 'day-2026-09-10';
+    let currentSeq = 1;
+    let firstAnchor: ((x: number, y: number, width: number, height: number) => void) | undefined;
+    let firstScroll: ((x: number, y: number, width: number, height: number) => void) | undefined;
+    requestLookbackLocate({
+      measureAnchorWindow: (callback) => {
+        firstAnchor = callback;
+      },
+      measureScrollWindow: (callback) => {
+        firstScroll = callback;
+      },
+      readOffset: () => 0,
+      isCurrent: () => lookbackLocateIsCurrent('day-2026-09-10', 1, currentId, currentSeq),
+      consume,
+    });
+    firstAnchor?.(0, 400, 390, 48);
+    currentId = 'day-2026-09-28';
+    currentSeq = nextLookbackLocateSeq(currentSeq);
+    currentId = 'day-2026-09-10';
+    currentSeq = nextLookbackLocateSeq(currentSeq);
+    expect(lookbackLocateIsCurrent('day-2026-09-10', 1, currentId, currentSeq)).toBe(false);
+    expect(lookbackLocateIsCurrent('day-2026-09-10', 3, currentId, currentSeq)).toBe(true);
+    firstScroll?.(0, 120, 390, 844);
     expect(consume).not.toHaveBeenCalled();
   });
 
