@@ -5,6 +5,7 @@ import {
 } from '../domain-adapters/moment-commands';
 import { createMemoryMediaStore } from '../infrastructure/media';
 import { createMemoryRepositories } from '../infrastructure/repositories';
+import { lookbackMonthPage } from './lookback-month';
 import {
   LOOKBACK_RESTORE_POLICY,
   readLookbackExpandedMonth,
@@ -14,6 +15,7 @@ import {
   resetLookbackSessionForTests,
   toggleLookbackExpandedMonth,
 } from './lookback-session';
+import { lookbackYearPage } from './lookback-year';
 import {
   AUDIO_MISSING_LABEL,
   AUDIO_UNPLAYABLE_LABEL,
@@ -167,6 +169,53 @@ describe('history lookback use cases', () => {
     const monthUnconfirmed = await app.getHistoryMonthUnconfirmed(2026, 1);
     if ('invalid' in monthUnconfirmed) throw new Error('expected month unconfirmed');
     expect(monthUnconfirmed.items.map((item) => item.id)).toEqual(['m_month']);
+  });
+
+  it('lets a month-precision-only month expand with 日子未确认 and no day rows', async () => {
+    const { app, repos } = createHistoryApp();
+    await saveMoment({
+      repos,
+      id: 'm_march_a',
+      note: '只要三月',
+      recordedAt: '2026-09-01T12:00:00.000Z',
+      occurredAt: '2026-03-08T00:00:00.000Z',
+      precision: 'month',
+    });
+    await saveMoment({
+      repos,
+      id: 'm_march_b',
+      note: '也是三月',
+      recordedAt: '2026-09-02T12:00:00.000Z',
+      occurredAt: '2026-03-22T00:00:00.000Z',
+      precision: 'month',
+    });
+
+    const year = await app.getHistoryYear(2026);
+    if ('invalid' in year) throw new Error('expected year');
+    expect(year.months[2]).toMatchObject({
+      month: 3,
+      count: 2,
+      status: 'filled',
+      summary: '有2条记录',
+    });
+    expect(year.months.filter((month) => month.status === 'filled')).toHaveLength(1);
+    expect(lookbackYearPage(year).entries).toEqual([
+      { month: 3, label: '3月', count: 2, summary: '有2条记录' },
+    ]);
+
+    const march = await app.getHistoryMonth(2026, 3);
+    if ('invalid' in march) throw new Error('expected month');
+    expect(march.days.every((day) => day.count === 0)).toBe(true);
+    expect(march.dayUnconfirmedCount).toBe(2);
+    const expand = lookbackMonthPage(march);
+    expect(expand.entries).toEqual([]);
+    expect(expand.dayUnconfirmedCount).toBe(2);
+    expect(expand.isEmpty).toBe(false);
+
+    const shelf = await app.getHistoryMonthUnconfirmed(2026, 3);
+    if ('invalid' in shelf) throw new Error('expected month unconfirmed');
+    expect(shelf.items.map((item) => item.id)).toEqual(['m_march_a', 'm_march_b']);
+    expect(shelf.title).toBe('2026年3月，日子未确认');
   });
 
   it('does not load another year when reading one year of a long archive', async () => {

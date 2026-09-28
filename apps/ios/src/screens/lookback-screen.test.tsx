@@ -15,6 +15,11 @@ import LookbackYearScreen from '../app/lookback/[year]/index';
 import LookbackDayScreen from '../app/lookback/[year]/[month]/[day]';
 import LookbackUnconfirmedScreen from '../app/lookback/unconfirmed';
 import { LOOKBACK_MONTH_EXPAND_ERROR } from '../application/lookback-month';
+import { createUseCases } from '../application/use-cases';
+import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
+import { activateMoment, createDraftMoment } from '../domain-adapters/moment-commands';
+import { createMemoryMediaStore } from '../infrastructure/media';
+import { createMemoryRepositories } from '../infrastructure/repositories';
 import { projectHistoryMonthFromCounts } from '../projections/history-projection';
 import {
   issueLookbackYearOrigin,
@@ -67,6 +72,32 @@ jest.mock('../application/container', () => ({
     getHistoryUnknown: mockGetHistoryUnknown,
   }),
 }));
+
+async function saveHistoryMoment(options: {
+  repos: ReturnType<typeof createMemoryRepositories>;
+  id: string;
+  note: string;
+  recordedAt: string;
+  occurredAt?: string;
+  precision: string;
+}) {
+  const now = new Date(options.recordedAt);
+  let moment = createDraftMoment(
+    {
+      ownerId: LOCAL_OWNER_ID,
+      content: { note: options.note, emotion: '' },
+      time: {
+        recordedAt: options.recordedAt,
+        occurredAt: options.occurredAt,
+        occurredAtPrecision: options.precision,
+      },
+      origin: { type: 'created' },
+    },
+    { now: () => now, ownerId: LOCAL_OWNER_ID, id: () => options.id },
+  );
+  moment = activateMoment(moment, LOCAL_OWNER_ID, now);
+  await options.repos.moments.save(moment);
+}
 
 function wrap(ui: ReactElement) {
   return (
@@ -318,6 +349,48 @@ describe('lookback screens', () => {
     });
     expect(view.queryByText('3月1日 · 有1条记录')).toBeNull();
     expect(view.queryByText('这个月还没有留下什么。')).toBeNull();
+  });
+
+  it('expands repository month-precision records and opens the existing unconfirmed page', async () => {
+    const repos = createMemoryRepositories();
+    const app = createUseCases({
+      ...repos,
+      media: createMemoryMediaStore(),
+      clock: { now: () => new Date('2026-09-24T12:00:00.000Z') },
+      timezoneOffsetMinutes: 0,
+    });
+    await saveHistoryMoment({
+      repos,
+      id: 'm_march_a',
+      note: '只要三月',
+      recordedAt: '2026-09-01T12:00:00.000Z',
+      occurredAt: '2026-03-08T00:00:00.000Z',
+      precision: 'month',
+    });
+    await saveHistoryMoment({
+      repos,
+      id: 'm_march_b',
+      note: '也是三月',
+      recordedAt: '2026-09-02T12:00:00.000Z',
+      occurredAt: '2026-03-22T00:00:00.000Z',
+      precision: 'month',
+    });
+    mockGetHistoryYear.mockImplementation(() => app.getHistoryYear(2026));
+    mockGetHistoryMonth.mockImplementation((year: number, month: number) =>
+      app.getHistoryMonth(year, month),
+    );
+    const view = await render(wrap(<LookbackYearScreen />));
+    await waitFor(() => {
+      expect(view.getByText('3月 · 有2条记录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('lookback-month-entry-2026-03'));
+    await waitFor(() => {
+      expect(view.getByLabelText('这个月，日子未确认，有2条记录')).toBeTruthy();
+    });
+    expect(view.queryByText(/3月\d+日 · 有/)).toBeNull();
+    expect(view.queryByText('这个月还没有留下什么。')).toBeNull();
+    fireEvent.press(view.getByTestId('lookback-year-expand-unconfirmed-2026-03'));
+    expect(mockPush).toHaveBeenCalledWith('/lookback/2026/03/unconfirmed');
   });
 
   it('opens a month deep link by replacing onto the year page with that month expanded', async () => {
