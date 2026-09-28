@@ -116,14 +116,18 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
   );
 }
 
-export function useLookbackLayout() {
-  const { width, height, fontScale } = useWindowDimensions();
+export function lookbackLayoutFor(width: number, height: number, fontScale: number) {
   return {
     readingWidth: Math.min(width, 720),
     verticalTime: width < 600 || fontScale >= 1.3,
     shortHeight: height < 500,
     maxBar: Math.min(width, 720) - 48,
   };
+}
+
+export function useLookbackLayout() {
+  const { width, height, fontScale } = useWindowDimensions();
+  return lookbackLayoutFor(width, height, fontScale);
 }
 
 export function LookbackScaffold({

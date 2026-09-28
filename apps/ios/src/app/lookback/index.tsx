@@ -14,6 +14,7 @@ import {
   type LookbackBookView,
 } from '../../application/lookback-book';
 import { nextLookbackLocateSeq } from '../../application/lookback-locate';
+import { beginLookbackTiming, finishLookbackTiming } from '../../application/lookback-timing';
 import { lookbackMonthPage, type LookbackMonthPage } from '../../application/lookback-month';
 import {
   readLookbackBookOpen,
@@ -158,20 +159,24 @@ export default function LookbackIndexScreen() {
     setSelectedDay(day);
     setExcerpts({ day, dayTotal, status: 'loading' });
     persistOpen({ year, month, day });
+    const dayStarted = beginLookbackTiming();
     try {
       const app = await getUseCases();
       const next = await app.getHistoryDay(year, month, day, 0);
       if (!mounted.current || !lookbackBookResponseIsCurrent(excerptGeneration.current, generation)) return;
       if ('invalid' in next) {
         setExcerpts({ day, dayTotal, status: 'ready', items: [] });
+        finishLookbackTiming('day-excerpts-ready', dayStarted);
         if (locate) beginLocate(lookbackBookLocateId({ year, month, day }));
         return;
       }
       setExcerpts({ day, dayTotal, status: 'ready', items: lookbackBookExcerpts(next.items) });
+      finishLookbackTiming('day-excerpts-ready', dayStarted);
       if (locate) beginLocate(lookbackBookLocateId({ year, month, day }));
     } catch {
       if (!mounted.current || !lookbackBookResponseIsCurrent(excerptGeneration.current, generation)) return;
       setExcerpts({ day, dayTotal, status: 'error' });
+      finishLookbackTiming('day-excerpts-ready', dayStarted);
       if (locate) beginLocate(lookbackBookLocateId({ year, month, day }));
     }
   }, [beginLocate, persistOpen]);
@@ -206,6 +211,7 @@ export default function LookbackIndexScreen() {
       let cancelled = false;
       let consumed: LookbackBookIntent | null = null;
       let applied = false;
+      const bookStarted = beginLookbackTiming();
       getUseCases()
         .then((app) => app.getLookbackBook())
         .then(async (next) => {
@@ -217,6 +223,7 @@ export default function LookbackIndexScreen() {
             return;
           }
           setView(next);
+          finishLookbackTiming('book-first-ready', bookStarted);
           setError(null);
           const fallback = consumed ? null : readLookbackBookOpen();
           await applyIntent(consumed, fallback);
