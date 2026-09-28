@@ -87,6 +87,10 @@ export default function LookbackIndexScreen() {
     rememberLookbackBookOpen(next);
   }, []);
 
+  const clearLocate = useCallback(() => {
+    setLocateKey(null);
+  }, []);
+
   const loadDayRef = useRef<
     (year: number, month: number, day: number, dayTotal: number, locate?: boolean) => Promise<void>
   >(async () => undefined);
@@ -244,6 +248,7 @@ export default function LookbackIndexScreen() {
       path="/lookback"
       root
       locateKey={locateKey}
+      onLocated={clearLocate}
       onGoRecent={() => {
         const openedFromRecent = shouldBackToRecent({
           originToken,

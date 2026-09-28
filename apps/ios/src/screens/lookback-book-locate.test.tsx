@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Dimensions, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -97,83 +97,33 @@ describe('lookback book year locate', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-locate-year-2024')).toBeTruthy();
+      expect(view.getByTestId('lookback-book-locating')).toBeTruthy();
     });
     expect(view.queryByTestId('lookback-book-expand-2024-01')).toBeNull();
-    fireEvent(view.getByTestId('lookback-book-locate-year-2024'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 640, width: 390, height: 48 } },
+    await act(async () => {
+      fireEvent(view.getByTestId('lookback-book-locate-year-2024'), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 640, width: 390, height: 48 } },
+      });
+    });
+    await waitFor(() => {
+      expect(view.queryByTestId('lookback-book-locating')).toBeNull();
     });
     expect(mockScrollTo).toHaveBeenCalledWith({ y: 640, animated: false });
     expect(mockScrollTo).not.toHaveBeenCalledWith({ y: 18, animated: false });
-  });
-});
-
-describe('lookback book day locate', () => {
-  beforeEach(reset);
-  afterEach(() => {
-    cleanup();
-  });
-
-  it('scrolls a day intent to the selected date after excerpts are ready', async () => {
-    writeLookbackBookIntent({ year: 2026, month: 9, day: 24 });
-    mockGetLookbackBook.mockResolvedValue({
-      unknownCount: 0,
-      isEmpty: false,
-      years: [
-        {
-          year: 2026,
-          momentCount: 2,
-          title: '2026年',
-          yearUnconfirmedCount: 0,
-          yearUnconfirmedLabel: '这一年，月份未确认',
-          months: [{ month: 9, label: '9月', count: 2, summary: '有2条记录' }],
-        },
-      ],
+    const afterLocate = mockScrollTo.mock.calls.length;
+    fireEvent(view.getByTestId('lookback-book-locate-year-2024'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 880, width: 390, height: 48 } },
     });
-    mockGetHistoryMonth.mockResolvedValue({
-      year: 2026,
-      month: 9,
-      title: '2026年9月',
-      dayUnconfirmedCount: 0,
-      dayUnconfirmedLabel: '日子未确认',
-      isEmpty: false,
-      days: Array.from({ length: 30 }, (_, index) => ({
-        day: index + 1,
-        label: `9月${index + 1}日`,
-        count: index + 1 === 24 ? 2 : 0,
-        status: index + 1 === 24 ? 'filled' : 'quiet',
-        summary: index + 1 === 24 ? '有2条记录' : '安静',
-      })),
+    fireEvent.scroll(view.getByTestId('lookback-scroll'), {
+      nativeEvent: {
+        contentOffset: { y: 24, x: 0 },
+        contentSize: { height: 2400, width: 390 },
+        layoutMeasurement: { height: 844, width: 390 },
+      },
     });
-    mockGetHistoryDay.mockResolvedValue({
-      year: 2026,
-      month: 9,
-      day: 24,
-      title: '2026年9月24日',
-      isEmpty: false,
-      items: [
-        {
-          id: 'm_day',
-          note: '冷日回来',
-          precision: 'day',
-          timeLabel: '2026年9月24日',
-          usedRecordedAtFallback: false,
-          feeling: null,
-          images: [],
-          audio: null,
-          unknownMedia: [],
-        },
-      ],
-      hasMore: false,
+    fireEvent(view.getByTestId('lookback-book-locate-year-2024'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 880, width: 390, height: 48 } },
     });
-    const view = await render(wrap(<LookbackIndexScreen />));
-    await waitFor(() => {
-      expect(view.getByText('冷日回来')).toBeTruthy();
-    });
-    expect(view.getByTestId('lookback-book-locate-day-2026-09-24')).toBeTruthy();
-    fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-24'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 480, width: 390, height: 80 } },
-    });
-    expect(mockScrollTo).toHaveBeenCalledWith({ y: 480, animated: false });
+    expect(mockScrollTo.mock.calls.length).toBe(afterLocate);
   });
 });

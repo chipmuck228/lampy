@@ -40,6 +40,7 @@ type LookbackLocateApi = {
   locateKey: string | null;
   scrollRef: RefObject<ScrollView | null>;
   readOffset: () => number;
+  finishLocate: (id: string) => void;
 };
 
 const LookbackLocateContext = createContext<LookbackLocateApi | null>(null);
@@ -47,38 +48,69 @@ const LookbackLocateContext = createContext<LookbackLocateApi | null>(null);
 export function LookbackLocateAnchor({ id }: { id: string }) {
   const api = useContext(LookbackLocateContext);
   const node = useRef<View>(null);
+  const scrolled = useRef(false);
   const active = !!api && api.locateKey === id;
 
-  function scrollToY(y: number) {
-    api?.scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: false });
+  useEffect(() => {
+    if (!active) scrolled.current = false;
+  }, [active]);
+
+  function complete(y: number) {
+    if (!api || api.locateKey !== id) return;
+    if (!scrolled.current) {
+      scrolled.current = true;
+      api.scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: false });
+    }
+    api.finishLocate(id);
   }
 
-  function locateFromLayout(fallbackY: number) {
-    if (!active || !api) return;
+  function locateFromMeasure(fallbackY: number) {
+    if (!api || api.locateKey !== id) return;
+    if (scrolled.current) {
+      api.finishLocate(id);
+      return;
+    }
     const scroll = api.scrollRef.current as
       | (ScrollView & { measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void })
       | null;
     const view = node.current;
     if (!scroll || !view) {
-      scrollToY(fallbackY);
+      complete(fallbackY);
       return;
     }
     let settled = false;
     if (typeof view.measureInWindow === 'function' && typeof scroll.measureInWindow === 'function') {
       view.measureInWindow((_x, pageY) => {
         settled = true;
+        let measured = false;
         scroll.measureInWindow?.((_sx: number, scrollPageY: number) => {
-          scrollToY(api.readOffset() + (pageY - scrollPageY));
+          measured = true;
+          complete(api.readOffset() + (pageY - scrollPageY));
         });
+        if (!measured) complete(fallbackY);
       });
     }
-    if (!settled) scrollToY(fallbackY);
+    if (!settled) complete(fallbackY);
   }
 
   useEffect(() => {
-    if (!active) return undefined;
+    if (!active || !api || scrolled.current) return undefined;
     const frame = requestAnimationFrame(() => {
-      locateFromLayout(0);
+      const view = node.current;
+      const scroll = api.scrollRef.current as
+        | (ScrollView & { measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void })
+        | null;
+      if (!view || !scroll) return;
+      if (typeof view.measureInWindow !== 'function' || typeof scroll.measureInWindow !== 'function') return;
+      view.measureInWindow((_x, pageY) => {
+        if (scrolled.current || api.locateKey !== id) return;
+        let measured = false;
+        scroll.measureInWindow?.((_sx: number, scrollPageY: number) => {
+          measured = true;
+          complete(api.readOffset() + (pageY - scrollPageY));
+        });
+        if (!measured) return;
+      });
     });
     return () => cancelAnimationFrame(frame);
   }, [active, api, id]);
@@ -89,7 +121,7 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
       collapsable={false}
       testID={`lookback-book-locate-${id}`}
       onLayout={(event) => {
-        locateFromLayout(event.nativeEvent.layout.y);
+        locateFromMeasure(event.nativeEvent.layout.y);
       }}
     />
   );
@@ -112,6 +144,7 @@ export function LookbackScaffold({
   footer,
   root,
   locateKey = null,
+  onLocated,
   onBack,
   onGoRecent,
   onLeave,
@@ -123,6 +156,7 @@ export function LookbackScaffold({
   footer?: ReactNode;
   root?: boolean;
   locateKey?: string | null;
+  onLocated?: () => void;
   onBack?: () => void;
   onGoRecent?: () => void;
   onLeave?: () => void;
@@ -132,11 +166,18 @@ export function LookbackScaffold({
   const { readingWidth, shortHeight } = useLookbackLayout();
   const scrollRef = useRef<ScrollView>(null);
   const restoreOnce = useRef(false);
+  const locateKeyRef = useRef(locateKey);
+  const onLocatedRef = useRef(onLocated);
+  locateKeyRef.current = locateKey;
+  onLocatedRef.current = onLocated;
   const locate = useMemo(
     () => ({
       locateKey,
       scrollRef,
       readOffset: () => readLookbackScroll(path),
+      finishLocate: (id: string) => {
+        if (locateKeyRef.current === id) onLocatedRef.current?.();
+      },
     }),
     [locateKey, path],
   );
@@ -162,6 +203,9 @@ export function LookbackScaffold({
       <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>
+      {locateKey ? (
+        <View testID="lookback-book-locating" accessibilityLabel={locateKey} />
+      ) : null}
       {children}
       {footer}
     </>
@@ -169,7 +213,10 @@ export function LookbackScaffold({
 
   const scrollProps = {
     onContentSizeChange: () => {
-      if (locateKey) return;
+      if (locateKey) {
+        restoreOnce.current = true;
+        return;
+      }
       if (restoreOnce.current) return;
       restoreOnce.current = true;
       scrollRef.current?.scrollTo({ y: readLookbackScroll(path), animated: false });

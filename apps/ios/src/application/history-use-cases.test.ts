@@ -5,6 +5,7 @@ import {
 } from '../domain-adapters/moment-commands';
 import { createMemoryMediaStore } from '../infrastructure/media';
 import { createMemoryRepositories } from '../infrastructure/repositories';
+import { lookbackBookLocateId } from './lookback-book';
 import {
   LOOKBACK_RESTORE_POLICY,
   readLookbackScroll,
@@ -169,6 +170,39 @@ describe('history lookback use cases', () => {
     const monthUnconfirmed = await app.getHistoryMonthUnconfirmed(2026, 1);
     if ('invalid' in monthUnconfirmed) throw new Error('expected month unconfirmed');
     expect(monthUnconfirmed.items.map((item) => item.id)).toEqual(['m_month']);
+  });
+
+  it('keeps a target year in an isolated multi-year library', async () => {
+    const { app, repos } = createHistoryApp();
+    await saveMoment({
+      repos,
+      id: 'm_2022',
+      note: '前一年',
+      recordedAt: '2022-06-01T12:00:00.000Z',
+      occurredAt: '2022-06-01T00:00:00.000Z',
+      precision: 'day',
+    });
+    await saveMoment({
+      repos,
+      id: 'm_2024',
+      note: '目标年',
+      recordedAt: '2024-03-10T12:00:00.000Z',
+      occurredAt: '2024-03-10T00:00:00.000Z',
+      precision: 'day',
+    });
+    await saveMoment({
+      repos,
+      id: 'm_2026',
+      note: '今年',
+      recordedAt: '2026-09-24T12:00:00.000Z',
+      occurredAt: '2026-09-24T00:00:00.000Z',
+      precision: 'day',
+    });
+    const book = await app.getLookbackBook();
+    expect(book.years.map((chapter) => chapter.year)).toEqual([2026, 2024, 2022]);
+    expect(book.years.find((chapter) => chapter.year === 2024)?.title).toBe('2024年');
+    expect(lookbackBookLocateId({ year: 2024 })).toBe('year-2024');
+    expect(lookbackBookLocateId({ year: 2022 })).not.toBe(lookbackBookLocateId({ year: 2026 }));
   });
 
   it('does not load another year when reading one year of a long archive', async () => {
