@@ -70,9 +70,13 @@ ID 使用 `moment_memoir_eval_*`。感受词表外的旧值用「闷」。
 
 ### S8 部分覆盖（年范围）
 
-范围为 `{ kind: 'year', year: 2023 }`。`textBearingTotal = 80`，本批只送 S2 三条（`analyzedCount = 3`, `omittedTextBearingCount = 77`）。
+范围为 `{ kind: 'year', year: 2023 }`。`textBearingTotal = 80`，本批只送 S2 三条 + 一条原文含「你一直」的记录（`analyzedCount = 4`, `omittedTextBearingCount = 76`）。
 
-Lampy 新写的覆盖说明若出现「这一年你的生活 / 整年 / 你一直」：机器可拒。用户原文恰好含这些词的 quote：**通过**，不得改写。另附一条原文「你一直去江边走走。」供 E15b。
+| id | precision | note | feeling | media |
+| --- | --- | --- | --- | --- |
+| `moment_memoir_eval_s8_always` | day · 2023-08-21 | 你一直去江边走走。 | null | 无 |
+
+Lampy 新写的覆盖说明若出现「这一年你的生活 / 整年 / 你一直」：机器可拒。用户原文恰好含这些词的 quote：**通过**，不得改写。
 
 ---
 
