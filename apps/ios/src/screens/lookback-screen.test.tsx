@@ -14,6 +14,7 @@ import LookbackIndexScreen from '../app/lookback/index';
 import LookbackYearScreen from '../app/lookback/[year]/index';
 import LookbackDayScreen from '../app/lookback/[year]/[month]/[day]';
 import LookbackUnconfirmedScreen from '../app/lookback/unconfirmed';
+import { LOOKBACK_MONTH_EXPAND_ERROR } from '../application/lookback-month';
 import { projectHistoryMonthFromCounts } from '../projections/history-projection';
 import {
   issueLookbackYearOrigin,
@@ -379,6 +380,162 @@ describe('lookback screens', () => {
     fireEvent.press(view.getByTestId('lookback-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockDismissTo).not.toHaveBeenCalled();
+  });
+
+  it('shows expand failure and retries into 日子未确认 plus the date row', async () => {
+    mockGetHistoryYear.mockResolvedValue({
+      year: 2026,
+      title: '2026年',
+      yearUnconfirmedCount: 0,
+      yearUnconfirmedLabel: '这一年，月份未确认',
+      months: Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        label: `2026年${index + 1}月`,
+        count: index === 8 ? 3 : 0,
+        status: index === 8 ? 'filled' : 'quiet',
+        summary: index === 8 ? '有3条记录' : '安静',
+      })),
+    });
+    mockGetHistoryMonth
+      .mockRejectedValueOnce(new Error('month-read-failed'))
+      .mockResolvedValueOnce(
+        projectHistoryMonthFromCounts(
+          2026,
+          9,
+          Array.from({ length: 30 }, (_, index) => (index === 23 ? 1 : 0)),
+          2,
+        ),
+      );
+    const view = await render(wrap(<LookbackYearScreen />));
+    await waitFor(() => {
+      expect(view.getByText('9月 · 有3条记录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('lookback-month-entry-2026-09'));
+    await waitFor(() => {
+      expect(view.getByText(LOOKBACK_MONTH_EXPAND_ERROR)).toBeTruthy();
+    });
+    expect(view.queryByLabelText('这个月，日子未确认，有2条记录')).toBeNull();
+    expect(view.queryByText('9月24日 · 有1条记录')).toBeNull();
+    fireEvent.press(view.getByTestId('lookback-year-expand-retry-2026-09'));
+    await waitFor(() => {
+      expect(view.getByLabelText('这个月，日子未确认，有2条记录')).toBeTruthy();
+    });
+    expect(view.getByText('9月24日 · 有1条记录')).toBeTruthy();
+    expect(view.queryByText(LOOKBACK_MONTH_EXPAND_ERROR)).toBeNull();
+  });
+
+  it('does not keep another month’s rows while the next expand is loading', async () => {
+    mockGetHistoryYear.mockResolvedValue({
+      year: 2026,
+      title: '2026年',
+      yearUnconfirmedCount: 0,
+      yearUnconfirmedLabel: '这一年，月份未确认',
+      months: Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        label: `2026年${index + 1}月`,
+        count: index === 0 || index === 8 ? 1 : 0,
+        status: index === 0 || index === 8 ? 'filled' : 'quiet',
+        summary: index === 0 || index === 8 ? '有1条记录' : '安静',
+      })),
+    });
+    let finishSeptember: ((view: ReturnType<typeof projectHistoryMonthFromCounts>) => void) | undefined;
+    mockGetHistoryMonth.mockImplementation((_year: number, month: number) => {
+      if (month === 1) {
+        return Promise.resolve(
+          projectHistoryMonthFromCounts(
+            2026,
+            1,
+            Array.from({ length: 31 }, (_, index) => (index === 0 ? 1 : 0)),
+            0,
+          ),
+        );
+      }
+      return new Promise((resolve) => {
+        finishSeptember = resolve;
+      });
+    });
+    const view = await render(wrap(<LookbackYearScreen />));
+    await waitFor(() => {
+      expect(view.getByText('1月 · 有1条记录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('lookback-month-entry-2026-01'));
+    await waitFor(() => {
+      expect(view.getByText('1月1日 · 有1条记录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('lookback-month-entry-2026-09'));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-year-expand-loading-2026-09')).toBeTruthy();
+    });
+    expect(view.queryByText('1月1日 · 有1条记录')).toBeNull();
+    finishSeptember?.(
+      projectHistoryMonthFromCounts(
+        2026,
+        9,
+        Array.from({ length: 30 }, (_, index) => (index === 23 ? 1 : 0)),
+        0,
+      ),
+    );
+    await waitFor(() => {
+      expect(view.getByText('9月24日 · 有1条记录')).toBeTruthy();
+    });
+    expect(view.queryByText('1月1日 · 有1条记录')).toBeNull();
+  });
+
+  it('reloads the expanded month when the year page is focused again', async () => {
+    rememberLookbackExpandedMonth(2026, 9);
+    mockGetHistoryYear.mockResolvedValue({
+      year: 2026,
+      title: '2026年',
+      yearUnconfirmedCount: 0,
+      yearUnconfirmedLabel: '这一年，月份未确认',
+      months: Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        label: `2026年${index + 1}月`,
+        count: index === 8 ? 1 : 0,
+        status: index === 8 ? 'filled' : 'quiet',
+        summary: index === 8 ? '有1条记录' : '安静',
+      })),
+    });
+    mockGetHistoryMonth.mockResolvedValue(
+      projectHistoryMonthFromCounts(
+        2026,
+        9,
+        Array.from({ length: 30 }, (_, index) => (index === 23 ? 1 : 0)),
+        0,
+      ),
+    );
+    const first = await render(wrap(<LookbackYearScreen />));
+    await waitFor(() => {
+      expect(first.getByText('9月24日 · 有1条记录')).toBeTruthy();
+    });
+    await first.unmount();
+    mockGetHistoryYear.mockResolvedValue({
+      year: 2026,
+      title: '2026年',
+      yearUnconfirmedCount: 0,
+      yearUnconfirmedLabel: '这一年，月份未确认',
+      months: Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        label: `2026年${index + 1}月`,
+        count: index === 8 ? 3 : 0,
+        status: index === 8 ? 'filled' : 'quiet',
+        summary: index === 8 ? '有3条记录' : '安静',
+      })),
+    });
+    mockGetHistoryMonth.mockResolvedValue(
+      projectHistoryMonthFromCounts(
+        2026,
+        9,
+        Array.from({ length: 30 }, (_, index) => (index === 23 ? 1 : 0)),
+        2,
+      ),
+    );
+    const second = await render(wrap(<LookbackYearScreen />));
+    await waitFor(() => {
+      expect(second.getByText('9月 · 有3条记录')).toBeTruthy();
+      expect(second.getByLabelText('这个月，日子未确认，有2条记录')).toBeTruthy();
+    });
+    expect(second.getByText('9月24日 · 有1条记录')).toBeTruthy();
   });
 
   it('keeps failed photos and sound on a lookback day, then returns to the same date', async () => {

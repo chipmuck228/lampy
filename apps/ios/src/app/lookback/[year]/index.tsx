@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, Text, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -15,13 +15,51 @@ import {
   lookbackHref,
   lookbackStyles,
 } from '../../../screens/lookback-chrome';
-import { LookbackYearEntries, LookbackYearMonths } from '../../../screens/lookback-year';
+import {
+  LookbackYearEntries,
+  LookbackYearMonths,
+  type LookbackYearExpandStatus,
+} from '../../../screens/lookback-year';
 import {
   firstSearchParam,
   forgetLookbackYearOrigin,
   goToLookbackRootFromYear,
   shouldBackToLookbackRoot,
 } from '../../../screens/lookback-origin';
+
+type ExpandState =
+  | { month: number; status: 'loading' }
+  | { month: number; status: 'ready'; view: HistoryMonthView }
+  | { month: number; status: 'error' };
+
+function applyExpandedMonth(
+  year: number,
+  month: number,
+  next: HistoryMonthView | { invalid: true } | 'error',
+  setExpand: (state: ExpandState) => void,
+) {
+  if (readLookbackExpandedMonth(year) !== month) return;
+  if (next === 'error' || 'invalid' in next) {
+    setExpand({ month, status: 'error' });
+    return;
+  }
+  setExpand({ month, status: 'ready', view: next });
+}
+
+function loadExpandedMonth(
+  year: number,
+  month: number,
+  setExpand: (state: ExpandState) => void,
+) {
+  return getUseCases()
+    .then((app) => app.getHistoryMonth(year, month))
+    .then((monthView) => {
+      applyExpandedMonth(year, month, monthView, setExpand);
+    })
+    .catch(() => {
+      applyExpandedMonth(year, month, 'error', setExpand);
+    });
+}
 
 export default function LookbackYearScreen() {
   const router = useRouter();
@@ -37,21 +75,25 @@ export default function LookbackYearScreen() {
   const year = Number(Array.isArray(params.year) ? params.year[0] : params.year);
   const originToken = firstSearchParam(params.y);
   const [view, setView] = useState<HistoryYearView | { invalid: true } | null>(null);
-  const [expandView, setExpandView] = useState<HistoryMonthView | { invalid: true } | null>(null);
+  const [expand, setExpand] = useState<ExpandState | null>(null);
   const [expandedMonth, setExpandedMonth] = useState<number | null>(() => readLookbackExpandedMonth(year));
   const [error, setError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      setExpandedMonth(readLookbackExpandedMonth(year));
       getUseCases()
         .then((app) => app.getHistoryYear(year))
         .then((next) => {
-          if (!cancelled) {
-            setView(next);
-            setError(null);
-          }
+          if (cancelled) return;
+          const month = readLookbackExpandedMonth(year);
+          setView(next);
+          setError(null);
+          setExpandedMonth(month);
+          if (!month) return;
+          return loadExpandedMonth(year, month, (state) => {
+            if (!cancelled) setExpand(state);
+          });
         })
         .catch(() => {
           if (!cancelled) setError('这一年暂时读不出来，原来的记录还在。');
@@ -62,39 +104,42 @@ export default function LookbackYearScreen() {
     }, [year]),
   );
 
-  useEffect(() => {
-    if (!expandedMonth) return undefined;
-    let cancelled = false;
-    getUseCases()
-      .then((app) => app.getHistoryMonth(year, expandedMonth))
-      .then((monthView) => {
-        if (!cancelled && readLookbackExpandedMonth(year) === expandedMonth) {
-          setExpandView(monthView);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [expandedMonth, year]);
-
   const ready = view && !('invalid' in view) ? view : null;
   const page = ready ? lookbackYearPage(ready) : null;
   const filledExpanded =
     page && expandedMonth && page.entries.some((entry) => entry.month === expandedMonth)
       ? expandedMonth
       : null;
-  const expandReady = expandView && !('invalid' in expandView) ? expandView : null;
-  const expandPage =
-    filledExpanded && expandReady && expandReady.month === filledExpanded
-      ? lookbackMonthPage(expandReady)
-      : null;
+  const expandStatus: LookbackYearExpandStatus | null = !filledExpanded
+    ? null
+    : expand && expand.month === filledExpanded
+      ? expand.status === 'ready'
+        ? { kind: 'ready', page: lookbackMonthPage(expand.view) }
+        : expand.status === 'error'
+          ? { kind: 'error' }
+          : { kind: 'loading' }
+      : { kind: 'loading' };
   const path = `/lookback/${year}`;
 
   function toggleMonth(month: number) {
     const next = toggleLookbackExpandedMonth(year, month);
     setExpandedMonth(next);
-    if (!next) setExpandView(null);
+    if (!next) {
+      setExpand(null);
+      return;
+    }
+    setExpand((current) =>
+      current?.month === next && current.status === 'ready'
+        ? current
+        : { month: next, status: 'loading' },
+    );
+    void loadExpandedMonth(year, next, setExpand);
+  }
+
+  function retryExpand(month: number) {
+    if (readLookbackExpandedMonth(year) !== month) return;
+    setExpand({ month, status: 'loading' });
+    void loadExpandedMonth(year, month, setExpand);
   }
 
   function openDay(month: number, day: number) {
@@ -139,8 +184,9 @@ export default function LookbackYearScreen() {
         <LookbackYearEntries
           page={page}
           expandedMonth={filledExpanded}
-          expandPage={expandPage}
+          expand={expandStatus}
           onToggleMonth={toggleMonth}
+          onRetryExpand={retryExpand}
           onOpenDay={openDay}
           onOpenDayUnconfirmed={openDayUnconfirmed}
         />

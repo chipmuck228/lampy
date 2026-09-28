@@ -1,8 +1,17 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { LookbackMonthPage } from '../application/lookback-month';
+import {
+  LOOKBACK_MONTH_EXPAND_ERROR,
+  LOOKBACK_MONTH_EXPAND_LOADING,
+  type LookbackMonthPage,
+} from '../application/lookback-month';
 import type { LookbackYearMonthCell, LookbackYearPage } from '../application/lookback-year';
 import { pad2 } from '../domain-adapters/calendar';
+
+export type LookbackYearExpandStatus =
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'ready'; page: LookbackMonthPage };
 
 export function LookbackYearMonths({
   page,
@@ -23,15 +32,17 @@ export function LookbackYearMonths({
 export function LookbackYearEntries({
   page,
   expandedMonth,
-  expandPage,
+  expand,
   onToggleMonth,
+  onRetryExpand,
   onOpenDay,
   onOpenDayUnconfirmed,
 }: {
   page: LookbackYearPage;
   expandedMonth: number | null;
-  expandPage: LookbackMonthPage | null;
+  expand: LookbackYearExpandStatus | null;
   onToggleMonth: (month: number) => void;
+  onRetryExpand: (month: number) => void;
   onOpenDay: (month: number, day: number) => void;
   onOpenDayUnconfirmed: (month: number) => void;
 }) {
@@ -54,10 +65,12 @@ export function LookbackYearEntries({
                 {entry.label} · {entry.summary}
               </Text>
             </Pressable>
-            {open && expandPage && expandPage.month === entry.month ? (
+            {open && expand ? (
               <LookbackYearMonthExpand
                 year={page.year}
-                page={expandPage}
+                month={entry.month}
+                expand={expand}
+                onRetry={() => onRetryExpand(entry.month)}
                 onOpenDay={onOpenDay}
                 onOpenDayUnconfirmed={onOpenDayUnconfirmed}
               />
@@ -71,47 +84,77 @@ export function LookbackYearEntries({
 
 function LookbackYearMonthExpand({
   year,
-  page,
+  month,
+  expand,
+  onRetry,
   onOpenDay,
   onOpenDayUnconfirmed,
 }: {
   year: number;
-  page: LookbackMonthPage;
+  month: number;
+  expand: LookbackYearExpandStatus;
+  onRetry: () => void;
   onOpenDay: (month: number, day: number) => void;
   onOpenDayUnconfirmed: (month: number) => void;
 }) {
   return (
-    <View
-      testID={`lookback-year-expand-${year}-${pad2(page.month)}`}
-      style={styles.expand}
-    >
-      {page.dayUnconfirmedCount > 0 ? (
+    <View testID={`lookback-year-expand-${year}-${pad2(month)}`} style={styles.expand}>
+      {expand.kind === 'loading' ? (
+        <Text
+          testID={`lookback-year-expand-loading-${year}-${pad2(month)}`}
+          style={styles.status}
+        >
+          {LOOKBACK_MONTH_EXPAND_LOADING}
+        </Text>
+      ) : null}
+      {expand.kind === 'error' ? (
+        <>
+          <Text
+            testID={`lookback-year-expand-error-${year}-${pad2(month)}`}
+            style={styles.status}
+          >
+            {LOOKBACK_MONTH_EXPAND_ERROR}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="再试一次"
+            testID={`lookback-year-expand-retry-${year}-${pad2(month)}`}
+            onPress={onRetry}
+            style={styles.entryHit}
+          >
+            <Text style={styles.entry}>再试一次</Text>
+          </Pressable>
+        </>
+      ) : null}
+      {expand.kind === 'ready' && expand.page.month === month && expand.page.dayUnconfirmedCount > 0 ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${page.dayUnconfirmedLabel}，有${page.dayUnconfirmedCount}条记录`}
-          testID={`lookback-year-expand-unconfirmed-${year}-${pad2(page.month)}`}
-          onPress={() => onOpenDayUnconfirmed(page.month)}
+          accessibilityLabel={`${expand.page.dayUnconfirmedLabel}，有${expand.page.dayUnconfirmedCount}条记录`}
+          testID={`lookback-year-expand-unconfirmed-${year}-${pad2(month)}`}
+          onPress={() => onOpenDayUnconfirmed(month)}
           style={styles.entryHit}
         >
           <Text style={styles.unconfirmed}>
-            {page.dayUnconfirmedLabel} · {page.dayUnconfirmedCount}条
+            {expand.page.dayUnconfirmedLabel} · {expand.page.dayUnconfirmedCount}条
           </Text>
         </Pressable>
       ) : null}
-      {page.entries.map((entry) => (
-        <Pressable
-          key={entry.day}
-          accessibilityRole="button"
-          accessibilityLabel={`${page.title}${entry.day}日，${entry.summary}`}
-          testID={`lookback-year-expand-day-${year}-${pad2(page.month)}-${pad2(entry.day)}`}
-          onPress={() => onOpenDay(page.month, entry.day)}
-          style={styles.entryHit}
-        >
-          <Text style={styles.dayEntry}>
-            {entry.label} · {entry.summary}
-          </Text>
-        </Pressable>
-      ))}
+      {expand.kind === 'ready' && expand.page.month === month
+        ? expand.page.entries.map((entry) => (
+            <Pressable
+              key={entry.day}
+              accessibilityRole="button"
+              accessibilityLabel={`${expand.page.title}${entry.day}日，${entry.summary}`}
+              testID={`lookback-year-expand-day-${year}-${pad2(month)}-${pad2(entry.day)}`}
+              onPress={() => onOpenDay(month, entry.day)}
+              style={styles.entryHit}
+            >
+              <Text style={styles.dayEntry}>
+                {entry.label} · {entry.summary}
+              </Text>
+            </Pressable>
+          ))
+        : null}
     </View>
   );
 }
@@ -180,4 +223,5 @@ const styles = StyleSheet.create({
   },
   unconfirmed: { fontSize: 18, lineHeight: 24, color: '#25231F' },
   dayEntry: { fontSize: 18, lineHeight: 24, color: '#53604F' },
+  status: { fontSize: 16, lineHeight: 24, color: '#5C5851', paddingTop: 8 },
 });

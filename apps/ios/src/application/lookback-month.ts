@@ -4,6 +4,8 @@ export const LOOKBACK_WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六'
 export const LOOKBACK_PAGE_GUTTER = 24;
 export const LOOKBACK_MONTH_COLUMNS = 7;
 export const LOOKBACK_MONTH_MIN_CELL = 44;
+export const LOOKBACK_MONTH_EXPAND_LOADING = '这个月正在打开。';
+export const LOOKBACK_MONTH_EXPAND_ERROR = '这个月暂时读不出来，原来的记录还在。';
 const LOOKBACK_READING_MAX = 720;
 
 export function weekdayMondayIndex(year: number, month: number, day: number): number {
