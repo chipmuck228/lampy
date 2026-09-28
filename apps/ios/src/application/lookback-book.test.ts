@@ -9,8 +9,10 @@ import {
   lookbackBookExcerpts,
   lookbackBookHref,
   lookbackBookIntentFromParts,
+  lookbackBookLocateId,
   lookbackBookMonthOpenable,
   lookbackBookRemaining,
+  lookbackBookResponseIsCurrent,
 } from './lookback-book';
 import type { HistoryMomentItem } from './history-use-cases';
 
@@ -83,6 +85,17 @@ describe('lookback book contract', () => {
     writeLookbackBookIntent({ year: 2026, month: 9, day: 24 });
     expect(takeLookbackBookIntent()).toEqual({ year: 2026, month: 9, day: 24 });
     expect(takeLookbackBookIntent()).toBeNull();
+  });
+
+  it('names the year, month, or day locate target from this intent', () => {
+    expect(lookbackBookLocateId({ year: 2024 })).toBe('year-2024');
+    expect(lookbackBookLocateId({ year: 2026, month: 9 })).toBe('month-2026-09');
+    expect(lookbackBookLocateId({ year: 2026, month: 9, day: 24 })).toBe('day-2026-09-24');
+  });
+
+  it('accepts only the latest request generation', () => {
+    expect(lookbackBookResponseIsCurrent(2, 1)).toBe(false);
+    expect(lookbackBookResponseIsCurrent(2, 2)).toBe(true);
   });
 
   it('keeps one photo on the excerpt and the exact moment id', () => {

@@ -142,6 +142,7 @@ describe('lookback book screen', () => {
     });
     expect(view.queryByTestId('lookback-book-expand-2026-09')).toBeNull();
     expect(view.queryByTestId('lookback-book-selected-day')).toBeNull();
+    expect(view.getByTestId('lookback-book-locate-year-2026')).toBeTruthy();
     expect(takeLookbackBookIntent()).toBeNull();
     view.unmount();
   });

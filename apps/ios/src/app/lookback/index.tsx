@@ -4,11 +4,11 @@ import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from '
 
 import { getUseCases } from '../../application/container';
 import {
-  lookbackBookDayKey,
   lookbackBookExcerpts,
-  lookbackBookMonthKey,
+  lookbackBookLocateId,
   lookbackBookMonthOpenable,
   lookbackBookRemaining,
+  lookbackBookResponseIsCurrent,
   type LookbackBookExcerpt,
   type LookbackBookIntent,
   type LookbackBookView,
@@ -29,6 +29,7 @@ import {
   LookbackBookYearChapter,
 } from '../../screens/lookback-book';
 import {
+  LookbackLocateAnchor,
   LookbackMessage,
   LookbackScaffold,
   lookbackHref,
@@ -46,16 +47,14 @@ import {
 import { useRecentClipPlayback } from '../../screens/use-recent-clip-playback';
 
 type MonthExpand =
-  | { year: number; month: number; tag: string; status: 'loading' }
-  | { year: number; month: number; tag: string; status: 'error' }
-  | { year: number; month: number; tag: string; status: 'ready'; page: LookbackMonthPage };
+  | { year: number; month: number; status: 'loading' }
+  | { year: number; month: number; status: 'error' }
+  | { year: number; month: number; status: 'ready'; page: LookbackMonthPage };
 
-type DayExcerpt = {
-  tag: string;
-  day: number;
-  dayTotal: number;
-  items: LookbackBookExcerpt[];
-};
+type DayExcerpt =
+  | { day: number; dayTotal: number; status: 'loading' }
+  | { day: number; dayTotal: number; status: 'ready'; items: LookbackBookExcerpt[] }
+  | { day: number; dayTotal: number; status: 'error' };
 
 export default function LookbackIndexScreen() {
   const router = useRouter();
@@ -67,8 +66,9 @@ export default function LookbackIndexScreen() {
   const [expand, setExpand] = useState<MonthExpand | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [excerpts, setExcerpts] = useState<DayExcerpt | null>(null);
-  const expandTag = useRef<string | null>(null);
-  const excerptTag = useRef<string | null>(null);
+  const [locateKey, setLocateKey] = useState<string | null>(null);
+  const expandGeneration = useRef(0);
+  const excerptGeneration = useRef(0);
   const mounted = useRef(true);
   const clips = useRecentClipPlayback();
   const clipsRef = useRef(clips);
@@ -88,22 +88,22 @@ export default function LookbackIndexScreen() {
   }, []);
 
   const loadDayRef = useRef<
-    (year: number, month: number, day: number, dayTotal: number) => Promise<void>
+    (year: number, month: number, day: number, dayTotal: number, locate?: boolean) => Promise<void>
   >(async () => undefined);
 
-  const loadMonth = useCallback(async (year: number, month: number, day?: number) => {
-    const tag = lookbackBookMonthKey(year, month);
-    expandTag.current = tag;
-    excerptTag.current = null;
+  const loadMonth = useCallback(async (year: number, month: number, day?: number, locate = false) => {
+    const generation = expandGeneration.current + 1;
+    expandGeneration.current = generation;
+    excerptGeneration.current += 1;
     void clipsRef.current.pause();
     setSelectedDay(day ?? null);
     setExcerpts(null);
-    setExpand({ year, month, tag, status: 'loading' });
+    setExpand({ year, month, status: 'loading' });
     persistOpen(day ? { year, month, day } : { year, month });
     try {
       const app = await getUseCases();
       const next = await app.getHistoryMonth(year, month);
-      if (!mounted.current || expandTag.current !== tag) return;
+      if (!mounted.current || !lookbackBookResponseIsCurrent(expandGeneration.current, generation)) return;
       if ('invalid' in next) {
         setExpand(null);
         persistOpen(null);
@@ -115,37 +115,51 @@ export default function LookbackIndexScreen() {
         persistOpen(null);
         return;
       }
-      setExpand({ year, month, tag, status: 'ready', page });
+      setExpand({ year, month, status: 'ready', page });
       if (day != null) {
         const entry = page.entries.find((item) => item.day === day);
-        if (entry) await loadDayRef.current(year, month, entry.day, entry.count);
-        else setSelectedDay(null);
+        if (entry) await loadDayRef.current(year, month, entry.day, entry.count, locate);
+        else {
+          setSelectedDay(null);
+          if (locate) setLocateKey(lookbackBookLocateId({ year, month }));
+        }
+      } else if (locate) {
+        setLocateKey(lookbackBookLocateId({ year, month }));
       }
     } catch {
-      if (!mounted.current || expandTag.current !== tag) return;
-      setExpand({ year, month, tag, status: 'error' });
+      if (!mounted.current || !lookbackBookResponseIsCurrent(expandGeneration.current, generation)) return;
+      setExpand({ year, month, status: 'error' });
     }
   }, [persistOpen]);
 
-  const loadDay = useCallback(async (year: number, month: number, day: number, dayTotal: number) => {
-    const tag = lookbackBookDayKey(year, month, day);
-    excerptTag.current = tag;
+  const loadDay = useCallback(async (
+    year: number,
+    month: number,
+    day: number,
+    dayTotal: number,
+    locate = false,
+  ) => {
+    const generation = excerptGeneration.current + 1;
+    excerptGeneration.current = generation;
     void clipsRef.current.pause();
     setSelectedDay(day);
-    setExcerpts(null);
+    setExcerpts({ day, dayTotal, status: 'loading' });
     persistOpen({ year, month, day });
     try {
       const app = await getUseCases();
       const next = await app.getHistoryDay(year, month, day, 0);
-      if (!mounted.current || excerptTag.current !== tag) return;
+      if (!mounted.current || !lookbackBookResponseIsCurrent(excerptGeneration.current, generation)) return;
       if ('invalid' in next) {
-        setExcerpts({ tag, day, dayTotal, items: [] });
+        setExcerpts({ day, dayTotal, status: 'ready', items: [] });
+        if (locate) setLocateKey(lookbackBookLocateId({ year, month, day }));
         return;
       }
-      setExcerpts({ tag, day, dayTotal, items: lookbackBookExcerpts(next.items) });
+      setExcerpts({ day, dayTotal, status: 'ready', items: lookbackBookExcerpts(next.items) });
+      if (locate) setLocateKey(lookbackBookLocateId({ year, month, day }));
     } catch {
-      if (!mounted.current || excerptTag.current !== tag) return;
-      setExcerpts({ tag, day, dayTotal, items: [] });
+      if (!mounted.current || !lookbackBookResponseIsCurrent(excerptGeneration.current, generation)) return;
+      setExcerpts({ day, dayTotal, status: 'error' });
+      if (locate) setLocateKey(lookbackBookLocateId({ year, month, day }));
     }
   }, [persistOpen]);
   useEffect(() => {
@@ -155,17 +169,18 @@ export default function LookbackIndexScreen() {
   const applyIntent = useCallback(
     async (intent: LookbackBookIntent | null, fallback: { year: number; month: number; day?: number } | null) => {
       if (intent && 'month' in intent) {
-        await loadMonth(intent.year, intent.month, 'day' in intent ? intent.day : undefined);
+        await loadMonth(intent.year, intent.month, 'day' in intent ? intent.day : undefined, true);
         return;
       }
       if (intent) {
-        expandTag.current = null;
-        excerptTag.current = null;
+        expandGeneration.current += 1;
+        excerptGeneration.current += 1;
         void clipsRef.current.pause();
         setExpand(null);
         setSelectedDay(null);
         setExcerpts(null);
         persistOpen(null);
+        setLocateKey(lookbackBookLocateId(intent));
         return;
       }
       if (fallback) await loadMonth(fallback.year, fallback.month, fallback.day);
@@ -207,14 +222,15 @@ export default function LookbackIndexScreen() {
   );
 
   function toggleMonth(year: number, month: number) {
-    if (expand && expand.year === year && expand.month === month) {
-      expandTag.current = null;
-      excerptTag.current = null;
+    if (expand && expand.year === year && expand.month === month && expand.status === 'ready') {
+      expandGeneration.current += 1;
+      excerptGeneration.current += 1;
       void clipsRef.current.pause();
       setExpand(null);
       setSelectedDay(null);
       setExcerpts(null);
       persistOpen(null);
+      setLocateKey(null);
       return;
     }
     void loadMonth(year, month);
@@ -227,6 +243,7 @@ export default function LookbackIndexScreen() {
       title="回看"
       path="/lookback"
       root
+      locateKey={locateKey}
       onGoRecent={() => {
         const openedFromRecent = shouldBackToRecent({
           originToken,
@@ -253,6 +270,7 @@ export default function LookbackIndexScreen() {
       ) : null}
       {view?.years.map((chapter) => (
         <LookbackBookYearChapter key={chapter.year} chapter={chapter}>
+          <LookbackLocateAnchor id={lookbackBookLocateId({ year: chapter.year })} />
           {chapter.yearUnconfirmedCount > 0 ? (
             <Pressable
               accessibilityRole="button"
@@ -272,6 +290,7 @@ export default function LookbackIndexScreen() {
             const failed = expand?.status === 'error' && expand.year === chapter.year && expand.month === month.month;
             return (
               <View key={month.month}>
+                <LookbackLocateAnchor id={lookbackBookLocateId({ year: chapter.year, month: month.month })} />
                 <LookbackBookMonthRow
                   year={chapter.year}
                   month={month.month}
@@ -316,10 +335,20 @@ export default function LookbackIndexScreen() {
                     ) : null}
                     {readyExpand.page.entries.map((entry) => {
                       const selected = selectedDay === entry.day;
-                      const dayKey = lookbackBookDayKey(chapter.year, month.month, entry.day);
-                      const dayExcerpts = selected && excerpts?.tag === dayKey ? excerpts : null;
+                      const dayState = selected && excerpts?.day === entry.day ? excerpts : null;
+                      const readyExcerpts = dayState?.status === 'ready' ? dayState : null;
+                      const remaining = readyExcerpts
+                        ? lookbackBookRemaining(readyExcerpts.dayTotal, readyExcerpts.items.length)
+                        : 0;
                       return (
                         <View key={entry.day} testID={selected ? 'lookback-book-selected-day' : undefined}>
+                          <LookbackLocateAnchor
+                            id={lookbackBookLocateId({
+                              year: chapter.year,
+                              month: month.month,
+                              day: entry.day,
+                            })}
+                          />
                           <LookbackBookDayRow
                             year={chapter.year}
                             month={month.month}
@@ -329,10 +358,28 @@ export default function LookbackIndexScreen() {
                               void loadDay(chapter.year, month.month, entry.day, entry.count);
                             }}
                           />
-                          {dayExcerpts
-                            ? dayExcerpts.items.map((excerpt) => (
+                          {dayState?.status === 'loading' ? (
+                            <Text testID="lookback-book-day-loading" style={lookbackStyles.action}>
+                              这一天正在读出来。
+                            </Text>
+                          ) : null}
+                          {dayState?.status === 'error' ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel="重试打开这一天"
+                              testID="lookback-book-day-retry"
+                              onPress={() => void loadDay(chapter.year, month.month, entry.day, entry.count)}
+                              style={lookbackStyles.hit}
+                            >
+                              <Text style={lookbackStyles.action}>
+                                这一天暂时读不出来，原来的记录还在。再试一次
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                          {readyExcerpts
+                            ? readyExcerpts.items.map((excerpt) => (
                                 <LookbackBookExcerptBlock
-                                  key={`${dayKey}-${excerpt.id}`}
+                                  key={`${entry.day}-${excerpt.id}`}
                                   excerpt={excerpt}
                                   listen={
                                     excerpt.audio
@@ -350,19 +397,17 @@ export default function LookbackIndexScreen() {
                                 />
                               ))
                             : null}
-                          {dayExcerpts && lookbackBookRemaining(dayExcerpts.dayTotal, dayExcerpts.items.length) > 0 ? (
+                          {remaining > 0 ? (
                             <Pressable
                               accessibilityRole="button"
-                              accessibilityLabel={`这一天还有${lookbackBookRemaining(dayExcerpts.dayTotal, dayExcerpts.items.length)}条`}
+                              accessibilityLabel={`这一天还有${remaining}条`}
                               testID={`lookback-book-day-more-${chapter.year}-${pad2(month.month)}-${pad2(entry.day)}`}
                               onPress={() =>
                                 router.push(lookbackDayHrefFromBook(chapter.year, month.month, entry.day))
                               }
                               style={lookbackStyles.hit}
                             >
-                              <Text style={lookbackStyles.action}>
-                                这一天还有 {lookbackBookRemaining(dayExcerpts.dayTotal, dayExcerpts.items.length)} 条
-                              </Text>
+                              <Text style={lookbackStyles.action}>这一天还有 {remaining} 条</Text>
                             </Pressable>
                           ) : null}
                         </View>

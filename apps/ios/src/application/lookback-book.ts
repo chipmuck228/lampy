@@ -1,4 +1,4 @@
-import { isValidCalendarDay } from '../domain-adapters/calendar';
+import { isValidCalendarDay, pad2 } from '../domain-adapters/calendar';
 import { lookbackDayEntries, type LookbackDayEntry } from './lookback-day';
 import type { HistoryMomentItem } from './history-use-cases';
 import { weekdayMondayIndex, LOOKBACK_WEEKDAY_LABELS } from './lookback-month';
@@ -86,4 +86,14 @@ export function lookbackBookMonthKey(year: number, month: number): string {
 
 export function lookbackBookDayKey(year: number, month: number, day: number): string {
   return `${year}-${month}-${day}`;
+}
+
+export function lookbackBookLocateId(target: LookbackBookIntent): string {
+  if ('day' in target) return `day-${target.year}-${pad2(target.month)}-${pad2(target.day)}`;
+  if ('month' in target) return `month-${target.year}-${pad2(target.month)}`;
+  return `year-${target.year}`;
+}
+
+export function lookbackBookResponseIsCurrent(activeGeneration: number, generation: number): boolean {
+  return activeGeneration === generation;
 }

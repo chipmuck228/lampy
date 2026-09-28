@@ -1,4 +1,12 @@
-import { useRef, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -28,6 +36,65 @@ export function momentHref(id: string): Href {
   return { pathname: '/moment/[id]', params: { id } } as Href;
 }
 
+type LookbackLocateApi = {
+  locateKey: string | null;
+  scrollRef: RefObject<ScrollView | null>;
+  readOffset: () => number;
+};
+
+const LookbackLocateContext = createContext<LookbackLocateApi | null>(null);
+
+export function LookbackLocateAnchor({ id }: { id: string }) {
+  const api = useContext(LookbackLocateContext);
+  const node = useRef<View>(null);
+  const active = !!api && api.locateKey === id;
+
+  function scrollToY(y: number) {
+    api?.scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: false });
+  }
+
+  function locateFromLayout(fallbackY: number) {
+    if (!active || !api) return;
+    const scroll = api.scrollRef.current as
+      | (ScrollView & { measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void })
+      | null;
+    const view = node.current;
+    if (!scroll || !view) {
+      scrollToY(fallbackY);
+      return;
+    }
+    let settled = false;
+    if (typeof view.measureInWindow === 'function' && typeof scroll.measureInWindow === 'function') {
+      view.measureInWindow((_x, pageY) => {
+        settled = true;
+        scroll.measureInWindow?.((_sx: number, scrollPageY: number) => {
+          scrollToY(api.readOffset() + (pageY - scrollPageY));
+        });
+      });
+    }
+    if (!settled) scrollToY(fallbackY);
+  }
+
+  useEffect(() => {
+    if (!active) return undefined;
+    const frame = requestAnimationFrame(() => {
+      locateFromLayout(0);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [active, api, id]);
+
+  return (
+    <View
+      ref={node}
+      collapsable={false}
+      testID={`lookback-book-locate-${id}`}
+      onLayout={(event) => {
+        locateFromLayout(event.nativeEvent.layout.y);
+      }}
+    />
+  );
+}
+
 export function useLookbackLayout() {
   const { width, height, fontScale } = useWindowDimensions();
   return {
@@ -44,6 +111,7 @@ export function LookbackScaffold({
   children,
   footer,
   root,
+  locateKey = null,
   onBack,
   onGoRecent,
   onLeave,
@@ -54,6 +122,7 @@ export function LookbackScaffold({
   children: ReactNode;
   footer?: ReactNode;
   root?: boolean;
+  locateKey?: string | null;
   onBack?: () => void;
   onGoRecent?: () => void;
   onLeave?: () => void;
@@ -63,6 +132,14 @@ export function LookbackScaffold({
   const { readingWidth, shortHeight } = useLookbackLayout();
   const scrollRef = useRef<ScrollView>(null);
   const restoreOnce = useRef(false);
+  const locate = useMemo(
+    () => ({
+      locateKey,
+      scrollRef,
+      readOffset: () => readLookbackScroll(path),
+    }),
+    [locateKey, path],
+  );
 
   useFocusEffect(() => {
     restoreOnce.current = false;
@@ -92,6 +169,7 @@ export function LookbackScaffold({
 
   const scrollProps = {
     onContentSizeChange: () => {
+      if (locateKey) return;
       if (restoreOnce.current) return;
       restoreOnce.current = true;
       scrollRef.current?.scrollTo({ y: readLookbackScroll(path), animated: false });
@@ -101,8 +179,8 @@ export function LookbackScaffold({
     },
   };
 
-  if (root && onGoRecent && onLeave) {
-    return (
+  const body =
+    root && onGoRecent && onLeave ? (
       <RootReadingLayout
         scrollTestID="lookback-scroll"
         scrollRef={scrollRef}
@@ -118,28 +196,27 @@ export function LookbackScaffold({
       >
         {content}
       </RootReadingLayout>
+    ) : (
+      <SafeAreaView style={styles.safe} accessible={false}>
+        <ScrollView
+          ref={scrollRef}
+          testID="lookback-scroll"
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.column,
+            { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16 },
+          ]}
+          onContentSizeChange={scrollProps.onContentSizeChange}
+          onScroll={scrollProps.onScroll}
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+        >
+          {content}
+        </ScrollView>
+      </SafeAreaView>
     );
-  }
 
-  return (
-    <SafeAreaView style={styles.safe} accessible={false}>
-      <ScrollView
-        ref={scrollRef}
-        testID="lookback-scroll"
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.column,
-          { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16 },
-        ]}
-        onContentSizeChange={scrollProps.onContentSizeChange}
-        onScroll={scrollProps.onScroll}
-        scrollEventThrottle={16}
-        keyboardShouldPersistTaps="handled"
-      >
-        {content}
-      </ScrollView>
-    </SafeAreaView>
-  );
+  return <LookbackLocateContext.Provider value={locate}>{body}</LookbackLocateContext.Provider>;
 }
 
 export function DensityBand({ count, max, label }: { count: number; max: number; label: string }) {

@@ -127,6 +127,7 @@ describe('lookback book race and intent', () => {
     });
     expect(view.queryByTestId('lookback-book-selected-day')).toBeNull();
     expect(view.queryByTestId('lookback-book-excerpt-m_first')).toBeNull();
+    expect(view.getByTestId('lookback-book-locate-month-2026-09')).toBeTruthy();
     expect(mockGetHistoryDay).not.toHaveBeenCalled();
   });
 
@@ -285,5 +286,162 @@ describe('lookback book race and intent', () => {
     expect(view.getByTestId('lookback-book-open-m_voice')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-book-open-m_voice'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_voice' } });
+  });
+
+  it('keeps a later same-day success when an earlier failure arrives late', async () => {
+    mockGetLookbackBook.mockResolvedValue(septemberBook());
+    mockGetHistoryMonth.mockResolvedValue(septemberDays({ 27: 3 }));
+    let rejectFirst: (error: Error) => void = () => undefined;
+    const first = new Promise((_, reject) => {
+      rejectFirst = reject;
+    });
+    mockGetHistoryDay.mockImplementationOnce(() => first).mockResolvedValueOnce({
+      year: 2026,
+      month: 9,
+      day: 27,
+      title: '2026年9月27日',
+      isEmpty: false,
+      items: [
+        {
+          id: 'm_ok',
+          note: '后到的成功',
+          precision: 'day',
+          timeLabel: '2026年9月27日',
+          usedRecordedAtFallback: false,
+          feeling: null,
+          images: [],
+          audio: null,
+          unknownMedia: [],
+        },
+      ],
+      hasMore: false,
+    });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByText('后到的成功')).toBeTruthy();
+    });
+    await act(async () => {
+      rejectFirst(new Error('stale'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(view.getByText('后到的成功')).toBeTruthy();
+    expect(view.queryByTestId('lookback-book-day-retry')).toBeNull();
+  });
+
+  it('shows a retryable excerpt failure without pretending the day is empty', async () => {
+    mockGetLookbackBook.mockResolvedValue(septemberBook());
+    mockGetHistoryMonth.mockResolvedValue(septemberDays({ 27: 11 }));
+    mockGetHistoryDay.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce({
+      year: 2026,
+      month: 9,
+      day: 27,
+      title: '2026年9月27日',
+      isEmpty: false,
+      items: [
+        {
+          id: 'm_recovered',
+          note: '重试后的摘录',
+          precision: 'day',
+          timeLabel: '2026年9月27日',
+          usedRecordedAtFallback: false,
+          feeling: null,
+          images: [],
+          audio: null,
+          unknownMedia: [],
+        },
+      ],
+      hasMore: false,
+    });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-day-retry')).toBeTruthy();
+    });
+    expect(view.getByText('9月27日 · 星期日 · 有11条记录')).toBeTruthy();
+    expect(view.queryByLabelText(/这一天还有/)).toBeNull();
+    expect(view.queryByTestId('lookback-book-excerpt-m_recovered')).toBeNull();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-day-retry'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByText('重试后的摘录')).toBeTruthy();
+    });
+    expect(view.queryByTestId('lookback-book-day-retry')).toBeNull();
+  });
+
+  it('keeps a later same-month success when an earlier failure arrives late', async () => {
+    mockGetLookbackBook.mockResolvedValue(septemberBook());
+    let rejectFirst: (error: Error) => void = () => undefined;
+    const first = new Promise((_, reject) => {
+      rejectFirst = reject;
+    });
+    mockGetHistoryMonth.mockImplementationOnce(() => first).mockResolvedValueOnce(septemberDays({ 27: 1 }));
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
+    });
+    await act(async () => {
+      rejectFirst(new Error('stale-month'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
+    expect(view.queryByTestId('lookback-book-month-retry')).toBeNull();
   });
 });
