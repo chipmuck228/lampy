@@ -1,0 +1,10 @@
+{
+  "name": "lampy-foundation-probe",
+  "version": "0.1.0",
+  "description": "Dev-only Apple Foundation Models availability probe. Not a product feature.",
+  "main": "index.js",
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}
