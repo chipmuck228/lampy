@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>回看 · A 跳转 / B 年页展开 / C 时间书页</title>
+  <style>
+    :root {
+      --paper: #F3F0E9;
+      --ink: #25231F;
+      --soft: #5C5851;
+      --sage: #53604F;
+      --line: rgba(37, 35, 31, 0.16);
+      --mark: #87513D;
+      --ok: #3d5340;
+    }
+    body { margin: 0; background: #e4dfd4; color: var(--ink); font: 16px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+    main { max-width: 1280px; margin: 0 auto; padding: 32px 24px 120px; }
+    h1 { font-size: 28px; font-weight: 500; margin: 0 0 8px; }
+    h2 { font-size: 20px; font-weight: 500; margin: 56px 0 12px; }
+    h3 { font-size: 16px; font-weight: 500; margin: 0 0 8px; }
+    p, li { color: var(--soft); }
+    code { font-size: 13px; color: var(--ink); }
+    .lead { font-size: 17px; max-width: 720px; }
+    .trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+    @media (max-width: 1100px) { .trio { grid-template-columns: 1fr; } }
+    @media (max-width: 800px) { .pair { grid-template-columns: 1fr; } }
+    .phone {
+      background: var(--paper);
+      width: 280px;
+      min-height: 560px;
+      height: 580px;
+      padding: 22px 20px 0;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .phone.tall { height: auto; min-height: 560px; padding-bottom: 20px; }
+    .phone.future { outline: 2px dashed var(--sage); outline-offset: 3px; }
+    .phone.drop { outline: 2px dashed var(--mark); outline-offset: 3px; }
+    .phone.wide { width: 420px; height: 320px; }
+    .phone.pad { width: 360px; height: 480px; }
+    .title { font-size: 28px; line-height: 36px; margin: 0 0 12px; }
+    .back { color: var(--sage); min-height: 44px; display: flex; align-items: center; font-size: 17px; }
+    .meta { font-size: 14px; color: var(--sage); }
+    .hit { min-height: 44px; display: flex; align-items: center; font-size: 17px; color: var(--ink); }
+    .hit.soft { color: var(--sage); }
+    .quiet { color: var(--soft); opacity: .45; min-height: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 0; margin: 4px 0 12px; }
+    .cell { min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; color: var(--soft); }
+    .cell.live { color: var(--ink); }
+    .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); margin-top: 3px; }
+    .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; margin: 6px 0; }
+    .d { min-height: 28px; font-size: 11px; color: var(--soft); display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: .4; }
+    .d.live { opacity: 1; color: var(--ink); }
+    .indent { padding-left: 14px; border-left: 1px solid var(--line); margin: 0 0 6px 4px; }
+    .note { font-size: 18px; line-height: 26px; margin: 6px 0; color: var(--ink); }
+    .note.clamp { max-height: 156px; overflow: hidden; position: relative; }
+    .note.clamp::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 36px; background: linear-gradient(transparent, var(--paper)); }
+    .cap { font-size: 13px; color: var(--sage); margin: 8px 0 0; max-width: 280px; }
+    .cap.wide { max-width: 420px; }
+    .ban { font-size: 13px; color: var(--mark); }
+    .ok { font-size: 13px; color: var(--ok); }
+    .nv { font-size: 12px; color: var(--mark); letter-spacing: 0.04em; }
+    .tag { display: inline-block; font-size: 11px; letter-spacing: .04em; color: var(--sage); border: 1px solid var(--line); padding: 2px 6px; margin-bottom: 8px; }
+    .shot { width: 280px; border: 0; display: block; }
+    .band { margin-top: auto; border-top: 1px solid var(--line); display: flex; justify-content: space-between; padding: 10px 0 16px; font-size: 15px; color: var(--sage); }
+    .thumb { width: 72px; height: 54px; background: #ddd6c8; margin: 6px 0; display: flex; align-items: flex-end; padding: 4px; font-size: 11px; color: var(--sage); box-sizing: border-box; }
+    .row2 { display: flex; gap: 8px; align-items: center; min-height: 44px; font-size: 15px; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; padding: 8px 10px 8px 0; color: var(--soft); }
+    th { color: var(--ink); font-weight: 500; }
+    .stack { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--ink); background: var(--paper); padding: 12px 14px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>回看 · 三个实际方案</h1>
+  <p class="lead">基线 <code>origin/main</code> @ <code>e9b1d8d</code>。#35 已合。#36 @ <code>f17c7f2</code> 保持 OPEN，只当 B 的备选实现。本页是对照稿，<strong>不是</strong>原生走查。</p>
+  <p>实线照片 = 真页面。虚线绿框 = 结构示意。虚线赭框 = 否决变体。横屏 / iPad / VoiceOver / 播放在展开切换后：<strong>NOT VERIFIED</strong>。</p>
+
+  <h2>0. 推荐一句话</h2>
+  <p class="lead">采用 <strong>C′ 时间书页</strong>：回看根连续读，年是章节，一个月展开只列出有记录的日子，选一天后在下方读有上限的当天内容，「看这条」进精确 ID。放弃把七列月历嵌进书页（C-cal）。B 不升格为时间书页。A 继续当现网，直到有实现 PR。</p>
+
+  <h2>1. 同一稀疏年（态 S）——真图 vs 结构</h2>
+  <p>库当时：2026 只有 9 月，9月24日 1 条。B 的真图是后来的 14 条，不放在这一行。</p>
+  <div class="trio">
+    <section>
+      <span class="tag">A · 真页面 · 年</span>
+      <img class="shot" src="../lookback-year-day/shots/iphone16-year.png" alt="2026年三列，仅9月有点" />
+      <p class="cap">十一格安静。有记录的月份还要再跳进月历。</p>
+    </section>
+    <section>
+      <span class="tag">A · 真页面 · 月历</span>
+      <img class="shot" src="../lookback-month/shots/iphone16-lookback-month.png" alt="9月整页月历，24日一点" />
+      <p class="cap">为看一天，先铺安静格。这是 A 的税，也是 C-cal 会搬进书页的东西。</p>
+    </section>
+    <section>
+      <span class="tag">C′ · 结构示意 · 不是 PASS</span>
+      <div class="phone future tall">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <div class="hit soft">时间未确认 · 4条</div>
+        <p class="meta" style="margin:12px 0 4px">2026年</p>
+        <div class="hit">9月 · 有1条记录</div>
+        <div class="indent">
+          <div class="hit">9月24日 · 星期四</div>
+          <p class="note">门口的风，9月24日发生。</p>
+          <div class="hit">看这条</div>
+        </div>
+        <div class="band"><span>留下</span><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">根上就是书。展开一个月、一天，正文留在首屏。底带只在这一层。</p>
+    </section>
+  </div>
+
+  <h2>2. 同一同月两天（态 D）——B 真图 + A/C 结构</h2>
+  <p>9月27日 11 条、28日 3 条。A 没有这一态的月/日真图；B 有年页展开真图。</p>
+  <div class="trio">
+    <section>
+      <span class="tag">A · 结构示意</span>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">2026年9月</p>
+        <div class="days">
+          <div class="d">一</div><div class="d">二</div><div class="d">三</div><div class="d">四</div><div class="d">五</div><div class="d">六</div><div class="d">日</div>
+          <div class="d">1</div><div class="d">2</div><div class="d">3</div><div class="d">4</div><div class="d">5</div><div class="d">6</div>
+          <div class="d">7</div><div class="d">8</div><div class="d">9</div><div class="d">10</div><div class="d">11</div><div class="d">12</div><div class="d">13</div>
+          <div class="d">14</div><div class="d">15</div><div class="d">16</div><div class="d">17</div><div class="d">18</div><div class="d">19</div><div class="d">20</div>
+          <div class="d">21</div><div class="d">22</div><div class="d">23</div><div class="d">24</div><div class="d">25</div><div class="d">26</div>
+          <div class="d live">27<span class="dot"></span></div>
+          <div class="d live">28<span class="dot"></span></div>
+          <div class="d">29</div><div class="d">30</div>
+        </div>
+        <p class="meta">有记录的日子</p>
+        <div class="hit">9月27日 · 有11条记录</div>
+        <div class="hit">9月28日 · 有3条记录</div>
+      </div>
+      <p class="cap">仍先付整月格，再跳日页才能读 11 条。</p>
+    </section>
+    <section>
+      <span class="tag">B · 真页面 · #36</span>
+      <img class="shot" src="shots/iphone16-year-expand-pr36.png" alt="2026年页展开9月27日与28日" />
+      <p class="cap">日期列表，没有当天正文。点日期仍进日页。不是时间书页。</p>
+    </section>
+    <section>
+      <span class="tag">C′ · 结构示意</span>
+      <div class="phone future tall">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <p class="meta">2026年</p>
+        <div class="hit">9月 · 有14条记录</div>
+        <div class="indent">
+          <div class="hit">9月27日 · 星期日 · 有11条</div>
+          <p class="note">第一条可辨认的正文，到此截断。</p>
+          <div class="hit">看这条</div>
+          <p class="note" style="margin-top:12px">第二条也只留可认出的部分。</p>
+          <div class="hit">看这条</div>
+          <div class="hit soft">这一天还有 9 条</div>
+          <div class="hit soft">9月28日 · 星期一 · 有3条</div>
+        </div>
+        <div class="band"><span>留下</span><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">预览最多 2 条。「还有 9 条」进现有日页。28 日未选，只留一行。</p>
+    </section>
+  </div>
+
+  <h2>3. 月历抢高度（否决 C-cal）</h2>
+  <p>同一 393pt、同一态 D。左边是题面「轻量月历 + 下方正文」。右边是 C′。少跳一页两边一样，差的是首屏给谁。</p>
+  <div class="pair">
+    <section>
+      <span class="tag">C-cal · 否决 · 结构示意</span>
+      <div class="phone drop">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <p class="meta">2026年 · 9月</p>
+        <div class="days">
+          <div class="d">一</div><div class="d">二</div><div class="d">三</div><div class="d">四</div><div class="d">五</div><div class="d">六</div><div class="d">日</div>
+          <div class="d">21</div><div class="d">22</div><div class="d">23</div><div class="d">24</div><div class="d">25</div><div class="d">26</div>
+          <div class="d live">27<span class="dot"></span></div>
+          <div class="d live">28<span class="dot"></span></div>
+          <div class="d">29</div><div class="d">30</div>
+        </div>
+        <p class="note" style="opacity:.55">正文从这里才开始，已经要滚。</p>
+      </div>
+      <p class="cap ban">稀疏月：安静格税。密集月：星期有用，阅读折下。不定稿。</p>
+    </section>
+    <section>
+      <span class="tag">C′ · 推荐 · 结构示意</span>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <p class="meta">2026年</p>
+        <div class="hit">9月 · 有14条记录</div>
+        <div class="indent">
+          <div class="hit">9月27日 · 星期日</div>
+          <p class="note">首屏就能认出当天写了什么。</p>
+          <div class="thumb">共3张</div>
+          <div class="row2">一段声音 · 播放</div>
+          <div class="hit">看这条</div>
+        </div>
+      </div>
+      <p class="cap ok">星期写在日期行。高度留给正文、一张图、分开放的声音。</p>
+    </section>
+  </div>
+  <p class="cap wide">C″（先月历，选定后收成「9月 · 27日周日 · 换一天」）比 C-cal 少占正文，但多一步开合。本库没有密集月真图证明必须先看网格，本轮不定 C″。见 README §3.3。</p>
+
+  <h2>4. 空月、只有月精度、多年</h2>
+  <div class="trio">
+    <section>
+      <span class="tag">空月 · 三案相同</span>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <p class="meta">2026年</p>
+        <div class="months">
+          <div class="quiet">1月</div><div class="quiet">2月</div><div class="quiet">3月</div>
+          <div class="quiet">4月</div><div class="quiet">5月</div><div class="quiet">6月</div>
+          <div class="quiet">7月</div><div class="quiet">8月</div>
+          <div class="cell live">9月<div class="dot"></div></div>
+          <div class="quiet">10月</div><div class="quiet">11月</div><div class="quiet">12月</div>
+        </div>
+        <p class="cap">C′ 不必在书页重画十二格；章节下列出可展开月即可。空月不可点，不进空页。</p>
+      </div>
+    </section>
+    <section>
+      <span class="tag">只有月精度 · 结构 · 用户路径 NOT VERIFIED</span>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <p class="meta">2026年</p>
+        <div class="hit soft">月份未确认 · 1条</div>
+        <div class="hit">4月 · 有2条记录</div>
+        <div class="indent">
+          <div class="hit">日子未确认 · 2条</div>
+        </div>
+      </div>
+      <p class="cap">月份行 N 含月精度。展开后没有日期行。留下页<strong>不能</strong>写出这一态。</p>
+    </section>
+    <section>
+      <span class="tag">多年 · C′ 结构</span>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <div class="hit soft">时间未确认 · 4条</div>
+        <p class="meta" style="margin-top:12px">2026年 · 有14条记录</p>
+        <div class="hit">9月 · 有14条记录</div>
+        <p class="meta" style="margin-top:16px">2025年 · 有1条记录</p>
+        <div class="hit soft">3月 · 有1条记录</div>
+        <div class="band"><span>留下</span><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">同时最多展开一个月。2025 收着。不是手风琴墙。</p>
+    </section>
+  </div>
+
+  <h2>5. 长文、三图、混合、缺失、同日上限</h2>
+  <div class="trio">
+    <section>
+      <span class="tag">长文 · C′ 结构</span>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="meta">9月27日 · 星期日</p>
+        <p class="note clamp">这一段会比六行更长。书页只留六行，下面的句子在这帧里被挡住，用来表示截断，不是设计花纹。真页面还没有这一态。</p>
+        <div class="hit">看这条</div>
+      </div>
+      <p class="cap">继续读 = 看这条 = 该条精确 ID。不在书页拉全文。</p>
+    </section>
+    <section>
+      <span class="tag">三图 + 声 · C′ 结构</span>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="meta">9月27日 · 星期日</p>
+        <p class="note">图文声音混合时，文字在前。</p>
+        <div class="thumb">共3张</div>
+        <div class="row2">当时的声音 · ▶ 播放</div>
+        <p class="meta">当时的感受</p>
+        <div class="hit">看这条</div>
+      </div>
+      <p class="cap">播放与看这条分列。层次对照最近真图 <code>iphone16-closeout-idle-mix.png</code>，那是最近，不是回看 PASS。</p>
+    </section>
+    <section>
+      <span class="tag">媒体缺失 · C′ 结构</span>
+      <div class="phone future">
+        <div class="back">返回原来的位置</div>
+        <p class="meta">9月27日 · 星期日</p>
+        <p class="note">还留着的那句文字。</p>
+        <p class="meta">有一段现在看不了的内容。</p>
+        <div class="hit">看这条</div>
+      </div>
+      <p class="cap">不拿别的记录或占位图顶上。与日页 / 详情同一中性句。</p>
+    </section>
+  </div>
+  <p class="ban">展开、收起、换日期之后声音是否仍在播：本页不画播放态，也不写已验证。</p>
+
+  <h2>6. 最大字号、窄屏、横屏、iPad</h2>
+  <div class="trio">
+    <section>
+      <span class="tag">XXXL · A 真页面 · 年</span>
+      <img class="shot" src="../lookback-year-day/shots/iphone16-year-xxxl.png" alt="XXXL 年页无三列" />
+      <p class="cap">A 已证大字号丢掉网格。C-cal 在这条路径上没有月历可嵌。</p>
+    </section>
+    <section>
+      <span class="tag">XXXL · C′ 结构</span>
+      <div class="phone future tall">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <p class="meta">2026年</p>
+        <div class="hit" style="font-size:22px;min-height:52px">9月 · 有14条记录</div>
+        <div class="indent">
+          <div class="hit" style="font-size:22px;min-height:52px">9月27日 · 星期日</div>
+          <p class="note">大字号仍是章节 + 一天 + 预览，不恢复三列或七列。</p>
+          <div class="hit" style="font-size:22px;min-height:52px">看这条</div>
+        </div>
+      </div>
+    </section>
+    <section>
+      <span class="tag">375pt · A 真页面 · 月</span>
+      <img class="shot" src="../lookback-month/shots/se3-375-lookback-month.png" alt="SE3 仍画七列月历" />
+      <p class="cap">窄但仍够 44pt 就画格，是 A 的规则。C′ 不按机型名藏内容。</p>
+    </section>
+  </div>
+  <div class="pair" style="margin-top:28px">
+    <section>
+      <span class="tag">横屏 · 结构 · #34 NOT VERIFIED</span>
+      <div class="phone future wide">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <p class="meta">2026年 · 9月27日 · 星期日</p>
+        <p class="note">仍是一个月、一个日期。不并排两年。</p>
+      </div>
+      <p class="cap wide">不得把这帧当成横屏 PASS。</p>
+    </section>
+    <section>
+      <span class="tag">iPad · 结构 · #34 NOT VERIFIED</span>
+      <div class="phone future pad">
+        <div class="back">返回原来的位置</div>
+        <p class="title">回看</p>
+        <p class="meta">2026年</p>
+        <div class="hit">9月 · 有14条记录</div>
+        <div class="indent">
+          <div class="hit">9月27日 · 星期日</div>
+          <p class="note">一本更宽的书，不是双年对照桌面。</p>
+          <div class="hit">看这条</div>
+        </div>
+      </div>
+      <p class="cap">不得把这帧当成 iPad PASS。</p>
+    </section>
+  </div>
+
+  <h2>7. 日页与详情仍在</h2>
+  <div class="pair">
+    <section>
+      <span class="tag">A/B/C′ · 真页面 · 日</span>
+      <img class="shot" src="../lookback-year-day/shots/iphone16-day.png" alt="9月24日日页一条" />
+      <p class="cap">C′ 保留日页给「这一天还有 N 条」和旧日深链。现日页整条可点，不能原样当书页预览（声音会误触）。</p>
+    </section>
+    <section>
+      <span class="tag">A/B/C′ · 真页面 · 详情</span>
+      <img class="shot" src="../lookback-year-day/shots/iphone16-detail.png" alt="精确 ID 详情" />
+      <p class="cap">「看这条」只进这一层。不改 Moment。</p>
+    </section>
+  </div>
+
+  <h2>8. 栈意图（不是设备日志）</h2>
+  <table>
+    <thead>
+      <tr><th>动作</th><th>A main</th><th>B #36</th><th>C′</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>最近 → 回看</td>
+        <td><code>[最近, 回看根]</code> · <code>o=</code></td>
+        <td>同 A</td>
+        <td><code>[最近, 书页]</code> · 同一套根签发</td>
+      </tr>
+      <tr>
+        <td>旧月深链 <code>/lookback/2026/09</code></td>
+        <td>月历页。冷启动 <code>back()</code> 落点未写死</td>
+        <td><code>replace</code> 年页 + 展开；冷回 <code>/lookback</code></td>
+        <td>书页 + 展开 9 月。不留月历层。冷回：有最近来源回最近，否则按 README §5，<strong>不</strong> <code>canGoBack()</code></td>
+      </tr>
+      <tr>
+        <td>日深链</td>
+        <td>日页</td>
+        <td>日页；从年页回则月仍开</td>
+        <td>日页保留。冷回书页 + 该月开 + 该日选中</td>
+      </tr>
+      <tr>
+        <td>详情返回</td>
+        <td>日页</td>
+        <td>日页</td>
+        <td>从看这条回书页（月、日仍在）；从日页回日页</td>
+      </tr>
+      <tr>
+        <td>未确认路由</td>
+        <td>独立列表页</td>
+        <td>同 A</td>
+        <td>同 A，不删</td>
+      </tr>
+    </tbody>
+  </table>
+  <pre class="stack">进程内：展开月、选中日、滚动 —— 从日页 / 未确认 / 详情 back() 后仍在。
+冷启动：上述丢掉；只信这一次 URL。音频不写入恢复。
+禁止：用 canGoBack() 在最近 / 回看根 / 退出之间猜。</pre>
+
+  <h2>9. 精度：能读 ≠ 能写</h2>
+  <p><code>year</code> → 章节外「月份未确认」。<code>month</code> → 展开月里「日子未确认」，不是某日。<code>unknown</code> → 书页最前。「留下」只写 <code>day</code> | <code>unknown</code>。月/年精度用户路径 <strong>NOT VERIFIED</strong>。</p>
+
+  <h2>10. 本页没证明的事</h2>
+  <ul>
+    <li>C′ 在真机上好不好读 —— 无实现。</li>
+    <li>B 已是时间书页 —— 它不是。</li>
+    <li>密集月月历一定有用 —— 无真图；高度账说明它和阅读冲突。</li>
+    <li>横屏、iPad、VoiceOver、展开后播放 —— <strong>NOT VERIFIED</strong>。</li>
+    <li>#36 该关或该并 —— 交给复审，本页保持它 OPEN。</li>
+  </ul>
+</main>
+</body>
+</html>
