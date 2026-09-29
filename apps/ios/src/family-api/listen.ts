@@ -16,8 +16,9 @@ import { createFamilyStore } from './store';
 import { ARGON2ID_TEST, createArgon2idPasswordHasher } from './password';
 
 export const FAMILY_JSON_MAX_BYTES = 4096;
+export const FAMILY_SHARE_JSON_MAX_BYTES = 64 * 1024;
 
-function readRawBody(req: IncomingMessage): Promise<Buffer | 'too-large'> {
+function readRawBody(req: IncomingMessage, maxBytes: number): Promise<Buffer | 'too-large'> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -26,10 +27,9 @@ function readRawBody(req: IncomingMessage): Promise<Buffer | 'too-large'> {
       if (tooLarge) return;
       const buffer = Buffer.from(chunk);
       size += buffer.length;
-      if (size > MEDIA_MAX_BYTES + 1024) {
+      if (size > maxBytes) {
         tooLarge = true;
         chunks.length = 0;
-        req.destroy();
         return;
       }
       chunks.push(buffer);
@@ -89,16 +89,20 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
       const url = new URL(req.url || '/', `http://${host}:${port}`);
-      const raw = await readRawBody(req);
+      const route = url.pathname.replace(/\/+$/, '');
+      const isMediaUpload = (req.method || '').toUpperCase() === 'POST' && route === '/v1/media';
+      const isShareCreate = (req.method || '').toUpperCase() === 'POST' && /^\/v1\/families\/[^/]+\/shares$/.test(route);
+      const maxBytes = isMediaUpload
+        ? MEDIA_MAX_BYTES + 1024
+        : isShareCreate
+          ? FAMILY_SHARE_JSON_MAX_BYTES
+          : FAMILY_JSON_MAX_BYTES;
+      const raw = await readRawBody(req, maxBytes);
       if (raw === 'too-large') {
         res.writeHead(413, { 'content-type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ error: { code: 'MEDIA_TOO_LARGE', message: 'Media is larger than 8 MiB.' } }));
-        return;
-      }
-      const isMediaUpload = (req.method || '').toUpperCase() === 'POST' && url.pathname.replace(/\/+$/, '') === '/v1/media';
-      if (!isMediaUpload && raw.length > FAMILY_JSON_MAX_BYTES) {
-        res.writeHead(413, { 'content-type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large.' } }));
+        res.end(JSON.stringify({ error: isMediaUpload
+          ? { code: 'MEDIA_TOO_LARGE', message: 'Media is larger than 8 MiB.' }
+          : { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large.' } }));
         return;
       }
       let body: unknown;
