@@ -109,7 +109,27 @@ export default function AccountScreen() {
         return 'ok' as const;
       }
       const family = await getFamilyUseCases();
-      let testFlags = { enabled: false, reason: 'disabled' };
+      const unknownTestFlags = { enabled: false, reason: 'disabled' };
+      if (applyLocalFirst) {
+        if (pendingRevoke && !hasSession) {
+          setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true, unknownTestFlags));
+        } else if (hasSession) {
+          setSnapshot(snapshotAfterSignedIn(appleAvailable, unknownTestFlags));
+        } else {
+          setSnapshot(
+            deriveAccountSnapshot({
+              serviceReady: true,
+              appleAvailable,
+              hasSession: false,
+              pendingRevoke: false,
+              membership: { kind: 'unauthenticated' },
+              testAccountLoginEnabled: unknownTestFlags.enabled,
+              testAccountLoginReason: unknownTestFlags.reason,
+            }),
+          );
+        }
+      }
+      let testFlags = unknownTestFlags;
       try {
         const health = await family.getAuthHealth();
         testFlags = {

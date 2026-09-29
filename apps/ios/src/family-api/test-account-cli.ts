@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { closeSync, openSync, readFileSync } from 'node:fs';
 import { stdin, stdout } from 'node:process';
 
 import { createFamilyCommands } from './commands';
@@ -23,7 +23,7 @@ export function promptHiddenPassword(
     if (!input.isTTY || !output.isTTY) {
       reject(
         new Error(
-          'Password must come from FAMILY_TEST_ACCOUNT_PASSWORD_FD or an interactive TTY. Do not pass it as a command-line argument.',
+          'Password must come from FAMILY_TEST_ACCOUNT_PASSWORD_FILE, FAMILY_TEST_ACCOUNT_PASSWORD_FD, or an interactive TTY. Do not pass it as a command-line argument.',
         ),
       );
       return;
@@ -62,6 +62,15 @@ export function promptHiddenPassword(
 }
 
 export async function readOperatorPassword(env: Record<string, string | undefined> = process.env) {
+  const passwordFile = (env.FAMILY_TEST_ACCOUNT_PASSWORD_FILE || '').trim();
+  if (passwordFile) {
+    const fd = openSync(passwordFile, 'r');
+    try {
+      return readPasswordFromRestrictedFd(fd);
+    } finally {
+      closeSync(fd);
+    }
+  }
   const rawFd = (env.FAMILY_TEST_ACCOUNT_PASSWORD_FD || '').trim();
   if (rawFd) {
     return readPasswordFromRestrictedFd(Number(rawFd));
@@ -79,7 +88,7 @@ export async function runTestAccountCli(input: {
   const [, , action, login] = input.argv;
   if ((action !== 'create' && action !== 'disable') || !login) {
     throw new Error(
-      'Usage: family-api-test-account create <login> | disable <login>\nPassword comes from FAMILY_TEST_ACCOUNT_PASSWORD_FD or a hidden TTY prompt.',
+      'Usage: family-api-test-account create <login> | disable <login>\nPassword comes from FAMILY_TEST_ACCOUNT_PASSWORD_FILE, FAMILY_TEST_ACCOUNT_PASSWORD_FD, or a hidden TTY prompt.',
     );
   }
   const databasePath = (env.LAMPY_FAMILY_DATABASE_PATH || '').trim();

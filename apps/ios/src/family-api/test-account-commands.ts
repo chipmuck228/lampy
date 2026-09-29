@@ -78,7 +78,27 @@ export async function assertTestAccountSessionAllowed(
   const credential = await tx.findTestCredentialByUserId(userId);
   if (!credential) return;
   if (!enabled || !credential.enabled) {
-    await tx.deleteSessionsForUser(userId);
+    throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
+  }
+}
+
+export async function rejectDisallowedTestAccountSession(
+  repository: FamilyRepository,
+  sessionToken: string | undefined,
+  now: Date,
+  enabled: boolean,
+) {
+  if (!sessionToken) return;
+  const revoked = await repository.withTransaction(async (tx) => {
+    const session = await tx.findSession(sessionToken);
+    if (!session || new Date(session.expiresAt).getTime() <= now.getTime()) return false;
+    const credential = await tx.findTestCredentialByUserId(session.userId);
+    if (!credential) return false;
+    if (enabled && credential.enabled) return false;
+    await tx.deleteSessionsForUser(session.userId);
+    return true;
+  });
+  if (revoked) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
 }

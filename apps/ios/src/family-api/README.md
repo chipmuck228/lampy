@@ -79,15 +79,17 @@ npm run family-api
 ```bash
 cd apps/ios
 LAMPY_FAMILY_DATABASE_PATH=./family.db \
-FAMILY_TEST_ACCOUNT_PASSWORD_FD=3 \
-npm run family-api:test-account -- create tester@example.com 3< /path/outside/repo/password
+FAMILY_TEST_ACCOUNT_PASSWORD_FILE=/path/outside/repo/password \
+npm run family-api:test-account -- create tester@example.com
 LAMPY_FAMILY_DATABASE_PATH=./family.db \
 npm run family-api:test-account -- disable tester@example.com
 ```
 
+`npm run` 不会把额外 FD 传给 Node，所以走 package script 时用 `FAMILY_TEST_ACCOUNT_PASSWORD_FILE`。直接跑 `node ./scripts/family-api-test-account.cjs` 时仍可用 `FAMILY_TEST_ACCOUNT_PASSWORD_FD=3` 加 `3< password`。不要把密码写进 argv。
+
 TTY 上也可交互隐藏输入密码。重复 create 不会覆盖既有密码、userId 或家庭资格。停用会立即撤销该账号服务端会话，不删除家庭分享或 F2 媒体。清理测试家庭请用现有成员／分享命令。
 
-回滚：去掉 `LAMPY_TEST_ACCOUNT_LOGIN` 并重启进程。Apple 登录不受影响。已预置的测试凭据行保留，但登录关闭；已有测试会话在下次受保护请求时被撤销。不要在本切片把开关打到 `family.yunpura.com`。
+回滚：去掉 `LAMPY_TEST_ACCOUNT_LOGIN` 并重启进程。Apple 登录不受影响。已预置的测试凭据行保留，但登录关闭；已有测试会话在下次受保护请求时于独立提交中撤销，重开开关后旧 token 不能恢复。不要在本切片把开关打到 `family.yunpura.com`。
 
 ## 单实例部署（Node + 持久 SQLite 卷）
 

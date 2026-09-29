@@ -3,7 +3,7 @@ import { fingerprintUploadMedia, sha256MediaBytes } from './media-validate';
 import type { FamilyRepository, FamilyTx } from './repository';
 import { FamilyStoreConstraintError } from './repository';
 import type { MediaBlobStore } from './media-blobs';
-import { assertTestAccountSessionAllowed } from './test-account-commands';
+import { assertTestAccountSessionAllowed, rejectDisallowedTestAccountSession } from './test-account-commands';
 import type { MediaObjectRecord, MediaObjectView } from './types';
 
 export type MediaCommands = {
@@ -115,6 +115,7 @@ export function createMediaCommands(deps: {
 
   return {
     async uploadMedia(sessionToken, input) {
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
       const mime = deps.assertPayload(input.bytes, input.mimeType);
       const bytes = input.bytes;
       const sha256 = sha256MediaBytes(bytes);
@@ -229,12 +230,14 @@ export function createMediaCommands(deps: {
     },
 
     async getMediaObject(sessionToken, objectId) {
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
       return deps.repository.withTransaction(async (tx) => {
         return toView(await requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled));
       });
     },
 
     async getMediaContent(sessionToken, objectId) {
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
       const row = await deps.repository.withTransaction(async (tx) => {
         return requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled);
       });

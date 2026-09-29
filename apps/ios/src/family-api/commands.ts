@@ -25,7 +25,11 @@ import type {
 } from './types';
 import type { PasswordHasher } from './password';
 import { ARGON2ID_PRODUCTION } from './password';
-import { assertTestAccountSessionAllowed, createTestAccountCommands } from './test-account-commands';
+import {
+  assertTestAccountSessionAllowed,
+  createTestAccountCommands,
+  rejectDisallowedTestAccountSession,
+} from './test-account-commands';
 import type { MediaBlobStore } from './media-blobs';
 import { createMemoryMediaBlobStore } from './media-blobs';
 import { createMediaCommands } from './media-commands';
@@ -252,6 +256,23 @@ export function createFamilyCommands(deps: {
     testAccountLoginEnabled,
   });
 
+  function withAuthedUser<T>(
+    sessionToken: string | undefined,
+    work: (tx: FamilyTx, userId: string) => Promise<T>,
+  ) {
+    return rejectDisallowedTestAccountSession(
+      repository,
+      sessionToken,
+      clock.now(),
+      testAccountLoginEnabled,
+    ).then(() =>
+      repository.withTransaction(async (tx) => {
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+        return work(tx, userId);
+      }),
+    );
+  }
+
   return {
     health() {
       const testHealth = testAccounts.health();
@@ -301,8 +322,7 @@ export function createFamilyCommands(deps: {
     },
 
     createFamily(sessionToken, idempotencyKey) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const fingerprint = fingerprintCreateFamily();
         const cached = await readIdempotent<FamilyView>(tx, userId, 'createFamily', idempotencyKey, fingerprint);
         if (cached) return replayCreateFamily(tx, cached, userId);
@@ -333,8 +353,7 @@ export function createFamilyCommands(deps: {
     },
 
     inviteMember(sessionToken, familyId, idempotencyKey) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const fingerprint = fingerprintInviteMember(familyId);
         const cached = await readIdempotent<InvitationView>(tx, userId, 'inviteMember', idempotencyKey, fingerprint);
         if (cached) return replayInviteMember(tx, cached, userId, familyId, clock.now());
@@ -355,8 +374,7 @@ export function createFamilyCommands(deps: {
     },
 
     revokeInvitation(sessionToken, invitationId) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const invitation = await tx.findInvitationById(invitationId);
         if (!invitation) {
           throw new FamilyError(FAMILY_ERROR.INVITE_NOT_FOUND, 'Invitation was not found.');
@@ -372,8 +390,7 @@ export function createFamilyCommands(deps: {
     },
 
     acceptInvitation(sessionToken, code, idempotencyKey) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const fingerprint = fingerprintAcceptInvitation(code);
         const cached = await readIdempotent<FamilyView>(tx, userId, 'acceptInvitation', idempotencyKey, fingerprint);
         if (cached) {
@@ -442,8 +459,7 @@ export function createFamilyCommands(deps: {
     },
 
     listMembership(sessionToken) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const membership = await tx.findActiveMembershipForUser(userId);
         if (!membership) return { family: null };
         return { family: await toFamilyView(tx, membership.familyId, userId) };
@@ -451,8 +467,7 @@ export function createFamilyCommands(deps: {
     },
 
     listPendingInvitations(sessionToken, familyId) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         await requireActiveFamily(tx, familyId);
         await requireActiveCreator(tx, familyId, userId, 'Only the family creator can list invitations.');
         const now = clock.now();
@@ -467,8 +482,7 @@ export function createFamilyCommands(deps: {
     },
 
     leaveFamily(sessionToken) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const membership = await tx.findActiveMembershipForUser(userId);
         if (!membership) {
           const prior = (await tx.findMembershipsForUser(userId)).find((row) => row.status === 'left');
@@ -488,8 +502,7 @@ export function createFamilyCommands(deps: {
     },
 
     removeMember(sessionToken, familyId, targetUserId) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         await requireActiveFamily(tx, familyId);
         await requireActiveCreator(tx, familyId, userId, 'Only the family creator can remove a member.');
         if (targetUserId === userId) {
@@ -508,8 +521,7 @@ export function createFamilyCommands(deps: {
     },
 
     dissolveFamily(sessionToken, familyId) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const family = await tx.findFamily(familyId);
         if (!family) {
           throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Family was not found.');

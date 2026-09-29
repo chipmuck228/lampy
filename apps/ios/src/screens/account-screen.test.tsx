@@ -198,6 +198,64 @@ describe('account screen', () => {
     expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
   });
 
+  it('paints a trusted local session before a delayed health response', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    mockSession.getSessionToken.mockResolvedValue('ses_1');
+    mockFamily.getAuthHealth.mockImplementation(() => new Promise(() => {}));
+    mockFamily.getMembership.mockImplementation(() => new Promise(() => {}));
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
+    });
+    expect(mockFamily.getAuthHealth).toHaveBeenCalled();
+    expect(mockFamily.getMembership).not.toHaveBeenCalled();
+    expect(view.queryByText(/现在读不到最新账户状态/)).toBeNull();
+    expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
+    expect(view.getByLabelText('退出登录')).toBeTruthy();
+  });
+
+  it('paints unsigned first then updates test-login capability after health arrives', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    let resolveHealth: (value: {
+      ok: true;
+      slice: 'identity-membership';
+      media: true;
+      shares: true;
+      inbox: true;
+      testAccountLogin: boolean;
+      testAccountLoginReason: string;
+      argon2id: { t: number; m: number; p: number; dkLen: number };
+    }) => void = () => {};
+    mockFamily.getMembership.mockResolvedValue({ kind: 'unauthenticated' });
+    mockFamily.getAuthHealth.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveHealth = resolve;
+        }),
+    );
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('account-kind-unsigned')).toBeTruthy();
+      expect(view.getByTestId('account-test-login-closed')).toBeTruthy();
+    });
+    expect(view.queryByLabelText('测试账号登录')).toBeNull();
+    await act(async () => {
+      resolveHealth({
+        ok: true,
+        slice: 'identity-membership',
+        media: true,
+        shares: true,
+        inbox: true,
+        testAccountLogin: true,
+        testAccountLoginReason: 'enabled',
+        argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
+      });
+    });
+    await waitFor(() => {
+      expect(view.getByLabelText('测试账号登录')).toBeTruthy();
+    });
+  });
+
   it('paints a trusted local session before membership refresh, not as unreachable', async () => {
     process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
     mockSession.getSessionToken.mockResolvedValue('ses_1');

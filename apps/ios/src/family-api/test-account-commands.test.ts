@@ -221,4 +221,98 @@ describe('controlled test-account commands', () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it('commits switch-off revocation so a later reopen cannot replay the old token', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'lampy-test-switch-'));
+    const file = path.join(dir, 'family.db');
+    const hasher = createArgon2idPasswordHasher(ARGON2ID_TEST);
+    const apple = createMapAppleVerifier({ apple_alice: { appleSubject: 'apple.alice' } });
+    const clock = { now: () => new Date('2026-09-29T08:00:00.000Z') };
+    try {
+      const firstDb = openFamilySqliteDatabase(file);
+      await applyFamilyApiSchema(firstDb);
+      const open = createFamilyCommands({
+        repository: createSqliteFamilyRepository(firstDb),
+        apple,
+        clock,
+        testAccountLoginEnabled: true,
+        passwordHasher: hasher,
+      });
+      await open.createTestAccount('a@example.com', 'correct-horse');
+      const signed = await open.signInWithTestAccount({ login: 'a@example.com', password: 'correct-horse' });
+      const appleIn = await open.signInWithApple('apple_alice');
+      const closed = createFamilyCommands({
+        repository: createSqliteFamilyRepository(firstDb),
+        apple,
+        clock,
+        testAccountLoginEnabled: false,
+        passwordHasher: hasher,
+      });
+      await expect(closed.listMembership(signed.sessionToken)).rejects.toMatchObject({
+        code: FAMILY_ERROR.UNAUTHENTICATED,
+      });
+      expect(await closed.listMembership(appleIn.sessionToken)).toEqual({ family: null });
+      await firstDb.close();
+
+      const secondDb = openFamilySqliteDatabase(file);
+      const reopened = createFamilyCommands({
+        repository: createSqliteFamilyRepository(secondDb),
+        apple,
+        clock,
+        testAccountLoginEnabled: true,
+        passwordHasher: hasher,
+      });
+      await expect(reopened.listMembership(signed.sessionToken)).rejects.toMatchObject({
+        code: FAMILY_ERROR.UNAUTHENTICATED,
+      });
+      expect(await reopened.listMembership(appleIn.sessionToken)).toEqual({ family: null });
+      await secondDb.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps CLI disable revocation after a SQLite reopen, separate from the deploy switch', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'lampy-test-disable-'));
+    const file = path.join(dir, 'family.db');
+    const hasher = createArgon2idPasswordHasher(ARGON2ID_TEST);
+    const apple = createMapAppleVerifier({});
+    const clock = { now: () => new Date('2026-09-29T08:00:00.000Z') };
+    try {
+      const firstDb = openFamilySqliteDatabase(file);
+      await applyFamilyApiSchema(firstDb);
+      const commands = createFamilyCommands({
+        repository: createSqliteFamilyRepository(firstDb),
+        apple,
+        clock,
+        testAccountLoginEnabled: true,
+        passwordHasher: hasher,
+      });
+      await commands.createTestAccount('a@example.com', 'correct-horse');
+      const signed = await commands.signInWithTestAccount({ login: 'a@example.com', password: 'correct-horse' });
+      await commands.disableTestAccount('a@example.com');
+      await expect(commands.listMembership(signed.sessionToken)).rejects.toMatchObject({
+        code: FAMILY_ERROR.UNAUTHENTICATED,
+      });
+      await firstDb.close();
+
+      const secondDb = openFamilySqliteDatabase(file);
+      const restored = createFamilyCommands({
+        repository: createSqliteFamilyRepository(secondDb),
+        apple,
+        clock,
+        testAccountLoginEnabled: true,
+        passwordHasher: hasher,
+      });
+      await expect(restored.listMembership(signed.sessionToken)).rejects.toMatchObject({
+        code: FAMILY_ERROR.UNAUTHENTICATED,
+      });
+      await expect(
+        restored.signInWithTestAccount({ login: 'a@example.com', password: 'correct-horse' }),
+      ).rejects.toMatchObject({ code: FAMILY_ERROR.AUTH_FAILED });
+      await secondDb.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
