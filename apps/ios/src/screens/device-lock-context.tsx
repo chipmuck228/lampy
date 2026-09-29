@@ -96,6 +96,7 @@ export function DeviceLockProvider({
   }, [snapshot.locked]);
 
   const retryUnlock = useCallback(async () => {
+    if (AppState.currentState !== 'active') return;
     if (session.snapshot().setting !== 'on' || inFlight.current) return;
     const generation = session.beginAuth();
     inFlight.current = true;
@@ -103,12 +104,14 @@ export function DeviceLockProvider({
     setMessage(null);
     try {
       const result = await resolvedAuthenticator.authenticate('验证是这台设备的持有人，才能打开 Lampy。');
+      if (AppState.currentState !== 'active') return;
       const next = session.finishUnlock(generation, result);
       if (next.kind === 'denied') {
         needsManualRetry.current = true;
         setMessage(deviceLockCopy(result));
       }
     } catch {
+      if (AppState.currentState !== 'active') return;
       needsManualRetry.current = true;
       setMessage(deviceLockAuthErrorCopy());
     } finally {
@@ -128,11 +131,12 @@ export function DeviceLockProvider({
       const current = session.snapshot();
       if (current.setting === 'on' && current.locked && !needsManualRetry.current) void retryUnlock();
     });
-    return () => sub.remove();
+    return () => sub?.remove();
   }, [refresh, retryUnlock, session]);
 
   useEffect(() => {
     if (
+      AppState.currentState === 'active' &&
       snapshot.setting === 'on' &&
       snapshot.locked &&
       !inFlight.current &&

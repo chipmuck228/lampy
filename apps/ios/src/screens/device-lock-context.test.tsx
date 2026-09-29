@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { AppState, Pressable, Text, type AppStateStatus } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 
@@ -14,6 +14,39 @@ function Toggle() {
       <Text>toggle</Text>
     </Pressable>
   );
+}
+
+function setAppState(state: AppStateStatus) {
+  Object.defineProperty(AppState, 'currentState', {
+    configurable: true,
+    writable: true,
+    value: state,
+  });
+}
+
+function mockAppState() {
+  const handlers: ((state: AppStateStatus) => void)[] = [];
+  let current: AppStateStatus = 'active';
+  const add = jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
+    if (type === 'change') handlers.push(handler);
+    return { remove: jest.fn() };
+  });
+  Object.defineProperty(AppState, 'currentState', {
+    configurable: true,
+    get: () => current,
+  });
+  return {
+    async set(next: AppStateStatus) {
+      current = next;
+      await act(async () => {
+        handlers.forEach((handler) => handler(next));
+      });
+    },
+    restore() {
+      add.mockRestore();
+      setAppState('active');
+    },
+  };
 }
 
 function wrap(
@@ -34,6 +67,12 @@ function wrap(
 describe('device lock cover', () => {
   beforeEach(async () => {
     await SecureStore.deleteItemAsync(DEVICE_LOCK_SECURE_KEY);
+    setAppState('active');
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    setAppState('active');
   });
 
   it('does not cover content or prompt when protection is off', async () => {
@@ -229,6 +268,62 @@ describe('device lock cover', () => {
       expect(authenticate).toHaveBeenCalledTimes(2);
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
     });
+  });
+
+  it('stays locked in the background and only authenticates again when active', async () => {
+    const app = mockAppState();
+    const pending: Array<(value: { ok: true }) => void> = [];
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(
+        wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }),
+      );
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+
+      await app.set('background');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(authenticate).toHaveBeenCalledTimes(1);
+
+      await app.set('active');
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(2);
+      });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+
+      await app.set('background');
+      expect(authenticate).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        pending[1]({ ok: true });
+      });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+
+      await app.set('active');
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(3);
+      });
+      await act(async () => {
+        pending[2]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+    } finally {
+      app.restore();
+    }
   });
 
   it('rolls back disable and stays retryable when the setting cannot be written', async () => {
