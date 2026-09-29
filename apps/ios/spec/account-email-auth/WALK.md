@@ -6,8 +6,8 @@
 
 | 端 | 值 |
 | --- | --- |
-| base `origin/main` | 开 PR 时填写 |
-| 本分支 head | 本提交 |
+| base `origin/main` | `b1abc11` |
+| 本分支 head | `39c90e1` |
 
 ## 契约
 
