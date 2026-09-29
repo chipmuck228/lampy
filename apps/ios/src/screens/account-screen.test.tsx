@@ -11,23 +11,17 @@ const mockFamily = {
   signInWithApple: jest.fn(),
   signOut: jest.fn(),
   hasUnconfirmedSessionRevoke: jest.fn(async () => false),
-  getEmailAuthStatus: jest.fn(async () => ({
+  getAuthHealth: jest.fn(async () => ({
     ok: true,
     slice: 'identity-membership',
     media: true,
     shares: true,
     inbox: true,
-    emailRegister: false,
-    emailRegisterReason: 'account-delete-incomplete',
+    testAccountLogin: false,
+    testAccountLoginReason: 'disabled',
     argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
   })),
-  registerWithEmail: jest.fn(),
-  verifyEmail: jest.fn(),
-  resendVerification: jest.fn(),
-  signInWithEmail: jest.fn(),
-  requestPasswordReset: jest.fn(),
-  resetPassword: jest.fn(),
-  deleteAccount: jest.fn(),
+  signInWithTestAccount: jest.fn(),
 };
 
 const mockSession = {
@@ -109,16 +103,17 @@ describe('account screen', () => {
     mockFamily.signInWithApple.mockReset();
     mockFamily.signOut.mockReset();
     mockFamily.hasUnconfirmedSessionRevoke.mockReset().mockResolvedValue(false);
-    mockFamily.getEmailAuthStatus.mockReset().mockResolvedValue({
+    mockFamily.getAuthHealth.mockReset().mockResolvedValue({
       ok: true,
       slice: 'identity-membership',
       media: true,
       shares: true,
       inbox: true,
-      emailRegister: false,
-      emailRegisterReason: 'account-delete-incomplete',
+      testAccountLogin: false,
+      testAccountLoginReason: 'disabled',
       argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
     });
+    mockFamily.signInWithTestAccount.mockReset();
     mockSession.getSessionToken.mockReset().mockResolvedValue(null);
     mockSession.getPendingRevoke.mockReset().mockResolvedValue(null);
     mockApple.isAvailable.mockReset().mockResolvedValue(true);
@@ -134,8 +129,8 @@ describe('account screen', () => {
     expect(view.getByTestId('account-personal')).toBeTruthy();
     expect(view.getByText(/没有跨设备同步或云备份/)).toBeTruthy();
     expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
-    expect(view.getByTestId('account-email-unavailable')).toBeTruthy();
-    expect(view.queryByLabelText('使用邮箱登录')).toBeNull();
+    expect(view.getByTestId('account-test-login-unavailable')).toBeTruthy();
+    expect(view.queryByLabelText('测试账号登录')).toBeNull();
     expect(view.queryByText(/家庭成员|头像/)).toBeNull();
     expect(mockFamily.getMembership).not.toHaveBeenCalled();
   });
@@ -148,8 +143,12 @@ describe('account screen', () => {
       expect(view.getByTestId('account-kind-unsigned')).toBeTruthy();
     });
     expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
-    expect(view.getByTestId('account-email-closed')).toBeTruthy();
-    expect(view.queryByLabelText('使用邮箱登录')).toBeNull();
+    expect(view.getByTestId('account-test-login-closed')).toBeTruthy();
+    expect(view.queryByLabelText('测试账号登录')).toBeNull();
+    expect(view.queryByLabelText('使用邮箱注册')).toBeNull();
+    expect(view.queryByLabelText('验证邮箱')).toBeNull();
+    expect(view.queryByLabelText('忘记密码')).toBeNull();
+    expect(view.queryByLabelText('删除账户')).toBeNull();
   });
 
   it('keeps cancelled Apple authorization as unsigned and retryable', async () => {
@@ -339,5 +338,42 @@ describe('account screen', () => {
     expect(view.queryByText('这件事没有做成。个人记录还在这台设备上。')).toBeNull();
     expect(view.queryByText(/连不上授权服务，家庭登录没有完成/)).toBeNull();
     expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
+  });
+
+  it('shows controlled test login only when the server says it is enabled', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    mockFamily.getMembership.mockResolvedValue({ kind: 'unauthenticated' });
+    mockFamily.getAuthHealth.mockResolvedValue({
+      ok: true,
+      slice: 'identity-membership',
+      media: true,
+      shares: true,
+      inbox: true,
+      testAccountLogin: true,
+      testAccountLoginReason: 'enabled',
+      argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
+    });
+    mockFamily.signInWithTestAccount.mockRejectedValue(new ApplicationError('AUTH_FAILED', 'Login name or password is wrong.'));
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('测试账号登录')).toBeTruthy();
+    });
+    expect(view.queryByText(/正式邮箱注册/)).toBeTruthy();
+    expect(view.queryByLabelText('使用邮箱注册')).toBeNull();
+    await act(async () => {
+      fireEvent.changeText(view.getByTestId('account-test-login-input'), 'a@example.com');
+      fireEvent.changeText(view.getByTestId('account-password-input'), 'correct-horse');
+    });
+    expect(view.getByDisplayValue('a@example.com')).toBeTruthy();
+    expect(view.getByDisplayValue('correct-horse')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('account-test-login-submit'));
+    });
+    await waitFor(() => {
+      expect(mockFamily.signInWithTestAccount).toHaveBeenCalledWith('a@example.com', 'correct-horse');
+      expect(view.getByText('登录名或密码不对。')).toBeTruthy();
+    });
+    expect(view.getByTestId('account-password-input').props.value).toBe('');
+    expect(view.getByTestId('account-test-login-submit')).toBeTruthy();
   });
 });

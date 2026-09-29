@@ -1,14 +1,13 @@
 import type {
   Account,
   AuthRateLimit,
-  EmailCredential,
-  EmailToken,
   Family,
   Invitation,
   MediaObjectRecord,
   Membership,
   Session,
   ShareRecord,
+  TestCredential,
 } from './types';
 
 export type IdempotentRecord = {
@@ -25,8 +24,7 @@ export type FamilyStore = {
   invitations: Invitation[];
   mediaObjects: MediaObjectRecord[];
   shares: ShareRecord[];
-  emailCredentials: EmailCredential[];
-  emailTokens: EmailToken[];
+  testCredentials: TestCredential[];
   rateLimits: AuthRateLimit[];
   idempotency: Map<string, IdempotentRecord>;
 };
@@ -40,8 +38,7 @@ export function createFamilyStore(): FamilyStore {
     invitations: [],
     mediaObjects: [],
     shares: [],
-    emailCredentials: [],
-    emailTokens: [],
+    testCredentials: [],
     rateLimits: [],
     idempotency: new Map(),
   };

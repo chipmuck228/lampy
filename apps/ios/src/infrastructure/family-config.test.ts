@@ -46,6 +46,13 @@ describe('family API URL safety', () => {
     await expect(
       publicHttp.request({ method: 'GET', path: '/v1/me/membership', sessionToken: 'ses_secret' }),
     ).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
+    await expect(
+      publicHttp.request({
+        method: 'POST',
+        path: '/v1/auth/test-account',
+        body: { login: 'tester@example.com', password: 'correct-horse' },
+      }),
+    ).rejects.toMatchObject({ code: 'SERVER_UNREACHABLE' });
     expect(fetchImpl).not.toHaveBeenCalled();
 
     const local = createFamilyHttpTransport({

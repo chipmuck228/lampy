@@ -17,9 +17,7 @@ import { consumeFamilyTestNextRequestFailure, recordFamilyTestLastRequest } from
 export function familyTestPathKind(method: string, path: string) {
   const verb = method.toUpperCase();
   if (path === '/v1/invitations/accept') return 'accept';
-  if (path === '/v1/auth/apple' || path === '/v1/auth/email/login') return 'sign-in';
-  if (path.startsWith('/v1/auth/email/')) return 'email-auth';
-  if (path === '/v1/me/delete') return 'delete-account';
+  if (path === '/v1/auth/apple' || path === '/v1/auth/test-account') return 'sign-in';
   if (path === '/v1/families') return 'create';
   if (path === '/v1/me/membership') return 'membership';
   if (path.includes('/invitations') && !path.includes('/revoke')) return 'invite';
@@ -61,13 +59,7 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 export type FamilyApiClient = {
   health(): Promise<FamilyHealth>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
-  registerWithEmail(input: { email: string; password: string }): Promise<{ accepted: true }>;
-  verifyEmail(token: string): Promise<{ verified: true }>;
-  resendVerification(email: string): Promise<{ accepted: true }>;
-  signInWithEmail(input: { email: string; password: string }): Promise<SignInResult>;
-  requestPasswordReset(email: string): Promise<{ accepted: true }>;
-  resetPassword(input: { token: string; password: string }): Promise<{ reset: true }>;
-  deleteAccount(sessionToken: string): Promise<{ deleted: true }>;
+  signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createFamily(sessionToken: string, idempotencyKey: string): Promise<FamilyView>;
   inviteMember(sessionToken: string, familyId: string, idempotencyKey: string): Promise<InvitationView>;
   revokeInvitation(sessionToken: string, invitationId: string): Promise<InvitationView>;
@@ -143,26 +135,8 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     signInWithApple(identityToken) {
       return send({ method: 'POST', path: '/v1/auth/apple', body: { identityToken } });
     },
-    registerWithEmail(input) {
-      return send({ method: 'POST', path: '/v1/auth/email/register', body: input });
-    },
-    verifyEmail(token) {
-      return send({ method: 'POST', path: '/v1/auth/email/verify', body: { token } });
-    },
-    resendVerification(email) {
-      return send({ method: 'POST', path: '/v1/auth/email/resend', body: { email } });
-    },
-    signInWithEmail(input) {
-      return send({ method: 'POST', path: '/v1/auth/email/login', body: input });
-    },
-    requestPasswordReset(email) {
-      return send({ method: 'POST', path: '/v1/auth/email/forgot', body: { email } });
-    },
-    resetPassword(input) {
-      return send({ method: 'POST', path: '/v1/auth/email/reset', body: input });
-    },
-    deleteAccount(sessionToken) {
-      return send({ method: 'POST', path: '/v1/me/delete', sessionToken });
+    signInWithTestAccount(input) {
+      return send({ method: 'POST', path: '/v1/auth/test-account', body: input });
     },
     createFamily(sessionToken, idempotencyKey) {
       return send({ method: 'POST', path: '/v1/families', sessionToken, idempotencyKey });

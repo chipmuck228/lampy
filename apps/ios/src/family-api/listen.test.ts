@@ -43,7 +43,12 @@ describe('family API listen startup', () => {
         expect(existsSync(databasePath)).toBe(true);
         const health = await getHealth(listening.port);
         expect(health.status).toBe(200);
-        expect(JSON.parse(health.body)).toMatchObject({ ok: true, slice: 'identity-membership', media: true });
+        expect(JSON.parse(health.body)).toMatchObject({
+          ok: true,
+          slice: 'identity-membership',
+          media: true,
+          testAccountLogin: false,
+        });
         expect(existsSync(path.join(dir, 'volume', 'media'))).toBe(true);
       } finally {
         await listening.close();
@@ -171,6 +176,44 @@ describe('family API listen startup', () => {
       await new Promise<void>((resolve, reject) => {
         blocker.close((error) => (error ? reject(error) : resolve()));
       });
+    }
+  });
+
+  it('rejects oversized JSON before parsing credentials', async () => {
+    const listening = await startFamilyApiServer({
+      port: 0,
+      host: '127.0.0.1',
+      env: {
+        LAMPY_FAMILY_API_MODE: 'test',
+        LAMPY_FAMILY_API_TEST_TOKENS: 'review-token:apple.review.sub',
+      },
+    });
+    try {
+      const payload = JSON.stringify({ login: 'a@example.com', password: 'x'.repeat(5000) });
+      const result = await new Promise<{ status?: number; body: { error?: { code?: string } } }>((resolve, reject) => {
+        const req = httpRequest(
+          {
+            hostname: '127.0.0.1',
+            port: listening.port,
+            method: 'POST',
+            path: '/v1/auth/test-account',
+            headers: { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(payload)) },
+          },
+          (res) => {
+            const chunks: Buffer[] = [];
+            res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+            res.on('end', () =>
+              resolve({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks).toString('utf8')) }),
+            );
+          },
+        );
+        req.on('error', reject);
+        req.end(payload);
+      });
+      expect(result.status).toBe(413);
+      expect(result.body.error?.code).toBe('PAYLOAD_TOO_LARGE');
+    } finally {
+      await listening.close();
     }
   });
 });

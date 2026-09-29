@@ -13,8 +13,9 @@ import { planFamilyApiListen } from './runtime';
 import { applyFamilyApiSchema } from './schema';
 import { createSqliteFamilyRepository } from './sqlite-repository';
 import { createFamilyStore } from './store';
-import { createMemoryMailer, createSmtpMailer, parseSmtpMailerConfig } from './mailer';
 import { ARGON2ID_TEST, createArgon2idPasswordHasher } from './password';
+
+export const FAMILY_JSON_MAX_BYTES = 4096;
 
 function readRawBody(req: IncomingMessage): Promise<Buffer | 'too-large'> {
   return new Promise((resolve, reject) => {
@@ -52,17 +53,8 @@ function headersOf(req: IncomingMessage) {
 export async function startFamilyApiServer(options?: { port?: number; host?: string; env?: NodeJS.ProcessEnv }) {
   const env = options?.env ?? process.env;
   const plan = planFamilyApiListen(env);
-  const smtp = parseSmtpMailerConfig(env);
-  const mailer =
-    plan.email.mailer === 'memory'
-      ? createMemoryMailer()
-      : plan.email.mailer === 'smtp' && smtp
-        ? createSmtpMailer(smtp)
-        : undefined;
-  const emailOpts = {
-    mailer,
-    emailRegisterEnabled: plan.email.emailRegisterEnabled,
-    emailRegisterReason: plan.email.emailRegisterReason,
+  const authOpts = {
+    testAccountLoginEnabled: plan.testAccount.testAccountLoginEnabled,
     passwordHasher: plan.mode === 'test' ? createArgon2idPasswordHasher(ARGON2ID_TEST) : undefined,
   };
   const commands =
@@ -71,7 +63,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
           store: createFamilyStore(),
           apple: createMapAppleVerifier(plan.testTokens),
           mediaBlobs: createMemoryMediaBlobStore(),
-          ...emailOpts,
+          ...authOpts,
         })
       : await (async () => {
           mkdirSync(path.dirname(path.resolve(plan.databasePath)), { recursive: true });
@@ -87,7 +79,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
               verifySignature: verifyAppleJwtSignature,
             }),
             mediaBlobs: createDirectoryMediaBlobStore(mediaRoot),
-            ...emailOpts,
+            ...authOpts,
           });
         })();
 
@@ -104,6 +96,11 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
         return;
       }
       const isMediaUpload = (req.method || '').toUpperCase() === 'POST' && url.pathname.replace(/\/+$/, '') === '/v1/media';
+      if (!isMediaUpload && raw.length > FAMILY_JSON_MAX_BYTES) {
+        res.writeHead(413, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large.' } }));
+        return;
+      }
       let body: unknown;
       if (!isMediaUpload && raw.length > 0) {
         try {

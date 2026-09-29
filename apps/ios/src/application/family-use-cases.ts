@@ -407,7 +407,7 @@ export function createFamilyUseCases(deps: {
   }
 
   return {
-    async getEmailAuthStatus() {
+    async getAuthHealth() {
       try {
         return await deps.client.health();
       } catch (error) {
@@ -419,8 +419,8 @@ export function createFamilyUseCases(deps: {
             media: true as const,
             shares: true as const,
             inbox: true as const,
-            emailRegister: false,
-            emailRegisterReason: 'mail-unconfigured' as const,
+            testAccountLogin: false,
+            testAccountLoginReason: 'disabled' as const,
             argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
           };
         }
@@ -436,60 +436,12 @@ export function createFamilyUseCases(deps: {
         throw asApplicationError(error);
       }
     },
-    async registerWithEmail(email: string, password: string) {
+    async signInWithTestAccount(login: string, password: string) {
       try {
-        return await deps.client.registerWithEmail({ email, password });
-      } catch (error) {
-        throw asApplicationError(error);
-      }
-    },
-    async verifyEmail(token: string) {
-      try {
-        return await deps.client.verifyEmail(token);
-      } catch (error) {
-        throw asApplicationError(error);
-      }
-    },
-    async resendVerification(email: string) {
-      try {
-        return await deps.client.resendVerification(email);
-      } catch (error) {
-        throw asApplicationError(error);
-      }
-    },
-    async signInWithEmail(email: string, password: string) {
-      try {
-        const result = await deps.client.signInWithEmail({ email, password });
+        const result = await deps.client.signInWithTestAccount({ login, password });
         return commitSignedIn(result);
       } catch (error) {
         await deps.session.clearSession();
-        throw asApplicationError(error);
-      }
-    },
-    async requestPasswordReset(email: string) {
-      try {
-        return await deps.client.requestPasswordReset(email);
-      } catch (error) {
-        throw asApplicationError(error);
-      }
-    },
-    async resetPassword(token: string, password: string) {
-      try {
-        return await deps.client.resetPassword({ token, password });
-      } catch (error) {
-        throw asApplicationError(error);
-      }
-    },
-    async deleteAccount() {
-      const { sessionToken, userId } = await requireAccount();
-      try {
-        const result = await deps.client.deleteAccount(sessionToken);
-        await deps.session.clearSession();
-        await deps.session.clearPendingRevoke();
-        await cache.clear();
-        await safeIsolateAccount(userId);
-        return result;
-      } catch (error) {
         throw asApplicationError(error);
       }
     },

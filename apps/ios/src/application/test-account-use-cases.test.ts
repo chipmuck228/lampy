@@ -4,29 +4,20 @@ import { createPendingFamilyOperationDisk, createPendingFamilyOperationStore } f
 import { createMapAppleVerifier } from '../family-api/apple';
 import { createFamilyCommands } from '../family-api/commands';
 import { dispatchFamilyApi } from '../family-api/http';
-import { createMemoryMailer } from '../family-api/mailer';
 import { ARGON2ID_TEST, createArgon2idPasswordHasher } from '../family-api/password';
 import { createFamilyStore } from '../family-api/store';
 import { createDispatchTransport, createFamilyApiClient } from '../infrastructure/family-http-client';
 import { createMemoryFamilyReceiveCache } from '../infrastructure/family-receive-cache';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 
-function tokenFrom(mailer: ReturnType<typeof createMemoryMailer>) {
-  const match = mailer.sent.at(-1)?.text.match(/\n\n([0-9a-f]{64})\n\n/);
-  if (!match) throw new Error('missing mail token');
-  return match[1];
-}
-
 function setup() {
   const store = createFamilyStore();
-  const mailer = createMemoryMailer();
   const commands = createFamilyCommands({
     store,
     apple: createMapAppleVerifier({
       apple_alice: { appleSubject: 'apple.alice', email: 'alice@example.com' },
     }),
-    mailer,
-    emailRegisterEnabled: true,
+    testAccountLoginEnabled: true,
     passwordHasher: createArgon2idPasswordHasher(ARGON2ID_TEST),
   });
   const receiveCache = createMemoryFamilyReceiveCache();
@@ -50,47 +41,44 @@ function setup() {
     receiveCache,
     personal: personalRepos,
   });
-  return { commands, mailer, alice, bob, aliceSession, bobSession, personal, store, receiveCache };
+  return { commands, alice, bob, aliceSession, personal, receiveCache };
 }
 
-describe('email auth use cases', () => {
-  it('issues the same session store as Apple after verify and does not merge by email', async () => {
-    const { alice, mailer, commands } = setup();
+describe('controlled test-account use cases', () => {
+  it('issues the same session store as Apple and does not merge by login string', async () => {
+    const { alice, commands } = setup();
     const apple = await commands.signInWithApple('apple_alice');
-    await alice.registerWithEmail('alice@example.com', 'correct-horse');
-    await alice.verifyEmail(tokenFrom(mailer));
-    const signed = await alice.signInWithEmail('alice@example.com', 'correct-horse');
+    await commands.createTestAccount('alice@example.com', 'correct-horse');
+    const signed = await alice.signInWithTestAccount('alice@example.com', 'correct-horse');
     expect(signed.userId).not.toBe(apple.userId);
     expect(await alice.getMembership()).toEqual({ kind: 'none' });
   });
 
-  it('does not leak pending ops or receive cache after A signs out and B signs in', async () => {
-    const { alice, bob, mailer, aliceSession } = setup();
-    await alice.registerWithEmail('a@example.com', 'correct-horse');
-    await alice.verifyEmail(tokenFrom(mailer));
-    await alice.signInWithEmail('a@example.com', 'correct-horse');
+  it('does not leak members, pending ops, or receive cache after A signs out and B signs in', async () => {
+    const { alice, bob, aliceSession, commands } = setup();
+    await commands.createTestAccount('a@example.com', 'correct-horse');
+    await alice.signInWithTestAccount('a@example.com', 'correct-horse');
     await alice.createFamily();
     expect((await alice.getMembership()).kind).toBe('ready');
     await alice.signOut();
     expect(await aliceSession.getSessionToken()).toBeNull();
 
-    await bob.registerWithEmail('b@example.com', 'correct-horse');
-    await bob.verifyEmail(tokenFrom(mailer));
-    await bob.signInWithEmail('b@example.com', 'correct-horse');
+    await commands.createTestAccount('b@example.com', 'correct-horse');
+    await bob.signInWithTestAccount('b@example.com', 'correct-horse');
     expect(await bob.getMembership()).toEqual({ kind: 'none' });
     expect(await bob.listFamilyInbox()).toEqual({ kind: 'hidden', reason: 'none' });
   });
 
-  it('deletes the family account without touching personal moments', async () => {
-    const { alice, mailer, personal } = setup();
+  it('keeps personal moments when family auth fails', async () => {
+    const { alice, personal, commands } = setup();
     const draft = await personal.restoreOrCreateDraft();
     await personal.updateDraftNote(draft.draftId, '门口的风');
     const saved = await personal.saveTextMoment(draft.draftId);
-    await alice.registerWithEmail('solo@example.com', 'correct-horse');
-    await alice.verifyEmail(tokenFrom(mailer));
-    await alice.signInWithEmail('solo@example.com', 'correct-horse');
-    expect(await alice.deleteAccount()).toEqual({ deleted: true });
-    expect(await alice.getMembership()).toEqual({ kind: 'unauthenticated' });
+    await commands.createTestAccount('solo@example.com', 'correct-horse');
+    await alice.signInWithTestAccount('solo@example.com', 'correct-horse');
+    await expect(alice.signInWithTestAccount('solo@example.com', 'wrong-password')).rejects.toMatchObject({
+      code: 'AUTH_FAILED',
+    });
     const detail = await personal.getMomentDetail(saved.id);
     expect(detail.kind).toBe('ready');
   });

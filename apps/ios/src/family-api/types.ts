@@ -10,23 +10,14 @@ export type Account = {
   createdAt: string;
 };
 
-export type EmailCredential = {
+export type TestCredential = {
   credentialId: string;
+  loginNormalized: string;
   userId: string;
-  emailNormalized: string;
   passwordHash: string;
-  emailVerifiedAt?: string;
+  enabled: boolean;
   createdAt: string;
-};
-
-export type EmailToken = {
-  tokenId: string;
-  userId: string;
-  purpose: 'verify' | 'reset';
-  tokenHash: string;
-  expiresAt: string;
-  consumedAt?: string;
-  createdAt: string;
+  disabledAt?: string;
 };
 
 export type AuthRateLimit = {
@@ -35,28 +26,10 @@ export type AuthRateLimit = {
   hitCount: number;
 };
 
-export type EmailAuthHealth = {
-  emailRegister: boolean;
-  emailRegisterReason:
-    | 'enabled'
-    | 'account-delete-incomplete'
-    | 'mail-unconfigured'
-    | 'explicitly-disabled';
+export type TestAccountHealth = {
+  testAccountLogin: boolean;
+  testAccountLoginReason: 'enabled' | 'disabled';
 };
-
-export type EmailAccepted = {
-  accepted: true;
-};
-
-export type AccountDeleteResult = {
-  deleted: true;
-};
-
-export type AccountDeleteBlockedReason =
-  | 'active-creator'
-  | 'active-member'
-  | 'active-shares'
-  | 'active-media';
 
 export type Session = {
   token: string;
@@ -117,8 +90,8 @@ export type FamilyHealth = {
   media: true;
   shares: true;
   inbox: true;
-  emailRegister: boolean;
-  emailRegisterReason: EmailAuthHealth['emailRegisterReason'];
+  testAccountLogin: boolean;
+  testAccountLoginReason: TestAccountHealth['testAccountLoginReason'];
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 

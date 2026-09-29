@@ -101,7 +101,7 @@ describe('account status', () => {
     );
   });
 
-  it('lets email sign-in work when Apple is unavailable and register is enabled', () => {
+  it('lets test-account sign-in work when Apple is unavailable and the server enables it', () => {
     expect(
       deriveAccountSnapshot({
         serviceReady: true,
@@ -109,14 +109,14 @@ describe('account status', () => {
         hasSession: false,
         pendingRevoke: false,
         membership: { kind: 'unauthenticated' },
-        emailRegisterEnabled: true,
-        emailRegisterReason: 'enabled',
+        testAccountLoginEnabled: true,
+        testAccountLoginReason: 'enabled',
       }),
     ).toMatchObject({
       kind: 'unsigned',
       canSignIn: true,
-      canSignInEmail: true,
-      emailRegisterEnabled: true,
+      canSignInTestAccount: true,
+      testAccountLoginEnabled: true,
     });
   });
 

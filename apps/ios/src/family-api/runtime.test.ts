@@ -50,10 +50,9 @@ describe('family API listen runtime', () => {
       databasePath: '/tmp/lampy-family.db',
       appleClientId: 'app.lampy.ios',
       banner: FAMILY_API_PRODUCTION_BANNER,
-      email: {
-        emailRegisterEnabled: false,
-        emailRegisterReason: 'account-delete-incomplete',
-        mailer: 'none',
+      testAccount: {
+        testAccountLoginEnabled: false,
+        testAccountLoginReason: 'disabled',
       },
     });
   });
@@ -69,10 +68,9 @@ describe('family API listen runtime', () => {
       apple: 'test-tokens',
       testTokens: { 'review-token': { appleSubject: 'apple.review.sub' } },
       banner: FAMILY_API_TEST_BANNER,
-      email: {
-        emailRegisterEnabled: false,
-        emailRegisterReason: 'account-delete-incomplete',
-        mailer: 'none',
+      testAccount: {
+        testAccountLoginEnabled: false,
+        testAccountLoginReason: 'disabled',
       },
     });
     expect(plan.banner).toMatch(/in-memory/i);
@@ -83,42 +81,28 @@ describe('family API listen runtime', () => {
     expect(() => planFamilyApiListen({})).toThrow(/LAMPY_FAMILY_API_MODE=test/);
   });
 
-  it('keeps production email register closed when SMTP is missing or memory mailer is requested', () => {
+  it('keeps test-account login off unless the independent server switch is set', () => {
     expect(
       planFamilyApiListen({
         LAMPY_FAMILY_API_MODE: 'production',
         LAMPY_FAMILY_DATABASE_PATH: '/tmp/lampy-family.db',
         LAMPY_APPLE_CLIENT_ID: 'app.lampy.ios',
-        LAMPY_EMAIL_REGISTER_ENABLED: '1',
-        LAMPY_EMAIL_MAILER: 'memory',
-      }).email,
+        LAMPY_TEST_ACCOUNT_LOGIN: '0',
+      }).testAccount,
     ).toEqual({
-      emailRegisterEnabled: false,
-      emailRegisterReason: 'mail-unconfigured',
-      mailer: 'none',
+      testAccountLoginEnabled: false,
+      testAccountLoginReason: 'disabled',
     });
     expect(
       planFamilyApiListen({
         LAMPY_FAMILY_API_MODE: 'production',
         LAMPY_FAMILY_DATABASE_PATH: '/tmp/lampy-family.db',
         LAMPY_APPLE_CLIENT_ID: 'app.lampy.ios',
-        LAMPY_EMAIL_REGISTER_ENABLED: '1',
-      }).email.emailRegisterReason,
-    ).toBe('mail-unconfigured');
-  });
-
-  it('enables test email register only with an injected memory mailer', () => {
-    expect(
-      planFamilyApiListen({
-        LAMPY_FAMILY_API_MODE: 'test',
-        LAMPY_FAMILY_API_TEST_TOKENS: 'review-token:apple.review.sub',
-        LAMPY_EMAIL_REGISTER_ENABLED: '1',
-        LAMPY_EMAIL_MAILER: 'memory',
-      }).email,
+        LAMPY_TEST_ACCOUNT_LOGIN: '1',
+      }).testAccount,
     ).toEqual({
-      emailRegisterEnabled: true,
-      emailRegisterReason: 'enabled',
-      mailer: 'memory',
+      testAccountLoginEnabled: true,
+      testAccountLoginReason: 'enabled',
     });
   });
 });

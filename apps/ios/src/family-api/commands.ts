@@ -9,8 +9,6 @@ import { createMemoryFamilyRepository, FamilyStoreConstraintError, type FamilyRe
 import { createFamilyStore, type FamilyStore, type IdempotentRecord } from './store';
 import type {
   AppleVerifier,
-  EmailAccepted,
-  EmailAuthHealth,
   FamilyClock,
   FamilyHealth,
   FamilyIds,
@@ -25,10 +23,9 @@ import type {
   ShareView,
   SignInResult,
 } from './types';
-import type { Mailer } from './mailer';
 import type { PasswordHasher } from './password';
 import { ARGON2ID_PRODUCTION } from './password';
-import { createEmailAuthCommands } from './email-commands';
+import { assertTestAccountSessionAllowed, createTestAccountCommands } from './test-account-commands';
 import type { MediaBlobStore } from './media-blobs';
 import { createMemoryMediaBlobStore } from './media-blobs';
 import { createMediaCommands } from './media-commands';
@@ -38,13 +35,9 @@ import { assertMediaPayload } from './media-validate';
 export type FamilyCommands = {
   health(): FamilyHealth;
   signInWithApple(identityToken: string): Promise<SignInResult>;
-  registerWithEmail(input: { email: string; password: string; clientKey?: string }): Promise<EmailAccepted>;
-  verifyEmail(input: { token: string }): Promise<{ verified: true }>;
-  resendVerification(input: { email: string; clientKey?: string }): Promise<EmailAccepted>;
-  signInWithEmail(input: { email: string; password: string; clientKey?: string }): Promise<SignInResult>;
-  requestPasswordReset(input: { email: string; clientKey?: string }): Promise<EmailAccepted>;
-  resetPassword(input: { token: string; password: string }): Promise<{ reset: true }>;
-  deleteAccount(sessionToken: string): Promise<{ deleted: true }>;
+  signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
+  createTestAccount(login: string, password: string): Promise<{ userId: string; created: true }>;
+  disableTestAccount(login: string): Promise<{ disabled: true; userId: string }>;
   createFamily(sessionToken: string, idempotencyKey?: string): Promise<FamilyView>;
   inviteMember(sessionToken: string, familyId: string, idempotencyKey?: string): Promise<InvitationView>;
   revokeInvitation(sessionToken: string, invitationId: string): Promise<InvitationView>;
@@ -82,7 +75,12 @@ function asConstraint(error: unknown): FamilyStoreConstraintError | null {
   return error instanceof FamilyStoreConstraintError ? error : null;
 }
 
-async function requireUser(tx: FamilyTx, sessionToken: string | undefined, clock: FamilyClock) {
+async function requireUser(
+  tx: FamilyTx,
+  sessionToken: string | undefined,
+  clock: FamilyClock,
+  testAccountLoginEnabled: boolean,
+) {
   if (!sessionToken) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
   }
@@ -90,6 +88,7 @@ async function requireUser(tx: FamilyTx, sessionToken: string | undefined, clock
   if (!session || new Date(session.expiresAt).getTime() <= clock.now().getTime()) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
+  await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled);
   return session.userId;
 }
 
@@ -220,10 +219,8 @@ export function createFamilyCommands(deps: {
   inviteTtlMs?: number;
   sessionTtlMs?: number;
   mediaBlobs?: MediaBlobStore;
-  mailer?: Mailer;
-  emailRegisterEnabled?: boolean;
-  emailRegisterReason?: EmailAuthHealth['emailRegisterReason'];
   passwordHasher?: PasswordHasher;
+  testAccountLoginEnabled?: boolean;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -232,40 +229,40 @@ export function createFamilyCommands(deps: {
   const store = deps.store ?? createFamilyStore();
   const repository = deps.repository ?? createMemoryFamilyRepository(store);
   const blobs = deps.mediaBlobs ?? createMemoryMediaBlobStore();
+  const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
   const media = createMediaCommands({
     repository,
     blobs,
     clock,
     assertPayload: assertMediaPayload,
+    testAccountLoginEnabled,
   });
   const shares = createShareCommands({
     repository,
     blobs,
     clock,
+    testAccountLoginEnabled,
   });
-  const email = createEmailAuthCommands({
+  const testAccounts = createTestAccountCommands({
     repository,
     clock,
     ids,
     sessionTtlMs,
-    blobs,
-    mailer: deps.mailer,
-    emailRegisterEnabled: deps.emailRegisterEnabled,
-    emailRegisterReason: deps.emailRegisterReason,
     passwordHasher: deps.passwordHasher,
+    testAccountLoginEnabled,
   });
 
   return {
     health() {
-      const emailHealth = email.health();
+      const testHealth = testAccounts.health();
       return {
         ok: true as const,
         slice: 'identity-membership' as const,
         media: true as const,
         shares: true as const,
         inbox: true as const,
-        emailRegister: emailHealth.emailRegister,
-        emailRegisterReason: emailHealth.emailRegisterReason,
+        testAccountLogin: testHealth.testAccountLogin,
+        testAccountLoginReason: testHealth.testAccountLoginReason,
         argon2id: ARGON2ID_PRODUCTION,
       };
     },
@@ -305,7 +302,7 @@ export function createFamilyCommands(deps: {
 
     createFamily(sessionToken, idempotencyKey) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         const fingerprint = fingerprintCreateFamily();
         const cached = await readIdempotent<FamilyView>(tx, userId, 'createFamily', idempotencyKey, fingerprint);
         if (cached) return replayCreateFamily(tx, cached, userId);
@@ -337,7 +334,7 @@ export function createFamilyCommands(deps: {
 
     inviteMember(sessionToken, familyId, idempotencyKey) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         const fingerprint = fingerprintInviteMember(familyId);
         const cached = await readIdempotent<InvitationView>(tx, userId, 'inviteMember', idempotencyKey, fingerprint);
         if (cached) return replayInviteMember(tx, cached, userId, familyId, clock.now());
@@ -359,7 +356,7 @@ export function createFamilyCommands(deps: {
 
     revokeInvitation(sessionToken, invitationId) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         const invitation = await tx.findInvitationById(invitationId);
         if (!invitation) {
           throw new FamilyError(FAMILY_ERROR.INVITE_NOT_FOUND, 'Invitation was not found.');
@@ -376,7 +373,7 @@ export function createFamilyCommands(deps: {
 
     acceptInvitation(sessionToken, code, idempotencyKey) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         const fingerprint = fingerprintAcceptInvitation(code);
         const cached = await readIdempotent<FamilyView>(tx, userId, 'acceptInvitation', idempotencyKey, fingerprint);
         if (cached) {
@@ -446,7 +443,7 @@ export function createFamilyCommands(deps: {
 
     listMembership(sessionToken) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         const membership = await tx.findActiveMembershipForUser(userId);
         if (!membership) return { family: null };
         return { family: await toFamilyView(tx, membership.familyId, userId) };
@@ -455,7 +452,7 @@ export function createFamilyCommands(deps: {
 
     listPendingInvitations(sessionToken, familyId) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         await requireActiveFamily(tx, familyId);
         await requireActiveCreator(tx, familyId, userId, 'Only the family creator can list invitations.');
         const now = clock.now();
@@ -471,7 +468,7 @@ export function createFamilyCommands(deps: {
 
     leaveFamily(sessionToken) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         const membership = await tx.findActiveMembershipForUser(userId);
         if (!membership) {
           const prior = (await tx.findMembershipsForUser(userId)).find((row) => row.status === 'left');
@@ -492,7 +489,7 @@ export function createFamilyCommands(deps: {
 
     removeMember(sessionToken, familyId, targetUserId) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         await requireActiveFamily(tx, familyId);
         await requireActiveCreator(tx, familyId, userId, 'Only the family creator can remove a member.');
         if (targetUserId === userId) {
@@ -512,7 +509,7 @@ export function createFamilyCommands(deps: {
 
     dissolveFamily(sessionToken, familyId) {
       return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
         const family = await tx.findFamily(familyId);
         if (!family) {
           throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Family was not found.');
@@ -535,26 +532,14 @@ export function createFamilyCommands(deps: {
       });
     },
 
-    registerWithEmail(input) {
-      return email.registerWithEmail(input);
+    signInWithTestAccount(input) {
+      return testAccounts.signInWithTestAccount(input);
     },
-    verifyEmail(input) {
-      return email.verifyEmail(input);
+    createTestAccount(login, password) {
+      return testAccounts.createTestAccount(login, password);
     },
-    resendVerification(input) {
-      return email.resendVerification(input);
-    },
-    signInWithEmail(input) {
-      return email.signInWithEmail(input);
-    },
-    requestPasswordReset(input) {
-      return email.requestPasswordReset(input);
-    },
-    resetPassword(input) {
-      return email.resetPassword(input);
-    },
-    deleteAccount(sessionToken) {
-      return email.deleteAccount(sessionToken);
+    disableTestAccount(login) {
+      return testAccounts.disableTestAccount(login);
     },
 
     signOut(sessionToken) {
