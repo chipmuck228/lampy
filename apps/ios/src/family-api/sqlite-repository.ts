@@ -1,13 +1,40 @@
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilySql } from './schema';
 import type { IdempotentRecord } from './store';
-import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session, ShareRecord, ShareSnapshot } from './types';
+import type {
+  Account,
+  AuthRateLimit,
+  Family,
+  Invitation,
+  MediaObjectRecord,
+  Membership,
+  Session,
+  ShareRecord,
+  ShareSnapshot,
+  TestCredential,
+} from './types';
 
 type AccountRow = {
   user_id: string;
-  apple_subject: string;
+  apple_subject: string | null;
   email: string | null;
   created_at: string;
+};
+
+type TestCredentialRow = {
+  credential_id: string;
+  login_normalized: string;
+  user_id: string;
+  password_hash: string;
+  enabled: number;
+  created_at: string;
+  disabled_at: string | null;
+};
+
+type RateLimitRow = {
+  bucket: string;
+  window_started_at: string;
+  hit_count: number;
 };
 
 type SessionRow = {
@@ -100,9 +127,29 @@ function mediaFrom(row: MediaRow): MediaObjectRecord {
 function accountFrom(row: AccountRow): Account {
   return {
     userId: row.user_id,
-    appleSubject: row.apple_subject,
+    appleSubject: row.apple_subject || undefined,
     email: row.email || undefined,
     createdAt: row.created_at,
+  };
+}
+
+function testCredentialFrom(row: TestCredentialRow): TestCredential {
+  return {
+    credentialId: row.credential_id,
+    loginNormalized: row.login_normalized,
+    userId: row.user_id,
+    passwordHash: row.password_hash,
+    enabled: row.enabled === 1,
+    createdAt: row.created_at,
+    disabledAt: row.disabled_at || undefined,
+  };
+}
+
+function rateLimitFrom(row: RateLimitRow): AuthRateLimit {
+  return {
+    bucket: row.bucket,
+    windowStartedAt: row.window_started_at,
+    hitCount: row.hit_count,
   };
 }
 
@@ -148,6 +195,12 @@ export function mapFamilySqlConstraint(error: unknown) {
   if (/family_accounts\.apple_subject/i.test(message)) {
     return new FamilyStoreConstraintError('apple_subject');
   }
+  if (/family_test_credentials\.login_normalized/i.test(message)) {
+    return new FamilyStoreConstraintError('test_login');
+  }
+  if (/family_test_credentials\.user_id/i.test(message)) {
+    return new FamilyStoreConstraintError('test_user');
+  }
   if (/family_idempotency/i.test(message)) {
     return new FamilyStoreConstraintError('idempotency');
   }
@@ -157,9 +210,17 @@ export function mapFamilySqlConstraint(error: unknown) {
 function createSqliteTx(db: FamilySql): FamilyTx {
   return {
     async findAccountByAppleSubject(appleSubject) {
+      if (!appleSubject) return null;
       const row = await db.getFirst<AccountRow>(
         'SELECT user_id, apple_subject, email, created_at FROM family_accounts WHERE apple_subject = ?',
         [appleSubject],
+      );
+      return row ? accountFrom(row) : null;
+    },
+    async findAccountByUserId(userId) {
+      const row = await db.getFirst<AccountRow>(
+        'SELECT user_id, apple_subject, email, created_at FROM family_accounts WHERE user_id = ?',
+        [userId],
       );
       return row ? accountFrom(row) : null;
     },
@@ -167,7 +228,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
       await db.run(
         `INSERT INTO family_accounts (user_id, apple_subject, email, created_at) VALUES (?, ?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET apple_subject = excluded.apple_subject, email = excluded.email`,
-        [account.userId, account.appleSubject, account.email ?? null, account.createdAt],
+        [account.userId, account.appleSubject ?? null, account.email ?? null, account.createdAt],
       );
     },
     async findSession(token) {
@@ -189,6 +250,58 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async deleteOtherSessions(userId, keepToken) {
       await db.run('DELETE FROM family_sessions WHERE user_id = ? AND token != ?', [userId, keepToken]);
+    },
+    async deleteSessionsForUser(userId) {
+      await db.run('DELETE FROM family_sessions WHERE user_id = ?', [userId]);
+    },
+    async findTestCredentialByLogin(loginNormalized) {
+      const row = await db.getFirst<TestCredentialRow>(
+        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at
+         FROM family_test_credentials WHERE login_normalized = ?`,
+        [loginNormalized],
+      );
+      return row ? testCredentialFrom(row) : null;
+    },
+    async findTestCredentialByUserId(userId) {
+      const row = await db.getFirst<TestCredentialRow>(
+        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at
+         FROM family_test_credentials WHERE user_id = ?`,
+        [userId],
+      );
+      return row ? testCredentialFrom(row) : null;
+    },
+    async saveTestCredential(credential) {
+      await db.run(
+        `INSERT INTO family_test_credentials
+         (credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(credential_id) DO UPDATE SET
+           enabled = excluded.enabled,
+           disabled_at = excluded.disabled_at`,
+        [
+          credential.credentialId,
+          credential.loginNormalized,
+          credential.userId,
+          credential.passwordHash,
+          credential.enabled ? 1 : 0,
+          credential.createdAt,
+          credential.disabledAt ?? null,
+        ],
+      );
+    },
+    async findRateLimit(bucket) {
+      const row = await db.getFirst<RateLimitRow>(
+        'SELECT bucket, window_started_at, hit_count FROM family_auth_rate_limits WHERE bucket = ?',
+        [bucket],
+      );
+      return row ? rateLimitFrom(row) : null;
+    },
+    async saveRateLimit(row) {
+      await db.run(
+        `INSERT INTO family_auth_rate_limits (bucket, window_started_at, hit_count) VALUES (?, ?, ?)
+         ON CONFLICT(bucket) DO UPDATE SET window_started_at = excluded.window_started_at, hit_count = excluded.hit_count`,
+        [row.bucket, row.windowStartedAt, row.hitCount],
+      );
     },
     async findFamily(familyId) {
       const row = await db.getFirst<FamilyRow>(

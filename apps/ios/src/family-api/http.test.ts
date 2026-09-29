@@ -360,4 +360,31 @@ describe('family HTTP contract', () => {
     });
     expect(oldMedia.status).toBe(404);
   });
+
+  it('keeps test-account login closed on the default listen contract and has no public register', async () => {
+    const commands = api();
+    const health = await dispatchFamilyApi(commands, { method: 'GET', path: '/health', headers: {} });
+    expect(health.status).toBe(200);
+    expect(health.body).toMatchObject({
+      ok: true,
+      testAccountLogin: false,
+      testAccountLoginReason: 'disabled',
+    });
+    const login = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/test-account',
+      headers: {},
+      body: { login: 'a@example.com', password: 'correct-horse' },
+    });
+    expect(login.status).toBe(503);
+    expect((login.body as { error: { code: string } }).error.code).toBe('TEST_ACCOUNT_LOGIN_CLOSED');
+    const register = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/email/register',
+      headers: {},
+      body: { email: 'a@example.com', password: 'correct-horse' },
+    });
+    expect(register.status).toBe(400);
+    expect((register.body as { error: { code: string } }).error.code).toBe('BAD_REQUEST');
+  });
 });

@@ -101,6 +101,25 @@ describe('account status', () => {
     );
   });
 
+  it('lets test-account sign-in work when Apple is unavailable and the server enables it', () => {
+    expect(
+      deriveAccountSnapshot({
+        serviceReady: true,
+        appleAvailable: false,
+        hasSession: false,
+        pendingRevoke: false,
+        membership: { kind: 'unauthenticated' },
+        testAccountLoginEnabled: true,
+        testAccountLoginReason: 'enabled',
+      }),
+    ).toMatchObject({
+      kind: 'unsigned',
+      canSignIn: true,
+      canSignInTestAccount: true,
+      testAccountLoginEnabled: true,
+    });
+  });
+
   it('does not invent family members from a ready membership on the account page', () => {
     const snapshot = deriveAccountSnapshot({
       serviceReady: true,

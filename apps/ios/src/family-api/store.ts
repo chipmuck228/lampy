@@ -1,4 +1,14 @@
-import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session, ShareRecord } from './types';
+import type {
+  Account,
+  AuthRateLimit,
+  Family,
+  Invitation,
+  MediaObjectRecord,
+  Membership,
+  Session,
+  ShareRecord,
+  TestCredential,
+} from './types';
 
 export type IdempotentRecord = {
   requestFingerprint: string;
@@ -14,6 +24,8 @@ export type FamilyStore = {
   invitations: Invitation[];
   mediaObjects: MediaObjectRecord[];
   shares: ShareRecord[];
+  testCredentials: TestCredential[];
+  rateLimits: AuthRateLimit[];
   idempotency: Map<string, IdempotentRecord>;
 };
 
@@ -26,11 +38,14 @@ export function createFamilyStore(): FamilyStore {
     invitations: [],
     mediaObjects: [],
     shares: [],
+    testCredentials: [],
+    rateLimits: [],
     idempotency: new Map(),
   };
 }
 
 export function findAccountByAppleSubject(store: FamilyStore, appleSubject: string) {
+  if (!appleSubject) return null;
   return store.accounts.find((account) => account.appleSubject === appleSubject) ?? null;
 }
 

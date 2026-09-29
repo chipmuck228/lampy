@@ -19,7 +19,9 @@
 - 生产：`createSqliteFamilyRepository` + `applyFamilyApiSchema`。同一 SQLite 连接上的事务排队，避免 HTTP 共用连接时二次 BEGIN。
 - HTTP：`dispatchFamilyApi`；监听：`listen.ts`。
 - Apple：test 模式用 `createMapAppleVerifier`。production 用 JWKS 校验签名、issuer、audience、exp、sub。测试 token **不得**进入 production。
-- 邮箱不当主键。登录成功不创建 Membership。
+- 邮箱不当主键，也不按邮箱字符串合并 Apple 账号。登录成功不创建 Membership。
+- 受控测试账号：离线 CLI 预置登录名 + Argon2id 哈希（`m=19456,t=2,p=1,dkLen=32`）。`POST /v1/auth/test-account` 默认关闭（`LAMPY_TEST_ACCOUNT_LOGIN` 未设）。没有公开注册、验证、重设密码或删号 HTTP。
+- 测试登录名可以长得像邮箱，只是账号标识，不是已验证邮箱，也不会和 Apple subject 合并。
 
 ## 配置清单（均需真实值，禁止编造）
 
@@ -34,6 +36,7 @@
 | `LAMPY_FAMILY_API_HOST` | 默认 `127.0.0.1` |
 | `LAMPY_FAMILY_MEDIA_PATH` | 可选。生产媒体文件目录。未设则为数据库目录下的 `media/` |
 | iOS `EXPO_PUBLIC_FAMILY_API_BASE_URL` | 客户端指向上述服务。未配置则视为不可达，不展示成员 |
+| `LAMPY_TEST_ACCOUNT_LOGIN` | 独立服务端开关。默认关闭。设为 `1` 才接受预置测试账号登录。关闭时 Apple 仍可用；已有测试会话在下次受保护请求时被撤销 |
 
 Apple 私钥、Key ID、Team ID、生产 Session 密钥：**本仓库不提供，也不写入。**
 
@@ -67,7 +70,30 @@ LAMPY_APPLE_CLIENT_ID=app.lampy.ios \
 npm run family-api
 ```
 
-`GET /health` 只表示本进程在听，不表示公网已部署。
+`GET /health` 只表示本进程在听，不表示公网已部署，也不表示已有两个真实可用的 Lampy userId。
+
+## 受控测试账号（离线 CLI）
+
+在受控主机对 SQLite 直接操作。不开放公网创建／停用接口。不要把密码写进 argv、日志或 shell 历史。
+
+先对该文件跑 `npm run family-api:migrate`。测试账号 CLI **不会**执行迁移（第 14 项会重建 `family_accounts`）。schema 14–16 不齐时直接拒绝。
+
+```bash
+cd apps/ios
+LAMPY_FAMILY_DATABASE_PATH=./family.db npm run family-api:migrate
+chmod 0600 /path/outside/repo/password
+LAMPY_FAMILY_DATABASE_PATH=./family.db \
+FAMILY_TEST_ACCOUNT_PASSWORD_FILE=/path/outside/repo/password \
+npm run family-api:test-account -- create tester@example.com
+LAMPY_FAMILY_DATABASE_PATH=./family.db \
+npm run family-api:test-account -- disable tester@example.com
+```
+
+`npm run` 不会把额外 FD 传给 Node，所以走 package script 时用仅 owner 可读写的 `FAMILY_TEST_ACCOUNT_PASSWORD_FILE`（拒绝 group/other 可读）。直接跑 `node ./scripts/family-api-test-account.cjs` 时仍可用 `FAMILY_TEST_ACCOUNT_PASSWORD_FD=3` 加 `3< password`。不要把密码写进 argv。
+
+TTY 上也可交互隐藏输入密码。重复 create 不会覆盖既有密码、userId 或家庭资格。停用会立即撤销该账号服务端会话，不删除家庭分享或 F2 媒体。清理测试家庭请用现有成员／分享命令。
+
+回滚：去掉 `LAMPY_TEST_ACCOUNT_LOGIN` 并重启进程。Apple 登录不受影响。已预置的测试凭据行保留，但登录关闭；已有测试会话在下次受保护请求时于独立提交中撤销，重开开关后旧 token 不能恢复。不要在本切片把开关打到 `family.yunpura.com`。
 
 ## 单实例部署（Node + 持久 SQLite 卷）
 

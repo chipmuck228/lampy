@@ -14,29 +14,44 @@ export type AccountSnapshot = {
   sessionUnreachable: boolean;
   canSignIn: boolean;
   canSignOut: boolean;
+  canSignInTestAccount: boolean;
+  testAccountLoginEnabled: boolean;
+  testAccountLoginReason: string;
 };
 
 export function familyAuthServiceReady(baseUrl?: string) {
   return isSafeFamilyApiBaseUrl(baseUrl);
 }
 
-export function snapshotAfterSignedIn(appleAvailable: boolean): AccountSnapshot {
+export function snapshotAfterSignedIn(
+  appleAvailable: boolean,
+  testLogin: { enabled?: boolean; reason?: string } = {},
+): AccountSnapshot {
   return {
     kind: 'signed-in',
     appleAvailable,
     sessionUnreachable: false,
     canSignIn: false,
     canSignOut: true,
+    canSignInTestAccount: false,
+    testAccountLoginEnabled: testLogin.enabled === true,
+    testAccountLoginReason: testLogin.reason ?? 'disabled',
   };
 }
 
-export function snapshotAfterLocalSignOut(appleAvailable: boolean, pendingRevoke: boolean): AccountSnapshot {
+export function snapshotAfterLocalSignOut(
+  appleAvailable: boolean,
+  pendingRevoke: boolean,
+  testLogin: { enabled?: boolean; reason?: string } = {},
+): AccountSnapshot {
   return deriveAccountSnapshot({
     serviceReady: true,
     appleAvailable,
     hasSession: false,
     pendingRevoke,
     membership: { kind: 'unauthenticated' },
+    testAccountLoginEnabled: testLogin.enabled === true,
+    testAccountLoginReason: testLogin.reason,
   });
 }
 
@@ -56,8 +71,13 @@ export function deriveAccountSnapshot(input: {
   hasSession: boolean;
   pendingRevoke: boolean;
   membership?: FamilyMembershipView | null;
+  testAccountLoginEnabled?: boolean;
+  testAccountLoginReason?: string;
 }): AccountSnapshot {
   const appleAvailable = input.appleAvailable;
+  const testAccountLoginEnabled = input.testAccountLoginEnabled === true;
+  const testAccountLoginReason = input.testAccountLoginReason ?? 'disabled';
+  const canSignInTestAccount = testAccountLoginEnabled;
   if (!input.serviceReady) {
     return {
       kind: 'service-unavailable',
@@ -65,6 +85,9 @@ export function deriveAccountSnapshot(input: {
       sessionUnreachable: false,
       canSignIn: false,
       canSignOut: input.hasSession,
+      canSignInTestAccount: false,
+      testAccountLoginEnabled: false,
+      testAccountLoginReason: 'disabled',
     };
   }
   if (input.pendingRevoke && !input.hasSession) {
@@ -72,8 +95,11 @@ export function deriveAccountSnapshot(input: {
       kind: 'local-out-revoke-pending',
       appleAvailable,
       sessionUnreachable: false,
-      canSignIn: appleAvailable,
+      canSignIn: appleAvailable || canSignInTestAccount,
       canSignOut: false,
+      canSignInTestAccount,
+      testAccountLoginEnabled,
+      testAccountLoginReason,
     };
   }
   const membership = input.membership;
@@ -82,8 +108,11 @@ export function deriveAccountSnapshot(input: {
       kind: 'needs-reauth',
       appleAvailable,
       sessionUnreachable: false,
-      canSignIn: appleAvailable,
+      canSignIn: appleAvailable || canSignInTestAccount,
       canSignOut: false,
+      canSignInTestAccount,
+      testAccountLoginEnabled,
+      testAccountLoginReason,
     };
   }
   if (membership?.kind === 'unauthenticated' || membership == null) {
@@ -91,8 +120,11 @@ export function deriveAccountSnapshot(input: {
       kind: 'unsigned',
       appleAvailable,
       sessionUnreachable: false,
-      canSignIn: appleAvailable,
+      canSignIn: appleAvailable || canSignInTestAccount,
       canSignOut: false,
+      canSignInTestAccount,
+      testAccountLoginEnabled,
+      testAccountLoginReason,
     };
   }
   return {
@@ -101,5 +133,8 @@ export function deriveAccountSnapshot(input: {
     sessionUnreachable: membership.kind === 'unconfirmed' && membership.reason === 'unreachable',
     canSignIn: false,
     canSignOut: true,
+    canSignInTestAccount: false,
+    testAccountLoginEnabled,
+    testAccountLoginReason,
   };
 }

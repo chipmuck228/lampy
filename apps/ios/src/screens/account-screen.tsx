@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -19,7 +19,7 @@ import { createSecureFamilySessionStore } from '../infrastructure/secure-family-
 import { createFamilyRefreshGate } from './family-refresh';
 import { ink, inkSoft, paper, sage } from './life-page';
 
-type Busy = 'idle' | 'signing-in' | 'signing-out';
+type Busy = 'idle' | 'signing-in' | 'signing-out' | 'test-login';
 
 function accountMessage(error: unknown) {
   if (isApplicationError(error)) {
@@ -29,10 +29,19 @@ function accountMessage(error: unknown) {
       return '现在连不上授权服务，家庭登录没有完成。个人记录还在这台设备上。';
     }
     if (error.code === 'UNAUTHENTICATED') {
-      return '这次会话已经失效，需要重新用 Apple 登录。';
+      return '这次会话已经失效，需要重新登录。';
     }
     if (error.code === 'APPLE_TOKEN_INVALID') {
       return '这次 Apple 登录没有完成。个人记录还在这台设备上。';
+    }
+    if (error.code === 'AUTH_FAILED') {
+      return '登录名或密码不对。';
+    }
+    if (error.code === 'RATE_LIMITED') {
+      return '请稍后再试。';
+    }
+    if (error.code === 'TEST_ACCOUNT_LOGIN_CLOSED') {
+      return '受控测试账号登录目前关闭。这不是正式邮箱注册。';
     }
   }
   return '这件事没有做成。个人记录还在这台设备上。';
@@ -43,7 +52,7 @@ function kindCopy(snapshot: AccountSnapshot) {
     return '现在没有可连接的授权服务，不能完成家庭登录。';
   }
   if (snapshot.kind === 'needs-reauth') {
-    return '这次会话已经失效，需要重新用 Apple 登录。登录成功还不等于已经在一个家里。';
+    return '这次会话已经失效，需要重新登录。登录成功还不等于已经在一个家里。';
   }
   if (snapshot.kind === 'local-out-revoke-pending') {
     return '这台设备已经退出。远端会话还没确认撤销，连上之后会再试。';
@@ -56,14 +65,25 @@ function kindCopy(snapshot: AccountSnapshot) {
   return '还没有家庭身份。登录成功还不等于已经在一个家里。';
 }
 
+function testLoginFlags(snapshot: AccountSnapshot | null) {
+  return {
+    enabled: snapshot?.testAccountLoginEnabled === true,
+    reason: snapshot?.testAccountLoginReason ?? 'disabled',
+  };
+}
+
 export default function AccountScreen() {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<AccountSnapshot | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>('idle');
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
   const refreshGate = useState(() => createFamilyRefreshGate())[0];
   const snapshotRef = useRef<AccountSnapshot | null>(null);
-  snapshotRef.current = snapshot;
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
 
   const load = useCallback(
     async (generation?: number, options?: { applyLocalFirst?: boolean }) => {
@@ -88,11 +108,13 @@ export default function AccountScreen() {
         );
         return 'ok' as const;
       }
+      const family = await getFamilyUseCases();
+      const unknownTestFlags = { enabled: false, reason: 'disabled' };
       if (applyLocalFirst) {
         if (pendingRevoke && !hasSession) {
-          setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true));
+          setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true, unknownTestFlags));
         } else if (hasSession) {
-          setSnapshot(snapshotAfterSignedIn(appleAvailable));
+          setSnapshot(snapshotAfterSignedIn(appleAvailable, unknownTestFlags));
         } else {
           setSnapshot(
             deriveAccountSnapshot({
@@ -101,11 +123,42 @@ export default function AccountScreen() {
               hasSession: false,
               pendingRevoke: false,
               membership: { kind: 'unauthenticated' },
+              testAccountLoginEnabled: unknownTestFlags.enabled,
+              testAccountLoginReason: unknownTestFlags.reason,
             }),
           );
         }
       }
-      const family = await getFamilyUseCases();
+      let testFlags = unknownTestFlags;
+      try {
+        const health = await family.getAuthHealth();
+        testFlags = {
+          enabled: health.testAccountLogin,
+          reason: health.testAccountLoginReason,
+        };
+      } catch {
+        /* hide test login unless the server explicitly supports it */
+      }
+      if (!refreshGate.isCurrent(gen)) return 'stale' as const;
+      if (applyLocalFirst) {
+        if (pendingRevoke && !hasSession) {
+          setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true, testFlags));
+        } else if (hasSession) {
+          setSnapshot(snapshotAfterSignedIn(appleAvailable, testFlags));
+        } else {
+          setSnapshot(
+            deriveAccountSnapshot({
+              serviceReady: true,
+              appleAvailable,
+              hasSession: false,
+              pendingRevoke: false,
+              membership: { kind: 'unauthenticated' },
+              testAccountLoginEnabled: testFlags.enabled,
+              testAccountLoginReason: testFlags.reason,
+            }),
+          );
+        }
+      }
       try {
         const membership = await family.getMembership();
         const familyPending = await family.hasUnconfirmedSessionRevoke();
@@ -118,6 +171,8 @@ export default function AccountScreen() {
             hasSession: latestSession,
             pendingRevoke: familyPending,
             membership,
+            testAccountLoginEnabled: testFlags.enabled,
+            testAccountLoginReason: testFlags.reason,
           }),
         );
         return 'ok' as const;
@@ -164,6 +219,7 @@ export default function AccountScreen() {
         });
       return () => {
         refreshGate.begin();
+        setPassword('');
       };
     }, [load, refreshGate]),
   );
@@ -179,7 +235,7 @@ export default function AccountScreen() {
       const family = await getFamilyUseCases();
       await family.signInWithApple(token);
       if (!refreshGate.isCurrent(generation)) return;
-      setSnapshot(snapshotAfterSignedIn(appleAvailable));
+      setSnapshot(snapshotAfterSignedIn(appleAvailable, testLoginFlags(snapshot)));
       setMessage(null);
     } catch (error) {
       if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
@@ -213,11 +269,11 @@ export default function AccountScreen() {
         setMessage('这台设备还没有退出。待撤销凭据没能写进本机保险柜，请再试。');
       } else if (result.server === 'unconfirmed') {
         committed = 'out-pending';
-        setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true));
+        setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true, testLoginFlags(snapshot)));
         setMessage('这台设备已经退出。远端会话还没确认撤销，连上之后会再试。');
       } else {
         committed = 'out';
-        setSnapshot(snapshotAfterLocalSignOut(appleAvailable, false));
+        setSnapshot(snapshotAfterLocalSignOut(appleAvailable, false, testLoginFlags(snapshot)));
       }
     } catch (error) {
       if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
@@ -247,7 +303,37 @@ export default function AccountScreen() {
     }
   }
 
+  async function signInWithTestAccount() {
+    if (busy !== 'idle' || !snapshot?.canSignInTestAccount) return;
+    const generation = refreshGate.begin();
+    const appleAvailable = snapshot.appleAvailable;
+    const submittedLogin = login;
+    const submittedPassword = password;
+    setPassword('');
+    setBusy('test-login');
+    setMessage(null);
+    try {
+      const family = await getFamilyUseCases();
+      await family.signInWithTestAccount(submittedLogin, submittedPassword);
+      if (!refreshGate.isCurrent(generation)) return;
+      setSnapshot(snapshotAfterSignedIn(appleAvailable, testLoginFlags(snapshot)));
+    } catch (error) {
+      if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
+      return;
+    } finally {
+      setBusy('idle');
+    }
+    try {
+      const result = await load(generation, { applyLocalFirst: false });
+      if (!refreshGate.isCurrent(generation) || result === 'stale') return;
+      setMessage(null);
+    } catch {
+      if (refreshGate.isCurrent(generation)) setMessage(accountRefreshFailureMessage('sign-in'));
+    }
+  }
+
   const showAppleButton = snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
+  const showTestLoginPanel = Boolean(snapshot && snapshot.kind !== 'service-unavailable' && snapshot.kind !== 'signed-in');
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="本机与账户">
@@ -282,6 +368,11 @@ export default function AccountScreen() {
             正在退出。
           </Text>
         ) : null}
+        {busy === 'test-login' ? (
+          <Text style={styles.body} testID="account-busy-test">
+            正在登录。
+          </Text>
+        ) : null}
         {showAppleButton ? (
           <View testID="account-apple-button">
             <AppleAuthentication.AppleAuthenticationButton
@@ -291,6 +382,58 @@ export default function AccountScreen() {
               style={styles.apple}
               onPress={() => void signIn()}
             />
+          </View>
+        ) : null}
+        {snapshot?.kind === 'service-unavailable' ? (
+          <Text style={styles.body} testID="account-test-login-unavailable">
+            没有授权服务地址时，通过 Apple 登录和受控测试账号登录都不能用。
+          </Text>
+        ) : null}
+        {showTestLoginPanel ? (
+          <View testID="account-test-login">
+            <Text style={styles.body} testID="account-test-login-copy">
+              测试账号登录是受控测试能力，不是正式邮箱注册。登录名只是账号标识，不是已验证邮箱，也不会和 Apple 账号自动合并。
+            </Text>
+            {snapshot?.canSignInTestAccount ? (
+              <>
+                <TextInput
+                  testID="account-test-login-input"
+                  accessibilityLabel="测试账号登录名"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  placeholder="测试账号登录名"
+                  value={login}
+                  onChangeText={setLogin}
+                  style={styles.field}
+                  editable={busy === 'idle'}
+                />
+                <TextInput
+                  testID="account-password-input"
+                  accessibilityLabel="密码"
+                  secureTextEntry
+                  placeholder="密码"
+                  value={password}
+                  onChangeText={setPassword}
+                  style={styles.field}
+                  editable={busy === 'idle'}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="测试账号登录"
+                  testID="account-test-login-submit"
+                  disabled={busy !== 'idle'}
+                  onPress={() => void signInWithTestAccount()}
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>测试账号登录</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Text style={styles.body} testID="account-test-login-closed">
+                这台授权服务没有开放受控测试账号登录。这不是正式邮箱注册，也没有忘记密码或验证邮箱。
+              </Text>
+            )}
           </View>
         ) : null}
         {snapshot?.canSignOut && busy === 'idle' ? (
@@ -323,4 +466,12 @@ const styles = StyleSheet.create({
   action: { fontSize: 17, lineHeight: 24, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   apple: { width: 240, height: 44 },
+  field: {
+    minHeight: 44,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: inkSoft,
+    fontSize: 17,
+    color: ink,
+    paddingVertical: 8,
+  },
 });

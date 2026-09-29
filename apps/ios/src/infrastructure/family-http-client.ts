@@ -9,6 +9,7 @@ import type {
   ShareMomentInput,
   ShareView,
   SignInResult,
+  FamilyHealth,
 } from '../family-api/types';
 import { isSafeFamilyApiBaseUrl } from './family-config';
 import { consumeFamilyTestNextRequestFailure, recordFamilyTestLastRequest } from './family-test-driver';
@@ -16,7 +17,7 @@ import { consumeFamilyTestNextRequestFailure, recordFamilyTestLastRequest } from
 export function familyTestPathKind(method: string, path: string) {
   const verb = method.toUpperCase();
   if (path === '/v1/invitations/accept') return 'accept';
-  if (path === '/v1/auth/apple') return 'sign-in';
+  if (path === '/v1/auth/apple' || path === '/v1/auth/test-account') return 'sign-in';
   if (path === '/v1/families') return 'create';
   if (path === '/v1/me/membership') return 'membership';
   if (path.includes('/invitations') && !path.includes('/revoke')) return 'invite';
@@ -56,7 +57,9 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 }
 
 export type FamilyApiClient = {
+  health(): Promise<FamilyHealth>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
+  signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createFamily(sessionToken: string, idempotencyKey: string): Promise<FamilyView>;
   inviteMember(sessionToken: string, familyId: string, idempotencyKey: string): Promise<InvitationView>;
   revokeInvitation(sessionToken: string, invitationId: string): Promise<InvitationView>;
@@ -126,8 +129,14 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
   }
 
   return {
+    health() {
+      return send({ method: 'GET', path: '/health' });
+    },
     signInWithApple(identityToken) {
       return send({ method: 'POST', path: '/v1/auth/apple', body: { identityToken } });
+    },
+    signInWithTestAccount(input) {
+      return send({ method: 'POST', path: '/v1/auth/test-account', body: input });
     },
     createFamily(sessionToken, idempotencyKey) {
       return send({ method: 'POST', path: '/v1/families', sessionToken, idempotencyKey });

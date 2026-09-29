@@ -1,4 +1,14 @@
-import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session, ShareRecord } from './types';
+import type {
+  Account,
+  AuthRateLimit,
+  Family,
+  Invitation,
+  MediaObjectRecord,
+  Membership,
+  Session,
+  ShareRecord,
+  TestCredential,
+} from './types';
 import type { FamilyStore, IdempotentRecord } from './store';
 import {
   findAccountByAppleSubject,
@@ -13,11 +23,18 @@ import {
 
 export type FamilyTx = {
   findAccountByAppleSubject(appleSubject: string): Promise<Account | null>;
+  findAccountByUserId(userId: string): Promise<Account | null>;
   saveAccount(account: Account): Promise<void>;
   findSession(token: string): Promise<Session | null>;
   saveSession(session: Session): Promise<void>;
   deleteSession(token: string): Promise<void>;
   deleteOtherSessions(userId: string, keepToken: string): Promise<void>;
+  deleteSessionsForUser(userId: string): Promise<void>;
+  findTestCredentialByLogin(loginNormalized: string): Promise<TestCredential | null>;
+  findTestCredentialByUserId(userId: string): Promise<TestCredential | null>;
+  saveTestCredential(credential: TestCredential): Promise<void>;
+  findRateLimit(bucket: string): Promise<AuthRateLimit | null>;
+  saveRateLimit(row: AuthRateLimit): Promise<void>;
   findFamily(familyId: string): Promise<Family | null>;
   saveFamily(family: Family): Promise<void>;
   findActiveMembershipForUser(userId: string): Promise<Membership | null>;
@@ -63,6 +80,8 @@ export class FamilyStoreConstraintError extends Error {
       | 'active_membership'
       | 'invitation_code'
       | 'apple_subject'
+      | 'test_login'
+      | 'test_user'
       | 'idempotency'
       | 'media_hash'
       | 'share_revision',
@@ -85,8 +104,14 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     async findAccountByAppleSubject(appleSubject) {
       return findAccountByAppleSubject(store, appleSubject);
     },
+    async findAccountByUserId(userId) {
+      return store.accounts.find((row) => row.userId === userId) ?? null;
+    },
     async saveAccount(account) {
-      if (store.accounts.some((row) => row.appleSubject === account.appleSubject && row.userId !== account.userId)) {
+      if (
+        account.appleSubject &&
+        store.accounts.some((row) => row.appleSubject === account.appleSubject && row.userId !== account.userId)
+      ) {
         throw new FamilyStoreConstraintError('apple_subject');
       }
       replaceBy(store.accounts, (row) => row.userId, account);
@@ -102,6 +127,38 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     },
     async deleteOtherSessions(userId, keepToken) {
       store.sessions = store.sessions.filter((row) => row.userId !== userId || row.token === keepToken);
+    },
+    async deleteSessionsForUser(userId) {
+      store.sessions = store.sessions.filter((row) => row.userId !== userId);
+    },
+    async findTestCredentialByLogin(loginNormalized) {
+      return store.testCredentials.find((row) => row.loginNormalized === loginNormalized) ?? null;
+    },
+    async findTestCredentialByUserId(userId) {
+      return store.testCredentials.find((row) => row.userId === userId) ?? null;
+    },
+    async saveTestCredential(credential) {
+      if (
+        store.testCredentials.some(
+          (row) => row.loginNormalized === credential.loginNormalized && row.credentialId !== credential.credentialId,
+        )
+      ) {
+        throw new FamilyStoreConstraintError('test_login');
+      }
+      if (
+        store.testCredentials.some(
+          (row) => row.userId === credential.userId && row.credentialId !== credential.credentialId,
+        )
+      ) {
+        throw new FamilyStoreConstraintError('test_user');
+      }
+      replaceBy(store.testCredentials, (row) => row.credentialId, credential);
+    },
+    async findRateLimit(bucket) {
+      return store.rateLimits.find((row) => row.bucket === bucket) ?? null;
+    },
+    async saveRateLimit(row) {
+      replaceBy(store.rateLimits, (item) => item.bucket, row);
     },
     async findFamily(familyId) {
       return findFamily(store, familyId);

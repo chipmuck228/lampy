@@ -3,6 +3,12 @@ export type FamilyApiListenEnv = {
   LAMPY_FAMILY_API_TEST_TOKENS?: string;
   LAMPY_APPLE_CLIENT_ID?: string;
   LAMPY_FAMILY_DATABASE_PATH?: string;
+  LAMPY_TEST_ACCOUNT_LOGIN?: string;
+};
+
+export type FamilyTestAccountListenPlan = {
+  testAccountLoginEnabled: boolean;
+  testAccountLoginReason: 'enabled' | 'disabled';
 };
 
 export type FamilyApiListenPlan =
@@ -12,6 +18,7 @@ export type FamilyApiListenPlan =
       apple: 'test-tokens';
       testTokens: Record<string, { appleSubject: string; email?: string }>;
       banner: string;
+      testAccount: FamilyTestAccountListenPlan;
     }
   | {
       mode: 'production';
@@ -20,6 +27,7 @@ export type FamilyApiListenPlan =
       databasePath: string;
       appleClientId: string;
       banner: string;
+      testAccount: FamilyTestAccountListenPlan;
     };
 
 export const FAMILY_API_PRODUCTION_REFUSED_MEMORY =
@@ -36,6 +44,14 @@ export const FAMILY_API_TEST_BANNER =
 
 export const FAMILY_API_PRODUCTION_BANNER =
   'Lampy family API production mode: SQLite family store with migrations and Apple JWKS verification. Do not enable test tokens.';
+
+export function planFamilyTestAccountListen(env: FamilyApiListenEnv): FamilyTestAccountListenPlan {
+  const enabled = /^(1|true|yes)$/i.test((env.LAMPY_TEST_ACCOUNT_LOGIN || '').trim());
+  return {
+    testAccountLoginEnabled: enabled,
+    testAccountLoginReason: enabled ? 'enabled' : 'disabled',
+  };
+}
 
 export function parseFamilyApiTestTokens(raw: string | undefined) {
   const tokens: Record<string, { appleSubject: string; email?: string }> = {};
@@ -71,6 +87,7 @@ export function planFamilyApiListen(env: FamilyApiListenEnv): FamilyApiListenPla
       databasePath,
       appleClientId,
       banner: FAMILY_API_PRODUCTION_BANNER,
+      testAccount: planFamilyTestAccountListen(env),
     };
   }
   if (mode !== 'test') {
@@ -88,5 +105,6 @@ export function planFamilyApiListen(env: FamilyApiListenEnv): FamilyApiListenPla
     apple: 'test-tokens',
     testTokens,
     banner: FAMILY_API_TEST_BANNER,
+    testAccount: planFamilyTestAccountListen(env),
   };
 }

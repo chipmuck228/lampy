@@ -54,6 +54,20 @@ npm run family-identity:accept
 
 本机 `127.0.0.1` 上的登录 / 邀请 / 加入 / 创建者移除 / 成员退出，与授权部署服务上的同一组操作是两套结果。部署走查只有双方 `GET /v1/me/membership` 均为 200 且 `family: null` 才建家；401、500 或异常响应立即停止。发现已有家庭会停止并报告，不会退出或解散未知家庭。本轮创建的家庭在邀请/移除等中途失败时也会尝试 dissolve；清理未确认则带 leftoverFamily 和 needsManualCleanup，走查不能算通过。只有公网 HTTPS 部署流程加上托管卷探测均为 PASS，`identityLoopAccepted` 才为 true。退出码 0 只表示没有 FAIL，自动化要读 `identityLoopAccepted`。需要把「未验收」当成失败时用 `npm run family-identity:accept:require`（exit 2）。
 
+## 受控测试账号（本切片默认关闭，且不部署到生产）
+
+不要在本 PR 里改 `family.yunpura.com` 的生产 env、库、DNS 或证书。生产启用和创建真实测试账号是单独、可核验的部署步骤。
+
+隔离验收：
+
+1. 另开 SQLite 文件，不要改生产库。
+2. 确认该文件已跑过 `npm run family-api:migrate`（测试账号 CLI 不执行迁移）。再用 `npm run family-api:test-account` create 两个登录名，确认得到不同 `userId`。密码只从隐藏输入、仅 owner 可访问的 `FAMILY_TEST_ACCOUNT_PASSWORD_FILE`，或 `FAMILY_TEST_ACCOUNT_PASSWORD_FD` 读取。
+3. 本机 listen 设 `LAMPY_TEST_ACCOUNT_LOGIN=1` 后才能 `POST /v1/auth/test-account`。未设时该端点返回 `TEST_ACCOUNT_LOGIN_CLOSED`，Apple 登录不受影响。
+4. 回滚：去掉 `LAMPY_TEST_ACCOUNT_LOGIN`，重启进程。凭据行保留；已有测试会话在下次受保护请求时被撤销。
+5. 本 PR 的迁移 14–16（仅存在于本 PR，main/生产仍停在 13）把 `apple_subject` 改为可空，并增加测试凭据表和登录限速表。不要改已在 main 应用过的 1–13。
+
+停用账号不会删除家庭分享或 F2 媒体。清理测试家庭请用现有成员／分享命令。`GET /health` 200、本地测试 token 或内存账号不能当作真实双账号验收。
+
 托管卷探测（在主机上）。`--after-restart` 只表示操作者声称已经重启并核了卷上 marker，**不是**进程重启证明。重启必须在探针外执行，并用 `systemctl status` / pid / journal 自行核对。
 
 ```bash

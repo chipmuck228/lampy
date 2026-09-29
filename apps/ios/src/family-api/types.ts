@@ -5,9 +5,30 @@ export type FamilyStatus = 'active' | 'dissolved';
 
 export type Account = {
   userId: string;
-  appleSubject: string;
+  appleSubject?: string;
   email?: string;
   createdAt: string;
+};
+
+export type TestCredential = {
+  credentialId: string;
+  loginNormalized: string;
+  userId: string;
+  passwordHash: string;
+  enabled: boolean;
+  createdAt: string;
+  disabledAt?: string;
+};
+
+export type AuthRateLimit = {
+  bucket: string;
+  windowStartedAt: string;
+  hitCount: number;
+};
+
+export type TestAccountHealth = {
+  testAccountLogin: boolean;
+  testAccountLoginReason: 'enabled' | 'disabled';
 };
 
 export type Session = {
@@ -61,6 +82,17 @@ export type SignInResult = {
   userId: string;
   sessionToken: string;
   expiresAt: string;
+};
+
+export type FamilyHealth = {
+  ok: true;
+  slice: 'identity-membership';
+  media: true;
+  shares: true;
+  inbox: true;
+  testAccountLogin: boolean;
+  testAccountLoginReason: TestAccountHealth['testAccountLoginReason'];
+  argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 
 export type MediaObjectRecord = {

@@ -10,6 +10,7 @@ import { createFamilyStore, type FamilyStore, type IdempotentRecord } from './st
 import type {
   AppleVerifier,
   FamilyClock,
+  FamilyHealth,
   FamilyIds,
   FamilyView,
   Invitation,
@@ -22,6 +23,13 @@ import type {
   ShareView,
   SignInResult,
 } from './types';
+import type { PasswordHasher } from './password';
+import { ARGON2ID_PRODUCTION } from './password';
+import {
+  assertTestAccountSessionAllowed,
+  createTestAccountCommands,
+  rejectDisallowedTestAccountSession,
+} from './test-account-commands';
 import type { MediaBlobStore } from './media-blobs';
 import { createMemoryMediaBlobStore } from './media-blobs';
 import { createMediaCommands } from './media-commands';
@@ -29,7 +37,11 @@ import { createShareCommands } from './share-commands';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = {
+  health(): FamilyHealth;
   signInWithApple(identityToken: string): Promise<SignInResult>;
+  signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
+  createTestAccount(login: string, password: string): Promise<{ userId: string; created: true }>;
+  disableTestAccount(login: string): Promise<{ disabled: true; userId: string }>;
   createFamily(sessionToken: string, idempotencyKey?: string): Promise<FamilyView>;
   inviteMember(sessionToken: string, familyId: string, idempotencyKey?: string): Promise<InvitationView>;
   revokeInvitation(sessionToken: string, invitationId: string): Promise<InvitationView>;
@@ -67,7 +79,12 @@ function asConstraint(error: unknown): FamilyStoreConstraintError | null {
   return error instanceof FamilyStoreConstraintError ? error : null;
 }
 
-async function requireUser(tx: FamilyTx, sessionToken: string | undefined, clock: FamilyClock) {
+async function requireUser(
+  tx: FamilyTx,
+  sessionToken: string | undefined,
+  clock: FamilyClock,
+  testAccountLoginEnabled: boolean,
+) {
   if (!sessionToken) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
   }
@@ -75,6 +92,7 @@ async function requireUser(tx: FamilyTx, sessionToken: string | undefined, clock
   if (!session || new Date(session.expiresAt).getTime() <= clock.now().getTime()) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
+  await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled);
   return session.userId;
 }
 
@@ -205,6 +223,8 @@ export function createFamilyCommands(deps: {
   inviteTtlMs?: number;
   sessionTtlMs?: number;
   mediaBlobs?: MediaBlobStore;
+  passwordHasher?: PasswordHasher;
+  testAccountLoginEnabled?: boolean;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -213,19 +233,60 @@ export function createFamilyCommands(deps: {
   const store = deps.store ?? createFamilyStore();
   const repository = deps.repository ?? createMemoryFamilyRepository(store);
   const blobs = deps.mediaBlobs ?? createMemoryMediaBlobStore();
+  const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
   const media = createMediaCommands({
     repository,
     blobs,
     clock,
     assertPayload: assertMediaPayload,
+    testAccountLoginEnabled,
   });
   const shares = createShareCommands({
     repository,
     blobs,
     clock,
+    testAccountLoginEnabled,
+  });
+  const testAccounts = createTestAccountCommands({
+    repository,
+    clock,
+    ids,
+    sessionTtlMs,
+    passwordHasher: deps.passwordHasher,
+    testAccountLoginEnabled,
   });
 
+  function withAuthedUser<T>(
+    sessionToken: string | undefined,
+    work: (tx: FamilyTx, userId: string) => Promise<T>,
+  ) {
+    return rejectDisallowedTestAccountSession(
+      repository,
+      sessionToken,
+      clock.now(),
+      testAccountLoginEnabled,
+    ).then(() =>
+      repository.withTransaction(async (tx) => {
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+        return work(tx, userId);
+      }),
+    );
+  }
+
   return {
+    health() {
+      const testHealth = testAccounts.health();
+      return {
+        ok: true as const,
+        slice: 'identity-membership' as const,
+        media: true as const,
+        shares: true as const,
+        inbox: true as const,
+        testAccountLogin: testHealth.testAccountLogin,
+        testAccountLoginReason: testHealth.testAccountLoginReason,
+        argon2id: ARGON2ID_PRODUCTION,
+      };
+    },
     async signInWithApple(identityToken: string) {
       if (!identityToken.trim()) {
         throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, 'Apple identity token is invalid.');
@@ -261,8 +322,7 @@ export function createFamilyCommands(deps: {
     },
 
     createFamily(sessionToken, idempotencyKey) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const fingerprint = fingerprintCreateFamily();
         const cached = await readIdempotent<FamilyView>(tx, userId, 'createFamily', idempotencyKey, fingerprint);
         if (cached) return replayCreateFamily(tx, cached, userId);
@@ -293,8 +353,7 @@ export function createFamilyCommands(deps: {
     },
 
     inviteMember(sessionToken, familyId, idempotencyKey) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const fingerprint = fingerprintInviteMember(familyId);
         const cached = await readIdempotent<InvitationView>(tx, userId, 'inviteMember', idempotencyKey, fingerprint);
         if (cached) return replayInviteMember(tx, cached, userId, familyId, clock.now());
@@ -315,8 +374,7 @@ export function createFamilyCommands(deps: {
     },
 
     revokeInvitation(sessionToken, invitationId) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const invitation = await tx.findInvitationById(invitationId);
         if (!invitation) {
           throw new FamilyError(FAMILY_ERROR.INVITE_NOT_FOUND, 'Invitation was not found.');
@@ -332,8 +390,7 @@ export function createFamilyCommands(deps: {
     },
 
     acceptInvitation(sessionToken, code, idempotencyKey) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const fingerprint = fingerprintAcceptInvitation(code);
         const cached = await readIdempotent<FamilyView>(tx, userId, 'acceptInvitation', idempotencyKey, fingerprint);
         if (cached) {
@@ -402,8 +459,7 @@ export function createFamilyCommands(deps: {
     },
 
     listMembership(sessionToken) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const membership = await tx.findActiveMembershipForUser(userId);
         if (!membership) return { family: null };
         return { family: await toFamilyView(tx, membership.familyId, userId) };
@@ -411,8 +467,7 @@ export function createFamilyCommands(deps: {
     },
 
     listPendingInvitations(sessionToken, familyId) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         await requireActiveFamily(tx, familyId);
         await requireActiveCreator(tx, familyId, userId, 'Only the family creator can list invitations.');
         const now = clock.now();
@@ -427,8 +482,7 @@ export function createFamilyCommands(deps: {
     },
 
     leaveFamily(sessionToken) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const membership = await tx.findActiveMembershipForUser(userId);
         if (!membership) {
           const prior = (await tx.findMembershipsForUser(userId)).find((row) => row.status === 'left');
@@ -448,8 +502,7 @@ export function createFamilyCommands(deps: {
     },
 
     removeMember(sessionToken, familyId, targetUserId) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         await requireActiveFamily(tx, familyId);
         await requireActiveCreator(tx, familyId, userId, 'Only the family creator can remove a member.');
         if (targetUserId === userId) {
@@ -468,8 +521,7 @@ export function createFamilyCommands(deps: {
     },
 
     dissolveFamily(sessionToken, familyId) {
-      return repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock);
+      return withAuthedUser(sessionToken, async (tx, userId) => {
         const family = await tx.findFamily(familyId);
         if (!family) {
           throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Family was not found.');
@@ -490,6 +542,16 @@ export function createFamilyCommands(deps: {
         }
         return { dissolved: true as const };
       });
+    },
+
+    signInWithTestAccount(input) {
+      return testAccounts.signInWithTestAccount(input);
+    },
+    createTestAccount(login, password) {
+      return testAccounts.createTestAccount(login, password);
+    },
+    disableTestAccount(login) {
+      return testAccounts.disableTestAccount(login);
     },
 
     signOut(sessionToken) {

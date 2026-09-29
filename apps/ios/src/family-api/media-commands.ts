@@ -3,6 +3,7 @@ import { fingerprintUploadMedia, sha256MediaBytes } from './media-validate';
 import type { FamilyRepository, FamilyTx } from './repository';
 import { FamilyStoreConstraintError } from './repository';
 import type { MediaBlobStore } from './media-blobs';
+import { assertTestAccountSessionAllowed, rejectDisallowedTestAccountSession } from './test-account-commands';
 import type { MediaObjectRecord, MediaObjectView } from './types';
 
 export type MediaCommands = {
@@ -31,7 +32,12 @@ function newObjectId() {
   return `med_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-async function requireUser(tx: FamilyTx, sessionToken: string | undefined, now: Date) {
+async function requireUser(
+  tx: FamilyTx,
+  sessionToken: string | undefined,
+  now: Date,
+  testAccountLoginEnabled: boolean,
+) {
   if (!sessionToken) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
   }
@@ -39,11 +45,18 @@ async function requireUser(tx: FamilyTx, sessionToken: string | undefined, now: 
   if (!session || new Date(session.expiresAt).getTime() <= now.getTime()) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
+  await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled);
   return session.userId;
 }
 
-async function requireOwnedMedia(tx: FamilyTx, sessionToken: string, objectId: string, now: Date) {
-  const userId = await requireUser(tx, sessionToken, now);
+async function requireOwnedMedia(
+  tx: FamilyTx,
+  sessionToken: string,
+  objectId: string,
+  now: Date,
+  testAccountLoginEnabled: boolean,
+) {
+  const userId = await requireUser(tx, sessionToken, now, testAccountLoginEnabled);
   const row = await tx.findMediaObject(objectId);
   if (!row) {
     throw new FamilyError(FAMILY_ERROR.MEDIA_NOT_FOUND, 'Media object was not found.');
@@ -95,18 +108,21 @@ export function createMediaCommands(deps: {
   clock?: { now: () => Date };
   objectId?: () => string;
   assertPayload: (bytes: Uint8Array | undefined, mime: string | undefined) => string;
+  testAccountLoginEnabled?: boolean;
 }): MediaCommands {
   const clock = deps.clock ?? { now: () => new Date() };
+  const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
 
   return {
     async uploadMedia(sessionToken, input) {
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
       const mime = deps.assertPayload(input.bytes, input.mimeType);
       const bytes = input.bytes;
       const sha256 = sha256MediaBytes(bytes);
       const fingerprint = fingerprintUploadMedia(sha256, mime, bytes.length);
 
       const prepared = await deps.repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock.now());
+        const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
         if (input.idempotencyKey) {
           const existing = await tx.findIdempotent(userId, 'uploadMedia', input.idempotencyKey);
           if (existing) {
@@ -159,7 +175,7 @@ export function createMediaCommands(deps: {
       }
       try {
         await deps.repository.withTransaction(async (tx) => {
-          const userId = await requireUser(tx, sessionToken, clock.now());
+          const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
           if (userId !== prepared.userId) {
             throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
           }
@@ -214,14 +230,16 @@ export function createMediaCommands(deps: {
     },
 
     async getMediaObject(sessionToken, objectId) {
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
       return deps.repository.withTransaction(async (tx) => {
-        return toView(await requireOwnedMedia(tx, sessionToken, objectId, clock.now()));
+        return toView(await requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled));
       });
     },
 
     async getMediaContent(sessionToken, objectId) {
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
       const row = await deps.repository.withTransaction(async (tx) => {
-        return requireOwnedMedia(tx, sessionToken, objectId, clock.now());
+        return requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled);
       });
       const bytes = await deps.blobs.read(row.storageKey);
       if (bytes.length !== row.byteLength || sha256MediaBytes(bytes) !== row.contentSha256) {

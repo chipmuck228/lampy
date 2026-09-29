@@ -4,6 +4,7 @@ import { sha256MediaBytes } from './media-validate';
 import type { MediaBlobStore } from './media-blobs';
 import type { FamilyRepository, FamilyTx } from './repository';
 import { FamilyStoreConstraintError } from './repository';
+import { assertTestAccountSessionAllowed, rejectDisallowedTestAccountSession } from './test-account-commands';
 import type {
   Membership,
   RevokeShareResult,
@@ -88,7 +89,12 @@ function assertShareInput(input: ShareMomentInput) {
   }
 }
 
-async function requireUser(tx: FamilyTx, sessionToken: string | undefined, now: Date) {
+async function requireUser(
+  tx: FamilyTx,
+  sessionToken: string | undefined,
+  now: Date,
+  testAccountLoginEnabled: boolean,
+) {
   if (!sessionToken) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
   }
@@ -96,6 +102,7 @@ async function requireUser(tx: FamilyTx, sessionToken: string | undefined, now: 
   if (!session || new Date(session.expiresAt).getTime() <= now.getTime()) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
+  await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled);
   return session.userId;
 }
 
@@ -150,8 +157,19 @@ export function createShareCommands(deps: {
   blobs: MediaBlobStore;
   clock?: { now: () => Date };
   shareId?: () => string;
+  testAccountLoginEnabled?: boolean;
 }): ShareCommands {
   const clock = deps.clock ?? { now: () => new Date() };
+  const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
+
+  function gateSession(sessionToken: string | undefined) {
+    return rejectDisallowedTestAccountSession(
+      deps.repository,
+      sessionToken,
+      clock.now(),
+      testAccountLoginEnabled,
+    );
+  }
 
   async function ownedReadableMedia(tx: FamilyTx, userId: string, objectIds: string[]) {
     const media = [];
@@ -173,6 +191,7 @@ export function createShareCommands(deps: {
 
   return {
     async shareMoment(sessionToken, familyId, input) {
+      await gateSession(sessionToken);
       assertShareInput(input);
       const snapshotCanonical = canonicalizeShareSnapshot({
         note: input.note,
@@ -189,7 +208,7 @@ export function createShareCommands(deps: {
       });
 
       return deps.repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock.now());
+        const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
         await requireActiveMember(tx, familyId, userId);
 
         if (input.idempotencyKey) {
@@ -291,8 +310,9 @@ export function createShareCommands(deps: {
     },
 
     async revokeShare(sessionToken, familyId, shareId) {
+      await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock.now());
+        const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
         await requireActiveMember(tx, familyId, userId);
         const row = await tx.findShare(shareId);
         if (!row || row.familyId !== familyId) {
@@ -311,8 +331,9 @@ export function createShareCommands(deps: {
     },
 
     async listVisibleShares(sessionToken, familyId) {
+      await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock.now());
+        const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
         const membership = await requireActiveMember(tx, familyId, userId);
         const rows = await tx.listSharesInFamily(familyId);
         return {
@@ -322,22 +343,32 @@ export function createShareCommands(deps: {
     },
 
     async getShare(sessionToken, familyId, shareId) {
+      await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
-        const { share } = await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now());
+        const { share } = await authorizeVisibleShare(
+          tx,
+          sessionToken,
+          familyId,
+          shareId,
+          clock.now(),
+          testAccountLoginEnabled,
+        );
         return toView(share);
       });
     },
 
     async getShareMedia(sessionToken, familyId, shareId, objectId) {
+      await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
-        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now());
+        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now(), testAccountLoginEnabled);
         return authorizedShareMedia(tx, deps.blobs, shareId, familyId, objectId);
       });
     },
 
     async getShareMediaContent(sessionToken, familyId, shareId, objectId) {
+      await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
-        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now());
+        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now(), testAccountLoginEnabled);
         const media = await authorizedShareMedia(tx, deps.blobs, shareId, familyId, objectId);
         const bytes = await deps.blobs.read(media.objectId);
         if (bytes.length !== media.byteLength || sha256MediaBytes(bytes) !== media.contentSha256) {
@@ -355,8 +386,9 @@ async function authorizeVisibleShare(
   familyId: string,
   shareId: string,
   now: Date,
+  testAccountLoginEnabled: boolean,
 ) {
-  const userId = await requireUser(tx, sessionToken, now);
+  const userId = await requireUser(tx, sessionToken, now, testAccountLoginEnabled);
   const membership = await requireActiveMember(tx, familyId, userId);
   const row = await tx.findShare(shareId);
   if (!row || row.familyId !== familyId || !shareIsActive(row)) {

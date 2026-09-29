@@ -240,7 +240,8 @@ describe('family media object commands', () => {
     const wrapped = {
       withTransaction<T>(work: (tx: FamilyTx) => Promise<T>): Promise<T> {
         commits += 1;
-        if (commits >= 2) {
+        // uploadMedia now pre-gates revoke in its own transaction, then prepares, then commits metadata.
+        if (commits >= 3) {
           return Promise.reject(new Error('disk full'));
         }
         return repository.withTransaction(work);

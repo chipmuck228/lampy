@@ -76,24 +76,75 @@ const MIGRATIONS = [
     ON family_shares(family_id, author_user_id, source_moment_id, source_revision);`,
   `ALTER TABLE family_shares ADD COLUMN status TEXT NOT NULL DEFAULT 'active';`,
   `ALTER TABLE family_shares ADD COLUMN revoked_at TEXT;`,
+  `CREATE TABLE family_accounts_v2 (
+    user_id TEXT PRIMARY KEY NOT NULL,
+    apple_subject TEXT UNIQUE,
+    email TEXT,
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO family_accounts_v2 (user_id, apple_subject, email, created_at)
+    SELECT user_id, apple_subject, email, created_at FROM family_accounts;
+  DROP TABLE family_accounts;
+  ALTER TABLE family_accounts_v2 RENAME TO family_accounts;`,
+  `CREATE TABLE IF NOT EXISTS family_test_credentials (
+    credential_id TEXT PRIMARY KEY NOT NULL,
+    login_normalized TEXT NOT NULL UNIQUE,
+    user_id TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    enabled INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    disabled_at TEXT
+  );`,
+  `CREATE TABLE IF NOT EXISTS family_auth_rate_limits (
+    bucket TEXT PRIMARY KEY NOT NULL,
+    window_started_at TEXT NOT NULL,
+    hit_count INTEGER NOT NULL
+  );`,
 ];
 
-export async function applyFamilyApiSchema(db: FamilySql): Promise<void> {
+export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;
+
+export async function applyFamilyApiSchema(db: FamilySql, options?: { upTo?: number }): Promise<void> {
+  const last = options?.upTo ?? MIGRATIONS.length;
   await db.exec(`CREATE TABLE IF NOT EXISTS family_schema_migrations (
     version INTEGER PRIMARY KEY NOT NULL,
     applied_at TEXT NOT NULL
   );`);
   for (const [index, sql] of MIGRATIONS.entries()) {
+    const version = index + 1;
+    if (version > last) break;
     const applied = await db.getFirst<{ version: number }>(
       'SELECT version FROM family_schema_migrations WHERE version = ?',
-      [index + 1],
+      [version],
     );
     if (!applied) {
       await db.exec(sql);
       await db.run('INSERT INTO family_schema_migrations (version, applied_at) VALUES (?, ?)', [
-        index + 1,
+        version,
         new Date().toISOString(),
       ]);
     }
   }
+}
+
+export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise<void> {
+  const table = await db.getFirst<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'family_schema_migrations'",
+  );
+  if (!table) {
+    throw missingTestAccountSchemaError();
+  }
+  const rows = await db.getAll<{ version: number }>(
+    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16)',
+  );
+  const have = new Set(rows.map((row) => row.version));
+  if (TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS.some((version) => !have.has(version))) {
+    throw missingTestAccountSchemaError();
+  }
+}
+
+function missingTestAccountSchemaError() {
+  return new Error(
+    'This database is missing family-api migrations 14–16. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
+  );
 }

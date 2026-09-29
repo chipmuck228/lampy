@@ -15,7 +15,6 @@ import {
   fingerprintShareMoment,
 } from '../family-api/idempotency';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
-import type { ShareView } from '../family-api/types';
 import { sha256MediaBytes } from '../family-api/media-validate';
 import type {
   FamilyCacheCleanup,
@@ -24,7 +23,13 @@ import type {
   ReceivedShareStatus,
 } from '../infrastructure/family-receive-cache';
 import { DEFAULT_SESSION_TTL_MS } from '../family-api/ids';
-import type { FamilyMemberView, FamilyView, InvitationView, MediaObjectView } from '../family-api/types';
+import type {
+  FamilyMemberView,
+  FamilyView,
+  InvitationView,
+  MediaObjectView,
+  ShareView,
+} from '../family-api/types';
 
 export type SharePreviewMedia = {
   assetId: string;
@@ -384,18 +389,57 @@ export function createFamilyUseCases(deps: {
     }
   }
 
+  async function commitSignedIn(result: { userId: string; sessionToken: string }) {
+    const previousUserId = await deps.session.getUserId();
+    const pendingRow = await deps.session.getPendingRevoke();
+    if (pendingRow?.userId === result.userId) {
+      await deps.session.clearPendingRevoke();
+    } else {
+      await flushPendingRevoke();
+    }
+    if (previousUserId && previousUserId !== result.userId) {
+      await cache.clear();
+      await safeIsolateAccount(previousUserId);
+    }
+    await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
+    await safeIsolateAccount(result.userId);
+    return { userId: result.userId };
+  }
+
   return {
+    async getAuthHealth() {
+      try {
+        return await deps.client.health();
+      } catch (error) {
+        const appError = asApplicationError(error);
+        if (appError.code === 'SERVER_UNREACHABLE' || appError.code === 'NETWORK') {
+          return {
+            ok: true as const,
+            slice: 'identity-membership' as const,
+            media: true as const,
+            shares: true as const,
+            inbox: true as const,
+            testAccountLogin: false,
+            testAccountLoginReason: 'disabled' as const,
+            argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
+          };
+        }
+        throw appError;
+      }
+    },
     async signInWithApple(identityToken: string) {
       try {
         const result = await deps.client.signInWithApple(identityToken);
-        const pendingRow = await deps.session.getPendingRevoke();
-        if (pendingRow?.userId === result.userId) {
-          await deps.session.clearPendingRevoke();
-        } else {
-          await flushPendingRevoke();
-        }
-        await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
-        return { userId: result.userId };
+        return commitSignedIn(result);
+      } catch (error) {
+        await deps.session.clearSession();
+        throw asApplicationError(error);
+      }
+    },
+    async signInWithTestAccount(login: string, password: string) {
+      try {
+        const result = await deps.client.signInWithTestAccount({ login, password });
+        return commitSignedIn(result);
       } catch (error) {
         await deps.session.clearSession();
         throw asApplicationError(error);
