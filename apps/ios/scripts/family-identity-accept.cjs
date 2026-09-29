@@ -165,9 +165,11 @@ async function main() {
   checks.hosted_persistent_volume = evaluateHostedVolume();
   checks.app_restart_session_restore = verdict('NOT VERIFIED', 'needs two real devices; client tests are not this check');
   checks.offline_pending_revoke_retry = verdict('NOT VERIFIED', 'needs a real device offline sign-out');
-  checks.family_entry_closed = inventory.env.EXPO_PUBLIC_FAMILY_API_BASE_URL === 'UNSET'
-    ? verdict('PASS', 'home family entry stays hidden without EXPO_PUBLIC_FAMILY_API_BASE_URL')
-    : verdict('FAIL', 'family entry URL is set; do not open this to real users without review');
+  const familyEntryFlag = (process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN || '').trim().toLowerCase();
+  const familyProductOpen = familyEntryFlag === '1' || familyEntryFlag === 'true' || familyEntryFlag === 'yes';
+  checks.family_entry_closed = familyProductOpen
+    ? verdict('FAIL', 'family product entry is open; do not open this to real users without review')
+    : verdict('PASS', 'family product entry stays closed unless EXPO_PUBLIC_FAMILY_ENTRY_OPEN is 1/true/yes');
 
   const volume = tmpVolume();
   const databasePath = path.join(volume, 'family.db');

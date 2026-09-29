@@ -32,7 +32,8 @@
 | `LAMPY_FAMILY_DATABASE_PATH` | UNSET |
 | `LAMPY_APPLE_CLIENT_ID` | UNSET（本机 listen 回退 `app.json` 的 `app.lampy.ios`） |
 | `LAMPY_FAMILY_API_TEST_TOKENS` | UNSET |
-| `EXPO_PUBLIC_FAMILY_API_BASE_URL` | UNSET（首页家庭入口不出现） |
+| `EXPO_PUBLIC_FAMILY_API_BASE_URL` | UNSET（授权服务目标；单独设置不会打开家庭产品入口） |
+| `EXPO_PUBLIC_FAMILY_ENTRY_OPEN` | UNSET（最近/回看「家庭」、分享、`/family` 不出现） |
 | `LAMPY_FAMILY_ACCEPT_PUBLIC_URL` | UNSET |
 | `LAMPY_FAMILY_ACCEPT_HOSTED_*` / `VOLUME_PROBE` | UNSET |
 | 真实 Apple identity token | 未提供 |
@@ -66,7 +67,7 @@
 | App 重启会话恢复 | NOT VERIFIED | 需要真机 |
 | 断网退出待撤销重试 | NOT VERIFIED | 需要真机 |
 | 家庭故障时个人库仍可用 | PASS | `family-personal-isolation` + image / audio / lookback 测试 |
-| 家庭入口未对真实用户打开 | PASS | `EXPO_PUBLIC_FAMILY_API_BASE_URL` 未设 |
+| 家庭入口未对真实用户打开 | PASS | `EXPO_PUBLIC_FAMILY_ENTRY_OPEN` 未设为 1/true/yes |
 
 `localIdentityLoopPassed=false`。`deployedIdentityLoopPassed=false`。`identityLoopAccepted=false`。`openToRealUsers=false`。
 

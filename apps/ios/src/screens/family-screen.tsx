@@ -8,7 +8,7 @@ import type { FamilyInboxView, FamilyMembershipView, FamilyUseCases } from '../a
 import { isApplicationError } from '../application/errors';
 import type { InvitationView } from '../family-api/types';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
-import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import {
   armFamilyTestCacheDeleteFailure,
   armFamilyTestNextRequestFailure,
@@ -74,7 +74,7 @@ export default function FamilyScreen() {
   const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
   const { width } = useWindowDimensions();
   const readingWidth = Math.min(width, 720);
-  const configured = isFamilyApiConfigured();
+  const configured = isFamilyProductEntryOpen();
   const testDriver = isFamilyTestDriverEnabled();
   const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
   const [membership, setMembership] = useState<FamilyMembershipView | null>(null);
@@ -436,7 +436,7 @@ export default function FamilyScreen() {
         </Text>
 
         {!configured ? (
-          <Text style={styles.body}>还没有接到能用的家庭服务。个人记录还在这台设备上。</Text>
+          <Text style={styles.body}>家庭入口还没有打开。个人记录还在这台设备上。</Text>
         ) : null}
 
         {configured && appleAvailable === false && !testDriver ? (

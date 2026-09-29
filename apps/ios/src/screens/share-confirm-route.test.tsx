@@ -2,7 +2,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ShareConfirmRoute from '../app/share/[id]';
-import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 
 const mockPrepare = jest.fn();
 const mockConfirm = jest.fn();
@@ -20,7 +20,7 @@ jest.mock('../application/container', () => ({
 }));
 
 jest.mock('../infrastructure/family-config', () => ({
-  isFamilyApiConfigured: jest.fn(() => true),
+  isFamilyProductEntryOpen: jest.fn(() => true),
 }));
 
 function wrap() {
@@ -38,16 +38,16 @@ function wrap() {
 
 describe('share confirm route', () => {
   beforeEach(() => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockPrepare.mockReset();
     mockConfirm.mockReset();
   });
 
-  it('stays closed when the family API is not configured', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(false);
+  it('stays closed when the family product entry is closed', async () => {
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(false);
     const view = await render(wrap());
     await waitFor(() => {
-      expect(view.getByText('还没有接到能用的家庭服务。个人记录还在这台设备上。')).toBeTruthy();
+      expect(view.getByText('家庭入口还没有打开。个人记录还在这台设备上。')).toBeTruthy();
     });
     expect(mockPrepare).not.toHaveBeenCalled();
     expect(view.queryByText('确认分享')).toBeNull();

@@ -36,8 +36,20 @@ function wrap(ui: ReactElement) {
 }
 
 describe('recent home', () => {
+  const previousUrl = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
+  const previousEntry = process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN;
+
   beforeEach(() => {
     resetStartupBrandForTests();
+    delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
+    delete process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN;
+  });
+
+  afterEach(() => {
+    if (previousUrl === undefined) delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
+    else process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = previousUrl;
+    if (previousEntry === undefined) delete process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN;
+    else process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN = previousEntry;
   });
 
   it('renders the empty recent state without inventing moments', async () => {
@@ -52,6 +64,29 @@ describe('recent home', () => {
     expect(view.getByText('写一句，拍一张，或留一段声音。以后再回来听见、看见。')).toBeTruthy();
     expect(view.getByLabelText('留下第一条')).toBeTruthy();
     expect(view.queryByTestId('home-family')).toBeNull();
+    expect(view.getByTestId('home-account')).toBeTruthy();
     expect(view.queryByText(/假数据|mock moment/i)).toBeNull();
+  });
+
+  it('hides 家庭 when an auth URL is set but the product entry is closed', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    delete process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN;
+    const view = await render(wrap(<RecentScreen />));
+    await waitFor(() => {
+      expect(view.getByText('这里，留下自己的生活。')).toBeTruthy();
+    });
+    expect(view.queryByTestId('home-family')).toBeNull();
+    expect(view.getByTestId('home-account')).toBeTruthy();
+  });
+
+  it('shows 家庭 only when the product entry is open', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN = '1';
+    const view = await render(wrap(<RecentScreen />));
+    await waitFor(() => {
+      expect(view.getByText('这里，留下自己的生活。')).toBeTruthy();
+    });
+    expect(view.getByTestId('home-family')).toBeTruthy();
+    expect(view.getByTestId('home-account')).toBeTruthy();
   });
 });

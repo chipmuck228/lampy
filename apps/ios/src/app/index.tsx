@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
-import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { leaveHref, lookbackRootHrefFromRecent } from '../screens/lookback-origin';
 import { RootNavBand, RootReadingLayout } from '../screens/root-nav-band';
 import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cases';
@@ -81,13 +81,22 @@ export default function RecentScreen() {
             here="recent"
             onOther={() => router.push(lookbackRootHrefFromRecent())}
             onLeave={() => router.push(leaveHref('recent'))}
-            onFamily={isFamilyApiConfigured() ? () => router.push('/family') : undefined}
+            onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
           />
         }
       >
         <Text style={styles.wordmark} accessibilityRole="header">
           最近
         </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="本机与账户"
+          testID="home-account"
+          onPress={() => router.push('/account')}
+          style={styles.accountHit}
+        >
+          <Text style={styles.account}>本机与账户</Text>
+        </Pressable>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -233,6 +242,8 @@ const styles = StyleSheet.create({
     gap: 40,
   },
   wordmark: { fontSize: 28, lineHeight: 36, color: ink, flexShrink: 1 },
+  accountHit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  account: { fontSize: 17, lineHeight: 24, color: sage },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
   emptyTitle: { fontSize: 28, lineHeight: 38, color: ink },
   body: { fontSize: 17, lineHeight: 26, color: inkSoft },

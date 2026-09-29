@@ -63,6 +63,9 @@ function wrap(ui: ReactElement) {
 }
 
 describe('lookback origin on the root screen', () => {
+  const previousUrl = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
+  const previousEntry = process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN;
+
   beforeEach(() => {
     mockPush.mockReset();
     mockBack.mockReset();
@@ -74,13 +77,23 @@ describe('lookback origin on the root screen', () => {
       delete mockSearchParams[key];
     });
     resetLookbackOriginsForTests();
+    delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
+    delete process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN;
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 2, fontScale: 1 },
     });
   });
 
+  afterEach(() => {
+    if (previousUrl === undefined) delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
+    else process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = previousUrl;
+    if (previousEntry === undefined) delete process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN;
+    else process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN = previousEntry;
+  });
+
   it('does not treat lampy://lookback?from=recent or ?o=invalid as a Recent push', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
     mockGetLookbackBook.mockResolvedValue({
       unknownCount: 0,
       isEmpty: false,
@@ -110,6 +123,7 @@ describe('lookback origin on the root screen', () => {
     expect(mockBack).not.toHaveBeenCalled();
     fireEvent.press(view.getByTestId('lookback-leave'));
     expect(mockPush).toHaveBeenCalledWith('/leave?from=lookback');
+    expect(view.queryByTestId('home-family')).toBeNull();
     await view.unmount();
   });
 });

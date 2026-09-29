@@ -1,11 +1,35 @@
-import { isFamilyApiConfigured, isSafeFamilyApiBaseUrl } from './family-config';
+import { isFamilyApiConfigured, isFamilyProductEntryOpen, isSafeFamilyApiBaseUrl } from './family-config';
 import { createFamilyHttpTransport } from './family-http-client';
 import { armFamilyTestNextRequestFailure } from './family-test-driver';
 
 describe('family API URL safety', () => {
-  it('treats any non-empty URL as configured so the family entry can appear', () => {
+  it('treats any non-empty URL as a configured auth/HTTP target, not as a product entry', () => {
     expect(isFamilyApiConfigured('http://example.com')).toBe(true);
     expect(isFamilyApiConfigured('')).toBe(false);
+    expect(isFamilyProductEntryOpen('')).toBe(false);
+    expect(isFamilyProductEntryOpen(undefined)).toBe(false);
+  });
+
+  it('keeps the family product entry closed unless EXPO_PUBLIC_FAMILY_ENTRY_OPEN is explicitly on', () => {
+    expect(isFamilyProductEntryOpen('1')).toBe(true);
+    expect(isFamilyProductEntryOpen('true')).toBe(true);
+    expect(isFamilyProductEntryOpen('YES')).toBe(true);
+    expect(isFamilyProductEntryOpen('0')).toBe(false);
+    expect(isFamilyProductEntryOpen('https://family.example.com')).toBe(false);
+  });
+
+  it('walks no URL / auth URL with entry closed / family entry open as separate gates', () => {
+    expect(isFamilyApiConfigured('')).toBe(false);
+    expect(isSafeFamilyApiBaseUrl('')).toBe(false);
+    expect(isFamilyProductEntryOpen('')).toBe(false);
+
+    expect(isFamilyApiConfigured('https://family.example.com')).toBe(true);
+    expect(isSafeFamilyApiBaseUrl('https://family.example.com')).toBe(true);
+    expect(isFamilyProductEntryOpen('')).toBe(false);
+
+    expect(isFamilyApiConfigured('https://family.example.com')).toBe(true);
+    expect(isSafeFamilyApiBaseUrl('https://family.example.com')).toBe(true);
+    expect(isFamilyProductEntryOpen('1')).toBe(true);
   });
 
   it('allows HTTPS and local HTTP, and refuses public HTTP before a session token is sent', async () => {

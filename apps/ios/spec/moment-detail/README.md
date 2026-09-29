@@ -38,7 +38,7 @@
 | 照片 | 单图原比例全宽；2–3 张按 `detailImageBands` 组带 |
 | 声音 | 详情用场景态：标题「当时的声音」、时长、发丝进度、播放/暂停 |
 | 次要 | 感受、来源 14 / 20 `ink-soft` |
-| 分享 | 内容之后；`isFamilyApiConfigured()` 才出现 |
+| 分享 | 内容之后；`isFamilyProductEntryOpen()` 才出现 |
 | 去 Card | 无圆角、阴影、描边底 |
 
 ### 精度只读映射

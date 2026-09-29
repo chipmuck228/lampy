@@ -19,7 +19,7 @@ Expo Router `Stack`，`headerShown: false`，切页 `fade`。无系统 Tab Bar�
 
 | 路由 | 页眉 | 现状离开 | 门控 |
 | --- | --- | --- | --- |
-| `/` | 标题「最近」；「回看」；门控「家庭」；「留下」 | 冷启动落点。现码保存后 `replace('/')`；契约改为 `dismissTo('/')` | 家庭入口仅 `isFamilyApiConfigured()` |
+| `/` | 标题「最近」；「回看」；门控「家庭」；「留下」 | 冷启动落点。现码保存后 `replace('/')`；契约改为 `dismissTo('/')` | 家庭入口仅 `isFamilyProductEntryOpen()` |
 | `/lookback` | 「返回原来的位置」+「回看」 | `back()`；滚动 `lookback-session` | 冷启动不恢复上回看（ADR 0005） |
 | `/lookback/[year]`…`/[day]`、`unconfirmed` | 返回 + 时间标题 | `back()`；滚动按 path | 无 |
 | `/moment/[id]` | 钉住「返回原来的位置」 | `back()` | 分享同家庭门控 |
@@ -114,7 +114,7 @@ Expo Router `Stack`，`headerShown: false`，切页 `fade`。无系统 Tab Bar�
 
 ### 3.6 家庭
 
-仅 `isFamilyApiConfigured()` 时根页出现「家庭」，`push('/family')`。返回 `back()`。未配置不画入口。
+仅 `isFamilyProductEntryOpen()` 时根页出现「家庭」，`push('/family')`。返回 `back()`。未打开产品入口不画入口。设置授权 URL 不会打开该入口。
 
 ---
 
