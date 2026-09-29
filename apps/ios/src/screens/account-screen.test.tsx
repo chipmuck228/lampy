@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ApplicationError } from '../application/errors';
@@ -192,5 +192,73 @@ describe('account screen', () => {
     await waitFor(() => {
       expect(view.getByText(/还没有退出/)).toBeTruthy();
     });
+  });
+
+  it('keeps a committed sign-in when the following membership refresh fails', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    mockFamily.getMembership
+      .mockResolvedValueOnce({ kind: 'unauthenticated' })
+      .mockRejectedValueOnce(new ApplicationError('SERVER_UNREACHABLE', 'Family server is unreachable.'));
+    mockFamily.signInWithApple.mockResolvedValue({ sessionToken: 'ses_1' });
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('通过 Apple 登录'));
+    await waitFor(() => {
+      expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
+      expect(view.getByText('已登录。现在读不到最新账户状态，可以再试。')).toBeTruthy();
+    });
+    expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
+    expect(view.getByLabelText('退出登录')).toBeTruthy();
+  });
+
+  it('keeps a committed local sign-out when the following refresh fails', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    mockFamily.getMembership
+      .mockResolvedValueOnce({ kind: 'none' })
+      .mockRejectedValueOnce(new ApplicationError('SERVER_UNREACHABLE', 'Family server is unreachable.'));
+    mockSession.getSessionToken.mockResolvedValue('ses_1');
+    mockFamily.signOut.mockResolvedValue({ local: 'signed-out', server: 'revoked' });
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('account-sign-out')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('account-sign-out'));
+    await waitFor(() => {
+      expect(view.getByTestId('account-kind-unsigned')).toBeTruthy();
+      expect(view.getByText('这台设备已经退出。现在读不到最新账户状态，可以再试。')).toBeTruthy();
+    });
+    expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
+    expect(view.queryByLabelText('退出登录')).toBeNull();
+  });
+
+  it('does not let a stale focus failure overwrite a later sign-in', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    let rejectFocus: (error: unknown) => void = () => {};
+    mockFamily.getMembership
+      .mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectFocus = reject;
+          }),
+      )
+      .mockImplementation(() => new Promise(() => {}));
+    mockFamily.signInWithApple.mockResolvedValue({ sessionToken: 'ses_1' });
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('通过 Apple 登录'));
+    await waitFor(() => {
+      expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
+    });
+    await act(async () => {
+      rejectFocus(new ApplicationError('SERVER_UNREACHABLE', 'Family server is unreachable.'));
+    });
+    expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
+    expect(view.queryByText('这件事没有做成。个人记录还在这台设备上。')).toBeNull();
+    expect(view.queryByText(/连不上授权服务，家庭登录没有完成/)).toBeNull();
+    expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
   });
 });

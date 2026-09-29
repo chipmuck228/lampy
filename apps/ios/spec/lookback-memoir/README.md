@@ -19,7 +19,7 @@
 | 精度 | `exact` / `day` / `month` / `year` / `unknown`。回看月份条数 = `exact`+`day`+`month`；日行 = `exact`+`day`；`unknown` 在书页最前，不进年章节 |
 | 当时的感受 | 领域自由字符串；展示用 `projectFeeling`。词表：高兴 / 平静 / 感动 / 疲惫 / 难过 / 烦乱 / 说不清。未知旧值原样显示，不丢弃、不推断空值 |
 | Asset | 最多三图 + 一段现场录音。`ImageView` / `AudioView` 有 `uri`、`durationMs`、`status`、`reason`。缺失只替换该媒介，不删 Moment |
-| 家庭 | 入口仅当 `isFamilyApiConfigured()`。接收快照是家庭缓存，**不是**个人 Moment。本设计不读家庭内容 |
+| 家庭 | 入口仅当 `isFamilyProductEntryOpen()`。接收快照是家庭缓存，**不是**个人 Moment。本设计不读家庭内容 |
 | Expo 原生 | SDK 57 Development Build。仓库无自定义 Swift 模块。现成接入是 `expo-modules-core.requireOptionalNativeModule`（如 `ExpoAudio`）。Foundation Models **未接入、未探测** |
 | 产品指南 | §4.2 记录要轻、回看要深。§7 感受不是分析对象、不由 AI 猜测、不算趋势。§10.4 回看是时间疏密，不是仪表盘。结语：不未经确认增加 AI / 纪念馆叙事 |
 | Phase 0 未实现表 | 「公开社交 / 点赞 / AI」标为规格禁止。本文件是一次**明确提案**，不是静默开 AI |

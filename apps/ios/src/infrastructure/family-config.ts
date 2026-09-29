@@ -6,6 +6,11 @@ export function isFamilyApiConfigured(value = process.env.EXPO_PUBLIC_FAMILY_API
   return Boolean(familyApiBaseUrl(value));
 }
 
+export function isFamilyProductEntryOpen(value = process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN) {
+  const raw = (value || '').trim().toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes';
+}
+
 function isLocalOrPrivateHostname(hostname: string) {
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
     return true;

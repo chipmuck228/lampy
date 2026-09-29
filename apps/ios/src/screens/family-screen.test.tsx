@@ -5,7 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApplicationError } from '../application/errors';
 import type { FamilyInboxView } from '../application/family-use-cases';
 import FamilyScreen from './family-screen';
-import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 
 const mockFamily = {
   getMembership: jest.fn(),
@@ -44,7 +44,7 @@ jest.mock('../application/container', () => ({
 }));
 
 jest.mock('../infrastructure/family-config', () => ({
-  isFamilyApiConfigured: jest.fn(() => false),
+  isFamilyProductEntryOpen: jest.fn(() => false),
 }));
 
 const mockTestDriver = { enabled: false, inviteCode: '' };
@@ -105,7 +105,7 @@ describe('family screen', () => {
       storeFamilyTestInviteCode: jest.Mock;
     };
     storeFamilyTestInviteCode.mockClear();
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(false);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(false);
     mockFamily.getMembership.mockReset();
     mockFamily.listPendingInvitations.mockReset().mockResolvedValue([]);
     mockFamily.signOut.mockReset();
@@ -123,17 +123,17 @@ describe('family screen', () => {
     mockFamily.inspectFamilyReceiveCache.mockReset().mockResolvedValue({ pendingCount: 0, fileCount: 0 });
   });
 
-  it('shows an accurate unavailable state when the family API is not configured', async () => {
+  it('shows an accurate closed state when the family product entry is closed', async () => {
     const view = await render(wrap(<FamilyScreen />));
     await waitFor(() => {
-      expect(view.getByText('还没有接到能用的家庭服务。个人记录还在这台设备上。')).toBeTruthy();
+      expect(view.getByText('家庭入口还没有打开。个人记录还在这台设备上。')).toBeTruthy();
     });
     expect(view.queryByText('家里现在有这些人。')).toBeNull();
     expect(view.queryByText(/时间线|假成员/)).toBeNull();
   });
 
   it('does not treat an unreachable server as a joined family', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({ kind: 'unconfirmed', reason: 'unreachable' });
     const view = await render(wrap(<FamilyScreen />));
     await waitFor(() => {
@@ -144,7 +144,7 @@ describe('family screen', () => {
   });
 
   it('shows only real members after a confirmed membership', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
       kind: 'ready',
       familyId: 'fam_1',
@@ -162,7 +162,7 @@ describe('family screen', () => {
 
   it('keeps the test-only join control visible so bob can accept after the creator invite is stored', async () => {
     mockTestDriver.enabled = true;
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({ kind: 'none' });
     const view = await render(wrap(<FamilyScreen />));
     await waitFor(() => {
@@ -182,7 +182,7 @@ describe('family screen', () => {
       storeFamilyTestInviteCode: jest.Mock;
     };
     mockTestDriver.enabled = true;
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
       kind: 'ready',
       familyId: 'fam_1',
@@ -200,7 +200,7 @@ describe('family screen', () => {
   });
 
   it('lists a received share as household content and never says family received it', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
       kind: 'ready',
       familyId: 'fam_1',
@@ -234,7 +234,7 @@ describe('family screen', () => {
   });
 
   it('offers Apple sign-in again after a stored session is rejected', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({ kind: 'unconfirmed', reason: 'unauthenticated' });
     const view = await render(wrap(<FamilyScreen />));
     await waitFor(() => {
@@ -246,7 +246,7 @@ describe('family screen', () => {
   });
 
   it('keeps confirmed members if only the pending-invite list fails', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
       kind: 'ready',
       familyId: 'fam_1',
@@ -265,7 +265,7 @@ describe('family screen', () => {
   });
 
   it('refreshes shares after a remote revoke even when the invite list fails', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
       kind: 'ready',
       familyId: 'fam_1',
@@ -312,7 +312,7 @@ describe('family screen', () => {
   });
 
   it('hides family shares when the share list request fails', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
       kind: 'ready',
       familyId: 'fam_1',
@@ -350,7 +350,7 @@ describe('family screen', () => {
   });
 
   it('shows an unconfirmed remote revoke after a later refresh without treating it as a live session', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({ kind: 'unauthenticated' });
     mockFamily.hasUnconfirmedSessionRevoke.mockResolvedValue(true);
     const view = await render(wrap(<FamilyScreen />));
@@ -362,7 +362,7 @@ describe('family screen', () => {
   });
 
   it('hides family content immediately on sign-out and does not claim a remote revoke when it is unconfirmed', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership
       .mockResolvedValueOnce({
         kind: 'ready',
@@ -386,7 +386,7 @@ describe('family screen', () => {
   });
 
   it('keeps the signed-in family page when pending revoke cannot be saved', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
       kind: 'ready',
       familyId: 'fam_1',
@@ -408,7 +408,7 @@ describe('family screen', () => {
   });
 
   it('says the device signed out after a confirmed server revoke', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership
       .mockResolvedValueOnce({
         kind: 'ready',
@@ -430,7 +430,7 @@ describe('family screen', () => {
   });
 
   it('hides previous members and admin actions when re-entering and revalidation fails', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     mockFamily.getMembership.mockResolvedValue({
       kind: 'ready',
       familyId: 'fam_1',

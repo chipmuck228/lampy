@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../application/container';
 import type { MomentDetailViewModel } from '../../application/use-cases';
-import { isFamilyApiConfigured } from '../../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../../infrastructure/family-config';
 import { MomentAudio, MomentUnknownMedia } from '../../screens/moment-audio';
 import { detailPrecisionLine } from '../../screens/moment-detail-entry';
 import { MomentFeeling } from '../../screens/moment-feeling';
@@ -141,7 +141,7 @@ export default function MomentDetailScreen() {
               <MomentFeeling feeling={view.feeling} testID="detail-feeling" />
               <Text style={styles.meta}>{view.sourceLabel}</Text>
             </View>
-            {isFamilyApiConfigured() ? (
+            {isFamilyProductEntryOpen() ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="分享给家里"

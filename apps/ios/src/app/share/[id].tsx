@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getFamilyUseCases } from '../../application/container';
 import { isApplicationError } from '../../application/errors';
 import type { ShareConfirmState, SharePreview } from '../../application/family-use-cases';
-import { isFamilyApiConfigured } from '../../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../../infrastructure/family-config';
 import { isFamilyTestDriverEnabled } from '../../infrastructure/family-test-driver';
 import { ShareConfirmScreen } from '../../screens/share-confirm-screen';
 
@@ -30,7 +30,7 @@ export default function ShareConfirmRoute() {
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
   const momentId = rawId ? decodeURIComponent(rawId) : '';
-  const configured = isFamilyApiConfigured();
+  const configured = isFamilyProductEntryOpen();
   const [preview, setPreview] = useState<SharePreview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState<ShareConfirmState>({ status: 'idle' });
@@ -95,7 +95,7 @@ export default function ShareConfirmRoute() {
           <Text style={styles.back}>返回原来的位置</Text>
         </Pressable>
         {!configured ? (
-          <Text style={styles.body}>还没有接到能用的家庭服务。个人记录还在这台设备上。</Text>
+          <Text style={styles.body}>家庭入口还没有打开。个人记录还在这台设备上。</Text>
         ) : null}
         {configured && loadError ? (
           <View style={styles.block}>

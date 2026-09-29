@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
-import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { leaveHref, lookbackRootHrefFromRecent } from '../screens/lookback-origin';
 import { RootNavBand, RootReadingLayout } from '../screens/root-nav-band';
 import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cases';
@@ -81,7 +81,7 @@ export default function RecentScreen() {
             here="recent"
             onOther={() => router.push(lookbackRootHrefFromRecent())}
             onLeave={() => router.push(leaveHref('recent'))}
-            onFamily={isFamilyApiConfigured() ? () => router.push('/family') : undefined}
+            onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
           />
         }
       >

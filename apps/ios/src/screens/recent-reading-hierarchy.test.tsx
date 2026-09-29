@@ -175,6 +175,7 @@ describe('recent reading hierarchy', () => {
     mockGetRecentLife.mockReset();
     mockPush.mockReset();
     resetStartupBrandForTests();
+    delete process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN;
   });
 
   it('treats mixed sound as its own scene, not a caption under the photos', async () => {

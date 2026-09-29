@@ -1,4 +1,10 @@
-import { deriveAccountSnapshot, familyAuthServiceReady } from './account-status';
+import {
+  accountRefreshFailureMessage,
+  deriveAccountSnapshot,
+  familyAuthServiceReady,
+  snapshotAfterLocalSignOut,
+  snapshotAfterSignedIn,
+} from './account-status';
 
 describe('account status', () => {
   const previous = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
@@ -70,6 +76,29 @@ describe('account status', () => {
         membership: { kind: 'unauthenticated' },
       }),
     ).toMatchObject({ kind: 'local-out-revoke-pending', canSignIn: true });
+  });
+
+  it('keeps a committed sign-in or local sign-out even before membership refresh', () => {
+    expect(snapshotAfterSignedIn(true)).toMatchObject({
+      kind: 'signed-in',
+      canSignOut: true,
+      canSignIn: false,
+      sessionUnreachable: false,
+    });
+    expect(snapshotAfterLocalSignOut(true, false)).toMatchObject({
+      kind: 'unsigned',
+      canSignIn: true,
+      canSignOut: false,
+    });
+    expect(snapshotAfterLocalSignOut(true, true)).toMatchObject({
+      kind: 'local-out-revoke-pending',
+      canSignIn: true,
+    });
+    expect(accountRefreshFailureMessage('sign-in')).toBe('已登录。现在读不到最新账户状态，可以再试。');
+    expect(accountRefreshFailureMessage('sign-out')).toBe('这台设备已经退出。现在读不到最新账户状态，可以再试。');
+    expect(accountRefreshFailureMessage('sign-out-pending')).toBe(
+      '这台设备已经退出。远端会话还没确认撤销。现在读不到最新账户状态，可以再试。',
+    );
   });
 
   it('does not invent family members from a ready membership on the account page', () => {

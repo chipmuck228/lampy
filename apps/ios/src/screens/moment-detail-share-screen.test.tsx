@@ -2,7 +2,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import MomentDetailScreen from '../app/moment/[id]';
-import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 
 const mockPush = jest.fn();
 
@@ -28,16 +28,16 @@ jest.mock('../application/container', () => ({
 }));
 
 jest.mock('../infrastructure/family-config', () => ({
-  isFamilyApiConfigured: jest.fn(() => false),
+  isFamilyProductEntryOpen: jest.fn(() => false),
 }));
 
 describe('moment detail share entry', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(false);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(false);
   });
 
-  it('does not show a share entry when the family API is not configured', async () => {
+  it('does not show a share entry when the family product entry is closed', async () => {
     const view = await render(
       <SafeAreaProvider
         initialMetrics={{
@@ -54,8 +54,8 @@ describe('moment detail share entry', () => {
     expect(view.queryByLabelText('分享给家里')).toBeNull();
   });
 
-  it('opens the confirm route from personal detail when the family API is configured', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+  it('opens the confirm route from personal detail when the family product entry is open', async () => {
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     const view = await render(
       <SafeAreaProvider
         initialMetrics={{

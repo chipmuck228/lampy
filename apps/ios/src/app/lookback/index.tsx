@@ -22,7 +22,7 @@ import {
   writeLookbackBookIntent,
 } from '../../application/lookback-session';
 import { pad2 } from '../../domain-adapters/calendar';
-import { isFamilyApiConfigured } from '../../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../../infrastructure/family-config';
 import {
   LookbackBookDayRow,
   LookbackBookExcerptBlock,
@@ -268,7 +268,7 @@ export default function LookbackIndexScreen() {
         forgetLookbackOrigin(originToken);
       }}
       onLeave={() => router.push(leaveHref('lookback'))}
-      onFamily={isFamilyApiConfigured() ? () => router.push('/family') : undefined}
+      onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
     >
       {error ? <LookbackMessage>{error}</LookbackMessage> : null}
       {view?.isEmpty ? <LookbackMessage>还没有可以按时间回看的记录。</LookbackMessage> : null}

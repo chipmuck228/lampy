@@ -3,7 +3,7 @@ import { Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import MomentDetailScreen from '../app/moment/[id]';
-import { isFamilyApiConfigured } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 
 Dimensions.set({
   window: { width: 390, height: 844, scale: 3, fontScale: 1 },
@@ -66,7 +66,7 @@ jest.mock('../application/container', () => ({
 }));
 
 jest.mock('../infrastructure/family-config', () => ({
-  isFamilyApiConfigured: jest.fn(() => true),
+  isFamilyProductEntryOpen: jest.fn(() => true),
 }));
 
 jest.mock('./use-sound-player', () => ({
@@ -89,7 +89,7 @@ describe('moment detail hierarchy', () => {
   });
 
   it('keeps date as the entry, pairs the last portraits, and treats sound as a scene', async () => {
-    jest.mocked(isFamilyApiConfigured).mockReturnValue(true);
+    jest.mocked(isFamilyProductEntryOpen).mockReturnValue(true);
     const view = await render(
       <SafeAreaProvider
         initialMetrics={{

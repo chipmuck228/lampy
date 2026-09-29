@@ -5,8 +5,11 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
 import {
+  accountRefreshFailureMessage,
   deriveAccountSnapshot,
   familyAuthServiceReady,
+  snapshotAfterLocalSignOut,
+  snapshotAfterSignedIn,
   type AccountSnapshot,
 } from '../application/account-status';
 import { getFamilyUseCases } from '../application/container';
@@ -57,95 +60,155 @@ export default function AccountScreen() {
   const [busy, setBusy] = useState<Busy>('idle');
   const refreshGate = useState(() => createFamilyRefreshGate())[0];
 
-  const load = useCallback(async () => {
-    const generation = refreshGate.begin();
-    const apple = createExpoAppleIdentityTokenSource();
-    const appleAvailable = await apple.isAvailable();
-    const session = createSecureFamilySessionStore();
-    const serviceReady = familyAuthServiceReady();
-    if (!serviceReady) {
+  const load = useCallback(
+    async (generation?: number, options?: { applyLocalFirst?: boolean }) => {
+      const gen = generation ?? refreshGate.begin();
+      const applyLocalFirst = options?.applyLocalFirst !== false;
+      const apple = createExpoAppleIdentityTokenSource();
+      const appleAvailable = await apple.isAvailable();
+      if (!refreshGate.isCurrent(gen)) return 'stale' as const;
+      const session = createSecureFamilySessionStore();
+      const serviceReady = familyAuthServiceReady();
       const hasSession = Boolean(await session.getSessionToken());
       const pendingRevoke = Boolean(await session.getPendingRevoke());
-      if (!refreshGate.isCurrent(generation)) return 'stale' as const;
+      if (!refreshGate.isCurrent(gen)) return 'stale' as const;
+      if (!serviceReady) {
+        setSnapshot(
+          deriveAccountSnapshot({
+            serviceReady: false,
+            appleAvailable,
+            hasSession,
+            pendingRevoke,
+          }),
+        );
+        return 'ok' as const;
+      }
+      if (applyLocalFirst) {
+        setSnapshot(
+          deriveAccountSnapshot({
+            serviceReady: true,
+            appleAvailable,
+            hasSession,
+            pendingRevoke,
+            membership: hasSession
+              ? { kind: 'unconfirmed', reason: 'unreachable' }
+              : { kind: 'unauthenticated' },
+          }),
+        );
+      }
+      const family = await getFamilyUseCases();
+      const membership = await family.getMembership();
+      const familyPending = await family.hasUnconfirmedSessionRevoke();
+      const latestSession = Boolean(await session.getSessionToken());
+      if (!refreshGate.isCurrent(gen)) return 'stale' as const;
       setSnapshot(
         deriveAccountSnapshot({
-          serviceReady: false,
+          serviceReady: true,
           appleAvailable,
-          hasSession,
-          pendingRevoke,
+          hasSession: latestSession,
+          pendingRevoke: familyPending,
+          membership,
         }),
       );
       return 'ok' as const;
-    }
-    const family = await getFamilyUseCases();
-    const membership = await family.getMembership();
-    const pendingRevoke = await family.hasUnconfirmedSessionRevoke();
-    const hasSession = Boolean(await session.getSessionToken());
-    if (!refreshGate.isCurrent(generation)) return 'stale' as const;
-    setSnapshot(
-      deriveAccountSnapshot({
-        serviceReady: true,
-        appleAvailable,
-        hasSession,
-        pendingRevoke,
-        membership,
-      }),
-    );
-    return 'ok' as const;
-  }, [refreshGate]);
+    },
+    [refreshGate],
+  );
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      load()
+      const generation = refreshGate.begin();
+      load(generation)
         .then((result) => {
-          if (cancelled || result === 'stale') return;
+          if (!refreshGate.isCurrent(generation) || result === 'stale') return;
           setMessage(null);
         })
         .catch((error) => {
-          if (!cancelled) setMessage(accountMessage(error));
+          if (!refreshGate.isCurrent(generation)) return;
+          setMessage(accountMessage(error));
         });
       return () => {
-        cancelled = true;
+        refreshGate.begin();
       };
-    }, [load]),
+    }, [load, refreshGate]),
   );
 
   async function signIn() {
     if (busy !== 'idle' || !snapshot?.canSignIn) return;
-    refreshGate.begin();
+    const generation = refreshGate.begin();
+    const appleAvailable = snapshot.appleAvailable;
     setBusy('signing-in');
     setMessage(null);
     try {
       const token = await createExpoAppleIdentityTokenSource().requestIdentityToken();
       const family = await getFamilyUseCases();
       await family.signInWithApple(token);
-      await load();
+      if (!refreshGate.isCurrent(generation)) return;
+      setSnapshot(snapshotAfterSignedIn(appleAvailable));
+      setMessage(null);
     } catch (error) {
-      setMessage(accountMessage(error));
+      if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
+      return;
     } finally {
       setBusy('idle');
+    }
+    try {
+      const result = await load(generation, { applyLocalFirst: false });
+      if (!refreshGate.isCurrent(generation) || result === 'stale') return;
+      setMessage(null);
+    } catch {
+      if (!refreshGate.isCurrent(generation)) return;
+      setMessage(accountRefreshFailureMessage('sign-in'));
     }
   }
 
   async function signOut() {
     if (busy !== 'idle' || !snapshot?.canSignOut) return;
-    refreshGate.begin();
+    const generation = refreshGate.begin();
+    const appleAvailable = snapshot.appleAvailable;
     setBusy('signing-out');
     setMessage(null);
+    let committed: 'still-in' | 'out' | 'out-pending' | null = null;
     try {
       const family = await getFamilyUseCases();
       const result = await family.signOut();
+      if (!refreshGate.isCurrent(generation)) return;
       if (result.local === 'still-signed-in') {
+        committed = 'still-in';
         setMessage('这台设备还没有退出。待撤销凭据没能写进本机保险柜，请再试。');
       } else if (result.server === 'unconfirmed') {
+        committed = 'out-pending';
+        setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true));
         setMessage('这台设备已经退出。远端会话还没确认撤销，连上之后会再试。');
+      } else {
+        committed = 'out';
+        setSnapshot(snapshotAfterLocalSignOut(appleAvailable, false));
       }
-      await load();
     } catch (error) {
-      setMessage(accountMessage(error));
+      if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
+      return;
     } finally {
       setBusy('idle');
+    }
+    try {
+      const result = await load(generation, { applyLocalFirst: false });
+      if (!refreshGate.isCurrent(generation) || result === 'stale') return;
+      if (committed === 'still-in') {
+        setMessage('这台设备还没有退出。待撤销凭据没能写进本机保险柜，请再试。');
+        return;
+      }
+      if (committed === 'out-pending') {
+        setMessage('这台设备已经退出。远端会话还没确认撤销，连上之后会再试。');
+        return;
+      }
+      setMessage(null);
+    } catch {
+      if (!refreshGate.isCurrent(generation)) return;
+      if (committed === 'still-in') {
+        setMessage('这台设备还没有退出。待撤销凭据没能写进本机保险柜，请再试。');
+        return;
+      }
+      setMessage(accountRefreshFailureMessage(committed === 'out-pending' ? 'sign-out-pending' : 'sign-out'));
     }
   }
 
