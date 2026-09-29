@@ -149,6 +149,54 @@ describe('account screen', () => {
     expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
   });
 
+  it('treats an invalid Apple token as a failed login, not an expired session', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    mockFamily.getMembership.mockResolvedValue({ kind: 'unauthenticated' });
+    mockFamily.signInWithApple.mockRejectedValue(
+      new ApplicationError('APPLE_TOKEN_INVALID', 'Apple identity token is invalid.'),
+    );
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
+    });
+    fireEvent.press(view.getByLabelText('通过 Apple 登录'));
+    await waitFor(() => {
+      expect(view.getByText('这次 Apple 登录没有完成。个人记录还在这台设备上。')).toBeTruthy();
+    });
+    expect(view.queryByText(/这次会话已经失效/)).toBeNull();
+    expect(view.getByTestId('account-kind-unsigned')).toBeTruthy();
+    expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
+  });
+
+  it('paints a trusted local session before membership refresh, not as unreachable', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    mockSession.getSessionToken.mockResolvedValue('ses_1');
+    mockFamily.getMembership.mockImplementation(() => new Promise(() => {}));
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
+    });
+    expect(view.queryByText(/现在读不到最新账户状态/)).toBeNull();
+    expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
+    expect(view.getByLabelText('退出登录')).toBeTruthy();
+  });
+
+  it('keeps a trusted local session when the focus refresh fails', async () => {
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
+    mockSession.getSessionToken.mockResolvedValue('ses_1');
+    mockFamily.getMembership.mockRejectedValue(
+      new ApplicationError('SERVER_UNREACHABLE', 'Family server is unreachable.'),
+    );
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
+      expect(view.getByText('已登录。现在读不到最新账户状态，可以再试。')).toBeTruthy();
+    });
+    expect(view.queryByText(/家庭登录没有完成/)).toBeNull();
+    expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
+    expect(view.getByLabelText('退出登录')).toBeTruthy();
+  });
+
   it('keeps a network login failure retryable and does not treat it as signed in', async () => {
     process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
     mockFamily.getMembership.mockResolvedValue({ kind: 'unauthenticated' });

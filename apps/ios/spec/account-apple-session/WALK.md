@@ -60,6 +60,8 @@ Jest 已分别走查这三组。真机本环境是「无 URL / 入口关闭」�
 | 401 后重新登录 | **NOT VERIFIED** |
 | 服务端完成登录 | **NOT VERIFIED** |
 | 登录或退出已成功、随后刷新失败 | **NOT VERIFIED**（真机未走通）。Jest：先落本机可信状态，刷新失败文案说明已完成部分 |
+| 进入账户页时已有本机会话、随后刷新失败 | **NOT VERIFIED**（真机）。Jest：先画已登录，失败文案是「读不到最新状态」，不是「登录没有完成」 |
+| 无效 Apple token | **NOT VERIFIED**（真机）。Jest：`APPLE_TOKEN_INVALID` 按登录未完成，不按会话过期 |
 | 旧失败晚于新成功 | **NOT VERIFIED**（真机）。Jest：失焦/登录/退出会使旧请求失效 |
 | 本机个人记录仍可用 | Jest `family-personal-isolation` **PASS**。真机个人记录 **NOT VERIFIED**（未读 `lampy.db`，不能把隔离测试写成真机个人记录通过） |
 

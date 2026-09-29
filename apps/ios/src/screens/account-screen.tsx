@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -28,8 +28,11 @@ function accountMessage(error: unknown) {
     if (error.code === 'SERVER_UNREACHABLE' || error.code === 'NETWORK') {
       return '现在连不上授权服务，家庭登录没有完成。个人记录还在这台设备上。';
     }
-    if (error.code === 'UNAUTHENTICATED' || error.code === 'APPLE_TOKEN_INVALID') {
+    if (error.code === 'UNAUTHENTICATED') {
       return '这次会话已经失效，需要重新用 Apple 登录。';
+    }
+    if (error.code === 'APPLE_TOKEN_INVALID') {
+      return '这次 Apple 登录没有完成。个人记录还在这台设备上。';
     }
   }
   return '这件事没有做成。个人记录还在这台设备上。';
@@ -59,6 +62,8 @@ export default function AccountScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>('idle');
   const refreshGate = useState(() => createFamilyRefreshGate())[0];
+  const snapshotRef = useRef<AccountSnapshot | null>(null);
+  snapshotRef.current = snapshot;
 
   const load = useCallback(
     async (generation?: number, options?: { applyLocalFirst?: boolean }) => {
@@ -84,33 +89,46 @@ export default function AccountScreen() {
         return 'ok' as const;
       }
       if (applyLocalFirst) {
+        if (pendingRevoke && !hasSession) {
+          setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true));
+        } else if (hasSession) {
+          setSnapshot(snapshotAfterSignedIn(appleAvailable));
+        } else {
+          setSnapshot(
+            deriveAccountSnapshot({
+              serviceReady: true,
+              appleAvailable,
+              hasSession: false,
+              pendingRevoke: false,
+              membership: { kind: 'unauthenticated' },
+            }),
+          );
+        }
+      }
+      const family = await getFamilyUseCases();
+      try {
+        const membership = await family.getMembership();
+        const familyPending = await family.hasUnconfirmedSessionRevoke();
+        const latestSession = Boolean(await session.getSessionToken());
+        if (!refreshGate.isCurrent(gen)) return 'stale' as const;
         setSnapshot(
           deriveAccountSnapshot({
             serviceReady: true,
             appleAvailable,
-            hasSession,
-            pendingRevoke,
-            membership: hasSession
-              ? { kind: 'unconfirmed', reason: 'unreachable' }
-              : { kind: 'unauthenticated' },
+            hasSession: latestSession,
+            pendingRevoke: familyPending,
+            membership,
           }),
         );
+        return 'ok' as const;
+      } catch (error) {
+        if (!refreshGate.isCurrent(gen)) return 'stale' as const;
+        if (applyLocalFirst && hasSession) return 'refresh-failed-signed-in' as const;
+        if (applyLocalFirst && pendingRevoke && !hasSession) {
+          return 'refresh-failed-pending-out' as const;
+        }
+        throw error;
       }
-      const family = await getFamilyUseCases();
-      const membership = await family.getMembership();
-      const familyPending = await family.hasUnconfirmedSessionRevoke();
-      const latestSession = Boolean(await session.getSessionToken());
-      if (!refreshGate.isCurrent(gen)) return 'stale' as const;
-      setSnapshot(
-        deriveAccountSnapshot({
-          serviceReady: true,
-          appleAvailable,
-          hasSession: latestSession,
-          pendingRevoke: familyPending,
-          membership,
-        }),
-      );
-      return 'ok' as const;
     },
     [refreshGate],
   );
@@ -121,10 +139,27 @@ export default function AccountScreen() {
       load(generation)
         .then((result) => {
           if (!refreshGate.isCurrent(generation) || result === 'stale') return;
+          if (result === 'refresh-failed-signed-in') {
+            setMessage(accountRefreshFailureMessage('sign-in'));
+            return;
+          }
+          if (result === 'refresh-failed-pending-out') {
+            setMessage(accountRefreshFailureMessage('sign-out-pending'));
+            return;
+          }
           setMessage(null);
         })
         .catch((error) => {
           if (!refreshGate.isCurrent(generation)) return;
+          const current = snapshotRef.current;
+          if (current?.kind === 'signed-in') {
+            setMessage(accountRefreshFailureMessage('sign-in'));
+            return;
+          }
+          if (current?.kind === 'local-out-revoke-pending') {
+            setMessage(accountRefreshFailureMessage('sign-out-pending'));
+            return;
+          }
           setMessage(accountMessage(error));
         });
       return () => {
