@@ -5,10 +5,58 @@ export type FamilyStatus = 'active' | 'dissolved';
 
 export type Account = {
   userId: string;
-  appleSubject: string;
+  appleSubject?: string;
   email?: string;
   createdAt: string;
 };
+
+export type EmailCredential = {
+  credentialId: string;
+  userId: string;
+  emailNormalized: string;
+  passwordHash: string;
+  emailVerifiedAt?: string;
+  createdAt: string;
+};
+
+export type EmailToken = {
+  tokenId: string;
+  userId: string;
+  purpose: 'verify' | 'reset';
+  tokenHash: string;
+  expiresAt: string;
+  consumedAt?: string;
+  createdAt: string;
+};
+
+export type AuthRateLimit = {
+  bucket: string;
+  windowStartedAt: string;
+  hitCount: number;
+};
+
+export type EmailAuthHealth = {
+  emailRegister: boolean;
+  emailRegisterReason:
+    | 'enabled'
+    | 'account-delete-incomplete'
+    | 'mail-unconfigured'
+    | 'explicitly-disabled';
+};
+
+export type EmailAccepted = {
+  accepted: true;
+};
+
+export type AccountDeleteResult = {
+  deleted: true;
+};
+
+export type AccountDeleteBlockedReason =
+  | 'active-creator'
+  | 'active-member'
+  | 'active-shares'
+  | 'active-media';
 
 export type Session = {
   token: string;
@@ -61,6 +109,17 @@ export type SignInResult = {
   userId: string;
   sessionToken: string;
   expiresAt: string;
+};
+
+export type FamilyHealth = {
+  ok: true;
+  slice: 'identity-membership';
+  media: true;
+  shares: true;
+  inbox: true;
+  emailRegister: boolean;
+  emailRegisterReason: EmailAuthHealth['emailRegisterReason'];
+  argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 
 export type MediaObjectRecord = {

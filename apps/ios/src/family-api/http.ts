@@ -35,6 +35,7 @@ function statusFor(code: string) {
   switch (code) {
     case FAMILY_ERROR.UNAUTHENTICATED:
     case FAMILY_ERROR.APPLE_TOKEN_INVALID:
+    case FAMILY_ERROR.AUTH_FAILED:
       return 401;
     case FAMILY_ERROR.FORBIDDEN:
       return 403;
@@ -48,6 +49,7 @@ function statusFor(code: string) {
     case FAMILY_ERROR.INVITE_ALREADY_USED:
     case FAMILY_ERROR.FAMILY_DISSOLVED:
     case FAMILY_ERROR.CONFLICT:
+    case FAMILY_ERROR.ACCOUNT_DELETE_BLOCKED:
       return 409;
     case FAMILY_ERROR.BAD_REQUEST:
     case FAMILY_ERROR.MEDIA_CORRUPT:
@@ -66,6 +68,13 @@ function statusFor(code: string) {
       return 400;
     case FAMILY_ERROR.SHARE_MEDIA_UNAVAILABLE:
       return 409;
+    case FAMILY_ERROR.RATE_LIMITED:
+      return 429;
+    case FAMILY_ERROR.EMAIL_REGISTER_CLOSED:
+    case FAMILY_ERROR.EMAIL_MAILER_UNAVAILABLE:
+      return 503;
+    case FAMILY_ERROR.TOKEN_INVALID:
+      return 400;
     default:
       return 400;
   }
@@ -98,15 +107,70 @@ export async function dispatchFamilyApi(
 
   try {
     if (method === 'GET' && path === '/health') {
-      return { status: 200, body: { ok: true, slice: 'identity-membership', media: true, shares: true, inbox: true } };
+      return { status: 200, body: commands.health() };
     }
 
     if (method === 'POST' && path === '/v1/auth/apple') {
       return { status: 200, body: await commands.signInWithApple(readString(body, 'identityToken')) };
     }
 
+    if (method === 'POST' && path === '/v1/auth/email/register') {
+      return {
+        status: 200,
+        body: await commands.registerWithEmail({
+          email: readString(body, 'email'),
+          password: readString(body, 'password'),
+          clientKey: header(request.headers, 'x-forwarded-for'),
+        }),
+      };
+    }
+    if (method === 'POST' && path === '/v1/auth/email/verify') {
+      return { status: 200, body: await commands.verifyEmail({ token: readString(body, 'token') }) };
+    }
+    if (method === 'POST' && path === '/v1/auth/email/resend') {
+      return {
+        status: 200,
+        body: await commands.resendVerification({
+          email: readString(body, 'email'),
+          clientKey: header(request.headers, 'x-forwarded-for'),
+        }),
+      };
+    }
+    if (method === 'POST' && path === '/v1/auth/email/login') {
+      return {
+        status: 200,
+        body: await commands.signInWithEmail({
+          email: readString(body, 'email'),
+          password: readString(body, 'password'),
+          clientKey: header(request.headers, 'x-forwarded-for'),
+        }),
+      };
+    }
+    if (method === 'POST' && path === '/v1/auth/email/forgot') {
+      return {
+        status: 200,
+        body: await commands.requestPasswordReset({
+          email: readString(body, 'email'),
+          clientKey: header(request.headers, 'x-forwarded-for'),
+        }),
+      };
+    }
+    if (method === 'POST' && path === '/v1/auth/email/reset') {
+      return {
+        status: 200,
+        body: await commands.resetPassword({
+          token: readString(body, 'token'),
+          password: readString(body, 'password'),
+        }),
+      };
+    }
+
     if (method === 'POST' && path === '/v1/auth/sign-out') {
       return { status: 200, body: await commands.signOut(token || '') };
+    }
+
+    if (method === 'POST' && path === '/v1/me/delete') {
+      return { status: 200, body: await commands.deleteAccount(token || '') };
     }
 
     if (method === 'POST' && path === '/v1/families') {

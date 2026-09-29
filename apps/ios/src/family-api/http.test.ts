@@ -360,4 +360,23 @@ describe('family HTTP contract', () => {
     });
     expect(oldMedia.status).toBe(404);
   });
+
+  it('keeps email register closed on the default listen contract', async () => {
+    const commands = api();
+    const health = await dispatchFamilyApi(commands, { method: 'GET', path: '/health', headers: {} });
+    expect(health.status).toBe(200);
+    expect(health.body).toMatchObject({
+      ok: true,
+      emailRegister: false,
+      emailRegisterReason: 'account-delete-incomplete',
+    });
+    const register = await dispatchFamilyApi(commands, {
+      method: 'POST',
+      path: '/v1/auth/email/register',
+      headers: {},
+      body: { email: 'a@example.com', password: 'correct-horse' },
+    });
+    expect(register.status).toBe(503);
+    expect((register.body as { error: { code: string } }).error.code).toBe('EMAIL_REGISTER_CLOSED');
+  });
 });

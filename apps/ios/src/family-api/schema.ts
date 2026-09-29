@@ -76,6 +76,38 @@ const MIGRATIONS = [
     ON family_shares(family_id, author_user_id, source_moment_id, source_revision);`,
   `ALTER TABLE family_shares ADD COLUMN status TEXT NOT NULL DEFAULT 'active';`,
   `ALTER TABLE family_shares ADD COLUMN revoked_at TEXT;`,
+  `CREATE TABLE family_accounts_email (
+    user_id TEXT PRIMARY KEY NOT NULL,
+    apple_subject TEXT UNIQUE,
+    email TEXT,
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO family_accounts_email (user_id, apple_subject, email, created_at)
+    SELECT user_id, apple_subject, email, created_at FROM family_accounts;
+  DROP TABLE family_accounts;
+  ALTER TABLE family_accounts_email RENAME TO family_accounts;`,
+  `CREATE TABLE IF NOT EXISTS family_email_credentials (
+    credential_id TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT NOT NULL UNIQUE,
+    email_normalized TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    email_verified_at TEXT,
+    created_at TEXT NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS family_email_tokens (
+    token_id TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    consumed_at TEXT,
+    created_at TEXT NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS family_auth_rate_limits (
+    bucket TEXT PRIMARY KEY NOT NULL,
+    window_started_at TEXT NOT NULL,
+    hit_count INTEGER NOT NULL
+  );`,
 ];
 
 export async function applyFamilyApiSchema(db: FamilySql): Promise<void> {

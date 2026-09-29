@@ -11,6 +11,23 @@ const mockFamily = {
   signInWithApple: jest.fn(),
   signOut: jest.fn(),
   hasUnconfirmedSessionRevoke: jest.fn(async () => false),
+  getEmailAuthStatus: jest.fn(async () => ({
+    ok: true,
+    slice: 'identity-membership',
+    media: true,
+    shares: true,
+    inbox: true,
+    emailRegister: false,
+    emailRegisterReason: 'account-delete-incomplete',
+    argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
+  })),
+  registerWithEmail: jest.fn(),
+  verifyEmail: jest.fn(),
+  resendVerification: jest.fn(),
+  signInWithEmail: jest.fn(),
+  requestPasswordReset: jest.fn(),
+  resetPassword: jest.fn(),
+  deleteAccount: jest.fn(),
 };
 
 const mockSession = {
@@ -92,6 +109,16 @@ describe('account screen', () => {
     mockFamily.signInWithApple.mockReset();
     mockFamily.signOut.mockReset();
     mockFamily.hasUnconfirmedSessionRevoke.mockReset().mockResolvedValue(false);
+    mockFamily.getEmailAuthStatus.mockReset().mockResolvedValue({
+      ok: true,
+      slice: 'identity-membership',
+      media: true,
+      shares: true,
+      inbox: true,
+      emailRegister: false,
+      emailRegisterReason: 'account-delete-incomplete',
+      argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
+    });
     mockSession.getSessionToken.mockReset().mockResolvedValue(null);
     mockSession.getPendingRevoke.mockReset().mockResolvedValue(null);
     mockApple.isAvailable.mockReset().mockResolvedValue(true);
@@ -107,7 +134,9 @@ describe('account screen', () => {
     expect(view.getByTestId('account-personal')).toBeTruthy();
     expect(view.getByText(/没有跨设备同步或云备份/)).toBeTruthy();
     expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
-    expect(view.queryByText(/家庭成员|头像|邮箱/)).toBeNull();
+    expect(view.getByTestId('account-email-unavailable')).toBeTruthy();
+    expect(view.queryByLabelText('使用邮箱登录')).toBeNull();
+    expect(view.queryByText(/家庭成员|头像/)).toBeNull();
     expect(mockFamily.getMembership).not.toHaveBeenCalled();
   });
 
@@ -119,6 +148,8 @@ describe('account screen', () => {
       expect(view.getByTestId('account-kind-unsigned')).toBeTruthy();
     });
     expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
+    expect(view.getByTestId('account-email-closed')).toBeTruthy();
+    expect(view.queryByLabelText('使用邮箱登录')).toBeNull();
   });
 
   it('keeps cancelled Apple authorization as unsigned and retryable', async () => {

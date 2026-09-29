@@ -15,7 +15,6 @@ import {
   fingerprintShareMoment,
 } from '../family-api/idempotency';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
-import type { ShareView } from '../family-api/types';
 import { sha256MediaBytes } from '../family-api/media-validate';
 import type {
   FamilyCacheCleanup,
@@ -24,7 +23,13 @@ import type {
   ReceivedShareStatus,
 } from '../infrastructure/family-receive-cache';
 import { DEFAULT_SESSION_TTL_MS } from '../family-api/ids';
-import type { FamilyMemberView, FamilyView, InvitationView, MediaObjectView } from '../family-api/types';
+import type {
+  FamilyMemberView,
+  FamilyView,
+  InvitationView,
+  MediaObjectView,
+  ShareView,
+} from '../family-api/types';
 
 export type SharePreviewMedia = {
   assetId: string;
@@ -384,20 +389,107 @@ export function createFamilyUseCases(deps: {
     }
   }
 
+  async function commitSignedIn(result: { userId: string; sessionToken: string }) {
+    const previousUserId = await deps.session.getUserId();
+    const pendingRow = await deps.session.getPendingRevoke();
+    if (pendingRow?.userId === result.userId) {
+      await deps.session.clearPendingRevoke();
+    } else {
+      await flushPendingRevoke();
+    }
+    if (previousUserId && previousUserId !== result.userId) {
+      await cache.clear();
+      await safeIsolateAccount(previousUserId);
+    }
+    await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
+    await safeIsolateAccount(result.userId);
+    return { userId: result.userId };
+  }
+
   return {
+    async getEmailAuthStatus() {
+      try {
+        return await deps.client.health();
+      } catch (error) {
+        const appError = asApplicationError(error);
+        if (appError.code === 'SERVER_UNREACHABLE' || appError.code === 'NETWORK') {
+          return {
+            ok: true as const,
+            slice: 'identity-membership' as const,
+            media: true as const,
+            shares: true as const,
+            inbox: true as const,
+            emailRegister: false,
+            emailRegisterReason: 'mail-unconfigured' as const,
+            argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
+          };
+        }
+        throw appError;
+      }
+    },
     async signInWithApple(identityToken: string) {
       try {
         const result = await deps.client.signInWithApple(identityToken);
-        const pendingRow = await deps.session.getPendingRevoke();
-        if (pendingRow?.userId === result.userId) {
-          await deps.session.clearPendingRevoke();
-        } else {
-          await flushPendingRevoke();
-        }
-        await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
-        return { userId: result.userId };
+        return commitSignedIn(result);
       } catch (error) {
         await deps.session.clearSession();
+        throw asApplicationError(error);
+      }
+    },
+    async registerWithEmail(email: string, password: string) {
+      try {
+        return await deps.client.registerWithEmail({ email, password });
+      } catch (error) {
+        throw asApplicationError(error);
+      }
+    },
+    async verifyEmail(token: string) {
+      try {
+        return await deps.client.verifyEmail(token);
+      } catch (error) {
+        throw asApplicationError(error);
+      }
+    },
+    async resendVerification(email: string) {
+      try {
+        return await deps.client.resendVerification(email);
+      } catch (error) {
+        throw asApplicationError(error);
+      }
+    },
+    async signInWithEmail(email: string, password: string) {
+      try {
+        const result = await deps.client.signInWithEmail({ email, password });
+        return commitSignedIn(result);
+      } catch (error) {
+        await deps.session.clearSession();
+        throw asApplicationError(error);
+      }
+    },
+    async requestPasswordReset(email: string) {
+      try {
+        return await deps.client.requestPasswordReset(email);
+      } catch (error) {
+        throw asApplicationError(error);
+      }
+    },
+    async resetPassword(token: string, password: string) {
+      try {
+        return await deps.client.resetPassword({ token, password });
+      } catch (error) {
+        throw asApplicationError(error);
+      }
+    },
+    async deleteAccount() {
+      const { sessionToken, userId } = await requireAccount();
+      try {
+        const result = await deps.client.deleteAccount(sessionToken);
+        await deps.session.clearSession();
+        await deps.session.clearPendingRevoke();
+        await cache.clear();
+        await safeIsolateAccount(userId);
+        return result;
+      } catch (error) {
         throw asApplicationError(error);
       }
     },

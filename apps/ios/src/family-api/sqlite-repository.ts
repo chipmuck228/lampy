@@ -1,13 +1,50 @@
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilySql } from './schema';
 import type { IdempotentRecord } from './store';
-import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session, ShareRecord, ShareSnapshot } from './types';
+import type {
+  Account,
+  AuthRateLimit,
+  EmailCredential,
+  EmailToken,
+  Family,
+  Invitation,
+  MediaObjectRecord,
+  Membership,
+  Session,
+  ShareRecord,
+  ShareSnapshot,
+} from './types';
 
 type AccountRow = {
   user_id: string;
-  apple_subject: string;
+  apple_subject: string | null;
   email: string | null;
   created_at: string;
+};
+
+type EmailCredentialRow = {
+  credential_id: string;
+  user_id: string;
+  email_normalized: string;
+  password_hash: string;
+  email_verified_at: string | null;
+  created_at: string;
+};
+
+type EmailTokenRow = {
+  token_id: string;
+  user_id: string;
+  purpose: string;
+  token_hash: string;
+  expires_at: string;
+  consumed_at: string | null;
+  created_at: string;
+};
+
+type RateLimitRow = {
+  bucket: string;
+  window_started_at: string;
+  hit_count: number;
 };
 
 type SessionRow = {
@@ -100,9 +137,40 @@ function mediaFrom(row: MediaRow): MediaObjectRecord {
 function accountFrom(row: AccountRow): Account {
   return {
     userId: row.user_id,
-    appleSubject: row.apple_subject,
+    appleSubject: row.apple_subject || undefined,
     email: row.email || undefined,
     createdAt: row.created_at,
+  };
+}
+
+function emailCredentialFrom(row: EmailCredentialRow): EmailCredential {
+  return {
+    credentialId: row.credential_id,
+    userId: row.user_id,
+    emailNormalized: row.email_normalized,
+    passwordHash: row.password_hash,
+    emailVerifiedAt: row.email_verified_at || undefined,
+    createdAt: row.created_at,
+  };
+}
+
+function emailTokenFrom(row: EmailTokenRow): EmailToken {
+  return {
+    tokenId: row.token_id,
+    userId: row.user_id,
+    purpose: row.purpose === 'reset' ? 'reset' : 'verify',
+    tokenHash: row.token_hash,
+    expiresAt: row.expires_at,
+    consumedAt: row.consumed_at || undefined,
+    createdAt: row.created_at,
+  };
+}
+
+function rateLimitFrom(row: RateLimitRow): AuthRateLimit {
+  return {
+    bucket: row.bucket,
+    windowStartedAt: row.window_started_at,
+    hitCount: row.hit_count,
   };
 }
 
@@ -148,6 +216,12 @@ export function mapFamilySqlConstraint(error: unknown) {
   if (/family_accounts\.apple_subject/i.test(message)) {
     return new FamilyStoreConstraintError('apple_subject');
   }
+  if (/family_email_credentials\.email_normalized/i.test(message)) {
+    return new FamilyStoreConstraintError('email_normalized');
+  }
+  if (/family_email_credentials\.user_id/i.test(message)) {
+    return new FamilyStoreConstraintError('email_user');
+  }
   if (/family_idempotency/i.test(message)) {
     return new FamilyStoreConstraintError('idempotency');
   }
@@ -157,9 +231,17 @@ export function mapFamilySqlConstraint(error: unknown) {
 function createSqliteTx(db: FamilySql): FamilyTx {
   return {
     async findAccountByAppleSubject(appleSubject) {
+      if (!appleSubject) return null;
       const row = await db.getFirst<AccountRow>(
         'SELECT user_id, apple_subject, email, created_at FROM family_accounts WHERE apple_subject = ?',
         [appleSubject],
+      );
+      return row ? accountFrom(row) : null;
+    },
+    async findAccountByUserId(userId) {
+      const row = await db.getFirst<AccountRow>(
+        'SELECT user_id, apple_subject, email, created_at FROM family_accounts WHERE user_id = ?',
+        [userId],
       );
       return row ? accountFrom(row) : null;
     },
@@ -167,8 +249,11 @@ function createSqliteTx(db: FamilySql): FamilyTx {
       await db.run(
         `INSERT INTO family_accounts (user_id, apple_subject, email, created_at) VALUES (?, ?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET apple_subject = excluded.apple_subject, email = excluded.email`,
-        [account.userId, account.appleSubject, account.email ?? null, account.createdAt],
+        [account.userId, account.appleSubject ?? null, account.email ?? null, account.createdAt],
       );
+    },
+    async deleteAccount(userId) {
+      await db.run('DELETE FROM family_accounts WHERE user_id = ?', [userId]);
     },
     async findSession(token) {
       const row = await db.getFirst<SessionRow>(
@@ -189,6 +274,122 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async deleteOtherSessions(userId, keepToken) {
       await db.run('DELETE FROM family_sessions WHERE user_id = ? AND token != ?', [userId, keepToken]);
+    },
+    async deleteSessionsForUser(userId) {
+      await db.run('DELETE FROM family_sessions WHERE user_id = ?', [userId]);
+    },
+    async findEmailCredentialByEmail(emailNormalized) {
+      const row = await db.getFirst<EmailCredentialRow>(
+        `SELECT credential_id, user_id, email_normalized, password_hash, email_verified_at, created_at
+         FROM family_email_credentials WHERE email_normalized = ?`,
+        [emailNormalized],
+      );
+      return row ? emailCredentialFrom(row) : null;
+    },
+    async findEmailCredentialByUserId(userId) {
+      const row = await db.getFirst<EmailCredentialRow>(
+        `SELECT credential_id, user_id, email_normalized, password_hash, email_verified_at, created_at
+         FROM family_email_credentials WHERE user_id = ?`,
+        [userId],
+      );
+      return row ? emailCredentialFrom(row) : null;
+    },
+    async saveEmailCredential(credential) {
+      await db.run(
+        `INSERT INTO family_email_credentials
+         (credential_id, user_id, email_normalized, password_hash, email_verified_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(credential_id) DO UPDATE SET
+           password_hash = excluded.password_hash,
+           email_verified_at = excluded.email_verified_at`,
+        [
+          credential.credentialId,
+          credential.userId,
+          credential.emailNormalized,
+          credential.passwordHash,
+          credential.emailVerifiedAt ?? null,
+          credential.createdAt,
+        ],
+      );
+    },
+    async deleteEmailCredential(userId) {
+      await db.run('DELETE FROM family_email_credentials WHERE user_id = ?', [userId]);
+    },
+    async findEmailTokenByHash(tokenHash) {
+      const row = await db.getFirst<EmailTokenRow>(
+        `SELECT token_id, user_id, purpose, token_hash, expires_at, consumed_at, created_at
+         FROM family_email_tokens WHERE token_hash = ?`,
+        [tokenHash],
+      );
+      return row ? emailTokenFrom(row) : null;
+    },
+    async listEmailTokensForUser(userId, purpose) {
+      const rows = await db.getAll<EmailTokenRow>(
+        `SELECT token_id, user_id, purpose, token_hash, expires_at, consumed_at, created_at
+         FROM family_email_tokens WHERE user_id = ? AND purpose = ?`,
+        [userId, purpose],
+      );
+      return rows.map(emailTokenFrom);
+    },
+    async saveEmailToken(token) {
+      await db.run(
+        `INSERT INTO family_email_tokens
+         (token_id, user_id, purpose, token_hash, expires_at, consumed_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(token_id) DO UPDATE SET consumed_at = excluded.consumed_at`,
+        [
+          token.tokenId,
+          token.userId,
+          token.purpose,
+          token.tokenHash,
+          token.expiresAt,
+          token.consumedAt ?? null,
+          token.createdAt,
+        ],
+      );
+    },
+    async deleteEmailTokensForUser(userId, purpose) {
+      if (purpose) {
+        await db.run('DELETE FROM family_email_tokens WHERE user_id = ? AND purpose = ?', [userId, purpose]);
+        return;
+      }
+      await db.run('DELETE FROM family_email_tokens WHERE user_id = ?', [userId]);
+    },
+    async findRateLimit(bucket) {
+      const row = await db.getFirst<RateLimitRow>(
+        'SELECT bucket, window_started_at, hit_count FROM family_auth_rate_limits WHERE bucket = ?',
+        [bucket],
+      );
+      return row ? rateLimitFrom(row) : null;
+    },
+    async saveRateLimit(row) {
+      await db.run(
+        `INSERT INTO family_auth_rate_limits (bucket, window_started_at, hit_count) VALUES (?, ?, ?)
+         ON CONFLICT(bucket) DO UPDATE SET window_started_at = excluded.window_started_at, hit_count = excluded.hit_count`,
+        [row.bucket, row.windowStartedAt, row.hitCount],
+      );
+    },
+    async listMediaByOwner(ownerUserId) {
+      const rows = await db.getAll<MediaRow>(
+        `SELECT object_id, owner_user_id, mime_type, byte_length, content_sha256, storage_key, created_at
+         FROM family_media_objects WHERE owner_user_id = ?`,
+        [ownerUserId],
+      );
+      return rows.map(mediaFrom);
+    },
+    async deleteMediaObject(objectId) {
+      await db.run('DELETE FROM family_media_objects WHERE object_id = ?', [objectId]);
+    },
+    async listSharesByAuthor(authorUserId) {
+      const rows = await db.getAll<ShareRow>(
+        `SELECT share_id, family_id, author_user_id, source_moment_id, source_revision, snapshot_json, audience_json, shared_at, status, revoked_at
+         FROM family_shares WHERE author_user_id = ?`,
+        [authorUserId],
+      );
+      return rows.map(shareFrom);
+    },
+    async deleteIdempotentForUser(userId) {
+      await db.run('DELETE FROM family_idempotency WHERE user_id = ?', [userId]);
     },
     async findFamily(familyId) {
       const row = await db.getFirst<FamilyRow>(

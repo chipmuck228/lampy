@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -19,7 +19,7 @@ import { createSecureFamilySessionStore } from '../infrastructure/secure-family-
 import { createFamilyRefreshGate } from './family-refresh';
 import { ink, inkSoft, paper, sage } from './life-page';
 
-type Busy = 'idle' | 'signing-in' | 'signing-out';
+type Busy = 'idle' | 'signing-in' | 'signing-out' | 'email' | 'deleting';
 
 function accountMessage(error: unknown) {
   if (isApplicationError(error)) {
@@ -29,10 +29,32 @@ function accountMessage(error: unknown) {
       return '现在连不上授权服务，家庭登录没有完成。个人记录还在这台设备上。';
     }
     if (error.code === 'UNAUTHENTICATED') {
-      return '这次会话已经失效，需要重新用 Apple 登录。';
+      return '这次会话已经失效，需要重新登录。';
     }
     if (error.code === 'APPLE_TOKEN_INVALID') {
       return '这次 Apple 登录没有完成。个人记录还在这台设备上。';
+    }
+    if (error.code === 'AUTH_FAILED') {
+      return '邮箱或密码不对，或还没有完成验证。';
+    }
+    if (error.code === 'TOKEN_INVALID') {
+      return '这个链接不能用了，可以重新发送。';
+    }
+    if (error.code === 'RATE_LIMITED') {
+      return '请稍后再试。';
+    }
+    if (error.code === 'EMAIL_REGISTER_CLOSED') {
+      return '邮箱注册目前关闭。家庭创建者、未撤回分享和媒体归属还不能安全删除，所以还不能开放邮箱注册。';
+    }
+    if (error.code === 'EMAIL_MAILER_UNAVAILABLE') {
+      return '邮件发送还没配置，不能做真实邮箱注册验收。';
+    }
+    if (error.code === 'ACCOUNT_DELETE_BLOCKED') {
+      return error.message.includes('creates')
+        ? '这个账号还是家庭创建者。先解散或移交家庭，才能删除账号。'
+        : error.message.includes('belongs')
+          ? '这个账号还在一个家里。先退出家庭，才能删除账号。'
+          : '这个账号还有未处理的家庭分享或媒体，不能安全删除。';
     }
   }
   return '这件事没有做成。个人记录还在这台设备上。';
@@ -43,7 +65,7 @@ function kindCopy(snapshot: AccountSnapshot) {
     return '现在没有可连接的授权服务，不能完成家庭登录。';
   }
   if (snapshot.kind === 'needs-reauth') {
-    return '这次会话已经失效，需要重新用 Apple 登录。登录成功还不等于已经在一个家里。';
+    return '这次会话已经失效，需要重新登录。登录成功还不等于已经在一个家里。';
   }
   if (snapshot.kind === 'local-out-revoke-pending') {
     return '这台设备已经退出。远端会话还没确认撤销，连上之后会再试。';
@@ -61,9 +83,14 @@ export default function AccountScreen() {
   const [snapshot, setSnapshot] = useState<AccountSnapshot | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>('idle');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailToken, setEmailToken] = useState('');
   const refreshGate = useState(() => createFamilyRefreshGate())[0];
   const snapshotRef = useRef<AccountSnapshot | null>(null);
-  snapshotRef.current = snapshot;
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
 
   const load = useCallback(
     async (generation?: number, options?: { applyLocalFirst?: boolean }) => {
@@ -88,11 +115,23 @@ export default function AccountScreen() {
         );
         return 'ok' as const;
       }
+      const family = await getFamilyUseCases();
+      let emailFlags = { enabled: false, reason: 'account-delete-incomplete' };
+      try {
+        const emailHealth = await family.getEmailAuthStatus();
+        emailFlags = {
+          enabled: emailHealth.emailRegister,
+          reason: emailHealth.emailRegisterReason,
+        };
+      } catch {
+        /* keep email closed if health cannot be read */
+      }
+      if (!refreshGate.isCurrent(gen)) return 'stale' as const;
       if (applyLocalFirst) {
         if (pendingRevoke && !hasSession) {
-          setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true));
+          setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true, emailFlags));
         } else if (hasSession) {
-          setSnapshot(snapshotAfterSignedIn(appleAvailable));
+          setSnapshot(snapshotAfterSignedIn(appleAvailable, emailFlags));
         } else {
           setSnapshot(
             deriveAccountSnapshot({
@@ -101,11 +140,12 @@ export default function AccountScreen() {
               hasSession: false,
               pendingRevoke: false,
               membership: { kind: 'unauthenticated' },
+              emailRegisterEnabled: emailFlags.enabled,
+              emailRegisterReason: emailFlags.reason,
             }),
           );
         }
       }
-      const family = await getFamilyUseCases();
       try {
         const membership = await family.getMembership();
         const familyPending = await family.hasUnconfirmedSessionRevoke();
@@ -118,6 +158,8 @@ export default function AccountScreen() {
             hasSession: latestSession,
             pendingRevoke: familyPending,
             membership,
+            emailRegisterEnabled: emailFlags.enabled,
+            emailRegisterReason: emailFlags.reason,
           }),
         );
         return 'ok' as const;
@@ -179,7 +221,12 @@ export default function AccountScreen() {
       const family = await getFamilyUseCases();
       await family.signInWithApple(token);
       if (!refreshGate.isCurrent(generation)) return;
-      setSnapshot(snapshotAfterSignedIn(appleAvailable));
+      setSnapshot(
+        snapshotAfterSignedIn(appleAvailable, {
+          enabled: snapshot.emailRegisterEnabled,
+          reason: snapshot.emailRegisterReason,
+        }),
+      );
       setMessage(null);
     } catch (error) {
       if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
@@ -213,11 +260,21 @@ export default function AccountScreen() {
         setMessage('这台设备还没有退出。待撤销凭据没能写进本机保险柜，请再试。');
       } else if (result.server === 'unconfirmed') {
         committed = 'out-pending';
-        setSnapshot(snapshotAfterLocalSignOut(appleAvailable, true));
+        setSnapshot(
+          snapshotAfterLocalSignOut(appleAvailable, true, {
+            enabled: snapshot.emailRegisterEnabled,
+            reason: snapshot.emailRegisterReason,
+          }),
+        );
         setMessage('这台设备已经退出。远端会话还没确认撤销，连上之后会再试。');
       } else {
         committed = 'out';
-        setSnapshot(snapshotAfterLocalSignOut(appleAvailable, false));
+        setSnapshot(
+          snapshotAfterLocalSignOut(appleAvailable, false, {
+            enabled: snapshot.emailRegisterEnabled,
+            reason: snapshot.emailRegisterReason,
+          }),
+        );
       }
     } catch (error) {
       if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
@@ -247,7 +304,89 @@ export default function AccountScreen() {
     }
   }
 
+  async function runEmail(
+    work: (family: Awaited<ReturnType<typeof getFamilyUseCases>>) => Promise<unknown>,
+    done?: string,
+  ) {
+    if (busy !== 'idle') return;
+    const generation = refreshGate.begin();
+    setBusy('email');
+    setMessage(null);
+    try {
+      const family = await getFamilyUseCases();
+      await work(family);
+      if (!refreshGate.isCurrent(generation)) return;
+      if (done) setMessage(done);
+    } catch (error) {
+      if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
+    } finally {
+      setBusy('idle');
+    }
+  }
+
+  async function signInWithEmail() {
+    if (busy !== 'idle' || !snapshot?.canSignInEmail) return;
+    const generation = refreshGate.begin();
+    const appleAvailable = snapshot.appleAvailable;
+    setBusy('email');
+    setMessage(null);
+    try {
+      const family = await getFamilyUseCases();
+      await family.signInWithEmail(email, password);
+      if (!refreshGate.isCurrent(generation)) return;
+      setSnapshot(
+        snapshotAfterSignedIn(appleAvailable, {
+          enabled: snapshot.emailRegisterEnabled,
+          reason: snapshot.emailRegisterReason,
+        }),
+      );
+      setPassword('');
+    } catch (error) {
+      if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
+      return;
+    } finally {
+      setBusy('idle');
+    }
+    try {
+      const result = await load(generation, { applyLocalFirst: false });
+      if (!refreshGate.isCurrent(generation) || result === 'stale') return;
+      setMessage(null);
+    } catch {
+      if (refreshGate.isCurrent(generation)) setMessage(accountRefreshFailureMessage('sign-in'));
+    }
+  }
+
+  async function deleteAccount() {
+    if (busy !== 'idle' || !snapshot?.canSignOut) return;
+    const generation = refreshGate.begin();
+    setBusy('deleting');
+    setMessage(null);
+    try {
+      const family = await getFamilyUseCases();
+      await family.deleteAccount();
+      if (!refreshGate.isCurrent(generation)) return;
+      setSnapshot(
+        snapshotAfterLocalSignOut(snapshot.appleAvailable, false, {
+          enabled: snapshot.emailRegisterEnabled,
+          reason: snapshot.emailRegisterReason,
+        }),
+      );
+      setMessage('这个家庭账号已删除。这台设备上的个人记录还在，没有被删掉。');
+    } catch (error) {
+      if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
+      return;
+    } finally {
+      setBusy('idle');
+    }
+    try {
+      await load(generation, { applyLocalFirst: false });
+    } catch {
+      /* keep the delete result copy */
+    }
+  }
+
   const showAppleButton = snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
+  const showEmailForm = Boolean(snapshot && snapshot.kind !== 'service-unavailable' && snapshot.kind !== 'signed-in');
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="本机与账户">
@@ -293,6 +432,132 @@ export default function AccountScreen() {
             />
           </View>
         ) : null}
+        {snapshot?.kind === 'service-unavailable' ? (
+          <Text style={styles.body} testID="account-email-unavailable">
+            没有授权服务地址时，通过 Apple 登录和使用邮箱登录／注册都不能用。
+          </Text>
+        ) : null}
+        {showEmailForm ? (
+          <View testID="account-email">
+            <Text style={styles.body} testID="account-email-split">
+              分别用 Apple 和邮箱注册可能产生两个 Lampy 账号。本版本不能绑定或合并，也不会把 Apple 私密转发邮箱当成同一个人。
+            </Text>
+            {snapshot?.emailRegisterEnabled ? (
+              <>
+                <TextInput
+                  testID="account-email-input"
+                  accessibilityLabel="邮箱"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  placeholder="邮箱"
+                  value={email}
+                  onChangeText={setEmail}
+                  style={styles.field}
+                  editable={busy === 'idle'}
+                />
+                <TextInput
+                  testID="account-password-input"
+                  accessibilityLabel="密码"
+                  secureTextEntry
+                  placeholder="密码"
+                  value={password}
+                  onChangeText={setPassword}
+                  style={styles.field}
+                  editable={busy === 'idle'}
+                />
+                <TextInput
+                  testID="account-token-input"
+                  accessibilityLabel="邮件里的一次性代码"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="邮件里的一次性代码"
+                  value={emailToken}
+                  onChangeText={setEmailToken}
+                  style={styles.field}
+                  editable={busy === 'idle'}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="使用邮箱登录"
+                  testID="account-email-login"
+                  disabled={busy !== 'idle'}
+                  onPress={() => void signInWithEmail()}
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>使用邮箱登录</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="使用邮箱注册"
+                  testID="account-email-register"
+                  disabled={busy !== 'idle'}
+                  onPress={() =>
+                    void runEmail(
+                      (family) => family.registerWithEmail(email, password),
+                      '如果这个邮箱可以继续，我们会发一封验证邮件。分别注册可能产生两个账号。',
+                    )
+                  }
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>使用邮箱注册</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="重新发送验证邮件"
+                  testID="account-email-resend"
+                  disabled={busy !== 'idle'}
+                  onPress={() =>
+                    void runEmail((family) => family.resendVerification(email), '如果这个邮箱可以继续，我们会再发一封邮件。')
+                  }
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>重新发送验证邮件</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="验证邮箱"
+                  testID="account-email-verify"
+                  disabled={busy !== 'idle'}
+                  onPress={() =>
+                    void runEmail((family) => family.verifyEmail(emailToken), '邮箱已验证，现在可以用密码登录。')
+                  }
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>验证邮箱</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="忘记密码"
+                  testID="account-email-forgot"
+                  disabled={busy !== 'idle'}
+                  onPress={() =>
+                    void runEmail((family) => family.requestPasswordReset(email), '如果这个邮箱可以继续，我们会发一封重设邮件。')
+                  }
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>忘记密码</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="重设密码"
+                  testID="account-email-reset"
+                  disabled={busy !== 'idle'}
+                  onPress={() =>
+                    void runEmail((family) => family.resetPassword(emailToken, password), '密码已重设。请重新登录。')
+                  }
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>重设密码</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Text style={styles.body} testID="account-email-closed">
+                使用邮箱登录／注册目前关闭。家庭创建者、未撤回分享和媒体归属还不能安全删除账号，所以本切片不开放邮箱注册。不会用假删除代替。
+              </Text>
+            )}
+          </View>
+        ) : null}
         {snapshot?.canSignOut && busy === 'idle' ? (
           <Pressable
             accessibilityRole="button"
@@ -303,6 +568,22 @@ export default function AccountScreen() {
           >
             <Text style={styles.action}>退出登录</Text>
           </Pressable>
+        ) : null}
+        {snapshot?.canSignOut && busy === 'idle' ? (
+          <View testID="account-delete">
+            <Text style={styles.body} testID="account-delete-copy">
+              删除账户会撤销这个家庭账号的会话和邮箱凭据。不会删除这台设备上的个人 Moment、照片、录音或回看。若仍是家庭创建者、家里还有你写的分享，或媒体还被家庭引用，删除会被拒绝。
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="删除账户"
+              testID="account-delete-button"
+              onPress={() => void deleteAccount()}
+              style={styles.hit}
+            >
+              <Text style={styles.action}>删除账户</Text>
+            </Pressable>
+          </View>
         ) : null}
         {message ? (
           <Text style={styles.body} testID="account-message">
@@ -323,4 +604,12 @@ const styles = StyleSheet.create({
   action: { fontSize: 17, lineHeight: 24, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   apple: { width: 240, height: 44 },
+  field: {
+    minHeight: 44,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: inkSoft,
+    fontSize: 17,
+    color: ink,
+    paddingVertical: 8,
+  },
 });

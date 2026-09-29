@@ -13,6 +13,8 @@ import { planFamilyApiListen } from './runtime';
 import { applyFamilyApiSchema } from './schema';
 import { createSqliteFamilyRepository } from './sqlite-repository';
 import { createFamilyStore } from './store';
+import { createMemoryMailer, createSmtpMailer, parseSmtpMailerConfig } from './mailer';
+import { ARGON2ID_TEST, createArgon2idPasswordHasher } from './password';
 
 function readRawBody(req: IncomingMessage): Promise<Buffer | 'too-large'> {
   return new Promise((resolve, reject) => {
@@ -50,12 +52,26 @@ function headersOf(req: IncomingMessage) {
 export async function startFamilyApiServer(options?: { port?: number; host?: string; env?: NodeJS.ProcessEnv }) {
   const env = options?.env ?? process.env;
   const plan = planFamilyApiListen(env);
+  const smtp = parseSmtpMailerConfig(env);
+  const mailer =
+    plan.email.mailer === 'memory'
+      ? createMemoryMailer()
+      : plan.email.mailer === 'smtp' && smtp
+        ? createSmtpMailer(smtp)
+        : undefined;
+  const emailOpts = {
+    mailer,
+    emailRegisterEnabled: plan.email.emailRegisterEnabled,
+    emailRegisterReason: plan.email.emailRegisterReason,
+    passwordHasher: plan.mode === 'test' ? createArgon2idPasswordHasher(ARGON2ID_TEST) : undefined,
+  };
   const commands =
     plan.mode === 'test'
       ? createFamilyCommands({
           store: createFamilyStore(),
           apple: createMapAppleVerifier(plan.testTokens),
           mediaBlobs: createMemoryMediaBlobStore(),
+          ...emailOpts,
         })
       : await (async () => {
           mkdirSync(path.dirname(path.resolve(plan.databasePath)), { recursive: true });
@@ -71,6 +87,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
               verifySignature: verifyAppleJwtSignature,
             }),
             mediaBlobs: createDirectoryMediaBlobStore(mediaRoot),
+            ...emailOpts,
           });
         })();
 

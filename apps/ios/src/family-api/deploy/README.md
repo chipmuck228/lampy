@@ -54,6 +54,20 @@ npm run family-identity:accept
 
 本机 `127.0.0.1` 上的登录 / 邀请 / 加入 / 创建者移除 / 成员退出，与授权部署服务上的同一组操作是两套结果。部署走查只有双方 `GET /v1/me/membership` 均为 200 且 `family: null` 才建家；401、500 或异常响应立即停止。发现已有家庭会停止并报告，不会退出或解散未知家庭。本轮创建的家庭在邀请/移除等中途失败时也会尝试 dissolve；清理未确认则带 leftoverFamily 和 needsManualCleanup，走查不能算通过。只有公网 HTTPS 部署流程加上托管卷探测均为 PASS，`identityLoopAccepted` 才为 true。退出码 0 只表示没有 FAIL，自动化要读 `identityLoopAccepted`。需要把「未验收」当成失败时用 `npm run family-identity:accept:require`（exit 2）。
 
+## 邮箱注册（本切片默认关闭）
+
+不要在 `family.yunpura.com` 的生产 env 上打开 `LAMPY_EMAIL_REGISTER_ENABLED`。缺 SMTP、DNS 发信记录或部署权限时，把这些列成待提供，不要把秘密写进仓库或日志。
+
+隔离验收：
+
+1. 另开 SQLite 文件，不要改生产库。
+2. 本机 `LAMPY_FAMILY_API_MODE=test` + `LAMPY_EMAIL_MAILER=memory` + `LAMPY_EMAIL_REGISTER_ENABLED=1` 只用于 Jest / 本机 API。
+3. 生产若误设 `LAMPY_EMAIL_MAILER=memory`，进程仍启动，但邮箱注册保持关闭。
+4. 回滚：去掉 `LAMPY_EMAIL_REGISTER_ENABLED`，重启进程。已写入的邮箱凭据表保留；Apple 登录不受影响。
+5. 迁移 14–17 把 `apple_subject` 改为可空，并增加邮箱凭据、一次性令牌摘要和限速表。
+
+待提供（不打印值）：生产 SMTP 凭据、发信域名的 SPF/DKIM/DMARC、在生产库执行迁移的权限。本地 HTTP 或合成邮件不得记为公网 PASS。
+
 托管卷探测（在主机上）。`--after-restart` 只表示操作者声称已经重启并核了卷上 marker，**不是**进程重启证明。重启必须在探针外执行，并用 `systemctl status` / pid / journal 自行核对。
 
 ```bash

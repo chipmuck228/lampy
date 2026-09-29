@@ -1,4 +1,15 @@
-import type { Account, Family, Invitation, MediaObjectRecord, Membership, Session, ShareRecord } from './types';
+import type {
+  Account,
+  AuthRateLimit,
+  EmailCredential,
+  EmailToken,
+  Family,
+  Invitation,
+  MediaObjectRecord,
+  Membership,
+  Session,
+  ShareRecord,
+} from './types';
 import type { FamilyStore, IdempotentRecord } from './store';
 import {
   findAccountByAppleSubject,
@@ -13,11 +24,28 @@ import {
 
 export type FamilyTx = {
   findAccountByAppleSubject(appleSubject: string): Promise<Account | null>;
+  findAccountByUserId(userId: string): Promise<Account | null>;
   saveAccount(account: Account): Promise<void>;
+  deleteAccount(userId: string): Promise<void>;
   findSession(token: string): Promise<Session | null>;
   saveSession(session: Session): Promise<void>;
   deleteSession(token: string): Promise<void>;
   deleteOtherSessions(userId: string, keepToken: string): Promise<void>;
+  deleteSessionsForUser(userId: string): Promise<void>;
+  findEmailCredentialByEmail(emailNormalized: string): Promise<EmailCredential | null>;
+  findEmailCredentialByUserId(userId: string): Promise<EmailCredential | null>;
+  saveEmailCredential(credential: EmailCredential): Promise<void>;
+  deleteEmailCredential(userId: string): Promise<void>;
+  findEmailTokenByHash(tokenHash: string): Promise<EmailToken | null>;
+  listEmailTokensForUser(userId: string, purpose: EmailToken['purpose']): Promise<EmailToken[]>;
+  saveEmailToken(token: EmailToken): Promise<void>;
+  deleteEmailTokensForUser(userId: string, purpose?: EmailToken['purpose']): Promise<void>;
+  findRateLimit(bucket: string): Promise<AuthRateLimit | null>;
+  saveRateLimit(row: AuthRateLimit): Promise<void>;
+  listMediaByOwner(ownerUserId: string): Promise<MediaObjectRecord[]>;
+  deleteMediaObject(objectId: string): Promise<void>;
+  listSharesByAuthor(authorUserId: string): Promise<ShareRecord[]>;
+  deleteIdempotentForUser(userId: string): Promise<void>;
   findFamily(familyId: string): Promise<Family | null>;
   saveFamily(family: Family): Promise<void>;
   findActiveMembershipForUser(userId: string): Promise<Membership | null>;
@@ -63,6 +91,8 @@ export class FamilyStoreConstraintError extends Error {
       | 'active_membership'
       | 'invitation_code'
       | 'apple_subject'
+      | 'email_normalized'
+      | 'email_user'
       | 'idempotency'
       | 'media_hash'
       | 'share_revision',
@@ -85,11 +115,20 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     async findAccountByAppleSubject(appleSubject) {
       return findAccountByAppleSubject(store, appleSubject);
     },
+    async findAccountByUserId(userId) {
+      return store.accounts.find((row) => row.userId === userId) ?? null;
+    },
     async saveAccount(account) {
-      if (store.accounts.some((row) => row.appleSubject === account.appleSubject && row.userId !== account.userId)) {
+      if (
+        account.appleSubject &&
+        store.accounts.some((row) => row.appleSubject === account.appleSubject && row.userId !== account.userId)
+      ) {
         throw new FamilyStoreConstraintError('apple_subject');
       }
       replaceBy(store.accounts, (row) => row.userId, account);
+    },
+    async deleteAccount(userId) {
+      store.accounts = store.accounts.filter((row) => row.userId !== userId);
     },
     async findSession(token) {
       return findSession(store, token);
@@ -102,6 +141,69 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     },
     async deleteOtherSessions(userId, keepToken) {
       store.sessions = store.sessions.filter((row) => row.userId !== userId || row.token === keepToken);
+    },
+    async deleteSessionsForUser(userId) {
+      store.sessions = store.sessions.filter((row) => row.userId !== userId);
+    },
+    async findEmailCredentialByEmail(emailNormalized) {
+      return store.emailCredentials.find((row) => row.emailNormalized === emailNormalized) ?? null;
+    },
+    async findEmailCredentialByUserId(userId) {
+      return store.emailCredentials.find((row) => row.userId === userId) ?? null;
+    },
+    async saveEmailCredential(credential) {
+      if (
+        store.emailCredentials.some(
+          (row) => row.emailNormalized === credential.emailNormalized && row.credentialId !== credential.credentialId,
+        )
+      ) {
+        throw new FamilyStoreConstraintError('email_normalized');
+      }
+      if (
+        store.emailCredentials.some(
+          (row) => row.userId === credential.userId && row.credentialId !== credential.credentialId,
+        )
+      ) {
+        throw new FamilyStoreConstraintError('email_user');
+      }
+      replaceBy(store.emailCredentials, (row) => row.credentialId, credential);
+    },
+    async deleteEmailCredential(userId) {
+      store.emailCredentials = store.emailCredentials.filter((row) => row.userId !== userId);
+    },
+    async findEmailTokenByHash(tokenHash) {
+      return store.emailTokens.find((row) => row.tokenHash === tokenHash) ?? null;
+    },
+    async listEmailTokensForUser(userId, purpose) {
+      return store.emailTokens.filter((row) => row.userId === userId && row.purpose === purpose);
+    },
+    async saveEmailToken(token) {
+      replaceBy(store.emailTokens, (row) => row.tokenId, token);
+    },
+    async deleteEmailTokensForUser(userId, purpose) {
+      store.emailTokens = store.emailTokens.filter(
+        (row) => row.userId !== userId || (purpose && row.purpose !== purpose),
+      );
+    },
+    async findRateLimit(bucket) {
+      return store.rateLimits.find((row) => row.bucket === bucket) ?? null;
+    },
+    async saveRateLimit(row) {
+      replaceBy(store.rateLimits, (item) => item.bucket, row);
+    },
+    async listMediaByOwner(ownerUserId) {
+      return store.mediaObjects.filter((row) => row.ownerUserId === ownerUserId);
+    },
+    async deleteMediaObject(objectId) {
+      store.mediaObjects = store.mediaObjects.filter((row) => row.objectId !== objectId);
+    },
+    async listSharesByAuthor(authorUserId) {
+      return store.shares.filter((row) => row.authorUserId === authorUserId);
+    },
+    async deleteIdempotentForUser(userId) {
+      for (const key of [...store.idempotency.keys()]) {
+        if (key.startsWith(`${userId}:`)) store.idempotency.delete(key);
+      }
     },
     async findFamily(familyId) {
       return findFamily(store, familyId);

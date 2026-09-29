@@ -19,7 +19,9 @@
 - 生产：`createSqliteFamilyRepository` + `applyFamilyApiSchema`。同一 SQLite 连接上的事务排队，避免 HTTP 共用连接时二次 BEGIN。
 - HTTP：`dispatchFamilyApi`；监听：`listen.ts`。
 - Apple：test 模式用 `createMapAppleVerifier`。production 用 JWKS 校验签名、issuer、audience、exp、sub。测试 token **不得**进入 production。
-- 邮箱不当主键。登录成功不创建 Membership。
+- 邮箱不当主键，也不按邮箱字符串合并 Apple 账号。登录成功不创建 Membership。
+- 邮箱密码：Argon2id `m=19456,t=2,p=1,dkLen=32`。数据库只存编码后的哈希。验证／重设令牌只存 SHA-256 摘要。
+- 邮箱注册默认关闭（`emailRegisterReason=account-delete-incomplete`）。缺 SMTP 或生产误开 memory mailer 时不得启用。
 
 ## 配置清单（均需真实值，禁止编造）
 
@@ -34,6 +36,9 @@
 | `LAMPY_FAMILY_API_HOST` | 默认 `127.0.0.1` |
 | `LAMPY_FAMILY_MEDIA_PATH` | 可选。生产媒体文件目录。未设则为数据库目录下的 `media/` |
 | iOS `EXPO_PUBLIC_FAMILY_API_BASE_URL` | 客户端指向上述服务。未配置则视为不可达，不展示成员 |
+| `LAMPY_EMAIL_REGISTER_ENABLED` | 必须保持未设，直到账号删除对创建者／分享／媒体可安全完成。测试可设 `1` |
+| `LAMPY_EMAIL_MAILER` | 测试可 `memory`。生产不得用 memory 声称已验证 |
+| `LAMPY_EMAIL_SMTP_HOST` / `PORT` / `USER` / `PASS` / `LAMPY_EMAIL_FROM` | 真实发信。缺一则拒绝启用邮箱注册 |
 
 Apple 私钥、Key ID、Team ID、生产 Session 密钥：**本仓库不提供，也不写入。**
 

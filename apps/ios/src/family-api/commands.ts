@@ -9,7 +9,10 @@ import { createMemoryFamilyRepository, FamilyStoreConstraintError, type FamilyRe
 import { createFamilyStore, type FamilyStore, type IdempotentRecord } from './store';
 import type {
   AppleVerifier,
+  EmailAccepted,
+  EmailAuthHealth,
   FamilyClock,
+  FamilyHealth,
   FamilyIds,
   FamilyView,
   Invitation,
@@ -22,6 +25,10 @@ import type {
   ShareView,
   SignInResult,
 } from './types';
+import type { Mailer } from './mailer';
+import type { PasswordHasher } from './password';
+import { ARGON2ID_PRODUCTION } from './password';
+import { createEmailAuthCommands } from './email-commands';
 import type { MediaBlobStore } from './media-blobs';
 import { createMemoryMediaBlobStore } from './media-blobs';
 import { createMediaCommands } from './media-commands';
@@ -29,7 +36,15 @@ import { createShareCommands } from './share-commands';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = {
+  health(): FamilyHealth;
   signInWithApple(identityToken: string): Promise<SignInResult>;
+  registerWithEmail(input: { email: string; password: string; clientKey?: string }): Promise<EmailAccepted>;
+  verifyEmail(input: { token: string }): Promise<{ verified: true }>;
+  resendVerification(input: { email: string; clientKey?: string }): Promise<EmailAccepted>;
+  signInWithEmail(input: { email: string; password: string; clientKey?: string }): Promise<SignInResult>;
+  requestPasswordReset(input: { email: string; clientKey?: string }): Promise<EmailAccepted>;
+  resetPassword(input: { token: string; password: string }): Promise<{ reset: true }>;
+  deleteAccount(sessionToken: string): Promise<{ deleted: true }>;
   createFamily(sessionToken: string, idempotencyKey?: string): Promise<FamilyView>;
   inviteMember(sessionToken: string, familyId: string, idempotencyKey?: string): Promise<InvitationView>;
   revokeInvitation(sessionToken: string, invitationId: string): Promise<InvitationView>;
@@ -205,6 +220,10 @@ export function createFamilyCommands(deps: {
   inviteTtlMs?: number;
   sessionTtlMs?: number;
   mediaBlobs?: MediaBlobStore;
+  mailer?: Mailer;
+  emailRegisterEnabled?: boolean;
+  emailRegisterReason?: EmailAuthHealth['emailRegisterReason'];
+  passwordHasher?: PasswordHasher;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -224,8 +243,32 @@ export function createFamilyCommands(deps: {
     blobs,
     clock,
   });
+  const email = createEmailAuthCommands({
+    repository,
+    clock,
+    ids,
+    sessionTtlMs,
+    blobs,
+    mailer: deps.mailer,
+    emailRegisterEnabled: deps.emailRegisterEnabled,
+    emailRegisterReason: deps.emailRegisterReason,
+    passwordHasher: deps.passwordHasher,
+  });
 
   return {
+    health() {
+      const emailHealth = email.health();
+      return {
+        ok: true as const,
+        slice: 'identity-membership' as const,
+        media: true as const,
+        shares: true as const,
+        inbox: true as const,
+        emailRegister: emailHealth.emailRegister,
+        emailRegisterReason: emailHealth.emailRegisterReason,
+        argon2id: ARGON2ID_PRODUCTION,
+      };
+    },
     async signInWithApple(identityToken: string) {
       if (!identityToken.trim()) {
         throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, 'Apple identity token is invalid.');
@@ -490,6 +533,28 @@ export function createFamilyCommands(deps: {
         }
         return { dissolved: true as const };
       });
+    },
+
+    registerWithEmail(input) {
+      return email.registerWithEmail(input);
+    },
+    verifyEmail(input) {
+      return email.verifyEmail(input);
+    },
+    resendVerification(input) {
+      return email.resendVerification(input);
+    },
+    signInWithEmail(input) {
+      return email.signInWithEmail(input);
+    },
+    requestPasswordReset(input) {
+      return email.requestPasswordReset(input);
+    },
+    resetPassword(input) {
+      return email.resetPassword(input);
+    },
+    deleteAccount(sessionToken) {
+      return email.deleteAccount(sessionToken);
     },
 
     signOut(sessionToken) {

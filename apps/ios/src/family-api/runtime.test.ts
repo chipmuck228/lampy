@@ -50,6 +50,11 @@ describe('family API listen runtime', () => {
       databasePath: '/tmp/lampy-family.db',
       appleClientId: 'app.lampy.ios',
       banner: FAMILY_API_PRODUCTION_BANNER,
+      email: {
+        emailRegisterEnabled: false,
+        emailRegisterReason: 'account-delete-incomplete',
+        mailer: 'none',
+      },
     });
   });
 
@@ -64,6 +69,11 @@ describe('family API listen runtime', () => {
       apple: 'test-tokens',
       testTokens: { 'review-token': { appleSubject: 'apple.review.sub' } },
       banner: FAMILY_API_TEST_BANNER,
+      email: {
+        emailRegisterEnabled: false,
+        emailRegisterReason: 'account-delete-incomplete',
+        mailer: 'none',
+      },
     });
     expect(plan.banner).toMatch(/in-memory/i);
     expect(plan.banner).toMatch(/NOT a production deploy/);
@@ -71,5 +81,44 @@ describe('family API listen runtime', () => {
 
   it('does not start when mode is unset', () => {
     expect(() => planFamilyApiListen({})).toThrow(/LAMPY_FAMILY_API_MODE=test/);
+  });
+
+  it('keeps production email register closed when SMTP is missing or memory mailer is requested', () => {
+    expect(
+      planFamilyApiListen({
+        LAMPY_FAMILY_API_MODE: 'production',
+        LAMPY_FAMILY_DATABASE_PATH: '/tmp/lampy-family.db',
+        LAMPY_APPLE_CLIENT_ID: 'app.lampy.ios',
+        LAMPY_EMAIL_REGISTER_ENABLED: '1',
+        LAMPY_EMAIL_MAILER: 'memory',
+      }).email,
+    ).toEqual({
+      emailRegisterEnabled: false,
+      emailRegisterReason: 'mail-unconfigured',
+      mailer: 'none',
+    });
+    expect(
+      planFamilyApiListen({
+        LAMPY_FAMILY_API_MODE: 'production',
+        LAMPY_FAMILY_DATABASE_PATH: '/tmp/lampy-family.db',
+        LAMPY_APPLE_CLIENT_ID: 'app.lampy.ios',
+        LAMPY_EMAIL_REGISTER_ENABLED: '1',
+      }).email.emailRegisterReason,
+    ).toBe('mail-unconfigured');
+  });
+
+  it('enables test email register only with an injected memory mailer', () => {
+    expect(
+      planFamilyApiListen({
+        LAMPY_FAMILY_API_MODE: 'test',
+        LAMPY_FAMILY_API_TEST_TOKENS: 'review-token:apple.review.sub',
+        LAMPY_EMAIL_REGISTER_ENABLED: '1',
+        LAMPY_EMAIL_MAILER: 'memory',
+      }).email,
+    ).toEqual({
+      emailRegisterEnabled: true,
+      emailRegisterReason: 'enabled',
+      mailer: 'memory',
+    });
   });
 });
