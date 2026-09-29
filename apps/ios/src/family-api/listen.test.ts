@@ -7,6 +7,26 @@ import path from 'node:path';
 import { startFamilyApiServer } from './listen';
 import { sampleJpegBytes } from './media-validate';
 
+function postJson(port: number, route: string, body: unknown, token?: string) {
+  const payload = JSON.stringify(body);
+  return new Promise<{ status?: number; body: any }>((resolve, reject) => {
+    const req = httpRequest({
+      hostname: '127.0.0.1', port, method: 'POST', path: route,
+      headers: {
+        'content-type': 'application/json',
+        'content-length': String(Buffer.byteLength(payload)),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+    }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks).toString('utf8')) }));
+    });
+    req.on('error', reject);
+    req.end(payload);
+  });
+}
+
 async function withTempDir<T>(run: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(path.join(tmpdir(), 'lampy-family-listen-'));
   try {
@@ -27,6 +47,51 @@ function getHealth(port: number) {
 }
 
 describe('family API listen startup', () => {
+  it('accepts a long F3 note with three uploaded media references while bounding share JSON', async () => {
+    const listening = await startFamilyApiServer({ port: 0, host: '127.0.0.1', env: {
+      LAMPY_FAMILY_API_MODE: 'test', LAMPY_FAMILY_API_TEST_TOKENS: 'review-token:apple.review.sub',
+    } });
+    try {
+      const login = await postJson(listening.port, '/v1/auth/apple', { identityToken: 'review-token' });
+      expect(login.status).toBe(200);
+      const token = login.body.sessionToken;
+      const family = await postJson(listening.port, '/v1/families', {}, token);
+      expect(family.status).toBe(200);
+      const ids: string[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const bytes = Buffer.concat([Buffer.from(sampleJpegBytes()), Buffer.from([i])]);
+        const media = await new Promise<{ status?: number; body: any }>((resolve, reject) => {
+          const req = httpRequest({ hostname: '127.0.0.1', port: listening.port, method: 'POST', path: '/v1/media',
+            headers: { authorization: `Bearer ${token}`, 'content-type': 'image/jpeg' },
+          }, (res) => {
+            const chunks: Buffer[] = [];
+            res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+            res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks).toString('utf8')) }));
+          });
+          req.on('error', reject);
+          req.end(bytes);
+        });
+        expect(media.status).toBe(200);
+        ids.push(media.body.objectId);
+      }
+      const shareInput = {
+        sourceMomentId: 'moment_long_note', sourceRevision: 1, note: '今天的片段。'.repeat(1000),
+        emotion: '平静', occurredAt: '2026-09-29T08:00:00.000Z', occurredAtPrecision: 'exact',
+        mediaObjectIds: ids, expectedMediaCount: 3,
+      };
+      expect(Buffer.byteLength(JSON.stringify(shareInput))).toBeGreaterThan(4096);
+      const shared = await postJson(listening.port, `/v1/families/${family.body.familyId}/shares`, shareInput, token);
+      expect(shared.status).toBe(200);
+      expect(shared.body.snapshot.note).toBe(shareInput.note);
+      expect(shared.body.snapshot.media).toHaveLength(3);
+      const oversized = await postJson(listening.port, `/v1/families/${family.body.familyId}/shares`,
+        { ...shareInput, sourceRevision: 2, note: '长'.repeat(23000) }, token);
+      expect(oversized.status).toBe(413);
+      expect(oversized.body.error.code).toBe('PAYLOAD_TOO_LARGE');
+    } finally {
+      await listening.close();
+    }
+  });
   it('opens the SQLite file on the configured path before listening in production', async () => {
     await withTempDir(async (dir) => {
       const databasePath = path.join(dir, 'volume', 'family.db');
