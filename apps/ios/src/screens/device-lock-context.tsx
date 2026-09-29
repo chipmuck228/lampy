@@ -12,8 +12,10 @@ import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   createDeviceLockSession,
+  deviceLockAuthErrorCopy,
   deviceLockCopy,
   deviceLockPersistCopy,
+  deviceLockReadCopy,
   type DeviceLockSnapshot,
 } from '../application/device-lock';
 import { pauseForegroundAudio } from '../application/foreground-audio';
@@ -56,29 +58,38 @@ export function DeviceLockProvider({
   const [message, setMessage] = useState<string | null>(null);
   const inFlight = useRef(false);
   const hydrated = useRef(false);
+  const needsManualRetry = useRef(false);
+  const mounted = useRef(true);
 
   const refresh = useCallback(() => setSnapshot(session.snapshot()), [session]);
 
-  useEffect(() => {
-    let alive = true;
-    void resolvedStore
-      .isEnabled()
-      .then((enabled) => {
-        if (!alive || hydrated.current) return;
-        hydrated.current = true;
-        session.applyStored(enabled);
-        refresh();
-      })
-      .catch(() => {
-        if (!alive || hydrated.current) return;
-        hydrated.current = true;
-        session.applyStored(false);
-        refresh();
-      });
-    return () => {
-      alive = false;
-    };
+  const loadStoredSetting = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setMessage(null);
+    try {
+      const enabled = await resolvedStore.isEnabled();
+      if (!mounted.current) return;
+      hydrated.current = true;
+      session.applyStored(enabled);
+      needsManualRetry.current = false;
+    } catch {
+      if (!mounted.current) return;
+      needsManualRetry.current = true;
+      setMessage(deviceLockReadCopy());
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) refresh();
+    }
   }, [refresh, resolvedStore, session]);
+
+  useEffect(() => {
+    mounted.current = true;
+    if (!hydrated.current) void loadStoredSetting();
+    return () => {
+      mounted.current = false;
+    };
+  }, [loadStoredSetting]);
 
   useEffect(() => {
     void setPrivateSnapshotBlocked(snapshot.locked);
@@ -88,11 +99,18 @@ export function DeviceLockProvider({
     if (session.snapshot().setting !== 'on' || inFlight.current) return;
     const generation = session.beginAuth();
     inFlight.current = true;
+    needsManualRetry.current = false;
     setMessage(null);
     try {
       const result = await resolvedAuthenticator.authenticate('验证是这台设备的持有人，才能打开 Lampy。');
       const next = session.finishUnlock(generation, result);
-      if (next.kind === 'denied') setMessage(deviceLockCopy(result));
+      if (next.kind === 'denied') {
+        needsManualRetry.current = true;
+        setMessage(deviceLockCopy(result));
+      }
+    } catch {
+      needsManualRetry.current = true;
+      setMessage(deviceLockAuthErrorCopy());
     } finally {
       inFlight.current = false;
       refresh();
@@ -108,16 +126,30 @@ export function DeviceLockProvider({
         return;
       }
       const current = session.snapshot();
-      if (current.setting === 'on' && current.locked) void retryUnlock();
+      if (current.setting === 'on' && current.locked && !needsManualRetry.current) void retryUnlock();
     });
     return () => sub.remove();
   }, [refresh, retryUnlock, session]);
 
   useEffect(() => {
-    if (snapshot.setting === 'on' && snapshot.locked && !inFlight.current && !message) {
+    if (
+      snapshot.setting === 'on' &&
+      snapshot.locked &&
+      !inFlight.current &&
+      !message &&
+      !needsManualRetry.current
+    ) {
       void retryUnlock();
     }
   }, [message, retryUnlock, snapshot.locked, snapshot.setting]);
+
+  function retryCoverAction() {
+    if (session.snapshot().setting === 'unknown') {
+      void loadStoredSetting();
+      return;
+    }
+    void retryUnlock();
+  }
 
   const toggle = useCallback(async () => {
     const current = session.snapshot();
@@ -142,6 +174,8 @@ export function DeviceLockProvider({
       } else if (next.kind === 'denied') {
         setMessage(deviceLockCopy(result));
       }
+    } catch {
+      setMessage(deviceLockAuthErrorCopy());
     } finally {
       inFlight.current = false;
       refresh();
@@ -171,16 +205,18 @@ export function DeviceLockProvider({
             {snapshot.setting === 'unknown' ? 'Lampy' : '这台设备已保护'}
           </Text>
           <Text style={styles.body}>
-            {snapshot.setting === 'unknown'
+            {snapshot.setting === 'unknown' && !message
               ? '正在确认本机设置。'
-              : '进入 Lampy 前，先确认是这台设备的持有人。记录还在。'}
+              : snapshot.setting === 'unknown'
+                ? '记录还在。'
+                : '进入 Lampy 前，先确认是这台设备的持有人。记录还在。'}
           </Text>
-          {snapshot.setting === 'on' ? (
+          {snapshot.setting === 'on' || message ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="再试一次"
               testID="device-lock-retry"
-              onPress={() => void retryUnlock()}
+              onPress={retryCoverAction}
               style={styles.hit}
             >
               <Text style={styles.action}>再试一次</Text>

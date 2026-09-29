@@ -170,6 +170,67 @@ describe('device lock cover', () => {
     expect(setEnabled).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the cover when the stored setting cannot be read, then authenticates after a successful retry', async () => {
+    let reads = 0;
+    const authenticate = jest.fn(async () => ({ ok: true as const }));
+    const view = await render(
+      wrap(
+        {
+          isEnabled: async () => {
+            reads += 1;
+            if (reads === 1) throw new Error('keychain');
+            return true;
+          },
+          setEnabled: async () => undefined,
+        },
+        { authenticate },
+      ),
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.getByText('暂时无法确认本机保护设置，可重试')).toBeTruthy();
+    });
+    expect(view.queryByText('private')).toBeNull();
+    expect(view.getByText('private', { includeHiddenElements: true })).toBeTruthy();
+    expect(authenticate).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('再试一次'));
+    });
+    await waitFor(() => {
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    });
+    expect(view.getByText('private')).toBeTruthy();
+  });
+
+  it('stays locked and waits for a manual retry when system auth throws', async () => {
+    const authenticate = jest.fn(async () => {
+      throw new Error('native');
+    });
+    const view = await render(
+      wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }),
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.getByText('这次系统认证没有完成。记录还在，可以再试一次。')).toBeTruthy();
+    });
+    expect(authenticate).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(authenticate).toHaveBeenCalledTimes(1);
+    expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+    authenticate.mockImplementation(async () => ({ ok: true as const }));
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('再试一次'));
+    });
+    await waitFor(() => {
+      expect(authenticate).toHaveBeenCalledTimes(2);
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    });
+  });
+
   it('rolls back disable and stays retryable when the setting cannot be written', async () => {
     const setEnabled = jest.fn(async () => {
       throw new Error('keychain');

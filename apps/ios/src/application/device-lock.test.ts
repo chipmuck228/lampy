@@ -1,4 +1,10 @@
-import { createDeviceLockSession, deviceLockCopy, deviceLockPersistCopy } from './device-lock';
+import {
+  createDeviceLockSession,
+  deviceLockAuthErrorCopy,
+  deviceLockCopy,
+  deviceLockPersistCopy,
+  deviceLockReadCopy,
+} from './device-lock';
 
 describe('device lock session', () => {
   it('stays unlocked when the stored setting is off', () => {
@@ -80,5 +86,7 @@ describe('device lock session', () => {
     expect(deviceLockCopy({ ok: false, reason: 'cancel' })).toMatch(/再试一次/);
     expect(deviceLockCopy({ ok: false, reason: 'unavailable' })).toMatch(/记录还在/);
     expect(deviceLockPersistCopy()).toMatch(/再试一次/);
+    expect(deviceLockReadCopy()).toBe('暂时无法确认本机保护设置，可重试');
+    expect(deviceLockAuthErrorCopy()).toMatch(/再试一次/);
   });
 });

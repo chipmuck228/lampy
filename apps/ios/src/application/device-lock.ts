@@ -96,3 +96,11 @@ export function deviceLockCopy(result: DeviceAuthResult) {
 export function deviceLockPersistCopy() {
   return '这次没有保存本机保护设置。记录还在，可以再试一次。';
 }
+
+export function deviceLockReadCopy() {
+  return '暂时无法确认本机保护设置，可重试';
+}
+
+export function deviceLockAuthErrorCopy() {
+  return '这次系统认证没有完成。记录还在，可以再试一次。';
+}
