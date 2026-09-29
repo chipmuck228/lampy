@@ -208,6 +208,7 @@ describe('recent reading hierarchy', () => {
     expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).toContain('看这条');
     expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).not.toContain('›');
     expect(view.queryByTestId('home-family')).toBeNull();
+    expect(view.getByTestId('home-account')).toBeTruthy();
   });
 
   it('lets play and open stay separate so VoiceOver can reach 播放 without opening the record', async () => {

@@ -52,6 +52,7 @@ describe('recent home', () => {
     expect(view.getByText('写一句，拍一张，或留一段声音。以后再回来听见、看见。')).toBeTruthy();
     expect(view.getByLabelText('留下第一条')).toBeTruthy();
     expect(view.queryByTestId('home-family')).toBeNull();
+    expect(view.getByTestId('home-account')).toBeTruthy();
     expect(view.queryByText(/假数据|mock moment/i)).toBeNull();
   });
 });
