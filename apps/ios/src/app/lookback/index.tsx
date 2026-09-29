@@ -271,7 +271,9 @@ export default function LookbackIndexScreen() {
       onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
     >
       {error ? <LookbackMessage>{error}</LookbackMessage> : null}
-      {view?.isEmpty ? <LookbackMessage>还没有可以按时间回看的记录。</LookbackMessage> : null}
+      {view?.isEmpty && !error ? (
+        <LookbackMessage testID="lookback-empty">以后可以按时间回来看。</LookbackMessage>
+      ) : null}
       {view && view.unknownCount > 0 ? (
         <Pressable
           accessibilityRole="button"

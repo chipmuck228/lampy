@@ -3,6 +3,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { DeviceLockProvider } from '../screens/device-lock-context';
+import { FirstRunGate } from '../screens/first-run-gate';
 import { paper } from '../screens/life-page';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -16,15 +18,17 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <>
+    <DeviceLockProvider>
       <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: paper },
-          animation: 'fade',
-        }}
-      />
-    </>
+      <FirstRunGate>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: paper },
+            animation: 'fade',
+          }}
+        />
+      </FirstRunGate>
+    </DeviceLockProvider>
   );
 }

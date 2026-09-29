@@ -100,8 +100,8 @@ export default function RecentScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {view?.isFirstUse ? (
-          <View style={styles.empty}>
+        {view?.isFirstUse && !error ? (
+          <View style={styles.empty} testID="recent-empty">
             <Text style={styles.emptyTitle}>这里，留下自己的生活。</Text>
             <Text style={styles.body}>写一句，拍一张，或留一段声音。以后再回来听见、看见。</Text>
             <Pressable

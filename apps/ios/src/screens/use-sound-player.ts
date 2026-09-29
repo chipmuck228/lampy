@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { registerForegroundAudioPauser } from '../application/foreground-audio';
 import { createExpoAudioPlayback } from '../infrastructure/expo-audio';
 import type { AudioPlayback, PlaybackStatus } from '../infrastructure/media';
 
@@ -123,6 +124,9 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
 
   useEffect(() => {
     mountedRef.current = true;
+    const stop = registerForegroundAudioPauser(() => {
+      void park();
+    });
     const app = AppState.addEventListener('change', (state) => {
       if (state !== 'active') {
         void park();
@@ -130,6 +134,7 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
     });
     return () => {
       mountedRef.current = false;
+      stop();
       app?.remove?.();
       void teardown(false);
     };

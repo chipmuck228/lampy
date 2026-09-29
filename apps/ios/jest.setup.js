@@ -22,6 +22,17 @@ jest.mock('expo-apple-authentication', () => ({
   AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
 }));
 
+jest.mock('expo-local-authentication', () => ({
+  SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC: 2 },
+  getEnrolledLevelAsync: async () => 0,
+  authenticateAsync: async () => ({ success: false, error: 'not_available' }),
+}));
+
+jest.mock('expo-screen-capture', () => ({
+  preventScreenCaptureAsync: async () => undefined,
+  allowScreenCaptureAsync: async () => undefined,
+}));
+
 jest.mock('expo-audio', () => ({
   AudioModule: {
     AudioRecorder: class AudioRecorder {
