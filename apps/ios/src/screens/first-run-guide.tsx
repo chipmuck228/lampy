@@ -19,7 +19,13 @@ import {
 } from '../application/first-run';
 import { ink, inkSoft, isCompactHeight, paper, sage } from './life-page';
 
-export function FirstRunGuide({ onFinished }: { onFinished: () => void }) {
+export function FirstRunGuide({
+  onFinished,
+  finishError,
+}: {
+  onFinished: () => void;
+  finishError?: string | null;
+}) {
   const { width, height } = useWindowDimensions();
   const compact = isCompactHeight(height);
   const pager = useRef<ScrollView>(null);
@@ -68,13 +74,20 @@ export function FirstRunGuide({ onFinished }: { onFinished: () => void }) {
         {FIRST_RUN_SCREENS.map((item) => (
           <View
             key={item.id}
-            style={[styles.page, { width, height: pageHeight, paddingTop: compact ? 24 : 48 }]}
+            style={[styles.page, { width, height: pageHeight }]}
             testID={`first-run-${item.id}`}
           >
-            <Text style={styles.title} accessibilityRole="header">
-              {item.title}
-            </Text>
-            <Text style={styles.body}>{item.body}</Text>
+            <ScrollView
+              style={styles.pageScroll}
+              contentContainerStyle={[styles.pageCopy, { paddingTop: compact ? 24 : 48 }]}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+            >
+              <Text style={styles.title} accessibilityRole="header">
+                {item.title}
+              </Text>
+              <Text style={styles.body}>{item.body}</Text>
+            </ScrollView>
           </View>
         ))}
       </ScrollView>
@@ -82,6 +95,11 @@ export function FirstRunGuide({ onFinished }: { onFinished: () => void }) {
         <Text style={styles.progress} testID="first-run-progress">
           {index + 1} / {FIRST_RUN_SCREENS.length}
         </Text>
+        {finishError ? (
+          <Text style={styles.body} testID="first-run-finish-error">
+            {finishError}
+          </Text>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={screen.action}
@@ -99,10 +117,12 @@ export function FirstRunGuide({ onFinished }: { onFinished: () => void }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper },
   pager: { flex: 1 },
-  page: { paddingHorizontal: 24, gap: 16, justifyContent: 'center' },
+  page: { overflow: 'hidden' },
+  pageScroll: { flex: 1 },
+  pageCopy: { paddingHorizontal: 24, gap: 16, flexGrow: 1, justifyContent: 'center' },
   title: { fontSize: 28, lineHeight: 36, color: ink },
   body: { fontSize: 17, lineHeight: 26, color: inkSoft },
-  footer: { paddingHorizontal: 24, paddingBottom: 16, gap: 8 },
+  footer: { flexShrink: 0, paddingHorizontal: 24, paddingBottom: 16, gap: 8 },
   progress: { fontSize: 15, lineHeight: 22, color: inkSoft },
   action: { fontSize: 20, lineHeight: 28, color: sage },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },

@@ -28,8 +28,14 @@ export function createDeviceLockSession() {
   return {
     snapshot,
     applyStored(enabled: boolean) {
-      setting = enabled ? 'on' : 'off';
-      sessionUnlocked = !enabled;
+      if (enabled) {
+        const keepUnlocked = setting === 'on' && sessionUnlocked;
+        setting = 'on';
+        sessionUnlocked = keepUnlocked;
+      } else {
+        setting = 'off';
+        sessionUnlocked = true;
+      }
       return snapshot();
     },
     beginAuth() {
@@ -56,6 +62,16 @@ export function createDeviceLockSession() {
       sessionUnlocked = true;
       return { kind: 'disabled' as const, persist: true, ...snapshot() };
     },
+    revertEnable() {
+      setting = 'off';
+      sessionUnlocked = true;
+      return snapshot();
+    },
+    revertDisable() {
+      setting = 'on';
+      sessionUnlocked = true;
+      return snapshot();
+    },
     lockForBackground() {
       authGeneration += 1;
       if (setting === 'on') sessionUnlocked = false;
@@ -75,4 +91,8 @@ export function deviceLockCopy(result: DeviceAuthResult) {
     return '现在不能用系统认证。记录还在，可以再试一次。';
   }
   return '这次没有解锁。记录还在，可以再试一次。';
+}
+
+export function deviceLockPersistCopy() {
+  return '这次没有保存本机保护设置。记录还在，可以再试一次。';
 }

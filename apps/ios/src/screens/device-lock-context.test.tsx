@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Pressable, Text } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import * as SecureStore from 'expo-secure-store';
 
-import { DeviceLockProvider, useDeviceLock } from './device-lock-context';
+import { DEVICE_LOCK_SECURE_KEY } from '../infrastructure/device-lock-store';
+import { DeviceLockProvider, DeviceLockSettings, useDeviceLock } from './device-lock-context';
 
 function Toggle() {
   const lock = useDeviceLock();
@@ -23,11 +26,16 @@ function wrap(
     <DeviceLockProvider store={store} authenticator={authenticator}>
       <Text>private</Text>
       <Toggle />
+      <DeviceLockSettings />
     </DeviceLockProvider>
   );
 }
 
 describe('device lock cover', () => {
+  beforeEach(async () => {
+    await SecureStore.deleteItemAsync(DEVICE_LOCK_SECURE_KEY);
+  });
+
   it('does not cover content or prompt when protection is off', async () => {
     const authenticate = jest.fn(async () => ({ ok: true as const }));
     const view = await render(
@@ -110,5 +118,76 @@ describe('device lock cover', () => {
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
     });
     expect(view.getByText('private', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('keeps an unlocked session when the default store is used across rerenders', async () => {
+    await SecureStore.setItemAsync(DEVICE_LOCK_SECURE_KEY, '1');
+    const authenticate = jest.fn(async () => ({ ok: true as const }));
+    function Harness() {
+      const [, bump] = useState(0);
+      return (
+        <DeviceLockProvider authenticator={{ authenticate }}>
+          <Text>private</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="rerender" onPress={() => bump((n) => n + 1)}>
+            <Text>rerender</Text>
+          </Pressable>
+        </DeviceLockProvider>
+      );
+    }
+    const view = await render(<Harness />);
+    await waitFor(() => {
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('rerender'));
+    });
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('rerender'));
+    });
+    expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    expect(view.getByText('private')).toBeTruthy();
+  });
+
+  it('rolls back enable and stays retryable when the setting cannot be written', async () => {
+    const setEnabled = jest.fn(async () => {
+      throw new Error('keychain');
+    });
+    const view = await render(
+      wrap({ isEnabled: async () => false, setEnabled }, { authenticate: async () => ({ ok: true }) }),
+    );
+    await waitFor(() => {
+      expect(view.getByText('private')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('toggle-lock'));
+    });
+    expect(setEnabled).toHaveBeenCalledWith(true);
+    expect(view.getByText('这次没有保存本机保护设置。记录还在，可以再试一次。')).toBeTruthy();
+    expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('toggle-lock'));
+    });
+    expect(setEnabled).toHaveBeenCalledTimes(2);
+  });
+
+  it('rolls back disable and stays retryable when the setting cannot be written', async () => {
+    const setEnabled = jest.fn(async () => {
+      throw new Error('keychain');
+    });
+    const view = await render(
+      wrap({ isEnabled: async () => true, setEnabled }, { authenticate: async () => ({ ok: true }) }),
+    );
+    await waitFor(() => {
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('toggle-lock'));
+    });
+    expect(setEnabled).toHaveBeenCalledWith(false);
+    expect(view.getByText('这次没有保存本机保护设置。记录还在，可以再试一次。')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('toggle-lock'));
+    });
+    expect(setEnabled).toHaveBeenCalledTimes(2);
   });
 });

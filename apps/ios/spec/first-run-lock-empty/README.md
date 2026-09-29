@@ -47,6 +47,8 @@
 | 回后台 | 锁定本会话；停播放；切换器遮挡 | — | 不变 |
 | 关闭保护：认证成功 | — | — | enabled=false |
 | 关闭保护：失败/取消 | — | — | 保持开启 |
+| 认证成功但 Keychain 写入失败 | 恢复写入前状态，可再试 | — | 不变 |
+| 默认 store 实例 | Provider 生命周期内稳定；已解锁后再次 applyStored(true) 不重锁 | 不认证 | 不变 |
 
 认证走 `expo-local-authentication`（系统 Face ID / 设备密码退路）。不存人脸。不改 `userId`、Apple 会话、`ownerId=local-user`、个人库路径。
 

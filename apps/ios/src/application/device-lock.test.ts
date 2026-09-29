@@ -1,4 +1,4 @@
-import { createDeviceLockSession, deviceLockCopy } from './device-lock';
+import { createDeviceLockSession, deviceLockCopy, deviceLockPersistCopy } from './device-lock';
 
 describe('device lock session', () => {
   it('stays unlocked when the stored setting is off', () => {
@@ -52,9 +52,33 @@ describe('device lock session', () => {
     expect(session.snapshot().setting).toBe('off');
   });
 
+  it('does not relock an unlocked session when the stored on setting is applied again', () => {
+    const session = createDeviceLockSession();
+    session.applyStored(true);
+    const unlock = session.beginAuth();
+    session.finishUnlock(unlock, { ok: true });
+    expect(session.applyStored(true).locked).toBe(false);
+  });
+
+  it('reverts a persist failure so memory matches the previous stored setting', () => {
+    const session = createDeviceLockSession();
+    session.applyStored(false);
+    const enable = session.beginAuth();
+    session.confirmEnable(enable, { ok: true });
+    expect(session.revertEnable().setting).toBe('off');
+    session.applyStored(true);
+    const unlock = session.beginAuth();
+    session.finishUnlock(unlock, { ok: true });
+    const disable = session.beginAuth();
+    session.confirmDisable(disable, { ok: true });
+    expect(session.revertDisable().setting).toBe('on');
+    expect(session.snapshot().locked).toBe(false);
+  });
+
   it('explains a missing device passcode without implying data loss', () => {
     expect(deviceLockCopy({ ok: false, reason: 'no-passcode' })).toMatch(/记录还在/);
     expect(deviceLockCopy({ ok: false, reason: 'cancel' })).toMatch(/再试一次/);
     expect(deviceLockCopy({ ok: false, reason: 'unavailable' })).toMatch(/记录还在/);
+    expect(deviceLockPersistCopy()).toMatch(/再试一次/);
   });
 });

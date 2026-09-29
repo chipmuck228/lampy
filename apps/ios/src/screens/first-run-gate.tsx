@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -8,6 +8,17 @@ import { leaveHref } from './lookback-origin';
 import { createSecureFirstRunStore, type FirstRunStore } from '../infrastructure/first-run-store';
 import { paper } from './life-page';
 import { FirstRunGuide } from './first-run-guide';
+
+export const FIRST_RUN_FINISH_ERROR = '这次没有记下引导完成。记录还在，可以再试一次。';
+
+export async function finishFirstRunGuide(store: FirstRunStore) {
+  try {
+    await store.markCompleted();
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, message: FIRST_RUN_FINISH_ERROR };
+  }
+}
 
 export async function readFirstRunLibrary() {
   try {
@@ -23,21 +34,38 @@ export async function readFirstRunLibrary() {
 
 export function FirstRunGate({
   children,
-  store = createSecureFirstRunStore(),
-  readLibrary = readFirstRunLibrary,
+  store,
+  readLibrary,
 }: {
   children: ReactNode;
   store?: FirstRunStore;
   readLibrary?: () => Promise<{ hasPersonalRecords: boolean; recordsUnknown: boolean }>;
 }) {
   const router = useRouter();
+  const defaults = useRef({
+    store: store ?? createSecureFirstRunStore(),
+    readLibrary: readLibrary ?? readFirstRunLibrary,
+  });
+  const resolvedStore = store ?? defaults.current.store;
+  const resolvedRead = readLibrary ?? defaults.current.readLibrary;
   const [decision, setDecision] = useState<'pending' | 'show' | 'skip'>('pending');
+  const [finishError, setFinishError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const completed = await store.isCompleted();
-      const library = await readLibrary();
+      let completed = false;
+      try {
+        completed = await resolvedStore.isCompleted();
+      } catch {
+        completed = false;
+      }
+      let library = { hasPersonalRecords: false, recordsUnknown: true };
+      try {
+        library = await resolvedRead();
+      } catch {
+        library = { hasPersonalRecords: false, recordsUnknown: true };
+      }
       if (!alive) return;
       const next = decideFirstRunGuide({
         completed,
@@ -49,19 +77,29 @@ export function FirstRunGate({
     return () => {
       alive = false;
     };
-  }, [readLibrary, store]);
+  }, [resolvedRead, resolvedStore]);
 
   if (decision === 'pending') {
     return <View testID="first-run-pending" style={{ flex: 1, backgroundColor: paper }} />;
   }
   if (decision === 'skip') {
-    return <View testID="first-run-ready" style={{ flex: 1 }}>{children}</View>;
+    return (
+      <View testID="first-run-ready" style={{ flex: 1 }}>
+        {children}
+      </View>
+    );
   }
 
   return (
     <FirstRunGuide
+      finishError={finishError}
       onFinished={() => {
-        void store.markCompleted().then(() => {
+        void finishFirstRunGuide(resolvedStore).then((result) => {
+          if (!result.ok) {
+            setFinishError(result.message);
+            return;
+          }
+          setFinishError(null);
           setDecision('skip');
           router.push(leaveHref('recent'));
         });

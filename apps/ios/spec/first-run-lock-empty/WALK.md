@@ -6,6 +6,8 @@
 
 不要清空现有真机个人库。空库请用可丢弃的独立测试安装。
 
+引导每页正文已有独立滚动，底栏 `flexShrink: 0`。最大字号与短屏是否重叠仍要在原生页确认。App 切换器遮挡、Face ID、设备密码退路仍是 **NOT VERIFIED**。
+
 ## 自动化
 
 在 `apps/ios`：
@@ -17,6 +19,12 @@
 | 全量 `npm test` 并行 | 机器过载下大量 5s timeout；同一套受影响文件 `--runInBand` 后 PASS |
 | 新文件 `eslint` | PASS |
 | `npx expo lint` 全库 | 既有 leave.tsx / share/[id].tsx `set-state-in-effect`，不是本切片引入 |
+
+## 走查边界
+
+引导每页高度等于翻页视口；标题和正文在页内可滚，底部「继续 / 留下瞬间」固定在页脚外。最大字号和短屏须在原生页确认文字不会压住按钮。Jest 不能替代这项。
+
+App 切换器遮挡、Face ID、设备密码退路仍是 **NOT VERIFIED**。
 
 ## 真机 A：默认关闭
 

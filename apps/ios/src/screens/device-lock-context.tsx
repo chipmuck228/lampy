@@ -13,6 +13,7 @@ import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   createDeviceLockSession,
   deviceLockCopy,
+  deviceLockPersistCopy,
   type DeviceLockSnapshot,
 } from '../application/device-lock';
 import { pauseForegroundAudio } from '../application/foreground-audio';
@@ -37,31 +38,47 @@ export function useDeviceLock() {
 
 export function DeviceLockProvider({
   children,
-  store = createSecureDeviceLockStore(),
-  authenticator = createExpoDeviceAuthenticator(),
+  store,
+  authenticator,
 }: {
   children: ReactNode;
   store?: DeviceLockStore;
   authenticator?: DeviceAuthenticator;
 }) {
+  const defaults = useRef({
+    store: store ?? createSecureDeviceLockStore(),
+    authenticator: authenticator ?? createExpoDeviceAuthenticator(),
+  });
+  const resolvedStore = store ?? defaults.current.store;
+  const resolvedAuthenticator = authenticator ?? defaults.current.authenticator;
   const session = useMemo(() => createDeviceLockSession(), []);
   const [snapshot, setSnapshot] = useState(session.snapshot());
   const [message, setMessage] = useState<string | null>(null);
   const inFlight = useRef(false);
+  const hydrated = useRef(false);
 
   const refresh = useCallback(() => setSnapshot(session.snapshot()), [session]);
 
   useEffect(() => {
     let alive = true;
-    void store.isEnabled().then((enabled) => {
-      if (!alive) return;
-      session.applyStored(enabled);
-      refresh();
-    });
+    void resolvedStore
+      .isEnabled()
+      .then((enabled) => {
+        if (!alive || hydrated.current) return;
+        hydrated.current = true;
+        session.applyStored(enabled);
+        refresh();
+      })
+      .catch(() => {
+        if (!alive || hydrated.current) return;
+        hydrated.current = true;
+        session.applyStored(false);
+        refresh();
+      });
     return () => {
       alive = false;
     };
-  }, [refresh, session, store]);
+  }, [refresh, resolvedStore, session]);
 
   useEffect(() => {
     void setPrivateSnapshotBlocked(snapshot.locked);
@@ -72,12 +89,15 @@ export function DeviceLockProvider({
     const generation = session.beginAuth();
     inFlight.current = true;
     setMessage(null);
-    const result = await authenticator.authenticate('验证是这台设备的持有人，才能打开 Lampy。');
-    const next = session.finishUnlock(generation, result);
-    inFlight.current = false;
-    refresh();
-    if (next.kind === 'denied') setMessage(deviceLockCopy(result));
-  }, [authenticator, refresh, session]);
+    try {
+      const result = await resolvedAuthenticator.authenticate('验证是这台设备的持有人，才能打开 Lampy。');
+      const next = session.finishUnlock(generation, result);
+      if (next.kind === 'denied') setMessage(deviceLockCopy(result));
+    } finally {
+      inFlight.current = false;
+      refresh();
+    }
+  }, [refresh, resolvedAuthenticator, session]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -106,15 +126,27 @@ export function DeviceLockProvider({
     inFlight.current = true;
     setMessage(null);
     const enabling = current.setting === 'off';
-    const result = await authenticator.authenticate(
-      enabling ? '验证是这台设备的持有人，才能打开本机保护。' : '验证是这台设备的持有人，才能关闭本机保护。',
-    );
-    const next = enabling ? session.confirmEnable(generation, result) : session.confirmDisable(generation, result);
-    if (next.persist) await store.setEnabled(enabling);
-    inFlight.current = false;
-    refresh();
-    if (next.kind === 'denied') setMessage(deviceLockCopy(result));
-  }, [authenticator, refresh, session, store]);
+    try {
+      const result = await resolvedAuthenticator.authenticate(
+        enabling ? '验证是这台设备的持有人，才能打开本机保护。' : '验证是这台设备的持有人，才能关闭本机保护。',
+      );
+      const next = enabling ? session.confirmEnable(generation, result) : session.confirmDisable(generation, result);
+      if (next.persist) {
+        try {
+          await resolvedStore.setEnabled(enabling);
+        } catch {
+          if (enabling) session.revertEnable();
+          else session.revertDisable();
+          setMessage(deviceLockPersistCopy());
+        }
+      } else if (next.kind === 'denied') {
+        setMessage(deviceLockCopy(result));
+      }
+    } finally {
+      inFlight.current = false;
+      refresh();
+    }
+  }, [refresh, resolvedAuthenticator, resolvedStore, session]);
 
   const value = {
     snapshot,
