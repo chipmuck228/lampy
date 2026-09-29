@@ -61,7 +61,7 @@ npm run family-identity:accept
 隔离验收：
 
 1. 另开 SQLite 文件，不要改生产库。
-2. 用 `npm run family-api:test-account` 在该文件上 create 两个登录名，确认得到不同 `userId`。密码只从隐藏输入、`FAMILY_TEST_ACCOUNT_PASSWORD_FILE` 或 `FAMILY_TEST_ACCOUNT_PASSWORD_FD` 读取。
+2. 确认该文件已跑过 `npm run family-api:migrate`（测试账号 CLI 不执行迁移）。再用 `npm run family-api:test-account` create 两个登录名，确认得到不同 `userId`。密码只从隐藏输入、仅 owner 可访问的 `FAMILY_TEST_ACCOUNT_PASSWORD_FILE`，或 `FAMILY_TEST_ACCOUNT_PASSWORD_FD` 读取。
 3. 本机 listen 设 `LAMPY_TEST_ACCOUNT_LOGIN=1` 后才能 `POST /v1/auth/test-account`。未设时该端点返回 `TEST_ACCOUNT_LOGIN_CLOSED`，Apple 登录不受影响。
 4. 回滚：去掉 `LAMPY_TEST_ACCOUNT_LOGIN`，重启进程。凭据行保留；已有测试会话在下次受保护请求时被撤销。
 5. 本 PR 的迁移 14–16（仅存在于本 PR，main/生产仍停在 13）把 `apple_subject` 改为可空，并增加测试凭据表和登录限速表。不要改已在 main 应用过的 1–13。

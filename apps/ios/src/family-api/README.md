@@ -76,8 +76,12 @@ npm run family-api
 
 在受控主机对 SQLite 直接操作。不开放公网创建／停用接口。不要把密码写进 argv、日志或 shell 历史。
 
+先对该文件跑 `npm run family-api:migrate`。测试账号 CLI **不会**执行迁移（第 14 项会重建 `family_accounts`）。schema 14–16 不齐时直接拒绝。
+
 ```bash
 cd apps/ios
+LAMPY_FAMILY_DATABASE_PATH=./family.db npm run family-api:migrate
+chmod 0600 /path/outside/repo/password
 LAMPY_FAMILY_DATABASE_PATH=./family.db \
 FAMILY_TEST_ACCOUNT_PASSWORD_FILE=/path/outside/repo/password \
 npm run family-api:test-account -- create tester@example.com
@@ -85,7 +89,7 @@ LAMPY_FAMILY_DATABASE_PATH=./family.db \
 npm run family-api:test-account -- disable tester@example.com
 ```
 
-`npm run` 不会把额外 FD 传给 Node，所以走 package script 时用 `FAMILY_TEST_ACCOUNT_PASSWORD_FILE`。直接跑 `node ./scripts/family-api-test-account.cjs` 时仍可用 `FAMILY_TEST_ACCOUNT_PASSWORD_FD=3` 加 `3< password`。不要把密码写进 argv。
+`npm run` 不会把额外 FD 传给 Node，所以走 package script 时用仅 owner 可读写的 `FAMILY_TEST_ACCOUNT_PASSWORD_FILE`（拒绝 group/other 可读）。直接跑 `node ./scripts/family-api-test-account.cjs` 时仍可用 `FAMILY_TEST_ACCOUNT_PASSWORD_FD=3` 加 `3< password`。不要把密码写进 argv。
 
 TTY 上也可交互隐藏输入密码。重复 create 不会覆盖既有密码、userId 或家庭资格。停用会立即撤销该账号服务端会话，不删除家庭分享或 F2 媒体。清理测试家庭请用现有成员／分享命令。
 

@@ -102,22 +102,49 @@ const MIGRATIONS = [
   );`,
 ];
 
-export async function applyFamilyApiSchema(db: FamilySql): Promise<void> {
+export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;
+
+export async function applyFamilyApiSchema(db: FamilySql, options?: { upTo?: number }): Promise<void> {
+  const last = options?.upTo ?? MIGRATIONS.length;
   await db.exec(`CREATE TABLE IF NOT EXISTS family_schema_migrations (
     version INTEGER PRIMARY KEY NOT NULL,
     applied_at TEXT NOT NULL
   );`);
   for (const [index, sql] of MIGRATIONS.entries()) {
+    const version = index + 1;
+    if (version > last) break;
     const applied = await db.getFirst<{ version: number }>(
       'SELECT version FROM family_schema_migrations WHERE version = ?',
-      [index + 1],
+      [version],
     );
     if (!applied) {
       await db.exec(sql);
       await db.run('INSERT INTO family_schema_migrations (version, applied_at) VALUES (?, ?)', [
-        index + 1,
+        version,
         new Date().toISOString(),
       ]);
     }
   }
+}
+
+export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise<void> {
+  const table = await db.getFirst<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'family_schema_migrations'",
+  );
+  if (!table) {
+    throw missingTestAccountSchemaError();
+  }
+  const rows = await db.getAll<{ version: number }>(
+    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16)',
+  );
+  const have = new Set(rows.map((row) => row.version));
+  if (TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS.some((version) => !have.has(version))) {
+    throw missingTestAccountSchemaError();
+  }
+}
+
+function missingTestAccountSchemaError() {
+  return new Error(
+    'This database is missing family-api migrations 14–16. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
+  );
 }

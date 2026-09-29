@@ -1,11 +1,11 @@
-import { closeSync, openSync, readFileSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs';
 import { stdin, stdout } from 'node:process';
 
 import { createFamilyCommands } from './commands';
 import { createFamilyClock, createFamilyIds } from './ids';
 import { openFamilySqliteDatabase } from './node-db';
 import { createArgon2idPasswordHasher, type PasswordHasher } from './password';
-import { applyFamilyApiSchema } from './schema';
+import { assertFamilyTestAccountSchemaReady } from './schema';
 import { createSqliteFamilyRepository } from './sqlite-repository';
 
 export function readPasswordFromRestrictedFd(fd: number) {
@@ -23,7 +23,7 @@ export function promptHiddenPassword(
     if (!input.isTTY || !output.isTTY) {
       reject(
         new Error(
-          'Password must come from FAMILY_TEST_ACCOUNT_PASSWORD_FILE, FAMILY_TEST_ACCOUNT_PASSWORD_FD, or an interactive TTY. Do not pass it as a command-line argument.',
+          'Password must come from a 0600 FAMILY_TEST_ACCOUNT_PASSWORD_FILE, FAMILY_TEST_ACCOUNT_PASSWORD_FD, or an interactive TTY. Do not pass it as a command-line argument.',
         ),
       );
       return;
@@ -61,15 +61,28 @@ export function promptHiddenPassword(
   });
 }
 
+export function readPasswordFromRestrictedFile(filePath: string) {
+  const fd = openSync(filePath, 'r');
+  try {
+    const stat = fstatSync(fd);
+    if (!stat.isFile()) {
+      throw new Error('FAMILY_TEST_ACCOUNT_PASSWORD_FILE must be a regular file.');
+    }
+    if ((stat.mode & 0o077) !== 0) {
+      throw new Error(
+        'FAMILY_TEST_ACCOUNT_PASSWORD_FILE must not be group- or world-accessible. chmod 0600 the file, or use a hidden TTY / FAMILY_TEST_ACCOUNT_PASSWORD_FD.',
+      );
+    }
+    return readPasswordFromRestrictedFd(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export async function readOperatorPassword(env: Record<string, string | undefined> = process.env) {
   const passwordFile = (env.FAMILY_TEST_ACCOUNT_PASSWORD_FILE || '').trim();
   if (passwordFile) {
-    const fd = openSync(passwordFile, 'r');
-    try {
-      return readPasswordFromRestrictedFd(fd);
-    } finally {
-      closeSync(fd);
-    }
+    return readPasswordFromRestrictedFile(passwordFile);
   }
   const rawFd = (env.FAMILY_TEST_ACCOUNT_PASSWORD_FD || '').trim();
   if (rawFd) {
@@ -88,7 +101,7 @@ export async function runTestAccountCli(input: {
   const [, , action, login] = input.argv;
   if ((action !== 'create' && action !== 'disable') || !login) {
     throw new Error(
-      'Usage: family-api-test-account create <login> | disable <login>\nPassword comes from FAMILY_TEST_ACCOUNT_PASSWORD_FILE, FAMILY_TEST_ACCOUNT_PASSWORD_FD, or a hidden TTY prompt.',
+      'Usage: family-api-test-account create <login> | disable <login>\nPassword comes from a 0600 FAMILY_TEST_ACCOUNT_PASSWORD_FILE, FAMILY_TEST_ACCOUNT_PASSWORD_FD, or a hidden TTY prompt.',
     );
   }
   const databasePath = (env.LAMPY_FAMILY_DATABASE_PATH || '').trim();
@@ -96,7 +109,12 @@ export async function runTestAccountCli(input: {
     throw new Error('LAMPY_FAMILY_DATABASE_PATH is required. This CLI talks to the SQLite file directly and does not open a public HTTP port.');
   }
   const db = openFamilySqliteDatabase(databasePath);
-  await applyFamilyApiSchema(db);
+  try {
+    await assertFamilyTestAccountSchemaReady(db);
+  } catch (error) {
+    await db.close();
+    throw error;
+  }
   const commands = createFamilyCommands({
     repository: createSqliteFamilyRepository(db),
     apple: {
