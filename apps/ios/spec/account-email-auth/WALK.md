@@ -1,6 +1,6 @@
 # 受控家庭测试账号登录走查
 
-独立 PR，基线核对见交付报告。未叠 #41。只改 `apps/ios`。PR 保持 OPEN。`identityLoopAccepted` 仍为 **false**。`EXPO_PUBLIC_FAMILY_ENTRY_OPEN` 未开。
+独立 PR，base `origin/main` `b1abc11`，head `6ac18e1`。未叠 #41。只改 `apps/ios`。PR 保持 OPEN。`identityLoopAccepted` 仍为 **false**。`EXPO_PUBLIC_FAMILY_ENTRY_OPEN` 未开。
 
 ## 最小契约
 
