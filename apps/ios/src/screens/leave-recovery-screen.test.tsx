@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LeaveScreen from '../app/leave';
@@ -137,13 +137,26 @@ describe('leave recovery copy', () => {
     });
     fireEvent.press(view.getByTestId('composer-camera'));
     await waitFor(() => {
-      expect(
-        view.getByText(
-          '没有打开相机。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许相机后，可以再试。',
-        ),
-      ).toBeTruthy();
+      expect(view.getByText('相机未打开，草稿还在。')).toBeTruthy();
+    });
+    expect(within(view.getByTestId('composer-action-band')).getByText('相机未打开，草稿还在。')).toBeTruthy();
+    expect(view.getByLabelText('查看说明')).toBeTruthy();
+    fireEvent.press(view.getByTestId('composer-feedback-detail'));
+    await waitFor(() => {
+      expect(view.getByTestId('composer-feedback-detail-body')).toBeTruthy();
+    });
+    expect(
+      view.getByText(
+        '没有打开相机。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许相机后，可以再试。',
+      ),
+    ).toBeTruthy();
+    fireEvent.press(view.getByTestId('composer-feedback-detail-close'));
+    await waitFor(() => {
+      expect(view.queryByTestId('composer-feedback-sheet')).toBeNull();
     });
     expect(view.getByDisplayValue('还可以写字')).toBeTruthy();
     expect(view.getByLabelText('照片')).toBeEnabled();
+    expect(view.getByTestId('composer-save')).toBeEnabled();
+    expect(view.getByTestId('leave-back')).toBeTruthy();
   });
 });

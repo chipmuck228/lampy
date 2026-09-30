@@ -33,11 +33,13 @@ export function OccurredDatePicker({
   today,
   disabled,
   onChange,
+  layoutRevision,
 }: {
   value: OccurredChoiceView;
   today: CalendarDayParts;
   disabled?: boolean;
   onChange: (next: OccurredDraftInput) => void;
+  layoutRevision?: number;
 }) {
   const selectedDay =
     value.kind !== 'unknown' && value.year && value.month && value.day
@@ -76,10 +78,12 @@ export function OccurredDatePicker({
         onPress={() => setOpen((current) => !current)}
         style={styles.toggleHit}
       >
-        <View style={styles.toggleRow}>
+        <View key={`occurred-row-${layoutRevision ?? 1}`} style={styles.toggleRow}>
           <View style={styles.toggleCopy}>
-            <Text style={styles.heading}>发生日期</Text>
-            <Text style={styles.chosen} accessible={false}>
+            <Text key={`occurred-heading-${layoutRevision ?? 1}`} style={styles.heading}>
+              发生日期
+            </Text>
+            <Text key={`occurred-chosen-${layoutRevision ?? 1}`} style={styles.chosen} accessible={false}>
               {value.label}
             </Text>
           </View>
@@ -225,7 +229,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   toggleCopy: { flex: 1, flexShrink: 1, gap: 2 },
-  heading: { fontSize: 16, lineHeight: 22, color: '#5C5851' },
+  heading: { fontSize: 16, color: '#5C5851' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     minHeight: 48,

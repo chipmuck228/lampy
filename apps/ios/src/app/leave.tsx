@@ -15,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { composerPermissionNotice } from '../application/composer-notice';
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
 import {
@@ -94,7 +95,22 @@ export default function LeaveScreen() {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
   });
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessageState] = useState<string | null>(null);
+  const [messageDetail, setMessageDetail] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [noteBoxHeight, setNoteBoxHeight] = useState<number | undefined>(undefined);
+
+  function setMessage(status: string | null, detail?: string | null) {
+    setMessageState(status);
+    setMessageDetail(status && detail ? detail : null);
+    if (!detail) setDetailOpen(false);
+  }
+
+  function setDeniedMessage(code: string, detail: string) {
+    const notice = composerPermissionNotice(code, detail);
+    if (notice) setMessage(notice.status, notice.detail);
+    else setMessage(detail);
+  }
   const [busy, setBusy] = useState<
     'idle' | 'photo' | 'record' | 'audio' | 'save' | 'abandon' | 'remove'
   >('idle');
@@ -150,6 +166,11 @@ export default function LeaveScreen() {
     );
     return run;
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- drop the previous type's measured note height
+    setNoteBoxHeight(undefined);
+  }, [fontScale]);
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -350,9 +371,14 @@ export default function LeaveScreen() {
         }
         if (
           isApplicationError(error) &&
-          (error.code === 'LIBRARY_DENIED' ||
-            error.code === 'CAMERA_DENIED' ||
-            error.code === 'DISK_FULL' ||
+          (error.code === 'LIBRARY_DENIED' || error.code === 'CAMERA_DENIED')
+        ) {
+          setDeniedMessage(error.code, error.message);
+          return;
+        }
+        if (
+          isApplicationError(error) &&
+          (error.code === 'DISK_FULL' ||
             error.code === 'COPY_FAILED' ||
             error.code === 'REPOSITORY_WRITE_FAILED' ||
             error.code === 'REPOSITORY_INVALID_RECORD' ||
@@ -394,7 +420,7 @@ export default function LeaveScreen() {
         if (abandoningRef.current || draftIdRef.current !== id) return;
         if (isApplicationError(error) && error.code === 'MIC_DENIED') {
           setRecordPhase('ready');
-          setMessage(error.message);
+          setDeniedMessage(error.code, error.message);
           return;
         }
         if (isApplicationError(error) && error.code === 'AUDIO_LIMIT') {
@@ -559,7 +585,7 @@ export default function LeaveScreen() {
           setRecordPhase(audio ? 'stopped' : 'failed');
         }
         if (isApplicationError(error) && error.code === 'MIC_DENIED') {
-          setMessage(error.message);
+          setDeniedMessage(error.code, error.message);
           return;
         }
         setMessage(shownError(error, '这次没有重新录上。可以再试。'));
@@ -720,11 +746,23 @@ export default function LeaveScreen() {
             : '留下';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']} accessibilityLabel="留下">
+    <SafeAreaView
+      style={styles.safe}
+      edges={['top', 'left', 'right']}
+      accessibilityLabel="留下"
+      testID="composer-layout"
+      accessibilityHint={`leave-layout scale:${fontScale} actions:${stackActions ? 'stack' : 'row'}`}
+    >
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <Text testID="composer-font-scale" accessible={false} style={styles.layoutProbe}>
+          {String(fontScale)}
+        </Text>
+        <Text testID="composer-actions-mode" accessible={false} style={styles.layoutProbe}>
+          {stackActions ? 'stack' : 'row'}
+        </Text>
         <ScrollView
           style={styles.flex}
           contentContainerStyle={[
@@ -792,6 +830,7 @@ export default function LeaveScreen() {
             </View>
           ) : null}
           <TextInput
+            key={`composer-note-${fontScale}`}
             accessibilityLabel="要留下的一句话"
             testID="composer-note"
             value={note}
@@ -799,11 +838,15 @@ export default function LeaveScreen() {
             onChangeText={(value) => {
               void persistNote(value);
             }}
+            onContentSizeChange={(event) => {
+              const next = Math.max(88, Math.ceil(event.nativeEvent.contentSize.height));
+              setNoteBoxHeight((current) => (current === next ? current : next));
+            }}
             placeholder="写一句就可以，也可以只留下照片或声音。"
             placeholderTextColor={placeholder}
             multiline
             textAlignVertical="top"
-            style={styles.input}
+            style={[styles.input, noteBoxHeight != null ? { height: noteBoxHeight } : null]}
           />
           <MomentImages
             images={images}
@@ -814,6 +857,7 @@ export default function LeaveScreen() {
           />
           <MomentUnknownMedia items={unknownMedia} testIDPrefix="composer-unknown" />
           <DraftSoundBar
+            layoutRevision={fontScale}
             phase={phase}
             elapsedMs={elapsedMs}
             audio={audio}
@@ -840,6 +884,7 @@ export default function LeaveScreen() {
             onRemove={removeAudio}
           />
           <FeelingPicker
+            layoutRevision={fontScale}
             value={emotion}
             disabled={!draftId || composerLocked}
             onChange={(next) => {
@@ -847,6 +892,7 @@ export default function LeaveScreen() {
             }}
           />
           <OccurredDatePicker
+            layoutRevision={fontScale}
             value={occurred}
             today={todayParts}
             disabled={!draftId || composerLocked}
@@ -854,6 +900,30 @@ export default function LeaveScreen() {
               persistOccurred(next);
             }}
           />
+          {detailOpen && messageDetail ? (
+            <View testID="composer-feedback-sheet" style={styles.sheet}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="关闭说明"
+                testID="composer-feedback-detail-close"
+                onPress={() => setDetailOpen(false)}
+                style={styles.sheetClose}
+              >
+                <Text style={styles.back}>关闭</Text>
+              </Pressable>
+              <ScrollView
+                testID="composer-feedback-detail-scroll"
+                style={styles.sheetScroll}
+                contentContainerStyle={styles.sheetBody}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+              >
+                <Text testID="composer-feedback-detail-body" style={styles.sheetText}>
+                  {messageDetail}
+                </Text>
+              </ScrollView>
+            </View>
+          ) : null}
         </ScrollView>
         <View
           testID="composer-action-band"
@@ -867,17 +937,31 @@ export default function LeaveScreen() {
           ]}
         >
           {message ? (
-            <Text
-              testID="composer-feedback"
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
-              style={[styles.message, { maxWidth: reading }]}
-            >
-              {message}
-            </Text>
+            <View testID="composer-feedback-row" style={[styles.feedbackRow, { maxWidth: reading }]}>
+              <Text
+                testID="composer-feedback"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                style={styles.message}
+              >
+                {message}
+              </Text>
+              {messageDetail ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="查看说明"
+                  testID="composer-feedback-detail"
+                  onPress={() => setDetailOpen(true)}
+                  style={styles.detailHit}
+                >
+                  <Text style={styles.detailLink}>查看说明</Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
           <View
             testID="composer-actions"
+            accessibilityLabel={stackActions ? 'leave-actions-stack' : 'leave-actions-row'}
             style={[
               styles.actions,
               { maxWidth: reading },
@@ -886,6 +970,7 @@ export default function LeaveScreen() {
           >
             <View style={styles.mediaRow}>
               <LifeLabeledHit
+                layoutRevision={fontScale}
                 icon="camera"
                 label="拍摄"
                 testID="composer-camera"
@@ -895,6 +980,7 @@ export default function LeaveScreen() {
                 }}
               />
               <LifeLabeledHit
+                layoutRevision={fontScale}
                 icon="photo"
                 label="照片"
                 testID="composer-library"
@@ -926,6 +1012,7 @@ export default function LeaveScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper },
   flex: { flex: 1 },
+  layoutProbe: { position: 'absolute', height: 0, width: 0, opacity: 0 },
   column: {
     flexGrow: 1,
     width: '100%',
@@ -941,20 +1028,37 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 88,
     fontSize: 22,
-    lineHeight: 32,
     color: ink,
     padding: 0,
   },
-  message: {
-    fontSize: 17,
-    lineHeight: 26,
-    color: clay,
-    paddingBottom: 8,
+  feedbackRow: {
     width: '100%',
     maxWidth: '100%',
     minWidth: 0,
     alignSelf: 'center',
+    gap: 4,
+    paddingBottom: 8,
   },
+  message: {
+    fontSize: 17,
+    color: clay,
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+  },
+  detailHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  detailLink: { fontSize: 16, color: sage },
+  sheet: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: hairline,
+    paddingTop: 8,
+    gap: 8,
+    maxHeight: 220,
+  },
+  sheetClose: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  sheetScroll: { maxHeight: 160 },
+  sheetBody: { paddingBottom: 16 },
+  sheetText: { fontSize: 17, color: inkSoft },
   band: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: hairline,

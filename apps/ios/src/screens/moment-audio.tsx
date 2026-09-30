@@ -232,6 +232,7 @@ export function DraftSoundBar({
   currentTimeMs,
   disabled,
   removeDisabled,
+  layoutRevision,
   onStart,
   onStop,
   onPlay,
@@ -246,6 +247,7 @@ export function DraftSoundBar({
   currentTimeMs: number;
   disabled: boolean;
   removeDisabled?: boolean;
+  layoutRevision?: number;
   onStart: () => void;
   onStop: () => void;
   onPlay: () => void;
@@ -331,6 +333,7 @@ export function DraftSoundBar({
       <View style={styles.block}>
         <Text style={styles.missing}>这次没有录下声音。已经写的字和照片还在。</Text>
         <LifeLabeledHit
+          layoutRevision={layoutRevision}
           icon="record"
           label="录音"
           testID="composer-sound"
@@ -343,6 +346,7 @@ export function DraftSoundBar({
 
   return (
     <LifeLabeledHit
+      layoutRevision={layoutRevision}
       icon="record"
       label="录音"
       testID="composer-sound"

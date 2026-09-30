@@ -9,9 +9,23 @@ export type PageMetrics = {
 
 const RESUME_REREAD_MS = [80, 400];
 
-export function readPageMetrics(): PageMetrics {
+export function pickFontScale(
+  windowScale: number | undefined,
+  pixelScale: number | undefined,
+  previous?: number,
+): number {
+  const win = windowScale || 0;
+  const pixel = pixelScale || 0;
+  if (previous != null && previous > 0) {
+    if (pixel && pixel !== previous && (!win || win === previous)) return pixel;
+    if (win && win !== previous) return win;
+  }
+  return win || pixel || 1;
+}
+
+export function readPageMetrics(previous?: PageMetrics): PageMetrics {
   const window = Dimensions.get('window');
-  const fontScale = window.fontScale || PixelRatio.getFontScale() || 1;
+  const fontScale = pickFontScale(window.fontScale, PixelRatio.getFontScale(), previous?.fontScale);
   return {
     width: window.width,
     height: window.height,
@@ -30,8 +44,10 @@ export function usePageMetrics(): PageMetrics {
     let alive = true;
     const apply = () => {
       if (!alive) return;
-      const next = readPageMetrics();
-      setMetrics((current) => (sameMetrics(current, next) ? current : next));
+      setMetrics((current) => {
+        const next = readPageMetrics(current);
+        return sameMetrics(current, next) ? current : next;
+      });
     };
     let resumeTimers: ReturnType<typeof setTimeout>[] = [];
     const refreshAfterResume = () => {

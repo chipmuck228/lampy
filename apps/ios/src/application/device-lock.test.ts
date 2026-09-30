@@ -71,6 +71,16 @@ describe('device lock session', () => {
     expect(session.snapshot().locked).toBe(true);
   });
 
+  it('conceals on inactive without invalidating the in-flight unlock generation', () => {
+    const session = createDeviceLockSession();
+    session.applyStored(true);
+    const first = session.beginAuth();
+    expect(session.conceal().locked).toBe(true);
+    expect(session.snapshot().authGeneration).toBe(first);
+    expect(session.finishUnlock(first, { ok: true }).kind).toBe('unlocked');
+    expect(session.snapshot().locked).toBe(false);
+  });
+
   it('locks again in background and ignores a stale unlock', () => {
     const session = createDeviceLockSession();
     session.applyStored(true);

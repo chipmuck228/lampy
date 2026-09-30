@@ -76,6 +76,7 @@ export function LifeLabeledHit({
   testID,
   disabled,
   accessibilityLabel,
+  layoutRevision,
 }: {
   icon: LifeIconName;
   label: string;
@@ -83,6 +84,7 @@ export function LifeLabeledHit({
   testID?: string;
   disabled?: boolean;
   accessibilityLabel?: string;
+  layoutRevision?: number;
 }) {
   return (
     <Pressable
@@ -94,9 +96,11 @@ export function LifeLabeledHit({
       disabled={disabled}
       style={styles.labeledHit}
     >
-      <View style={styles.labeledRow}>
+      <View key={`labeled-${layoutRevision ?? 1}`} style={styles.labeledRow}>
         <LifeIcon name={icon} size={18} color={sage} decorative />
-        <Text style={styles.labeledText}>{label}</Text>
+        <Text key={`labeled-text-${layoutRevision ?? 1}`} style={styles.labeledText}>
+          {label}
+        </Text>
       </View>
     </Pressable>
   );

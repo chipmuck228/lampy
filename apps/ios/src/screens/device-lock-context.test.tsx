@@ -3,6 +3,7 @@ import { AppState, Pressable, StyleSheet, Text, type AppStateStatus } from 'reac
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 
+import type { DeviceLockTrace } from '../application/device-lock-privacy';
 import { DEVICE_LOCK_SECURE_KEY } from '../infrastructure/device-lock-store';
 import { DeviceLockProvider, DeviceLockSettings, useDeviceLock } from './device-lock-context';
 
@@ -58,9 +59,10 @@ function wrap(
   authenticator: {
     authenticate: () => Promise<{ ok: true } | { ok: false; reason: 'cancel' | 'fail' | 'unavailable' | 'no-passcode' }>;
   },
+  onLockTrace?: (event: DeviceLockTrace) => void,
 ) {
   return (
-    <DeviceLockProvider store={store} authenticator={authenticator}>
+    <DeviceLockProvider store={store} authenticator={authenticator} onLockTrace={onLockTrace}>
       <Text>private</Text>
       <Toggle />
       <DeviceLockSettings />
@@ -380,7 +382,53 @@ describe('device lock cover', () => {
     }
   });
 
-  it('accepts a valid success after auth-caused inactive without locking', async () => {
+  it('keeps the cover through Face ID inactive and only uncovers after this generation succeeds while active', async () => {
+    const app = mockAppState();
+    const traces: DeviceLockTrace[] = [];
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(
+        wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }, (event) => {
+          traces.push(event);
+        }),
+      );
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await app.set('inactive');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+      expect(traces.some((item) => item.result === 'held-until-active')).toBe(true);
+      await app.set('active');
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      expect(view.getByText('private')).toBeTruthy();
+      const held = traces.findIndex((item) => item.result === 'held-until-active');
+      const opened = traces.findIndex((item) => item.result === 'unlocked' && !item.cover);
+      expect(held).toBeGreaterThan(-1);
+      expect(opened).toBeGreaterThan(held);
+      expect(traces[held].cover).toBe(true);
+      expect(traces.every((item) => item.cover || item.result === 'unlocked')).toBe(true);
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('covers on inactive after unlock so the app switcher does not keep the last private frame', async () => {
     const app = mockAppState();
     const pending: ((value: { ok: true }) => void)[] = [];
     const authenticate = jest.fn(
@@ -396,39 +444,22 @@ describe('device lock cover', () => {
       await waitFor(() => {
         expect(authenticate).toHaveBeenCalledTimes(1);
       });
-      await app.set('inactive');
-      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
-      expect(authenticate).toHaveBeenCalledTimes(1);
       await act(async () => {
         pending[0]({ ok: true });
       });
       await waitFor(() => {
         expect(view.queryByTestId('device-lock-cover')).toBeNull();
       });
-      await app.set('active');
-      expect(authenticate).toHaveBeenCalledTimes(1);
-      expect(view.getByText('private')).toBeTruthy();
-    } finally {
-      app.restore();
-    }
-  });
-
-  it('keeps an unlocked session through inactive and only covers after a real background', async () => {
-    const app = mockAppState();
-    const authenticate = jest.fn(async () => ({ ok: true as const }));
-    try {
-      const view = await render(
-        wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }),
-      );
-      await waitFor(() => {
-        expect(view.queryByTestId('device-lock-cover')).toBeNull();
-      });
       await app.set('inactive');
-      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
       expect(authenticate).toHaveBeenCalledTimes(1);
       await app.set('active');
-      expect(view.queryByTestId('device-lock-cover')).toBeNull();
-      expect(authenticate).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(2);
+      });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
       await app.set('background');
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
       expect(view.queryByText('private')).toBeNull();
@@ -461,7 +492,7 @@ describe('device lock cover', () => {
       });
 
       await app.set('inactive');
-      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
       await app.set('background');
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
       expect(authenticate).toHaveBeenCalledTimes(1);
@@ -552,11 +583,13 @@ describe('device lock cover', () => {
       await waitFor(() => {
         expect(setEnabled).toHaveBeenCalledWith(true);
       });
+      expect(view.getByText('已开启', { includeHiddenElements: true })).toBeTruthy();
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(1);
       expect(view.getByText('已开启')).toBeTruthy();
       expect(view.getByText('private')).toBeTruthy();
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
-      await app.set('active');
-      expect(authenticate).toHaveBeenCalledTimes(1);
     } finally {
       app.restore();
     }
@@ -691,6 +724,9 @@ describe('device lock cover', () => {
       await waitFor(() => {
         expect(setEnabled).toHaveBeenCalledWith(true);
       });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(1);
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
 
       await app.set('background');

@@ -8,10 +8,12 @@ export function FeelingPicker({
   value,
   disabled,
   onChange,
+  layoutRevision,
 }: {
   value: string;
   disabled?: boolean;
   onChange: (next: string) => void;
+  layoutRevision?: number;
 }) {
   const selected = value.trim();
   const unknown = !!selected && !(FEELING_VOCABULARY as readonly string[]).includes(selected);
@@ -27,8 +29,10 @@ export function FeelingPicker({
         onPress={() => setOpen((current) => !current)}
         style={styles.toggleHit}
       >
-        <View style={styles.toggleRow}>
-          <Text style={styles.heading}>{selected || '当时的感受'}</Text>
+        <View key={`feeling-row-${layoutRevision ?? 1}`} style={styles.toggleRow}>
+          <Text key={`feeling-heading-${layoutRevision ?? 1}`} style={styles.heading}>
+            {selected || '当时的感受'}
+          </Text>
           <LifeIcon name={open || !selected ? 'expand' : 'collapse'} size={14} decorative />
         </View>
       </Pressable>
@@ -105,7 +109,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  heading: { fontSize: 16, lineHeight: 22, color: '#5C5851' },
+  heading: { fontSize: 16, color: '#5C5851', flexShrink: 1 },
   unknown: { fontSize: 16, lineHeight: 22, color: '#5C5851' },
   chips: {
     flexDirection: 'row',
