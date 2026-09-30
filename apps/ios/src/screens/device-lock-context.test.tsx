@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AppState, Pressable, Text, type AppStateStatus } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, type AppStateStatus } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 
@@ -89,6 +89,24 @@ describe('device lock cover', () => {
     });
     expect(view.getByText('private')).toBeTruthy();
     expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  it('lets lock-cover copy grow with Dynamic Type instead of clipping into the next line', async () => {
+    const view = await render(
+      wrap(
+        { isEnabled: async () => true, setEnabled: async () => undefined },
+        { authenticate: async () => ({ ok: false, reason: 'cancel' }) },
+      ),
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+    });
+    expect(StyleSheet.flatten(view.getByText('这台设备已保护').props.style).lineHeight).toBeUndefined();
+    expect(
+      StyleSheet.flatten(view.getByText('进入 Lampy 前，先确认是这台设备的持有人。记录还在。').props.style)
+        .lineHeight,
+    ).toBeUndefined();
+    expect(StyleSheet.flatten(view.getByText('再试一次').props.style).lineHeight).toBeUndefined();
   });
 
   it('covers content until unlock succeeds and ignores a cancelled challenge', async () => {

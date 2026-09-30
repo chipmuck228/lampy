@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import {
   createDeviceLockSession,
@@ -281,32 +281,38 @@ export function DeviceLockProvider({
       </View>
       {snapshot.locked ? (
         <View style={styles.cover} testID="device-lock-cover" accessibilityLabel="Lampy 已锁定">
-          <Text style={styles.title} accessibilityRole="header">
-            {snapshot.setting === 'unknown' ? 'Lampy' : '这台设备已保护'}
-          </Text>
-          <Text style={styles.body}>
-            {snapshot.setting === 'unknown' && !message
-              ? '正在确认本机设置。'
-              : snapshot.setting === 'unknown'
-                ? '记录还在。'
-                : '进入 Lampy 前，先确认是这台设备的持有人。记录还在。'}
-          </Text>
-          {snapshot.setting === 'on' || message ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="再试一次"
-              testID="device-lock-retry"
-              onPress={retryCoverAction}
-              style={styles.hit}
-            >
-              <Text style={styles.action}>再试一次</Text>
-            </Pressable>
-          ) : null}
-          {message ? (
-            <Text style={styles.body} testID="device-lock-message">
-              {message}
+          <ScrollView
+            contentContainerStyle={styles.coverInner}
+            keyboardShouldPersistTaps="handled"
+            testID="device-lock-cover-scroll"
+          >
+            <Text style={styles.title} accessibilityRole="header">
+              {snapshot.setting === 'unknown' ? 'Lampy' : '这台设备已保护'}
             </Text>
-          ) : null}
+            <Text style={styles.body}>
+              {snapshot.setting === 'unknown' && !message
+                ? '正在确认本机设置。'
+                : snapshot.setting === 'unknown'
+                  ? '记录还在。'
+                  : '进入 Lampy 前，先确认是这台设备的持有人。记录还在。'}
+            </Text>
+            {snapshot.setting === 'on' || message ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="再试一次"
+                testID="device-lock-retry"
+                onPress={retryCoverAction}
+                style={styles.hit}
+              >
+                <Text style={styles.action}>再试一次</Text>
+              </Pressable>
+            ) : null}
+            {message ? (
+              <Text style={styles.body} testID="device-lock-message">
+                {message}
+              </Text>
+            ) : null}
+          </ScrollView>
         </View>
       ) : null}
     </DeviceLockContext.Provider>
@@ -356,14 +362,17 @@ const styles = StyleSheet.create({
   cover: {
     ...StyleSheet.absoluteFill,
     backgroundColor: paper,
-    padding: 24,
-    justifyContent: 'center',
-    gap: 16,
     zIndex: 20,
   },
-  title: { fontSize: 28, lineHeight: 36, color: ink },
-  body: { fontSize: 17, lineHeight: 26, color: inkSoft },
-  action: { fontSize: 17, lineHeight: 24, color: sage },
+  coverInner: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+    gap: 16,
+  },
+  title: { fontSize: 28, color: ink },
+  body: { fontSize: 17, color: inkSoft },
+  action: { fontSize: 17, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   settingsRow: {
     minHeight: 44,
