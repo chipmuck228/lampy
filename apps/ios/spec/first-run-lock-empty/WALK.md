@@ -13,7 +13,7 @@
 | 项 | SHA / 说明 | 结果 |
 | --- | --- | --- |
 | 远端 `origin/ios/first-run-lock-empty`（改前） | `344a5c6857ca6a08b700dd748bd113d56b1e9c06` | 已对齐 |
-| 本轮 JS / 将推送 head | 提交后填入 | 设置文案 + 真机记录 + 首次引导测试 |
+| 本轮 JS / 将推送 head | `f4cad3d7203078b9af645d995ca6234fc55434ac` | 设置文案 + 真机记录 + 首次引导测试 |
 | 真机 Liuz17 原生包 | `/Users/zhen/WeChatProjects/lampy`，`ios/account-email-auth` `cd92863` + 本机 Face ID pods | 不是 #46 专属 prebuild。JS 走 Metro。同源原生重装：**NOT VERIFIED** |
 | Metro 8081 | `lampy-guide/apps/ios` | 改前 JS `344a5c6`。Reload 后才是本轮 |
 | 模拟器 Lampy.app | DerivedData 仅有 `Debug-iphoneos`，本轮未编出 simulator 包 | 完整全新安装 UI 走查 **NOT VERIFIED**（不记模拟器 PASS） |
