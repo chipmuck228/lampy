@@ -66,6 +66,8 @@ export interface MediaStore {
   canDecode(localUri: string): Promise<boolean>;
   canPlay(localUri: string): Promise<boolean>;
   removeAppOwned(localUri: string): Promise<boolean>;
+  /** Readable file URI after container-path repair, or null when bytes are gone. */
+  resolveUri?(localUri: string): Promise<string | null>;
 }
 
 export interface AudioCapture {

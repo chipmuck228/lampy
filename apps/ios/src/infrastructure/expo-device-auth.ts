@@ -36,10 +36,32 @@ export function mapLocalAuthError(error?: string): DeviceAuthResult {
   return { ok: false, reason: 'fail' };
 }
 
-function loadLocalAuthentication(): LocalAuthenticationModule | null {
+let loaded: LocalAuthenticationModule | null | undefined;
+
+function hasNativeLocalAuthentication(): boolean {
   try {
-    return require('expo-local-authentication') as LocalAuthenticationModule;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const core = require('expo-modules-core') as {
+      requireOptionalNativeModule?: (name: string) => unknown;
+    };
+    return !!core.requireOptionalNativeModule?.('ExpoLocalAuthentication');
   } catch {
+    return false;
+  }
+}
+
+function loadLocalAuthentication(): LocalAuthenticationModule | null {
+  if (loaded !== undefined) return loaded;
+  if (!hasNativeLocalAuthentication()) {
+    loaded = null;
+    return null;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    loaded = require('expo-local-authentication') as LocalAuthenticationModule;
+    return loaded;
+  } catch {
+    loaded = null;
     return null;
   }
 }

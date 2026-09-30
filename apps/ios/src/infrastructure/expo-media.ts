@@ -140,12 +140,64 @@ function isAppOwned(localUri: string): boolean {
   return localUri.includes(`/${ASSET_DIR}/`);
 }
 
+function assetFileName(localUri: string): string | null {
+  const marker = `/${ASSET_DIR}/`;
+  const index = localUri.lastIndexOf(marker);
+  if (index < 0) return null;
+  let rest = localUri.slice(index + marker.length).split('?')[0] ?? '';
+  try {
+    rest = decodeURIComponent(rest);
+  } catch {
+    return null;
+  }
+  if (!rest || rest.includes('/') || rest.includes('\\') || rest.includes('..')) return null;
+  return rest;
+}
+
+function withPrivateVarVariants(uri: string): string[] {
+  if (uri.includes('/private/var/')) {
+    return [uri, uri.replace('/private/var/', '/var/')];
+  }
+  if (uri.includes('/var/')) {
+    return [uri, uri.replace('file:///var/', 'file:///private/var/')];
+  }
+  return [uri];
+}
+
+function candidateUris(localUri: string): string[] {
+  const out: string[] = [];
+  for (const uri of withPrivateVarVariants(localUri)) {
+    if (!out.includes(uri)) out.push(uri);
+  }
+  const name = assetFileName(localUri);
+  if (name) {
+    const remapped = `${assetDirectory()}/${name}`;
+    for (const uri of withPrivateVarVariants(remapped)) {
+      if (!out.includes(uri)) out.push(uri);
+    }
+  }
+  return out;
+}
+
+async function locateExistingFile(localUri: string): Promise<string | null> {
+  for (const uri of candidateUris(localUri)) {
+    try {
+      const info = await FileSystem.getInfoAsync(uri);
+      if (info.exists && !info.isDirectory) return uri;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
 export async function readExpoAssetBytes(localUri: string): Promise<Uint8Array> {
-  const info = await FileSystem.getInfoAsync(localUri);
+  const located = (await locateExistingFile(localUri)) ?? localUri;
+  const info = await FileSystem.getInfoAsync(located);
   if (!info.exists || info.isDirectory) {
     throw new Error('asset file is missing');
   }
-  const base64 = await FileSystem.readAsStringAsync(localUri, {
+  const base64 = await FileSystem.readAsStringAsync(located, {
     encoding: 'base64',
   });
   const binary = globalThis.atob(base64);
@@ -165,30 +217,37 @@ export function createExpoMediaStore(): MediaStore {
         sourceUri,
       );
     },
+    async resolveUri(localUri) {
+      return locateExistingFile(localUri);
+    },
     async exists(localUri) {
-      const info = await FileSystem.getInfoAsync(localUri);
-      return info.exists && !info.isDirectory;
+      return (await locateExistingFile(localUri)) != null;
     },
     async canDecode(localUri) {
-      const info = await FileSystem.getInfoAsync(localUri);
+      const located = await locateExistingFile(localUri);
+      if (!located) return false;
+      const info = await FileSystem.getInfoAsync(located);
       if (!info.exists || info.isDirectory || (info.size ?? 0) <= 0) return false;
       return new Promise((resolve) => {
         Image.getSize(
-          localUri,
+          located,
           () => resolve(true),
           () => resolve(false),
         );
       });
     },
     async canPlay(localUri) {
-      const info = await FileSystem.getInfoAsync(localUri);
+      const located = await locateExistingFile(localUri);
+      if (!located) return false;
+      const info = await FileSystem.getInfoAsync(located);
       return info.exists && !info.isDirectory && (info.size ?? 0) > 0;
     },
     async removeAppOwned(localUri) {
       if (!isAppOwned(localUri)) return false;
-      const info = await FileSystem.getInfoAsync(localUri);
+      const located = (await locateExistingFile(localUri)) ?? localUri;
+      const info = await FileSystem.getInfoAsync(located);
       if (!info.exists || info.isDirectory) return false;
-      await FileSystem.deleteAsync(localUri, { idempotent: true });
+      await FileSystem.deleteAsync(located, { idempotent: true });
       return true;
     },
   };

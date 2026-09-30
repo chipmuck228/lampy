@@ -16,7 +16,7 @@
 | 本轮 JS / 将推送 head | `2853a9d409046af19c704b0e6942bbade4ebafcd` | 模拟器缺 ExpoScreenCapture 时不崩 |
 | 真机 Liuz17 原生包 | `/Users/zhen/WeChatProjects/lampy`，`ios/account-email-auth` `cd92863` + 本机 Face ID pods | 不是 #46 专属 prebuild。JS 走 Metro。同源原生重装：**NOT VERIFIED** |
 | Metro 8081 | `lampy-guide/apps/ios`，host `192.168.31.139`（避开 USB `169.254`） | 模拟器手输 `http://127.0.0.1:8081`；真机 `http://192.168.31.139:8081` |
-| 模拟器 iPhone 17 启动 | 原生包无 `ExpoScreenCapture` | 先 `requireOptionalNativeModule`，没有则不加载 JS。Metro Reload 后再测 |
+| 模拟器 iPhone 17 启动 | 原生包无 ScreenCapture / LocalAuthentication | 先探测原生模块。缺 Face ID 模块时开关应变 unavailable，不红屏。Reload 后再测 |
 | `npx tsc --noEmit` | | **PASS** |
 | 相关 Jest | device-lock / screen-privacy / expo-device-auth | **PASS**（含缺 ExpoScreenCapture 不抛） |
 | 本轮 eslint | 改动的 lock / account / first-run 测试 | **PASS** |
@@ -63,6 +63,7 @@ Dev Client 不要点已存的 `169.254.*:8081`（USB 链路本地，模拟器不
 4. 只有保存成功后，「已开启 / 未开启」才变。取消或失败保持原状态，可见现有重试文案。
 5. 已记录：`344a5c6` 上开启、关闭、开启后后台遮挡均为 PASS。
 6. 关闭后后台返回、关闭后冷启动：真机 **PASS**。
+7. 照片/声音「暂时找不到」：记录不得删。本轮按当前 `Documents/lampy-assets` 重定向旧容器路径。若文件已不在盘上，无法从云端找回。Reload 后看最近与回看是否恢复。未卸载 Liuz17。
 
 ## 首次引导（仅可丢弃安装或全新模拟器）
 

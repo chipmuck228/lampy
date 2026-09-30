@@ -234,6 +234,40 @@ describe('expo media decode', () => {
     expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
   });
 
+  it('finds lampy-assets files after the iOS container path changes', async () => {
+    const stale =
+      'file:///var/mobile/Containers/Data/Application/OLD/Documents/lampy-assets/asset_keep.jpg';
+    const current = 'file:///docs/lampy-assets/asset_keep.jpg';
+    jest.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => {
+      const found = String(uri) === current;
+      return {
+        exists: found,
+        isDirectory: false,
+        size: found ? 2048 : 0,
+        uri: String(uri),
+        modificationTime: 0,
+      };
+    });
+
+    const store = createExpoMediaStore();
+    await expect(store.resolveUri?.(stale)).resolves.toBe(current);
+    await expect(store.exists(stale)).resolves.toBe(true);
+  });
+
+  it('does not treat a traversal name as an app-owned asset', async () => {
+    jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
+      exists: false,
+      isDirectory: false,
+      uri: 'file:///docs/lampy-assets/../secret.jpg',
+    });
+
+    await expect(
+      createExpoMediaStore().exists('file:///docs/lampy-assets/../secret.jpg'),
+    ).resolves.toBe(false);
+    expect(FileSystem.getInfoAsync).toHaveBeenCalledWith('file:///docs/lampy-assets/../secret.jpg');
+    expect(FileSystem.getInfoAsync).not.toHaveBeenCalledWith('file:///docs/secret.jpg');
+  });
+
   it('treats an empty audio file as unplayable', async () => {
     jest.mocked(FileSystem.getInfoAsync).mockResolvedValue({
       exists: true,

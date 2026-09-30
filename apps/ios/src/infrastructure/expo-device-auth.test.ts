@@ -3,6 +3,15 @@ import { createExpoDeviceAuthenticator, mapLocalAuthError } from './expo-device-
 const mockGetEnrolledLevelAsync = jest.fn();
 const mockAuthenticateAsync = jest.fn();
 
+jest.mock('expo-modules-core', () => {
+  const actual = jest.requireActual('expo-modules-core') as typeof import('expo-modules-core');
+  return {
+    ...actual,
+    requireOptionalNativeModule: (name: string) =>
+      name === 'ExpoLocalAuthentication' ? {} : actual.requireOptionalNativeModule?.(name),
+  };
+});
+
 jest.mock('expo-local-authentication', () => ({
   SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC: 2 },
   getEnrolledLevelAsync: (...args: unknown[]) => mockGetEnrolledLevelAsync(...args),
@@ -52,21 +61,25 @@ describe('expo device authenticator', () => {
     await expect(auth.authenticate('reason')).resolves.toEqual({ ok: false, reason: 'unavailable' });
   });
 
-  it('does not throw when the native module cannot be loaded', async () => {
-    jest.isolateModules(() => {
-      jest.doMock('expo-local-authentication', () => {
-        throw new Error("Cannot find native module 'ExpoLocalAuthentication'");
-      });
+  it('does not load expo-local-authentication when the native module is missing', async () => {
+    const loadAuth = jest.fn(() => {
+      throw new Error("Cannot find native module 'ExpoLocalAuthentication'");
     });
     let auth: ReturnType<typeof createExpoDeviceAuthenticator> | undefined;
     jest.isolateModules(() => {
-      jest.doMock('expo-local-authentication', () => {
-        throw new Error("Cannot find native module 'ExpoLocalAuthentication'");
+      jest.doMock('expo-modules-core', () => {
+        const actual = jest.requireActual('expo-modules-core') as typeof import('expo-modules-core');
+        return {
+          ...actual,
+          requireOptionalNativeModule: () => null,
+        };
       });
+      jest.doMock('expo-local-authentication', () => loadAuth());
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const loaded = require('./expo-device-auth') as typeof import('./expo-device-auth');
       auth = loaded.createExpoDeviceAuthenticator();
     });
     await expect(auth!.authenticate('reason')).resolves.toEqual({ ok: false, reason: 'unavailable' });
+    expect(loadAuth).not.toHaveBeenCalled();
   });
 });
