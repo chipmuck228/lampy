@@ -10,7 +10,7 @@
 
 | 项 | SHA / 说明 | 结果 |
 | --- | --- | --- |
-| 将合并 head | 提交走查后填入 | 无新阻塞 |
+| 将合并 head | `807628eeb9cc5dc7222d08dedfa273acdfe9da51` | 无新阻塞 |
 | 媒体路径恢复 | 旧容器 UUID → 当前 `Documents/lampy-assets/<文件名>`；拒绝 `..` | 代码 + Jest **PASS**。真机文件若已不在盘上无法恢复，**不阻塞合并** |
 | 缺原生模块 | 先 `requireOptionalNativeModule`，再加载 Face ID / ScreenCapture JS | Jest **PASS** |
 | `npx tsc --noEmit` | | **PASS** |
