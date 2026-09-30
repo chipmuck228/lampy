@@ -6,6 +6,11 @@ import { ApplicationError } from '../application/errors';
 import AccountScreen from './account-screen';
 import { DeviceLockProvider } from './device-lock-context';
 import { familyAuthServiceReady } from '../application/account-status';
+import { isPersonalSettingsDiagnosticsOpen } from '../application/personal-settings-visibility';
+
+jest.mock('../application/personal-settings-visibility', () => ({
+  isPersonalSettingsDiagnosticsOpen: jest.fn(() => true),
+}));
 
 const mockFamily = {
   getMembership: jest.fn(),
@@ -119,6 +124,7 @@ describe('account screen', () => {
     mockSession.getPendingRevoke.mockReset().mockResolvedValue(null);
     mockApple.isAvailable.mockReset().mockResolvedValue(true);
     mockApple.requestIdentityToken.mockReset().mockResolvedValue('identity-token');
+    jest.mocked(isPersonalSettingsDiagnosticsOpen).mockReturnValue(true);
   });
 
   it('does not pretend family login works when no auth service is configured', async () => {
@@ -463,6 +469,24 @@ describe('account screen', () => {
     });
     expect(authenticate).toHaveBeenCalled();
     expect(setEnabled).toHaveBeenCalledWith(true);
+  });
+
+  it('hides account diagnostics on the user settings page', async () => {
+    jest.mocked(isPersonalSettingsDiagnosticsOpen).mockReturnValue(false);
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('本机设置')).toBeTruthy();
+      expect(view.getByText('本机设置')).toBeTruthy();
+    });
+    expect(view.getByTestId('account-personal')).toBeTruthy();
+    expect(view.getByText(/个人记录保存在这台设备/)).toBeTruthy();
+    expect(view.getByTestId('account-version')).toBeTruthy();
+    expect(view.queryByTestId('account-diagnostics')).toBeNull();
+    expect(view.queryByTestId('account-family-preview')).toBeNull();
+    expect(view.queryByTestId('account-kind-service-unavailable')).toBeNull();
+    expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
+    expect(view.queryByLabelText('测试账号登录')).toBeNull();
+    expect(view.queryByText('私密家庭空间正在准备中。敬请期待。')).toBeNull();
   });
 });
 

@@ -63,7 +63,6 @@ describe('leave feeling picker', () => {
     await waitFor(() => {
       expect(view.getByLabelText('当时的感受')).toBeTruthy();
     });
-    expect(view.getByText('当时的感受，可选')).toBeTruthy();
     expect(view.getByLabelText('当时的感受，高兴').props.accessibilityState.selected).toBe(false);
     expect(view.queryByLabelText('清除当时的感受')).toBeNull();
     expect(mockUpdateDraftEmotion).not.toHaveBeenCalled();
@@ -71,6 +70,10 @@ describe('leave feeling picker', () => {
 
   it('selects, changes, and clears a feeling', async () => {
     const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByTestId('composer-feeling-toggle')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('composer-feeling-toggle'));
     await waitFor(() => {
       expect(view.getByLabelText('当时的感受，高兴')).toBeTruthy();
     });
@@ -106,7 +109,7 @@ describe('leave feeling picker', () => {
     await waitFor(() => {
       expect(view.getByTestId('composer-feeling-unknown').props.children).toBe('喜悦');
     });
-    expect(view.getByText('上次还有一些内容没保存，已经为你放回来了。')).toBeTruthy();
+    expect(view.getByText('上次没保存的内容已放回来。')).toBeTruthy();
     expect(view.getByLabelText('当时的感受，高兴').props.accessibilityState.selected).toBe(false);
     expect(view.getByLabelText('清除当时的感受')).toBeTruthy();
   });

@@ -4,13 +4,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   LOOKBACK_BOOK_NOTE_LINES,
   lookbackBookDateLabel,
+  lookbackBookMonthAccessLabel,
   type LookbackBookExcerpt,
   type LookbackBookYear,
 } from '../application/lookback-book';
 import type { LookbackMonthEntry } from '../application/lookback-month';
 import { pad2 } from '../domain-adapters/calendar';
 import type { PlaybackStatus } from '../infrastructure/media';
-import { lookbackStyles } from './lookback-chrome';
+import { LifeIcon, LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentFeeling } from './moment-feeling';
 import { MomentImages } from './moment-images';
@@ -27,7 +28,9 @@ export function LookbackBookYearChapter({
       <Text style={styles.chapterTitle} accessibilityRole="header">
         {chapter.title}
       </Text>
-      <Text style={styles.meta}>有{chapter.momentCount}条记录</Text>
+      <Text style={styles.meta} accessibilityLabel={`有${chapter.momentCount}条记录`}>
+        {chapter.momentCount}条
+      </Text>
       {children}
     </View>
   );
@@ -36,12 +39,14 @@ export function LookbackBookYearChapter({
 export function LookbackBookMonthRow({
   year,
   month,
+  count,
   summary,
   expanded,
   onPress,
 }: {
   year: number;
   month: number;
+  count: number;
   summary: string;
   expanded: boolean;
   onPress: () => void;
@@ -50,14 +55,18 @@ export function LookbackBookMonthRow({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ expanded }}
-      accessibilityLabel={`${year}年${month}月，${summary}`}
+      accessibilityLabel={lookbackBookMonthAccessLabel(year, month, summary, expanded)}
       testID={`lookback-book-month-${year}-${pad2(month)}`}
       onPress={onPress}
-      style={lookbackStyles.hit}
+      style={styles.monthHit}
     >
-      <Text style={lookbackStyles.action}>
-        {month}月 · {summary}
-      </Text>
+      <View style={styles.monthRow}>
+        <View style={styles.monthCopy}>
+          <Text style={styles.monthTitle}>{month}月</Text>
+          <Text style={styles.monthCount}>{count}条</Text>
+        </View>
+        <LifeIcon name={expanded ? 'collapse' : 'expand'} size={16} decorative />
+      </View>
     </Pressable>
   );
 }
@@ -83,11 +92,12 @@ export function LookbackBookDayRow({
       accessibilityLabel={`${weekday}，${entry.summary}`}
       testID={`lookback-book-day-${year}-${pad2(month)}-${pad2(entry.day)}`}
       onPress={onPress}
-      style={lookbackStyles.hit}
+      style={styles.dayHit}
     >
-      <Text style={lookbackStyles.action}>
-        {weekday} · {entry.summary}
-      </Text>
+      <View style={styles.dayRow}>
+        <Text style={styles.dayTitle}>{weekday}</Text>
+        <Text style={styles.dayCount}>{entry.count}条</Text>
+      </View>
     </Pressable>
   );
 }
@@ -127,15 +137,11 @@ export function LookbackBookExcerptBlock({
       />
       <MomentUnknownMedia items={excerpt.unknownMedia} testIDPrefix={`lookback-book-unknown-${excerpt.id}`} />
       <MomentFeeling feeling={excerpt.feeling ?? null} testID={`lookback-book-feeling-${excerpt.id}`} />
-      <Pressable
-        accessibilityRole="button"
+      <LookThisHit
         accessibilityLabel={`看这条，${excerpt.note || excerpt.id}`}
         testID={`lookback-book-open-${excerpt.id}`}
         onPress={() => onOpen(excerpt.id)}
-        style={lookbackStyles.hit}
-      >
-        <Text style={lookbackStyles.action}>看这条</Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -146,5 +152,24 @@ const styles = StyleSheet.create({
   meta: { fontSize: 14, lineHeight: 20, color: '#53604F' },
   clock: { fontSize: 14, lineHeight: 20, color: '#53604F' },
   note: { fontSize: 20, lineHeight: 28, color: '#25231F' },
-  excerpt: { gap: 8, paddingVertical: 8, minHeight: 44 },
+  excerpt: { gap: 8, paddingVertical: 8, minHeight: 48 },
+  monthHit: { minHeight: 48, justifyContent: 'center' },
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  monthCopy: { flex: 1, flexShrink: 1, gap: 2 },
+  monthTitle: { fontSize: 20, lineHeight: 26, color: '#25231F' },
+  monthCount: { fontSize: 14, lineHeight: 20, color: '#53604F' },
+  dayHit: { minHeight: 48, justifyContent: 'center' },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  dayTitle: { flex: 1, flexShrink: 1, fontSize: 17, lineHeight: 24, color: '#25231F' },
+  dayCount: { fontSize: 14, lineHeight: 20, color: '#53604F' },
 });

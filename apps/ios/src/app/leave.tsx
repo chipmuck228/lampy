@@ -39,6 +39,7 @@ import {
   draftPreviewStatus,
   type RecordPhase,
 } from '../screens/moment-audio';
+import { LifeLabeledHit } from '../screens/life-icons';
 import { FeelingPicker } from '../screens/moment-feeling';
 import { OccurredDatePicker } from '../screens/moment-occurred';
 import { MomentImages } from '../screens/moment-images';
@@ -62,6 +63,8 @@ import {
   isFamilyTestDriverEnabled,
 } from '../infrastructure/family-test-driver';
 import { finishLeaveToRecent, leaveOpenedFromLookback } from '../screens/lookback-origin';
+
+export const DRAFT_RESTORED_COPY = '上次没保存的内容已放回来。';
 
 export default function LeaveScreen() {
   const router = useRouter();
@@ -747,7 +750,7 @@ export default function LeaveScreen() {
             <Text style={styles.back}>{fromLookback ? '返回原来的位置' : '最近'}</Text>
           </Pressable>
           {restored ? (
-            <Text style={styles.restore}>上次还有一些内容没保存，已经为你放回来了。</Text>
+            <Text style={styles.restore}>{DRAFT_RESTORED_COPY}</Text>
           ) : null}
           {showAbandon && !confirmingAbandon ? (
             <Pressable
@@ -881,30 +884,24 @@ export default function LeaveScreen() {
             ]}
           >
             <View style={styles.mediaRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="拍摄"
+              <LifeLabeledHit
+                icon="camera"
+                label="拍摄"
                 testID="composer-camera"
+                disabled={composerLocked}
                 onPress={() => {
                   applyImageAction('camera');
                 }}
-                disabled={composerLocked}
-                style={styles.mediaHit}
-              >
-                <Text style={styles.media}>拍摄</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="照片"
+              />
+              <LifeLabeledHit
+                icon="photo"
+                label="照片"
                 testID="composer-library"
+                disabled={composerLocked}
                 onPress={() => {
                   applyImageAction('library');
                 }}
-                disabled={composerLocked}
-                style={styles.mediaHit}
-              >
-                <Text style={styles.media}>照片</Text>
-              </Pressable>
+              />
             </View>
             <Pressable
               accessibilityRole="button"
@@ -981,8 +978,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 20,
   },
-  mediaHit: { minHeight: 48, minWidth: 48, justifyContent: 'center' },
-  media: { fontSize: 18, lineHeight: 24, color: sage },
   saveHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', marginLeft: 'auto' },
   saveHitStacked: { marginLeft: 0, alignSelf: 'flex-start' },
   save: { fontSize: 18, lineHeight: 24, color: ink },

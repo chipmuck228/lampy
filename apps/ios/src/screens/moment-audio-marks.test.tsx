@@ -19,7 +19,7 @@ describe('MomentAudio action marks', () => {
       <MomentAudio audio={audio} onPlay={() => undefined} onPause={() => undefined} testIDPrefix="plain" />,
     );
     expect(plain.getByLabelText('播放，4秒')).toBeTruthy();
-    expect(plain.queryByText('▶')).toBeNull();
+    expect(plain.queryByTestId('plain-mark-asset_voice')).toBeNull();
 
     const marked = await render(
       <MomentAudio
@@ -31,7 +31,7 @@ describe('MomentAudio action marks', () => {
       />,
     );
     expect(marked.getByLabelText('播放，4秒')).toBeTruthy();
-    expect(marked.getByText('▶')).toBeTruthy();
+    expect(marked.getByTestId('marked-mark-asset_voice')).toBeTruthy();
   });
 
   it('hides the empty idle track when Recent asks for heard progress only', async () => {

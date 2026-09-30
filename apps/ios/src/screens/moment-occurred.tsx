@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { LifeIcon } from './life-icons';
+
 import {
   isCalendarDayAfter,
   isSameCalendarDayParts,
@@ -41,6 +43,7 @@ export function OccurredDatePicker({
     value.kind !== 'unknown' && value.year && value.month && value.day
       ? { year: value.year, month: value.month, day: value.day }
       : today;
+  const [open, setOpen] = useState(value.kind !== 'today');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState<CalendarDayParts>({
     year: selectedDay.year,
@@ -63,8 +66,26 @@ export function OccurredDatePicker({
   );
 
   return (
-    <View accessibilityLabel="这件事发生在哪一天" style={styles.block}>
-      <Text style={styles.heading}>这件事发生在哪一天</Text>
+    <View style={styles.block}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="这件事发生在哪一天"
+        accessibilityState={{ expanded: open, disabled: !!disabled }}
+        testID="composer-occurred-toggle"
+        disabled={disabled}
+        onPress={() => setOpen((current) => !current)}
+        style={styles.toggleHit}
+      >
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleCopy}>
+            <Text style={styles.heading}>发生日期</Text>
+            <Text style={styles.chosen} accessible={false}>
+              {value.label}
+            </Text>
+          </View>
+          <LifeIcon name={open ? 'collapse' : 'expand'} size={14} decorative />
+        </View>
+      </Pressable>
       <View style={styles.chips}>
         <Pressable
           accessibilityRole="button"
@@ -93,7 +114,6 @@ export function OccurredDatePicker({
           </Text>
         </Pressable>
       </View>
-      {value.kind === 'day' ? <Text style={styles.chosen}>{value.label}</Text> : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="选择过去的一天"
@@ -197,11 +217,19 @@ export function OccurredDatePicker({
 
 const styles = StyleSheet.create({
   block: { gap: 8 },
+  toggleHit: { minHeight: 48, justifyContent: 'center' },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  toggleCopy: { flex: 1, flexShrink: 1, gap: 2 },
   heading: { fontSize: 16, lineHeight: 22, color: '#5C5851' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    minHeight: 44,
-    minWidth: 44,
+    minHeight: 48,
+    minWidth: 48,
     paddingHorizontal: 12,
     justifyContent: 'center',
     borderWidth: 1,
@@ -211,7 +239,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
   chipTextSelected: { color: '#25231F', textDecorationLine: 'underline' },
   chosen: { fontSize: 16, lineHeight: 22, color: '#25231F' },
-  pickHit: { minHeight: 44, justifyContent: 'center' },
+  pickHit: { minHeight: 48, justifyContent: 'center' },
   pick: { fontSize: 16, lineHeight: 22, color: '#53604F' },
   calendar: { gap: 8 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

@@ -59,6 +59,15 @@ export function lookbackBookDateLabel(year: number, month: number, day: number):
   return `${month}月${day}日 · ${lookbackBookWeekdayName(year, month, day)}`;
 }
 
+export function lookbackBookMonthAccessLabel(
+  year: number,
+  month: number,
+  summary: string,
+  expanded: boolean,
+): string {
+  return `${year}年${month}月，${summary}，${expanded ? '已展开' : '已收起'}`;
+}
+
 export function lookbackBookMonthOpenable(input: {
   dayCount: number;
   dayUnconfirmedCount: number;

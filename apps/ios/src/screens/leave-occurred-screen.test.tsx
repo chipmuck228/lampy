@@ -92,6 +92,10 @@ describe('leave occurred date picker', () => {
   it('can mark time unknown and pick a past day', async () => {
     const view = await render(wrap());
     await waitFor(() => {
+      expect(view.getByTestId('composer-occurred-toggle')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('composer-occurred-toggle'));
+    await waitFor(() => {
       expect(view.getByTestId('composer-occurred-unknown')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('composer-occurred-unknown'));
@@ -128,7 +132,7 @@ describe('leave occurred date picker', () => {
     await waitFor(() => {
       expect(view.getByLabelText('发生日期，时间不确定，已选中')).toBeTruthy();
     });
-    expect(view.getByText('上次还有一些内容没保存，已经为你放回来了。')).toBeTruthy();
+    expect(view.getByText('上次没保存的内容已放回来。')).toBeTruthy();
     expect(mockUpdateDraftOccurred).not.toHaveBeenCalled();
   });
 
@@ -184,6 +188,7 @@ describe('leave occurred date picker', () => {
       expect(view.getByLabelText('发生日期，今天，已选中')).toBeTruthy();
       expect(mockUpdateDraftOccurred).toHaveBeenCalledWith('moment_draft', { kind: 'today' });
     });
+    fireEvent.press(view.getByTestId('composer-occurred-toggle'));
     fireEvent.press(view.getByTestId('composer-occurred-unknown'));
     await waitFor(() => {
       expect(view.getByLabelText('发生日期，时间不确定，已选中')).toBeTruthy();

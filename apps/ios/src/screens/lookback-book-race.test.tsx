@@ -397,7 +397,8 @@ describe('lookback book race and intent', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-day-retry')).toBeTruthy();
     });
-    expect(view.getByText('9月27日 · 星期日 · 有11条记录')).toBeTruthy();
+    expect(view.getByText('9月27日 · 星期日')).toBeTruthy();
+    expect(view.getByText('11条')).toBeTruthy();
     expect(view.queryByLabelText(/这一天还有/)).toBeNull();
     expect(view.queryByTestId('lookback-book-excerpt-m_recovered')).toBeNull();
     await act(async () => {

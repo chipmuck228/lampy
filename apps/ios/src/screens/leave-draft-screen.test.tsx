@@ -173,7 +173,7 @@ describe('leave draft restore and abandon', () => {
     });
     expect(view.getByTestId('composer-note').props.value).toBe('');
     expect(view.queryByDisplayValue('还没留下的一句')).toBeNull();
-    expect(view.queryByText('上次还有一些内容没保存，已经为你放回来了。')).toBeNull();
+    expect(view.queryByText('上次没保存的内容已放回来。')).toBeNull();
     expect(view.queryByLabelText('照片 1/1')).toBeNull();
     expect(view.queryByLabelText('放弃这份草稿')).toBeNull();
     expect(view.queryByText('已放弃')).toBeNull();

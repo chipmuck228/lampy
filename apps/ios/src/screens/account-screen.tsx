@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
 
 import {
   accountRefreshFailureMessage,
@@ -16,6 +17,7 @@ import { getFamilyUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { createSecureFamilySessionStore } from '../infrastructure/secure-family-session';
+import { isPersonalSettingsDiagnosticsOpen } from '../application/personal-settings-visibility';
 import { DeviceLockSettings } from './device-lock-context';
 import { createFamilyRefreshGate } from './family-refresh';
 import { ink, inkSoft, paper, sage } from './life-page';
@@ -335,9 +337,11 @@ export default function AccountScreen() {
 
   const showAppleButton = snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
   const showTestLoginPanel = Boolean(snapshot && snapshot.kind !== 'service-unavailable' && snapshot.kind !== 'signed-in');
+  const showDiagnostics = isPersonalSettingsDiagnosticsOpen();
+  const appVersion = Constants.expoConfig?.version ?? '0.1.0';
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="本机与账户">
+    <SafeAreaView style={styles.safe} accessibilityLabel="本机设置">
       <ScrollView contentContainerStyle={styles.column} testID="account-scroll">
         <Pressable
           accessibilityRole="button"
@@ -349,12 +353,14 @@ export default function AccountScreen() {
           <Text style={styles.back}>返回</Text>
         </Pressable>
         <Text style={styles.title} accessibilityRole="header">
-          本机与账户
+          本机设置
         </Text>
+        <DeviceLockSettings />
         <Text style={styles.body} testID="account-personal">
           个人记录保存在这台设备。目前没有跨设备同步或云备份。
         </Text>
-        <DeviceLockSettings />
+        {showDiagnostics ? (
+        <View testID="account-diagnostics">
         <View testID="account-family-preview">
           <Text style={styles.body} testID="account-family-copy">
             有些生活，只想交给重要的人。
@@ -462,6 +468,11 @@ export default function AccountScreen() {
             {message}
           </Text>
         ) : null}
+        </View>
+        ) : null}
+        <Text style={styles.version} testID="account-version">
+          版本 {appVersion}
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -474,7 +485,8 @@ const styles = StyleSheet.create({
   body: { fontSize: 17, lineHeight: 26, color: inkSoft },
   back: { fontSize: 17, lineHeight: 24, color: sage },
   action: { fontSize: 17, lineHeight: 24, color: sage },
-  hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  version: { fontSize: 14, lineHeight: 20, color: inkSoft, marginTop: 8 },
   apple: { width: 240, height: 44 },
   field: {
     minHeight: 44,

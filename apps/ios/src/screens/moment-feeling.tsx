@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FEELING_VOCABULARY, type FeelingView } from '../application/feeling';
+import { LifeIcon } from './life-icons';
 
 export function FeelingPicker({
   value,
@@ -13,37 +15,52 @@ export function FeelingPicker({
 }) {
   const selected = value.trim();
   const unknown = !!selected && !(FEELING_VOCABULARY as readonly string[]).includes(selected);
+  const [open, setOpen] = useState(Boolean(selected));
 
   return (
-    <View accessibilityLabel="当时的感受" style={styles.block}>
-      <Text style={styles.heading}>当时的感受，可选</Text>
+    <View style={styles.block}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={selected ? `当时的感受，${selected}` : '当时的感受'}
+        testID="composer-feeling-toggle"
+        disabled={disabled}
+        onPress={() => setOpen((current) => !current)}
+        style={styles.toggleHit}
+      >
+        <View style={styles.toggleRow}>
+          <Text style={styles.heading}>{selected || '当时的感受'}</Text>
+          <LifeIcon name={open || !selected ? 'expand' : 'collapse'} size={14} decorative />
+        </View>
+      </Pressable>
       {unknown ? (
         <Text testID="composer-feeling-unknown" style={styles.unknown}>
           {selected}
         </Text>
       ) : null}
-      <View style={styles.chips}>
-        {FEELING_VOCABULARY.map((word) => {
-          const isSelected = selected === word;
-          return (
-            <Pressable
-              key={word}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isSelected ? `当时的感受，${word}，已选中` : `当时的感受，${word}`
-              }
-              accessibilityState={{ selected: isSelected, disabled: !!disabled }}
-              accessibilityHint={isSelected ? '再点可清除' : '可选，不是必须'}
-              testID={`composer-feeling-${word}`}
-              disabled={disabled}
-              onPress={() => onChange(isSelected ? '' : word)}
-              style={[styles.chip, isSelected && styles.chipSelected]}
-            >
-              <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{word}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {open || !selected ? (
+        <View style={styles.chips}>
+          {FEELING_VOCABULARY.map((word) => {
+            const isSelected = selected === word;
+            return (
+              <Pressable
+                key={word}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isSelected ? `当时的感受，${word}，已选中` : `当时的感受，${word}`
+                }
+                accessibilityState={{ selected: isSelected, disabled: !!disabled }}
+                accessibilityHint={isSelected ? '再点可清除' : '可选，不是必须'}
+                testID={`composer-feeling-${word}`}
+                disabled={disabled}
+                onPress={() => onChange(isSelected ? '' : word)}
+                style={[styles.chip, isSelected && styles.chipSelected]}
+              >
+                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{word}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       {selected ? (
         <Pressable
           accessibilityRole="button"
@@ -81,6 +98,13 @@ export function MomentFeeling({
 
 const styles = StyleSheet.create({
   block: { gap: 8 },
+  toggleHit: { minHeight: 48, justifyContent: 'center' },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   heading: { fontSize: 16, lineHeight: 22, color: '#5C5851' },
   unknown: { fontSize: 16, lineHeight: 22, color: '#5C5851' },
   chips: {
@@ -89,8 +113,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    minHeight: 44,
-    minWidth: 44,
+    minHeight: 48,
+    minWidth: 48,
     paddingHorizontal: 12,
     justifyContent: 'center',
     borderWidth: 1,
@@ -108,7 +132,7 @@ const styles = StyleSheet.create({
     color: '#25231F',
     textDecorationLine: 'underline',
   },
-  clearHit: { minHeight: 44, justifyContent: 'center' },
+  clearHit: { minHeight: 48, justifyContent: 'center' },
   clear: { fontSize: 16, lineHeight: 22, color: '#53604F' },
   display: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
 });

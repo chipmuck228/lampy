@@ -6,6 +6,7 @@ import {
 import {
   LOOKBACK_BOOK_EXCERPT_LIMIT,
   lookbackBookDateLabel,
+  lookbackBookMonthAccessLabel,
   lookbackBookExcerpts,
   lookbackBookHref,
   lookbackBookIntentFromParts,
@@ -62,6 +63,12 @@ describe('lookback book contract', () => {
   it('writes weekday on the date row and does not invent a calendar', () => {
     expect(lookbackBookDateLabel(2026, 9, 27)).toBe('9月27日 · 星期日');
     expect(lookbackBookDateLabel(2026, 9, 28)).toBe('9月28日 · 星期一');
+    expect(lookbackBookMonthAccessLabel(2026, 9, '有14条记录', false)).toBe(
+      '2026年9月，有14条记录，已收起',
+    );
+    expect(lookbackBookMonthAccessLabel(2026, 9, '有14条记录', true)).toBe(
+      '2026年9月，有14条记录，已展开',
+    );
   });
 
   it('opens a month that has days or only month-precision records', () => {

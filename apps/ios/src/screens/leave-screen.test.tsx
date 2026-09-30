@@ -65,7 +65,7 @@ describe('leave screen', () => {
     );
 
     await waitFor(() => {
-      expect(view.getByText('上次还有一些内容没保存，已经为你放回来了。')).toBeTruthy();
+      expect(view.getByText('上次没保存的内容已放回来。')).toBeTruthy();
     });
     expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
     expect(view.getByLabelText('当时的感受')).toBeTruthy();

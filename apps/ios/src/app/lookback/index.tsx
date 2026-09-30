@@ -311,6 +311,7 @@ export default function LookbackIndexScreen() {
                 <LookbackBookMonthRow
                   year={chapter.year}
                   month={month.month}
+                  count={month.count}
                   summary={month.summary}
                   expanded={!!open || !!loading}
                   onPress={() => toggleMonth(chapter.year, month.month)}
