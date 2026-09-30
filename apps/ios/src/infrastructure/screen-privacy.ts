@@ -3,12 +3,32 @@ type ScreenCaptureModule = {
   allowScreenCaptureAsync(): Promise<void>;
 };
 
-function loadScreenCapture(): ScreenCaptureModule | null {
+let loaded: ScreenCaptureModule | null | undefined;
+
+function hasNativeScreenCapture(): boolean {
   try {
-    // Native module is missing on some simulator binaries; load only when called.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('expo-screen-capture') as ScreenCaptureModule;
+    const core = require('expo-modules-core') as {
+      requireOptionalNativeModule?: (name: string) => unknown;
+    };
+    return !!core.requireOptionalNativeModule?.('ExpoScreenCapture');
   } catch {
+    return false;
+  }
+}
+
+function loadScreenCapture(): ScreenCaptureModule | null {
+  if (loaded !== undefined) return loaded;
+  if (!hasNativeScreenCapture()) {
+    loaded = null;
+    return null;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    loaded = require('expo-screen-capture') as ScreenCaptureModule;
+    return loaded;
+  } catch {
+    loaded = null;
     return null;
   }
 }

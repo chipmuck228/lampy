@@ -16,7 +16,7 @@
 | 本轮 JS / 将推送 head | `2853a9d409046af19c704b0e6942bbade4ebafcd` | 模拟器缺 ExpoScreenCapture 时不崩 |
 | 真机 Liuz17 原生包 | `/Users/zhen/WeChatProjects/lampy`，`ios/account-email-auth` `cd92863` + 本机 Face ID pods | 不是 #46 专属 prebuild。JS 走 Metro。同源原生重装：**NOT VERIFIED** |
 | Metro 8081 | `lampy-guide/apps/ios`，host `192.168.31.139`（避开 USB `169.254`） | 模拟器手输 `http://127.0.0.1:8081`；真机 `http://192.168.31.139:8081` |
-| 模拟器 iPhone 17 启动 | 原生包无 `ExpoScreenCapture` 时，旧 JS 红屏 `Cannot find native module` | 本轮改为按需 `require`，缺模块只跳过防截屏。Reload 后复测 |
+| 模拟器 iPhone 17 启动 | 原生包无 `ExpoScreenCapture` | 先 `requireOptionalNativeModule`，没有则不加载 JS。Metro Reload 后再测 |
 | `npx tsc --noEmit` | | **PASS** |
 | 相关 Jest | device-lock / screen-privacy / expo-device-auth | **PASS**（含缺 ExpoScreenCapture 不抛） |
 | 本轮 eslint | 改动的 lock / account / first-run 测试 | **PASS** |
