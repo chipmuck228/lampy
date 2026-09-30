@@ -5,14 +5,16 @@ Base：`origin/main` `6e25227203fc0e9a270cda4f08d81f70ea5d04e4`（#46）。
 
 ## 真机验收时实际 JS
 
-Liuz17 / iPhone 17 Pro / iOS 26.2 三项关闭项通过时，Metro 应对齐下面这一份 JS。走查记录提交不改 `apps/ios/src`。
+Liuz17 / iPhone 17 Pro / iOS 26.2 三项关闭项通过时的 JS（不复测）。本轮收尾另有新 JS，见合并核对本表。
 
 | 项 | SHA |
 | --- | --- |
-| git（含本轮 JS 的提交） | `25e4b6a6430bc9fd99cb798299b1be385a904f4e` |
-| `apps/ios/src` SHA256（`.ts` / `.tsx` / `.js` / `.jsx` 路径+内容） | `833594f758ac1f00538e5823b61bfb081e9b7bbead3b47e3108c43258fc5926f` |
-| 文件数 | 238 |
-| 当时 PR head（走查记录之前） | `a6a56e4b8fbc7db2b7a622183c1e574c62b03824` |
+| git（三项关闭项当时） | `25e4b6a6430bc9fd99cb798299b1be385a904f4e` |
+| `apps/ios/src` SHA256（当时） | `833594f758ac1f00538e5823b61bfb081e9b7bbead3b47e3108c43258fc5926f` |
+| 文件数（当时） | 238 |
+| 收尾 JS git | `cf6f3f9fd6c0d0bf2f3d2f10f7c9593eb8c302fb` |
+| 收尾 `apps/ios/src` SHA256 | `b984124ea0cda383e8a53191572f620da28be434499ee66ff0ffcff8f27d278d` |
+| 收尾文件数 | 240 |
 
 原生仍是已装的 Dev Client（`app.lampy.ios` / Expo 0.1.0）。本轮只热更新 JS，不卸、不重装、不清记录。不以 Jest 代替真机。
 
@@ -25,9 +27,9 @@ Liuz17 / iPhone 17 Pro / iOS 26.2 三项关闭项通过时，Metro 应对齐下�
 | `identityLoopAccepted` | 仍为 false，未对真实用户开放 `/family` | **PASS** |
 | 诊断页门控 | `/account-diagnostics` 走 `isPersonalSettingsDiagnosticsOpen` | **PASS** |
 | GitHub PR #47 | OPEN，`MERGEABLE` / `CLEAN`，base `main` | **PASS** |
-| 将合并 JS | `25e4b6a` + src SHA `833594f7…fc5926f` | 无新阻塞 |
+| 将合并 JS | `cf6f3f9` + src SHA `b984124e…f27d278d` | 无新阻塞 |
 | `npx tsc --noEmit` | | **PASS** |
-| 相关 Jest | device-lock* / screen-privacy / composer-notice / use-page-metrics / leave-font-scale / leave-screen / leave-image / personal-settings-visibility | **PASS** 10 suites / 59 tests |
+| 相关 Jest | device-lock* / screen-privacy / composer-notice / use-page-metrics / leave-font-scale / leave-image / leave-feeling / leave-occurred / moment-feeling / moment-occurred / root-nav-band | **PASS** 11 suites / 59 tests |
 | 本轮 ESLint | 关闭项相关文件 0 errors；`leave.tsx` 预存 hooks warnings | **PASS** |
 | `git diff --check` | | **PASS** |
 | 真机三项关闭项 | Liuz17，见下表 | **PASS**（用户 2026-09-30） |
