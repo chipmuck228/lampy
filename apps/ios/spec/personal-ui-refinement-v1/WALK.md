@@ -1,9 +1,9 @@
 # 个人 MVP 体验精修 v1 · 走查
 
 Base：`origin/main` `6e25227203fc0e9a270cda4f08d81f70ea5d04e4`（#46）。  
-Head：本 PR。只改 `apps/ios`。家庭入口关闭。`identityLoopAccepted` 保持 false。未卸 Liuz17，未清个人库。
+Head：`42d66a99446b3a29220a41bfe796b53619c4f0af`。只改 `apps/ios`。家庭入口关闭。`identityLoopAccepted` 保持 false。未卸 Liuz17，未清个人库。
 
-远端对照（本轮开始）：`origin/ios/personal-ui-refinement-v1` = `5278727148f9c5bf8ac03a6877a7332be914c5ff`。原生仍是已装的 Dev Client（`app.lampy.ios` / Expo 0.1.0），本轮只热更新 JS，不卸、不重装、不清记录。Metro JS 以 git head + `apps/ios/src` SHA 核对，不以 Jest 代替真机。
+上一轮 head：`5278727148f9c5bf8ac03a6877a7332be914c5ff`。本轮只热更新 JS，不卸、不重装、不清记录。原生仍是已装的 Dev Client（`app.lampy.ios` / Expo 0.1.0）。Metro JS 以 git head + `apps/ios/src` SHA 核对，不以 Jest 代替真机。
 
 ## 命令
 
