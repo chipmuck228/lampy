@@ -11,7 +11,7 @@
 | 项 | SHA / 说明 | 结果 |
 | --- | --- | --- |
 | 远端 `origin/ios/first-run-lock-empty`（改前） | `c768b6951a2240505895b29b0a2333bfdc0f22fc` | 已对齐 fetch |
-| 本轮 JS / 将推送 head | 提交后填入 | 设置持久化与会话解锁资格分开 |
+| 本轮 JS / 将推送 head | `964575f1fbd726e67a2e482bacf09d25e97cb5bf` | 设置持久化与会话解锁资格分开 |
 | 真机 Liuz17 已装原生包 | Xcode 工程在 `/Users/zhen/WeChatProjects/lampy`，分支 `ios/account-email-auth` `cd92863`，另含本机补进的 `ExpoLocalAuthentication` / `ExpoScreenCapture` | **不是** #46 专属 prebuild。本轮为 JS，Metro Reload。同源原生重装：**NOT VERIFIED** |
 | Metro 8081 | 启动目录 `lampy-guide/apps/ios` | Reload 后才是本轮 JS。改前为 `c768b69` |
 | `npx tsc --noEmit` | apps/ios | **PASS** |
