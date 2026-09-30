@@ -33,23 +33,42 @@ describe('device lock session', () => {
     expect(enabled.locked).toBe(false);
   });
 
-  it('does not stale a settings change when background invalidates unlock', () => {
+  it('saves enable after a real background without granting unlock', () => {
     const session = createDeviceLockSession();
     session.applyStored(false);
     const enable = session.beginSettingsAuth();
     session.lockForBackground();
-    expect(session.confirmEnable(enable, { ok: true }).persist).toBe(true);
-    expect(session.snapshot().setting).toBe('on');
-    expect(session.snapshot().locked).toBe(false);
+    const enabled = session.confirmEnable(enable, { ok: true });
+    expect(enabled.persist).toBe(true);
+    expect(enabled.setting).toBe('on');
+    expect(enabled.sessionUnlocked).toBe(false);
+    expect(enabled.locked).toBe(true);
+  });
 
-    const close = session.beginSettingsAuth();
+  it('lifts protection when disable persists after a real background', () => {
+    const session = createDeviceLockSession();
+    session.applyStored(true);
     const unlock = session.beginAuth();
+    session.finishUnlock(unlock, { ok: true });
+    const close = session.beginSettingsAuth();
     session.lockForBackground();
     expect(session.finishUnlock(unlock, { ok: true }).kind).toBe('stale');
-    expect(session.snapshot().locked).toBe(true);
     expect(session.confirmDisable(close, { ok: true }).persist).toBe(true);
     expect(session.snapshot().setting).toBe('off');
     expect(session.snapshot().locked).toBe(false);
+  });
+
+  it('keeps a background lock when disable persist is reverted', () => {
+    const session = createDeviceLockSession();
+    session.applyStored(true);
+    const unlock = session.beginAuth();
+    session.finishUnlock(unlock, { ok: true });
+    const close = session.beginSettingsAuth();
+    session.confirmDisable(close, { ok: true });
+    session.lockForBackground();
+    expect(session.revertDisable().setting).toBe('on');
+    expect(session.snapshot().sessionUnlocked).toBe(false);
+    expect(session.snapshot().locked).toBe(true);
   });
 
   it('locks again in background and ignores a stale unlock', () => {
@@ -98,6 +117,7 @@ describe('device lock session', () => {
     session.confirmDisable(disable, { ok: true });
     expect(session.revertDisable().setting).toBe('on');
     expect(session.snapshot().locked).toBe(false);
+    expect(session.snapshot().sessionUnlocked).toBe(true);
   });
 
   it('explains a missing device passcode without implying data loss', () => {

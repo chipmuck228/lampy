@@ -17,6 +17,8 @@ export function createDeviceLockSession() {
   let sessionUnlocked = false;
   let authGeneration = 0;
   let settingsGeneration = 0;
+  let unlockEpoch = 0;
+  let settingsUnlockEpoch = 0;
 
   function snapshot(): DeviceLockSnapshot {
     return {
@@ -26,6 +28,10 @@ export function createDeviceLockSession() {
       authGeneration,
       settingsGeneration,
     };
+  }
+
+  function settingsSessionStillValid() {
+    return settingsUnlockEpoch === unlockEpoch;
   }
 
   return {
@@ -47,6 +53,7 @@ export function createDeviceLockSession() {
     },
     beginSettingsAuth() {
       settingsGeneration += 1;
+      settingsUnlockEpoch = unlockEpoch;
       return settingsGeneration;
     },
     finishUnlock(generation: number, result: DeviceAuthResult) {
@@ -59,29 +66,27 @@ export function createDeviceLockSession() {
       if (generation !== settingsGeneration) return { kind: 'stale' as const, persist: false, ...snapshot() };
       if (!result.ok) return { kind: 'denied' as const, persist: false, ...snapshot(), result };
       setting = 'on';
-      sessionUnlocked = true;
+      sessionUnlocked = settingsSessionStillValid();
       return { kind: 'enabled' as const, persist: true, ...snapshot() };
     },
     confirmDisable(generation: number, result: DeviceAuthResult) {
       if (generation !== settingsGeneration) return { kind: 'stale' as const, persist: false, ...snapshot() };
       if (!result.ok) return { kind: 'denied' as const, persist: false, ...snapshot(), result };
       setting = 'off';
-      sessionUnlocked = true;
       return { kind: 'disabled' as const, persist: true, ...snapshot() };
     },
     revertEnable() {
       setting = 'off';
-      sessionUnlocked = true;
       return snapshot();
     },
     revertDisable() {
       setting = 'on';
-      sessionUnlocked = true;
       return snapshot();
     },
     lockForBackground() {
       authGeneration += 1;
-      if (setting === 'on') sessionUnlocked = false;
+      unlockEpoch += 1;
+      sessionUnlocked = false;
       return snapshot();
     },
   };

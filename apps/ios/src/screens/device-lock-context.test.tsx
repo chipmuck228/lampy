@@ -468,7 +468,7 @@ describe('device lock cover', () => {
     });
   });
 
-  it('persists enable after system-auth inactive and background without staling the toggle', async () => {
+  it('persists a foreground enable through system-auth inactive without locking', async () => {
     const app = mockAppState();
     const pending: ((value: { ok: true }) => void)[] = [];
     const setEnabled = jest.fn(async () => undefined);
@@ -491,10 +491,7 @@ describe('device lock cover', () => {
       });
       await app.set('inactive');
       expect(setEnabled).not.toHaveBeenCalled();
-      await app.set('background');
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
-      await app.set('active');
-      expect(authenticate).toHaveBeenCalledTimes(1);
       await act(async () => {
         pending[0]({ ok: true });
       });
@@ -502,7 +499,59 @@ describe('device lock cover', () => {
         expect(setEnabled).toHaveBeenCalledWith(true);
       });
       expect(view.getByText('已使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.getByText('private')).toBeTruthy();
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(1);
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('saves a late enable after background but keeps private content covered until a new unlock', async () => {
+    const app = mockAppState();
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const setEnabled = jest.fn(async () => undefined);
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(wrap({ isEnabled: async () => false, setEnabled }, { authenticate }));
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+      await act(async () => {
+        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+      });
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await app.set('background');
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(setEnabled).toHaveBeenCalledWith(true);
+      });
+      expect(view.getByText('已使用 Face ID 保护 Lampy', { includeHiddenElements: true })).toBeTruthy();
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+
+      await app.set('active');
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(2);
+      });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      await act(async () => {
+        pending[1]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+      expect(view.getByText('private')).toBeTruthy();
     } finally {
       app.restore();
     }
@@ -582,14 +631,13 @@ describe('device lock cover', () => {
         expect(authenticate).toHaveBeenCalledTimes(1);
       });
       await app.set('inactive');
-      await app.set('background');
-      await app.set('active');
       await act(async () => {
         pending[0]({ ok: true });
       });
       await waitFor(() => {
         expect(setEnabled).toHaveBeenCalledWith(true);
       });
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
 
       await app.set('background');
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
@@ -601,6 +649,61 @@ describe('device lock cover', () => {
       await act(async () => {
         pending[1]({ ok: true });
       });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('keeps protection on and locked when disable persist fails after a real background', async () => {
+    const app = mockAppState();
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const writes: { reject(error: Error): void }[] = [];
+    const setEnabled = jest.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          writes.push({ reject });
+        }),
+    );
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(wrap({ isEnabled: async () => true, setEnabled }, { authenticate }));
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+
+      await act(async () => {
+        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+      });
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(2);
+      });
+      await act(async () => {
+        pending[1]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(setEnabled).toHaveBeenCalledWith(false);
+      });
+      await app.set('background');
+      await act(async () => {
+        writes[0].reject(new Error('keychain'));
+      });
+      await waitFor(() => {
+        expect(view.getByText('这次没有保存本机保护设置。记录还在，可以再试一次。')).toBeTruthy();
+      });
+      expect(view.getByText('已使用 Face ID 保护 Lampy', { includeHiddenElements: true })).toBeTruthy();
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
       expect(view.queryByText('private')).toBeNull();
     } finally {
