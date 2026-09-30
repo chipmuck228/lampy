@@ -1,0 +1,35 @@
+Xcode 26.3 / Swift 6.2.4 isolated ExpoModulesJSI iphoneos compile
+Same expo-modules-jsi@57.1.0 sources as origin/main e0c7a99 and #41 f69a306.
+Language mode: -swift-version 6
+Upcoming: NonisolatedNonsendingByDefault InferIsolatedConformances
+Compiler: /Applications/Xcode-26.3.app/.../swift-frontend
+SDK: iPhoneOS 26.5 (from the 26.3 Xcode)
+
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:193:43: error: sending 'resultPtr' risks causing data races
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:193:43: error: sending 'resultPtr' risks causing data races
+            try context.get(propertyName).writeJSIValue(to: resultPtr)
+            try context.get(propertyName).writeJSIValue(to: resultPtr)
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:786:22: error: sending 'thisPtr' risks causing data races
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:786:22: error: sending 'thisPtr' risks causing data races
+          let this = UnsafeMutablePointer(mutating: thisPtr).move()
+          let this = UnsafeMutablePointer(mutating: thisPtr).move()
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:787:66: error: sending 'argumentsPtr' risks causing data races
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:787:66: error: sending 'argumentsPtr' risks causing data races
+          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr, count: argumentsCount)
+          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr, count: argumentsCount)
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:789:58: error: sending 'resultPtr' risks causing data races
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:789:58: error: sending 'resultPtr' risks causing data races
+          try context.call(thisValue, consume arguments).writeJSIValue(to: resultPtr)
+          try context.call(thisValue, consume arguments).writeJSIValue(to: resultPtr)
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:829:66: error: sending 'argumentsPtr' risks causing data races
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:829:66: error: sending 'argumentsPtr' risks causing data races
+          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr, count: argumentsCount)
+          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr, count: argumentsCount)
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:830:27: error: sending 'thisPtr' risks causing data races
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:830:27: error: sending 'thisPtr' risks causing data races
+          let thisValue = JavaScriptUnownedValue(runtime.pointee, thisPtr)
+          let thisValue = JavaScriptUnownedValue(runtime.pointee, thisPtr)
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:831:58: error: sending 'resultPtr' risks causing data races
+/Users/zhen/WeChatProjects/lampy/apps/ios/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift:831:58: error: sending 'resultPtr' risks causing data races
+          try context.call(thisValue, consume arguments).writeJSIValue(to: resultPtr)
+          try context.call(thisValue, consume arguments).writeJSIValue(to: resultPtr)

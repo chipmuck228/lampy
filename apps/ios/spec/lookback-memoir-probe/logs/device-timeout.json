@@ -1,0 +1,74 @@
+{
+  "scenario": "timeout",
+  "inspect": {
+    "linked": true,
+    "availability": "unavailable",
+    "unavailableReason": "deviceNotEligible",
+    "osName": "iOS",
+    "osVersion": "26.2",
+    "osMajor": 26,
+    "deviceModel": "iPhone18,1",
+    "localeIdentifier": "zh_CN",
+    "preferredLanguages": [
+      "zh-Hans-CN",
+      "zh-Hant-CN"
+    ],
+    "supportsLocaleCurrent": true,
+    "supportsLocaleZhHans": true,
+    "supportsLocaleZhCN": true,
+    "supportsLocaleZhHant": true,
+    "supportedLanguages": [
+      "da-Latn-DK",
+      "de-Latn-DE",
+      "en-Latn-AU",
+      "en-Latn-GB",
+      "en-Latn-US",
+      "es-Latn-419",
+      "es-Latn-ES",
+      "es-Latn-US",
+      "fr-Latn-CA",
+      "fr-Latn-FR",
+      "it-Latn-IT",
+      "ja-Jpan-JP",
+      "ko-Kore-KR",
+      "nb-Latn-NO",
+      "nl-Latn-NL",
+      "pt-Latn-BR",
+      "pt-Latn-PT",
+      "sv-Latn-SE",
+      "tr-Latn-TR",
+      "vi-Latn-VN",
+      "zh-Hans-CN",
+      "zh-Hant-HK",
+      "zh-Hant-TW"
+    ],
+    "supportedLanguagesIncludesChinese": true,
+    "contextCapacityTokens": 4096,
+    "contextCapacityNote": "SystemLanguageModel.contextSize (tokens, prompt+response). @backDeployed(before: iOS 26.4) is 4096 on 26.0–26.3. Compile SDK iPhoneOS26.5.",
+    "tokenCountForProbePrompt": null,
+    "tokenCountNote": "tokenCount(for:) requires iOS 26.4; compile SDK iPhoneOS26.5 has it; this OS is below 26.4",
+    "compileSdkVersion": "26.5",
+    "compileXcodeVersion": "26.6 (17F113)"
+  },
+  "sides": [
+    {
+      "side": "B",
+      "line": "[memoir-probe] foundation unavailable 0ms quotes=0 accurate=0 omitted=6 extra=0 rewritten=0",
+      "status": "unavailable",
+      "durationMs": 0,
+      "quoteCount": 0,
+      "accurateCount": 0,
+      "omittedIds": [
+        "moment_memoir_eval_s1_a",
+        "moment_memoir_eval_s1_b",
+        "moment_memoir_eval_s2_a",
+        "moment_memoir_eval_s3_a",
+        "moment_memoir_eval_s3_b",
+        "moment_memoir_eval_s8_always"
+      ],
+      "extraIds": [],
+      "rewrittenIds": []
+    }
+  ],
+  "excerptFlags": []
+}

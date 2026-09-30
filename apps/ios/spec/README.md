@@ -15,5 +15,6 @@
 | `FAMILY_IMPLEMENTATION_SLICES.md` | F0–F6；本轮仅 F1 |
 | `lookback-book/` | 回看三案对照：A main 跳转、B #36 年页展开、C′ 时间书页。设计稿，不改运行代码 |
 | `lookback-memoir/` | 生活回眸端侧原型：设计与契约。不接模型、不改运行代码 |
+| `lookback-memoir-probe/` | 阶段 B：端侧 Foundation Models 探针。合成中文，不读个人库 |
 | `lookback-expand/` | #35 当时的年页展开契约。产品效力见 `lookback-book/`；#36 是 B 的备选实现 |
 | `adr/` | `0001`–`0006`。`0006` 已接受：身份、成员、快照矛盾结论 |
