@@ -12,13 +12,13 @@
 
 | 项 | SHA / 说明 | 结果 |
 | --- | --- | --- |
-| 远端 `origin/ios/first-run-lock-empty`（改前） | `344a5c6857ca6a08b700dd748bd113d56b1e9c06` | 已对齐 |
-| 本轮 JS / 将推送 head | `f4cad3d7203078b9af645d995ca6234fc55434ac` | 设置文案 + 真机记录 + 首次引导测试 |
+| 远端 `origin/ios/first-run-lock-empty`（改前） | `7f33ad7190cc4b62befaab4866660bbf42461c66` | 已对齐 |
+| 本轮 JS / 将推送 head | 提交后填入 | 模拟器缺 ExpoScreenCapture 时不崩 |
 | 真机 Liuz17 原生包 | `/Users/zhen/WeChatProjects/lampy`，`ios/account-email-auth` `cd92863` + 本机 Face ID pods | 不是 #46 专属 prebuild。JS 走 Metro。同源原生重装：**NOT VERIFIED** |
 | Metro 8081 | `lampy-guide/apps/ios` | 改前 JS `344a5c6`。Reload 后才是本轮 |
-| 模拟器 Lampy.app | DerivedData 仅有 `Debug-iphoneos`，本轮未编出 simulator 包 | 完整全新安装 UI 走查 **NOT VERIFIED**（不记模拟器 PASS） |
+| 模拟器 iPhone 17 启动 | 原生包无 `ExpoScreenCapture` 时，旧 JS 红屏 `Cannot find native module` | 本轮改为按需 `require`，缺模块只跳过防截屏。Reload 后复测 |
 | `npx tsc --noEmit` | | **PASS** |
-| 相关 Jest | device-lock / account / expo-device-auth / first-run | **PASS** 8 suites / 69 tests |
+| 相关 Jest | device-lock / screen-privacy / expo-device-auth | **PASS**（含缺 ExpoScreenCapture 不抛） |
 | 本轮 eslint | 改动的 lock / account / first-run 测试 | **PASS** |
 | `git diff --check` | 本轮文件 | **PASS** |
 
@@ -31,8 +31,8 @@
 | 开启保护，Face ID / 设备密码成功，显示开启 | **PASS**（`344a5c6`） |
 | 再次操作可关闭保护 | **PASS**（`344a5c6`） |
 | 开启后后台返回遮挡 | **PASS**（`344a5c6`） |
-| 关闭后后台返回不认证 | **NOT VERIFIED** |
-| 关闭后冷启动不认证 | **NOT VERIFIED** |
+| 关闭后后台返回不认证 | **PASS**（用户 2026-09-30） |
+| 关闭后冷启动不认证 | **PASS**（用户 2026-09-30） |
 | 本机保护标题 + 系统 Switch + 已开启/未开启 | 本轮新文案。真机 **NOT VERIFIED**（须 Reload 本轮 JS） |
 | 首次三屏引导 / 最近与回看空状态 | 真机有历史，**不记 PASS** |
 
@@ -60,7 +60,7 @@
 3. 拨动开关应拉起认证；认证或保存期间开关不可再拨。
 4. 只有保存成功后，「已开启 / 未开启」才变。取消或失败保持原状态，可见现有重试文案。
 5. 已记录：`344a5c6` 上开启、关闭、开启后后台遮挡均为 PASS。
-6. 仍待：关闭后后台返回、关闭后冷启动。
+6. 关闭后后台返回、关闭后冷启动：真机 **PASS**。
 
 ## 首次引导（仅可丢弃安装或全新模拟器）
 
@@ -79,3 +79,4 @@
 - 设置提交与 `sessionUnlocked` 分开；迟到设置认证不恢复已失效会话。
 - 开关 UI 只在 hydrate 或 `toggle` 结束后按已提交设置更新；`settingsBusy` 时禁用 Switch。
 - 引导只在最后一步 `markCompleted`；中途退出不写完成。
+- `expo-screen-capture` 与 Face ID 一样按需 `require`。原生包没有 `ExpoScreenCapture`（常见于模拟器旧包）时不崩溃，遮罩仍在。
