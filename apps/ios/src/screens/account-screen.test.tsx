@@ -454,11 +454,12 @@ describe('account screen', () => {
       ),
     );
     await waitFor(() => {
-      expect(view.getByLabelText('使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.getByText('本机保护')).toBeTruthy();
+      expect(view.getByText('未开启')).toBeTruthy();
     });
-    expect(view.getByText(/不会上传面部数据/)).toBeTruthy();
+    expect(view.getByText('开启后，进入 Lampy 需要 Face ID 或设备密码。')).toBeTruthy();
     await act(async () => {
-      fireEvent.press(view.getByTestId('account-device-lock-toggle'));
+      fireEvent(view.getByTestId('account-device-lock-toggle'), 'valueChange', true);
     });
     expect(authenticate).toHaveBeenCalled();
     expect(setEnabled).toHaveBeenCalledWith(true);

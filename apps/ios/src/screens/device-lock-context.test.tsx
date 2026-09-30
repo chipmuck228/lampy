@@ -16,6 +16,10 @@ function Toggle() {
   );
 }
 
+function flipSettings(view: { getByTestId: (id: string) => Parameters<typeof fireEvent>[0] }) {
+  fireEvent(view.getByTestId('account-device-lock-toggle'), 'valueChange', true);
+}
+
 function setAppState(state: AppStateStatus) {
   Object.defineProperty(AppState, 'currentState', {
     configurable: true,
@@ -144,6 +148,38 @@ describe('device lock cover', () => {
       fireEvent.press(view.getByLabelText('toggle-lock'));
     });
     expect(setEnabled).toHaveBeenCalledWith(false);
+  });
+
+  it('keeps the switch off until enable is saved, and on until disable is saved', async () => {
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const setEnabled = jest.fn(async () => undefined);
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    const view = await render(wrap({ isEnabled: async () => false, setEnabled }, { authenticate }));
+    await waitFor(() => {
+      expect(view.getByText('未开启')).toBeTruthy();
+    });
+    expect(view.getByText('本机保护')).toBeTruthy();
+    expect(view.getByText('开启后，进入 Lampy 需要 Face ID 或设备密码。')).toBeTruthy();
+    await act(async () => {
+      flipSettings(view);
+    });
+    await waitFor(() => {
+      expect(authenticate).toHaveBeenCalledTimes(1);
+    });
+    expect(view.getByText('未开启')).toBeTruthy();
+    expect(setEnabled).not.toHaveBeenCalled();
+    await act(async () => {
+      pending[0]({ ok: true });
+    });
+    await waitFor(() => {
+      expect(setEnabled).toHaveBeenCalledWith(true);
+      expect(view.getByText('已开启')).toBeTruthy();
+    });
   });
 
   it('keeps the route tree mounted under the cover so deep links share the same lock', async () => {
@@ -484,7 +520,7 @@ describe('device lock cover', () => {
         expect(view.queryByTestId('device-lock-cover')).toBeNull();
       });
       await act(async () => {
-        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+        flipSettings(view);
       });
       await waitFor(() => {
         expect(authenticate).toHaveBeenCalledTimes(1);
@@ -498,7 +534,7 @@ describe('device lock cover', () => {
       await waitFor(() => {
         expect(setEnabled).toHaveBeenCalledWith(true);
       });
-      expect(view.getByText('已使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.getByText('已开启')).toBeTruthy();
       expect(view.getByText('private')).toBeTruthy();
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
       await app.set('active');
@@ -524,7 +560,7 @@ describe('device lock cover', () => {
         expect(view.queryByTestId('device-lock-cover')).toBeNull();
       });
       await act(async () => {
-        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+        flipSettings(view);
       });
       await waitFor(() => {
         expect(authenticate).toHaveBeenCalledTimes(1);
@@ -536,7 +572,7 @@ describe('device lock cover', () => {
       await waitFor(() => {
         expect(setEnabled).toHaveBeenCalledWith(true);
       });
-      expect(view.getByText('已使用 Face ID 保护 Lampy', { includeHiddenElements: true })).toBeTruthy();
+      expect(view.getByText('已开启', { includeHiddenElements: true })).toBeTruthy();
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
       expect(view.queryByText('private')).toBeNull();
 
@@ -580,7 +616,7 @@ describe('device lock cover', () => {
       });
 
       await act(async () => {
-        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+        flipSettings(view);
       });
       await waitFor(() => {
         expect(authenticate).toHaveBeenCalledTimes(2);
@@ -596,7 +632,7 @@ describe('device lock cover', () => {
       await waitFor(() => {
         expect(setEnabled).toHaveBeenCalledWith(false);
       });
-      expect(view.getByText('使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.getByText('未开启')).toBeTruthy();
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
 
       await app.set('background');
@@ -625,7 +661,7 @@ describe('device lock cover', () => {
         expect(view.queryByTestId('device-lock-cover')).toBeNull();
       });
       await act(async () => {
-        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+        flipSettings(view);
       });
       await waitFor(() => {
         expect(authenticate).toHaveBeenCalledTimes(1);
@@ -685,7 +721,7 @@ describe('device lock cover', () => {
       });
 
       await act(async () => {
-        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+        flipSettings(view);
       });
       await waitFor(() => {
         expect(authenticate).toHaveBeenCalledTimes(2);
@@ -703,7 +739,7 @@ describe('device lock cover', () => {
       await waitFor(() => {
         expect(view.getByText('这次没有保存本机保护设置。记录还在，可以再试一次。')).toBeTruthy();
       });
-      expect(view.getByText('已使用 Face ID 保护 Lampy', { includeHiddenElements: true })).toBeTruthy();
+      expect(view.getByText('已开启', { includeHiddenElements: true })).toBeTruthy();
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
       expect(view.queryByText('private')).toBeNull();
     } finally {
@@ -738,7 +774,7 @@ describe('device lock cover', () => {
       });
 
       await act(async () => {
-        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+        flipSettings(view);
       });
       await waitFor(() => {
         expect(authenticate).toHaveBeenCalledTimes(2);
@@ -752,10 +788,10 @@ describe('device lock cover', () => {
         expect(setEnabled).toHaveBeenCalledWith(false);
         expect(view.getByText('这次没有保存本机保护设置。记录还在，可以再试一次。')).toBeTruthy();
       });
-      expect(view.getByText('已使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.getByText('已开启')).toBeTruthy();
 
       await act(async () => {
-        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+        flipSettings(view);
       });
       await waitFor(() => {
         expect(authenticate).toHaveBeenCalledTimes(3);
@@ -766,7 +802,7 @@ describe('device lock cover', () => {
       await waitFor(() => {
         expect(setEnabled).toHaveBeenCalledTimes(2);
       });
-      expect(view.getByText('使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.getByText('未开启')).toBeTruthy();
       expect(view.queryByText('这次没有保存本机保护设置。记录还在，可以再试一次。')).toBeNull();
     } finally {
       app.restore();

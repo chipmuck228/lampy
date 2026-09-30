@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { useState } from 'react';
 import { Pressable, Text } from 'react-native';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 
@@ -32,6 +32,10 @@ describe('first-run gate errors', () => {
   beforeEach(async () => {
     mockPush.mockReset();
     await SecureStore.deleteItemAsync(FIRST_RUN_SECURE_KEY);
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('skips the blank pending page when the store or library cannot be read', async () => {
@@ -91,5 +95,30 @@ describe('first-run gate errors', () => {
     });
     expect(view.getByText('app')).toBeTruthy();
     expect(view.queryByTestId('first-run-pending')).toBeNull();
+  });
+
+  it('does not mark the guide complete before the last screen', async () => {
+    const markCompleted = jest.fn(async () => undefined);
+    const view = await render(
+      wrap(
+        <FirstRunGate
+          store={{ isCompleted: async () => false, markCompleted }}
+          readLibrary={async () => ({ hasPersonalRecords: false, recordsUnknown: false })}
+        >
+          <Text>app</Text>
+        </FirstRunGate>,
+      ),
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('first-run-continue')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('first-run-continue'));
+    expect(markCompleted).not.toHaveBeenCalled();
+    fireEvent.press(view.getByTestId('first-run-continue'));
+    await waitFor(() => {
+      expect(view.getByLabelText('留下瞬间')).toBeTruthy();
+    });
+    expect(markCompleted).not.toHaveBeenCalled();
+    expect(view.queryByText('app')).toBeNull();
   });
 });

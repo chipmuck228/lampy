@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import {
   createDeviceLockSession,
@@ -31,6 +31,8 @@ function appIsBackgrounded() {
 export type DeviceLockContextValue = {
   snapshot: DeviceLockSnapshot;
   enabled: boolean;
+  switchOn: boolean;
+  settingsBusy: boolean;
   toggle(): Promise<void>;
   retryUnlock(): Promise<void>;
   message: string | null;
@@ -60,6 +62,8 @@ export function DeviceLockProvider({
   const session = useMemo(() => createDeviceLockSession(), []);
   const [snapshot, setSnapshot] = useState(session.snapshot());
   const [message, setMessage] = useState<string | null>(null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [switchOn, setSwitchOn] = useState(false);
   const inFlight = useRef(false);
   const hydrated = useRef(false);
   const needsManualRetry = useRef(false);
@@ -103,7 +107,11 @@ export function DeviceLockProvider({
       setMessage(deviceLockReadCopy());
     } finally {
       inFlight.current = false;
-      if (mounted.current) refresh();
+      if (mounted.current) {
+        const stored = session.snapshot();
+        if (stored.setting === 'on' || stored.setting === 'off') setSwitchOn(stored.setting === 'on');
+        refresh();
+      }
     }
   }, [refresh, resolvedStore, session]);
 
@@ -216,6 +224,7 @@ export function DeviceLockProvider({
     if (current.setting === 'unknown' || inFlight.current) return;
     const generation = session.beginSettingsAuth();
     inFlight.current = true;
+    setSettingsBusy(true);
     setMessage(null);
     const enabling = current.setting === 'off';
     logLock('settings-start', { settingsGeneration: generation });
@@ -243,13 +252,19 @@ export function DeviceLockProvider({
       setMessage(deviceLockAuthErrorCopy());
     } finally {
       inFlight.current = false;
-      refresh();
+      if (mounted.current) {
+        setSettingsBusy(false);
+        setSwitchOn(session.snapshot().setting === 'on');
+        refresh();
+      }
     }
   }, [logLock, refresh, resolvedAuthenticator, resolvedStore, session]);
 
   const value = {
     snapshot,
     enabled: snapshot.setting === 'on',
+    switchOn,
+    settingsBusy,
     toggle,
     retryUnlock,
     message,
@@ -301,21 +316,31 @@ export function DeviceLockProvider({
 export function DeviceLockSettings() {
   const lock = useDeviceLock();
   if (!lock || lock.snapshot.setting === 'unknown') return null;
-  const on = lock.snapshot.setting === 'on';
+  const displayOn = lock.switchOn;
+  const busy = lock.settingsBusy;
   return (
     <View testID="account-device-lock">
-      <Pressable
-        accessibilityRole="switch"
-        accessibilityState={{ checked: on }}
-        accessibilityLabel="使用 Face ID 保护 Lampy"
-        testID="account-device-lock-toggle"
-        onPress={() => void lock.toggle()}
-        style={styles.hit}
-      >
-        <Text style={styles.action}>{on ? '已使用 Face ID 保护 Lampy' : '使用 Face ID 保护 Lampy'}</Text>
-      </Pressable>
+      <Text style={styles.title} accessibilityRole="header">
+        本机保护
+      </Text>
+      <View style={styles.settingsRow}>
+        <Text style={styles.action} testID="account-device-lock-state">
+          {displayOn ? '已开启' : '未开启'}
+        </Text>
+        <Switch
+          value={displayOn}
+          disabled={busy}
+          onValueChange={() => {
+            if (busy) return;
+            void lock.toggle();
+          }}
+          accessibilityLabel="本机保护"
+          accessibilityState={{ checked: displayOn, disabled: busy }}
+          testID="account-device-lock-toggle"
+        />
+      </View>
       <Text style={styles.body} testID="account-device-lock-copy">
-        开启后，进入 Lampy 时需先验证设备持有人。设置只作用于这台设备，不是 Lampy 账户登录，也不会上传面部数据。
+        开启后，进入 Lampy 需要 Face ID 或设备密码。
       </Text>
       {lock.message ? (
         <Text style={styles.body} testID="account-device-lock-message">
@@ -340,4 +365,11 @@ const styles = StyleSheet.create({
   body: { fontSize: 17, lineHeight: 26, color: inkSoft },
   action: { fontSize: 17, lineHeight: 24, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  settingsRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
 });
