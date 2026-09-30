@@ -1,16 +1,16 @@
 # 个人 MVP 体验精修 v1 · 走查
 
 Base：`origin/main` `6e25227203fc0e9a270cda4f08d81f70ea5d04e4`（#46）。  
-Head：`42d66a99446b3a29220a41bfe796b53619c4f0af`。只改 `apps/ios`。家庭入口关闭。`identityLoopAccepted` 保持 false。未卸 Liuz17，未清个人库。
+Head：本 PR。只改 `apps/ios`。家庭入口关闭。`identityLoopAccepted` 保持 false。未卸 Liuz17，未清个人库。
 
-上一轮 head：`5278727148f9c5bf8ac03a6877a7332be914c5ff`。本轮只热更新 JS，不卸、不重装、不清记录。原生仍是已装的 Dev Client（`app.lampy.ios` / Expo 0.1.0）。Metro JS 以 git head + `apps/ios/src` SHA 核对，不以 Jest 代替真机。
+远端对照（本轮开始）：`origin/ios/personal-ui-refinement-v1` = `34c4eb0b329cc710e2e2222f59d98de66664123c`。本轮只热更新 JS，不卸、不重装、不清记录。原生仍是已装的 Dev Client（`app.lampy.ios` / Expo 0.1.0）。Metro JS 以 git head + `apps/ios/src` SHA 核对，不以 Jest 代替真机。
 
 ## 命令
 
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | **PASS** |
-| 相关 Jest（lookback-book / leave-* / account / recent-reading / scaffold / moment-audio-marks / personal-settings-visibility / device-lock* / use-page-metrics 连续读取 / composer-notice） | **PASS** |
+| 相关 Jest（lookback-book / leave-* / account / recent-reading / scaffold / moment-audio-marks / personal-settings-visibility / device-lock* / screen-privacy 队列 / use-page-metrics 连续读取 / composer-notice） | **PASS** |
 | 本轮 ESLint（新改 UI 文件 + 门控/测试） | **PASS** |
 | `src/app/leave.tsx` 全文件 ESLint | 预存 `react-hooks/set-state-in-effect`（`setPreviewBoundId`，main 已有）。本轮另有 `setNoteBoxHeight`：字号变化时丢掉旧测量高度，不重建整页 |
 | `git diff --check` | **PASS** |
@@ -33,6 +33,7 @@ Head：`42d66a99446b3a29220a41bfe796b53619c4f0af`。只改 `apps/ios`。家庭�
 | 真机 Liuz17 | **NOT VERIFIED**（未卸、未清库） |
 | 真机：最近同日省略重复日期，异日保留发生日期 | **PASS**（用户已复测） |
 | 真机：最大字号下留下操作按钮本身完整可见可点 | **PASS**（用户已复测） |
+| 真机：启动后 Face ID 验证完应回到纸色页面，不能黑屏 | **NOT VERIFIED**（等用户复测） |
 | 真机：Face ID 验证期间私人内容不暴露 | **NOT VERIFIED**（等用户复测） |
 | 真机：最大字号相机拒绝提示不撑满操作栏 | **NOT VERIFIED**（等用户复测） |
 | 真机：运行中最大字号改小字号后留下布局 | **NOT VERIFIED**（等用户复测） |

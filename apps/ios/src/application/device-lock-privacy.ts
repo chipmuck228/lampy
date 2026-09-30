@@ -30,16 +30,26 @@ export function shouldBlockPrivateSnapshot(input: {
   cover: boolean;
   setting: DeviceLockSetting;
   appState: AppStateStatus;
+  sessionUnlocked?: boolean;
+  unlockInFlight?: boolean;
 }): boolean {
-  if (input.cover) return true;
-  return input.setting === 'on' && input.appState !== 'active';
+  if (input.setting === 'off') return false;
+  if (input.appState === 'background') return true;
+  if (input.setting === 'unknown' || input.unlockInFlight) return true;
+  if (input.sessionUnlocked && input.appState !== 'active') return false;
+  return input.cover || (input.setting === 'on' && input.appState !== 'active');
 }
 
 export function shouldConcealOnInactive(input: {
   setting: DeviceLockSetting;
   settingsInFlight: boolean;
+  unlockInFlight: boolean;
+  sessionUnlocked: boolean;
 }): boolean {
-  return input.setting === 'on' && !input.settingsInFlight;
+  if (input.setting !== 'on') return false;
+  if (input.settingsInFlight || input.unlockInFlight) return false;
+  if (input.sessionUnlocked) return false;
+  return true;
 }
 
 export function decideUnlockResult(input: {

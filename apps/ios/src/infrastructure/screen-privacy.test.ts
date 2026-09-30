@@ -1,6 +1,8 @@
+import { createSnapshotBlockGate } from './screen-privacy';
+
 describe('screen privacy when native module is present', () => {
-  const mockPrevent = jest.fn(async () => undefined);
-  const mockAllow = jest.fn(async () => undefined);
+  const mockPrevent = jest.fn(async (): Promise<void> => undefined);
+  const mockAllow = jest.fn(async (): Promise<void> => undefined);
 
   beforeEach(() => {
     jest.resetModules();
@@ -27,6 +29,25 @@ describe('screen privacy when native module is present', () => {
     await setPrivateSnapshotBlocked(true);
     expect(mockPrevent).toHaveBeenCalledTimes(1);
     await setPrivateSnapshotBlocked(false);
+    expect(mockAllow).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a later allow finish after a slow prevent so Face ID dismiss does not stay black', async () => {
+    let finishPrevent: (() => void) | undefined;
+    mockPrevent.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishPrevent = resolve;
+        }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { setPrivateSnapshotBlocked } = require('./screen-privacy') as typeof import('./screen-privacy');
+    const first = setPrivateSnapshotBlocked(true);
+    const second = setPrivateSnapshotBlocked(false);
+    expect(finishPrevent).toBeTruthy();
+    finishPrevent?.();
+    await Promise.all([first, second]);
+    expect(mockPrevent).toHaveBeenCalledTimes(1);
     expect(mockAllow).toHaveBeenCalledTimes(1);
   });
 });
@@ -57,5 +78,31 @@ describe('screen privacy without ExpoScreenCapture', () => {
     await expect(setPrivateSnapshotBlocked(true)).resolves.toBeUndefined();
     await expect(setPrivateSnapshotBlocked(false)).resolves.toBeUndefined();
     expect(loadCapture).not.toHaveBeenCalled();
+  });
+});
+
+describe('snapshot block gate', () => {
+  it('lets a later allow win over a slow prevent so Face ID dismiss does not leave a black screen', async () => {
+    const applied: boolean[] = [];
+    let finishPrevent: (() => void) | undefined;
+    const apply = jest.fn((blocked: boolean) => {
+      if (blocked && !finishPrevent) {
+        return new Promise<void>((resolve) => {
+          finishPrevent = resolve;
+        }).then(() => {
+          applied.push(true);
+        });
+      }
+      applied.push(blocked);
+      return Promise.resolve();
+    });
+    const gate = createSnapshotBlockGate(apply);
+    const first = gate.set(true);
+    const second = gate.set(false);
+    expect(finishPrevent).toBeTruthy();
+    finishPrevent?.();
+    await Promise.all([first, second]);
+    expect(applied).toEqual([true, false]);
+    expect(applied[applied.length - 1]).toBe(false);
   });
 });

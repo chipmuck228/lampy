@@ -108,6 +108,8 @@ export function DeviceLockProvider({
           cover,
           setting: current.setting,
           appState: AppState.currentState,
+          sessionUnlocked: current.sessionUnlocked,
+          unlockInFlight: inFlight.current && !settingsBusyRef.current,
         }),
         ...(extra?.result ? { result: extra.result } : {}),
       };
@@ -175,9 +177,11 @@ export function DeviceLockProvider({
         cover: coverVisible,
         setting: snapshot.setting,
         appState: lifeState,
+        sessionUnlocked: snapshot.sessionUnlocked,
+        unlockInFlight: unlockBusy,
       }),
     );
-  }, [coverVisible, lifeState, snapshot.setting]);
+  }, [coverVisible, lifeState, snapshot.sessionUnlocked, snapshot.setting, unlockBusy]);
 
   const retryUnlock = useCallback(async () => {
     if (appIsBackgrounded()) return;
@@ -249,12 +253,22 @@ export function DeviceLockProvider({
           shouldConcealOnInactive({
             setting: current.setting,
             settingsInFlight: settingsBusyRef.current,
+            unlockInFlight: inFlight.current && !settingsBusyRef.current,
+            sessionUnlocked: current.sessionUnlocked,
           })
         ) {
           session.conceal();
           refresh();
         }
-        if (current.setting === 'on' || current.locked || current.setting === 'unknown') {
+        if (
+          shouldBlockPrivateSnapshot({
+            cover: true,
+            setting: current.setting,
+            appState: 'inactive',
+            sessionUnlocked: current.sessionUnlocked,
+            unlockInFlight: inFlight.current && !settingsBusyRef.current,
+          })
+        ) {
           void setPrivateSnapshotBlocked(true);
         }
         logLock('app-state', { cover: true });

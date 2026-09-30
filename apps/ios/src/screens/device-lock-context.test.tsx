@@ -423,6 +423,37 @@ describe('device lock cover', () => {
       expect(opened).toBeGreaterThan(held);
       expect(traces[held].cover).toBe(true);
       expect(traces.every((item) => item.cover || item.result === 'unlocked')).toBe(true);
+      await app.set('inactive');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      expect(view.getByText('private')).toBeTruthy();
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('keeps the session open after launch Face ID even if a trailing inactive follows success', async () => {
+    const app = mockAppState();
+    const authenticate = jest.fn(async () => ({ ok: true as const }));
+    try {
+      const view = await render(
+        wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }),
+      );
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+      expect(view.getByText('private')).toBeTruthy();
+      await app.set('inactive');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      expect(view.getByText('private')).toBeTruthy();
     } finally {
       app.restore();
     }
@@ -455,11 +486,9 @@ describe('device lock cover', () => {
       expect(view.queryByText('private')).toBeNull();
       expect(authenticate).toHaveBeenCalledTimes(1);
       await app.set('active');
-      await waitFor(() => {
-        expect(authenticate).toHaveBeenCalledTimes(2);
-      });
-      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
-      expect(view.queryByText('private')).toBeNull();
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      expect(view.getByText('private')).toBeTruthy();
       await app.set('background');
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
       expect(view.queryByText('private')).toBeNull();

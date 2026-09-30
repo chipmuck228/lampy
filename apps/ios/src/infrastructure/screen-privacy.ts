@@ -33,7 +33,28 @@ function loadScreenCapture(): ScreenCaptureModule | null {
   }
 }
 
-export async function setPrivateSnapshotBlocked(blocked: boolean) {
+export function createSnapshotBlockGate(apply: (blocked: boolean) => Promise<void>) {
+  let next: boolean | null = null;
+  let busy = false;
+  return {
+    async set(blocked: boolean) {
+      next = blocked;
+      if (busy) return;
+      busy = true;
+      try {
+        while (next !== null) {
+          const wanted = next;
+          next = null;
+          await apply(wanted);
+        }
+      } finally {
+        busy = false;
+      }
+    },
+  };
+}
+
+const gate = createSnapshotBlockGate(async (blocked) => {
   const capture = loadScreenCapture();
   if (!capture) return;
   try {
@@ -42,4 +63,8 @@ export async function setPrivateSnapshotBlocked(blocked: boolean) {
   } catch {
     // Native calls can fail on a mismatched binary; keep the in-app cover.
   }
+});
+
+export async function setPrivateSnapshotBlocked(blocked: boolean) {
+  await gate.set(blocked);
 }

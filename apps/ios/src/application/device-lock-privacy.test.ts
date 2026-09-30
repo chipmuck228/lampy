@@ -22,8 +22,26 @@ describe('device lock privacy event order', () => {
       shouldConcealOnInactive({
         setting: 'on',
         settingsInFlight: false,
+        unlockInFlight: false,
+        sessionUnlocked: false,
       }),
     ).toBe(true);
+    expect(
+      shouldConcealOnInactive({
+        setting: 'on',
+        settingsInFlight: false,
+        unlockInFlight: false,
+        sessionUnlocked: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldConcealOnInactive({
+        setting: 'on',
+        settingsInFlight: false,
+        unlockInFlight: true,
+        sessionUnlocked: false,
+      }),
+    ).toBe(false);
     expect(
       shouldBlockPrivateSnapshot({
         cover: true,
@@ -31,6 +49,15 @@ describe('device lock privacy event order', () => {
         appState: 'inactive',
       }),
     ).toBe(true);
+    expect(
+      shouldBlockPrivateSnapshot({
+        cover: true,
+        setting: 'on',
+        appState: 'inactive',
+        sessionUnlocked: true,
+        unlockInFlight: false,
+      }),
+    ).toBe(false);
   });
 
   it('does not conceal during settings auth, and does not treat settings success as unlock', () => {
@@ -38,6 +65,8 @@ describe('device lock privacy event order', () => {
       shouldConcealOnInactive({
         setting: 'on',
         settingsInFlight: true,
+        unlockInFlight: false,
+        sessionUnlocked: false,
       }),
     ).toBe(false);
     expect(
