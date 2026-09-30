@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Dimensions } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
@@ -159,6 +159,7 @@ describe('lookback book adapt surfaces', () => {
       expect(view.getByText('稀疏月一条')).toBeTruthy();
     });
     expect(view.getByLabelText('看这条，稀疏月一条')).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByLabelText('看这条，稀疏月一条').props.style).minHeight).toBe(48);
     view.unmount();
   });
 

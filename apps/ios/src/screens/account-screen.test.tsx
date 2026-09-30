@@ -3,6 +3,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ApplicationError } from '../application/errors';
+import AccountDiagnosticsRoute from '../app/account-diagnostics';
 import AccountScreen from './account-screen';
 import { DeviceLockProvider } from './device-lock-context';
 import { familyAuthServiceReady } from '../application/account-status';
@@ -485,6 +486,22 @@ describe('account screen', () => {
     expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
     expect(view.queryByLabelText('测试账号登录')).toBeNull();
     expect(view.queryByText('私密家庭空间正在准备中。敬请期待。')).toBeNull();
+  });
+
+  it('does not show diagnostics or fetch them when the route is opened with the gate closed', async () => {
+    jest.mocked(isPersonalSettingsDiagnosticsOpen).mockReturnValue(false);
+    const view = await render(wrap(<AccountDiagnosticsRoute />));
+    await waitFor(() => {
+      expect(view.getByTestId('account-diagnostics-closed')).toBeTruthy();
+    });
+    expect(view.getByText('这里没有开发诊断。')).toBeTruthy();
+    expect(view.queryByTestId('account-diagnostics')).toBeNull();
+    expect(view.queryByTestId('account-family-preview')).toBeNull();
+    expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
+    expect(view.queryByLabelText('测试账号登录')).toBeNull();
+    expect(mockApple.isAvailable).not.toHaveBeenCalled();
+    expect(mockFamily.getMembership).not.toHaveBeenCalled();
+    expect(mockFamily.getAuthHealth).not.toHaveBeenCalled();
   });
 
   it('hides the developer entry when the diagnostics gate is closed', async () => {

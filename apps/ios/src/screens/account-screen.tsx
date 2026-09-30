@@ -75,9 +75,30 @@ function testLoginFlags(snapshot: AccountSnapshot | null) {
   };
 }
 
+export function AccountDiagnosticsClosed() {
+  const router = useRouter();
+  return (
+    <SafeAreaView style={styles.safe} accessibilityLabel="开发诊断" testID="account-diagnostics-closed">
+      <ScrollView contentContainerStyle={styles.column}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="返回"
+          testID="account-back"
+          onPress={() => router.back()}
+          style={styles.hit}
+        >
+          <Text style={styles.back}>返回</Text>
+        </Pressable>
+        <Text style={styles.body}>这里没有开发诊断。</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 export default function AccountScreen({ variant = 'user' }: { variant?: 'user' | 'diagnostics' } = {}) {
   const router = useRouter();
   const diagnostics = variant === 'diagnostics';
+  const diagnosticsAllowed = isPersonalSettingsDiagnosticsOpen();
   const [snapshot, setSnapshot] = useState<AccountSnapshot | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>('idle');
@@ -194,6 +215,7 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
 
   useFocusEffect(
     useCallback(() => {
+      if (!diagnostics || !diagnosticsAllowed) return undefined;
       const generation = refreshGate.begin();
       load(generation)
         .then((result) => {
@@ -225,7 +247,7 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
         refreshGate.begin();
         setPassword('');
       };
-    }, [load, refreshGate]),
+    }, [diagnostics, diagnosticsAllowed, load, refreshGate]),
   );
 
   async function signIn() {
@@ -338,8 +360,12 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
 
   const showAppleButton = snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
   const showTestLoginPanel = Boolean(snapshot && snapshot.kind !== 'service-unavailable' && snapshot.kind !== 'signed-in');
-  const showDiagnosticsEntry = !diagnostics && isPersonalSettingsDiagnosticsOpen();
+  const showDiagnosticsEntry = !diagnostics && diagnosticsAllowed;
   const appVersion = Constants.expoConfig?.version ?? '0.1.0';
+
+  if (diagnostics && !diagnosticsAllowed) {
+    return <AccountDiagnosticsClosed />;
+  }
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel={diagnostics ? '开发诊断' : '本机设置'}>

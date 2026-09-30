@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lookThisTight: {
-    minHeight: 44,
+    minHeight: 48,
     alignSelf: 'flex-start',
     justifyContent: 'flex-start',
     paddingTop: 2,
