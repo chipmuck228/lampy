@@ -9,7 +9,7 @@
 | 项 | SHA / 说明 | 结果 |
 | --- | --- | --- |
 | 远端 `origin/ios/first-run-lock-empty`（改前） | `64f175adab2c388ecd45def0ccafdd03d0b43c41` | 已对齐 fetch |
-| 本轮 JS / 将推送 head | 见提交后 `git rev-parse HEAD` | 本轮代码 |
+| 本轮 JS / 将推送 head | `52c82f8ac5b5b0298fb8613c823c06ef0abf4255` | 本轮代码 |
 | 真机 Liuz17 已装原生包 | Xcode 工程在 `/Users/zhen/WeChatProjects/lampy`，当时分支 `ios/account-email-auth` `cd92863`，另含本机补进的 `ExpoLocalAuthentication` / `ExpoScreenCapture` | **不是** #46 专属 prebuild。本轮 AppState 修复为 JS，可用 Metro 热更新。与 #46 同源原生重装：**NOT VERIFIED** |
 | Metro 8081 | 启动目录 `lampy-guide/apps/ios` | 需 Reload 后才是本轮 JS |
 | `npx tsc --noEmit` | apps/ios | **PASS** |
