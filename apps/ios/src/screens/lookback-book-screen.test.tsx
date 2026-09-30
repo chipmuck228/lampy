@@ -119,6 +119,27 @@ describe('lookback book screen', () => {
     });
   });
 
+  it('shows a quiet empty lookback only when the book is truly empty', async () => {
+    mockGetLookbackBook.mockResolvedValue({ unknownCount: 0, isEmpty: true, years: [] });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-empty')).toBeTruthy();
+    }, { timeout: 10000 });
+    expect(view.getByText('以后可以按时间回来看。')).toBeTruthy();
+    expect(view.queryByTestId('lookback-unconfirmed')).toBeNull();
+    view.unmount();
+  });
+
+  it('does not treat unknown dates as an empty library', async () => {
+    mockGetLookbackBook.mockResolvedValue({ unknownCount: 2, isEmpty: false, years: [] });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('时间未确认，有2条记录')).toBeTruthy();
+    });
+    expect(view.queryByTestId('lookback-empty')).toBeNull();
+    view.unmount();
+  });
+
   it('opens recorded months on the lookback book without a top back', async () => {
     mockGetLookbackBook.mockResolvedValue(bookView());
     const view = await render(wrap(<LookbackIndexScreen />));

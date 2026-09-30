@@ -350,6 +350,12 @@ export function createUseCases(deps: {
     }));
   }
 
+  async function locateMediaUri(stored: string): Promise<string | null> {
+    if (!stored || !deps.media) return null;
+    if (deps.media.resolveUri) return deps.media.resolveUri(stored);
+    return (await deps.media.exists(stored)) ? stored : null;
+  }
+
   async function resolveImages(assetIds: string[]): Promise<ImageView[]> {
     const { imageIds } = await classify(assetIds);
     const total = imageIds.length;
@@ -368,8 +374,8 @@ export function createUseCases(deps: {
         });
         continue;
       }
-      const uri = found.asset.localUri;
-      const exists = deps.media ? await deps.media.exists(uri) : false;
+      const uri = await locateMediaUri(found.asset.localUri);
+      const exists = uri != null;
       if (!exists) {
         views.push({
           id: assetId,
@@ -427,8 +433,8 @@ export function createUseCases(deps: {
         reason: 'missing',
       };
     }
-    const uri = found.asset.localUri;
-    const exists = !!deps.media && (await deps.media.exists(uri));
+    const uri = await locateMediaUri(found.asset.localUri);
+    const exists = uri != null;
     if (!exists) {
       return {
         id: audioId,
@@ -1056,13 +1062,13 @@ export function createUseCases(deps: {
           projectionAssets.push(null);
           continue;
         }
-        const uri = asset.asset.localUri;
-        const usable = asset.asset.type === 'audio'
-          ? !!deps.media && (await deps.media.exists(uri)) && (await deps.media.canPlay(uri))
-          : !!deps.media && (await deps.media.exists(uri)) && (await deps.media.canDecode(uri));
+        const uri = await locateMediaUri(asset.asset.localUri);
+        const usable = !!uri && (asset.asset.type === 'audio'
+          ? await deps.media!.canPlay(uri)
+          : await deps.media!.canDecode(uri));
         projectionAssets.push(
           usable
-            ? toProjectionAsset(asset.asset)
+            ? toProjectionAsset({ ...asset.asset, localUri: uri })
             : {
                 ...asset.asset,
                 localUri: '',

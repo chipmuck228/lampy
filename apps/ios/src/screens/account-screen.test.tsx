@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ApplicationError } from '../application/errors';
 import AccountScreen from './account-screen';
+import { DeviceLockProvider } from './device-lock-context';
 import { familyAuthServiceReady } from '../application/account-status';
 
 const mockFamily = {
@@ -132,6 +133,10 @@ describe('account screen', () => {
     expect(view.getByTestId('account-test-login-unavailable')).toBeTruthy();
     expect(view.queryByLabelText('测试账号登录')).toBeNull();
     expect(view.queryByText(/家庭成员|头像/)).toBeNull();
+    expect(view.getByTestId('account-family-preview')).toBeTruthy();
+    expect(view.getByText('私密家庭空间正在准备中。敬请期待。')).toBeTruthy();
+    expect(view.queryByLabelText('邀请')).toBeNull();
+    expect(view.queryByLabelText('分享')).toBeNull();
     expect(mockFamily.getMembership).not.toHaveBeenCalled();
   });
 
@@ -434,4 +439,30 @@ describe('account screen', () => {
     expect(view.getByTestId('account-password-input').props.value).toBe('');
     expect(view.getByTestId('account-test-login-submit')).toBeTruthy();
   });
+
+  it('lets the user turn Face ID protection on only after a successful device challenge', async () => {
+    const setEnabled = jest.fn(async () => undefined);
+    const authenticate = jest.fn(async () => ({ ok: true as const }));
+    const view = await render(
+      wrap(
+        <DeviceLockProvider
+          store={{ isEnabled: async () => false, setEnabled }}
+          authenticator={{ authenticate }}
+        >
+          <AccountScreen />
+        </DeviceLockProvider>,
+      ),
+    );
+    await waitFor(() => {
+      expect(view.getByText('本机保护')).toBeTruthy();
+      expect(view.getByText('未开启')).toBeTruthy();
+    });
+    expect(view.getByText('开启后，进入 Lampy 需要 Face ID 或设备密码。')).toBeTruthy();
+    await act(async () => {
+      fireEvent(view.getByTestId('account-device-lock-toggle'), 'valueChange', true);
+    });
+    expect(authenticate).toHaveBeenCalled();
+    expect(setEnabled).toHaveBeenCalledWith(true);
+  });
 });
+

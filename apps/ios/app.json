@@ -16,7 +16,8 @@
         "NSCameraUsageDescription": "Lampy 只在你拍照留下一条生活时使用相机。",
         "NSMicrophoneUsageDescription": "Lampy 只在你录下当时的声音时使用麦克风。",
         "NSPhotoLibraryUsageDescription": "Lampy 只在你从相册选择已有照片留下时读取相册。",
-        "NSPhotoLibraryAddUsageDescription": "Lampy 不会把生活写回系统相册；此说明仅用于系统要求。"
+        "NSPhotoLibraryAddUsageDescription": "Lampy 不会把生活写回系统相册；此说明仅用于系统要求。",
+        "NSFaceIDUsageDescription": "Lampy 只在你打开本机保护时，用 Face ID 或设备密码确认是这台设备的持有人。不会上传面部数据。"
       }
     },
     "android": {
@@ -46,6 +47,12 @@
       ],
       "expo-sqlite",
       "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Lampy 只在你打开本机保护时，用 Face ID 或设备密码确认是这台设备的持有人。不会上传面部数据。"
+        }
+      ],
       "expo-apple-authentication",
       "expo-file-system",
       [

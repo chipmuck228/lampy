@@ -337,8 +337,12 @@ export function HistoryMomentRow({
   );
 }
 
-export function LookbackMessage({ children }: { children: string }) {
-  return <Text style={styles.body}>{children}</Text>;
+export function LookbackMessage({ children, testID }: { children: string; testID?: string }) {
+  return (
+    <Text style={styles.body} testID={testID}>
+      {children}
+    </Text>
+  );
 }
 
 export const lookbackStyles = StyleSheet.create({

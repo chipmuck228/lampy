@@ -16,6 +16,7 @@ import { getFamilyUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { createSecureFamilySessionStore } from '../infrastructure/secure-family-session';
+import { DeviceLockSettings } from './device-lock-context';
 import { createFamilyRefreshGate } from './family-refresh';
 import { ink, inkSoft, paper, sage } from './life-page';
 
@@ -353,6 +354,15 @@ export default function AccountScreen() {
         <Text style={styles.body} testID="account-personal">
           个人记录保存在这台设备。目前没有跨设备同步或云备份。
         </Text>
+        <DeviceLockSettings />
+        <View testID="account-family-preview">
+          <Text style={styles.body} testID="account-family-copy">
+            有些生活，只想交给重要的人。
+          </Text>
+          <Text style={styles.body} testID="account-family-soon">
+            私密家庭空间正在准备中。敬请期待。
+          </Text>
+        </View>
         {snapshot ? (
           <Text style={styles.body} testID={`account-kind-${snapshot.kind}`}>
             {kindCopy(snapshot)}
