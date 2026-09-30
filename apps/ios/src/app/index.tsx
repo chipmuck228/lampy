@@ -9,7 +9,7 @@ import { RootNavBand, RootReadingLayout } from '../screens/root-nav-band';
 import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cases';
 import { LifeIconButton, LookThisHit } from '../screens/life-icons';
 import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
-import { MomentFeeling } from '../screens/moment-feeling';
+import { RecentFeeling } from '../screens/recent-feeling';
 import { MomentImages } from '../screens/moment-images';
 import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
 import type { PlaybackStatus } from '../infrastructure/media';
@@ -201,7 +201,7 @@ function RecentMoment({
         markedActions
         progressWhenHeard
       />
-      <MomentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
+      <RecentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
       <LookThisHit
         accessibilityLabel={
           [item.dateLabel, item.occurredLabel, item.note, '看这条'].filter(Boolean).join('，') ||

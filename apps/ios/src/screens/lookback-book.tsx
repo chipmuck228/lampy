@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   LOOKBACK_BOOK_NOTE_LINES,
-  lookbackBookDateLabel,
+  lookbackBookDayAccessLabel,
+  lookbackBookDayPrimaryLabel,
+  lookbackBookDaySecondaryLabel,
   lookbackBookMonthAccessLabel,
   type LookbackBookExcerpt,
   type LookbackBookYear,
@@ -11,7 +13,7 @@ import {
 import type { LookbackMonthEntry } from '../application/lookback-month';
 import { pad2 } from '../domain-adapters/calendar';
 import type { PlaybackStatus } from '../infrastructure/media';
-import { hairline } from './life-page';
+import { hairline, paperDeep } from './life-page';
 import { LifeIcon, LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentFeeling } from './moment-feeling';
@@ -85,19 +87,32 @@ export function LookbackBookDayRow({
   selected: boolean;
   onPress: () => void;
 }) {
-  const weekday = lookbackBookDateLabel(year, month, entry.day);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${weekday}，${entry.summary}`}
+      accessibilityState={{ selected, expanded: selected }}
+      accessibilityLabel={lookbackBookDayAccessLabel(
+        year,
+        month,
+        entry.day,
+        entry.summary,
+        selected,
+      )}
       testID={`lookback-book-day-${year}-${pad2(month)}-${pad2(entry.day)}`}
       onPress={onPress}
       style={styles.dayHit}
     >
       <View style={styles.dayRow}>
-        <Text style={styles.dayTitle}>{weekday}</Text>
-        <Text style={styles.dayCount}>{entry.count}条</Text>
+        <View style={styles.dayCopy}>
+          <Text style={styles.dayTitle}>{lookbackBookDayPrimaryLabel(entry.day)}</Text>
+          <Text style={styles.dayWeekday}>{lookbackBookDaySecondaryLabel(year, month, entry.day)}</Text>
+        </View>
+        <View style={styles.dayMeta} importantForAccessibility="no">
+          <View style={styles.dayCountTag}>
+            <Text style={styles.dayCount}>{entry.count}条</Text>
+          </View>
+          <LifeIcon name={selected ? 'collapse' : 'expand'} size={16} decorative />
+        </View>
       </View>
     </Pressable>
   );
@@ -177,10 +192,24 @@ const styles = StyleSheet.create({
   dayRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  dayTitle: { flex: 1, flexShrink: 1, minWidth: 0, fontSize: 17, color: '#25231F' },
-  dayCount: { fontSize: 14, color: '#53604F' },
+  dayCopy: { flex: 1, flexShrink: 1, minWidth: 120, gap: 2 },
+  dayTitle: { fontSize: 17, lineHeight: 24, color: '#25231F' },
+  dayWeekday: { fontSize: 14, lineHeight: 20, color: '#53604F' },
+  dayMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  dayCountTag: {
+    backgroundColor: paperDeep,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  dayCount: { fontSize: 14, lineHeight: 18, color: '#53604F' },
 });

@@ -17,23 +17,23 @@ export function decideFirstRunGuide(input: {
 export const FIRST_RUN_SCREENS = [
   {
     id: 'leave',
-    title: '这里，留下自己的生活。',
-    body: '一句话、一张照片或一段声音。不用发布，也不用让它显得重要。',
-    source: 'https://www.yunpura.com/zh-cn h1 与导语，2026-09-29',
+    title: '一句话，也值得留下。',
+    body: '一张照片，一段声音，或此刻的感受。',
+    source: '本轮新文案，2026-10-01',
     action: '继续',
   },
   {
     id: 'lookback',
-    title: '生活不是信息流，它会慢慢积累。',
-    body: '先把今天留下，以后再回来看看。',
-    source: 'https://www.yunpura.com/zh-cn h2 与页脚说明，2026-09-29',
+    title: '那些平常的日子，后来都有了模样。',
+    body: '再读一句原话，再听一次当时的声音。',
+    source: '本轮新文案，2026-10-01',
     action: '继续',
   },
   {
-    id: 'share',
-    title: '不是每一张照片，都需要发出去。',
-    body: '有些生活适合分享。也有些，只想留给自己和重要的人。',
-    source: 'https://www.yunpura.com/zh-cn h2 与导语，2026-09-29',
+    id: 'keep',
+    title: '自己的生活，安心放在这里。',
+    body: '记录保存在这台设备，也可以开启本机保护。',
+    source: '本轮新文案，2026-10-01',
     action: '留下瞬间',
   },
 ] as const;

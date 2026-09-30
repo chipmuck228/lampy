@@ -39,11 +39,13 @@ describe('first-run guide decision', () => {
     );
   });
 
-  it('uses website copy and does not claim cloud backup or an open family', () => {
+  it('uses this-round copy and does not claim cloud backup or sync', () => {
     const text = FIRST_RUN_SCREENS.map((screen) => `${screen.title}${screen.body}`).join('');
-    expect(text).toContain('这里，留下自己的生活。');
-    expect(text).not.toMatch(/云备份|家庭已开放|已经可以分享给家人/);
-    expect(FIRST_RUN_SCREENS.every((screen) => screen.source.includes('yunpura.com'))).toBe(true);
+    expect(text).toContain('一句话，也值得留下。');
+    expect(text).toContain('记录保存在这台设备');
+    expect(text).not.toMatch(/云备份|同步|家庭已开放|已经可以分享给家人/);
+    expect(FIRST_RUN_SCREENS.every((screen) => screen.source.includes('本轮新文案'))).toBe(true);
+    expect(FIRST_RUN_SCREENS[2].id).toBe('keep');
     expect(FIRST_RUN_SCREENS[2].action).toBe('留下瞬间');
   });
 });

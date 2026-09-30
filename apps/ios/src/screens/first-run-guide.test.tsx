@@ -25,7 +25,9 @@ describe('first-run guide', () => {
   it('does not finish until the last screen action', async () => {
     const finished = jest.fn();
     const view = await render(wrap(<FirstRunGuide onFinished={finished} />));
-    expect(view.getByText('这里，留下自己的生活。')).toBeTruthy();
+    expect(view.getByText('一句话，也值得留下。')).toBeTruthy();
+    expect(view.getByTestId('first-run-scene-leave')).toBeTruthy();
+    expect(view.getAllByText('示意，不是你的记录').length).toBe(3);
     fireEvent.press(view.getByTestId('first-run-continue'));
     expect(finished).not.toHaveBeenCalled();
     fireEvent.press(view.getByTestId('first-run-continue'));

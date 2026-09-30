@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  Animated,
+  AppState,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -18,6 +20,7 @@ import {
   nextFirstRunIndex,
 } from '../application/first-run';
 import { ink, inkSoft, isCompactHeight, paper, sage } from './life-page';
+import { FirstRunScene } from './first-run-scene';
 
 export function FirstRunGuide({
   onFinished,
@@ -32,15 +35,65 @@ export function FirstRunGuide({
   const [index, setIndex] = useState(0);
   const indexRef = useRef(0);
   const [pageHeight, setPageHeight] = useState(Math.max(height - 160, 280));
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const [opacity] = useState(() => new Animated.Value(1));
+  const [shift] = useState(() => new Animated.Value(0));
   const screen = FIRST_RUN_SCREENS[index];
+
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (!cancelled) setReduceMotion(enabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setReduceMotion(true);
+      });
+    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
+      setReduceMotion(enabled === true);
+    });
+    return () => {
+      cancelled = true;
+      sub?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      opacity.setValue(1);
+      shift.setValue(0);
+      return;
+    }
+    opacity.setValue(0);
+    shift.setValue(8);
+    const anim = Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(shift, { toValue: 0, duration: 280, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => {
+      anim.stop();
+    };
+  }, [index, opacity, reduceMotion, shift]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') {
+        opacity.stopAnimation();
+        shift.stopAnimation();
+      }
+    });
+    return () => {
+      sub.remove();
+      opacity.stopAnimation();
+      shift.stopAnimation();
+    };
+  }, [opacity, shift]);
 
   function moveTo(next: number) {
     indexRef.current = next;
     setIndex(next);
-    const reduce = AccessibilityInfo.isReduceMotionEnabled?.();
-    void Promise.resolve(reduce).then((value) => {
-      pager.current?.scrollTo({ y: next * pageHeight, animated: value !== true });
-    });
+    pager.current?.scrollTo({ y: next * pageHeight, animated: !reduceMotion });
   }
 
   function onContinue() {
@@ -53,7 +106,13 @@ export function FirstRunGuide({
   }
 
   function onScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const next = Math.max(0, Math.min(Math.round(event.nativeEvent.contentOffset.y / Math.max(pageHeight, 1)), FIRST_RUN_SCREENS.length - 1));
+    const next = Math.max(
+      0,
+      Math.min(
+        Math.round(event.nativeEvent.contentOffset.y / Math.max(pageHeight, 1)),
+        FIRST_RUN_SCREENS.length - 1,
+      ),
+    );
     indexRef.current = next;
     setIndex(next);
   }
@@ -83,6 +142,14 @@ export function FirstRunGuide({
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
             >
+              <Animated.View
+                style={{
+                  opacity: item.id === screen.id ? opacity : 1,
+                  transform: [{ translateY: item.id === screen.id ? shift : 0 }],
+                }}
+              >
+                <FirstRunScene id={item.id} />
+              </Animated.View>
               <Text style={styles.title} accessibilityRole="header">
                 {item.title}
               </Text>

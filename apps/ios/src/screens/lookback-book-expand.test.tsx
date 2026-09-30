@@ -167,7 +167,8 @@ describe('lookback book expand', () => {
       expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
     });
     expect(view.queryByTestId('lookback-month-calendar')).toBeNull();
-    expect(view.getByText('9月28日 · 星期一')).toBeTruthy();
+    expect(view.getByText('28日')).toBeTruthy();
+    expect(view.getByText('周一')).toBeTruthy();
     expect(view.getByText('3条')).toBeTruthy();
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
@@ -178,6 +179,7 @@ describe('lookback book expand', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-open-m_first')).toBeTruthy();
     });
+    expect(view.getByLabelText('2026年9月27日，星期日，有11条记录，已展开')).toBeTruthy();
     expect(view.getByText('第一条')).toBeTruthy();
     expect(view.getByText('第二条')).toBeTruthy();
     expect(view.queryByText('第三条')).toBeNull();
