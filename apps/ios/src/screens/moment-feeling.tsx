@@ -134,5 +134,5 @@ const styles = StyleSheet.create({
   },
   clearHit: { minHeight: 48, justifyContent: 'center' },
   clear: { fontSize: 16, lineHeight: 22, color: '#53604F' },
-  display: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
+  display: { fontSize: 14, color: '#5C5851' },
 });

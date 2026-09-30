@@ -10,7 +10,6 @@ import {
   Text,
   TextInput,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -63,6 +62,7 @@ import {
   isFamilyTestDriverEnabled,
 } from '../infrastructure/family-test-driver';
 import { finishLeaveToRecent, leaveOpenedFromLookback } from '../screens/lookback-origin';
+import { usePageMetrics } from '../screens/use-page-metrics';
 
 export const DRAFT_RESTORED_COPY = '上次没保存的内容已放回来。';
 
@@ -70,7 +70,7 @@ export default function LeaveScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[] }>();
   const fromLookback = leaveOpenedFromLookback(params.from);
-  const { width, height } = useWindowDimensions();
+  const { width, height } = usePageMetrics();
   const insets = useSafeAreaInsets();
   const reading = readingWidth(width, height);
   const gutter = pageGutter(width, height);
@@ -121,6 +121,7 @@ export default function LeaveScreen() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- preview is bound to the current audio id
     setPreviewBoundId(null);
     void sound.stop();
   }, [audioId]);
@@ -661,7 +662,6 @@ export default function LeaveScreen() {
   const testAction = Array.isArray(params.td) ? params.td[0] : params.td;
   const testNonce = Array.isArray(params.n) ? params.n[0] : params.n;
   const ranTestAction = useRef('');
-  /* eslint-disable react-hooks/set-state-in-effect -- family test driver on main */
   useEffect(() => {
     if (!isFamilyTestDriverEnabled() || !testAction || !draftId) return;
     const key = `${testAction}:${testNonce || ''}`;
@@ -701,7 +701,6 @@ export default function LeaveScreen() {
       void onSave();
     }
   }, [testAction, testNonce, draftId]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const draftHasContent =
     !!note.trim() || !!emotion.trim() || images.length > 0 || !!audio || unknownMedia.length > 0;

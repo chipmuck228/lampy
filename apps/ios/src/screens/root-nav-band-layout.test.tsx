@@ -135,6 +135,23 @@ describe('root nav band layout', () => {
     await lookbackGrid.unmount();
   });
 
+  it('stacks a phone band at accessibility extra-large so labels are not crushed', async () => {
+    Dimensions.set({
+      window: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
+      screen: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
+    });
+    const stacked = await render(
+      wrap(<RootNavBand here="recent" onOther={() => undefined} onLeave={() => undefined} />),
+    );
+    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-band').props.style)).toEqual(
+      expect.objectContaining({ flexDirection: 'column', flexWrap: 'nowrap' }),
+    );
+    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-here-wrap').props.style).minHeight).toBeGreaterThan(
+      48,
+    );
+    await stacked.unmount();
+  });
+
   it('stacks only when a 2×2 cell would be narrower than the enlarged label', async () => {
     Dimensions.set({
       window: { width: 200, height: 568, scale: 2, fontScale: 3.1 },
@@ -154,8 +171,11 @@ describe('root nav band layout', () => {
       expect.objectContaining({ flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch' }),
     );
     expect(stacked.queryByTestId('root-nav-grid-row-1')).toBeNull();
-    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-here-wrap').props.style)).toEqual(
-      expect.objectContaining({ minWidth: 48, minHeight: 48, alignItems: 'center' }),
+    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-here-wrap').props.style).minHeight).toBeGreaterThan(
+      48,
+    );
+    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-here-wrap').props.style).minWidth).toBeGreaterThan(
+      48,
     );
     await stacked.unmount();
   });

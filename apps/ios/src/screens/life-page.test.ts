@@ -11,6 +11,7 @@ import {
   readingWidth,
   recentColumnWidth,
   chooseNavBandLayout,
+  navBandItemMinHeight,
   navBandItemMinWidth,
   navBandItemsFor,
   shouldShowSameDayRule,
@@ -71,6 +72,9 @@ describe('life page measures', () => {
     const three = navBandItemsFor('lookback', false);
     expect(navBandItemMinWidth('留下', 20, 1)).toBe(48);
     expect(navBandItemMinWidth('留下', 20, 1.3)).toBe(60);
+    expect(navBandItemMinHeight(17, 1)).toBe(48);
+    expect(navBandItemMinHeight(20, 3.1)).toBeGreaterThan(48);
+    expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 3.1, items: three })).toBe('stack');
     expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 1, items: four })).toBe('row');
     expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 1, items: three })).toBe('row');
     expect(chooseNavBandLayout({ windowWidth: 390, fontScale: 1.3, items: four })).toBe('row');
@@ -80,6 +84,20 @@ describe('life page measures', () => {
     expect(chooseNavBandLayout({ windowWidth: 200, fontScale: 3.1, items: four })).toBe('stack');
     expect(chooseNavBandLayout({ windowWidth: 200, fontScale: 3.1, items: three })).toBe('stack');
     expect(chooseNavBandLayout({ windowWidth: 1024, fontScale: 3.1, items: four })).toBe('row');
+    expect(
+      chooseNavBandLayout({
+        windowWidth: 390,
+        fontScale: 1,
+        items: three.map((item) => ({ ...item, measuredWidth: 120 })),
+      }),
+    ).toBe('stack');
+    expect(
+      chooseNavBandLayout({
+        windowWidth: 390,
+        fontScale: 3.1,
+        items: three.map((item) => ({ ...item, measuredWidth: 28 })),
+      }),
+    ).toBe('row');
     expect(shouldStackNavBand(390, 1.3, 4)).toBe(false);
     expect(shouldStackNavBand(200, 1, 4)).toBe(false);
     expect(shouldStackNavBand(200, 3.1, 4)).toBe(true);

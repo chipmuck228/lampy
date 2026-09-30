@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
@@ -29,10 +29,11 @@ import {
   shouldStackRecentDay,
 } from '../screens/life-page';
 import { StartupBrandLayer } from '../screens/startup-brand-layer';
+import { usePageMetrics } from '../screens/use-page-metrics';
 
 export default function RecentScreen() {
   const router = useRouter();
-  const { width, height, fontScale } = useWindowDimensions();
+  const { width, height, fontScale } = usePageMetrics();
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
   const stackDay = shouldStackRecentDay(width, height, fontScale);
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  wordmark: { fontSize: 28, lineHeight: 36, color: ink, flex: 1, flexShrink: 1 },
+  wordmark: { fontSize: 28, color: ink, flex: 1, flexShrink: 1, minWidth: 0 },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
   emptyTitle: { fontSize: 28, lineHeight: 38, color: ink },
   body: { fontSize: 17, lineHeight: 26, color: inkSoft },
@@ -238,7 +239,7 @@ const styles = StyleSheet.create({
   error: { fontSize: 17, lineHeight: 26, color: clay, paddingVertical: 8 },
   day: { gap: 12 },
   dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
-  date: { fontSize: 16, lineHeight: 22, color: sage, paddingBottom: 4 },
+  date: { fontSize: 16, color: sage, paddingBottom: 4, minWidth: 0 },
   dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
   dayItems: { gap: 32 },
   dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
@@ -252,6 +253,6 @@ const styles = StyleSheet.create({
   moment: { gap: 8, minHeight: 48 },
   momentMixed: { gap: 16 },
   momentBody: { gap: 8 },
-  note: { fontSize: 21, lineHeight: 32, color: ink },
-  occurred: { fontSize: 15, lineHeight: 22, color: inkSoft },
+  note: { fontSize: 21, color: ink },
+  occurred: { fontSize: 15, color: inkSoft },
 });
