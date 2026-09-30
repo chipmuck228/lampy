@@ -53,7 +53,6 @@
           "faceIDPermission": "Lampy 只在你打开本机保护时，用 Face ID 或设备密码确认是这台设备的持有人。不会上传面部数据。"
         }
       ],
-      "expo-screen-capture",
       "expo-apple-authentication",
       "expo-file-system",
       [

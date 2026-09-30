@@ -15,7 +15,7 @@
 | 远端 `origin/ios/first-run-lock-empty`（改前） | `7f33ad7190cc4b62befaab4866660bbf42461c66` | 已对齐 |
 | 本轮 JS / 将推送 head | `2853a9d409046af19c704b0e6942bbade4ebafcd` | 模拟器缺 ExpoScreenCapture 时不崩 |
 | 真机 Liuz17 原生包 | `/Users/zhen/WeChatProjects/lampy`，`ios/account-email-auth` `cd92863` + 本机 Face ID pods | 不是 #46 专属 prebuild。JS 走 Metro。同源原生重装：**NOT VERIFIED** |
-| Metro 8081 | `lampy-guide/apps/ios` | 改前 JS `344a5c6`。Reload 后才是本轮 |
+| Metro 8081 | `lampy-guide/apps/ios`，host `192.168.31.139`（避开 USB `169.254`） | 模拟器手输 `http://127.0.0.1:8081`；真机 `http://192.168.31.139:8081` |
 | 模拟器 iPhone 17 启动 | 原生包无 `ExpoScreenCapture` 时，旧 JS 红屏 `Cannot find native module` | 本轮改为按需 `require`，缺模块只跳过防截屏。Reload 后复测 |
 | `npx tsc --noEmit` | | **PASS** |
 | 相关 Jest | device-lock / screen-privacy / expo-device-auth | **PASS**（含缺 ExpoScreenCapture 不抛） |
@@ -50,6 +50,8 @@
 | 最大字号、短屏下正文与底部按钮可操作 | 引导底栏 `flexShrink: 0`，正文可滚。全新安装 UI **NOT VERIFIED** |
 
 模拟器通过只记模拟器 PASS。上表 UI 项未做成全新安装，故不记模拟器 PASS。
+
+Dev Client 不要点已存的 `169.254.*:8081`（USB 链路本地，模拟器不可达，真机启动器也会连到错误兄弟地址）。模拟器手输 `http://127.0.0.1:8081`。真机与电脑同一 Wi-Fi 时手输 `http://192.168.31.139:8081`。`expo-screen-capture` 无 config plugin，已从 `app.json` plugins 去掉，否则 `expo start` 起不来；依赖与按需 require 仍在。
 
 ## 真机复测（本轮文案，Reload 后）
 
