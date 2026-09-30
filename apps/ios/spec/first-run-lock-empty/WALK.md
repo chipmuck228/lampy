@@ -13,7 +13,7 @@
 | 项 | SHA / 说明 | 结果 |
 | --- | --- | --- |
 | 远端 `origin/ios/first-run-lock-empty`（改前） | `7f33ad7190cc4b62befaab4866660bbf42461c66` | 已对齐 |
-| 本轮 JS / 将推送 head | 提交后填入 | 模拟器缺 ExpoScreenCapture 时不崩 |
+| 本轮 JS / 将推送 head | `2853a9d409046af19c704b0e6942bbade4ebafcd` | 模拟器缺 ExpoScreenCapture 时不崩 |
 | 真机 Liuz17 原生包 | `/Users/zhen/WeChatProjects/lampy`，`ios/account-email-auth` `cd92863` + 本机 Face ID pods | 不是 #46 专属 prebuild。JS 走 Metro。同源原生重装：**NOT VERIFIED** |
 | Metro 8081 | `lampy-guide/apps/ios` | 改前 JS `344a5c6`。Reload 后才是本轮 |
 | 模拟器 iPhone 17 启动 | 原生包无 `ExpoScreenCapture` 时，旧 JS 红屏 `Cannot find native module` | 本轮改为按需 `require`，缺模块只跳过防截屏。Reload 后复测 |
