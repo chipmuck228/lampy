@@ -2,99 +2,48 @@
 
 独立 PR #46，base `origin/main`。只改 `apps/ios`。未打开家庭入口。`EXPO_PUBLIC_FAMILY_ENTRY_OPEN` 关闭。`identityLoopAccepted` 为 false。
 
-本机保护默认关闭。认证与后台规则未改：真正 `background` 失效解锁；系统认证 `inactive` 不视为离开；设置提交与会话解锁资格分开。
+本机保护默认关闭。认证与后台规则：真正 `background` 失效解锁；系统认证 `inactive` 不视为离开；设置提交与会话解锁资格分开。
 
-账户设置固定标题「本机保护」，系统 Switch，状态为「已开启 / 未开启」。认证或保存期间禁用重复操作；仅成功保存后更新开关。
+账户设置标题「本机保护」，系统 Switch，「已开启 / 未开启」。未在正式 App 增加「重置首次使用」按钮。未卸载 Liuz17。
 
-未在正式 App 增加「重置首次使用」按钮。不把强制显示引导当成完整首次安装验收。未卸载、清空或重置 Liuz17。
-
-## 本轮核对
+## 合并前核对（2026-09-30）
 
 | 项 | SHA / 说明 | 结果 |
 | --- | --- | --- |
-| 远端 `origin/ios/first-run-lock-empty`（改前） | `7f33ad7190cc4b62befaab4866660bbf42461c66` | 已对齐 |
-| 本轮 JS / 将推送 head | `2853a9d409046af19c704b0e6942bbade4ebafcd` | 模拟器缺 ExpoScreenCapture 时不崩 |
-| 真机 Liuz17 原生包 | `/Users/zhen/WeChatProjects/lampy`，`ios/account-email-auth` `cd92863` + 本机 Face ID pods | 不是 #46 专属 prebuild。JS 走 Metro。同源原生重装：**NOT VERIFIED** |
-| Metro 8081 | `lampy-guide/apps/ios`，host `192.168.31.139`（避开 USB `169.254`） | 模拟器手输 `http://127.0.0.1:8081`；真机 `http://192.168.31.139:8081` |
-| 模拟器 iPhone 17 启动 | 原生包无 ScreenCapture / LocalAuthentication | 先探测原生模块。缺 Face ID 模块时开关应变 unavailable，不红屏。Reload 后再测 |
+| 将合并 head | 提交走查后填入 | 无新阻塞 |
+| 媒体路径恢复 | 旧容器 UUID → 当前 `Documents/lampy-assets/<文件名>`；拒绝 `..` | 代码 + Jest **PASS**。真机文件若已不在盘上无法恢复，**不阻塞合并** |
+| 缺原生模块 | 先 `requireOptionalNativeModule`，再加载 Face ID / ScreenCapture JS | Jest **PASS** |
 | `npx tsc --noEmit` | | **PASS** |
-| 相关 Jest | device-lock / screen-privacy / expo-device-auth | **PASS**（含缺 ExpoScreenCapture 不抛） |
-| 本轮 eslint | 改动的 lock / account / first-run 测试 | **PASS** |
-| `git diff --check` | 本轮文件 | **PASS** |
+| 相关 Jest | media / device-auth / screen-privacy / device-lock / first-run-gate / image / audio | **PASS** 8 suites / 89 tests |
+| 本轮 eslint | 上述改动文件 | **PASS**（0 errors） |
+| 首次引导主路径 | iPhone 17 Pro 模拟器，Xcode 重装 | **PASS**（用户）。不复测 |
+| 真机保护开关 / 后台 / 冷启动 | `344a5c6` 及之后用户走查 | **PASS**。不复测 |
 
 ## 真机 Liuz17 / iPhone 17 Pro / iOS 26.2
 
-走查 JS：`344a5c6`。不卸载、不清空记录。
+不卸载、不清空记录。
 
 | 项 | 结果 |
 | --- | --- |
-| 开启保护，Face ID / 设备密码成功，显示开启 | **PASS**（`344a5c6`） |
-| 再次操作可关闭保护 | **PASS**（`344a5c6`） |
-| 开启后后台返回遮挡 | **PASS**（`344a5c6`） |
-| 关闭后后台返回不认证 | **PASS**（用户 2026-09-30） |
-| 关闭后冷启动不认证 | **PASS**（用户 2026-09-30） |
-| 本机保护标题 + 系统 Switch + 已开启/未开启 | 本轮新文案。真机 **NOT VERIFIED**（须 Reload 本轮 JS） |
-| 首次三屏引导 / 最近与回看空状态 | 真机有历史，**不记 PASS** |
+| 开启 / 关闭保护，开启后后台遮挡 | **PASS** |
+| 关闭后后台返回、关闭后冷启动 | **PASS** |
+| 本机保护新文案 | Reload 本 head 后 **NOT VERIFIED**，不阻塞 |
+| 历史照片/声音「暂时找不到」 | 记录保留。路径恢复已测自动化。盘上无文件则无法找回。真机是否恢复 **NOT VERIFIED**，不阻塞 |
+| 首次三屏 / 空库 | 真机有历史，**不记 PASS** |
 
-## 模拟器（与真机分列）
+## 模拟器 iPhone 17 Pro
 
-设备：iPhone 17 Pro Simulator。用户 2026-09-30 用 Xcode 重装后走查。模拟器 PASS ≠ 真机 PASS。
+模拟器 PASS ≠ 真机 PASS。不复测已通过的首次引导。
 
 | 项 | 结果 |
 | --- | --- |
-| 构建 / JS | Xcode 重装模拟器开发包 + 本分支 Metro |
-| 三屏引导后「留下瞬间」进入应用 | **PASS**（用户） |
-| 留下第一条记录 | **PASS**（用户） |
-| 中途退出再开，不提前记完成 | 自动化 **PASS**。本次 UI **NOT VERIFIED** |
-| 完成后最近空状态原文 | 自动化 **PASS**。本次未核对原文 **NOT VERIFIED** |
-| 回看空状态原文 | 自动化有空书页文案。本次 **NOT VERIFIED** |
-| 留下第一条后空状态说明消失 | 留下了第一条。空说明是否消失 **NOT VERIFIED** |
-| 杀进程重开不重播已完成引导 | 自动化：`completed` 后不再显示。本次 UI **NOT VERIFIED** |
-| 最大字号、短屏下正文与底部按钮可操作 | 引导底栏 `flexShrink: 0`。本次 **NOT VERIFIED** |
+| 三屏后「留下瞬间」，留下第一条 | **PASS**（用户 2026-09-30） |
+| 中途退出、空状态原文、杀进程、短屏 | 自动化覆盖；本次 UI 未逐项走，**不阻塞** |
 
-Dev Client 不要点已存的 `169.254.*:8081`（USB 链路本地，模拟器不可达，真机启动器也会连到错误兄弟地址）。模拟器手输 `http://127.0.0.1:8081`。真机与电脑同一 Wi-Fi 时手输 `http://192.168.31.139:8081`。`expo-screen-capture` 无 config plugin，已从 `app.json` plugins 去掉，否则 `expo start` 起不来；依赖与按需 require 仍在。
-
-## 真机复测（本轮文案，Reload 后）
-
-不要卸载 Liuz17。
-
-1. 本机与账户应看到标题「本机保护」、系统开关、「未开启」或「已开启」。
-2. 说明为：「开启后，进入 Lampy 需要 Face ID 或设备密码。」
-3. 拨动开关应拉起认证；认证或保存期间开关不可再拨。
-4. 只有保存成功后，「已开启 / 未开启」才变。取消或失败保持原状态，可见现有重试文案。
-5. 已记录：`344a5c6` 上开启、关闭、开启后后台遮挡均为 PASS。
-6. 关闭后后台返回、关闭后冷启动：真机 **PASS**。
-7. 照片/声音「暂时找不到」：记录不得删。本轮按当前 `Documents/lampy-assets` 重定向旧容器路径。若文件已不在盘上，无法从云端找回。Reload 后看最近与回看是否恢复。未卸载 Liuz17。
-
-## 模拟器与真机不是两套产品 JS
-
-两边若都连同一 Metro（`lampy-guide/apps/ios`，`127.0.0.1:8081` / `192.168.31.139:8081`），跑的是同一 head。差别在：
-
-- 原生包：模拟器常缺 Face ID / ScreenCapture；真机 Liuz17 是 `cd92863` + 本机 pods。
-- 本机状态：账户会话、首次引导标记、个人库互不相通。
-- 「退出登录」只在这台设备已登录时出现（`canSignOut`）。模拟器若用过测试账号就会有；Liuz17 未登录就没有。家庭产品入口仍关。
-
-不要用「退出登录」当版本对照。不要卸 Liuz17。
-
-## 首次引导（仅可丢弃安装或全新模拟器）
-
-不要在正式 App 加重置按钮。不要在 Liuz17 上做首次安装。
-
-1. 在 **iPhone 17 模拟器** 长按 Lampy → 删除 App（清掉 SQLite、Keychain 里的 `lampy.first-run.v1`）。
-2. 再装一次开发包（Xcode 或 `npx expo run:ios` 装到该模拟器）。
-3. Dev Client 手输 `http://127.0.0.1:8081`，冷启动。
-4. 应出现三屏：继续 / 继续 / **留下瞬间**。前两屏退出再开仍应看到引导。点「留下瞬间」后才记完成，进入最近空状态。
-5. 再留下第一条；空状态说明消失。杀进程再开，不重播引导。
-6. 已走：Xcode 重装 iPhone 17 Pro 模拟器 → 三屏 → 留下第一条。其余 UI 项仍开着。
-
-库里已有记录、或引导已标记完成，都会跳过三屏。只删引导标记但留着记录，也不算首次打开。
-
-不得把强制显示引导当成完整首次安装。
-
-## 契约（实现，本轮未改认证/后台）
+## 契约
 
 - `background` 才 `lockForBackground()`；`inactive` 不失效解锁。
-- 设置提交与 `sessionUnlocked` 分开；迟到设置认证不恢复已失效会话。
-- 开关 UI 只在 hydrate 或 `toggle` 结束后按已提交设置更新；`settingsBusy` 时禁用 Switch。
-- 引导只在最后一步 `markCompleted`；中途退出不写完成。
-- `expo-screen-capture` 与 Face ID 一样按需 `require`。原生包没有 `ExpoScreenCapture`（常见于模拟器旧包）时不崩溃，遮罩仍在。
+- 设置提交与 `sessionUnlocked` 分开。
+- 引导只在最后一步 `markCompleted`。
+- 原生模块缺失时不加载对应 JS。
+- 个人媒体只认 `lampy-assets` 下的文件名，不跟随 `..`。
