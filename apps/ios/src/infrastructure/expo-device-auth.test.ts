@@ -40,4 +40,22 @@ describe('expo device authenticator', () => {
     mockAuthenticateAsync.mockResolvedValue({ success: false, error: 'lockout' });
     await expect(auth.authenticate('reason')).resolves.toEqual({ ok: false, reason: 'unavailable' });
   });
+
+  it('does not throw when the native module cannot be loaded', async () => {
+    jest.isolateModules(() => {
+      jest.doMock('expo-local-authentication', () => {
+        throw new Error("Cannot find native module 'ExpoLocalAuthentication'");
+      });
+    });
+    let auth: ReturnType<typeof createExpoDeviceAuthenticator> | undefined;
+    jest.isolateModules(() => {
+      jest.doMock('expo-local-authentication', () => {
+        throw new Error("Cannot find native module 'ExpoLocalAuthentication'");
+      });
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const loaded = require('./expo-device-auth') as typeof import('./expo-device-auth');
+      auth = loaded.createExpoDeviceAuthenticator();
+    });
+    await expect(auth!.authenticate('reason')).resolves.toEqual({ ok: false, reason: 'unavailable' });
+  });
 });

@@ -1,10 +1,10 @@
-import * as LocalAuthentication from 'expo-local-authentication';
-
 import type { DeviceAuthResult } from '../application/device-lock';
 
 export type DeviceAuthenticator = {
   authenticate(reason: string): Promise<DeviceAuthResult>;
 };
+
+type LocalAuthenticationModule = typeof import('expo-local-authentication');
 
 function mapError(error?: string): DeviceAuthResult {
   const code = (error || '').toLowerCase();
@@ -20,20 +20,36 @@ function mapError(error?: string): DeviceAuthResult {
   return { ok: false, reason: 'fail' };
 }
 
+function loadLocalAuthentication(): LocalAuthenticationModule | null {
+  try {
+    return require('expo-local-authentication') as LocalAuthenticationModule;
+  } catch {
+    return null;
+  }
+}
+
 export function createExpoDeviceAuthenticator(): DeviceAuthenticator {
   return {
     async authenticate(reason) {
-      const security = await LocalAuthentication.getEnrolledLevelAsync();
-      if (security === LocalAuthentication.SecurityLevel.NONE) {
-        return { ok: false, reason: 'no-passcode' };
+      const LocalAuthentication = loadLocalAuthentication();
+      if (!LocalAuthentication) {
+        return { ok: false, reason: 'unavailable' };
       }
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: reason,
-        disableDeviceFallback: false,
-        cancelLabel: '取消',
-      });
-      if (result.success) return { ok: true };
-      return mapError(result.error);
+      try {
+        const security = await LocalAuthentication.getEnrolledLevelAsync();
+        if (security === LocalAuthentication.SecurityLevel.NONE) {
+          return { ok: false, reason: 'no-passcode' };
+        }
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: reason,
+          disableDeviceFallback: false,
+          cancelLabel: '取消',
+        });
+        if (result.success) return { ok: true };
+        return mapError(result.error);
+      } catch {
+        return { ok: false, reason: 'unavailable' };
+      }
     },
   };
 }
