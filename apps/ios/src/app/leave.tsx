@@ -54,6 +54,7 @@ import {
   readingPageWidth,
   readingWidth,
   sage,
+  shouldStackLeaveActions,
 } from '../screens/life-page';
 import { useSoundPlayer } from '../screens/use-sound-player';
 import {
@@ -70,13 +71,13 @@ export default function LeaveScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[] }>();
   const fromLookback = leaveOpenedFromLookback(params.from);
-  const { width, height } = usePageMetrics();
+  const { width, height, fontScale } = usePageMetrics();
   const insets = useSafeAreaInsets();
   const reading = readingWidth(width, height);
   const gutter = pageGutter(width, height);
   const pageWidth = readingPageWidth(width, height);
   const compact = isCompactHeight(height);
-  const stackActions = compact || reading < 320;
+  const stackActions = compact || reading < 320 || shouldStackLeaveActions(reading, fontScale);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -876,6 +877,7 @@ export default function LeaveScreen() {
             </Text>
           ) : null}
           <View
+            testID="composer-actions"
             style={[
               styles.actions,
               { maxWidth: reading },
@@ -979,5 +981,5 @@ const styles = StyleSheet.create({
   },
   saveHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', marginLeft: 'auto' },
   saveHitStacked: { marginLeft: 0, alignSelf: 'flex-start' },
-  save: { fontSize: 18, lineHeight: 24, color: ink },
+  save: { fontSize: 18, color: ink },
 });

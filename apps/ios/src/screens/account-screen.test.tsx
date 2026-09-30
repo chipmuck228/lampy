@@ -129,12 +129,10 @@ describe('account screen', () => {
 
   it('does not pretend family login works when no auth service is configured', async () => {
     expect(familyAuthServiceReady()).toBe(false);
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-kind-service-unavailable')).toBeTruthy();
     });
-    expect(view.getByTestId('account-personal')).toBeTruthy();
-    expect(view.getByText(/没有跨设备同步或云备份/)).toBeTruthy();
     expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
     expect(view.getByTestId('account-test-login-unavailable')).toBeTruthy();
     expect(view.queryByLabelText('测试账号登录')).toBeNull();
@@ -149,7 +147,7 @@ describe('account screen', () => {
   it('shows the system Apple control when the auth service is ready and the user is unsigned', async () => {
     process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
     mockFamily.getMembership.mockResolvedValue({ kind: 'unauthenticated' });
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-kind-unsigned')).toBeTruthy();
     });
@@ -168,7 +166,7 @@ describe('account screen', () => {
     mockApple.requestIdentityToken.mockRejectedValue(
       new ApplicationError('APPLE_SIGN_IN_CANCELLED', 'Sign in with Apple was cancelled.'),
     );
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
     });
@@ -183,7 +181,7 @@ describe('account screen', () => {
   it('asks for a new Apple sign-in after a 401 session', async () => {
     process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
     mockFamily.getMembership.mockResolvedValue({ kind: 'unconfirmed', reason: 'unauthenticated' });
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-kind-needs-reauth')).toBeTruthy();
     });
@@ -196,7 +194,7 @@ describe('account screen', () => {
     mockFamily.signInWithApple.mockRejectedValue(
       new ApplicationError('APPLE_TOKEN_INVALID', 'Apple identity token is invalid.'),
     );
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
     });
@@ -214,7 +212,7 @@ describe('account screen', () => {
     mockSession.getSessionToken.mockResolvedValue('ses_1');
     mockFamily.getAuthHealth.mockImplementation(() => new Promise(() => {}));
     mockFamily.getMembership.mockImplementation(() => new Promise(() => {}));
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
     });
@@ -244,7 +242,7 @@ describe('account screen', () => {
           resolveHealth = resolve;
         }),
     );
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-kind-unsigned')).toBeTruthy();
       expect(view.getByTestId('account-test-login-closed')).toBeTruthy();
@@ -271,7 +269,7 @@ describe('account screen', () => {
     process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL = 'https://family.example.com';
     mockSession.getSessionToken.mockResolvedValue('ses_1');
     mockFamily.getMembership.mockImplementation(() => new Promise(() => {}));
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
     });
@@ -286,7 +284,7 @@ describe('account screen', () => {
     mockFamily.getMembership.mockRejectedValue(
       new ApplicationError('SERVER_UNREACHABLE', 'Family server is unreachable.'),
     );
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-kind-signed-in')).toBeTruthy();
       expect(view.getByText('已登录。现在读不到最新账户状态，可以再试。')).toBeTruthy();
@@ -302,7 +300,7 @@ describe('account screen', () => {
     mockFamily.signInWithApple.mockRejectedValue(
       new ApplicationError('SERVER_UNREACHABLE', 'Family server is unreachable.'),
     );
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
     });
@@ -319,7 +317,7 @@ describe('account screen', () => {
     mockFamily.getMembership.mockResolvedValue({ kind: 'unauthenticated' });
     mockFamily.hasUnconfirmedSessionRevoke.mockResolvedValue(true);
     mockSession.getSessionToken.mockResolvedValue(null);
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-kind-local-out-revoke-pending')).toBeTruthy();
     });
@@ -331,7 +329,7 @@ describe('account screen', () => {
     mockFamily.getMembership.mockResolvedValue({ kind: 'none' });
     mockSession.getSessionToken.mockResolvedValue('ses_1');
     mockFamily.signOut.mockResolvedValue({ local: 'still-signed-in', server: 'unconfirmed' });
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-sign-out')).toBeTruthy();
     });
@@ -347,7 +345,7 @@ describe('account screen', () => {
       .mockResolvedValueOnce({ kind: 'unauthenticated' })
       .mockRejectedValueOnce(new ApplicationError('SERVER_UNREACHABLE', 'Family server is unreachable.'));
     mockFamily.signInWithApple.mockResolvedValue({ sessionToken: 'ses_1' });
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
     });
@@ -367,7 +365,7 @@ describe('account screen', () => {
       .mockRejectedValueOnce(new ApplicationError('SERVER_UNREACHABLE', 'Family server is unreachable.'));
     mockSession.getSessionToken.mockResolvedValue('ses_1');
     mockFamily.signOut.mockResolvedValue({ local: 'signed-out', server: 'revoked' });
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByTestId('account-sign-out')).toBeTruthy();
     });
@@ -392,7 +390,7 @@ describe('account screen', () => {
       )
       .mockImplementation(() => new Promise(() => {}));
     mockFamily.signInWithApple.mockResolvedValue({ sessionToken: 'ses_1' });
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy();
     });
@@ -423,7 +421,7 @@ describe('account screen', () => {
       argon2id: { t: 2, m: 19_456, p: 1, dkLen: 32 },
     });
     mockFamily.signInWithTestAccount.mockRejectedValue(new ApplicationError('AUTH_FAILED', 'Login name or password is wrong.'));
-    const view = await render(wrap(<AccountScreen />));
+    const view = await render(wrap(<AccountScreen variant="diagnostics" />));
     await waitFor(() => {
       expect(view.getByLabelText('测试账号登录')).toBeTruthy();
     });
@@ -471,8 +469,7 @@ describe('account screen', () => {
     expect(setEnabled).toHaveBeenCalledWith(true);
   });
 
-  it('hides account diagnostics on the user settings page', async () => {
-    jest.mocked(isPersonalSettingsDiagnosticsOpen).mockReturnValue(false);
+  it('keeps 本机设置 to protection, storage, and version', async () => {
     const view = await render(wrap(<AccountScreen />));
     await waitFor(() => {
       expect(view.getByLabelText('本机设置')).toBeTruthy();
@@ -481,12 +478,25 @@ describe('account screen', () => {
     expect(view.getByTestId('account-personal')).toBeTruthy();
     expect(view.getByText(/个人记录保存在这台设备/)).toBeTruthy();
     expect(view.getByTestId('account-version')).toBeTruthy();
+    expect(view.getByLabelText('开发诊断')).toBeTruthy();
     expect(view.queryByTestId('account-diagnostics')).toBeNull();
     expect(view.queryByTestId('account-family-preview')).toBeNull();
     expect(view.queryByTestId('account-kind-service-unavailable')).toBeNull();
     expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
     expect(view.queryByLabelText('测试账号登录')).toBeNull();
     expect(view.queryByText('私密家庭空间正在准备中。敬请期待。')).toBeNull();
+  });
+
+  it('hides the developer entry when the diagnostics gate is closed', async () => {
+    jest.mocked(isPersonalSettingsDiagnosticsOpen).mockReturnValue(false);
+    const view = await render(wrap(<AccountScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('本机设置')).toBeTruthy();
+    });
+    expect(view.getByTestId('account-personal')).toBeTruthy();
+    expect(view.getByTestId('account-version')).toBeTruthy();
+    expect(view.queryByLabelText('开发诊断')).toBeNull();
+    expect(view.queryByTestId('account-diagnostics')).toBeNull();
   });
 });
 

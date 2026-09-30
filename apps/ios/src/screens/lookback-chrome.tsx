@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   fallback: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
   note: { fontSize: 20, color: '#25231F' },
   row: {
-    gap: 8,
+    gap: 4,
     paddingVertical: 8,
     minHeight: 44,
     flexGrow: 0,

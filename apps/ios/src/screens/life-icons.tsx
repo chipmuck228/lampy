@@ -117,10 +117,12 @@ export function LookThisHit({
   onPress,
   testID,
   accessibilityLabel,
+  tight,
 }: {
   onPress: () => void;
   testID?: string;
   accessibilityLabel: string;
+  tight?: boolean;
 }) {
   const ids = openChildIds(testID);
   return (
@@ -130,7 +132,7 @@ export function LookThisHit({
       accessibilityHint="打开这条记录"
       testID={testID}
       onPress={onPress}
-      style={styles.lookThis}
+      style={[styles.lookThis, tight && styles.lookThisTight]}
     >
       <View style={styles.lookThisRow} testID={ids?.row}>
         <Text style={styles.lookThisText} testID={ids?.label}>
@@ -166,7 +168,6 @@ const styles = StyleSheet.create({
   },
   labeledText: {
     fontSize: 16,
-    lineHeight: 22,
     color: sage,
   },
   lookThis: {
@@ -174,6 +175,12 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  lookThisTight: {
+    minHeight: 44,
+    alignSelf: 'flex-start',
+    justifyContent: 'flex-start',
+    paddingTop: 2,
   },
   lookThisRow: {
     flexDirection: 'row',

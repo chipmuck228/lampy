@@ -48,6 +48,7 @@ import {
   groupRecentLifeDays,
   recordedDayForRecent,
   recordedHeadingForRecent,
+  sameViewerCalendarDay,
 } from './recent-life';
 
 export type { OccurredChoiceView, OccurredDraftInput };
@@ -210,11 +211,14 @@ function viewerOffsetAt(iso: string | undefined, clock: HistoryClock): number {
 }
 
 function recentOccurredLabel(
-  moment: { time: { occurredAt?: string; occurredAtPrecision: string } },
+  moment: { time: { recordedAt?: string; occurredAt?: string; occurredAtPrecision: string } },
   clock: HistoryClock,
 ): string | null {
   const precision = moment.time.occurredAtPrecision;
   if (precision === 'unknown' || !moment.time.occurredAt) return null;
+  if (precision === 'day' && sameViewerCalendarDay(moment.time.occurredAt, moment.time.recordedAt, clock)) {
+    return null;
+  }
   return `发生于 ${formatCalendarDate(
     moment.time.occurredAt,
     precision,

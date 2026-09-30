@@ -1,4 +1,9 @@
-import { groupRecentLifeDays, recordedDayForRecent, recordedHeadingForRecent } from './recent-life';
+import {
+  groupRecentLifeDays,
+  recordedDayForRecent,
+  recordedHeadingForRecent,
+  sameViewerCalendarDay,
+} from './recent-life';
 
 const SHANGHAI = { timeZone: 'Asia/Shanghai' };
 const NEW_YORK = { timeZone: 'America/New_York' };
@@ -62,6 +67,15 @@ describe('groupRecentLifeDays', () => {
 
   it('does not invent a day when the list is empty', () => {
     expect(groupRecentLifeDays([])).toEqual([]);
+  });
+
+  it('treats recorded and occurred stamps on the same viewer day as one date', () => {
+    expect(
+      sameViewerCalendarDay('2026-09-26T16:30:00.000Z', '2026-09-26T16:00:00.000Z', SHANGHAI),
+    ).toBe(true);
+    expect(
+      sameViewerCalendarDay('2026-09-26T16:30:00.000Z', '2026-09-19T16:00:00.000Z', SHANGHAI),
+    ).toBe(false);
   });
 
   it('marks group headings as recorded days without changing the key', () => {

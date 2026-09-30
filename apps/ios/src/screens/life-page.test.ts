@@ -15,6 +15,7 @@ import {
   navBandItemMinWidth,
   navBandItemsFor,
   shouldShowSameDayRule,
+  shouldStackLeaveActions,
   shouldStackNavBand,
   shouldStackRecentDay,
   shouldUseNavRail,
@@ -101,6 +102,12 @@ describe('life page measures', () => {
     expect(shouldStackNavBand(390, 1.3, 4)).toBe(false);
     expect(shouldStackNavBand(200, 1, 4)).toBe(false);
     expect(shouldStackNavBand(200, 3.1, 4)).toBe(true);
+  });
+
+  it('stacks 留下 onto its own row when the three actions no longer fit', () => {
+    expect(shouldStackLeaveActions(342, 1)).toBe(false);
+    expect(shouldStackLeaveActions(342, 3.1)).toBe(true);
+    expect(shouldStackLeaveActions(220, 1)).toBe(true);
   });
 
   it('draws a same-day rule only between siblings, never around a day', () => {

@@ -145,3 +145,15 @@ export function recentColumnWidth(windowWidth: number, windowHeight: number, fon
 export function shouldShowSameDayRule(indexInDay: number): boolean {
   return indexInDay > 0;
 }
+
+const LEAVE_MEDIA_ICON = 24;
+const LEAVE_ACTION_GAP = 20;
+const LEAVE_MEDIA_SIZE = 16;
+const LEAVE_SAVE_SIZE = 18;
+
+export function shouldStackLeaveActions(availableWidth: number, fontScale: number): boolean {
+  const camera = navBandItemMinWidth('拍摄', LEAVE_MEDIA_SIZE, fontScale) + LEAVE_MEDIA_ICON;
+  const photo = navBandItemMinWidth('照片', LEAVE_MEDIA_SIZE, fontScale) + LEAVE_MEDIA_ICON;
+  const save = navBandItemMinWidth('留下', LEAVE_SAVE_SIZE, fontScale);
+  return camera + photo + save + LEAVE_ACTION_GAP * 2 > availableWidth;
+}

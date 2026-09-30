@@ -75,8 +75,9 @@ function testLoginFlags(snapshot: AccountSnapshot | null) {
   };
 }
 
-export default function AccountScreen() {
+export default function AccountScreen({ variant = 'user' }: { variant?: 'user' | 'diagnostics' } = {}) {
   const router = useRouter();
+  const diagnostics = variant === 'diagnostics';
   const [snapshot, setSnapshot] = useState<AccountSnapshot | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>('idle');
@@ -337,11 +338,11 @@ export default function AccountScreen() {
 
   const showAppleButton = snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
   const showTestLoginPanel = Boolean(snapshot && snapshot.kind !== 'service-unavailable' && snapshot.kind !== 'signed-in');
-  const showDiagnostics = isPersonalSettingsDiagnosticsOpen();
+  const showDiagnosticsEntry = !diagnostics && isPersonalSettingsDiagnosticsOpen();
   const appVersion = Constants.expoConfig?.version ?? '0.1.0';
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="本机设置">
+    <SafeAreaView style={styles.safe} accessibilityLabel={diagnostics ? '开发诊断' : '本机设置'}>
       <ScrollView contentContainerStyle={styles.column} testID="account-scroll">
         <Pressable
           accessibilityRole="button"
@@ -353,13 +354,17 @@ export default function AccountScreen() {
           <Text style={styles.back}>返回</Text>
         </Pressable>
         <Text style={styles.title} accessibilityRole="header">
-          本机设置
+          {diagnostics ? '开发诊断' : '本机设置'}
         </Text>
-        <DeviceLockSettings />
-        <Text style={styles.body} testID="account-personal">
-          个人记录保存在这台设备。目前没有跨设备同步或云备份。
-        </Text>
-        {showDiagnostics ? (
+        {diagnostics ? null : (
+          <>
+            <DeviceLockSettings />
+            <Text style={styles.body} testID="account-personal">
+              个人记录保存在这台设备。目前没有跨设备同步或云备份。
+            </Text>
+          </>
+        )}
+        {diagnostics ? (
         <View testID="account-diagnostics">
         <View testID="account-family-preview">
           <Text style={styles.body} testID="account-family-copy">
@@ -470,9 +475,24 @@ export default function AccountScreen() {
         ) : null}
         </View>
         ) : null}
-        <Text style={styles.version} testID="account-version">
-          版本 {appVersion}
-        </Text>
+        {diagnostics ? null : (
+          <>
+            {showDiagnosticsEntry ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="开发诊断"
+                testID="account-open-diagnostics"
+                onPress={() => router.push('/account-diagnostics')}
+                style={styles.hit}
+              >
+                <Text style={styles.action}>开发诊断</Text>
+              </Pressable>
+            ) : null}
+            <Text style={styles.version} testID="account-version">
+              版本 {appVersion}
+            </Text>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

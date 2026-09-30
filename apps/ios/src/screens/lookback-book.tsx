@@ -11,6 +11,7 @@ import {
 import type { LookbackMonthEntry } from '../application/lookback-month';
 import { pad2 } from '../domain-adapters/calendar';
 import type { PlaybackStatus } from '../infrastructure/media';
+import { hairline } from './life-page';
 import { LifeIcon, LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentFeeling } from './moment-feeling';
@@ -140,6 +141,7 @@ export function LookbackBookExcerptBlock({
       <LookThisHit
         accessibilityLabel={`看这条，${excerpt.note || excerpt.id}`}
         testID={`lookback-book-open-${excerpt.id}`}
+        tight
         onPress={() => onOpen(excerpt.id)}
       />
     </View>
@@ -152,7 +154,14 @@ const styles = StyleSheet.create({
   meta: { fontSize: 14, color: '#53604F' },
   clock: { fontSize: 14, color: '#53604F' },
   note: { fontSize: 20, color: '#25231F' },
-  excerpt: { gap: 8, paddingVertical: 8, minHeight: 48 },
+  excerpt: {
+    gap: 4,
+    paddingTop: 4,
+    paddingBottom: 12,
+    minHeight: 48,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: hairline,
+  },
   monthHit: { minHeight: 48, justifyContent: 'center' },
   monthRow: {
     flexDirection: 'row',
