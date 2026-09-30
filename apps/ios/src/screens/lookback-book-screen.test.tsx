@@ -147,7 +147,9 @@ describe('lookback book screen', () => {
       expect(view.getByTestId('lookback-book-year-2026')).toBeTruthy();
     });
     expect(view.getByLabelText('时间未确认，有1条记录')).toBeTruthy();
-    expect(view.getByText('9月 · 有14条记录')).toBeTruthy();
+    expect(view.getByText('9月')).toBeTruthy();
+    expect(view.getAllByText('14条').length).toBeGreaterThanOrEqual(1);
+    expect(view.getByLabelText('2026年9月，有14条记录，已收起')).toBeTruthy();
     expect(view.queryByTestId('lookback-year-2026')).toBeNull();
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
     expect(view.queryByTestId('lookback-back')).toBeNull();

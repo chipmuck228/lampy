@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Dimensions } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
@@ -137,7 +137,7 @@ describe('lookback book adapt surfaces', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />, 390, 844));
     await waitFor(() => {
-      expect(view.getByLabelText('2025年4月，有1条记录')).toBeTruthy();
+      expect(view.getByLabelText('2025年4月，有1条记录，已收起')).toBeTruthy();
     });
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-month-2025-04'));
@@ -159,6 +159,7 @@ describe('lookback book adapt surfaces', () => {
       expect(view.getByText('稀疏月一条')).toBeTruthy();
     });
     expect(view.getByLabelText('看这条，稀疏月一条')).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByLabelText('看这条，稀疏月一条').props.style).minHeight).toBe(48);
     view.unmount();
   });
 
@@ -184,7 +185,7 @@ describe('lookback book adapt surfaces', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />, 1024, 1366));
     await waitFor(() => {
-      expect(view.getByLabelText('2025年4月，有1条记录')).toBeTruthy();
+      expect(view.getByLabelText('2025年4月，有1条记录，已收起')).toBeTruthy();
     });
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
     expect(view.getByLabelText('回看，当前页')).toBeTruthy();

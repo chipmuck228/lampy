@@ -1,3 +1,4 @@
+import { ScrollView } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -120,12 +121,20 @@ describe('leave image actions', () => {
     });
     fireEvent.press(view.getByTestId('composer-library'));
     await waitFor(() => {
-      expect(
-        view.getByText(
-          '没有打开相册。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许照片后，可以再试。',
-        ),
-      ).toBeTruthy();
+      expect(view.getByText('相册未打开，草稿还在。')).toBeTruthy();
     });
+    const scrollToEnd = jest.spyOn(ScrollView.prototype, 'scrollToEnd').mockImplementation(() => undefined);
+    fireEvent.press(view.getByTestId('composer-feedback-detail'));
+    await waitFor(() => {
+      expect(view.getByTestId('composer-feedback-detail-body')).toBeTruthy();
+      expect(scrollToEnd).toHaveBeenCalled();
+    });
+    scrollToEnd.mockRestore();
+    expect(
+      view.getByText(
+        '没有打开相册。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许照片后，可以再试。',
+      ),
+    ).toBeTruthy();
     expect(view.getByDisplayValue('还可以写字')).toBeTruthy();
   });
 

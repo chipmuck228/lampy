@@ -74,6 +74,10 @@ export function navBandItemMinWidth(label: string, fontSize: number, fontScale: 
   return Math.max(NAV_BAND_HIT, textWidth + NAV_BAND_LABEL_PAD);
 }
 
+export function navBandItemMinHeight(fontSize: number, fontScale: number): number {
+  return Math.max(NAV_BAND_HIT, Math.ceil(fontSize * 1.45 * fontScale));
+}
+
 export function navBandItemsFor(
   here: 'recent' | 'lookback',
   hasFamily: boolean,
@@ -89,15 +93,25 @@ export function navBandItemsFor(
   return items;
 }
 
+export function navBandOccupiedWidth(
+  item: { label: string; fontSize: number; measuredWidth?: number },
+  fontScale: number,
+): number {
+  if (item.measuredWidth != null && item.measuredWidth > 0) {
+    return Math.max(NAV_BAND_HIT, item.measuredWidth + NAV_BAND_LABEL_PAD);
+  }
+  return navBandItemMinWidth(item.label, item.fontSize, fontScale);
+}
+
 export function chooseNavBandLayout(input: {
   windowWidth: number;
   fontScale: number;
-  items: { label: string; fontSize: number }[];
+  items: { label: string; fontSize: number; measuredWidth?: number }[];
 }): NavBandLayout {
   const available = input.windowWidth - NAV_BAND_PAD_X;
   const widest = Math.max(
     NAV_BAND_HIT,
-    ...input.items.map((item) => navBandItemMinWidth(item.label, item.fontSize, input.fontScale)),
+    ...input.items.map((item) => navBandOccupiedWidth(item, input.fontScale)),
   );
   const count = input.items.length;
   if (count < 1) return 'row';
@@ -130,4 +144,16 @@ export function recentColumnWidth(windowWidth: number, windowHeight: number, fon
 
 export function shouldShowSameDayRule(indexInDay: number): boolean {
   return indexInDay > 0;
+}
+
+const LEAVE_MEDIA_ICON = 24;
+const LEAVE_ACTION_GAP = 20;
+const LEAVE_MEDIA_SIZE = 16;
+const LEAVE_SAVE_SIZE = 18;
+
+export function shouldStackLeaveActions(availableWidth: number, fontScale: number): boolean {
+  const camera = navBandItemMinWidth('拍摄', LEAVE_MEDIA_SIZE, fontScale) + LEAVE_MEDIA_ICON;
+  const photo = navBandItemMinWidth('照片', LEAVE_MEDIA_SIZE, fontScale) + LEAVE_MEDIA_ICON;
+  const save = navBandItemMinWidth('留下', LEAVE_SAVE_SIZE, fontScale);
+  return camera + photo + save + LEAVE_ACTION_GAP * 2 > availableWidth;
 }

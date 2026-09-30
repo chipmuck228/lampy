@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatSoundDuration } from '../application/duration';
 import type { AudioView, UnknownMediaView } from '../application/use-cases';
 import type { PlaybackStatus } from '../infrastructure/media';
+import { LifeIcon, LifeLabeledHit, type LifeIconName } from './life-icons';
 import { hairline, inkSoft, sage, sound } from './life-page';
 
 export type RecordPhase = 'ready' | 'recording' | 'stopped' | 'processing' | 'failed';
@@ -172,9 +173,23 @@ export function MomentAudio({
         >
           <View style={styles.actionRow}>
             {markedActions ? (
-              <Text accessible={false} style={styles.mark}>
-                {playing ? '❚❚' : playbackStatus === 'finished' ? '↺' : preparing ? '·' : '▶'}
-              </Text>
+              <View
+                accessible={false}
+                testID={`${testIDPrefix}-mark-${audio.id}`}
+              >
+                <LifeIcon
+                  name={
+                    (playing
+                      ? 'pause'
+                      : playbackStatus === 'finished'
+                        ? 'replay'
+                        : 'play') as LifeIconName
+                  }
+                  size={14}
+                  color={sage}
+                  decorative
+                />
+              </View>
             ) : null}
             <Text style={styles.action}>{actionLabel}</Text>
           </View>
@@ -217,6 +232,7 @@ export function DraftSoundBar({
   currentTimeMs,
   disabled,
   removeDisabled,
+  layoutRevision,
   onStart,
   onStop,
   onPlay,
@@ -231,6 +247,7 @@ export function DraftSoundBar({
   currentTimeMs: number;
   disabled: boolean;
   removeDisabled?: boolean;
+  layoutRevision?: number;
   onStart: () => void;
   onStop: () => void;
   onPlay: () => void;
@@ -315,31 +332,27 @@ export function DraftSoundBar({
     return (
       <View style={styles.block}>
         <Text style={styles.missing}>这次没有录下声音。已经写的字和照片还在。</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="声音"
+        <LifeLabeledHit
+          layoutRevision={layoutRevision}
+          icon="record"
+          label="录音"
           testID="composer-sound"
           onPress={onStart}
           disabled={disabled}
-          style={styles.hit}
-        >
-          <Text style={styles.action}>声音</Text>
-        </Pressable>
+        />
       </View>
     );
   }
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="声音"
+    <LifeLabeledHit
+      layoutRevision={layoutRevision}
+      icon="record"
+      label="录音"
       testID="composer-sound"
       onPress={onStart}
       disabled={disabled}
-      style={styles.hit}
-    >
-      <Text style={styles.action}>声音</Text>
-    </Pressable>
+    />
   );
 }
 
@@ -348,7 +361,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   hit: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 },
-  mark: { fontSize: 13, lineHeight: 18, color: sage, minWidth: 14 },
   action: { fontSize: 18, lineHeight: 24, color: sage },
   recording: { fontSize: 18, lineHeight: 24, color: sound },
   meta: { fontSize: 16, lineHeight: 24, color: sound },

@@ -83,6 +83,10 @@ export function createDeviceLockSession() {
       setting = 'on';
       return snapshot();
     },
+    conceal() {
+      sessionUnlocked = false;
+      return snapshot();
+    },
     lockForBackground() {
       authGeneration += 1;
       unlockEpoch += 1;

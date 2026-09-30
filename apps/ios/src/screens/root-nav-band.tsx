@@ -1,27 +1,34 @@
-import type { ReactNode, Ref } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type StyleProp,
+  type TextLayoutEventData,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  NAV_BAND_HERE_SIZE,
+  NAV_BAND_HIT,
+  NAV_BAND_LEAVE_SIZE,
   chooseNavBandLayout,
   ink,
+  navBandItemMinHeight,
+  navBandItemMinWidth,
   navBandItemsFor,
+  navBandOccupiedWidth,
   paper,
   paperDeep,
   sage,
   shouldUseNavRail,
 } from './life-page';
+import { usePageMetrics } from './use-page-metrics';
 
 export function RootNavBand({
   here,
@@ -34,27 +41,71 @@ export function RootNavBand({
   onLeave: () => void;
   onFamily?: () => void;
 }) {
-  const { width, height, fontScale } = useWindowDimensions();
+  const { width, height, fontScale } = usePageMetrics();
+  const [painted, setPainted] = useState<Partial<Record<string, { width: number; height: number }>>>({});
+  const hereLabel = here === 'recent' ? '最近' : '回看';
+  const otherLabel = here === 'recent' ? '回看' : '最近';
+  const items = navBandItemsFor(here, !!onFamily).map((item, index) => ({
+    ...item,
+    id: (['here', 'other', 'leave', 'family'] as const)[index],
+  }));
+  const paintedReady = items.every((item) => painted[item.id]);
   const rail = shouldUseNavRail(width, height, fontScale);
   const layout = rail
     ? 'rail'
     : chooseNavBandLayout({
         windowWidth: width,
         fontScale,
-        items: navBandItemsFor(here, !!onFamily),
+        items: items.map((item) => ({
+          ...item,
+          measuredWidth: paintedReady ? painted[item.id]?.width : undefined,
+        })),
       });
-  const hereLabel = here === 'recent' ? '最近' : '回看';
-  const otherLabel = here === 'recent' ? '回看' : '最近';
+
+  function onPainted(id: string) {
+    return (event: NativeSyntheticEvent<TextLayoutEventData>) => {
+      const lines = event.nativeEvent.lines;
+      if (!lines.length) return;
+      const next = {
+        width: lines.reduce((max, line) => Math.max(max, line.width), 0),
+        height: lines.reduce((sum, line) => sum + line.height, 0),
+      };
+      if (next.width <= 0 || next.height <= 0) return;
+      setPainted((current) => {
+        const prev = current[id];
+        if (prev && prev.width === next.width && prev.height === next.height) return current;
+        return { ...current, [id]: next };
+      });
+    };
+  }
+
+  function itemMin(id: string, label: string, fontSize: number) {
+    const measure = painted[id];
+    return {
+      minWidth: measure
+        ? navBandOccupiedWidth({ label, fontSize, measuredWidth: measure.width }, fontScale)
+        : navBandItemMinWidth(label, fontSize, fontScale),
+      minHeight: measure
+        ? Math.max(NAV_BAND_HIT, Math.ceil(measure.height))
+        : navBandItemMinHeight(fontSize, fontScale),
+    };
+  }
+
+  const hereMin = itemMin('here', hereLabel, NAV_BAND_HERE_SIZE);
+  const otherMin = itemMin('other', otherLabel, NAV_BAND_HERE_SIZE);
+  const leaveMin = itemMin('leave', '留下', NAV_BAND_LEAVE_SIZE);
+  const familyMin = itemMin('family', '家庭', NAV_BAND_HERE_SIZE);
   const itemStyle = [
     styles.item,
     layout === 'rail' ? styles.railItem : layout === 'stack' ? styles.stackItem : styles.columnItem,
   ];
 
   const hereItem = (
-    <View testID="root-nav-here-wrap" style={itemStyle}>
+    <View testID="root-nav-here-wrap" style={[itemStyle, hereMin]}>
       <Text
         testID="root-nav-here"
         style={styles.here}
+        onTextLayout={onPainted('here')}
         accessibilityRole="text"
         accessibilityLabel={`${hereLabel}，当前页`}
       >
@@ -68,9 +119,11 @@ export function RootNavBand({
       accessibilityLabel={otherLabel}
       testID={here === 'recent' ? 'home-lookback' : 'lookback-go-recent'}
       onPress={onOther}
-      style={itemStyle}
+      style={[itemStyle, otherMin]}
     >
-      <Text style={styles.go}>{otherLabel}</Text>
+      <Text style={styles.go} onTextLayout={onPainted('other')}>
+        {otherLabel}
+      </Text>
     </Pressable>
   );
   const leaveItem = (
@@ -79,9 +132,11 @@ export function RootNavBand({
       accessibilityLabel="留下"
       testID={here === 'recent' ? 'home-leave' : 'lookback-leave'}
       onPress={onLeave}
-      style={itemStyle}
+      style={[itemStyle, leaveMin]}
     >
-      <Text style={styles.leave}>留下</Text>
+      <Text style={styles.leave} onTextLayout={onPainted('leave')}>
+        留下
+      </Text>
     </Pressable>
   );
   const familyItem = onFamily ? (
@@ -90,9 +145,11 @@ export function RootNavBand({
       accessibilityLabel="家庭"
       testID="home-family"
       onPress={onFamily}
-      style={itemStyle}
+      style={[itemStyle, familyMin]}
     >
-      <Text style={styles.go}>家庭</Text>
+      <Text style={styles.go} onTextLayout={onPainted('family')}>
+        家庭
+      </Text>
     </Pressable>
   ) : null;
 
@@ -151,7 +208,7 @@ export function RootReadingLayout({
   onScrollBeginDrag?: () => void;
   onContentSizeChange?: () => void;
 }) {
-  const { width, height, fontScale } = useWindowDimensions();
+  const { width, height, fontScale } = usePageMetrics();
   const rail = shouldUseNavRail(width, height, fontScale);
 
   return (
@@ -224,7 +281,7 @@ const styles = StyleSheet.create({
   },
   columnItem: {
     flexGrow: 1,
-    flexShrink: 1,
+    flexShrink: 0,
     flexBasis: 0,
     alignItems: 'center',
   },
@@ -239,7 +296,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignItems: 'flex-start',
   },
-  here: { fontSize: 17, lineHeight: 24, color: ink, textAlign: 'center' },
-  go: { fontSize: 17, lineHeight: 24, color: sage, textAlign: 'center' },
-  leave: { fontSize: 20, lineHeight: 28, color: ink, textAlign: 'center' },
+  here: { fontSize: 17, color: ink, textAlign: 'center', flexShrink: 0 },
+  go: { fontSize: 17, color: sage, textAlign: 'center', flexShrink: 0 },
+  leave: { fontSize: 20, color: ink, textAlign: 'center', flexShrink: 0 },
 });

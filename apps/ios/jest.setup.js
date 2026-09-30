@@ -65,3 +65,12 @@ jest.mock('expo-audio', () => ({
   requestRecordingPermissionsAsync: async () => ({ granted: false }),
   setAudioModeAsync: async () => undefined,
 }));
+
+jest.mock('expo-symbols', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    SymbolView: ({ accessibilityLabel, testID }) =>
+      React.createElement(View, { accessibilityLabel, testID }),
+  };
+});

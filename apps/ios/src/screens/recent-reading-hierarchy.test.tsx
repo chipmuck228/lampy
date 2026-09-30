@@ -188,7 +188,7 @@ describe('recent reading hierarchy', () => {
     expect(view.queryByTestId('recent-sound-moment_mix-progress-asset_voice')).toBeNull();
     expect(view.getAllByText('一段声音 · 4秒').length).toBeGreaterThanOrEqual(2);
     expect(view.getAllByLabelText('播放，4秒')).toHaveLength(2);
-    expect(view.getAllByText('▶').length).toBeGreaterThanOrEqual(2);
+    expect(view.getAllByTestId(/recent-sound-.*-mark-asset_voice/).length).toBeGreaterThanOrEqual(2);
     expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('看这条');
     expect(view.queryByTestId('recent-sound-moment_voice-scene-asset_voice')).toBeNull();
     expect(view.queryByTestId('recent-sound-moment_voice-progress-asset_voice')).toBeNull();
@@ -210,6 +210,7 @@ describe('recent reading hierarchy', () => {
     expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).not.toContain('›');
     expect(view.queryByTestId('home-family')).toBeNull();
     expect(view.getByTestId('home-account')).toBeTruthy();
+    expect(view.getByLabelText('本机设置')).toBeTruthy();
   });
 
   it('lets play and open stay separate so VoiceOver can reach 播放 without opening the record', async () => {

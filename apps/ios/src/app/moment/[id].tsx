@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -20,10 +20,11 @@ import {
   sage,
 } from '../../screens/life-page';
 import { useSoundPlayer } from '../../screens/use-sound-player';
+import { usePageMetrics } from '../../screens/use-page-metrics';
 
 export default function MomentDetailScreen() {
   const router = useRouter();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
   const pageWidth = readingPageWidth(width, height);
   const compact = isCompactHeight(height);

@@ -15,12 +15,12 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
+import { usePageMetrics } from './use-page-metrics';
 
 import type { FeelingView } from '../application/feeling';
 import { LOOKBACK_PAGE_GUTTER } from '../application/lookback-month';
@@ -126,7 +126,7 @@ export function lookbackLayoutFor(width: number, height: number, fontScale: numb
 }
 
 export function useLookbackLayout() {
-  const { width, height, fontScale } = useWindowDimensions();
+  const { width, height, fontScale } = usePageMetrics();
   return lookbackLayoutFor(width, height, fontScale);
 }
 
@@ -367,13 +367,13 @@ const styles = StyleSheet.create({
   },
   backHit: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
   back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
-  title: { fontSize: 28, lineHeight: 36, color: '#25231F', flexShrink: 0 },
+  title: { fontSize: 28, color: '#25231F', flexShrink: 1, minWidth: 0 },
   body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
   meta: { fontSize: 14, lineHeight: 20, color: '#53604F' },
   fallback: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
-  note: { fontSize: 20, lineHeight: 28, color: '#25231F' },
+  note: { fontSize: 20, color: '#25231F' },
   row: {
-    gap: 8,
+    gap: 4,
     paddingVertical: 8,
     minHeight: 44,
     flexGrow: 0,

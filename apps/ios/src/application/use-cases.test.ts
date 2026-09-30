@@ -217,7 +217,7 @@ describe('leave occurred date', () => {
 
     const recent = await app.getRecentLife();
     expect(recent.items[0].dateLabel).toBe('记录于 9月27日');
-    expect(recent.items[0].occurredLabel).toBe('发生于 2026年9月27日');
+    expect(recent.items[0].occurredLabel).toBeNull();
     expect(recent.days[0].label).toBe('记录于 9月27日');
     const detail = await app.getMomentDetail(saved.id);
     expect(detail.kind).toBe('ready');
@@ -413,7 +413,7 @@ describe('leave occurred date', () => {
     const detail = await app.getMomentDetail(saved.id);
     const day = await app.getHistoryDay(2026, 9, 27);
     expect(recent.items[0].dateLabel).toBe('记录于 9月27日');
-    expect(recent.items[0].occurredLabel).toBe('发生于 2026年9月27日');
+    expect(recent.items[0].occurredLabel).toBeNull();
     expect(detail.kind).toBe('ready');
     if (detail.kind === 'ready') expect(detail.dateLabel).toBe('2026年9月27日');
     expect('invalid' in day ? '' : day.title).toBe('2026年9月27日');

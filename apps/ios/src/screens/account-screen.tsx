@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
 
 import {
   accountRefreshFailureMessage,
@@ -16,6 +17,7 @@ import { getFamilyUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { createSecureFamilySessionStore } from '../infrastructure/secure-family-session';
+import { isPersonalSettingsDiagnosticsOpen } from '../application/personal-settings-visibility';
 import { DeviceLockSettings } from './device-lock-context';
 import { createFamilyRefreshGate } from './family-refresh';
 import { ink, inkSoft, paper, sage } from './life-page';
@@ -73,8 +75,30 @@ function testLoginFlags(snapshot: AccountSnapshot | null) {
   };
 }
 
-export default function AccountScreen() {
+export function AccountDiagnosticsClosed() {
   const router = useRouter();
+  return (
+    <SafeAreaView style={styles.safe} accessibilityLabel="开发诊断" testID="account-diagnostics-closed">
+      <ScrollView contentContainerStyle={styles.column}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="返回"
+          testID="account-back"
+          onPress={() => router.back()}
+          style={styles.hit}
+        >
+          <Text style={styles.back}>返回</Text>
+        </Pressable>
+        <Text style={styles.body}>这里没有开发诊断。</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+export default function AccountScreen({ variant = 'user' }: { variant?: 'user' | 'diagnostics' } = {}) {
+  const router = useRouter();
+  const diagnostics = variant === 'diagnostics';
+  const diagnosticsAllowed = isPersonalSettingsDiagnosticsOpen();
   const [snapshot, setSnapshot] = useState<AccountSnapshot | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>('idle');
@@ -191,6 +215,7 @@ export default function AccountScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      if (!diagnostics || !diagnosticsAllowed) return undefined;
       const generation = refreshGate.begin();
       load(generation)
         .then((result) => {
@@ -222,7 +247,7 @@ export default function AccountScreen() {
         refreshGate.begin();
         setPassword('');
       };
-    }, [load, refreshGate]),
+    }, [diagnostics, diagnosticsAllowed, load, refreshGate]),
   );
 
   async function signIn() {
@@ -335,9 +360,15 @@ export default function AccountScreen() {
 
   const showAppleButton = snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
   const showTestLoginPanel = Boolean(snapshot && snapshot.kind !== 'service-unavailable' && snapshot.kind !== 'signed-in');
+  const showDiagnosticsEntry = !diagnostics && diagnosticsAllowed;
+  const appVersion = Constants.expoConfig?.version ?? '0.1.0';
+
+  if (diagnostics && !diagnosticsAllowed) {
+    return <AccountDiagnosticsClosed />;
+  }
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="本机与账户">
+    <SafeAreaView style={styles.safe} accessibilityLabel={diagnostics ? '开发诊断' : '本机设置'}>
       <ScrollView contentContainerStyle={styles.column} testID="account-scroll">
         <Pressable
           accessibilityRole="button"
@@ -349,12 +380,18 @@ export default function AccountScreen() {
           <Text style={styles.back}>返回</Text>
         </Pressable>
         <Text style={styles.title} accessibilityRole="header">
-          本机与账户
+          {diagnostics ? '开发诊断' : '本机设置'}
         </Text>
-        <Text style={styles.body} testID="account-personal">
-          个人记录保存在这台设备。目前没有跨设备同步或云备份。
-        </Text>
-        <DeviceLockSettings />
+        {diagnostics ? null : (
+          <>
+            <DeviceLockSettings />
+            <Text style={styles.body} testID="account-personal">
+              个人记录保存在这台设备。目前没有跨设备同步或云备份。
+            </Text>
+          </>
+        )}
+        {diagnostics ? (
+        <View testID="account-diagnostics">
         <View testID="account-family-preview">
           <Text style={styles.body} testID="account-family-copy">
             有些生活，只想交给重要的人。
@@ -462,6 +499,26 @@ export default function AccountScreen() {
             {message}
           </Text>
         ) : null}
+        </View>
+        ) : null}
+        {diagnostics ? null : (
+          <>
+            {showDiagnosticsEntry ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="开发诊断"
+                testID="account-open-diagnostics"
+                onPress={() => router.push('/account-diagnostics')}
+                style={styles.hit}
+              >
+                <Text style={styles.action}>开发诊断</Text>
+              </Pressable>
+            ) : null}
+            <Text style={styles.version} testID="account-version">
+              版本 {appVersion}
+            </Text>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -474,7 +531,8 @@ const styles = StyleSheet.create({
   body: { fontSize: 17, lineHeight: 26, color: inkSoft },
   back: { fontSize: 17, lineHeight: 24, color: sage },
   action: { fontSize: 17, lineHeight: 24, color: sage },
-  hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  version: { fontSize: 14, lineHeight: 20, color: inkSoft, marginTop: 8 },
   apple: { width: 240, height: 44 },
   field: {
     minHeight: 44,

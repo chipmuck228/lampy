@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   createDeviceLockSession,
@@ -18,6 +19,14 @@ import {
   deviceLockReadCopy,
   type DeviceLockSnapshot,
 } from '../application/device-lock';
+import {
+  decideUnlockResult,
+  shouldBlockPrivateSnapshot,
+  shouldConcealOnInactive,
+  shouldShowDeviceLockCover,
+  shouldStartUnlockOnActive,
+  type DeviceLockTrace,
+} from '../application/device-lock-privacy';
 import { pauseForegroundAudio } from '../application/foreground-audio';
 import { createSecureDeviceLockStore, type DeviceLockStore } from '../infrastructure/device-lock-store';
 import { createExpoDeviceAuthenticator, type DeviceAuthenticator } from '../infrastructure/expo-device-auth';
@@ -48,10 +57,12 @@ export function DeviceLockProvider({
   children,
   store,
   authenticator,
+  onLockTrace,
 }: {
   children: ReactNode;
   store?: DeviceLockStore;
   authenticator?: DeviceAuthenticator;
+  onLockTrace?: (event: DeviceLockTrace) => void;
 }) {
   const defaults = useRef({
     store: store ?? createSecureDeviceLockStore(),
@@ -68,27 +79,59 @@ export function DeviceLockProvider({
   const hydrated = useRef(false);
   const needsManualRetry = useRef(false);
   const leftToBackground = useRef(false);
+  const settingsBusyRef = useRef(false);
+  const heldUnlock = useRef<number | null>(null);
   const mounted = useRef(true);
+  const [lifeState, setLifeState] = useState(AppState.currentState);
+  const [unlockBusy, setUnlockBusy] = useState(false);
+  const coverInsets = useSafeAreaInsets();
 
   const refresh = useCallback(() => setSnapshot(session.snapshot()), [session]);
 
   const logLock = useCallback(
-    (event: string, extra?: { generation?: number; settingsGeneration?: number; locked?: boolean; result?: string }) => {
-      if (process.env.JEST_WORKER_ID) return;
-      if (typeof __DEV__ !== 'undefined' && !__DEV__) return;
+    (event: string, extra?: { generation?: number; settingsGeneration?: number; locked?: boolean; cover?: boolean; result?: string }) => {
       const current = session.snapshot();
-      console.log('[device-lock]', {
+      const cover =
+        extra?.cover ??
+        shouldShowDeviceLockCover({
+          locked: extra?.locked ?? current.locked,
+          setting: current.setting,
+          appState: AppState.currentState,
+          unlockInFlight: inFlight.current && !settingsBusyRef.current,
+        });
+      const trace: DeviceLockTrace = {
         event,
         appState: AppState.currentState,
         generation: extra?.generation ?? current.authGeneration,
         settingsGeneration: extra?.settingsGeneration ?? current.settingsGeneration,
         locked: extra?.locked ?? current.locked,
+        cover,
+        snapshotBlocked: shouldBlockPrivateSnapshot({
+          cover,
+          setting: current.setting,
+          appState: AppState.currentState,
+          sessionUnlocked: current.sessionUnlocked,
+          unlockInFlight: inFlight.current && !settingsBusyRef.current,
+        }),
+        ...(extra?.result ? { result: extra.result } : {}),
+      };
+      onLockTrace?.(trace);
+      if (process.env.JEST_WORKER_ID) return;
+      if (typeof __DEV__ !== 'undefined' && !__DEV__) return;
+      console.log('[device-lock]', {
+        event: trace.event,
+        appState: trace.appState,
+        generation: trace.generation,
+        settingsGeneration: trace.settingsGeneration,
+        locked: trace.locked,
+        cover: trace.cover,
+        snapshotBlocked: trace.snapshotBlocked,
         setting: current.setting,
         inFlight: inFlight.current,
-        ...(extra?.result ? { result: extra.result } : {}),
+        ...(trace.result ? { result: trace.result } : {}),
       });
     },
-    [session],
+    [onLockTrace, session],
   );
 
   const loadStoredSetting = useCallback(async () => {
@@ -123,22 +166,57 @@ export function DeviceLockProvider({
     };
   }, [loadStoredSetting]);
 
+  const coverVisible = shouldShowDeviceLockCover({
+    locked: snapshot.locked,
+    setting: snapshot.setting,
+    appState: lifeState,
+    unlockInFlight: unlockBusy,
+  });
+
   useEffect(() => {
-    void setPrivateSnapshotBlocked(snapshot.locked);
-  }, [snapshot.locked]);
+    void setPrivateSnapshotBlocked(
+      shouldBlockPrivateSnapshot({
+        cover: coverVisible,
+        setting: snapshot.setting,
+        appState: lifeState,
+        sessionUnlocked: snapshot.sessionUnlocked,
+        unlockInFlight: unlockBusy,
+      }),
+    );
+  }, [coverVisible, lifeState, snapshot.sessionUnlocked, snapshot.setting, unlockBusy]);
 
   const retryUnlock = useCallback(async () => {
     if (appIsBackgrounded()) return;
+    if (AppState.currentState !== 'active') return;
     if (session.snapshot().setting !== 'on' || inFlight.current) return;
     const generation = session.beginAuth();
     inFlight.current = true;
+    setUnlockBusy(true);
     needsManualRetry.current = false;
+    heldUnlock.current = null;
     setMessage(null);
-    logLock('auth-start', { generation });
+    logLock('auth-start', { generation, cover: true });
     try {
       const result = await resolvedAuthenticator.authenticate('验证是这台设备的持有人，才能打开 Lampy。');
-      if (appIsBackgrounded()) {
-        logLock('auth-end', { generation, result: 'ignored-background' });
+      const decision = decideUnlockResult({
+        appState: AppState.currentState,
+        generation,
+        currentGeneration: session.snapshot().authGeneration,
+      });
+      if (decision === 'ignore-background' || decision === 'stale') {
+        logLock('auth-end', { generation, result: decision, cover: true });
+        return;
+      }
+      if (decision === 'hold') {
+        if (result.ok) {
+          heldUnlock.current = generation;
+          logLock('auth-end', { generation, result: 'held-until-active', cover: true });
+        } else {
+          const next = session.finishUnlock(generation, result);
+          needsManualRetry.current = true;
+          setMessage(deviceLockCopy(result));
+          logLock('auth-end', { generation, result: next.kind, locked: next.locked, cover: true });
+        }
         return;
       }
       const next = session.finishUnlock(generation, result);
@@ -148,33 +226,64 @@ export function DeviceLockProvider({
         setMessage(deviceLockCopy(result));
       }
     } catch {
-      if (appIsBackgrounded()) {
-        logLock('auth-end', { generation, result: 'ignored-background' });
+      const decision = decideUnlockResult({
+        appState: AppState.currentState,
+        generation,
+        currentGeneration: session.snapshot().authGeneration,
+      });
+      if (decision === 'ignore-background' || decision === 'stale') {
+        logLock('auth-end', { generation, result: decision, cover: true });
         return;
       }
       needsManualRetry.current = true;
       setMessage(deviceLockAuthErrorCopy());
-      logLock('auth-end', { generation, result: 'error' });
+      logLock('auth-end', { generation, result: 'error', cover: true });
     } finally {
       inFlight.current = false;
+      setUnlockBusy(false);
       refresh();
     }
   }, [logLock, refresh, resolvedAuthenticator, session]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
+      setLifeState(state);
       if (state === 'inactive') {
         pauseForegroundAudio();
-        logLock('app-state');
+        const current = session.snapshot();
+        if (
+          shouldConcealOnInactive({
+            setting: current.setting,
+            settingsInFlight: settingsBusyRef.current,
+            unlockInFlight: inFlight.current && !settingsBusyRef.current,
+            sessionUnlocked: current.sessionUnlocked,
+          })
+        ) {
+          session.conceal();
+          refresh();
+        }
+        if (
+          shouldBlockPrivateSnapshot({
+            cover: true,
+            setting: current.setting,
+            appState: 'inactive',
+            sessionUnlocked: current.sessionUnlocked,
+            unlockInFlight: inFlight.current && !settingsBusyRef.current,
+          })
+        ) {
+          void setPrivateSnapshotBlocked(true);
+        }
+        logLock('app-state', { cover: true });
         return;
       }
       if (state === 'background') {
         pauseForegroundAudio();
         leftToBackground.current = true;
+        heldUnlock.current = null;
         session.lockForBackground();
         void setPrivateSnapshotBlocked(true);
         refresh();
-        logLock('app-state');
+        logLock('app-state', { cover: true });
         return;
       }
       if (state !== 'active') {
@@ -183,13 +292,28 @@ export function DeviceLockProvider({
       }
       const returnedFromBackground = leftToBackground.current;
       leftToBackground.current = false;
+      const held = heldUnlock.current;
+      if (held != null) {
+        heldUnlock.current = null;
+        if (held === session.snapshot().authGeneration && !appIsBackgrounded()) {
+          const next = session.finishUnlock(held, { ok: true });
+          refresh();
+          logLock('auth-end', { generation: held, result: next.kind, locked: next.locked });
+          return;
+        }
+      }
       logLock('app-state');
       const current = session.snapshot();
       if (
-        returnedFromBackground &&
-        current.setting === 'on' &&
-        current.locked &&
-        !needsManualRetry.current
+        shouldStartUnlockOnActive({
+          setting: current.setting,
+          locked: current.locked,
+          unlockInFlight: inFlight.current,
+          needsManualRetry: needsManualRetry.current,
+          settingsInFlight: settingsBusyRef.current,
+          hasHeldSuccess: false,
+        }) &&
+        (returnedFromBackground || current.locked)
       ) {
         void retryUnlock();
       }
@@ -200,11 +324,15 @@ export function DeviceLockProvider({
   useEffect(() => {
     if (
       AppState.currentState === 'active' &&
-      snapshot.setting === 'on' &&
-      snapshot.locked &&
-      !inFlight.current &&
+      shouldStartUnlockOnActive({
+        setting: snapshot.setting,
+        locked: snapshot.locked,
+        unlockInFlight: inFlight.current,
+        needsManualRetry: needsManualRetry.current,
+        settingsInFlight: settingsBusyRef.current,
+        hasHeldSuccess: heldUnlock.current != null,
+      }) &&
       !message &&
-      !needsManualRetry.current &&
       !leftToBackground.current
     ) {
       void retryUnlock();
@@ -224,6 +352,7 @@ export function DeviceLockProvider({
     if (current.setting === 'unknown' || inFlight.current) return;
     const generation = session.beginSettingsAuth();
     inFlight.current = true;
+    settingsBusyRef.current = true;
     setSettingsBusy(true);
     setMessage(null);
     const enabling = current.setting === 'off';
@@ -252,6 +381,7 @@ export function DeviceLockProvider({
       setMessage(deviceLockAuthErrorCopy());
     } finally {
       inFlight.current = false;
+      settingsBusyRef.current = false;
       if (mounted.current) {
         setSettingsBusy(false);
         setSwitchOn(session.snapshot().setting === 'on');
@@ -274,39 +404,54 @@ export function DeviceLockProvider({
     <DeviceLockContext.Provider value={value}>
       <View
         style={styles.stack}
-        accessibilityElementsHidden={snapshot.locked}
-        importantForAccessibility={snapshot.locked ? 'no-hide-descendants' : 'auto'}
+        accessibilityElementsHidden={coverVisible}
+        importantForAccessibility={coverVisible ? 'no-hide-descendants' : 'auto'}
       >
         {children}
       </View>
-      {snapshot.locked ? (
+      {coverVisible ? (
         <View style={styles.cover} testID="device-lock-cover" accessibilityLabel="Lampy 已锁定">
-          <Text style={styles.title} accessibilityRole="header">
-            {snapshot.setting === 'unknown' ? 'Lampy' : '这台设备已保护'}
-          </Text>
-          <Text style={styles.body}>
-            {snapshot.setting === 'unknown' && !message
-              ? '正在确认本机设置。'
-              : snapshot.setting === 'unknown'
-                ? '记录还在。'
-                : '进入 Lampy 前，先确认是这台设备的持有人。记录还在。'}
-          </Text>
-          {snapshot.setting === 'on' || message ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="再试一次"
-              testID="device-lock-retry"
-              onPress={retryCoverAction}
-              style={styles.hit}
-            >
-              <Text style={styles.action}>再试一次</Text>
-            </Pressable>
-          ) : null}
-          {message ? (
-            <Text style={styles.body} testID="device-lock-message">
-              {message}
+          <ScrollView
+            contentContainerStyle={[
+              styles.coverInner,
+              {
+                paddingTop: 24 + coverInsets.top,
+                paddingBottom: 24 + coverInsets.bottom,
+                paddingLeft: 24 + coverInsets.left,
+                paddingRight: 24 + coverInsets.right,
+              },
+            ]}
+            contentInsetAdjustmentBehavior="automatic"
+            keyboardShouldPersistTaps="handled"
+            testID="device-lock-cover-scroll"
+          >
+            <Text style={styles.title} accessibilityRole="header">
+              {snapshot.setting === 'unknown' ? 'Lampy' : '这台设备已保护'}
             </Text>
-          ) : null}
+            <Text style={styles.body}>
+              {snapshot.setting === 'unknown' && !message
+                ? '正在确认本机设置。'
+                : snapshot.setting === 'unknown'
+                  ? '记录还在。'
+                  : '进入 Lampy 前，先确认是这台设备的持有人。记录还在。'}
+            </Text>
+            {snapshot.setting === 'on' || message ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="再试一次"
+                testID="device-lock-retry"
+                onPress={retryCoverAction}
+                style={styles.hit}
+              >
+                <Text style={styles.action}>再试一次</Text>
+              </Pressable>
+            ) : null}
+            {message ? (
+              <Text style={styles.body} testID="device-lock-message">
+                {message}
+              </Text>
+            ) : null}
+          </ScrollView>
         </View>
       ) : null}
     </DeviceLockContext.Provider>
@@ -356,14 +501,17 @@ const styles = StyleSheet.create({
   cover: {
     ...StyleSheet.absoluteFill,
     backgroundColor: paper,
-    padding: 24,
-    justifyContent: 'center',
-    gap: 16,
     zIndex: 20,
   },
-  title: { fontSize: 28, lineHeight: 36, color: ink },
-  body: { fontSize: 17, lineHeight: 26, color: inkSoft },
-  action: { fontSize: 17, lineHeight: 24, color: sage },
+  coverInner: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+    gap: 16,
+  },
+  title: { fontSize: 28, color: ink },
+  body: { fontSize: 17, color: inkSoft },
+  action: { fontSize: 17, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   settingsRow: {
     minHeight: 44,

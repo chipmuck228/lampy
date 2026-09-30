@@ -167,7 +167,8 @@ describe('lookback book expand', () => {
       expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
     });
     expect(view.queryByTestId('lookback-month-calendar')).toBeNull();
-    expect(view.getByText('9月28日 · 星期一 · 有3条记录')).toBeTruthy();
+    expect(view.getByText('9月28日 · 星期一')).toBeTruthy();
+    expect(view.getByText('3条')).toBeTruthy();
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
       await Promise.resolve();

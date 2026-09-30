@@ -23,6 +23,20 @@ export function recordedHeadingForRecent(dayLabel: string): string {
   return dayLabel.startsWith('记录于') ? dayLabel : `记录于 ${dayLabel}`;
 }
 
+export function sameViewerCalendarDay(
+  leftIso: string | undefined,
+  rightIso: string | undefined,
+  clock: HistoryClock,
+): boolean {
+  if (!leftIso || !rightIso) return false;
+  const left = parseMillis(leftIso);
+  const right = parseMillis(rightIso);
+  if (left == null || right == null) return false;
+  const a = calendarPartsAt(left, clock);
+  const b = calendarPartsAt(right, clock);
+  return a.year === b.year && a.month === b.month && a.day === b.day;
+}
+
 export function recordedDayForRecent(
   recordedAt: string,
   now: Date,

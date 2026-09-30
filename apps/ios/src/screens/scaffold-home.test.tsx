@@ -65,6 +65,7 @@ describe('recent home', () => {
     expect(view.getByLabelText('留下第一条')).toBeTruthy();
     expect(view.queryByTestId('home-family')).toBeNull();
     expect(view.getByTestId('home-account')).toBeTruthy();
+    expect(view.getByLabelText('本机设置')).toBeTruthy();
     expect(view.queryByText(/假数据|mock moment/i)).toBeNull();
   });
 
