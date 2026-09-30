@@ -1,37 +1,44 @@
-# 首次引导 / 本机保护 / 空库走查
+# 首次引导、本机保护与空库走查
 
-日期：2026-09-29。基线 `origin/main` `f8e9199`。分支 `ios/first-run-lock-empty`。只改 `apps/ios`。未叠 #41 / #45。未开放 `EXPO_PUBLIC_FAMILY_ENTRY_OPEN`。`identityLoopAccepted` 仍为 **false**。未部署服务。未合并。
+独立 PR #46，base `origin/main`。只改 `apps/ios`。未打开家庭入口。`EXPO_PUBLIC_FAMILY_ENTRY_OPEN` 关闭。`identityLoopAccepted` 为 false。
 
-原生 Face ID / 设备密码 / App 切换器遮挡需要 **prebuild 后重装**。Metro 热更新不算 B 组验收。
+本机保护默认关闭、需用户打开。打开后，真正离开 App（`background`）立即失效解锁资格；系统 Face ID / 密码面板引起的 `inactive` 不视为离开。
 
-不要清空现有真机个人库。空库请用可丢弃的独立测试安装。
+## 本轮核对
 
-引导每页正文已有独立滚动，底栏 `flexShrink: 0`。最大字号与短屏是否重叠仍要在原生页确认。App 切换器遮挡、Face ID、设备密码退路仍是 **NOT VERIFIED**。
+| 项 | SHA / 说明 | 结果 |
+| --- | --- | --- |
+| 远端 `origin/ios/first-run-lock-empty`（改前） | `64f175adab2c388ecd45def0ccafdd03d0b43c41` | 已对齐 fetch |
+| 本轮 JS / 将推送 head | 见提交后 `git rev-parse HEAD` | 本轮代码 |
+| 真机 Liuz17 已装原生包 | Xcode 工程在 `/Users/zhen/WeChatProjects/lampy`，当时分支 `ios/account-email-auth` `cd92863`，另含本机补进的 `ExpoLocalAuthentication` / `ExpoScreenCapture` | **不是** #46 专属 prebuild。本轮 AppState 修复为 JS，可用 Metro 热更新。与 #46 同源原生重装：**NOT VERIFIED** |
+| Metro 8081 | 启动目录 `lampy-guide/apps/ios` | 需 Reload 后才是本轮 JS |
+| `npx tsc --noEmit` | apps/ios | **PASS** |
+| 相关 Jest | device-lock / expo-device-auth / first-run | **PASS** 5 suites / 32 tests |
+| 本轮 eslint | 改动的 lock / auth 文件 | **PASS**（0 errors；`require()` 为按需加载原生模块） |
+| `git diff --check`（本轮文件） | | **PASS** |
 
-## 自动化
+开发诊断只打 `[device-lock]`：`appState`、`generation`、`auth-start` / `auth-end`、`locked`。不记录正文、凭据、人脸。
 
-在 `apps/ios`：
+## 真机 Liuz17 / iPhone 17 Pro / iOS 26.2
 
-| 检查 | 结果 |
+不卸载、不清空现有记录。首次三屏引导必须用**可丢弃的独立安装**，历史库跳过引导 **不能**写成首次引导 PASS。
+
+| 项 | 结果 |
 | --- | --- |
-| `npx tsc --noEmit` | PASS |
-| 本切片 Jest（引导 / 锁 / 空库 / 账户 Face ID / 回看空态 / 声音暂停） | PASS |
-| 全量 `npm test` 并行 | 机器过载下大量 5s timeout；同一套受影响文件 `--runInBand` 后 PASS |
-| 新文件 `eslint` | PASS |
-| `npx expo lint` 全库 | 既有 leave.tsx / share/[id].tsx `set-state-in-effect`，不是本切片引入 |
+| 本机与账户能拉起 Face ID 或设备密码 | 用户前回 **PASS**；本轮改完后复测 **NOT VERIFIED** |
+| 已解锁 → 真正后台 → 返回：完成新认证前遮挡 | 前回 **FAIL**（无遮挡）。本轮已改生命周期。复测 **NOT VERIFIED** |
+| 认证过程中 → 后台 → 返回：迟到成功不能揭开 | 自动化 **PASS**。真机 **NOT VERIFIED** |
+| 系统认证 `inactive` 不锁死、不连弹 | 自动化 **PASS**。真机 **NOT VERIFIED** |
+| App 切换器无私人内容 | **NOT VERIFIED** |
+| 失败后保持遮挡，可见「再试一次」，不连弹 | 自动化 **PASS**。真机 **NOT VERIFIED** |
+| 系统 Face ID 面板取消入口 | 由系统决定。人工取消 **NOT VERIFIED**（前回未能取消） |
+| 设备密码退路 | 用户前回 **PASS**；本轮复测 **NOT VERIFIED** |
+| 首次三屏引导 | 真机有历史记录，**未验收**。不记 PASS |
 
-## 走查边界
+## 契约（实现）
 
-引导每页高度等于翻页视口；标题和正文在页内可滚，底部「继续 / 留下瞬间」固定在页脚外。最大字号和短屏须在原生页确认文字不会压住按钮。Jest 不能替代这项。
-
-App 切换器遮挡、Face ID、设备密码退路仍是 **NOT VERIFIED**。
-
-## 真机 A：默认关闭
-
-新装或引导未完成的安装：三屏上滑 +「继续」→ 最后「留下瞬间」→ 留下一条 → 最近 / 回看。全程不弹系统认证。中途杀进程再开，引导应仍在。已有记录的升级安装不得挡进入记录。
-
-## 真机 B：主动开启
-
-本机与账户打开「使用 Face ID 保护 Lampy」→ 认证成功才保持开启。后台 / 冷启动先遮挡再解锁。深链 `/lookback`、`/moment/:id`、`/leave`、`/account` 同样先锁。取消后「再试一次」。关闭保护也要先认证。App 切换器不得露出最近/回看/详情。Face ID 不可用时走系统设备密码；没有密码时说明记录还在。
-
-模拟器 / Jest 不记作真机 PASS。
+- 仅 `AppState === 'background'` 调用 `lockForBackground()` 并立刻 `preventScreenCapture`。
+- `inactive`（含系统认证面板）不抬世代、不失效当前解锁。
+- `finishUnlock` 在 `background` 中丢弃；世代被后台抬高后的迟到成功为 stale。
+- 从后台回到 `active` 且仍锁定、且上次不是需手动重试时，发起**一次**新认证；`inactive → active` 不自动再弹。
+- 取消 / 失败 / 抛错：保持锁定、文案、「再试一次」，不自动连弹。

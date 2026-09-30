@@ -243,7 +243,7 @@ describe('device lock cover', () => {
   });
 
   it('stays locked and waits for a manual retry when system auth throws', async () => {
-    const authenticate = jest.fn(async () => {
+    const authenticate = jest.fn(async (): Promise<{ ok: true }> => {
       throw new Error('native');
     });
     const view = await render(
@@ -260,7 +260,7 @@ describe('device lock cover', () => {
     });
     expect(authenticate).toHaveBeenCalledTimes(1);
     expect(view.getByTestId('device-lock-cover')).toBeTruthy();
-    authenticate.mockImplementation(async () => ({ ok: true as const }));
+    (authenticate as jest.Mock).mockImplementation(async () => ({ ok: true }));
     await act(async () => {
       fireEvent.press(view.getByLabelText('再试一次'));
     });
@@ -272,7 +272,7 @@ describe('device lock cover', () => {
 
   it('stays locked in the background and only authenticates again when active', async () => {
     const app = mockAppState();
-    const pending: Array<(value: { ok: true }) => void> = [];
+    const pending: ((value: { ok: true }) => void)[] = [];
     const authenticate = jest.fn(
       () =>
         new Promise<{ ok: true }>((resolve) => {
@@ -324,6 +324,148 @@ describe('device lock cover', () => {
     } finally {
       app.restore();
     }
+  });
+
+  it('accepts a valid success after auth-caused inactive without locking', async () => {
+    const app = mockAppState();
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(
+        wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }),
+      );
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await app.set('inactive');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      expect(view.getByText('private')).toBeTruthy();
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('keeps an unlocked session through inactive and only covers after a real background', async () => {
+    const app = mockAppState();
+    const authenticate = jest.fn(async () => ({ ok: true as const }));
+    try {
+      const view = await render(
+        wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }),
+      );
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+      await app.set('inactive');
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      await app.set('active');
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      await app.set('background');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('covers again after background, ignores a late success, then unlocks on a new foreground auth', async () => {
+    const app = mockAppState();
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(
+        wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }),
+      );
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+
+      await app.set('inactive');
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      await app.set('background');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(authenticate).toHaveBeenCalledTimes(1);
+
+      await app.set('active');
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(2);
+      });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+
+      await app.set('background');
+      await act(async () => {
+        pending[1]({ ok: true });
+      });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+
+      await app.set('active');
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(3);
+      });
+      await act(async () => {
+        pending[2]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('does not auto-prompt after cancel and unlocks only on a manual retry', async () => {
+    const authenticate = jest.fn(
+      async (): Promise<{ ok: true } | { ok: false; reason: 'cancel' }> => ({ ok: false, reason: 'cancel' }),
+    );
+    const view = await render(
+      wrap({ isEnabled: async () => true, setEnabled: async () => undefined }, { authenticate }),
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.getByText('这次没有解锁。记录还在，可以再试一次。')).toBeTruthy();
+    });
+    expect(authenticate).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(authenticate).toHaveBeenCalledTimes(1);
+    expect(view.getByLabelText('再试一次')).toBeTruthy();
+    (authenticate as jest.Mock).mockImplementation(async () => ({ ok: true }));
+    await act(async () => {
+      fireEvent.press(view.getByLabelText('再试一次'));
+    });
+    await waitFor(() => {
+      expect(authenticate).toHaveBeenCalledTimes(2);
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    });
   });
 
   it('rolls back disable and stays retryable when the setting cannot be written', async () => {

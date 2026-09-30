@@ -1,4 +1,4 @@
-import { createExpoDeviceAuthenticator } from './expo-device-auth';
+import { createExpoDeviceAuthenticator, mapLocalAuthError } from './expo-device-auth';
 
 const mockGetEnrolledLevelAsync = jest.fn();
 const mockAuthenticateAsync = jest.fn();
@@ -30,6 +30,17 @@ describe('expo device authenticator', () => {
     const auth = createExpoDeviceAuthenticator();
     await expect(auth.authenticate('reason')).resolves.toEqual({ ok: false, reason: 'no-passcode' });
     expect(mockAuthenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it('maps expo-local-authentication error strings to lock reasons', () => {
+    expect(mapLocalAuthError('user_cancel')).toEqual({ ok: false, reason: 'cancel' });
+    expect(mapLocalAuthError('system_cancel')).toEqual({ ok: false, reason: 'cancel' });
+    expect(mapLocalAuthError('app_cancel')).toEqual({ ok: false, reason: 'cancel' });
+    expect(mapLocalAuthError('authentication_failed')).toEqual({ ok: false, reason: 'fail' });
+    expect(mapLocalAuthError('not_enrolled')).toEqual({ ok: false, reason: 'no-passcode' });
+    expect(mapLocalAuthError('passcode_not_set')).toEqual({ ok: false, reason: 'no-passcode' });
+    expect(mapLocalAuthError('lockout')).toEqual({ ok: false, reason: 'unavailable' });
+    expect(mapLocalAuthError('not_available')).toEqual({ ok: false, reason: 'unavailable' });
   });
 
   it('maps cancel and lockout without unlocking', async () => {

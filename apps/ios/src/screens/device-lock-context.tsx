@@ -24,6 +24,10 @@ import { createExpoDeviceAuthenticator, type DeviceAuthenticator } from '../infr
 import { setPrivateSnapshotBlocked } from '../infrastructure/screen-privacy';
 import { ink, inkSoft, paper, sage } from './life-page';
 
+function appIsBackgrounded() {
+  return AppState.currentState === 'background';
+}
+
 export type DeviceLockContextValue = {
   snapshot: DeviceLockSnapshot;
   enabled: boolean;
@@ -59,9 +63,26 @@ export function DeviceLockProvider({
   const inFlight = useRef(false);
   const hydrated = useRef(false);
   const needsManualRetry = useRef(false);
+  const leftToBackground = useRef(false);
   const mounted = useRef(true);
 
   const refresh = useCallback(() => setSnapshot(session.snapshot()), [session]);
+
+  const logLock = useCallback(
+    (event: string, extra?: { generation?: number; locked?: boolean; result?: string }) => {
+      if (process.env.JEST_WORKER_ID) return;
+      if (typeof __DEV__ !== 'undefined' && !__DEV__) return;
+      const current = session.snapshot();
+      console.log('[device-lock]', {
+        event,
+        appState: AppState.currentState,
+        generation: extra?.generation ?? current.authGeneration,
+        locked: extra?.locked ?? current.locked,
+        ...(extra?.result ? { result: extra.result } : {}),
+      });
+    },
+    [session],
+  );
 
   const loadStoredSetting = useCallback(async () => {
     if (inFlight.current) return;
@@ -96,43 +117,74 @@ export function DeviceLockProvider({
   }, [snapshot.locked]);
 
   const retryUnlock = useCallback(async () => {
-    if (AppState.currentState !== 'active') return;
+    if (appIsBackgrounded()) return;
     if (session.snapshot().setting !== 'on' || inFlight.current) return;
     const generation = session.beginAuth();
     inFlight.current = true;
     needsManualRetry.current = false;
     setMessage(null);
+    logLock('auth-start', { generation });
     try {
       const result = await resolvedAuthenticator.authenticate('验证是这台设备的持有人，才能打开 Lampy。');
-      if (AppState.currentState !== 'active') return;
+      if (appIsBackgrounded()) {
+        logLock('auth-end', { generation, result: 'ignored-background' });
+        return;
+      }
       const next = session.finishUnlock(generation, result);
+      logLock('auth-end', { generation, result: next.kind, locked: next.locked });
       if (next.kind === 'denied') {
         needsManualRetry.current = true;
         setMessage(deviceLockCopy(result));
       }
     } catch {
-      if (AppState.currentState !== 'active') return;
+      if (appIsBackgrounded()) {
+        logLock('auth-end', { generation, result: 'ignored-background' });
+        return;
+      }
       needsManualRetry.current = true;
       setMessage(deviceLockAuthErrorCopy());
+      logLock('auth-end', { generation, result: 'error' });
     } finally {
       inFlight.current = false;
       refresh();
     }
-  }, [refresh, resolvedAuthenticator, session]);
+  }, [logLock, refresh, resolvedAuthenticator, session]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') {
+      if (state === 'inactive') {
         pauseForegroundAudio();
-        session.lockForBackground();
-        refresh();
+        logLock('app-state');
         return;
       }
+      if (state === 'background') {
+        pauseForegroundAudio();
+        leftToBackground.current = true;
+        session.lockForBackground();
+        void setPrivateSnapshotBlocked(true);
+        refresh();
+        logLock('app-state');
+        return;
+      }
+      if (state !== 'active') {
+        logLock('app-state');
+        return;
+      }
+      const returnedFromBackground = leftToBackground.current;
+      leftToBackground.current = false;
+      logLock('app-state');
       const current = session.snapshot();
-      if (current.setting === 'on' && current.locked && !needsManualRetry.current) void retryUnlock();
+      if (
+        returnedFromBackground &&
+        current.setting === 'on' &&
+        current.locked &&
+        !needsManualRetry.current
+      ) {
+        void retryUnlock();
+      }
     });
     return () => sub?.remove();
-  }, [refresh, retryUnlock, session]);
+  }, [logLock, refresh, retryUnlock, session]);
 
   useEffect(() => {
     if (
@@ -141,7 +193,8 @@ export function DeviceLockProvider({
       snapshot.locked &&
       !inFlight.current &&
       !message &&
-      !needsManualRetry.current
+      !needsManualRetry.current &&
+      !leftToBackground.current
     ) {
       void retryUnlock();
     }
