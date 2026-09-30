@@ -1,6 +1,6 @@
-import type { ReactElement } from 'react';
-import { render } from '@testing-library/react-native';
-import { Dimensions, StyleSheet } from 'react-native';
+import { useEffect, type ReactElement } from 'react';
+import { act, render } from '@testing-library/react-native';
+import { Dimensions, StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
@@ -209,6 +209,35 @@ describe('root nav band layout', () => {
       expect.objectContaining({ flex: 1, minWidth: 0 }),
     );
     expect(StyleSheet.flatten(view.getByTestId('tablet-scroll').props.style).width).toBeUndefined();
+    await view.unmount();
+  });
+
+  it('keeps the reading scroll tree mounted when metrics change', async () => {
+    let mounts = 0;
+    function Child() {
+      useEffect(() => {
+        mounts += 1;
+      }, []);
+      return <Text testID="reading-child">page</Text>;
+    }
+    const view = await render(
+      wrap(
+        <RootReadingLayout scrollTestID="reading-scroll" band={<Text>band</Text>}>
+          <Child />
+        </RootReadingLayout>,
+      ),
+    );
+    expect(view.getByTestId('reading-scroll')).toBeTruthy();
+    expect(mounts).toBe(1);
+    await act(async () => {
+      Dimensions.set({
+        window: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
+        screen: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
+      });
+    });
+    expect(view.getByTestId('reading-scroll')).toBeTruthy();
+    expect(view.getByTestId('reading-child')).toBeTruthy();
+    expect(mounts).toBe(1);
     await view.unmount();
   });
 });

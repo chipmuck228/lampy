@@ -75,10 +75,15 @@ export function OccurredDatePicker({
         accessibilityState={{ expanded: open, disabled: !!disabled }}
         testID="composer-occurred-toggle"
         disabled={disabled}
-        onPress={() => setOpen((current) => !current)}
+        onPress={() =>
+          setOpen((current) => {
+            if (current) setCalendarOpen(false);
+            return !current;
+          })
+        }
         style={styles.toggleHit}
       >
-        <View key={`occurred-row-${layoutRevision ?? 1}`} style={styles.toggleRow}>
+        <View style={styles.toggleRow}>
           <View style={styles.toggleCopy}>
             <Text key={`occurred-heading-${layoutRevision ?? 1}`} style={styles.heading}>
               发生日期
@@ -90,6 +95,8 @@ export function OccurredDatePicker({
           <LifeIcon name={open ? 'collapse' : 'expand'} size={14} decorative />
         </View>
       </Pressable>
+      {open ? (
+        <View testID="composer-occurred-options">
       <View style={styles.chips}>
         <Pressable
           accessibilityRole="button"
@@ -213,6 +220,8 @@ export function OccurredDatePicker({
               );
             })}
           </View>
+        </View>
+      ) : null}
         </View>
       ) : null}
     </View>

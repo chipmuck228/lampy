@@ -16,32 +16,28 @@ export function FeelingPicker({
   layoutRevision?: number;
 }) {
   const selected = value.trim();
-  const unknown = !!selected && !(FEELING_VOCABULARY as readonly string[]).includes(selected);
-  const [open, setOpen] = useState(Boolean(selected));
+  const [open, setOpen] = useState(false);
+  const chipsVisible = !selected || open;
 
   return (
     <View style={styles.block}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={selected ? `当时的感受，${selected}` : '当时的感受'}
+        accessibilityState={{ expanded: chipsVisible, disabled: !!disabled }}
         testID="composer-feeling-toggle"
         disabled={disabled}
         onPress={() => setOpen((current) => !current)}
         style={styles.toggleHit}
       >
-        <View key={`feeling-row-${layoutRevision ?? 1}`} style={styles.toggleRow}>
+        <View style={styles.toggleRow}>
           <Text key={`feeling-heading-${layoutRevision ?? 1}`} style={styles.heading}>
             {selected || '当时的感受'}
           </Text>
-          <LifeIcon name={open || !selected ? 'expand' : 'collapse'} size={14} decorative />
+          <LifeIcon name={chipsVisible ? 'collapse' : 'expand'} size={14} decorative />
         </View>
       </Pressable>
-      {unknown ? (
-        <Text testID="composer-feeling-unknown" style={styles.unknown}>
-          {selected}
-        </Text>
-      ) : null}
-      {open || !selected ? (
+      {chipsVisible ? (
         <View style={styles.chips}>
           {FEELING_VOCABULARY.map((word) => {
             const isSelected = selected === word;
@@ -110,7 +106,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heading: { fontSize: 16, color: '#5C5851', flexShrink: 1 },
-  unknown: { fontSize: 16, lineHeight: 22, color: '#5C5851' },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',

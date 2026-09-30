@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text, type AppStateStatus } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 
 import type { DeviceLockTrace } from '../application/device-lock-privacy';
@@ -62,11 +63,18 @@ function wrap(
   onLockTrace?: (event: DeviceLockTrace) => void,
 ) {
   return (
-    <DeviceLockProvider store={store} authenticator={authenticator} onLockTrace={onLockTrace}>
-      <Text>private</Text>
-      <Toggle />
-      <DeviceLockSettings />
-    </DeviceLockProvider>
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        insets: { top: 47, left: 0, right: 0, bottom: 34 },
+      }}
+    >
+      <DeviceLockProvider store={store} authenticator={authenticator} onLockTrace={onLockTrace}>
+        <Text>private</Text>
+        <Toggle />
+        <DeviceLockSettings />
+      </DeviceLockProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -109,6 +117,9 @@ describe('device lock cover', () => {
         .lineHeight,
     ).toBeUndefined();
     expect(StyleSheet.flatten(view.getByText('再试一次').props.style).lineHeight).toBeUndefined();
+    expect(StyleSheet.flatten(view.getByTestId('device-lock-cover-scroll').props.contentContainerStyle)).toEqual(
+      expect.objectContaining({ paddingTop: 71, paddingBottom: 58 }),
+    );
   });
 
   it('covers content until unlock succeeds and ignores a cancelled challenge', async () => {
@@ -221,12 +232,19 @@ describe('device lock cover', () => {
     function Harness() {
       const [, bump] = useState(0);
       return (
-        <DeviceLockProvider authenticator={{ authenticate }}>
-          <Text>private</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="rerender" onPress={() => bump((n) => n + 1)}>
-            <Text>rerender</Text>
-          </Pressable>
-        </DeviceLockProvider>
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width: 390, height: 844 },
+            insets: { top: 47, left: 0, right: 0, bottom: 34 },
+          }}
+        >
+          <DeviceLockProvider authenticator={{ authenticate }}>
+            <Text>private</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="rerender" onPress={() => bump((n) => n + 1)}>
+              <Text>rerender</Text>
+            </Pressable>
+          </DeviceLockProvider>
+        </SafeAreaProvider>
       );
     }
     const view = await render(<Harness />);

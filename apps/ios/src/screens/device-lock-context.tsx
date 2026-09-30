@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { AppState, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   createDeviceLockSession,
@@ -83,6 +84,7 @@ export function DeviceLockProvider({
   const mounted = useRef(true);
   const [lifeState, setLifeState] = useState(AppState.currentState);
   const [unlockBusy, setUnlockBusy] = useState(false);
+  const coverInsets = useSafeAreaInsets();
 
   const refresh = useCallback(() => setSnapshot(session.snapshot()), [session]);
 
@@ -410,7 +412,16 @@ export function DeviceLockProvider({
       {coverVisible ? (
         <View style={styles.cover} testID="device-lock-cover" accessibilityLabel="Lampy 已锁定">
           <ScrollView
-            contentContainerStyle={styles.coverInner}
+            contentContainerStyle={[
+              styles.coverInner,
+              {
+                paddingTop: 24 + coverInsets.top,
+                paddingBottom: 24 + coverInsets.bottom,
+                paddingLeft: 24 + coverInsets.left,
+                paddingRight: 24 + coverInsets.right,
+              },
+            ]}
+            contentInsetAdjustmentBehavior="automatic"
             keyboardShouldPersistTaps="handled"
             testID="device-lock-cover-scroll"
           >

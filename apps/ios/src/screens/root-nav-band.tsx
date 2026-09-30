@@ -210,11 +210,10 @@ export function RootReadingLayout({
 }) {
   const { width, height, fontScale } = usePageMetrics();
   const rail = shouldUseNavRail(width, height, fontScale);
-  const metricsKey = `${width}x${height}x${fontScale}`;
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel={accessibilityLabel}>
-      <View key={metricsKey} style={rail ? styles.row : styles.column}>
+      <View style={rail ? styles.row : styles.column}>
         {rail ? band : null}
         <ScrollView
           ref={scrollRef}

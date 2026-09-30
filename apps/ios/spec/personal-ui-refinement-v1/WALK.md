@@ -32,9 +32,13 @@ Liuz17 / iPhone 17 Pro / iOS 26.2 三项关闭项通过时，Metro 应对齐下�
 | `git diff --check` | | **PASS** |
 | 真机三项关闭项 | Liuz17，见下表 | **PASS**（用户 2026-09-30） |
 | 横屏 / iPad / VoiceOver 听音 | 本轮未走 | **不阻塞** 本 PR 关闭项 |
-| Bugbot 残留 | 感受/日期折叠与 chevron、阅读页字号 remount 丢滚动、锁定遮罩短屏安全区、新挂载页首次字号若窗口仍旧 | **不阻塞** 已验收的三项；诊断门控与字号回跳已在后续提交里处理 |
+| Bugbot 收尾（阅读滚动不重建、新进页字号、日期折叠、遮罩安全区、说明滚入、感受恢复/箭头/重复） | 代码 + 针对性 Jest | **PASS**（本轮）。真机三项关闭项不复测，仍记 **PASS** |
 
 未在本轮执行合并。需要合并时再发。
+
+## 收尾修复（本轮，不复测真机三项）
+
+阅读 `RootReadingLayout` 不再用宽/高/字号作 key。`resolveFontScale` 首次无历史且两侧不一致时跟 `PixelRatio`。发生日期 `open` 为假时选项不挂载。锁定遮罩 `padding` 含安全区。打开「查看说明」后 `scrollToEnd`。感受恢复不重复旧词，箭头与 `expanded` 一致。
 
 ## 命令
 

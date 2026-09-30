@@ -106,7 +106,8 @@ describe('leave layout follows an in-session fontScale change', () => {
     });
     await expectLayout(view, '1', 'row');
     expect(view.getByLabelText('当时的感受，平静')).toBeTruthy();
-    expect(view.getByTestId('composer-occurred-today')).toBeTruthy();
+    expect(view.getByLabelText('这件事发生在哪一天')).toBeTruthy();
+    expect(view.getByText('今天')).toBeTruthy();
     expect(view.getByLabelText('照片 1/1')).toBeTruthy();
     expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
 
@@ -125,7 +126,8 @@ describe('leave layout follows an in-session fontScale change', () => {
     await expectLayout(view, '1', 'row');
     expect(view.getByTestId('composer-note').props.value).toBe('门口的风还在。');
     expect(view.getByLabelText('当时的感受，平静')).toBeTruthy();
-    expect(view.getByTestId('composer-occurred-today')).toBeTruthy();
+    expect(view.getByLabelText('这件事发生在哪一天')).toBeTruthy();
+    expect(view.getByText('今天')).toBeTruthy();
     expect(view.getByLabelText('照片 1/1')).toBeTruthy();
     expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
     expect(view.getByLabelText('拍摄')).toBeEnabled();

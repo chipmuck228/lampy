@@ -110,6 +110,22 @@ describe('font scale source conflict', () => {
     ]);
   });
 
+  it('uses PixelRatio on the first Leave/Lookback mount when the window is still stale', () => {
+    jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(1);
+    setWindowFontScale(3);
+    const first = readPageMetrics();
+    expect(first.fontScale).toBe(1);
+    expect(first.windowFontScale).toBe(3);
+    expect(first.pixelFontScale).toBe(1);
+    const seen = readSequence(rereadSchedule('enter'), {
+      fontScale: first.fontScale,
+      windowScale: first.windowFontScale,
+      pixelScale: first.pixelFontScale,
+    });
+    expect(seen.map((item) => item.fontScale)).toEqual([1, 1, 1, 1]);
+    expect(seen.every((item) => item.reading.windowScale === 3 && item.reading.pixelScale === 1)).toBe(true);
+  });
+
   it('holds the confirmed scale until the stale source catches up', () => {
     const afterPixel = resolveFontScale(3, 1, { fontScale: 3, windowScale: 3, pixelScale: 3 });
     const held = readSequence(

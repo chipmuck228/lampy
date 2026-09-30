@@ -128,6 +128,7 @@ export default function LeaveScreen() {
   const pendingTodaySeedRef = useRef<string | null>(null);
   const sound = useSoundPlayer();
   const [previewBoundId, setPreviewBoundId] = useState<string | null>(null);
+  const contentScrollRef = useRef<ScrollView>(null);
   const audioId = audio?.id;
 
   useEffect(() => {
@@ -171,6 +172,14 @@ export default function LeaveScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- drop the previous type's measured note height
     setNoteBoxHeight(undefined);
   }, [fontScale]);
+
+  useEffect(() => {
+    if (!detailOpen || !messageDetail) return;
+    const id = requestAnimationFrame(() => {
+      contentScrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [detailOpen, messageDetail]);
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -764,6 +773,8 @@ export default function LeaveScreen() {
           {stackActions ? 'stack' : 'row'}
         </Text>
         <ScrollView
+          ref={contentScrollRef}
+          testID="composer-scroll"
           style={styles.flex}
           contentContainerStyle={[
             styles.column,

@@ -61,7 +61,9 @@ export function resolveFontScale(
   }
 
   if (!prior) {
-    const fontScale = window || pixel || 1;
+    // After Settings, PixelRatio updates first. A newly mounted Leave/Lookback
+    // must not freeze the still-stale window value for the rest of the session.
+    const fontScale = pixel && window && pixel !== window ? pixel : window || pixel || 1;
     return { fontScale, windowScale: window, pixelScale: pixel };
   }
 
