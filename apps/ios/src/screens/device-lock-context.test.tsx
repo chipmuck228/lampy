@@ -468,6 +468,208 @@ describe('device lock cover', () => {
     });
   });
 
+  it('persists enable after system-auth inactive and background without staling the toggle', async () => {
+    const app = mockAppState();
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const setEnabled = jest.fn(async () => undefined);
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(wrap({ isEnabled: async () => false, setEnabled }, { authenticate }));
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+      await act(async () => {
+        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+      });
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await app.set('inactive');
+      expect(setEnabled).not.toHaveBeenCalled();
+      await app.set('background');
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(setEnabled).toHaveBeenCalledWith(true);
+      });
+      expect(view.getByText('已使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('persists disable after system-auth lifecycle and then ignores later backgrounds', async () => {
+    const app = mockAppState();
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const setEnabled = jest.fn(async () => undefined);
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(wrap({ isEnabled: async () => true, setEnabled }, { authenticate }));
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+
+      await act(async () => {
+        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+      });
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(2);
+      });
+      await app.set('inactive');
+      await app.set('background');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        pending[1]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(setEnabled).toHaveBeenCalledWith(false);
+      });
+      expect(view.getByText('使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+
+      await app.set('background');
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      await app.set('active');
+      expect(authenticate).toHaveBeenCalledTimes(2);
+      expect(view.queryByTestId('device-lock-cover')).toBeNull();
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('covers after a successful enable when the app later backgrounds and ignores a late unlock', async () => {
+    const app = mockAppState();
+    const pending: ((value: { ok: true }) => void)[] = [];
+    const setEnabled = jest.fn(async () => undefined);
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(wrap({ isEnabled: async () => false, setEnabled }, { authenticate }));
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+      await act(async () => {
+        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+      });
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await app.set('inactive');
+      await app.set('background');
+      await app.set('active');
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(setEnabled).toHaveBeenCalledWith(true);
+      });
+
+      await app.set('background');
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      await app.set('active');
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(2);
+      });
+      await app.set('background');
+      await act(async () => {
+        pending[1]({ ok: true });
+      });
+      expect(view.getByTestId('device-lock-cover')).toBeTruthy();
+      expect(view.queryByText('private')).toBeNull();
+    } finally {
+      app.restore();
+    }
+  });
+
+  it('retries disable after a persist failure without changing the stored setting first', async () => {
+    const app = mockAppState();
+    const pending: ((value: { ok: true }) => void)[] = [];
+    let writes = 0;
+    const setEnabled = jest.fn(async () => {
+      writes += 1;
+      if (writes === 1) throw new Error('keychain');
+    });
+    const authenticate = jest.fn(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    try {
+      const view = await render(wrap({ isEnabled: async () => true, setEnabled }, { authenticate }));
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        pending[0]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(view.queryByTestId('device-lock-cover')).toBeNull();
+      });
+
+      await act(async () => {
+        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+      });
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(2);
+      });
+      await app.set('inactive');
+      await app.set('active');
+      await act(async () => {
+        pending[1]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(setEnabled).toHaveBeenCalledWith(false);
+        expect(view.getByText('这次没有保存本机保护设置。记录还在，可以再试一次。')).toBeTruthy();
+      });
+      expect(view.getByText('已使用 Face ID 保护 Lampy')).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(view.getByLabelText('使用 Face ID 保护 Lampy'));
+      });
+      await waitFor(() => {
+        expect(authenticate).toHaveBeenCalledTimes(3);
+      });
+      await act(async () => {
+        pending[2]({ ok: true });
+      });
+      await waitFor(() => {
+        expect(setEnabled).toHaveBeenCalledTimes(2);
+      });
+      expect(view.getByText('使用 Face ID 保护 Lampy')).toBeTruthy();
+      expect(view.queryByText('这次没有保存本机保护设置。记录还在，可以再试一次。')).toBeNull();
+    } finally {
+      app.restore();
+    }
+  });
+
   it('rolls back disable and stays retryable when the setting cannot be written', async () => {
     const setEnabled = jest.fn(async () => {
       throw new Error('keychain');

@@ -9,12 +9,14 @@ export type DeviceLockSnapshot = {
   sessionUnlocked: boolean;
   locked: boolean;
   authGeneration: number;
+  settingsGeneration: number;
 };
 
 export function createDeviceLockSession() {
   let setting: DeviceLockSetting = 'unknown';
   let sessionUnlocked = false;
   let authGeneration = 0;
+  let settingsGeneration = 0;
 
   function snapshot(): DeviceLockSnapshot {
     return {
@@ -22,6 +24,7 @@ export function createDeviceLockSession() {
       sessionUnlocked,
       locked: setting === 'unknown' || (setting === 'on' && !sessionUnlocked),
       authGeneration,
+      settingsGeneration,
     };
   }
 
@@ -42,6 +45,10 @@ export function createDeviceLockSession() {
       authGeneration += 1;
       return authGeneration;
     },
+    beginSettingsAuth() {
+      settingsGeneration += 1;
+      return settingsGeneration;
+    },
     finishUnlock(generation: number, result: DeviceAuthResult) {
       if (generation !== authGeneration) return { kind: 'stale' as const, ...snapshot() };
       if (setting !== 'on') return { kind: 'ignored' as const, ...snapshot() };
@@ -49,14 +56,14 @@ export function createDeviceLockSession() {
       return { kind: result.ok ? ('unlocked' as const) : ('denied' as const), ...snapshot(), result };
     },
     confirmEnable(generation: number, result: DeviceAuthResult) {
-      if (generation !== authGeneration) return { kind: 'stale' as const, persist: false, ...snapshot() };
+      if (generation !== settingsGeneration) return { kind: 'stale' as const, persist: false, ...snapshot() };
       if (!result.ok) return { kind: 'denied' as const, persist: false, ...snapshot(), result };
       setting = 'on';
       sessionUnlocked = true;
       return { kind: 'enabled' as const, persist: true, ...snapshot() };
     },
     confirmDisable(generation: number, result: DeviceAuthResult) {
-      if (generation !== authGeneration) return { kind: 'stale' as const, persist: false, ...snapshot() };
+      if (generation !== settingsGeneration) return { kind: 'stale' as const, persist: false, ...snapshot() };
       if (!result.ok) return { kind: 'denied' as const, persist: false, ...snapshot(), result };
       setting = 'off';
       sessionUnlocked = true;

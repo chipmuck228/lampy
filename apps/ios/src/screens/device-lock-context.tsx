@@ -69,7 +69,7 @@ export function DeviceLockProvider({
   const refresh = useCallback(() => setSnapshot(session.snapshot()), [session]);
 
   const logLock = useCallback(
-    (event: string, extra?: { generation?: number; locked?: boolean; result?: string }) => {
+    (event: string, extra?: { generation?: number; settingsGeneration?: number; locked?: boolean; result?: string }) => {
       if (process.env.JEST_WORKER_ID) return;
       if (typeof __DEV__ !== 'undefined' && !__DEV__) return;
       const current = session.snapshot();
@@ -77,7 +77,10 @@ export function DeviceLockProvider({
         event,
         appState: AppState.currentState,
         generation: extra?.generation ?? current.authGeneration,
+        settingsGeneration: extra?.settingsGeneration ?? current.settingsGeneration,
         locked: extra?.locked ?? current.locked,
+        setting: current.setting,
+        inFlight: inFlight.current,
         ...(extra?.result ? { result: extra.result } : {}),
       });
     },
@@ -211,15 +214,17 @@ export function DeviceLockProvider({
   const toggle = useCallback(async () => {
     const current = session.snapshot();
     if (current.setting === 'unknown' || inFlight.current) return;
-    const generation = session.beginAuth();
+    const generation = session.beginSettingsAuth();
     inFlight.current = true;
     setMessage(null);
     const enabling = current.setting === 'off';
+    logLock('settings-start', { settingsGeneration: generation });
     try {
       const result = await resolvedAuthenticator.authenticate(
         enabling ? '验证是这台设备的持有人，才能打开本机保护。' : '验证是这台设备的持有人，才能关闭本机保护。',
       );
       const next = enabling ? session.confirmEnable(generation, result) : session.confirmDisable(generation, result);
+      logLock('settings-end', { settingsGeneration: generation, result: next.kind, locked: next.locked });
       if (next.persist) {
         try {
           await resolvedStore.setEnabled(enabling);
@@ -230,14 +235,17 @@ export function DeviceLockProvider({
         }
       } else if (next.kind === 'denied') {
         setMessage(deviceLockCopy(result));
+      } else if (next.kind === 'stale') {
+        setMessage(deviceLockPersistCopy());
       }
     } catch {
+      logLock('settings-end', { settingsGeneration: generation, result: 'error' });
       setMessage(deviceLockAuthErrorCopy());
     } finally {
       inFlight.current = false;
       refresh();
     }
-  }, [refresh, resolvedAuthenticator, resolvedStore, session]);
+  }, [logLock, refresh, resolvedAuthenticator, resolvedStore, session]);
 
   const value = {
     snapshot,

@@ -16,7 +16,7 @@ describe('device lock session', () => {
   it('keeps the setting off when enable auth fails or is cancelled', () => {
     const session = createDeviceLockSession();
     session.applyStored(false);
-    const generation = session.beginAuth();
+    const generation = session.beginSettingsAuth();
     const denied = session.confirmEnable(generation, { ok: false, reason: 'cancel' });
     expect(denied.persist).toBe(false);
     expect(denied.setting).toBe('off');
@@ -26,11 +26,30 @@ describe('device lock session', () => {
   it('persists enabled only after a successful challenge', () => {
     const session = createDeviceLockSession();
     session.applyStored(false);
-    const generation = session.beginAuth();
+    const generation = session.beginSettingsAuth();
     const enabled = session.confirmEnable(generation, { ok: true });
     expect(enabled.persist).toBe(true);
     expect(enabled.setting).toBe('on');
     expect(enabled.locked).toBe(false);
+  });
+
+  it('does not stale a settings change when background invalidates unlock', () => {
+    const session = createDeviceLockSession();
+    session.applyStored(false);
+    const enable = session.beginSettingsAuth();
+    session.lockForBackground();
+    expect(session.confirmEnable(enable, { ok: true }).persist).toBe(true);
+    expect(session.snapshot().setting).toBe('on');
+    expect(session.snapshot().locked).toBe(false);
+
+    const close = session.beginSettingsAuth();
+    const unlock = session.beginAuth();
+    session.lockForBackground();
+    expect(session.finishUnlock(unlock, { ok: true }).kind).toBe('stale');
+    expect(session.snapshot().locked).toBe(true);
+    expect(session.confirmDisable(close, { ok: true }).persist).toBe(true);
+    expect(session.snapshot().setting).toBe('off');
+    expect(session.snapshot().locked).toBe(false);
   });
 
   it('locks again in background and ignores a stale unlock', () => {
@@ -50,10 +69,10 @@ describe('device lock session', () => {
     session.applyStored(true);
     const unlock = session.beginAuth();
     session.finishUnlock(unlock, { ok: true });
-    const close = session.beginAuth();
+    const close = session.beginSettingsAuth();
     expect(session.confirmDisable(close, { ok: false, reason: 'fail' }).persist).toBe(false);
     expect(session.snapshot().setting).toBe('on');
-    const again = session.beginAuth();
+    const again = session.beginSettingsAuth();
     expect(session.confirmDisable(again, { ok: true }).persist).toBe(true);
     expect(session.snapshot().setting).toBe('off');
   });
@@ -69,13 +88,13 @@ describe('device lock session', () => {
   it('reverts a persist failure so memory matches the previous stored setting', () => {
     const session = createDeviceLockSession();
     session.applyStored(false);
-    const enable = session.beginAuth();
+    const enable = session.beginSettingsAuth();
     session.confirmEnable(enable, { ok: true });
     expect(session.revertEnable().setting).toBe('off');
     session.applyStored(true);
     const unlock = session.beginAuth();
     session.finishUnlock(unlock, { ok: true });
-    const disable = session.beginAuth();
+    const disable = session.beginSettingsAuth();
     session.confirmDisable(disable, { ok: true });
     expect(session.revertDisable().setting).toBe('on');
     expect(session.snapshot().locked).toBe(false);
