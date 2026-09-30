@@ -3,14 +3,14 @@
 Base：`origin/main` `6e25227203fc0e9a270cda4f08d81f70ea5d04e4`（#46）。  
 Head：本 PR。只改 `apps/ios`。家庭入口关闭。`identityLoopAccepted` 保持 false。未卸 Liuz17，未清个人库。
 
-远端对照（本轮开始）：`origin/ios/personal-ui-refinement-v1` = `d9c038e55f913fd010b0b15bd7232883a101c28c`。原生仍是已装的 Dev Client（`app.lampy.ios` / Expo 0.1.0），本轮只热更新 JS，不卸、不重装、不清记录。Metro JS 以 git head + `apps/ios/src` SHA 核对，不以 Jest 代替真机。
+远端对照（本轮开始）：`origin/ios/personal-ui-refinement-v1` = `5278727148f9c5bf8ac03a6877a7332be914c5ff`。原生仍是已装的 Dev Client（`app.lampy.ios` / Expo 0.1.0），本轮只热更新 JS，不卸、不重装、不清记录。Metro JS 以 git head + `apps/ios/src` SHA 核对，不以 Jest 代替真机。
 
 ## 命令
 
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | **PASS** |
-| 相关 Jest（lookback-book / leave-* / account / recent-reading / scaffold / moment-audio-marks / personal-settings-visibility / device-lock* / use-page-metrics / composer-notice） | **PASS** |
+| 相关 Jest（lookback-book / leave-* / account / recent-reading / scaffold / moment-audio-marks / personal-settings-visibility / device-lock* / use-page-metrics 连续读取 / composer-notice） | **PASS** |
 | 本轮 ESLint（新改 UI 文件 + 门控/测试） | **PASS** |
 | `src/app/leave.tsx` 全文件 ESLint | 预存 `react-hooks/set-state-in-effect`（`setPreviewBoundId`，main 已有）。本轮另有 `setNoteBoxHeight`：字号变化时丢掉旧测量高度，不重建整页 |
 | `git diff --check` | **PASS** |
