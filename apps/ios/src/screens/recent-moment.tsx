@@ -8,6 +8,7 @@ import { LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentImages } from './moment-images';
 import { RecentFeeling } from './recent-feeling';
+import { RecentPhotoReveal } from './recent-photo-reveal-view';
 import {
   recentNoteIsTruncated,
   recentNoteVisibleLineLimit,
@@ -30,6 +31,7 @@ export function RecentMoment({
   echoing = false,
   expanded = false,
   listen,
+  reduceMotion = false,
   onToggleExpand,
   onOpen,
   onPlay,
@@ -41,6 +43,7 @@ export function RecentMoment({
   echoing?: boolean;
   expanded?: boolean;
   listen: { status: PlaybackStatus; currentTimeMs: number };
+  reduceMotion?: boolean;
   onToggleExpand?: () => void;
   onOpen: () => void;
   onPlay: () => void;
@@ -115,6 +118,15 @@ export function RecentMoment({
                 images={item.images}
                 testIDPrefix={`recent-image-${item.id}`}
                 rhythm={pairImages}
+                wrapAvailable={(image, slot) => (
+                  <RecentPhotoReveal
+                    photoId={image.id}
+                    reduceMotion={reduceMotion}
+                    testID={`recent-image-${item.id}-reveal-${image.id}`}
+                  >
+                    {slot}
+                  </RecentPhotoReveal>
+                )}
               />
               <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
             </View>
