@@ -38,3 +38,15 @@ export function shouldRevealSaveEcho(input: {
 export function shouldSkipSaveEchoFade(reduceMotion: boolean): boolean {
   return reduceMotion;
 }
+
+export function isRecentForeground(state: string | null | undefined): boolean {
+  return state === 'active';
+}
+
+export function nextEchoSeq(current: number): number {
+  return current + 1;
+}
+
+export function echoCallbackIsCurrent(started: number, current: number): boolean {
+  return started === current;
+}

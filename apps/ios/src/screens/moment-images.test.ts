@@ -1,3 +1,4 @@
+import { recentImageColumnWidth } from './life-page';
 import { detailImageBands, momentImageAspectRatio, recentImageBands, shouldPairRecentImages } from './moment-images';
 import type { ImageView } from '../application/use-cases';
 
@@ -58,6 +59,17 @@ describe('moment image layout', () => {
     expect(shouldPairRecentImages(1, 345)).toBe(true);
     expect(shouldPairRecentImages(1.3, 345)).toBe(false);
     expect(shouldPairRecentImages(1, 200)).toBe(false);
+    expect(shouldPairRecentImages(1, recentImageColumnWidth(390, 844, 1))).toBe(true);
+    expect(shouldPairRecentImages(1, recentImageColumnWidth(320, 700, 1))).toBe(false);
+    expect(shouldPairRecentImages(1.3, recentImageColumnWidth(1024, 1366, 1.3))).toBe(false);
+  });
+
+  it('does not pair when the page is wide but the content column is under 280', () => {
+    const column = recentImageColumnWidth(768, 1024, 1, 200, 200);
+    expect(768).toBeGreaterThanOrEqual(280);
+    expect(column).toBeLessThan(280);
+    expect(shouldPairRecentImages(1, column)).toBe(false);
+    expect(shouldPairRecentImages(1, recentImageColumnWidth(768, 1024, 1))).toBe(true);
   });
 
   it('keeps recent image order and stacks when pairing is off', () => {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUseCases } from '../application/container';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
@@ -12,6 +13,9 @@ import { shouldPairRecentImages } from '../screens/moment-images';
 import { RecentMoment } from '../screens/recent-moment';
 import {
   consumeJustSavedMomentId,
+  echoCallbackIsCurrent,
+  isRecentForeground,
+  nextEchoSeq,
   peekJustSavedMomentId,
   SAVE_ECHO_FADE_MS,
   SAVE_ECHO_START_OPACITY,
@@ -29,8 +33,8 @@ import {
   hairline,
   pageGutter,
   paper,
-  readingWidth,
   recentColumnWidth,
+  recentImageColumnWidth,
   sage,
   shouldShowSameDayRule,
   shouldStackRecentDay,
@@ -40,23 +44,31 @@ import { usePageMetrics } from '../screens/use-page-metrics';
 
 export default function RecentScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { width, height, fontScale } = usePageMetrics();
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
   const stackDay = shouldStackRecentDay(width, height, fontScale);
   const columnWidth = recentColumnWidth(width, height, fontScale);
-  const pairImages = shouldPairRecentImages(fontScale, readingWidth(width, height));
+  const pairImages = shouldPairRecentImages(
+    fontScale,
+    recentImageColumnWidth(width, height, fontScale, insets.left, insets.right),
+  );
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [echoId, setEchoId] = useState<string | null>(null);
   const [reduceMotion, setReduceMotion] = useState(true);
   const [echoOpacity] = useState(() => new Animated.Value(1));
   const echoAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const echoSeq = useRef(0);
   const clips = useRecentClipPlayback();
   const days = view?.days ?? [];
   const reduceMotionRef = useRef(reduceMotion);
+  const itemIdsRef = useRef<string[]>([]);
+  const loadReadyRef = useRef(false);
 
   const settleEcho = useCallback(() => {
+    echoSeq.current = nextEchoSeq(echoSeq.current);
     echoAnim.current?.stop();
     echoAnim.current = null;
     echoOpacity.setValue(1);
@@ -64,6 +76,10 @@ export default function RecentScreen() {
 
   const revealEcho = useCallback(
     (id: string, skipFade: boolean) => {
+      const seq = nextEchoSeq(echoSeq.current);
+      echoSeq.current = seq;
+      echoAnim.current?.stop();
+      echoAnim.current = null;
       setEchoId(id);
       if (skipFade) {
         echoOpacity.setValue(1);
@@ -77,6 +93,7 @@ export default function RecentScreen() {
       });
       echoAnim.current = anim;
       anim.start(({ finished }) => {
+        if (!echoCallbackIsCurrent(seq, echoSeq.current)) return;
         if (!finished) echoOpacity.setValue(1);
         echoAnim.current = null;
       });
@@ -84,9 +101,38 @@ export default function RecentScreen() {
     [echoOpacity],
   );
 
+  const tryRevealPending = useCallback(
+    (itemIds: string[], loadReady: boolean) => {
+      const pending = peekJustSavedMomentId();
+      if (
+        shouldRevealSaveEcho({
+          momentId: pending,
+          itemIds,
+          loadReady,
+          foreground: isRecentForeground(AppState.currentState),
+        })
+      ) {
+        consumeJustSavedMomentId();
+        revealEcho(pending as string, shouldSkipSaveEchoFade(reduceMotionRef.current));
+        return;
+      }
+      if (pending && loadReady && !itemIds.includes(pending)) consumeJustSavedMomentId();
+    },
+    [revealEcho],
+  );
+
   useEffect(() => {
     reduceMotionRef.current = reduceMotion;
   }, [reduceMotion]);
+
+  useEffect(() => {
+    itemIdsRef.current = view?.items.map((item) => item.id) ?? [];
+    loadReadyRef.current = view !== null;
+  }, [view]);
+
+  useEffect(() => {
+    if (reduceMotion) settleEcho();
+  }, [reduceMotion, settleEcho]);
 
   useEffect(() => {
     let alive = true;
@@ -101,7 +147,11 @@ export default function RecentScreen() {
       setReduceMotion(value === true);
     });
     const app = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') settleEcho();
+      if (isRecentForeground(state)) {
+        tryRevealPending(itemIdsRef.current, loadReadyRef.current);
+        return;
+      }
+      settleEcho();
     });
     return () => {
       alive = false;
@@ -109,7 +159,7 @@ export default function RecentScreen() {
       app.remove();
       settleEcho();
     };
-  }, [settleEcho]);
+  }, [settleEcho, tryRevealPending]);
 
   useFocusEffect(
     useCallback(() => {
@@ -120,29 +170,19 @@ export default function RecentScreen() {
           if (cancelled) return;
           setView(next);
           setError(null);
-          const pending = peekJustSavedMomentId();
-          const itemIds = next.items.map((item) => item.id);
-          if (
-            shouldRevealSaveEcho({
-              momentId: pending,
-              itemIds,
-              loadReady: true,
-              foreground: AppState.currentState !== 'background' && AppState.currentState !== 'inactive',
-            })
-          ) {
-            consumeJustSavedMomentId();
-            revealEcho(pending as string, shouldSkipSaveEchoFade(reduceMotionRef.current));
-            return;
-          }
-          if (pending && !itemIds.includes(pending)) consumeJustSavedMomentId();
+          tryRevealPending(
+            next.items.map((item) => item.id),
+            true,
+          );
         })
         .catch(() => {
           if (!cancelled) setError('最近的记录暂时读不出来，原来的内容还在这台设备上。');
         });
       return () => {
         cancelled = true;
+        settleEcho();
       };
-    }, [revealEcho]),
+    }, [settleEcho, tryRevealPending]),
   );
 
   return (
@@ -217,7 +257,8 @@ export default function RecentScreen() {
                   <RecentMoment
                     item={item}
                     pairImages={pairImages}
-                    echoOpacity={echoId === item.id ? echoOpacity : undefined}
+                    echoOpacity={echoOpacity}
+                    echoing={echoId === item.id}
                     listen={
                       item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
                     }

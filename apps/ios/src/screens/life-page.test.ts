@@ -10,6 +10,7 @@ import {
   readingPageWidth,
   readingWidth,
   recentColumnWidth,
+  recentImageColumnWidth,
   chooseNavBandLayout,
   navBandItemMinHeight,
   navBandItemMinWidth,
@@ -59,6 +60,15 @@ describe('life page measures', () => {
     expect(recentColumnWidth(1024, 1366, 1)).toBe(768);
     expect(recentColumnWidth(1024, 1366, 3.1)).toBe(616);
     expect(recentColumnWidth(390, 844, 3.1)).toBe(390);
+  });
+
+  it('measures the image column after gutters, the date rail, and safe edges', () => {
+    expect(recentImageColumnWidth(1024, 1366, 1)).toBe(READING_MAX);
+    expect(recentImageColumnWidth(390, 844, 1)).toBe(342);
+    expect(recentImageColumnWidth(320, 700, 1)).toBe(272);
+    expect(recentImageColumnWidth(768, 1024, 1, 200, 200)).toBe(120);
+    expect(768).toBeGreaterThanOrEqual(280);
+    expect(recentImageColumnWidth(768, 1024, 1, 200, 200)).toBeLessThan(280);
   });
 
   it('uses a left rail on tablet regular type, not on a phone or large type', () => {

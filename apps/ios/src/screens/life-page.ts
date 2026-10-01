@@ -142,6 +142,24 @@ export function recentColumnWidth(windowWidth: number, windowHeight: number, fon
   return isLargeType(fontScale) ? readingPageWidth(windowWidth, windowHeight) : pageColumnWidth(windowWidth, windowHeight);
 }
 
+/** Width left for photos after gutters, safe edges, and the date rail when it sits beside the items. */
+export function recentImageColumnWidth(
+  windowWidth: number,
+  windowHeight: number,
+  fontScale: number,
+  safeLeft = 0,
+  safeRight = 0,
+): number {
+  const gutter = pageGutter(windowWidth, windowHeight);
+  const pageCol = recentColumnWidth(windowWidth, windowHeight, fontScale);
+  const used = Math.min(Math.max(0, windowWidth - safeLeft - safeRight), pageCol);
+  const inner = used - gutter * 2;
+  if (shouldStackRecentDay(windowWidth, windowHeight, fontScale)) {
+    return Math.max(0, inner);
+  }
+  return Math.max(0, inner - DATE_RAIL_WIDTH - DATE_RAIL_GAP);
+}
+
 export function shouldShowSameDayRule(indexInDay: number): boolean {
   return indexInDay > 0;
 }

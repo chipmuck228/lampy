@@ -1,5 +1,8 @@
 import {
   consumeJustSavedMomentId,
+  echoCallbackIsCurrent,
+  isRecentForeground,
+  nextEchoSeq,
   peekJustSavedMomentId,
   resetJustSavedMomentIdForTests,
   shouldRevealSaveEcho,
@@ -58,5 +61,41 @@ describe('recent save echo', () => {
   it('skips the fade when Reduce Motion is on', () => {
     expect(shouldSkipSaveEchoFade(true)).toBe(true);
     expect(shouldSkipSaveEchoFade(false)).toBe(false);
+  });
+
+  it('treats only AppState active as recent foreground', () => {
+    expect(isRecentForeground('active')).toBe(true);
+    expect(isRecentForeground('background')).toBe(false);
+    expect(isRecentForeground('inactive')).toBe(false);
+    expect(isRecentForeground(undefined)).toBe(false);
+  });
+
+  it('ignores a finished callback from an earlier echo sequence', () => {
+    const first = nextEchoSeq(0);
+    const second = nextEchoSeq(first);
+    expect(echoCallbackIsCurrent(first, first)).toBe(true);
+    expect(echoCallbackIsCurrent(first, second)).toBe(false);
+    expect(echoCallbackIsCurrent(second, second)).toBe(true);
+  });
+
+  it('does not reveal a consumed id again after a later load', () => {
+    writeJustSavedMomentId('moment_one');
+    expect(
+      shouldRevealSaveEcho({
+        momentId: peekJustSavedMomentId(),
+        itemIds: ['moment_one'],
+        loadReady: true,
+        foreground: true,
+      }),
+    ).toBe(true);
+    consumeJustSavedMomentId();
+    expect(
+      shouldRevealSaveEcho({
+        momentId: peekJustSavedMomentId(),
+        itemIds: ['moment_one'],
+        loadReady: true,
+        foreground: true,
+      }),
+    ).toBe(false);
   });
 });
