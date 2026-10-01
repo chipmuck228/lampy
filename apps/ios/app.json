@@ -10,6 +10,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.lampy.ios",
+      "appleTeamId": "B283NY984J",
+      "buildNumber": "1",
       "usesAppleSignIn": true,
       "icon": "./assets/expo.icon",
       "infoPlist": {

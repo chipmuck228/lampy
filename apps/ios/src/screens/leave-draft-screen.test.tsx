@@ -129,7 +129,11 @@ describe('leave draft restore and abandon', () => {
     expect(input.props.editable).toBe(true);
     expect(view.getByLabelText('拍摄').props.accessibilityState?.disabled).toBeFalsy();
     expect(view.getByLabelText('照片').props.accessibilityState?.disabled).toBeFalsy();
-    expect(view.getByLabelText('当时的感受，平静，已选中').props.accessibilityState.disabled).toBeFalsy();
+    const restoredFeeling = view.getByLabelText('当时的感受，平静');
+    expect(restoredFeeling.props.accessibilityState?.disabled).toBeFalsy();
+    expect(restoredFeeling.props.accessibilityState?.expanded).toBe(false);
+    expect(view.queryByLabelText('当时的感受，平静，已选中')).toBeNull();
+    expect(view.getByLabelText('清除当时的感受')).toBeTruthy();
     expect(view.getByLabelText('照片 1/1')).toBeTruthy();
     expect(view.getByLabelText('一段声音，2秒，未播放')).toBeTruthy();
 
@@ -300,7 +304,8 @@ describe('leave draft restore and abandon', () => {
     });
     expect(mockAbandon).not.toHaveBeenCalled();
     expect(view.getByDisplayValue('还没留下的一句')).toBeTruthy();
-    expect(view.getByLabelText('当时的感受，平静，已选中')).toBeTruthy();
+    expect(view.getByLabelText('当时的感受，平静').props.accessibilityState?.expanded).toBe(false);
+    expect(view.queryByLabelText('当时的感受，平静，已选中')).toBeNull();
     expect(view.queryByLabelText('照片 1/1')).toBeNull();
     expect(view.getByLabelText('一段声音，2秒，未播放')).toBeTruthy();
     expect(view.getByLabelText('放弃这份草稿')).toBeTruthy();
@@ -417,11 +422,19 @@ describe('leave draft restore and abandon', () => {
       expect(view.getByTestId('composer-note').props.editable).toBe(true);
     });
     fireEvent.changeText(view.getByTestId('composer-note'), '改过的一句');
-    fireEvent.press(view.getByTestId('composer-feeling-高兴'));
     await waitFor(() => {
       expect(mockUpdateDraftNote).toHaveBeenCalledWith('moment_restored', '改过的一句');
+    });
+    fireEvent.press(view.getByLabelText('当时的感受，平静'));
+    await waitFor(() => {
+      expect(view.getByLabelText('当时的感受，平静').props.accessibilityState?.expanded).toBe(true);
+    });
+    fireEvent.press(view.getByLabelText('当时的感受，高兴'));
+    await waitFor(() => {
       expect(mockUpdateDraftEmotion).toHaveBeenCalledWith('moment_restored', '高兴');
-      expect(view.getByLabelText('当时的感受，高兴，已选中')).toBeTruthy();
+      expect(view.getByLabelText('当时的感受，高兴，已选中').props.accessibilityState.selected).toBe(
+        true,
+      );
     });
   });
 });
