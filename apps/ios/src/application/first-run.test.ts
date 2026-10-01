@@ -1,5 +1,8 @@
 import {
   decideFirstRunGuide,
+  firstRunInnerCanScroll,
+  firstRunPageAfterInnerSwipe,
+  firstRunPageFromOffset,
   isFirstRunFinishAction,
   nextFirstRunIndex,
   settleFirstRunMotion,
@@ -38,6 +41,52 @@ describe('first-run guide decision', () => {
     expect(decideFirstRunGuide({ completed: true, hasPersonalRecords: false, recordsUnknown: false }).showGuide).toBe(
       false,
     );
+  });
+
+  it('pages from a swipe only after the inner copy has nowhere left to scroll', () => {
+    expect(firstRunPageFromOffset(640, 320, 3)).toBe(2);
+    expect(firstRunInnerCanScroll(400, 400)).toBe(false);
+    expect(firstRunInnerCanScroll(520, 400)).toBe(true);
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: true,
+        offsetY: 120,
+        viewHeight: 400,
+        contentHeight: 520,
+        velocityY: 0.8,
+        index: 0,
+      }),
+    ).toBe(1);
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: true,
+        offsetY: 40,
+        viewHeight: 400,
+        contentHeight: 520,
+        velocityY: 0.8,
+        index: 0,
+      }),
+    ).toBeNull();
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: false,
+        offsetY: 0,
+        viewHeight: 400,
+        contentHeight: 400,
+        velocityY: 0.8,
+        index: 0,
+      }),
+    ).toBeNull();
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: true,
+        offsetY: 120,
+        viewHeight: 400,
+        contentHeight: 520,
+        velocityY: 0.8,
+        index: FIRST_RUN_LAST_INDEX,
+      }),
+    ).toBeNull();
   });
 
   it('restores a visible scene when motion is stopped mid-flight', () => {

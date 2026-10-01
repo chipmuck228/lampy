@@ -57,3 +57,32 @@ export function settleFirstRunMotion(motion: {
   motion.opacity.setValue(1);
   motion.shift.setValue(0);
 }
+
+export function firstRunPageFromOffset(offsetY: number, pageHeight: number, pageCount: number) {
+  return Math.max(0, Math.min(Math.round(offsetY / Math.max(pageHeight, 1)), pageCount - 1));
+}
+
+export function firstRunInnerCanScroll(contentHeight: number, viewHeight: number) {
+  return contentHeight > viewHeight + 1;
+}
+
+/** Finger swipe up raises contentOffset and has positive velocity.y on iOS. */
+export function firstRunPageAfterInnerSwipe(input: {
+  canScroll: boolean;
+  offsetY: number;
+  viewHeight: number;
+  contentHeight: number;
+  velocityY: number;
+  index: number;
+}): number | null {
+  if (!input.canScroll) return null;
+  const atEnd = input.offsetY + input.viewHeight >= input.contentHeight - 8;
+  const atStart = input.offsetY <= 8;
+  if (atEnd && input.velocityY > 0.15 && !isFirstRunFinishAction(input.index)) {
+    return nextFirstRunIndex(input.index);
+  }
+  if (atStart && input.velocityY < -0.15 && input.index > 0) {
+    return input.index - 1;
+  }
+  return null;
+}

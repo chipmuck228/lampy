@@ -13,7 +13,7 @@ Base：`origin/main` `e7580e33f01429d9945ee2d8a2b5a3980b3c4e92`（#47 merge）�
 | --- | --- |
 | 重新生成 Expo typed routes（`.expo/types/router.d.ts`，gitignore） | 生成后含 `/account-diagnostics` |
 | `npx tsc --noEmit` | **PASS**（上一轮 FAIL 是本机缺少生成类型，不是 `account-screen` 代码错误） |
-| 相关 Jest（含 `first-run-guide-motion`、`settleFirstRunMotion`） | **PASS** |
+| 相关 Jest（含分页规则、`first-run-guide-motion`、`settleFirstRunMotion`） | **PASS** |
 | 本轮 ESLint | **PASS** 0 errors |
 | `git diff --check -- apps/ios` | **PASS** |
 
@@ -25,7 +25,8 @@ Base：`origin/main` `e7580e33f01429d9945ee2d8a2b5a3980b3c4e92`（#47 merge）�
 | --- | --- | --- |
 | 擦除后的旧模拟器 `E5013DFB` | `completed: true`，`hasPersonalRecords: false`，`recordsUnknown: false` | **旧完成标记还在 Keychain**。擦除 App 数据 / `erase` 清不掉 `lampy.first-run.v1` |
 | 已有记录的模拟器 `4D4C1816` | `completed: true`，`hasPersonalRecords: true` | 完成标记 + 已有记录 |
-| **新建** `Lampy-guide-isol`（`DEB86847`，iOS 26.5） | `needed`，`completed: false`，空库 | 三屏出现 |
+| **新建** `Lampy-guide-isol`（`DEB86847`，iOS 26.5） | `needed`，`completed: false`，空库 | 三屏出现（上一轮「继续」） |
+| **新建** `Lampy-guide-swipe`（`380CE848`，iOS 26.5） | `needed`，`completed: false`，空库 | 本轮上滑 / 最大字号 / Reduce Motion 走完三屏 |
 
 不是读库失败。Liuz17 未重置。
 
@@ -37,9 +38,11 @@ Base：`origin/main` `e7580e33f01429d9945ee2d8a2b5a3980b3c4e92`（#47 merge）�
 | 第2屏构图 +「继续」 | **PASS**（`shots/after-guide-2.png`） |
 | 第3屏 + 动画中切 Safari 再回 Lampy，场景完整可见 | **PASS**（`shots/after-guide-3-bg.png`） |
 | 中途退出（未点「留下瞬间」就杀掉再开） | **PASS**（仍 `needed`，引导还在；`after-guide-reduce.png` / mid-exit 同屏 1/3） |
-| Reduce Motion 开启后内容直接可见 | **PASS**（`shots/after-guide-reduce.png`） |
+| Reduce Motion 开启后内容直接可见 | **PASS**（上一轮第一屏 `after-guide-reduce.png`；本轮走完三屏见下） |
 | 最后一步「留下瞬间」才完成；再开不重播 | **PASS**（去留下页；再开空最近，`completed: true`；`after-guide-finish.png`、`after-guide-no-replay.png`） |
-| 上滑翻页 | **NOT VERIFIED**（本轮只用「继续」） |
+| 上滑翻页（默认字号，三屏） | **PASS**（`Lampy-guide-swipe`；`after-guide-swipe-1/2/3.png`。末屏再上滑仍停在 3/3，未完成） |
+| 最大字号：正文先滚，到底再翻页 | **PASS**（短滑仍 1/3 并露出后文，`after-guide-swipe-max-scroll.png`；再上滑到 2/3，`after-guide-swipe-max-page.png`） |
+| Reduce Motion 走完翻页，无位移动画 | **PASS**（`after-guide-reduce-1/2/3.png`；翻页后场景与文案立刻完整，无半透明/错位残留） |
 
 ## 回看 / 最近（示意库，非 Liuz17）
 
@@ -50,17 +53,14 @@ Base：`origin/main` `e7580e33f01429d9945ee2d8a2b5a3980b3c4e92`（#47 merge）�
 | 最大字号日期行 | **PASS**（`accessibility-extra-extra-extra-large` 可见 `18日`、`2条`，折行未裁字；Dev Tools 挡了一部分） |
 | 摘录 → 详情 → 返回 | **PASS**（详情 `门口的风` / `高兴` 无色点；返回可见同日两条。书页摘录条被 Dev Tools 挡住，以详情/日页为准） |
 | 最近色点 / 未选 / 未知旧词 | **PASS**（上一轮示意库，本轮未改存储） |
-| 播放 / 本机保护 | **NOT VERIFIED** |
+| 播放 / 本机保护 | **NOT VERIFIED**（Liuz17 隧道未通，本轮未在真机点） |
 | 横屏 / iPad / VoiceOver | **NOT VERIFIED** |
 | Liuz17 | **NOT VERIFIED** |
 
 ## 真机 Liuz17
 
-不要卸、不要清库、不要重置首次引导。
+不要卸、不要清库、不要重置首次引导。本轮 **未重置**。
 
-1. 本分支覆盖安装。
-2. 最近色点与详情无点。
-3. 回看日期行、摘录、详情、返回；三种未确认仍独立。
-4. 最大字号再拉回。
-5. 三屏请用 **新建** 模拟器或新设备，不要擦旧模拟器指望 Keychain 会清。
-6. 抽查播放与本机保护。
+`devicectl` 仍显示 `available (paired)`，iOS 26.2 / iPhone 17 Pro。隧道失败（`RemotePairingError` 4），上次成功连接 `2026-09-30 23:18 UTC`。无法截屏或覆盖安装，色点 / 日期行 / 详情返回 / 播放 / 本机保护 **不能记 PASS**。
+
+三屏请用 **新建** 模拟器或新设备，不要擦旧模拟器指望 Keychain 会清。

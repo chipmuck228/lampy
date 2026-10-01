@@ -62,4 +62,26 @@ describe('first-run guide motion', () => {
     expect(finished).not.toHaveBeenCalled();
     app.restore();
   });
+
+  it('keeps pages visible and does not shift when Reduce Motion stays on', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+    const app = mockAppState();
+    const finished = jest.fn();
+    const view = await render(wrap(<FirstRunGuide onFinished={finished} />));
+    await waitFor(() => {
+      expect(view.getByText('一句话，也值得留下。')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('first-run-continue'));
+    await waitFor(() => {
+      expect(view.getByText('那些平常的日子，后来都有了模样。')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('first-run-continue'));
+    await waitFor(() => {
+      expect(view.getByLabelText('留下瞬间')).toBeTruthy();
+    });
+    expect(view.getByText('自己的生活，安心放在这里。')).toBeTruthy();
+    expect(view.getByTestId('first-run-scene-keep')).toBeTruthy();
+    expect(finished).not.toHaveBeenCalled();
+    app.restore();
+  });
 });
