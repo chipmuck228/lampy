@@ -17,7 +17,7 @@
 | `recent-lookback-reading/` | 最近扫读与回看停留。阶段 A 设计对照（#50 已合）。Figma Make 视觉取舍见 `figma-make-supplement.md`，不塞进 #51，不开始阶段 C |
 | `recent-reading-b/` | 阶段 B「最近」实现走查。回看仍不动 |
 | `recent-visual-refinement/` | #54 最近第一轮视觉。从 main 新开，不续写 #53 |
-| `recent-photo-reveal/` | 最近照片显现（Photo Reveal）。设计冻结，不改运行代码 |
+| `recent-photo-reveal/` | #55 最近照片显现（Photo Reveal）。设计冻结，不改运行代码 |
 | `personal-visual-details/` | 感受色点、回看日期行、首次三屏。运行中实现 |
 | `testflight-beta-1/` | 第一份 TestFlight 预发布准备。不上传、不邀请 |
 | `lookback-expand/` | #35 当时的年页展开契约。产品效力见 `lookback-book/`；#36 是 B 的备选实现 |

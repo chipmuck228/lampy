@@ -17,7 +17,7 @@
 | 对象 | 状态 | SHA |
 | --- | --- | --- |
 | `origin/main` | #54 已合 | `b9a01440fbe790062d921753a5a8416cd3382705` |
-| 本分支 | `ios/recent-photo-reveal` 从上述 SHA 新开 | 本 PR |
+| 本分支 | `ios/recent-photo-reveal`（PR #55 OPEN）从上述 SHA 新开 | 本 PR |
 
 #54 已把「最近」从生活记录列表收成**最近留下的生活阅读入口**。一条记录的阅读顺序是：
 
