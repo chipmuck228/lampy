@@ -2,6 +2,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LeaveScreen from '../app/leave';
+import { peekJustSavedMomentId, resetJustSavedMomentIdForTests } from './recent-save-echo';
 
 const mockBack = jest.fn();
 const mockDismissTo = jest.fn();
@@ -74,6 +75,7 @@ describe('leave entry copy and save dismiss', () => {
     mockSaveTextMoment.mockReset();
     mockSaveTextMoment.mockResolvedValue({ id: 'moment_draft' });
     mockSearchParams = {};
+    resetJustSavedMomentIdForTests();
   });
 
   it('shows 最近 when Leave opened from Recent and still backs without saving', async () => {
@@ -112,5 +114,6 @@ describe('leave entry copy and save dismiss', () => {
     });
     expect(mockDismissTo).toHaveBeenCalledWith('/');
     expect(mockReplace).not.toHaveBeenCalled();
+    expect(peekJustSavedMomentId()).toBe('moment_draft');
   });
 });

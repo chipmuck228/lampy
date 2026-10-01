@@ -1,4 +1,4 @@
-import { detailImageBands, momentImageAspectRatio } from './moment-images';
+import { detailImageBands, momentImageAspectRatio, recentImageBands, shouldPairRecentImages } from './moment-images';
 import type { ImageView } from '../application/use-cases';
 
 function photo(id: string, width: number, height: number): ImageView {
@@ -52,6 +52,22 @@ describe('moment image layout', () => {
       { kind: 'solo', images: [one] },
       { kind: 'pair', images: [two, three] },
     ]);
+  });
+
+  it('pairs recent portraits only when type is regular and the column is wide enough', () => {
+    expect(shouldPairRecentImages(1, 345)).toBe(true);
+    expect(shouldPairRecentImages(1.3, 345)).toBe(false);
+    expect(shouldPairRecentImages(1, 200)).toBe(false);
+  });
+
+  it('keeps recent image order and stacks when pairing is off', () => {
+    const one = photo('one', 1200, 1600);
+    const two = photo('two', 900, 1200);
+    expect(recentImageBands([one, two], false)).toEqual([
+      { kind: 'solo', images: [one] },
+      { kind: 'solo', images: [two] },
+    ]);
+    expect(recentImageBands([one, two], true)).toEqual([{ kind: 'pair', images: [one, two] }]);
   });
 
   it('stacks a readable portrait and a missing portrait that still has size, in the same order', () => {

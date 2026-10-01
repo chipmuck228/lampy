@@ -1,18 +1,24 @@
-import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { leaveHref, lookbackRootHrefFromRecent } from '../screens/lookback-origin';
 import { RootNavBand, RootReadingLayout } from '../screens/root-nav-band';
-import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cases';
-import { LifeIconButton, LookThisHit } from '../screens/life-icons';
-import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
-import { RecentFeeling } from '../screens/recent-feeling';
-import { MomentImages } from '../screens/moment-images';
+import type { RecentLifeViewModel } from '../application/use-cases';
+import { LifeIconButton } from '../screens/life-icons';
+import { shouldPairRecentImages } from '../screens/moment-images';
+import { RecentMoment } from '../screens/recent-moment';
+import {
+  consumeJustSavedMomentId,
+  peekJustSavedMomentId,
+  SAVE_ECHO_FADE_MS,
+  SAVE_ECHO_START_OPACITY,
+  shouldRevealSaveEcho,
+  shouldSkipSaveEchoFade,
+} from '../screens/recent-save-echo';
 import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
-import type { PlaybackStatus } from '../infrastructure/media';
 import {
   clay,
   ink,
@@ -23,6 +29,7 @@ import {
   hairline,
   pageGutter,
   paper,
+  readingWidth,
   recentColumnWidth,
   sage,
   shouldShowSameDayRule,
@@ -38,10 +45,71 @@ export default function RecentScreen() {
   const compact = isCompactHeight(height);
   const stackDay = shouldStackRecentDay(width, height, fontScale);
   const columnWidth = recentColumnWidth(width, height, fontScale);
+  const pairImages = shouldPairRecentImages(fontScale, readingWidth(width, height));
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [echoId, setEchoId] = useState<string | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const [echoOpacity] = useState(() => new Animated.Value(1));
+  const echoAnim = useRef<Animated.CompositeAnimation | null>(null);
   const clips = useRecentClipPlayback();
   const days = view?.days ?? [];
+  const reduceMotionRef = useRef(reduceMotion);
+
+  const settleEcho = useCallback(() => {
+    echoAnim.current?.stop();
+    echoAnim.current = null;
+    echoOpacity.setValue(1);
+  }, [echoOpacity]);
+
+  const revealEcho = useCallback(
+    (id: string, skipFade: boolean) => {
+      setEchoId(id);
+      if (skipFade) {
+        echoOpacity.setValue(1);
+        return;
+      }
+      echoOpacity.setValue(SAVE_ECHO_START_OPACITY);
+      const anim = Animated.timing(echoOpacity, {
+        toValue: 1,
+        duration: SAVE_ECHO_FADE_MS,
+        useNativeDriver: true,
+      });
+      echoAnim.current = anim;
+      anim.start(({ finished }) => {
+        if (!finished) echoOpacity.setValue(1);
+        echoAnim.current = null;
+      });
+    },
+    [echoOpacity],
+  );
+
+  useEffect(() => {
+    reduceMotionRef.current = reduceMotion;
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((value) => {
+        if (alive) setReduceMotion(value === true);
+      })
+      .catch(() => {
+        if (alive) setReduceMotion(true);
+      });
+    const motion = AccessibilityInfo.addEventListener('reduceMotionChanged', (value) => {
+      setReduceMotion(value === true);
+    });
+    const app = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') settleEcho();
+    });
+    return () => {
+      alive = false;
+      motion.remove();
+      app.remove();
+      settleEcho();
+    };
+  }, [settleEcho]);
 
   useFocusEffect(
     useCallback(() => {
@@ -49,10 +117,24 @@ export default function RecentScreen() {
       getUseCases()
         .then((app) => app.getRecentLife())
         .then((next) => {
-          if (!cancelled) {
-            setView(next);
-            setError(null);
+          if (cancelled) return;
+          setView(next);
+          setError(null);
+          const pending = peekJustSavedMomentId();
+          const itemIds = next.items.map((item) => item.id);
+          if (
+            shouldRevealSaveEcho({
+              momentId: pending,
+              itemIds,
+              loadReady: true,
+              foreground: AppState.currentState !== 'background' && AppState.currentState !== 'inactive',
+            })
+          ) {
+            consumeJustSavedMomentId();
+            revealEcho(pending as string, shouldSkipSaveEchoFade(reduceMotionRef.current));
+            return;
           }
+          if (pending && !itemIds.includes(pending)) consumeJustSavedMomentId();
         })
         .catch(() => {
           if (!cancelled) setError('最近的记录暂时读不出来，原来的内容还在这台设备上。');
@@ -60,7 +142,7 @@ export default function RecentScreen() {
       return () => {
         cancelled = true;
       };
-    }, []),
+    }, [revealEcho]),
   );
 
   return (
@@ -134,6 +216,8 @@ export default function RecentScreen() {
                   ) : null}
                   <RecentMoment
                     item={item}
+                    pairImages={pairImages}
+                    echoOpacity={echoId === item.id ? echoOpacity : undefined}
                     listen={
                       item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
                     }
@@ -152,64 +236,6 @@ export default function RecentScreen() {
           </View>
         ))}
       </RootReadingLayout>
-    </View>
-  );
-}
-
-function RecentMoment({
-  item,
-  listen,
-  onOpen,
-  onPlay,
-  onPause,
-}: {
-  item: RecentLifeItem;
-  listen: { status: PlaybackStatus; currentTimeMs: number };
-  onOpen: () => void;
-  onPlay: () => void;
-  onPause: () => void;
-}) {
-  const mixed = !!(
-    item.audio &&
-    (item.note || item.images.length > 0 || (item.unknownMedia?.length ?? 0) > 0 || item.feeling)
-  );
-  return (
-    <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
-      <View style={styles.momentBody}>
-        {item.note ? (
-          <Text style={styles.note} testID={`recent-note-${item.id}`}>
-            {item.note}
-          </Text>
-        ) : null}
-        {item.occurredLabel ? (
-          <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
-            {item.occurredLabel}
-          </Text>
-        ) : null}
-        <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
-        <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
-      </View>
-      <MomentAudio
-        audio={item.audio}
-        playbackStatus={listen.status}
-        currentTimeMs={listen.currentTimeMs}
-        onPlay={onPlay}
-        onPause={onPause}
-        testIDPrefix={`recent-sound-${item.id}`}
-        compact={!mixed}
-        scene={mixed}
-        markedActions
-        progressWhenHeard
-      />
-      <RecentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
-      <LookThisHit
-        accessibilityLabel={
-          [item.dateLabel, item.occurredLabel, item.note, '看这条'].filter(Boolean).join('，') ||
-          `${item.dateLabel}，一条记录`
-        }
-        testID={`recent-open-${item.id}`}
-        onPress={onOpen}
-      />
     </View>
   );
 }
@@ -250,9 +276,4 @@ const styles = StyleSheet.create({
     marginTop: -16,
     marginBottom: 16,
   },
-  moment: { gap: 8, minHeight: 48 },
-  momentMixed: { gap: 16 },
-  momentBody: { gap: 8 },
-  note: { fontSize: 21, color: ink },
-  occurred: { fontSize: 15, color: inkSoft },
 });

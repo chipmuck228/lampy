@@ -64,6 +64,7 @@ import {
   isFamilyTestDriverEnabled,
 } from '../infrastructure/family-test-driver';
 import { finishLeaveToRecent, leaveOpenedFromLookback } from '../screens/lookback-origin';
+import { writeJustSavedMomentId } from '../screens/recent-save-echo';
 import { usePageMetrics } from '../screens/use-page-metrics';
 
 export const DRAFT_RESTORED_COPY = '上次没保存的内容已放回来。';
@@ -615,7 +616,8 @@ export default function LeaveScreen() {
         await app.updateDraftNote(id, note);
         await app.updateDraftEmotion(id, emotion);
         await app.updateDraftOccurred(id, occurredInputFromChoice(occurred));
-        await app.saveTextMoment(id);
+        const saved = await app.saveTextMoment(id);
+        writeJustSavedMomentId(saved.id);
       });
       if (abandoningRef.current || draftIdRef.current !== id) return;
       finishLeaveToRecent(router);

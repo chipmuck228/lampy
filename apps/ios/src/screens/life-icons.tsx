@@ -121,11 +121,13 @@ export function LookThisHit({
   onPress,
   testID,
   accessibilityLabel,
+  caption = '看这条',
   tight,
 }: {
   onPress: () => void;
   testID?: string;
   accessibilityLabel: string;
+  caption?: string;
   tight?: boolean;
 }) {
   const ids = openChildIds(testID);
@@ -140,7 +142,7 @@ export function LookThisHit({
     >
       <View style={styles.lookThisRow} testID={ids?.row}>
         <Text style={styles.lookThisText} testID={ids?.label}>
-          看这条
+          {caption}
         </Text>
         <View accessible={false} testID={ids?.mark}>
           <LifeIcon name="open" size={12} color={sage} decorative />
