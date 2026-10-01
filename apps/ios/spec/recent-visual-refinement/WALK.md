@@ -1,6 +1,6 @@
 # 最近第一轮视觉走查
 
-实现分支 `ios/recent-visual-refinement`（PR #54 OPEN），从当时 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #53 回看分支继续。
+实现分支 `ios/recent-visual-refinement`（PR #54 OPEN），HEAD `47fda153fa34fe346efe9ff8f2b6d2ffffb2d639`，从当时 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #53 回看分支继续。
 
 只改 Presentation：最近页眉、同日分隔、原位展开、底带两项、浮动留下、空态文案。未改 Moment / Asset / 保存 / 草稿 / 播放器 / 本机保护 / 家庭 / AI / 日期行为 / 回看阅读逻辑。
 
