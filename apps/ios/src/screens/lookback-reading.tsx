@@ -109,6 +109,18 @@ export function LookbackReadingMoment({
           >
             {entry.note}
           </Text>
+          {truncated ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              accessibilityLabel={expanded ? '收起正文' : '展开正文'}
+              testID={`lookback-reading-expand-${entry.id}`}
+              onPress={onToggleExpand}
+              style={styles.hit}
+            >
+              <Text style={styles.action}>{expanded ? '收起正文' : '展开正文'}</Text>
+            </Pressable>
+          ) : null}
         </>
       ) : null}
       <MomentImages
@@ -127,18 +139,6 @@ export function LookbackReadingMoment({
         compact
       />
       <RecentFeeling feeling={entry.feeling ?? null} testID={`lookback-reading-feeling-${entry.id}`} />
-      {truncated ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          accessibilityLabel={expanded ? '收起正文' : '展开正文'}
-          testID={`lookback-reading-expand-${entry.id}`}
-          onPress={onToggleExpand}
-          style={styles.hit}
-        >
-          <Text style={styles.action}>{expanded ? '收起正文' : '展开正文'}</Text>
-        </Pressable>
-      ) : null}
       <LookThisHit
         caption="阅读完整记录"
         accessibilityLabel={`阅读完整记录，${entry.note || entry.id}`}

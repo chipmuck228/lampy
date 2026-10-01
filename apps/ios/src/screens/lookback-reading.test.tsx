@@ -15,6 +15,20 @@ const longNote = [
   '先把这一刻留下来。',
 ].join('\n');
 
+function collectTestIDs(node: unknown): string[] {
+  const ids: string[] = [];
+  function walk(current: unknown) {
+    if (!current || typeof current !== 'object') return;
+    const next = current as { props?: { testID?: string }; children?: unknown };
+    if (typeof next.props?.testID === 'string') ids.push(next.props.testID);
+    const children = next.children;
+    if (Array.isArray(children)) children.forEach(walk);
+    else walk(children);
+  }
+  walk(node);
+  return ids;
+}
+
 function entry(partial: Partial<LookbackDayEntry> = {}): LookbackDayEntry {
   return {
     id: 'm_mix',
@@ -72,6 +86,66 @@ describe('lookback reading moment', () => {
     expect(view.getByText('阅读完整记录')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-reading-expand-m_mix'));
     expect(onToggle).toHaveBeenCalled();
+  });
+
+  it('keeps expand with the note, before photos and the full-record action', async () => {
+    const view = await render(
+      <LookbackReadingMoment
+        entry={entry({
+          note: longNote,
+          images: [
+            {
+              id: 'a',
+              status: 'available',
+              uri: 'memory://a.jpg',
+              width: 800,
+              height: 600,
+              label: '照片 1/1',
+            },
+          ],
+          audio: {
+            id: 'clip_a',
+            status: 'available',
+            uri: 'memory://a.m4a',
+            durationMs: 4000,
+            durationLabel: '4秒',
+            label: '当时的声音',
+          },
+          feeling: { value: '平静', label: '平静', known: true },
+        })}
+        pairImages={false}
+        expanded={false}
+        listen={{ status: 'idle', currentTimeMs: 0 }}
+        onToggleExpand={() => undefined}
+        onOpen={() => undefined}
+        onPlay={() => undefined}
+        onPause={() => undefined}
+      />,
+    );
+    const measure = view.getByTestId('lookback-reading-note-measure-m_mix', { includeHiddenElements: true });
+    await act(async () => {
+      measure.props.onTextLayout({
+        nativeEvent: { lines: Array.from({ length: 9 }, () => ({ text: 'line' })) },
+      });
+    });
+    const order = collectTestIDs(view.toJSON()).filter((id) =>
+      [
+        'lookback-reading-note-m_mix',
+        'lookback-reading-expand-m_mix',
+        'lookback-reading-image-m_mix-a',
+        'lookback-reading-sound-m_mix-play-clip_a',
+        'lookback-reading-feeling-m_mix',
+        'lookback-book-open-m_mix',
+      ].includes(id),
+    );
+    expect(order).toEqual([
+      'lookback-reading-note-m_mix',
+      'lookback-reading-expand-m_mix',
+      'lookback-reading-image-m_mix-a',
+      'lookback-reading-sound-m_mix-play-clip_a',
+      'lookback-reading-feeling-m_mix',
+      'lookback-book-open-m_mix',
+    ]);
   });
 
   it('shows every photo and a missing placeholder without inventing a crop', async () => {

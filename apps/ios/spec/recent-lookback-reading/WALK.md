@@ -46,6 +46,7 @@
 | 分页失败只点一次重试即请求并追加 | **PASS**（`lookback-reading-failure-guards` 旧日/未确认） |
 | 恢复后续页失败保留已读并显示分页重试 | **PASS**（`lookback-reading-failure-guards`） |
 | 相邻日查询失败保留当天并提供重试 | **PASS**（`lookback-reading-failure-guards` 根页/旧日页） |
+| 展开正文紧跟文字、在图声感受之前 | **PASS**（`lookback-reading.test.tsx` 顺序） |
 
 ## 真机（Liuz17 / 可丢弃安装）
 
