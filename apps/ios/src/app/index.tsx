@@ -27,13 +27,7 @@ import {
   recentType,
   recentWeekdayInk,
 } from '../screens/recent-visual';
-import {
-  RECENT_FAB_HIDE_MS,
-  RECENT_FAB_IDLE_MS,
-  RECENT_FAB_SHIFT_Y,
-  RECENT_FAB_SHOW_MS,
-  recentFabIntent,
-} from '../screens/recent-leave-fab';
+import { createRecentLeaveFabScroll, recentFabMotion } from '../screens/recent-leave-fab';
 import {
   acceptRecentEchoLoad,
   beginRecentEchoFocus,
@@ -86,10 +80,9 @@ export default function RecentScreen() {
   const days = view?.days ?? [];
   const reduceMotionRef = useRef(reduceMotion);
   const echoGate = useRef(createSaveEchoFocusGate());
-  const lastScrollY = useRef(0);
-  const fabIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fabOpenRef = useRef(true);
-  const fabEpoch = useRef(0);
+  const fabScroll = useRef<ReturnType<typeof createRecentLeaveFabScroll> | null>(null);
+  const revealFabRef = useRef<(visible: boolean) => void>(() => undefined);
 
   const settleEcho = useCallback(() => {
     echoSeq.current = nextEchoSeq(echoSeq.current);
@@ -129,13 +122,6 @@ export default function RecentScreen() {
     router.push(lookbackRootHrefFromRecent());
   }, [router]);
 
-  const clearFabIdle = useCallback(() => {
-    if (fabIdle.current) {
-      clearTimeout(fabIdle.current);
-      fabIdle.current = null;
-    }
-  }, []);
-
   const revealFab = useCallback(
     (visible: boolean) => {
       if (fabOpenRef.current === visible) return;
@@ -143,24 +129,23 @@ export default function RecentScreen() {
       setFabOpen(visible);
       fabAnim.current?.stop();
       fabAnim.current = null;
-      if (reduceMotionRef.current) {
-        fabOpacity.setValue(visible ? 1 : 0);
-        fabShift.setValue(visible ? 0 : RECENT_FAB_SHIFT_Y);
+      const motion = recentFabMotion(visible, reduceMotionRef.current);
+      if (motion.duration === 0) {
+        fabOpacity.setValue(motion.opacity);
+        fabShift.setValue(motion.translateY);
         return;
       }
-      const duration = visible ? RECENT_FAB_SHOW_MS : RECENT_FAB_HIDE_MS;
-      const easing = Easing.out(Easing.cubic);
       const next = Animated.parallel([
         Animated.timing(fabOpacity, {
-          toValue: visible ? 1 : 0,
-          duration,
-          easing,
+          toValue: motion.opacity,
+          duration: motion.duration,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(fabShift, {
-          toValue: visible ? 0 : RECENT_FAB_SHIFT_Y,
-          duration,
-          easing,
+          toValue: motion.translateY,
+          duration: motion.duration,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]);
@@ -172,26 +157,9 @@ export default function RecentScreen() {
     [fabOpacity, fabShift],
   );
 
-  const onRecentScroll = useCallback(
-    (event: { nativeEvent: { contentOffset: { y: number } } }) => {
-      const offsetY = event.nativeEvent.contentOffset.y;
-      const intent = recentFabIntent(offsetY, lastScrollY.current);
-      lastScrollY.current = offsetY;
-      clearFabIdle();
-      if (intent === 'show') {
-        revealFab(true);
-        return;
-      }
-      if (intent === 'hide') revealFab(false);
-      const epoch = fabEpoch.current;
-      fabIdle.current = setTimeout(() => {
-        fabIdle.current = null;
-        if (fabEpoch.current !== epoch) return;
-        revealFab(true);
-      }, RECENT_FAB_IDLE_MS);
-    },
-    [clearFabIdle, revealFab],
-  );
+  const onRecentScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    fabScroll.current?.onScroll(event.nativeEvent.contentOffset.y);
+  }, []);
 
   const tryRevealPending = useCallback(() => {
     const id = tryConsumeSaveEcho(echoGate.current, AppState.currentState);
@@ -203,12 +171,18 @@ export default function RecentScreen() {
   }, [reduceMotion]);
 
   useEffect(() => {
+    revealFabRef.current = revealFab;
+  }, [revealFab]);
+
+  useEffect(() => {
+    const scroll = createRecentLeaveFabScroll((visible) => revealFabRef.current(visible));
+    fabScroll.current = scroll;
     return () => {
-      fabEpoch.current += 1;
-      clearFabIdle();
+      scroll.dispose();
+      if (fabScroll.current === scroll) fabScroll.current = null;
       fabAnim.current?.stop();
     };
-  }, [clearFabIdle]);
+  }, []);
 
   useEffect(() => {
     if (reduceMotion) settleEcho();
@@ -238,10 +212,9 @@ export default function RecentScreen() {
       motion.remove();
       app.remove();
       settleEcho();
-      clearFabIdle();
       fabAnim.current?.stop();
     };
-  }, [clearFabIdle, settleEcho, tryRevealPending]);
+  }, [settleEcho, tryRevealPending]);
 
   useFocusEffect(
     useCallback(() => {

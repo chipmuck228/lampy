@@ -58,6 +58,7 @@ describe('recent home', () => {
     expect(view.getByTestId('recent-wordmark').props.children).toBe('刚刚留下的生活');
     expect(view.getByLabelText('回看')).toBeTruthy();
     expect(view.getByTestId('recent-leave-fab')).toBeTruthy();
+    expect(view.getByTestId('recent-leave-fab').props.accessibilityElementsHidden).toBe(false);
     expect(view.getByLabelText('留下')).toBeTruthy();
     expect(view.queryByTestId('home-leave')).toBeNull();
     expect(view.getByTestId('recent-scroll')).toBeTruthy();
