@@ -1,6 +1,6 @@
 # 回看同页连续阅读走查
 
-实现分支 `ios/lookback-continuous-reading`，从最新 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #51 旧分支或未合入实现复制。#52 Figma 视觉稿仍独立，本切片未全局替换未落地字体/配色。
+实现分支 `ios/lookback-continuous-reading`，HEAD `f3dfe561e7214cf87d9817ecc6b5a16f43857a92`，从最新 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #51 旧分支或未合入实现复制。#52 Figma 视觉稿仍独立，本切片未全局替换未落地字体/配色。
 
 Jest 与静态稿 **≠** 原生页面 PASS。未实际操作的项写 **NOT VERIFIED**。
 
