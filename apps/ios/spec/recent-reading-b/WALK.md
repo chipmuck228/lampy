@@ -30,9 +30,9 @@
 
 | 层 | 结论 |
 | --- | --- |
-| 自动化 | PASS（上表）。保存反馈资格仍在 `recent-save-echo.test.ts`。「看这条」在 `life-icons.test.ts`：最大字号窄列下文案完整、可换行、可见 `minHeight` 48、不关 `allowFontScaling`、无 `hitSlop`。长文初始六行由 `recentNoteVisibleLineLimit` 证明 |
-| 模拟器实际操作 / 隔离安装 | **部分 PASS**。见下表。不是全量夹具 F |
-| 真机 | **NOT VERIFIED**。未上物理机，未碰 Liuz17，未重传 TestFlight |
+| 自动化 | PASS（上表）。保存反馈资格仍在 `recent-save-echo.test.ts`。长文初始六行由 `recentNoteVisibleLineLimit` 证明。后期改为固定字号后，生产文案走 `life-text`（`allowFontScaling={false}`）；旧「跟随系统字号」句只描述当时实现 |
+| 模拟器实际操作 / 隔离安装 | **部分 PASS**。见下表。不是全量夹具 F。旧 XXXL / Dynamic Type 走查**不是**固定字号版本的 PASS |
+| 真机 | **PASS**（固定字号，Liuz17）。运行 JS SHA 见文末「真机 · 固定字号」。未卸载、未清库、未重传 TestFlight |
 
 ---
 
@@ -131,3 +131,26 @@ Liuz17 报告：Face ID 通过后整屏黑、什么都不显示。不能把该�
 处理：不要把 `overflow: 'visible'` 写在带 native-driver opacity 的 `Animated.View` 上（Face ID 进出时 iOS 可能整窗不合成）。外壳改回普通 `View`；解锁成功且 `active` 时立刻 `allowScreenCapture`。根层用纸色，避免底下露出系统黑底。
 
 复测：确认 Metro 加载本修复 SHA → Face ID → 应回到纸色最近页，不是黑屏。仍不合并。
+
+---
+
+## 真机 · 固定字号（2026-10-01，用户）
+
+设备：**Liuz17 / iPhone 17 Pro / iOS 26.2**。Dev Client `app.lampy.ios`，本仓库 Metro `8083`（LAN `192.168.31.139`）。未卸载、未清库、未重传 TestFlight。未拿 #52 / 文档 head 代替运行包。
+
+实际运行 JS SHA：**`a2920c4ea9b1a8687753071eaebba9767566cced`**（`Use a fixed app type scale instead of following Dynamic Type.`）。
+
+核对：该 SHA 于 21:16:53 +0800 落在 `ios/recent-reading`。Metro `8083` 的 iOS 包在 **21:23:27** 打完后，有个人记录的客户端立刻 `first-run completed`。随后同一条连接上出现本机保护与 Face ID 日志（21:24:43–21:25:32）。8082 只绑 `127.0.0.1`；8081 是 `lampy-guide`，不是本仓库。不是仓库 head 的口头替代。
+
+用户四项均为 **真机 PASS**：
+
+| 项 | 结论 |
+| --- | --- |
+| 系统常规字号与最大字号各看一次「最近」 | **PASS**。应用文字大小一致（不再跟随系统字号）。正文、日期、播放和「看这条」完整可见可点 |
+| 「回看」「留下」「本机设置」各看一次 | **PASS**。无裁切，长内容可滚动，操作入口可达 |
+| 留下一条文字＋照片＋录音 | **PASS**。保存、播放、暂停续播、详情返回；草稿与位置正常 |
+| 开启本机保护后后台返回 | **PASS**。Face ID 期间仍遮挡。Metro 同期：`setting: on` 后 `background`/`active` 均为 `cover: true`、`locked: true`，认证中保持遮挡，解锁后 `cover: false` |
+
+旧 XXXL / Dynamic Type 走查（隔离机未验证、「最近」垂直裁切 FAIL、Face ID 黑屏）仍是历史记录，**不是**本 SHA 的 PASS。
+
+#51 本 SHA 无新增阻塞，可普通合并。#52 仍独立做设计复审，不随本表合并。
