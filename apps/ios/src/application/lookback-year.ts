@@ -1,22 +1,15 @@
-import {
-  LOOKBACK_MONTH_MIN_CELL,
-  monthCalendarContentWidth,
-  shouldStackMonthCalendar,
-} from './lookback-month';
+import { LOOKBACK_MONTH_MIN_CELL, monthCalendarContentWidth } from './lookback-month';
 import type { HistoryYearView } from '../projections/history-projection';
 
 export const LOOKBACK_YEAR_COLUMNS = 3;
 
 export function shouldShowYearMonthGrid({
-  fontScale,
   windowWidth,
   horizontalInset = 0,
 }: {
-  fontScale: number;
   windowWidth: number;
   horizontalInset?: number;
 }): boolean {
-  if (shouldStackMonthCalendar(fontScale)) return false;
   return (
     monthCalendarContentWidth(windowWidth, horizontalInset) / LOOKBACK_YEAR_COLUMNS >= LOOKBACK_MONTH_MIN_CELL
   );

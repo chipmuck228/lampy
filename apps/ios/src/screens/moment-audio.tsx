@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text, type } from './life-text';
 
 import { formatSoundDuration } from '../application/duration';
 import type { AudioView, UnknownMediaView } from '../application/use-cases';
@@ -360,12 +361,12 @@ const styles = StyleSheet.create({
   block: { gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   hit: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48 },
-  action: { fontSize: 18, lineHeight: 24, color: sage },
-  recording: { fontSize: 18, lineHeight: 24, color: sound },
-  meta: { fontSize: 16, lineHeight: 24, color: sound },
-  compactMeta: { fontSize: 14, lineHeight: 20, color: sound },
-  sceneTitle: { fontSize: 18, lineHeight: 26, color: sound },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, minHeight: 48 },
+  action: { ...type.action, color: sage },
+  recording: { ...type.action, color: sound },
+  meta: { ...type.meta, color: sound },
+  compactMeta: { ...type.meta, color: sound },
+  sceneTitle: { ...type.action, color: sound },
   track: {
     height: 1,
     width: '100%',
@@ -382,5 +383,5 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   heardFill: { height: 3, backgroundColor: sound },
-  missing: { fontSize: 16, lineHeight: 24, color: inkSoft },
+  missing: { ...type.action, color: inkSoft },
 });

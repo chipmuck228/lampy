@@ -93,7 +93,7 @@ export function FirstRunGate({
   }
   if (decision === 'skip') {
     return (
-      <View testID="first-run-ready" style={{ flex: 1 }}>
+      <View testID="first-run-ready" style={{ flex: 1, backgroundColor: paper }}>
         {skipReason ? <View testID={`first-run-skip-${skipReason}`} /> : null}
         {children}
       </View>

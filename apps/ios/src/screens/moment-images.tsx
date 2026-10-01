@@ -1,8 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import type { ImageView } from '../application/use-cases';
 import { clay } from './life-page';
+import { Text } from './life-text';
+
+export const RECENT_IMAGE_PAIR_MIN_WIDTH = 280;
 
 export function momentImageAspectRatio(image: { width?: number; height?: number }): number {
   if (image.width && image.height && image.width > 0 && image.height > 0) {
@@ -28,6 +31,15 @@ export type DetailImageBand = {
   kind: 'solo' | 'pair';
   images: ImageView[];
 };
+
+export function shouldPairRecentImages(contentWidth: number): boolean {
+  return contentWidth >= RECENT_IMAGE_PAIR_MIN_WIDTH;
+}
+
+export function recentImageBands(images: ImageView[], pair: boolean): DetailImageBand[] {
+  if (!pair) return images.map((image) => ({ kind: 'solo' as const, images: [image] }));
+  return detailImageBands(images);
+}
 
 export function detailImageBands(images: ImageView[]): DetailImageBand[] {
   if (images.length === 0) return [];

@@ -135,29 +135,28 @@ describe('root nav band layout', () => {
     await lookbackGrid.unmount();
   });
 
-  it('stacks a phone band at accessibility extra-large so labels are not crushed', async () => {
+  it('keeps a phone band in one row when the system type is extra-large', async () => {
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
       screen: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
     });
-    const stacked = await render(
+    const row = await render(
       wrap(<RootNavBand here="recent" onOther={() => undefined} onLeave={() => undefined} />),
     );
-    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-band').props.style)).toEqual(
-      expect.objectContaining({ flexDirection: 'column', flexWrap: 'nowrap' }),
+    expect(StyleSheet.flatten(row.getByTestId('root-nav-band').props.style)).toEqual(
+      expect.objectContaining({ flexDirection: 'row', flexWrap: 'nowrap' }),
     );
-    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-here-wrap').props.style).minHeight).toBeGreaterThan(
-      48,
-    );
-    await stacked.unmount();
+    expect(StyleSheet.flatten(row.getByTestId('root-nav-here-wrap').props.style).minHeight).toBe(48);
+    expect(row.getByTestId('root-nav-here').props.allowFontScaling).toBe(false);
+    await row.unmount();
   });
 
-  it('stacks only when a 2×2 cell would be narrower than the enlarged label', async () => {
+  it('uses a 2×2 grid on a narrow window even if the system type is extra-large', async () => {
     Dimensions.set({
       window: { width: 200, height: 568, scale: 2, fontScale: 3.1 },
       screen: { width: 200, height: 568, scale: 2, fontScale: 3.1 },
     });
-    const stacked = await render(
+    const grid = await render(
       wrap(
         <RootNavBand
           here="recent"
@@ -167,17 +166,12 @@ describe('root nav band layout', () => {
         />,
       ),
     );
-    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-band').props.style)).toEqual(
-      expect.objectContaining({ flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch' }),
+    expect(StyleSheet.flatten(grid.getByTestId('root-nav-band').props.style)).toEqual(
+      expect.objectContaining({ flexDirection: 'column', alignItems: 'stretch' }),
     );
-    expect(stacked.queryByTestId('root-nav-grid-row-1')).toBeNull();
-    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-here-wrap').props.style).minHeight).toBeGreaterThan(
-      48,
-    );
-    expect(StyleSheet.flatten(stacked.getByTestId('root-nav-here-wrap').props.style).minWidth).toBeGreaterThan(
-      48,
-    );
-    await stacked.unmount();
+    expect(grid.getByTestId('root-nav-grid-row-1')).toBeTruthy();
+    expect(StyleSheet.flatten(grid.getByTestId('root-nav-here-wrap').props.style).minHeight).toBe(48);
+    await grid.unmount();
   });
 
   it('lets the iPad reading pane shrink beside a fixed 112pt rail', async () => {
@@ -209,6 +203,31 @@ describe('root nav band layout', () => {
       expect.objectContaining({ flex: 1, minWidth: 0 }),
     );
     expect(StyleSheet.flatten(view.getByTestId('tablet-scroll').props.style).width).toBeUndefined();
+    await view.unmount();
+  });
+
+  it('does not restack the band when only the system type changes', async () => {
+    const view = await render(
+      wrap(<RootNavBand here="recent" onOther={() => undefined} onLeave={() => undefined} />),
+    );
+    await act(async () => {
+      view.getByTestId('root-nav-here').props.onTextLayout({
+        nativeEvent: { lines: [{ width: 40, height: 20 }] },
+      });
+    });
+    expect(StyleSheet.flatten(view.getByTestId('root-nav-here-wrap').props.style).minHeight).toBe(48);
+
+    await act(async () => {
+      Dimensions.set({
+        window: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
+        screen: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
+      });
+    });
+
+    expect(StyleSheet.flatten(view.getByTestId('root-nav-here-wrap').props.style).minHeight).toBe(48);
+    expect(StyleSheet.flatten(view.getByTestId('root-nav-band').props.style)).toEqual(
+      expect.objectContaining({ flexDirection: 'row' }),
+    );
     await view.unmount();
   });
 

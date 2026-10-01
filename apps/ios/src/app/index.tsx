@@ -1,18 +1,32 @@
-import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, View } from 'react-native';
+import { Text, type } from '../screens/life-text';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUseCases } from '../application/container';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { leaveHref, lookbackRootHrefFromRecent } from '../screens/lookback-origin';
 import { RootNavBand, RootReadingLayout } from '../screens/root-nav-band';
-import type { RecentLifeItem, RecentLifeViewModel } from '../application/use-cases';
-import { LifeIconButton, LookThisHit } from '../screens/life-icons';
-import { MomentAudio, MomentUnknownMedia } from '../screens/moment-audio';
-import { RecentFeeling } from '../screens/recent-feeling';
-import { MomentImages } from '../screens/moment-images';
+import type { RecentLifeViewModel } from '../application/use-cases';
+import { LifeIconButton } from '../screens/life-icons';
+import { shouldPairRecentImages } from '../screens/moment-images';
+import { RecentMoment } from '../screens/recent-moment';
+import {
+  acceptRecentEchoLoad,
+  beginRecentEchoFocus,
+  createSaveEchoFocusGate,
+  echoCallbackIsCurrent,
+  endRecentEchoFocus,
+  isRecentForeground,
+  nextEchoSeq,
+  rejectRecentEchoLoad,
+  SAVE_ECHO_FADE_MS,
+  SAVE_ECHO_START_OPACITY,
+  shouldSkipSaveEchoFade,
+  tryConsumeSaveEcho,
+} from '../screens/recent-save-echo';
 import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
-import type { PlaybackStatus } from '../infrastructure/media';
 import {
   clay,
   ink,
@@ -24,6 +38,7 @@ import {
   pageGutter,
   paper,
   recentColumnWidth,
+  recentImageColumnWidth,
   sage,
   shouldShowSameDayRule,
   shouldStackRecentDay,
@@ -33,34 +48,127 @@ import { usePageMetrics } from '../screens/use-page-metrics';
 
 export default function RecentScreen() {
   const router = useRouter();
-  const { width, height, fontScale } = usePageMetrics();
+  const insets = useSafeAreaInsets();
+  const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
-  const stackDay = shouldStackRecentDay(width, height, fontScale);
-  const columnWidth = recentColumnWidth(width, height, fontScale);
+  const stackDay = shouldStackRecentDay(width, height);
+  const columnWidth = recentColumnWidth(width, height);
+  const pairImages = shouldPairRecentImages(
+    recentImageColumnWidth(width, height, insets.left, insets.right),
+  );
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [echoId, setEchoId] = useState<string | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const [echoOpacity] = useState(() => new Animated.Value(1));
+  const echoAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const echoSeq = useRef(0);
   const clips = useRecentClipPlayback();
   const days = view?.days ?? [];
+  const reduceMotionRef = useRef(reduceMotion);
+  const echoGate = useRef(createSaveEchoFocusGate());
+
+  const settleEcho = useCallback(() => {
+    echoSeq.current = nextEchoSeq(echoSeq.current);
+    echoAnim.current?.stop();
+    echoAnim.current = null;
+    echoOpacity.setValue(1);
+  }, [echoOpacity]);
+
+  const revealEcho = useCallback(
+    (id: string, skipFade: boolean) => {
+      const seq = nextEchoSeq(echoSeq.current);
+      echoSeq.current = seq;
+      echoAnim.current?.stop();
+      echoAnim.current = null;
+      setEchoId(id);
+      if (skipFade) {
+        echoOpacity.setValue(1);
+        return;
+      }
+      echoOpacity.setValue(SAVE_ECHO_START_OPACITY);
+      const anim = Animated.timing(echoOpacity, {
+        toValue: 1,
+        duration: SAVE_ECHO_FADE_MS,
+        useNativeDriver: true,
+      });
+      echoAnim.current = anim;
+      anim.start(({ finished }) => {
+        if (!echoCallbackIsCurrent(seq, echoSeq.current)) return;
+        if (!finished) echoOpacity.setValue(1);
+        echoAnim.current = null;
+      });
+    },
+    [echoOpacity],
+  );
+
+  const tryRevealPending = useCallback(() => {
+    const id = tryConsumeSaveEcho(echoGate.current, AppState.currentState);
+    if (id) revealEcho(id, shouldSkipSaveEchoFade(reduceMotionRef.current));
+  }, [revealEcho]);
+
+  useEffect(() => {
+    reduceMotionRef.current = reduceMotion;
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    if (reduceMotion) settleEcho();
+  }, [reduceMotion, settleEcho]);
+
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((value) => {
+        if (alive) setReduceMotion(value === true);
+      })
+      .catch(() => {
+        if (alive) setReduceMotion(true);
+      });
+    const motion = AccessibilityInfo.addEventListener('reduceMotionChanged', (value) => {
+      setReduceMotion(value === true);
+    });
+    const app = AppState.addEventListener('change', (state) => {
+      if (isRecentForeground(state)) {
+        tryRevealPending();
+        return;
+      }
+      settleEcho();
+    });
+    return () => {
+      alive = false;
+      motion.remove();
+      app.remove();
+      settleEcho();
+    };
+  }, [settleEcho, tryRevealPending]);
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
+      const request = beginRecentEchoFocus(echoGate.current);
       getUseCases()
         .then((app) => app.getRecentLife())
         .then((next) => {
-          if (!cancelled) {
-            setView(next);
-            setError(null);
+          if (!acceptRecentEchoLoad(
+            echoGate.current,
+            request,
+            next.items.map((item) => item.id),
+          )) {
+            return;
           }
+          setView(next);
+          setError(null);
+          tryRevealPending();
         })
         .catch(() => {
-          if (!cancelled) setError('最近的记录暂时读不出来，原来的内容还在这台设备上。');
+          if (!rejectRecentEchoLoad(echoGate.current, request)) return;
+          setError('最近的记录暂时读不出来，原来的内容还在这台设备上。');
         });
       return () => {
-        cancelled = true;
+        endRecentEchoFocus(echoGate.current);
+        settleEcho();
       };
-    }, []),
+    }, [settleEcho, tryRevealPending]),
   );
 
   return (
@@ -134,6 +242,9 @@ export default function RecentScreen() {
                   ) : null}
                   <RecentMoment
                     item={item}
+                    pairImages={pairImages}
+                    echoOpacity={echoOpacity}
+                    echoing={echoId === item.id}
                     listen={
                       item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
                     }
@@ -156,64 +267,6 @@ export default function RecentScreen() {
   );
 }
 
-function RecentMoment({
-  item,
-  listen,
-  onOpen,
-  onPlay,
-  onPause,
-}: {
-  item: RecentLifeItem;
-  listen: { status: PlaybackStatus; currentTimeMs: number };
-  onOpen: () => void;
-  onPlay: () => void;
-  onPause: () => void;
-}) {
-  const mixed = !!(
-    item.audio &&
-    (item.note || item.images.length > 0 || (item.unknownMedia?.length ?? 0) > 0 || item.feeling)
-  );
-  return (
-    <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
-      <View style={styles.momentBody}>
-        {item.note ? (
-          <Text style={styles.note} testID={`recent-note-${item.id}`}>
-            {item.note}
-          </Text>
-        ) : null}
-        {item.occurredLabel ? (
-          <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
-            {item.occurredLabel}
-          </Text>
-        ) : null}
-        <MomentImages images={item.images} testIDPrefix={`recent-image-${item.id}`} />
-        <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
-      </View>
-      <MomentAudio
-        audio={item.audio}
-        playbackStatus={listen.status}
-        currentTimeMs={listen.currentTimeMs}
-        onPlay={onPlay}
-        onPause={onPause}
-        testIDPrefix={`recent-sound-${item.id}`}
-        compact={!mixed}
-        scene={mixed}
-        markedActions
-        progressWhenHeard
-      />
-      <RecentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
-      <LookThisHit
-        accessibilityLabel={
-          [item.dateLabel, item.occurredLabel, item.note, '看这条'].filter(Boolean).join('，') ||
-          `${item.dateLabel}，一条记录`
-        }
-        testID={`recent-open-${item.id}`}
-        onPress={onOpen}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper },
   scroll: { flex: 1, width: '100%' },
@@ -230,16 +283,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  wordmark: { fontSize: 28, color: ink, flex: 1, flexShrink: 1, minWidth: 0 },
+  wordmark: { ...type.title, color: ink, flex: 1, flexShrink: 1, minWidth: 0 },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
-  emptyTitle: { fontSize: 28, lineHeight: 38, color: ink },
-  body: { fontSize: 17, lineHeight: 26, color: inkSoft },
+  emptyTitle: { ...type.title, color: ink },
+  body: { ...type.body, color: inkSoft },
   firstHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  first: { fontSize: 20, lineHeight: 28, color: ink },
-  error: { fontSize: 17, lineHeight: 26, color: clay, paddingVertical: 8 },
-  day: { gap: 12 },
+  first: { ...type.action, color: ink },
+  error: { ...type.body, color: clay, paddingVertical: 8 },
+  day: { gap: 12, overflow: 'visible' },
   dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
-  date: { fontSize: 16, color: sage, paddingBottom: 4, minWidth: 0 },
+  date: { ...type.meta, color: sage, paddingBottom: 4, minWidth: 0 },
   dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
   dayItems: { gap: 32 },
   dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
@@ -250,9 +303,4 @@ const styles = StyleSheet.create({
     marginTop: -16,
     marginBottom: 16,
   },
-  moment: { gap: 8, minHeight: 48 },
-  momentMixed: { gap: 16 },
-  momentBody: { gap: 8 },
-  note: { fontSize: 21, color: ink },
-  occurred: { fontSize: 15, color: inkSoft },
 });

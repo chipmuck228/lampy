@@ -1,16 +1,6 @@
 import { useState, type ReactNode, type Ref } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  type StyleProp,
-  type TextLayoutEventData,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type TextLayoutEventData, type ViewStyle } from 'react-native';
+import { Text, type } from './life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -41,7 +31,7 @@ export function RootNavBand({
   onLeave: () => void;
   onFamily?: () => void;
 }) {
-  const { width, height, fontScale } = usePageMetrics();
+  const { width, height } = usePageMetrics();
   const [painted, setPainted] = useState<Partial<Record<string, { width: number; height: number }>>>({});
   const hereLabel = here === 'recent' ? '最近' : '回看';
   const otherLabel = here === 'recent' ? '回看' : '最近';
@@ -50,12 +40,11 @@ export function RootNavBand({
     id: (['here', 'other', 'leave', 'family'] as const)[index],
   }));
   const paintedReady = items.every((item) => painted[item.id]);
-  const rail = shouldUseNavRail(width, height, fontScale);
+  const rail = shouldUseNavRail(width, height);
   const layout = rail
     ? 'rail'
     : chooseNavBandLayout({
         windowWidth: width,
-        fontScale,
         items: items.map((item) => ({
           ...item,
           measuredWidth: paintedReady ? painted[item.id]?.width : undefined,
@@ -83,11 +72,11 @@ export function RootNavBand({
     const measure = painted[id];
     return {
       minWidth: measure
-        ? navBandOccupiedWidth({ label, fontSize, measuredWidth: measure.width }, fontScale)
-        : navBandItemMinWidth(label, fontSize, fontScale),
+        ? navBandOccupiedWidth({ label, fontSize, measuredWidth: measure.width })
+        : navBandItemMinWidth(label, fontSize),
       minHeight: measure
         ? Math.max(NAV_BAND_HIT, Math.ceil(measure.height))
-        : navBandItemMinHeight(fontSize, fontScale),
+        : navBandItemMinHeight(fontSize),
     };
   }
 
@@ -208,8 +197,8 @@ export function RootReadingLayout({
   onScrollBeginDrag?: () => void;
   onContentSizeChange?: () => void;
 }) {
-  const { width, height, fontScale } = usePageMetrics();
-  const rail = shouldUseNavRail(width, height, fontScale);
+  const { width, height } = usePageMetrics();
+  const rail = shouldUseNavRail(width, height);
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel={accessibilityLabel}>
@@ -278,6 +267,7 @@ const styles = StyleSheet.create({
     minWidth: 48,
     minHeight: 48,
     justifyContent: 'center',
+    overflow: 'visible',
   },
   columnItem: {
     flexGrow: 1,
@@ -296,7 +286,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignItems: 'flex-start',
   },
-  here: { fontSize: 17, color: ink, textAlign: 'center', flexShrink: 0 },
-  go: { fontSize: 17, color: sage, textAlign: 'center', flexShrink: 0 },
-  leave: { fontSize: 20, color: ink, textAlign: 'center', flexShrink: 0 },
+  here: { ...type.action, color: ink, textAlign: 'center', flexShrink: 0 },
+  go: { ...type.action, color: sage, textAlign: 'center', flexShrink: 0 },
+  leave: { ...type.action, color: ink, textAlign: 'center', flexShrink: 0 },
 });

@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Text, type } from './life-text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -242,6 +243,10 @@ export function DeviceLockProvider({
       inFlight.current = false;
       setUnlockBusy(false);
       refresh();
+      const unlocked = !session.snapshot().locked;
+      if (unlocked && AppState.currentState === 'active') {
+        void setPrivateSnapshotBlocked(false);
+      }
     }
   }, [logLock, refresh, resolvedAuthenticator, session]);
 
@@ -403,6 +408,7 @@ export function DeviceLockProvider({
   return (
     <DeviceLockContext.Provider value={value}>
       <View
+        testID="device-lock-root"
         style={styles.stack}
         accessibilityElementsHidden={coverVisible}
         importantForAccessibility={coverVisible ? 'no-hide-descendants' : 'auto'}
@@ -497,7 +503,7 @@ export function DeviceLockSettings() {
 }
 
 const styles = StyleSheet.create({
-  stack: { flex: 1 },
+  stack: { flex: 1, backgroundColor: paper },
   cover: {
     ...StyleSheet.absoluteFill,
     backgroundColor: paper,
@@ -509,9 +515,9 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
-  title: { fontSize: 28, color: ink },
-  body: { fontSize: 17, color: inkSoft },
-  action: { fontSize: 17, color: sage },
+  title: { ...type.title, color: ink },
+  body: { ...type.body, color: inkSoft },
+  action: { ...type.action, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   settingsRow: {
     minHeight: 44,

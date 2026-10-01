@@ -32,6 +32,23 @@ describe('MomentAudio action marks', () => {
     );
     expect(marked.getByLabelText('播放，4秒')).toBeTruthy();
     expect(marked.getByTestId('marked-mark-asset_voice')).toBeTruthy();
+    expect(StyleSheet.flatten(marked.getByText('播放').props.style).fontSize).toBe(17);
+    expect(marked.getByText('播放').props.allowFontScaling).toBe(false);
+  });
+
+  it('keeps scene and compact copy on the fixed app type scale', async () => {
+    const scene = await render(
+      <MomentAudio audio={audio} testIDPrefix="scene" scene />,
+    );
+    expect(StyleSheet.flatten(scene.getByTestId('scene-scene-asset_voice').props.style).fontSize).toBe(17);
+    expect(StyleSheet.flatten(scene.getByText('一段声音 · 4秒').props.style).fontSize).toBe(15);
+    expect(scene.getByText('一段声音 · 4秒').props.allowFontScaling).toBe(false);
+
+    const compact = await render(
+      <MomentAudio audio={audio} testIDPrefix="compact" compact />,
+    );
+    expect(StyleSheet.flatten(compact.getByText('一段声音 · 4秒').props.style).fontSize).toBe(15);
+    expect(compact.getByText('一段声音 · 4秒').props.allowFontScaling).toBe(false);
   });
 
   it('hides the empty idle track when Recent asks for heard progress only', async () => {

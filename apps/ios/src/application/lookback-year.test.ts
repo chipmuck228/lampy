@@ -34,12 +34,10 @@ describe('lookback year page', () => {
     expect(page.entries.map((entry) => entry.count)).toEqual([1, 4, 1, 2, 1, 3, 1, 2, 1]);
   });
 
-  it('hides the three-column grid at large type even when the window is wide', () => {
-    expect(shouldShowYearMonthGrid({ fontScale: 1, windowWidth: 390 })).toBe(true);
-    expect(shouldShowYearMonthGrid({ fontScale: 1, windowWidth: 179 })).toBe(false);
-    expect(shouldShowYearMonthGrid({ fontScale: 1, windowWidth: 390, horizontalInset: 250 })).toBe(
-      false,
-    );
-    expect(shouldShowYearMonthGrid({ fontScale: 1.3, windowWidth: 768 })).toBe(false);
+  it('hides the three-column grid only when the content column is too narrow', () => {
+    expect(shouldShowYearMonthGrid({ windowWidth: 390 })).toBe(true);
+    expect(shouldShowYearMonthGrid({ windowWidth: 179 })).toBe(false);
+    expect(shouldShowYearMonthGrid({ windowWidth: 390, horizontalInset: 250 })).toBe(false);
+    expect(shouldShowYearMonthGrid({ windowWidth: 768 })).toBe(true);
   });
 });

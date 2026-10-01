@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text, type } from './life-text';
 import { SymbolView } from 'expo-symbols';
 
 import { inkSoft, sage } from './life-page';
@@ -121,11 +122,13 @@ export function LookThisHit({
   onPress,
   testID,
   accessibilityLabel,
+  caption = '看这条',
   tight,
 }: {
   onPress: () => void;
   testID?: string;
   accessibilityLabel: string;
+  caption?: string;
   tight?: boolean;
 }) {
   const ids = openChildIds(testID);
@@ -138,12 +141,12 @@ export function LookThisHit({
       onPress={onPress}
       style={[styles.lookThis, tight && styles.lookThisTight]}
     >
-      <View style={styles.lookThisRow} testID={ids?.row}>
+      <View style={[styles.lookThisRow, tight && styles.lookThisRowTight]} testID={ids?.row}>
         <Text style={styles.lookThisText} testID={ids?.label}>
-          看这条
+          {caption}
         </Text>
-        <View accessible={false} testID={ids?.mark}>
-          <LifeIcon name="open" size={12} color={sage} decorative />
+        <View accessible={false} testID={ids?.mark} style={styles.lookThisMark}>
+          <LifeIcon name="open" size={16} color={sage} decorative />
         </View>
       </View>
     </Pressable>
@@ -171,7 +174,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   labeledText: {
-    fontSize: 16,
+    ...type.action,
     color: sage,
   },
   lookThis: {
@@ -179,22 +182,32 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'visible',
   },
   lookThisTight: {
     minHeight: 48,
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     justifyContent: 'flex-start',
     paddingTop: 2,
   },
   lookThisRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    maxWidth: '100%',
+  },
+  lookThisRowTight: {
+    justifyContent: 'flex-start',
   },
   lookThisText: {
-    fontSize: 16,
-    lineHeight: 22,
+    ...type.action,
     color: sage,
+    flexShrink: 1,
+  },
+  lookThisMark: {
+    flexShrink: 0,
   },
 });

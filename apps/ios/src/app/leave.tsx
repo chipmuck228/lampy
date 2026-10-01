@@ -1,16 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  AppState,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { AppState, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput, type } from '../screens/life-text';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -64,6 +54,7 @@ import {
   isFamilyTestDriverEnabled,
 } from '../infrastructure/family-test-driver';
 import { finishLeaveToRecent, leaveOpenedFromLookback } from '../screens/lookback-origin';
+import { writeJustSavedMomentId } from '../screens/recent-save-echo';
 import { usePageMetrics } from '../screens/use-page-metrics';
 
 export const DRAFT_RESTORED_COPY = '上次没保存的内容已放回来。';
@@ -72,13 +63,13 @@ export default function LeaveScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[] }>();
   const fromLookback = leaveOpenedFromLookback(params.from);
-  const { width, height, fontScale } = usePageMetrics();
+  const { width, height } = usePageMetrics();
   const insets = useSafeAreaInsets();
   const reading = readingWidth(width, height);
   const gutter = pageGutter(width, height);
   const pageWidth = readingPageWidth(width, height);
   const compact = isCompactHeight(height);
-  const stackActions = compact || reading < 320 || shouldStackLeaveActions(reading, fontScale);
+  const stackActions = compact || reading < 320 || shouldStackLeaveActions(reading);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -167,11 +158,6 @@ export default function LeaveScreen() {
     );
     return run;
   }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- drop the previous type's measured note height
-    setNoteBoxHeight(undefined);
-  }, [fontScale]);
 
   useEffect(() => {
     if (!detailOpen || !messageDetail) return;
@@ -615,7 +601,8 @@ export default function LeaveScreen() {
         await app.updateDraftNote(id, note);
         await app.updateDraftEmotion(id, emotion);
         await app.updateDraftOccurred(id, occurredInputFromChoice(occurred));
-        await app.saveTextMoment(id);
+        const saved = await app.saveTextMoment(id);
+        writeJustSavedMomentId(saved.id);
       });
       if (abandoningRef.current || draftIdRef.current !== id) return;
       finishLeaveToRecent(router);
@@ -760,14 +747,14 @@ export default function LeaveScreen() {
       edges={['top', 'left', 'right']}
       accessibilityLabel="留下"
       testID="composer-layout"
-      accessibilityHint={`leave-layout scale:${fontScale} actions:${stackActions ? 'stack' : 'row'}`}
+      accessibilityHint={`leave-layout width:${Math.round(reading)} actions:${stackActions ? 'stack' : 'row'}`}
     >
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Text testID="composer-font-scale" accessible={false} style={styles.layoutProbe}>
-          {String(fontScale)}
+        <Text testID="composer-type-policy" accessible={false} style={styles.layoutProbe}>
+          fixed
         </Text>
         <Text testID="composer-actions-mode" accessible={false} style={styles.layoutProbe}>
           {stackActions ? 'stack' : 'row'}
@@ -841,7 +828,6 @@ export default function LeaveScreen() {
             </View>
           ) : null}
           <TextInput
-            key={`composer-note-${fontScale}`}
             accessibilityLabel="要留下的一句话"
             testID="composer-note"
             value={note}
@@ -868,7 +854,6 @@ export default function LeaveScreen() {
           />
           <MomentUnknownMedia items={unknownMedia} testIDPrefix="composer-unknown" />
           <DraftSoundBar
-            layoutRevision={fontScale}
             phase={phase}
             elapsedMs={elapsedMs}
             audio={audio}
@@ -895,7 +880,6 @@ export default function LeaveScreen() {
             onRemove={removeAudio}
           />
           <FeelingPicker
-            layoutRevision={fontScale}
             value={emotion}
             disabled={!draftId || composerLocked}
             onChange={(next) => {
@@ -903,7 +887,6 @@ export default function LeaveScreen() {
             }}
           />
           <OccurredDatePicker
-            layoutRevision={fontScale}
             value={occurred}
             today={todayParts}
             disabled={!draftId || composerLocked}
@@ -981,7 +964,6 @@ export default function LeaveScreen() {
           >
             <View style={styles.mediaRow}>
               <LifeLabeledHit
-                layoutRevision={fontScale}
                 icon="camera"
                 label="拍摄"
                 testID="composer-camera"
@@ -991,7 +973,6 @@ export default function LeaveScreen() {
                 }}
               />
               <LifeLabeledHit
-                layoutRevision={fontScale}
                 icon="photo"
                 label="照片"
                 testID="composer-library"
@@ -1031,14 +1012,14 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   backHit: { minHeight: 44, justifyContent: 'center' },
-  back: { fontSize: 16, lineHeight: 22, color: sage },
-  restore: { fontSize: 16, lineHeight: 24, color: inkSoft },
+  back: { ...type.action, color: sage },
+  restore: { ...type.action, color: inkSoft },
   abandonHit: { minHeight: 44, justifyContent: 'center' },
-  abandon: { fontSize: 16, lineHeight: 22, color: clay },
+  abandon: { ...type.action, color: clay },
   confirmRow: { flexDirection: 'row', gap: 24, marginTop: 8 },
   input: {
     minHeight: 88,
-    fontSize: 22,
+    ...type.body,
     color: ink,
     padding: 0,
   },
@@ -1051,14 +1032,14 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   message: {
-    fontSize: 17,
+    ...type.body,
     color: clay,
     width: '100%',
     maxWidth: '100%',
     minWidth: 0,
   },
   detailHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  detailLink: { fontSize: 16, color: sage },
+  detailLink: { ...type.action, color: sage },
   sheet: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: hairline,
@@ -1069,7 +1050,7 @@ const styles = StyleSheet.create({
   sheetClose: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   sheetScroll: { maxHeight: 160 },
   sheetBody: { paddingBottom: 16 },
-  sheetText: { fontSize: 17, color: inkSoft },
+  sheetText: { ...type.body, color: inkSoft },
   band: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: hairline,
@@ -1096,5 +1077,5 @@ const styles = StyleSheet.create({
   },
   saveHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', marginLeft: 'auto' },
   saveHitStacked: { marginLeft: 0, alignSelf: 'flex-start' },
-  save: { fontSize: 18, color: ink },
+  save: { ...type.action, color: ink },
 });

@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { resetStartupBrandForTests, setBrandReadyTimeoutForTests } from '../application/startup-brand';
 import RecentScreen from '../app/index';
+import { resetJustSavedMomentIdForTests } from './recent-save-echo';
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -76,6 +77,7 @@ describe('recent life page', () => {
   beforeEach(() => {
     mockGetRecentLife.mockReset();
     resetStartupBrandForTests();
+    resetJustSavedMomentIdForTests();
   });
 
   it('shares one date heading for several records on the same day', async () => {

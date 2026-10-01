@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text, type } from './life-text';
 
 import { feelingAccentColor } from '../application/feeling-accent';
 import type { FeelingView } from '../application/feeling';
@@ -31,9 +32,10 @@ export function RecentFeeling({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
-    minHeight: 22,
+    minHeight: 48,
   },
   dot: {
     width: 7,
@@ -41,5 +43,5 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     flexShrink: 0,
   },
-  text: { fontSize: 14, lineHeight: 20, color: '#5C5851', flexShrink: 1 },
+  text: { ...type.meta, color: '#5C5851', flexShrink: 1 },
 });

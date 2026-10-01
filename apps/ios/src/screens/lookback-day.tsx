@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import { Text, type } from './life-text';
 
 import type { LookbackDayEntry } from '../application/lookback-day';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
@@ -52,6 +53,6 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     minWidth: 0,
   },
-  clock: { fontSize: 14, lineHeight: 20, color: '#53604F' },
-  note: { fontSize: 20, lineHeight: 28, color: '#25231F' },
+  clock: { ...type.meta, color: '#53604F' },
+  note: { ...type.body, color: '#25231F' },
 });
