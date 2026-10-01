@@ -168,6 +168,7 @@ export function RootReadingLayout({
   onScrollBeginDrag,
   onContentSizeChange,
   overlay,
+  canvas = paper,
 }: {
   accessibilityLabel?: string;
   scrollTestID: string;
@@ -179,12 +180,13 @@ export function RootReadingLayout({
   onScrollBeginDrag?: () => void;
   onContentSizeChange?: () => void;
   overlay?: ReactNode;
+  canvas?: string;
 }) {
   const { width, height } = usePageMetrics();
   const rail = shouldUseNavRail(width, height);
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel={accessibilityLabel}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: canvas }]} accessibilityLabel={accessibilityLabel}>
       <View style={rail ? styles.row : styles.column}>
         {rail ? band : null}
         <View style={styles.scroll}>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, View } from 'react-native';
-import { Text, type } from '../screens/life-text';
+import { Text } from '../screens/life-text';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +12,22 @@ import type { RecentLifeViewModel } from '../application/use-cases';
 import { LifeIconButton } from '../screens/life-icons';
 import { shouldPairRecentImages } from '../screens/moment-images';
 import { RecentMoment } from '../screens/recent-moment';
+import {
+  recentDayHeading,
+  recentEndInk,
+  recentInk,
+  recentInkSoft,
+  recentKicker,
+  recentOlive,
+  recentPaper,
+  recentPrefixInk,
+  recentRule,
+  recentHairline,
+  recentSettings,
+  recentType,
+  recentWeekdayInk,
+  recentYearInk,
+} from '../screens/recent-visual';
 import {
   acceptRecentEchoLoad,
   beginRecentEchoFocus,
@@ -29,19 +45,11 @@ import {
 import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
 import {
   clay,
-  ink,
-  inkSoft,
   isCompactHeight,
-  DATE_RAIL_WIDTH,
-  READING_MAX,
-  hairline,
   pageGutter,
-  paper,
   recentColumnWidth,
   recentImageColumnWidth,
-  sage,
   shouldShowSameDayRule,
-  shouldStackRecentDay,
 } from '../screens/life-page';
 import { StartupBrandLayer } from '../screens/startup-brand-layer';
 import { usePageMetrics } from '../screens/use-page-metrics';
@@ -52,7 +60,6 @@ export default function RecentScreen() {
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
-  const stackDay = shouldStackRecentDay(width, height);
   const columnWidth = recentColumnWidth(width, height);
   const pairImages = shouldPairRecentImages(
     recentImageColumnWidth(width, height, insets.left, insets.right),
@@ -178,13 +185,14 @@ export default function RecentScreen() {
       <RootReadingLayout
         accessibilityLabel="最近"
         scrollTestID="recent-scroll"
+        canvas={recentPaper}
         contentContainerStyle={[
           styles.column,
           {
             maxWidth: columnWidth,
             paddingHorizontal: gutter,
-            paddingTop: compact ? 4 : 12,
-            paddingBottom: 88,
+            paddingTop: compact ? 8 : 0,
+            paddingBottom: 92,
           },
         ]}
         band={
@@ -219,6 +227,8 @@ export default function RecentScreen() {
             name="settings"
             label="本机设置"
             testID="home-account"
+            color={recentSettings}
+            size={20}
             onPress={() => router.push('/account')}
           />
         </View>
@@ -243,16 +253,14 @@ export default function RecentScreen() {
           </View>
         ) : null}
 
-        {days.map((day) => (
+        {days.map((day, dayIndex) => (
           <View
             key={day.key}
-            style={[styles.day, !stackDay && styles.dayRegular]}
+            style={[styles.day, dayIndex > 0 && styles.nextDay]}
             accessibilityLabel={`${day.label}，${day.items.length}条记录`}
           >
-            <Text style={[styles.date, !stackDay && styles.dateRail]} accessibilityRole="header">
-              {day.label}
-            </Text>
-            <View style={[styles.dayItems, !stackDay && styles.dayItemsRegular]}>
+            <RecentDayHeading dayKey={day.key} label={day.label} />
+            <View style={styles.dayItems}>
               {day.items.map((item, index) => (
                 <View key={item.id}>
                   {shouldShowSameDayRule(index) ? (
@@ -288,49 +296,109 @@ export default function RecentScreen() {
             </View>
           </View>
         ))}
+        {days.length > 0 ? (
+          <Text style={styles.endNote} testID="recent-end-note">
+            每一个平常的日子，都在这里。
+          </Text>
+        ) : null}
       </RootReadingLayout>
     </View>
   );
 }
 
+function RecentDayHeading({ dayKey, label }: { dayKey: string; label: string }) {
+  const heading = recentDayHeading(dayKey, label);
+  return (
+    <View style={styles.sectionHeading}>
+      <View style={styles.sectionCopy}>
+        <Text style={styles.sectionPrefix}>{heading.prefix}</Text>
+        <View style={styles.sectionDateRow}>
+          <Text style={styles.sectionDate} accessibilityRole="header">
+            {heading.date}
+          </Text>
+          {heading.weekday ? <Text style={styles.sectionWeekday}>{heading.weekday}</Text> : null}
+        </View>
+      </View>
+      {heading.year ? <Text style={styles.sectionYear}>{heading.year}</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: paper },
+  safe: { flex: 1, backgroundColor: recentPaper },
   scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,
     width: '100%',
     maxWidth: '100%',
     alignSelf: 'center',
-    gap: 40,
+    gap: 0,
   },
   hero: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
+    paddingTop: 20,
+    paddingBottom: 17,
     gap: 12,
   },
-  heroCopy: { flex: 1, flexShrink: 1, minWidth: 0, gap: 4 },
-  eyebrow: { ...type.meta, color: sage },
-  wordmark: { ...type.title, color: ink },
-  fab: { minHeight: 48, minWidth: 48, justifyContent: 'center', alignItems: 'flex-end' },
-  fabLabel: { ...type.action, color: ink },
+  heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
+  eyebrow: { ...recentType.kicker, color: recentKicker },
+  wordmark: { ...recentType.title, color: recentInk, marginTop: 8 },
+  fab: {
+    minHeight: 48,
+    height: 48,
+    minWidth: 48,
+    paddingLeft: 13,
+    paddingRight: 17,
+    borderRadius: 50,
+    backgroundColor: recentOlive,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 5,
+  },
+  fabLabel: { ...recentType.fab, color: '#FFFFFF' },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
-  emptyTitle: { ...type.title, color: ink },
-  body: { ...type.body, color: inkSoft },
+  emptyTitle: { ...recentType.title, color: recentInk },
+  body: { ...recentType.note, color: recentInkSoft },
   firstHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  first: { ...type.action, color: ink },
-  error: { ...type.body, color: clay, paddingVertical: 8 },
-  day: { gap: 12, overflow: 'visible' },
-  dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
-  date: { ...type.meta, color: sage, paddingBottom: 4, minWidth: 0 },
-  dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
-  dayItems: { gap: 32 },
-  dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
+  first: { ...recentType.expand, color: recentInk },
+  error: { ...recentType.note, color: clay, paddingVertical: 8 },
+  day: { overflow: 'visible' },
+  nextDay: { marginTop: 26 },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: recentRule,
+    paddingTop: 20,
+    marginTop: 5,
+    marginBottom: 4,
+  },
+  sectionCopy: { flex: 1, minWidth: 0 },
+  sectionPrefix: { ...recentType.prefix, color: recentPrefixInk },
+  sectionDateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    marginTop: 6,
+    gap: 5,
+  },
+  sectionDate: { ...recentType.date, color: recentInk },
+  sectionWeekday: { ...recentType.weekday, color: recentWeekdayInk },
+  sectionYear: { ...recentType.year, color: recentYearInk, marginBottom: 4 },
+  dayItems: { gap: 0 },
   sameDayRule: {
     alignSelf: 'stretch',
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: hairline,
-    marginTop: -16,
-    marginBottom: 16,
+    height: 1,
+    backgroundColor: recentHairline,
+  },
+  endNote: {
+    ...recentType.end,
+    color: recentEndInk,
+    textAlign: 'center',
+    paddingTop: 28,
+    paddingBottom: 18,
   },
 });

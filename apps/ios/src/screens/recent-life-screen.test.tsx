@@ -92,10 +92,11 @@ describe('recent life page', () => {
     await waitFor(() => {
       expect(view.getByText('门口的风')).toBeTruthy();
     });
-    expect(view.getAllByText('记录于 9月27日')).toHaveLength(1);
+    expect(view.getAllByText('记录于')).toHaveLength(2);
+    expect(view.getByText('9月27日')).toBeTruthy();
     expect(view.getByLabelText('记录于 9月27日，2条记录')).toBeTruthy();
     expect(view.getByText('同一天的第二句')).toBeTruthy();
-    expect(view.getByText('记录于 9月24日')).toBeTruthy();
+    expect(view.getByText('9月24日')).toBeTruthy();
     expect(view.getByLabelText('留下')).toBeTruthy();
     expect(view.getByLabelText('回看')).toBeTruthy();
     expect(view.getByLabelText('最近')).toBeTruthy();

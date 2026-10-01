@@ -56,11 +56,11 @@ describe('life page measures', () => {
     expect(recentColumnWidth(390, 844)).toBe(390);
   });
 
-  it('measures the image column after gutters, the date rail, and safe edges', () => {
-    expect(recentImageColumnWidth(1024, 1366)).toBe(READING_MAX);
+  it('measures the image column after gutters and safe edges', () => {
+    expect(recentImageColumnWidth(1024, 1366)).toBe(672);
     expect(recentImageColumnWidth(390, 844)).toBe(342);
     expect(recentImageColumnWidth(320, 700)).toBe(272);
-    expect(recentImageColumnWidth(768, 1024, 200, 200)).toBe(120);
+    expect(recentImageColumnWidth(768, 1024, 200, 200)).toBe(272);
     expect(768).toBeGreaterThanOrEqual(280);
     expect(recentImageColumnWidth(768, 1024, 200, 200)).toBeLessThan(280);
   });

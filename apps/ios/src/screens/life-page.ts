@@ -128,7 +128,7 @@ export function recentColumnWidth(windowWidth: number, windowHeight: number): nu
   return pageColumnWidth(windowWidth, windowHeight);
 }
 
-/** Width left for photos after gutters, safe edges, and the date rail when it sits beside the items. */
+/** Width left for photos after gutters and safe edges. */
 export function recentImageColumnWidth(
   windowWidth: number,
   windowHeight: number,
@@ -139,10 +139,7 @@ export function recentImageColumnWidth(
   const pageCol = recentColumnWidth(windowWidth, windowHeight);
   const used = Math.min(Math.max(0, windowWidth - safeLeft - safeRight), pageCol);
   const inner = used - gutter * 2;
-  if (shouldStackRecentDay(windowWidth, windowHeight)) {
-    return Math.max(0, inner);
-  }
-  return Math.max(0, inner - DATE_RAIL_WIDTH - DATE_RAIL_GAP);
+  return Math.max(0, inner);
 }
 
 export function shouldShowSameDayRule(indexInDay: number): boolean {

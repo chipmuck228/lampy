@@ -136,9 +136,9 @@ describe('recent moment row', () => {
     expect(StyleSheet.flatten(view.getByTestId('recent-fade-moment_type').props.style).overflow).not.toBe(
       'visible',
     );
-    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).fontSize).toBe(17);
-    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBe(32);
-    expect(StyleSheet.flatten(view.getByTestId('recent-occurred-moment_type').props.style).fontSize).toBe(15);
+    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).fontSize).toBe(13);
+    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBe(27);
+    expect(StyleSheet.flatten(view.getByTestId('recent-occurred-moment_type').props.style).fontSize).toBe(10);
     expect(view.getByTestId('recent-note-moment_type').props.allowFontScaling).toBe(false);
     expect(view.getByTestId('recent-occurred-moment_type').props.allowFontScaling).toBe(false);
   });

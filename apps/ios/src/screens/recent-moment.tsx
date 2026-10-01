@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
-import { Text, type } from './life-text';
+import { Text } from './life-text';
 
 import type { RecentLifeItem } from '../application/use-cases';
 import type { PlaybackStatus } from '../infrastructure/media';
-import { ink, inkSoft, sage } from './life-page';
 import { LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentImages } from './moment-images';
@@ -15,6 +14,15 @@ import {
   recentOpenAccessLabel,
   recentOpenCaption,
 } from './recent-note';
+import {
+  recentInk,
+  recentInkSoft,
+  recentOccurred,
+  recentOpenInk,
+  recentRecordedClock,
+  recentSage,
+  recentType,
+} from './recent-visual';
 
 export function RecentMoment({
   item,
@@ -45,6 +53,7 @@ export function RecentMoment({
     item.audio &&
     (item.note || item.images.length > 0 || (item.unknownMedia?.length ?? 0) > 0 || item.feeling)
   );
+  const clock = recentRecordedClock(item.recordedAt);
   return (
     <View
       style={styles.shell}
@@ -57,6 +66,20 @@ export function RecentMoment({
         collapsable={false}
       >
       <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
+        {clock || item.occurredLabel ? (
+          <View style={styles.meta}>
+            {clock ? (
+              <Text style={styles.time} testID={`recent-clock-${item.id}`}>
+                {clock}
+              </Text>
+            ) : null}
+            {item.occurredLabel ? (
+              <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
+                {item.occurredLabel}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.momentBody}>
           {item.note ? (
             <>
@@ -90,11 +113,6 @@ export function RecentMoment({
               ) : null}
             </>
           ) : null}
-          {item.occurredLabel ? (
-            <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
-              {item.occurredLabel}
-            </Text>
-          ) : null}
           <MomentImages
             images={item.images}
             testIDPrefix={`recent-image-${item.id}`}
@@ -114,16 +132,26 @@ export function RecentMoment({
           markedActions
           progressWhenHeard
         />
-        <RecentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
-        <LookThisHit
-          caption={recentOpenCaption(truncated)}
-          accessibilityLabel={
-            recentOpenAccessLabel([item.dateLabel, item.occurredLabel, item.note], truncated) ||
-            `${item.dateLabel}，一条记录`
-          }
-          testID={`recent-open-${item.id}`}
-          onPress={onOpen}
-        />
+        <View style={styles.foot}>
+          {item.feeling ? (
+            <View style={styles.footFeeling}>
+              <RecentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
+            </View>
+          ) : (
+            <View style={styles.footSpacer} />
+          )}
+          <LookThisHit
+            caption={recentOpenCaption(truncated)}
+            accessibilityLabel={
+              recentOpenAccessLabel([item.dateLabel, item.occurredLabel, item.note], truncated) ||
+              `${item.dateLabel}，一条记录`
+            }
+            testID={`recent-open-${item.id}`}
+            onPress={onOpen}
+            align="end"
+            captionStyle={styles.open}
+          />
+        </View>
       </View>
       </Animated.View>
     </View>
@@ -134,18 +162,45 @@ const styles = StyleSheet.create({
   // Keep overflow off the native-driver fade. Face ID in/out can black the window
   // if Animated.View is asked to clip-visible while compositing opacity.
   shell: { overflow: 'visible' },
-  moment: { gap: 8, minHeight: 48, overflow: 'visible' },
-  momentMixed: { gap: 16 },
-  momentBody: { gap: 8, overflow: 'visible' },
-  note: { ...type.body, color: ink },
+  moment: { gap: 0, minHeight: 48, overflow: 'visible', paddingTop: 19, paddingBottom: 12 },
+  momentMixed: { gap: 0 },
+  meta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  time: { ...recentType.meta, color: recentInkSoft },
+  occurred: { ...recentType.meta, color: recentOccurred },
+  momentBody: { gap: 0, overflow: 'visible' },
+  note: { ...recentType.note, color: recentInk, marginBottom: 13 },
   measure: {
     position: 'absolute',
     opacity: 0,
     left: 0,
     right: 0,
     zIndex: -1,
+    marginBottom: 0,
   },
-  occurred: { ...type.meta, color: inkSoft },
-  expandHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  expand: { ...type.action, color: sage },
+  expandHit: {
+    minHeight: 48,
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    marginTop: -5,
+    marginBottom: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 3,
+  },
+  expand: { ...recentType.expand, color: recentSage },
+  foot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 45,
+    gap: 8,
+  },
+  footFeeling: { flex: 1, minWidth: 0 },
+  footSpacer: { flex: 1 },
+  open: { ...recentType.open, color: recentOpenInk },
 });
