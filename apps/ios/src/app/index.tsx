@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../screens/life-text';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -149,15 +149,19 @@ export default function RecentScreen() {
         fabShift.setValue(visible ? 0 : RECENT_FAB_SHIFT_Y);
         return;
       }
+      const duration = visible ? RECENT_FAB_SHOW_MS : RECENT_FAB_HIDE_MS;
+      const easing = visible ? Easing.out(Easing.cubic) : Easing.in(Easing.quad);
       const next = Animated.parallel([
         Animated.timing(fabOpacity, {
           toValue: visible ? 1 : 0,
-          duration: visible ? RECENT_FAB_SHOW_MS : RECENT_FAB_HIDE_MS,
+          duration,
+          easing,
           useNativeDriver: true,
         }),
         Animated.timing(fabShift, {
           toValue: visible ? 0 : RECENT_FAB_SHIFT_Y,
-          duration: visible ? RECENT_FAB_SHOW_MS : RECENT_FAB_HIDE_MS,
+          duration,
+          easing,
           useNativeDriver: true,
         }),
       ]);
