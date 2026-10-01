@@ -1,4 +1,6 @@
-# Source from apps/ios before a Release archive. Not for Metro / Dev Client.
+# Source only from scripts/release-archive.sh. Not for Metro / Dev Client.
+# Do not source this file in a developer shell — it exports NODE_ENV=production
+# and will make Jest/React Test Renderer fail with actImplementation errors.
 # Overrides leftover shell flags. scripts/release-archive.sh also stashes local dotenv.
 
 unset EXPO_PUBLIC_FAMILY_ENTRY_OPEN

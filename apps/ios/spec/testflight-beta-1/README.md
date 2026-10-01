@@ -22,7 +22,9 @@
 | 个人记录 | 本机 SQLite + 文件，无需注册或网络 |
 | Metro / Dev Client 启动器 | Release Archive 须打进 JS；测试员不能再看到开发菜单或 Searching for development servers |
 
-Release 环境由 `scripts/release-public-env.sh` 与入库的 `.env.production` 固定。`scripts/release-archive.sh` 会先挪走本机 `.env` / `.env.local`，再 prebuild + Archive，避免把本机调试开关打进包。不要只看本机 `.env` 推断外测包。
+Release 环境由 `scripts/release-public-env.sh` 与入库的 `.env.production` 固定。`scripts/release-archive.sh` 会先挪走本机 `.env` / `.env.local`，再 prebuild + Archive，避免把本机调试开关打进包。不要只看本机 `.env` 推断外测包。不要在开发 shell 里 `source` 该 env 脚本（会把 `NODE_ENV=production` 留给 Jest）。
+
+`ios/` 未入库。若本地已有 `apps/ios/ios`，脚本会拒绝 `prebuild --clean`，除非设置 `LAMPY_ALLOW_PREBUILD_CLEAN=1`（先备份到输出目录）。辅助函数单测不能代替对 Archive 内 `main.jsbundle` 的检查：`bash scripts/release-archive.sh --inspect /tmp/lampy-testflight-beta-1/Lampy.xcarchive`。
 
 ## 1. 在 App Store Connect 创建 App
 
@@ -52,16 +54,18 @@ bash scripts/release-archive.sh
 4. 分发选项保持默认即可；不要勾选会改签名的额外重新签名，除非证书过期。
 5. 等 Processing 变为 Ready to Submit / Ready to Test。
 
-`archive` 成功 **不能** 代替 TestFlight 安装验收。上传后须用 TestFlight 装到真机，再走 `WALK.md` 里的六项回归。
+`archive` 成功 **不能** 代替 TestFlight 安装验收。包内有 `main.jsbundle` 只说明「含 bundle」，**不是**「运行时不依赖 Metro」。后者必须装 TestFlight 包确认。
+
+**建议顺序：** 先上传供本人 Internal Testing → 用 TestFlight 安装包走完 `WALK.md` 六项个人 MVP 回归 → 通过后再建 External Testing 组、提交 Beta 审核、邀请外部用户。本 PR 不代上传、不代提交审核、不代发邀请。
 
 ## 3. 外部测试必须走 Beta 审核
 
 少量外部用户 **不能** 只用 Internal Testing：
 
-- Internal Testing 只给 App Store Connect 团队成员（Users and Access 里的用户）。
+- Internal Testing 只给 App Store Connect 团队成员（Users and Access 里的用户）。**建议本人先走这一步做安装验收。**
 - 朋友 / 少量外部用户必须建 **External Testing** 组，加入邮箱或之后开限量 Public Link。
 - **第一次外测组需要 Beta App Review。** 未过审前外部测不了。
-- 不要把「只走 Internal」当成这次外测的完成条件。
+- 不要把「只走 Internal」当成外测完成条件；也不要在六项回归未过时申请外测审核。
 
 过审后再邀请；本 PR 不代发邀请。
 

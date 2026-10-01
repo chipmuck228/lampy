@@ -3,37 +3,71 @@
 基线：`origin/main` `b79174b346b02cb072f526af7e3ca33dac30473d`（#48）。  
 分支 `ios/testflight-beta-1`。家庭入口关闭。未卸 Liuz17，未清个人库，未重置首次引导。
 
-`origin/main` 在切开时没有 `b79174b` 之后的提交。Archive 打的是本分支工作区（准备代码 + 基线），`main.jsbundle` 不含本 markdown。提交后的准备 SHA 见「Archive 记录」。
+`origin/main` 在切开后没有后续提交。Archive 打进包的 JS 来自 `9142760cb2632f0f9a7a24fb7608a902c6f8c8c9`。本轮补检查只改测试、脚本和文档，**未重新 Archive**。文档 / 脚本 head 见文末。
 
 横屏 / iPad / VoiceOver：**NOT VERIFIED**。
 
+建议：先上传供本人 Internal Testing，用 TestFlight 包走完下面六项，通过后再申请外部 Beta 审核和邀请。
+
 ## 命令
 
-在 `apps/ios`：
+在 `apps/ios`，且 **未** `source` `release-public-env.sh`（该脚本会留下 `NODE_ENV=production`，Jest 会变成 `actImplementation is not a function`）：
 
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | **PASS** |
-| 全量 `npx jest --ci` | 128 suites / 675 tests **PASS**。3 fail 均在 `leave-draft-screen.test.tsx`（找不到「当时的感受，平静，已选中」）。该文件相对 `origin/main` **无改动**，记 **既有**，非本分支新增 |
-| 本轮 ESLint（`release-public-env*`） | **PASS** |
+| `npx jest --ci`（全量） | **129 suites / 678 tests passed，0 failed**。不要写成「全量 PASS 但有 3 个失败」。 |
+| 本轮 ESLint（leave-draft 测试、release-public-env、inspect-release-archive） | **PASS** |
+| `node --test scripts/inspect-release-archive.test.cjs` | **PASS** |
 | `git diff --check -- apps/ios` | **PASS** |
+| `bash scripts/release-archive.sh --inspect /tmp/lampy-testflight-beta-1/Lampy.xcarchive` | **PASS**（problems=none） |
+| `bash scripts/release-archive.sh`（本地已有 `ios/`，未设 `LAMPY_ALLOW_PREBUILD_CLEAN`） | **exit 2**，未覆盖 `ios/`；dotenv 已恢复 |
+
+## leave-draft 三项失败：隔离对照
+
+同一依赖（`apps/ios/node_modules`）、同一命令：
+
+```
+unset NODE_ENV BABEL_ENV
+npx jest --ci --runInBand src/screens/leave-draft-screen.test.tsx
+```
+
+隔离 worktree：
+
+| 树 | SHA | 结果 |
+| --- | --- | --- |
+| `/tmp/lampy-jest-base` | `b79174b346b02cb072f526af7e3ca33dac30473d` | 3 failed / 11 passed / 14 |
+| `/tmp/lampy-jest-pr49` | `ff09b61c4aeabe318cd0af323f201408189a3a87`（对照时的 #49 head） | 3 failed / 11 passed / 14 |
+
+两边失败信息相同：
+
+1. `lets a restored draft keep being edited` — 找不到「当时的感受，平静，已选中」
+2. `removes one restored photo without abandoning the draft` — 同上
+3. `persists edits on a restored draft` — 找不到 `composer-feeling-高兴`（芯片未展开）
+
+`leave-draft-screen.test.tsx` 与 `moment-feeling.tsx` 在两棵树上 **内容相同**。这不是「文件没改所以既有」的推断，而是基线与 #49 用同一命令跑出的同一结果。
+
+根因：恢复且已有感受时，`FeelingPicker` 的 `chipsVisible = !selected || open`，默认收起。真实可访问性是折叠按钮「当时的感受，平静」（`expanded=false`），芯片「…，已选中」不在树上。`leave-feeling-screen.test.tsx` 已按此写；draft 测试仍按展开态断言。
+
+修正：按折叠语义断言；覆盖草稿文字 / 照片 / 放弃仍在。改感受前先展开。修正后该文件 **14 passed**。全量变为 **678 passed / 0 failed**。
 
 ## Release 配置
 
 | 项 | 期望 | 实际 |
 | --- | --- | --- |
-| Bundle ID | `app.lampy.ios` | Archive 内 `Info.plist` = `app.lampy.ios` |
+| Bundle ID | `app.lampy.ios` | Archive `Info.plist` = `app.lampy.ios` |
 | Team | `B283NY984J` | codesign `TeamIdentifier=B283NY984J` |
 | Version / Build | `0.1.0` / `1` | Archive 内 `0.1.0` / `1`。本仓库无既有 TestFlight 上传记录 |
-| 家庭入口 | 关 | `inspectReleasePublicEnv(..., false).familyEntryOpen === false` |
-| 家庭 API | 关 | 无 `EXPO_PUBLIC_FAMILY_API_BASE_URL` |
-| 开发诊断 | 关 | `EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS=0`，Release `__DEV__` false |
-| 测试登录 | 关 | 诊断页关闭后，「本机设置」无测试登录 |
+| 家庭入口 | 关 | 包内无 `family.example`；`EXPO_PUBLIC_FAMILY_*` 键已被 inline 掉 |
+| 家庭 API | 关 | 同上 |
+| 开发诊断 | 关 | 构建时 `EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS=0`。包内出现该标识符是压缩后的标识符碰撞，**不是**值为 1 |
+| 测试登录 | 关 | 诊断关闭后，「本机设置」无测试登录 |
 | AI / 回眸 | 无入口 | `apps/ios/src` 无 memoir/AI 路由 |
-| 独立运行 | 不依赖 Metro | Archive 含 `main.jsbundle`；包内无 “Searching for development servers” |
+| 含 bundle | 有 `main.jsbundle` | 有（约 3.2MB）。inspect：`jsbundle_present=yes` |
+| 运行时不依赖 Metro | 须安装验证 | **`runtime_metro_independent=NOT_VERIFIED`**。有 bundle ≠ 运行时不依赖 Metro |
 | 个人数据 / Keychain / 本机保护 / 引导 | 不改语义 | 本分支不改 store key 与完成条件 |
 
-本机 `.env` **不是** Release 依据。`release-archive.sh` 会 stash 本地 dotenv，并打印实际 `EXPO_PUBLIC_*`。
+本机 `.env` **不是** Release 依据。`release-archive.sh` 会 stash 本地 dotenv；失败或中断后若构建期未生成同名文件则恢复，否则保留构建期文件、原件留在 stash。辅助函数单测不能代替 `--inspect`。
 
 ## 分发配置
 
@@ -41,16 +75,12 @@
 | --- | --- |
 | Icon | `app.json` → `ios.icon` `./assets/expo.icon`，`icon` `./assets/images/icon.png` |
 | Launch Screen | `expo-splash-screen` 纸色 `#F3F0E9` + `splash-icon.png` |
-| 相机 | 「Lampy 只在你拍照留下一条生活时使用相机。」 |
-| 相册读 | 「Lampy 只在你从相册选择已有照片留下时读取相册。」 |
-| 相册写 | 「Lampy 不会把生活写回系统相册；此说明仅用于系统要求。」 |
-| 麦克风 | 「Lampy 只在你录下当时的声音时使用麦克风。」 |
-| Face ID | 「Lampy 只在你打开本机保护时，用 Face ID 或设备密码确认是这台设备的持有人。不会上传面部数据。」 |
-| 隐私清单 | prebuild 后的 `ios/Lampy/PrivacyInfo.xcprivacy` 与用途对照，见 Archive 记录 |
-| 出口合规 | **不**在 Info.plist 预写 `ITSAppUsesNonExemptEncryption`。按下方依据在 Connect 里回答 |
-| 最低 iOS / iPad | 本次 prebuild `IPHONEOS_DEPLOYMENT_TARGET=16.4`，`TARGETED_DEVICE_FAMILY=1,2`。iPad 可装，**NOT VERIFIED** |
+| 相机 / 相册 / 麦克风 / Face ID | 文案见 prebuild `Info.plist`，与 README 一致 |
+| 隐私清单 | **不能**只看主工程三项。实际 Archive 里有 10 份 `PrivacyInfo.xcprivacy`，见下 |
+| 出口合规 | **不**在 Info.plist 预写 `ITSAppUsesNonExemptEncryption` |
+| 最低 iOS / iPad | prebuild `IPHONEOS_DEPLOYMENT_TARGET=16.4`，`TARGETED_DEVICE_FAMILY=1,2`。iPad 可装，**NOT VERIFIED** |
 
-### 出口合规回答依据（不要为了跳过询问而写死声明）
+### 出口合规回答依据
 
 个人 MVP 运行时：
 
@@ -59,30 +89,46 @@
 - 本包不连家庭 API，个人路径不发起业务 HTTPS。系统栈仍可能带 TLS。
 - `@noble/hashes` 的 argon2 / SHA-256 用在 `family-api` 服务端与测试，不在个人留下/最近/回看路径。
 
-上传时按 App Store Connect **当时**问卷作答。不要为了少点一下就在工程里设置「不含非豁免加密」。若问卷问到「是否使用加密」，应据实包含系统 Keychain / 可能的 TLS，再按苹果当前豁免项往下选。
+上传时按 App Store Connect **当时**问卷作答。不要为了少点一下就在工程里设置「不含非豁免加密」。
+
+### 隐私清单（实际 Archive，不是只看主工程）
+
+`inspect` 列出 10 份。主工程 `PrivacyInfo.xcprivacy`：UserDefaults `CA92.1`、FileTimestamp `C617.1`、SystemBootTime `35F9.1`；无收集类型；`NSPrivacyTracking=false`。
+
+依赖一并打进包的清单（类型与主工程重叠，**不是**「已证明所有依赖合规」的结论）：
+
+- `ExpoConstants_privacy` UserDefaults CA92.1
+- `ExpoDevice_privacy` SystemBootTime 35F9.1
+- `ExpoSystemUI_privacy` UserDefaults CA92.1
+- `React-Core_privacy` FileTimestamp C617.1 + UserDefaults CA92.1
+- `React-cxxreact_privacy` FileTimestamp C617.1
+- `React-timing_privacy` SystemBootTime 35F9.1
+- `ReactNativeDependencies_{boost,folly,glog}` FileTimestamp / SystemBootTime
+
+这是库存。Apple 是否接受、是否还有未声明 API，要等上传后的 Connect 检查，不能在这里写 PASS。
 
 ## Archive 记录
 
 | 项 | 值 |
 | --- | --- |
-| git SHA（基线 / 切开时 HEAD） | `b79174b346b02cb072f526af7e3ca33dac30473d` |
-| 准备 / 构建代码 SHA | `9142760cb2632f0f9a7a24fb7608a902c6f8c8c9`（Archive 打进包的 JS）。其后提交只改走查文档 |
+| 基线 SHA | `b79174b346b02cb072f526af7e3ca33dac30473d` |
+| **构建 / 打包 SHA** | `9142760cb2632f0f9a7a24fb7608a902c6f8c8c9`（打进 `main.jsbundle` 的工作区）。本轮未改打包进 App 的源码，未重新 Archive |
+| **文档 / 脚本 head** | 见本文件提交后的 `git rev-parse HEAD`（leave-draft 测试、inspect 脚本、交接文档） |
 | version / build | `0.1.0` / `1` |
 | Xcode | 26.6（17F113） |
 | Bundle ID / Team | `app.lampy.ios` / `B283NY984J` |
-| 实际 `EXPO_PUBLIC_*`（脚本打印，已 stash 本机 `.env`） | `ACCOUNT_DIAGNOSTICS=0`；家庭入口/API/test driver 空 |
-| 功能开关 | 家庭关、诊断关、测试登录关、AI 无入口 |
-| Archive 结果 | **SUCCEEDED** → `/tmp/lampy-testflight-beta-1/Lampy.xcarchive` |
-| embedded JS | 有 `main.jsbundle`（约 3.2MB） |
+| 功能开关 | 家庭关、诊断关、测试登录关、AI 无入口（以 Archive inspect 为准，不以 helper 单测代替） |
+| Archive 结果 | 仍为先前 **SUCCEEDED** → `/tmp/lampy-testflight-beta-1/Lampy.xcarchive`。本轮 `--inspect` problems=none |
+| embedded JS | 有 `main.jsbundle` |
+| 运行时不依赖 Metro | **NOT VERIFIED**（须 TestFlight 安装） |
 | 签名 | 本地 Archive 为 `Apple Development: Zhen Liu (H36468MSTC)`。上传时须在 Organizer 再签 App Store Connect |
-| 隐私清单 | UserDefaults `CA92.1`、FileTimestamp `C617.1`、SystemBootTime `35F9.1`；无收集类型；`NSPrivacyTracking=false`。与本机存储/文件时间/运行时计时相符，无分析 SDK |
-| Dev Client 残留 | `expo-dev-client` 仍在 plugin 里；Info.plist 生成过 `exp+lampy-ios` / Bonjour。Release 有 Strip Local Network Keys 脚本。测试员若仍看到开发启动器，这一包不能当外测 |
+| Dev Client 残留 | `expo-dev-client` 仍在 plugin 里。测试员若仍看到开发启动器，这一包不能当外测 |
 
-构建成功 ≠ TestFlight 安装验收。第一次 `pod install` 因 GitHub 超时失败；带本机代理后成功。
+构建成功 ≠ TestFlight 安装验收。有 `main.jsbundle` ≠ 运行时不依赖 Metro。
 
 ## TestFlight 安装后（六项）
 
-须用 **TestFlight 安装包**，不能用 Dev Client / Metro。Liuz17 可装，但不要卸、不要清库、不要重置引导。
+须用 **TestFlight 安装包**，不能用 Dev Client / Metro。建议本人 Internal Testing 先走完。Liuz17 可装，但不要卸、不要清库、不要重置引导。
 
 | # | 项 | 结果 |
 | --- | --- | --- |
