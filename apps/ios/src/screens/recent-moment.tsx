@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 48,
     gap: 10,
-    marginTop: 4,
+    marginTop: 18,
   },
   footFeeling: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
   footSpacer: { flexGrow: 1, flexShrink: 1, minWidth: 0 },

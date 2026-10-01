@@ -240,7 +240,7 @@ describe('recent reading hierarchy', () => {
     expectBefore(ids, 'recent-sound-moment_order-play-asset_voice', 'recent-sound-moment_order-scene-asset_voice');
     expectBefore(ids, 'recent-sound-moment_order-scene-asset_voice', 'recent-feeling-moment_order');
     expectBefore(ids, 'recent-feeling-moment_order', 'recent-open-label-moment_order');
-    expect(view.getAllByText('当时的感受 · 平静')).toHaveLength(2);
+    expect(view.getAllByText('平静')).toHaveLength(2);
     expect(view.getAllByText('这段内容这次打不开，其他内容仍然保留。')).toHaveLength(2);
     const missing = testIdsInTree(view.getByTestId('recent-item-moment_missing_sound'));
     expectBefore(missing, 'recent-unknown-moment_missing_sound-unavailable-asset_unknown', 'recent-sound-moment_missing_sound-unavailable-asset_voice');

@@ -25,7 +25,7 @@ export function RecentFeeling({
         importantForAccessibility="no"
         style={[styles.dot, { backgroundColor: feelingAccentColor(feeling) }]}
       />
-      <Text style={styles.text}>当时的感受 · {feeling.label}</Text>
+      <Text style={styles.text}>{feeling.label}</Text>
     </View>
   );
 }
