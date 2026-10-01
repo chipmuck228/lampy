@@ -1,6 +1,6 @@
 # 回看同页连续阅读走查
 
-实现分支 `ios/lookback-continuous-reading`（PR #53 OPEN），从最新 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #51 旧分支或未合入实现复制。#52 Figma 视觉稿仍独立，本切片未全局替换未落地字体/配色。
+实现分支 `ios/lookback-continuous-reading`（PR #53 OPEN），审阅补修 HEAD `c412e4ae3e55b394eadee6d697a755c81c081e19`，从最新 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #51 旧分支或未合入实现复制。#52 Figma 视觉稿仍独立，本切片未全局替换未落地字体/配色。
 
 审阅补修已落到同分支：分页互斥、范围世代、真实范围计数、换日回顶、失败保留并重试。Jest 与静态稿 **≠** 原生页面 PASS。未实际操作的项写 **NOT VERIFIED**。真机验收仍等这轮补修之后。
 
