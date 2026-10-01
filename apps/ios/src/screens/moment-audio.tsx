@@ -51,6 +51,14 @@ function playbackMeta(status: PlaybackStatus, durationLabel: string, currentMs: 
   return `一段声音 · ${durationLabel}`;
 }
 
+function formatClock(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) ms = 0;
+  const total = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export function MomentAudio({
   audio,
   playbackStatus = 'idle',
@@ -62,6 +70,7 @@ export function MomentAudio({
   scene = false,
   markedActions = false,
   progressWhenHeard = false,
+  chrome = 'plain',
 }: {
   audio: AudioView | null;
   playbackStatus?: PlaybackStatus;
@@ -73,6 +82,7 @@ export function MomentAudio({
   scene?: boolean;
   markedActions?: boolean;
   progressWhenHeard?: boolean;
+  chrome?: 'plain' | 'row';
 }) {
   if (!audio) return null;
 
@@ -133,6 +143,88 @@ export function MomentAudio({
   const showProgress = progressWhenHeard
     ? shouldShowHeardProgress(playbackStatus, currentTimeMs)
     : scene;
+  const playIcon = (
+    playing ? 'pause' : playbackStatus === 'finished' ? 'replay' : 'play'
+  ) as LifeIconName;
+  const playControl =
+    onPlay || onPause ? (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${actionLabel}，${durationLabel}`}
+        accessibilityState={{ disabled: preparing }}
+        testID={`${testIDPrefix}-play-${audio.id}`}
+        disabled={preparing}
+        onPress={() => {
+          if (preparing) return;
+          if (playing) onPause?.();
+          else onPlay?.();
+        }}
+        style={chrome === 'row' ? styles.rowPlayHit : styles.hit}
+      >
+        {chrome === 'row' ? (
+          <View style={styles.rowPlay}>
+            {markedActions ? (
+              <View accessible={false} testID={`${testIDPrefix}-mark-${audio.id}`}>
+                <LifeIcon name={playIcon} size={18} color="#FFFFFF" decorative />
+              </View>
+            ) : (
+              <LifeIcon name={playIcon} size={18} color="#FFFFFF" decorative />
+            )}
+          </View>
+        ) : (
+          <View style={styles.actionRow}>
+            {markedActions ? (
+              <View accessible={false} testID={`${testIDPrefix}-mark-${audio.id}`}>
+                <LifeIcon name={playIcon} size={14} color={sage} decorative />
+              </View>
+            ) : null}
+            <Text style={styles.action}>{actionLabel}</Text>
+          </View>
+        )}
+      </Pressable>
+    ) : null;
+
+  if (chrome === 'row') {
+    return (
+      <View style={styles.rowChrome}>
+        {playControl}
+        <View style={styles.rowInfo}>
+          {scene ? (
+            <Text
+              style={styles.rowTitle}
+              testID={`${testIDPrefix}-scene-${audio.id}`}
+              numberOfLines={1}
+            >
+              {audio.label}
+            </Text>
+          ) : (
+            <Text
+              style={styles.rowTitle}
+              numberOfLines={1}
+              accessibilityLabel={playbackLabel(playbackStatus, durationLabel, currentTimeMs)}
+            >
+              {playbackMeta(playbackStatus, durationLabel, currentTimeMs)}
+            </Text>
+          )}
+          <View
+            accessible={false}
+            testID={`${testIDPrefix}-progress-${audio.id}`}
+            style={styles.rowTrack}
+          >
+            <View style={[styles.rowFill, { width: `${Math.round(progress * 100)}%` }]} />
+          </View>
+        </View>
+        <Text
+          style={styles.rowTime}
+          accessibilityLabel={
+            scene ? playbackLabel(playbackStatus, durationLabel, currentTimeMs) : undefined
+          }
+        >
+          {`${formatClock(currentTimeMs)} / ${formatClock(audio.durationMs)}`}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.block}>
@@ -158,44 +250,7 @@ export function MomentAudio({
           />
         </View>
       ) : null}
-      {onPlay || onPause ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${actionLabel}，${durationLabel}`}
-          accessibilityState={{ disabled: preparing }}
-          testID={`${testIDPrefix}-play-${audio.id}`}
-          disabled={preparing}
-          onPress={() => {
-            if (preparing) return;
-            if (playing) onPause?.();
-            else onPlay?.();
-          }}
-          style={styles.hit}
-        >
-          <View style={styles.actionRow}>
-            {markedActions ? (
-              <View
-                accessible={false}
-                testID={`${testIDPrefix}-mark-${audio.id}`}
-              >
-                <LifeIcon
-                  name={
-                    (playing
-                      ? 'pause'
-                      : playbackStatus === 'finished'
-                        ? 'replay'
-                        : 'play') as LifeIconName
-                  }
-                  size={14}
-                  color={sage}
-                  decorative
-                />
-              </View>
-            ) : null}
-            <Text style={styles.action}>{actionLabel}</Text>
-          </View>
-        </Pressable>
-      ) : null}
+      {playControl}
     </View>
   );
 }
@@ -384,4 +439,55 @@ const styles = StyleSheet.create({
   },
   heardFill: { height: 3, backgroundColor: sound },
   missing: { ...type.action, color: inkSoft },
+  rowChrome: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#DCDED2',
+    borderRadius: 4,
+    backgroundColor: '#F5F3E9',
+    marginTop: 11,
+    marginBottom: 7,
+  },
+  rowPlayHit: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginLeft: -7,
+  },
+  rowPlay: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#454C3D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowInfo: { flex: 1, minWidth: 0 },
+  rowTitle: {
+    fontFamily: 'PingFang SC',
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#555B4F',
+    marginBottom: 7,
+  },
+  rowTrack: {
+    width: '100%',
+    height: 2,
+    backgroundColor: '#D6D8CA',
+    overflow: 'hidden',
+  },
+  rowFill: { height: 2, backgroundColor: '#747D67' },
+  rowTime: {
+    fontFamily: 'PingFang SC',
+    fontSize: 11,
+    lineHeight: 14,
+    color: '#969A8D',
+    flexShrink: 0,
+  },
 });

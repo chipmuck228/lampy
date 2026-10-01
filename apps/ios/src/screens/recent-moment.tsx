@@ -131,6 +131,7 @@ export function RecentMoment({
           scene={mixed}
           markedActions
           progressWhenHeard
+          chrome="row"
         />
         <View style={styles.foot}>
           {item.feeling ? (
