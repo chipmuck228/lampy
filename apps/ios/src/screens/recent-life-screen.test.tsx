@@ -92,14 +92,16 @@ describe('recent life page', () => {
     await waitFor(() => {
       expect(view.getByText('门口的风')).toBeTruthy();
     });
-    expect(view.getAllByText('记录于')).toHaveLength(2);
+    expect(view.queryByText('记录于')).toBeNull();
     expect(view.getByText('9月27日')).toBeTruthy();
-    expect(view.getByLabelText('记录于 9月27日，2条记录')).toBeTruthy();
+    expect(view.getByText('星期日')).toBeTruthy();
+    expect(view.getByLabelText('9月27日，星期日，2026，2条记录')).toBeTruthy();
     expect(view.getByText('同一天的第二句')).toBeTruthy();
     expect(view.getByText('9月24日')).toBeTruthy();
     expect(view.getByLabelText('留下')).toBeTruthy();
     expect(view.getByLabelText('回看')).toBeTruthy();
-    expect(view.getByLabelText('最近')).toBeTruthy();
+    expect(view.getByLabelText('最近留下的生活')).toBeTruthy();
+    expect(view.getByTestId('recent-wordmark').props.children).toBe('最近留下的生活');
     expect(view.queryByTestId('recent-day-rule-moment_one')).toBeNull();
     expect(view.getByTestId('recent-day-rule-moment_two')).toBeTruthy();
     expect(view.queryByTestId('recent-day-rule-moment_older')).toBeNull();
@@ -117,11 +119,12 @@ describe('recent life page', () => {
       expect(view.getByText('今年的一句')).toBeTruthy();
     });
     expect(view.getByText('去年的一句')).toBeTruthy();
-    expect(view.getByLabelText('记录于 9月27日，1条记录')).toBeTruthy();
-    expect(view.getByLabelText('记录于 2025年9月27日，1条记录')).toBeTruthy();
+    expect(view.getByLabelText('9月27日，星期日，2026，1条记录')).toBeTruthy();
+    expect(view.getByLabelText('9月27日，星期六，2025，1条记录')).toBeTruthy();
+    expect(view.getAllByText('2025')).toHaveLength(1);
   });
 
-  it('shows a confirmed occurrence under the recorded-day heading', async () => {
+  it('keeps Recent to the recorded clock and hides the occurred date', async () => {
     mockGetRecentLife.mockResolvedValue(
       life([
         item(
@@ -145,11 +148,12 @@ describe('recent life page', () => {
     await waitFor(() => {
       expect(view.getByText('门口的风')).toBeTruthy();
     });
-    expect(view.getByLabelText('记录于 9月27日，2条记录')).toBeTruthy();
-    expect(view.getByText('发生于 2026年9月24日')).toBeTruthy();
-    expect(view.getByLabelText(/记录于 9月27日，发生于 2026年9月24日，门口的风/)).toBeTruthy();
+    expect(view.getByLabelText('9月27日，星期日，2026，2条记录')).toBeTruthy();
+    expect(view.getByTestId('recent-clock-moment_later')).toBeTruthy();
+    expect(view.queryByText('发生于 2026年9月24日')).toBeNull();
+    expect(view.queryByTestId('recent-occurred-moment_later')).toBeNull();
     expect(view.getByText('想不起来哪天')).toBeTruthy();
-    expect(view.queryByTestId('recent-occurred-moment_unsure')).toBeNull();
+    expect(view.getByTestId('recent-open-moment_later').props.accessibilityLabel).not.toContain('发生于');
     expect(view.queryByText('发生于 2026年9月27日')).toBeNull();
   });
 
@@ -160,7 +164,7 @@ describe('recent life page', () => {
     await waitFor(() => {
       expect(view.getByText('最近的记录暂时读不出来，原来的内容还在这台设备上。')).toBeTruthy();
     });
-    expect(view.getByLabelText('最近')).toBeTruthy();
+    expect(view.getByLabelText('最近留下的生活')).toBeTruthy();
     expect(view.queryByTestId(/recent-item-/)).toBeNull();
     fireEvent.press(view.getByTestId('startup-brand-skip'));
     await waitFor(() => {
@@ -174,17 +178,17 @@ describe('recent life page', () => {
     mockGetRecentLife.mockReturnValue(new Promise(() => undefined));
     const view = await render(wrap(<RecentScreen />));
     expect(view.getByTestId('startup-brand-layer')).toBeTruthy();
-    expect(view.getByLabelText('最近')).toBeTruthy();
+    expect(view.getByLabelText('最近留下的生活')).toBeTruthy();
     expect(view.queryByTestId(/recent-item-/)).toBeNull();
     await waitFor(() => {
       expect(view.queryByTestId('startup-brand-layer')).toBeNull();
     });
-    expect(view.getByLabelText('最近')).toBeTruthy();
+    expect(view.getByLabelText('最近留下的生活')).toBeTruthy();
     expect(view.queryByTestId(/recent-item-/)).toBeNull();
     view.unmount();
     const resumed = await render(wrap(<RecentScreen />));
     expect(resumed.queryByTestId('startup-brand-layer')).toBeNull();
-    expect(resumed.getByLabelText('最近')).toBeTruthy();
+    expect(resumed.getByLabelText('最近留下的生活')).toBeTruthy();
     resumed.unmount();
   });
 

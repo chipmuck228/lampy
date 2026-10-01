@@ -190,6 +190,7 @@ describe('recent reading hierarchy', () => {
     expect(view.getAllByText('0:00 / 0:04').length).toBeGreaterThanOrEqual(2);
     expect(view.getAllByLabelText('播放，4秒')).toHaveLength(2);
     expect(view.getAllByTestId(/recent-sound-.*-mark-asset_voice/).length).toBeGreaterThanOrEqual(2);
+    expect(view.getByTestId('recent-image-pause-moment_mix')).toBeTruthy();
     expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('阅读完整记录');
     expect(view.queryByTestId('recent-sound-moment_voice-scene-asset_voice')).toBeNull();
     expect(view.getByTestId('recent-sound-moment_voice-progress-asset_voice')).toBeTruthy();

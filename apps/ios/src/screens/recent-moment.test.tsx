@@ -115,7 +115,7 @@ describe('recent moment row', () => {
     expect(view.getByTestId('recent-note-moment_late')).toBeTruthy();
   });
 
-  it('keeps Recent note and occurred copy on the fixed app type scale', async () => {
+  it('keeps Recent note and clock on the fixed app type scale and hides occurred dates', async () => {
     const view = await render(
       <RecentMoment
         item={item({
@@ -138,9 +138,12 @@ describe('recent moment row', () => {
     );
     expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).fontSize).toBe(17);
     expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBe(35);
-    expect(StyleSheet.flatten(view.getByTestId('recent-occurred-moment_type').props.style).fontSize).toBe(13);
+    expect(StyleSheet.flatten(view.getByTestId('recent-clock-moment_type').props.style).fontSize).toBe(13);
     expect(view.getByTestId('recent-note-moment_type').props.allowFontScaling).toBe(false);
-    expect(view.getByTestId('recent-occurred-moment_type').props.allowFontScaling).toBe(false);
+    expect(view.getByTestId('recent-clock-moment_type').props.allowFontScaling).toBe(false);
+    expect(view.queryByText('发生于 9月28日')).toBeNull();
+    expect(view.queryByTestId('recent-occurred-moment_type')).toBeNull();
+    expect(StyleSheet.flatten(view.getByTestId('recent-image-pause-moment_type').props.style).marginTop).toBe(22);
   });
 
   it('keeps expand with the note, before photos and the full-record action', async () => {

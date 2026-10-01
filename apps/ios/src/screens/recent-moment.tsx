@@ -17,7 +17,6 @@ import {
 import {
   recentInk,
   recentInkSoft,
-  recentOccurred,
   recentOpenInk,
   recentRecordedClock,
   recentSage,
@@ -54,6 +53,7 @@ export function RecentMoment({
     (item.note || item.images.length > 0 || (item.unknownMedia?.length ?? 0) > 0 || item.feeling)
   );
   const clock = recentRecordedClock(item.recordedAt);
+  const hasStill = item.images.length > 0 || (item.unknownMedia?.length ?? 0) > 0;
   return (
     <View
       style={styles.shell}
@@ -66,18 +66,11 @@ export function RecentMoment({
         collapsable={false}
       >
       <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
-        {clock || item.occurredLabel ? (
+        {clock ? (
           <View style={styles.meta}>
-            {clock ? (
-              <Text style={styles.time} testID={`recent-clock-${item.id}`}>
-                {clock}
-              </Text>
-            ) : null}
-            {item.occurredLabel ? (
-              <Text style={styles.occurred} testID={`recent-occurred-${item.id}`}>
-                {item.occurredLabel}
-              </Text>
-            ) : null}
+            <Text style={styles.time} testID={`recent-clock-${item.id}`}>
+              {clock}
+            </Text>
           </View>
         ) : null}
         <View style={styles.momentBody}>
@@ -113,12 +106,19 @@ export function RecentMoment({
               ) : null}
             </>
           ) : null}
-          <MomentImages
-            images={item.images}
-            testIDPrefix={`recent-image-${item.id}`}
-            rhythm={pairImages}
-          />
-          <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
+          {hasStill ? (
+            <View
+              testID={item.note ? `recent-image-pause-${item.id}` : undefined}
+              style={item.note ? styles.imagePause : undefined}
+            >
+              <MomentImages
+                images={item.images}
+                testIDPrefix={`recent-image-${item.id}`}
+                rhythm={pairImages}
+              />
+              <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
+            </View>
+          ) : null}
         </View>
         <MomentAudio
           audio={item.audio}
@@ -144,8 +144,8 @@ export function RecentMoment({
           <LookThisHit
             caption={recentOpenCaption(truncated)}
             accessibilityLabel={
-              recentOpenAccessLabel([item.dateLabel, item.occurredLabel, item.note], truncated) ||
-              `${item.dateLabel}，一条记录`
+              recentOpenAccessLabel([item.dayLabel, clock, item.note], truncated) ||
+              `${item.dayLabel}，一条记录`
             }
             testID={`recent-open-${item.id}`}
             onPress={onOpen}
@@ -173,8 +173,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   time: { ...recentType.meta, color: recentInkSoft },
-  occurred: { ...recentType.meta, color: recentOccurred },
   momentBody: { gap: 10, overflow: 'visible' },
+  imagePause: { marginTop: 22, gap: 16 },
   note: { ...recentType.note, color: recentInk, marginBottom: 4 },
   measure: {
     position: 'absolute',

@@ -116,7 +116,6 @@ export function recentDayHeading(
   key: string,
   label: string,
 ): {
-  prefix: string;
   date: string;
   weekday: string | null;
   year: string | null;
@@ -124,17 +123,23 @@ export function recentDayHeading(
   const matched = DAY_KEY.exec(key);
   if (!matched) {
     const rest = label.replace(/^记录于\s*/, '');
-    return { prefix: '记录于', date: rest || label, weekday: null, year: null };
+    return { date: rest || label, weekday: null, year: null };
   }
   const year = Number(matched[1]);
   const month = Number(matched[2]);
   const day = Number(matched[3]);
   return {
-    prefix: '记录于',
     date: `${month}月${day}日`,
     weekday: lookbackBookWeekdayName(year, month, day),
     year: String(year),
   };
+}
+
+export function recentDayAccessLabel(
+  heading: { date: string; weekday: string | null; year: string | null },
+  count: number,
+): string {
+  return [heading.date, heading.weekday, heading.year, `${count}条记录`].filter(Boolean).join('，');
 }
 
 export function recentRecordedClock(recordedAt?: string | null): string | null {

@@ -13,6 +13,7 @@ import { LifeIconButton } from '../screens/life-icons';
 import { shouldPairRecentImages } from '../screens/moment-images';
 import { RecentMoment } from '../screens/recent-moment';
 import {
+  recentDayAccessLabel,
   recentDayHeading,
   recentEndInk,
   recentInk,
@@ -20,7 +21,6 @@ import {
   recentKicker,
   recentOlive,
   recentPaper,
-  recentPrefixInk,
   recentRule,
   recentHairline,
   recentSettings,
@@ -28,6 +28,13 @@ import {
   recentWeekdayInk,
   recentYearInk,
 } from '../screens/recent-visual';
+import {
+  RECENT_FAB_HIDE_MS,
+  RECENT_FAB_IDLE_MS,
+  RECENT_FAB_SHIFT_Y,
+  RECENT_FAB_SHOW_MS,
+  recentFabIntent,
+} from '../screens/recent-leave-fab';
 import {
   acceptRecentEchoLoad,
   beginRecentEchoFocus,
@@ -70,12 +77,20 @@ export default function RecentScreen() {
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [reduceMotion, setReduceMotion] = useState(true);
   const [echoOpacity] = useState(() => new Animated.Value(1));
+  const [fabOpacity] = useState(() => new Animated.Value(1));
+  const [fabShift] = useState(() => new Animated.Value(0));
+  const [fabOpen, setFabOpen] = useState(true);
   const echoAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const fabAnim = useRef<Animated.CompositeAnimation | null>(null);
   const echoSeq = useRef(0);
   const clips = useRecentClipPlayback();
   const days = view?.days ?? [];
   const reduceMotionRef = useRef(reduceMotion);
   const echoGate = useRef(createSaveEchoFocusGate());
+  const lastScrollY = useRef(0);
+  const fabIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fabOpenRef = useRef(true);
+  const fabEpoch = useRef(0);
 
   const settleEcho = useCallback(() => {
     echoSeq.current = nextEchoSeq(echoSeq.current);
@@ -115,6 +130,66 @@ export default function RecentScreen() {
     router.push(lookbackRootHrefFromRecent());
   }, [router]);
 
+  const clearFabIdle = useCallback(() => {
+    if (fabIdle.current) {
+      clearTimeout(fabIdle.current);
+      fabIdle.current = null;
+    }
+  }, []);
+
+  const revealFab = useCallback(
+    (visible: boolean) => {
+      if (fabOpenRef.current === visible) return;
+      fabOpenRef.current = visible;
+      setFabOpen(visible);
+      fabAnim.current?.stop();
+      fabAnim.current = null;
+      if (reduceMotionRef.current) {
+        fabOpacity.setValue(visible ? 1 : 0);
+        fabShift.setValue(visible ? 0 : RECENT_FAB_SHIFT_Y);
+        return;
+      }
+      const next = Animated.parallel([
+        Animated.timing(fabOpacity, {
+          toValue: visible ? 1 : 0,
+          duration: visible ? RECENT_FAB_SHOW_MS : RECENT_FAB_HIDE_MS,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fabShift, {
+          toValue: visible ? 0 : RECENT_FAB_SHIFT_Y,
+          duration: visible ? RECENT_FAB_SHOW_MS : RECENT_FAB_HIDE_MS,
+          useNativeDriver: true,
+        }),
+      ]);
+      fabAnim.current = next;
+      next.start(({ finished }) => {
+        if (finished) fabAnim.current = null;
+      });
+    },
+    [fabOpacity, fabShift],
+  );
+
+  const onRecentScroll = useCallback(
+    (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+      const offsetY = event.nativeEvent.contentOffset.y;
+      const intent = recentFabIntent(offsetY, lastScrollY.current);
+      lastScrollY.current = offsetY;
+      clearFabIdle();
+      if (intent === 'show') {
+        revealFab(true);
+        return;
+      }
+      if (intent === 'hide') revealFab(false);
+      const epoch = fabEpoch.current;
+      fabIdle.current = setTimeout(() => {
+        fabIdle.current = null;
+        if (fabEpoch.current !== epoch) return;
+        revealFab(true);
+      }, RECENT_FAB_IDLE_MS);
+    },
+    [clearFabIdle, revealFab],
+  );
+
   const tryRevealPending = useCallback(() => {
     const id = tryConsumeSaveEcho(echoGate.current, AppState.currentState);
     if (id) revealEcho(id, shouldSkipSaveEchoFade(reduceMotionRef.current));
@@ -123,6 +198,14 @@ export default function RecentScreen() {
   useEffect(() => {
     reduceMotionRef.current = reduceMotion;
   }, [reduceMotion]);
+
+  useEffect(() => {
+    return () => {
+      fabEpoch.current += 1;
+      clearFabIdle();
+      fabAnim.current?.stop();
+    };
+  }, [clearFabIdle]);
 
   useEffect(() => {
     if (reduceMotion) settleEcho();
@@ -152,8 +235,10 @@ export default function RecentScreen() {
       motion.remove();
       app.remove();
       settleEcho();
+      clearFabIdle();
+      fabAnim.current?.stop();
     };
-  }, [settleEcho, tryRevealPending]);
+  }, [clearFabIdle, settleEcho, tryRevealPending]);
 
   useFocusEffect(
     useCallback(() => {
@@ -187,9 +272,10 @@ export default function RecentScreen() {
     <View style={styles.safe}>
       <StartupBrandLayer homeSettled={view !== null || error !== null} />
       <RootReadingLayout
-        accessibilityLabel="最近"
+        accessibilityLabel="最近留下的生活"
         scrollTestID="recent-scroll"
         canvas={recentPaper}
+        onScroll={onRecentScroll}
         header={
           <View
             testID="recent-header"
@@ -206,8 +292,8 @@ export default function RecentScreen() {
               <Text style={styles.eyebrow} testID="recent-eyebrow">
                 LAMPY · 生活记录
               </Text>
-              <Text style={styles.wordmark} accessibilityRole="header">
-                最近
+              <Text style={styles.wordmark} accessibilityRole="header" testID="recent-wordmark">
+                最近留下的生活
               </Text>
             </View>
             <LifeIconButton
@@ -237,15 +323,28 @@ export default function RecentScreen() {
           />
         }
         overlay={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="留下"
-            testID="recent-leave-fab"
-            onPress={() => router.push(leaveHref('recent'))}
-            style={styles.fab}
+          <Animated.View
+            pointerEvents={fabOpen ? 'box-none' : 'none'}
+            style={[
+              styles.fabWrap,
+              {
+                opacity: fabOpacity,
+                transform: [{ translateY: fabShift }],
+              },
+            ]}
           >
-            <Text style={styles.fabLabel}>＋ 留下</Text>
-          </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="留下"
+              accessibilityElementsHidden={!fabOpen}
+              importantForAccessibility={fabOpen ? 'yes' : 'no-hide-descendants'}
+              testID="recent-leave-fab"
+              onPress={() => router.push(leaveHref('recent'))}
+              style={styles.fab}
+            >
+              <Text style={styles.fabLabel}>＋ 留下</Text>
+            </Pressable>
+          </Animated.View>
         }
       >
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -272,7 +371,7 @@ export default function RecentScreen() {
           <View
             key={day.key}
             style={[styles.day, dayIndex > 0 && styles.nextDay]}
-            accessibilityLabel={`${day.label}，${day.items.length}条记录`}
+            accessibilityLabel={recentDayAccessLabel(recentDayHeading(day.key, day.label), day.items.length)}
           >
             <RecentDayHeading dayKey={day.key} label={day.label} />
             <View style={styles.dayItems}>
@@ -337,15 +436,14 @@ function RecentDayHeading({ dayKey, label }: { dayKey: string; label: string }) 
   return (
     <View style={styles.sectionHeading}>
       <View style={styles.sectionCopy}>
-        <Text style={styles.sectionPrefix}>{heading.prefix}</Text>
         <View style={styles.sectionDateRow}>
           <Text style={styles.sectionDate} accessibilityRole="header">
             {heading.date}
           </Text>
           {heading.weekday ? <Text style={styles.sectionWeekday}>{heading.weekday}</Text> : null}
         </View>
+        {heading.year ? <Text style={styles.sectionYear}>{heading.year}</Text> : null}
       </View>
-      {heading.year ? <Text style={styles.sectionYear}>{heading.year}</Text> : null}
     </View>
   );
 }
@@ -371,7 +469,8 @@ const styles = StyleSheet.create({
   },
   heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
   eyebrow: { ...recentType.kicker, color: recentKicker },
-  wordmark: { ...recentType.title, color: recentInk, marginTop: 8 },
+  wordmark: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
+  fabWrap: { alignItems: 'flex-end' },
   fab: {
     minHeight: 48,
     height: 48,
@@ -404,17 +503,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionCopy: { flex: 1, minWidth: 0 },
-  sectionPrefix: { ...recentType.prefix, color: recentPrefixInk },
   sectionDateRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'baseline',
-    marginTop: 6,
-    gap: 5,
+    gap: 8,
   },
   sectionDate: { ...recentType.date, color: recentInk },
   sectionWeekday: { ...recentType.weekday, color: recentWeekdayInk },
-  sectionYear: { ...recentType.year, color: recentYearInk, marginBottom: 4 },
+  sectionYear: { ...recentType.year, color: recentYearInk, marginTop: 6 },
   dayItems: { gap: 0 },
   sameDayRule: {
     alignSelf: 'stretch',
