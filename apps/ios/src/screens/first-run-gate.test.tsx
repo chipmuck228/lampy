@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
@@ -60,6 +60,7 @@ describe('first-run gate errors', () => {
       expect(view.getByTestId('first-run-ready')).toBeTruthy();
     });
     expect(view.getByTestId('first-run-skip-records-unknown')).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByTestId('first-run-ready').props.style).backgroundColor).toBe('#F3F0E9');
     expect(view.getByText('app')).toBeTruthy();
     expect(view.queryByTestId('first-run-pending')).toBeNull();
   });

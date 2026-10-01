@@ -6,6 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { DeviceLockTrace } from '../application/device-lock-privacy';
 import { DEVICE_LOCK_SECURE_KEY } from '../infrastructure/device-lock-store';
+import { paper } from './life-page';
 import { DeviceLockProvider, DeviceLockSettings, useDeviceLock } from './device-lock-context';
 
 function Toggle() {
@@ -97,6 +98,7 @@ describe('device lock cover', () => {
     await waitFor(() => {
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
     });
+    expect(StyleSheet.flatten(view.getByTestId('device-lock-root').props.style).backgroundColor).toBe(paper);
     expect(view.getByText('private')).toBeTruthy();
     expect(authenticate).not.toHaveBeenCalled();
   });

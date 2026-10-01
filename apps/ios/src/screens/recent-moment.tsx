@@ -41,10 +41,16 @@ export function RecentMoment({
     (item.note || item.images.length > 0 || (item.unknownMedia?.length ?? 0) > 0 || item.feeling)
   );
   return (
-    <Animated.View
-      style={[styles.shell, { opacity: echoing ? echoOpacity : 1 }]}
+    <View
+      style={styles.shell}
       testID={echoing ? `recent-echo-${item.id}` : `recent-shell-${item.id}`}
+      collapsable={false}
     >
+      <Animated.View
+        testID={`recent-fade-${item.id}`}
+        style={{ opacity: echoing ? echoOpacity : 1 }}
+        collapsable={false}
+      >
       <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
         <View style={styles.momentBody}>
           {item.note ? (
@@ -102,12 +108,14 @@ export function RecentMoment({
           onPress={onOpen}
         />
       </View>
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Native-driver opacity otherwise clips glyph ink that sits outside the RN box.
+  // Keep overflow off the native-driver fade. Face ID in/out can black the window
+  // if Animated.View is asked to clip-visible while compositing opacity.
   shell: { overflow: 'visible' },
   moment: { gap: 8, minHeight: 48, overflow: 'visible' },
   momentMixed: { gap: 16 },

@@ -242,6 +242,10 @@ export function DeviceLockProvider({
       inFlight.current = false;
       setUnlockBusy(false);
       refresh();
+      const unlocked = !session.snapshot().locked;
+      if (unlocked && AppState.currentState === 'active') {
+        void setPrivateSnapshotBlocked(false);
+      }
     }
   }, [logLock, refresh, resolvedAuthenticator, session]);
 
@@ -403,6 +407,7 @@ export function DeviceLockProvider({
   return (
     <DeviceLockContext.Provider value={value}>
       <View
+        testID="device-lock-root"
         style={styles.stack}
         accessibilityElementsHidden={coverVisible}
         importantForAccessibility={coverVisible ? 'no-hide-descendants' : 'auto'}
@@ -497,7 +502,7 @@ export function DeviceLockSettings() {
 }
 
 const styles = StyleSheet.create({
-  stack: { flex: 1 },
+  stack: { flex: 1, backgroundColor: paper },
   cover: {
     ...StyleSheet.absoluteFill,
     backgroundColor: paper,

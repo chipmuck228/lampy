@@ -119,3 +119,13 @@
 3. 点「看这条」进详情，返回位置和播放状态仍对。
 4. 对照回看：不应回退。
 5. 结果单独记「真机 PASS / FAIL」+ **实际 JS SHA**。模拟器或测试不得代替。
+
+---
+
+## 真机 · Face ID 后黑屏
+
+Liuz17 报告：Face ID 通过后整屏黑、什么都不显示。不能把该现象自动记到某一个旧 head。
+
+处理：不要把 `overflow: 'visible'` 写在带 native-driver opacity 的 `Animated.View` 上（Face ID 进出时 iOS 可能整窗不合成）。外壳改回普通 `View`；解锁成功且 `active` 时立刻 `allowScreenCapture`。根层用纸色，避免底下露出系统黑底。
+
+复测：确认 Metro 加载本修复 SHA → Face ID → 应回到纸色最近页，不是黑屏。仍不合并。

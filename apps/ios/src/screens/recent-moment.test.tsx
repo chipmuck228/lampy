@@ -132,6 +132,9 @@ describe('recent moment row', () => {
     );
     const shell = StyleSheet.flatten(view.getByTestId('recent-shell-moment_type').props.style);
     expect(shell.overflow).toBe('visible');
+    expect(StyleSheet.flatten(view.getByTestId('recent-fade-moment_type').props.style).overflow).not.toBe(
+      'visible',
+    );
     expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBeUndefined();
     expect(StyleSheet.flatten(view.getByTestId('recent-occurred-moment_type').props.style).lineHeight).toBeUndefined();
     expect(view.getByTestId('recent-note-moment_type').props.allowFontScaling).not.toBe(false);
