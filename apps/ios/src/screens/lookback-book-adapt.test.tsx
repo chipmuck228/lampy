@@ -146,7 +146,7 @@ describe('lookback book adapt surfaces', () => {
       await Promise.resolve();
     });
     await waitFor(() => {
-      expect(view.getByLabelText('4月8日 · 星期二，有1条记录')).toBeTruthy();
+      expect(view.getByLabelText('2025年4月8日，星期二，有1条记录，已收起')).toBeTruthy();
     });
     expect(view.queryByTestId(/lookback-book-day-2025-04-(?!08)/)).toBeNull();
     await act(async () => {

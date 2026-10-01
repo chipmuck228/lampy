@@ -1,7 +1,11 @@
 import {
   decideFirstRunGuide,
+  firstRunInnerCanScroll,
+  firstRunPageAfterInnerSwipe,
+  firstRunPageFromOffset,
   isFirstRunFinishAction,
   nextFirstRunIndex,
+  settleFirstRunMotion,
   FIRST_RUN_LAST_INDEX,
   FIRST_RUN_SCREENS,
 } from './first-run';
@@ -39,11 +43,69 @@ describe('first-run guide decision', () => {
     );
   });
 
-  it('uses website copy and does not claim cloud backup or an open family', () => {
+  it('pages from a swipe only after the inner copy has nowhere left to scroll', () => {
+    expect(firstRunPageFromOffset(640, 320, 3)).toBe(2);
+    expect(firstRunInnerCanScroll(400, 400)).toBe(false);
+    expect(firstRunInnerCanScroll(520, 400)).toBe(true);
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: true,
+        offsetY: 120,
+        viewHeight: 400,
+        contentHeight: 520,
+        velocityY: 0.8,
+        index: 0,
+      }),
+    ).toBe(1);
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: true,
+        offsetY: 40,
+        viewHeight: 400,
+        contentHeight: 520,
+        velocityY: 0.8,
+        index: 0,
+      }),
+    ).toBeNull();
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: false,
+        offsetY: 0,
+        viewHeight: 400,
+        contentHeight: 400,
+        velocityY: 0.8,
+        index: 0,
+      }),
+    ).toBeNull();
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: true,
+        offsetY: 120,
+        viewHeight: 400,
+        contentHeight: 520,
+        velocityY: 0.8,
+        index: FIRST_RUN_LAST_INDEX,
+      }),
+    ).toBeNull();
+  });
+
+  it('restores a visible scene when motion is stopped mid-flight', () => {
+    const opacity = { stopAnimation: jest.fn(), setValue: jest.fn() };
+    const shift = { stopAnimation: jest.fn(), setValue: jest.fn() };
+    settleFirstRunMotion({ opacity, shift });
+    expect(opacity.stopAnimation).toHaveBeenCalled();
+    expect(shift.stopAnimation).toHaveBeenCalled();
+    expect(opacity.setValue).toHaveBeenCalledWith(1);
+    expect(shift.setValue).toHaveBeenCalledWith(0);
+  });
+
+  it('uses this-round copy and does not claim cloud backup or sync', () => {
     const text = FIRST_RUN_SCREENS.map((screen) => `${screen.title}${screen.body}`).join('');
-    expect(text).toContain('这里，留下自己的生活。');
-    expect(text).not.toMatch(/云备份|家庭已开放|已经可以分享给家人/);
-    expect(FIRST_RUN_SCREENS.every((screen) => screen.source.includes('yunpura.com'))).toBe(true);
+    expect(text).toContain('一句话，也值得留下。');
+    expect(text).toContain('记录保存在这台设备');
+    expect(text).not.toMatch(/云备份|同步|家庭已开放|已经可以分享给家人/);
+    expect(FIRST_RUN_SCREENS.every((screen) => screen.source.includes('本轮新文案'))).toBe(true);
+    expect(FIRST_RUN_SCREENS[2].id).toBe('keep');
     expect(FIRST_RUN_SCREENS[2].action).toBe('留下瞬间');
   });
 });

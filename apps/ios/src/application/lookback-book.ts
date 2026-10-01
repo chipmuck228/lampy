@@ -59,6 +59,26 @@ export function lookbackBookDateLabel(year: number, month: number, day: number):
   return `${month}月${day}日 · ${lookbackBookWeekdayName(year, month, day)}`;
 }
 
+export function lookbackBookDayPrimaryLabel(day: number): string {
+  return `${day}日`;
+}
+
+export function lookbackBookDaySecondaryLabel(year: number, month: number, day: number): string {
+  return `周${LOOKBACK_WEEKDAY_LABELS[weekdayMondayIndex(year, month, day)]}`;
+}
+
+export function lookbackBookDayAccessLabel(
+  year: number,
+  month: number,
+  day: number,
+  summary: string,
+  expanded: boolean,
+): string {
+  return `${year}年${month}月${day}日，${lookbackBookWeekdayName(year, month, day)}，${summary}，${
+    expanded ? '已展开' : '已收起'
+  }`;
+}
+
 export function lookbackBookMonthAccessLabel(
   year: number,
   month: number,

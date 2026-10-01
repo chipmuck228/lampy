@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  Animated,
+  AppState,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -14,10 +16,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   FIRST_RUN_SCREENS,
+  firstRunInnerCanScroll,
+  firstRunPageAfterInnerSwipe,
+  firstRunPageFromOffset,
   isFirstRunFinishAction,
   nextFirstRunIndex,
+  settleFirstRunMotion,
 } from '../application/first-run';
 import { ink, inkSoft, isCompactHeight, paper, sage } from './life-page';
+import { FirstRunScene } from './first-run-scene';
 
 export function FirstRunGuide({
   onFinished,
@@ -32,15 +39,68 @@ export function FirstRunGuide({
   const [index, setIndex] = useState(0);
   const indexRef = useRef(0);
   const [pageHeight, setPageHeight] = useState(Math.max(height - 160, 280));
+  const [copyViewH, setCopyViewH] = useState(0);
+  const [copyContentH, setCopyContentH] = useState(0);
+  const innerScrolls = firstRunInnerCanScroll(copyContentH, copyViewH);
+  const [reduceMotion, setReduceMotion] = useState(true);
+  const [opacity] = useState(() => new Animated.Value(1));
+  const [shift] = useState(() => new Animated.Value(0));
   const screen = FIRST_RUN_SCREENS[index];
 
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (!cancelled) setReduceMotion(enabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setReduceMotion(true);
+      });
+    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
+      setReduceMotion(enabled === true);
+    });
+    return () => {
+      cancelled = true;
+      sub?.remove?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      opacity.setValue(1);
+      shift.setValue(0);
+      return;
+    }
+    opacity.setValue(0);
+    shift.setValue(8);
+    const anim = Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(shift, { toValue: 0, duration: 280, useNativeDriver: true }),
+    ]);
+    anim.start();
+    return () => {
+      anim.stop();
+    };
+  }, [index, opacity, reduceMotion, shift]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') settleFirstRunMotion({ opacity, shift });
+    });
+    return () => {
+      sub?.remove?.();
+      settleFirstRunMotion({ opacity, shift });
+    };
+  }, [opacity, shift]);
+
   function moveTo(next: number) {
+    if (next !== indexRef.current) {
+      setCopyViewH(0);
+      setCopyContentH(0);
+    }
     indexRef.current = next;
     setIndex(next);
-    const reduce = AccessibilityInfo.isReduceMotionEnabled?.();
-    void Promise.resolve(reduce).then((value) => {
-      pager.current?.scrollTo({ y: next * pageHeight, animated: value !== true });
-    });
+    pager.current?.scrollTo({ y: next * pageHeight, animated: !reduceMotion });
   }
 
   function onContinue() {
@@ -53,9 +113,25 @@ export function FirstRunGuide({
   }
 
   function onScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const next = Math.max(0, Math.min(Math.round(event.nativeEvent.contentOffset.y / Math.max(pageHeight, 1)), FIRST_RUN_SCREENS.length - 1));
+    const next = firstRunPageFromOffset(
+      event.nativeEvent.contentOffset.y,
+      pageHeight,
+      FIRST_RUN_SCREENS.length,
+    );
     indexRef.current = next;
     setIndex(next);
+  }
+
+  function onInnerEndDrag(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const next = firstRunPageAfterInnerSwipe({
+      canScroll: innerScrolls,
+      offsetY: event.nativeEvent.contentOffset.y,
+      viewHeight: event.nativeEvent.layoutMeasurement.height,
+      contentHeight: event.nativeEvent.contentSize.height,
+      velocityY: event.nativeEvent.velocity?.y ?? 0,
+      index: indexRef.current,
+    });
+    if (next != null) moveTo(next);
   }
 
   return (
@@ -63,6 +139,7 @@ export function FirstRunGuide({
       <ScrollView
         ref={pager}
         pagingEnabled
+        scrollEnabled={!innerScrolls}
         testID="first-run-pager"
         onLayout={(event) => setPageHeight(event.nativeEvent.layout.height)}
         onMomentumScrollEnd={onScrollEnd}
@@ -78,11 +155,28 @@ export function FirstRunGuide({
             testID={`first-run-${item.id}`}
           >
             <ScrollView
+              testID={`first-run-copy-${item.id}`}
               style={styles.pageScroll}
               contentContainerStyle={[styles.pageCopy, { paddingTop: compact ? 24 : 48 }]}
+              scrollEnabled={innerScrolls && item.id === screen.id}
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
+              onLayout={(event) => {
+                if (item.id === screen.id) setCopyViewH(event.nativeEvent.layout.height);
+              }}
+              onContentSizeChange={(_, contentHeight) => {
+                if (item.id === screen.id) setCopyContentH(contentHeight);
+              }}
+              onScrollEndDrag={item.id === screen.id ? onInnerEndDrag : undefined}
             >
+              <Animated.View
+                style={{
+                  opacity: item.id === screen.id ? opacity : 1,
+                  transform: [{ translateY: item.id === screen.id ? shift : 0 }],
+                }}
+              >
+                <FirstRunScene id={item.id} />
+              </Animated.View>
               <Text style={styles.title} accessibilityRole="header">
                 {item.title}
               </Text>

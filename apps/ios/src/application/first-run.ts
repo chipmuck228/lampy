@@ -17,23 +17,23 @@ export function decideFirstRunGuide(input: {
 export const FIRST_RUN_SCREENS = [
   {
     id: 'leave',
-    title: '这里，留下自己的生活。',
-    body: '一句话、一张照片或一段声音。不用发布，也不用让它显得重要。',
-    source: 'https://www.yunpura.com/zh-cn h1 与导语，2026-09-29',
+    title: '一句话，也值得留下。',
+    body: '一张照片，一段声音，或此刻的感受。',
+    source: '本轮新文案，2026-10-01',
     action: '继续',
   },
   {
     id: 'lookback',
-    title: '生活不是信息流，它会慢慢积累。',
-    body: '先把今天留下，以后再回来看看。',
-    source: 'https://www.yunpura.com/zh-cn h2 与页脚说明，2026-09-29',
+    title: '那些平常的日子，后来都有了模样。',
+    body: '再读一句原话，再听一次当时的声音。',
+    source: '本轮新文案，2026-10-01',
     action: '继续',
   },
   {
-    id: 'share',
-    title: '不是每一张照片，都需要发出去。',
-    body: '有些生活适合分享。也有些，只想留给自己和重要的人。',
-    source: 'https://www.yunpura.com/zh-cn h2 与导语，2026-09-29',
+    id: 'keep',
+    title: '自己的生活，安心放在这里。',
+    body: '记录保存在这台设备，也可以开启本机保护。',
+    source: '本轮新文案，2026-10-01',
     action: '留下瞬间',
   },
 ] as const;
@@ -46,4 +46,43 @@ export function nextFirstRunIndex(index: number) {
 
 export function isFirstRunFinishAction(index: number) {
   return index >= FIRST_RUN_LAST_INDEX;
+}
+
+export function settleFirstRunMotion(motion: {
+  opacity: { stopAnimation: () => void; setValue: (value: number) => void };
+  shift: { stopAnimation: () => void; setValue: (value: number) => void };
+}) {
+  motion.opacity.stopAnimation();
+  motion.shift.stopAnimation();
+  motion.opacity.setValue(1);
+  motion.shift.setValue(0);
+}
+
+export function firstRunPageFromOffset(offsetY: number, pageHeight: number, pageCount: number) {
+  return Math.max(0, Math.min(Math.round(offsetY / Math.max(pageHeight, 1)), pageCount - 1));
+}
+
+export function firstRunInnerCanScroll(contentHeight: number, viewHeight: number) {
+  return contentHeight > viewHeight + 1;
+}
+
+/** Finger swipe up raises contentOffset and has positive velocity.y on iOS. */
+export function firstRunPageAfterInnerSwipe(input: {
+  canScroll: boolean;
+  offsetY: number;
+  viewHeight: number;
+  contentHeight: number;
+  velocityY: number;
+  index: number;
+}): number | null {
+  if (!input.canScroll) return null;
+  const atEnd = input.offsetY + input.viewHeight >= input.contentHeight - 8;
+  const atStart = input.offsetY <= 8;
+  if (atEnd && input.velocityY > 0.15 && !isFirstRunFinishAction(input.index)) {
+    return nextFirstRunIndex(input.index);
+  }
+  if (atStart && input.velocityY < -0.15 && input.index > 0) {
+    return input.index - 1;
+  }
+  return null;
 }

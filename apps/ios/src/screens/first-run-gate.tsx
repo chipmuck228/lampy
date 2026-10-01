@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { decideFirstRunGuide } from '../application/first-run';
+import { decideFirstRunGuide, type FirstRunDecision } from '../application/first-run';
 import { getUseCases } from '../application/container';
 import { leaveHref } from './lookback-origin';
 import { createSecureFirstRunStore, type FirstRunStore } from '../infrastructure/first-run-store';
@@ -46,13 +46,14 @@ export function FirstRunGate({
     store: store ?? createSecureFirstRunStore(),
     readLibrary: readLibrary ?? readFirstRunLibrary,
   });
-  const resolvedStore = store ?? defaults.current.store;
-  const resolvedRead = readLibrary ?? defaults.current.readLibrary;
   const [decision, setDecision] = useState<'pending' | 'show' | 'skip'>('pending');
+  const [skipReason, setSkipReason] = useState<FirstRunDecision['reason'] | null>(null);
   const [finishError, setFinishError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+    const resolvedStore = store ?? defaults.current.store;
+    const resolvedRead = readLibrary ?? defaults.current.readLibrary;
     void (async () => {
       let completed = false;
       try {
@@ -72,12 +73,20 @@ export function FirstRunGate({
         hasPersonalRecords: library.hasPersonalRecords,
         recordsUnknown: library.recordsUnknown,
       });
+      if (__DEV__) {
+        console.log('[first-run]', next.reason, {
+          completed,
+          hasPersonalRecords: library.hasPersonalRecords,
+          recordsUnknown: library.recordsUnknown,
+        });
+      }
+      setSkipReason(next.showGuide ? null : next.reason);
       setDecision(next.showGuide ? 'show' : 'skip');
     })();
     return () => {
       alive = false;
     };
-  }, [resolvedRead, resolvedStore]);
+  }, [readLibrary, store]);
 
   if (decision === 'pending') {
     return <View testID="first-run-pending" style={{ flex: 1, backgroundColor: paper }} />;
@@ -85,6 +94,7 @@ export function FirstRunGate({
   if (decision === 'skip') {
     return (
       <View testID="first-run-ready" style={{ flex: 1 }}>
+        {skipReason ? <View testID={`first-run-skip-${skipReason}`} /> : null}
         {children}
       </View>
     );
@@ -94,7 +104,7 @@ export function FirstRunGate({
     <FirstRunGuide
       finishError={finishError}
       onFinished={() => {
-        void finishFirstRunGuide(resolvedStore).then((result) => {
+        void finishFirstRunGuide(store ?? defaults.current.store).then((result) => {
           if (!result.ok) {
             setFinishError(result.message);
             return;
