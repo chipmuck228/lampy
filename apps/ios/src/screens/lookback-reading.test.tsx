@@ -1,7 +1,13 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import type { LookbackDayEntry } from '../application/lookback-day';
-import { LookbackReadingMoment } from './lookback-reading';
+import type { LookbackPlacedDay } from '../application/lookback-reading';
+import {
+  LookbackReadingMoment,
+  LookbackReadingNeighbors,
+  lookbackNeighborsDirection,
+} from './lookback-reading';
 
 const longNote = [
   '傍晚回家，楼道里还留着白天的热。',
@@ -179,5 +185,67 @@ describe('lookback reading moment', () => {
     );
     expect(view.getByTestId('lookback-reading-image-m_mix-a')).toBeTruthy();
     expect(view.getByText('这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
+  });
+});
+
+const current = { year: 2026, month: 9, day: 27 };
+const previousDay: LookbackPlacedDay = { year: 2026, month: 9, day: 24, count: 2 };
+const nextDay: LookbackPlacedDay = { year: 2026, month: 9, day: 28, count: 1 };
+
+async function renderNeighbors(onOpen = jest.fn()) {
+  return {
+    onOpen,
+    view: await render(
+      <LookbackReadingNeighbors current={current} previous={previousDay} next={nextDay} onOpen={onOpen} />,
+    ),
+  };
+}
+
+describe('lookback reading neighbors', () => {
+  it('shows both entries, stacks them when narrow, and opens the chosen day', async () => {
+    expect(
+      lookbackNeighborsDirection(280, ['前一个有记录日 · 9月24日', '后一个有记录日 · 9月28日']),
+    ).toBe('column');
+    expect(
+      lookbackNeighborsDirection(900, ['前一个有记录日 · 9月24日', '后一个有记录日 · 9月28日']),
+    ).toBe('row');
+    const { view, onOpen } = await renderNeighbors();
+    await act(async () => {
+      fireEvent(view.getByTestId('lookback-reading-neighbors'), 'layout', {
+        nativeEvent: { layout: { width: 342, height: 48 } },
+      });
+    });
+    expect(view.getByText('前一个有记录日 · 9月24日')).toBeTruthy();
+    expect(view.getByText('后一个有记录日 · 9月28日')).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-neighbors').props.style).flexDirection).toBe(
+      'column',
+    );
+    await act(async () => {
+      fireEvent(view.getByTestId('lookback-reading-neighbors'), 'layout', {
+        nativeEvent: { layout: { width: 280, height: 96 } },
+      });
+    });
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-neighbors').props.style).flexDirection).toBe(
+      'column',
+    );
+    await act(async () => {
+      fireEvent(view.getByTestId('lookback-reading-neighbors'), 'layout', {
+        nativeEvent: { layout: { width: 900, height: 48 } },
+      });
+    });
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-neighbors').props.style).flexDirection).toBe(
+      'row',
+    );
+    const previous = view.getByText('前一个有记录日 · 9月24日');
+    expect(previous.props.allowFontScaling).toBe(false);
+    expect(previous.props.maxFontSizeMultiplier).toBe(1);
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-prev-day').props.style).minHeight).toBe(48);
+    expect(collectTestIDs(view.toJSON()).filter((id) => id.endsWith('-day'))).toEqual([
+      'lookback-reading-prev-day',
+      'lookback-reading-next-day',
+    ]);
+    fireEvent.press(view.getByTestId('lookback-reading-prev-day'));
+    fireEvent.press(view.getByTestId('lookback-reading-next-day'));
+    expect(onOpen.mock.calls).toEqual([[previousDay], [nextDay]]);
   });
 });

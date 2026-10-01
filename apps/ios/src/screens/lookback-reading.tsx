@@ -201,6 +201,17 @@ export function LookbackNeighborRetry({
   );
 }
 
+export function lookbackNeighborsDirection(
+  availableWidth: number,
+  captions: string[],
+): 'row' | 'column' {
+  if (captions.length <= 1 || availableWidth <= 0) return 'column';
+  const needed = captions.reduce((sum, caption, index) => {
+    return sum + caption.length * type.action.fontSize + (index > 0 ? 8 : 0);
+  }, 0);
+  return needed <= availableWidth ? 'row' : 'column';
+}
+
 export function LookbackReadingNeighbors({
   current,
   previous,
@@ -212,29 +223,40 @@ export function LookbackReadingNeighbors({
   next: LookbackPlacedDay | null;
   onOpen: (day: LookbackPlacedDay) => void;
 }) {
+  const [availableWidth, setAvailableWidth] = useState(0);
   if (!previous && !next) return null;
+  const previousCaption = previous ? lookbackNeighborCaption('previous', current, previous) : null;
+  const nextCaption = next ? lookbackNeighborCaption('next', current, next) : null;
+  const direction = lookbackNeighborsDirection(
+    availableWidth,
+    [previousCaption, nextCaption].filter((caption): caption is string => !!caption),
+  );
   return (
-    <View testID="lookback-reading-neighbors" style={styles.neighbors}>
-      {previous ? (
+    <View
+      testID="lookback-reading-neighbors"
+      onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)}
+      style={[styles.neighbors, direction === 'row' ? styles.neighborsRow : styles.neighborsColumn]}
+    >
+      {previous && previousCaption ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={lookbackNeighborCaption('previous', current, previous)}
+          accessibilityLabel={previousCaption}
           testID="lookback-reading-prev-day"
           onPress={() => onOpen(previous)}
-          style={styles.hit}
+          style={[styles.hit, direction === 'row' ? styles.neighborHitRow : styles.neighborHitColumn]}
         >
-          <Text style={styles.action}>{lookbackNeighborCaption('previous', current, previous)}</Text>
+          <Text style={styles.action}>{previousCaption}</Text>
         </Pressable>
       ) : null}
-      {next ? (
+      {next && nextCaption ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={lookbackNeighborCaption('next', current, next)}
+          accessibilityLabel={nextCaption}
           testID="lookback-reading-next-day"
           onPress={() => onOpen(next)}
-          style={styles.hit}
+          style={[styles.hit, direction === 'row' ? styles.neighborHitRow : styles.neighborHitColumn]}
         >
-          <Text style={styles.action}>{lookbackNeighborCaption('next', current, next)}</Text>
+          <Text style={styles.action}>{nextCaption}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -264,4 +286,8 @@ const styles = StyleSheet.create({
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   action: { ...type.action, color: sage },
   neighbors: { gap: 8, marginTop: 8 },
+  neighborsColumn: { flexDirection: 'column', alignItems: 'stretch' },
+  neighborsRow: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'flex-start' },
+  neighborHitColumn: { alignSelf: 'stretch' },
+  neighborHitRow: { flexShrink: 0 },
 });

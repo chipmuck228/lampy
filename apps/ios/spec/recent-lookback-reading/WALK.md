@@ -47,6 +47,7 @@
 | 恢复后续页失败保留已读并显示分页重试 | **PASS**（`lookback-reading-failure-guards`） |
 | 相邻日查询失败保留当天并提供重试 | **PASS**（`lookback-reading-failure-guards` 根页/旧日页） |
 | 展开正文紧跟文字、在图声感受之前 | **PASS**（`lookback-reading.test.tsx` 顺序） |
+| 相邻日按宽度纵排/横排，不裁切 | **PASS**（`lookback-reading.test.tsx` neighbors） |
 
 ## 真机（Liuz17 / 可丢弃安装）
 
