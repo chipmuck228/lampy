@@ -12,15 +12,18 @@ import { LifeIconButton } from '../screens/life-icons';
 import { shouldPairRecentImages } from '../screens/moment-images';
 import { RecentMoment } from '../screens/recent-moment';
 import {
-  consumeJustSavedMomentId,
+  acceptRecentEchoLoad,
+  beginRecentEchoFocus,
+  createSaveEchoFocusGate,
   echoCallbackIsCurrent,
+  endRecentEchoFocus,
   isRecentForeground,
   nextEchoSeq,
-  peekJustSavedMomentId,
+  rejectRecentEchoLoad,
   SAVE_ECHO_FADE_MS,
   SAVE_ECHO_START_OPACITY,
-  shouldRevealSaveEcho,
   shouldSkipSaveEchoFade,
+  tryConsumeSaveEcho,
 } from '../screens/recent-save-echo';
 import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
 import {
@@ -64,8 +67,7 @@ export default function RecentScreen() {
   const clips = useRecentClipPlayback();
   const days = view?.days ?? [];
   const reduceMotionRef = useRef(reduceMotion);
-  const itemIdsRef = useRef<string[]>([]);
-  const loadReadyRef = useRef(false);
+  const echoGate = useRef(createSaveEchoFocusGate());
 
   const settleEcho = useCallback(() => {
     echoSeq.current = nextEchoSeq(echoSeq.current);
@@ -101,34 +103,14 @@ export default function RecentScreen() {
     [echoOpacity],
   );
 
-  const tryRevealPending = useCallback(
-    (itemIds: string[], loadReady: boolean) => {
-      const pending = peekJustSavedMomentId();
-      if (
-        shouldRevealSaveEcho({
-          momentId: pending,
-          itemIds,
-          loadReady,
-          foreground: isRecentForeground(AppState.currentState),
-        })
-      ) {
-        consumeJustSavedMomentId();
-        revealEcho(pending as string, shouldSkipSaveEchoFade(reduceMotionRef.current));
-        return;
-      }
-      if (pending && loadReady && !itemIds.includes(pending)) consumeJustSavedMomentId();
-    },
-    [revealEcho],
-  );
+  const tryRevealPending = useCallback(() => {
+    const id = tryConsumeSaveEcho(echoGate.current, AppState.currentState);
+    if (id) revealEcho(id, shouldSkipSaveEchoFade(reduceMotionRef.current));
+  }, [revealEcho]);
 
   useEffect(() => {
     reduceMotionRef.current = reduceMotion;
   }, [reduceMotion]);
-
-  useEffect(() => {
-    itemIdsRef.current = view?.items.map((item) => item.id) ?? [];
-    loadReadyRef.current = view !== null;
-  }, [view]);
 
   useEffect(() => {
     if (reduceMotion) settleEcho();
@@ -148,7 +130,7 @@ export default function RecentScreen() {
     });
     const app = AppState.addEventListener('change', (state) => {
       if (isRecentForeground(state)) {
-        tryRevealPending(itemIdsRef.current, loadReadyRef.current);
+        tryRevealPending();
         return;
       }
       settleEcho();
@@ -163,23 +145,27 @@ export default function RecentScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
+      const request = beginRecentEchoFocus(echoGate.current);
       getUseCases()
         .then((app) => app.getRecentLife())
         .then((next) => {
-          if (cancelled) return;
+          if (!acceptRecentEchoLoad(
+            echoGate.current,
+            request,
+            next.items.map((item) => item.id),
+          )) {
+            return;
+          }
           setView(next);
           setError(null);
-          tryRevealPending(
-            next.items.map((item) => item.id),
-            true,
-          );
+          tryRevealPending();
         })
         .catch(() => {
-          if (!cancelled) setError('最近的记录暂时读不出来，原来的内容还在这台设备上。');
+          if (!rejectRecentEchoLoad(echoGate.current, request)) return;
+          setError('最近的记录暂时读不出来，原来的内容还在这台设备上。');
         });
       return () => {
-        cancelled = true;
+        endRecentEchoFocus(echoGate.current);
         settleEcho();
       };
     }, [settleEcho, tryRevealPending]),
