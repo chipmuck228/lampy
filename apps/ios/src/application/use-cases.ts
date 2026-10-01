@@ -49,6 +49,7 @@ import {
   recordedDayForRecent,
   recordedHeadingForRecent,
   sameViewerCalendarDay,
+  takeRecentLifeDays,
 } from './recent-life';
 
 export type { OccurredChoiceView, OccurredDraftInput };
@@ -1012,7 +1013,7 @@ export function createUseCases(deps: {
   }
 
   async function getRecentLife(): Promise<RecentLifeViewModel> {
-    const moments = await deps.moments.listRecent(50);
+    const moments = await deps.moments.listRecent(200);
     const viewerClock: HistoryClock = deps.timezone ?? deps.timezoneOffsetMinutes ?? {
       timeZone: deviceTimeZone(),
     };
@@ -1034,10 +1035,12 @@ export function createUseCases(deps: {
         unknownMedia: await resolveUnknown(moment.assetIds),
       });
     }
+    const days = takeRecentLifeDays(groupRecentLifeDays(items));
+    const visible = new Set(days.flatMap((day) => day.items.map((item) => item.id)));
     return {
       isFirstUse: moments.length === 0,
-      items,
-      days: groupRecentLifeDays(items),
+      items: items.filter((item) => visible.has(item.id)),
+      days,
     };
   }
 

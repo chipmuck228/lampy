@@ -129,6 +129,10 @@ describe('root navigation band', () => {
     expect(view.getByTestId('recent-open-label-moment_wind').props.children).toBe('阅读完整记录');
     fireEvent.press(view.getByTestId('home-lookback'));
     expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/lookback\?o=[^&]+$/));
+    expect(view.getByTestId('recent-end-note')).toBeTruthy();
+    fireEvent.press(view.getByTestId('recent-end-lookback'));
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/lookback\?o=[^&]+$/));
+    expect(view.getByLabelText('都在这里，打开回看').props.accessibilityRole).toBe('link');
     fireEvent.press(view.getByTestId('recent-leave-fab'));
     expect(mockPush).toHaveBeenCalledWith('/leave?from=recent');
     expect(view.queryByTestId('home-leave')).toBeNull();

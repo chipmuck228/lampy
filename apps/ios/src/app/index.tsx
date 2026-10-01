@@ -111,6 +111,10 @@ export default function RecentScreen() {
     [echoOpacity],
   );
 
+  const openLookback = useCallback(() => {
+    router.push(lookbackRootHrefFromRecent());
+  }, [router]);
+
   const tryRevealPending = useCallback(() => {
     const id = tryConsumeSaveEcho(echoGate.current, AppState.currentState);
     if (id) revealEcho(id, shouldSkipSaveEchoFade(reduceMotionRef.current));
@@ -228,7 +232,7 @@ export default function RecentScreen() {
         band={
           <RootNavBand
             here="recent"
-            onOther={() => router.push(lookbackRootHrefFromRecent())}
+            onOther={openLookback}
             onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
           />
         }
@@ -309,7 +313,17 @@ export default function RecentScreen() {
         ))}
         {days.length > 0 ? (
           <Text style={styles.endNote} testID="recent-end-note">
-            每一个平常的日子，都在这里。
+            每一个平常的日子，
+            <Text
+              accessibilityRole="link"
+              accessibilityLabel="都在这里，打开回看"
+              testID="recent-end-lookback"
+              onPress={openLookback}
+              style={styles.endLink}
+            >
+              都在这里
+            </Text>
+            。
           </Text>
         ) : null}
       </RootReadingLayout>
@@ -412,5 +426,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingTop: 28,
     paddingBottom: 18,
+  },
+  endLink: {
+    ...recentType.end,
+    color: recentOlive,
+    textDecorationLine: 'underline',
   },
 });

@@ -3,6 +3,7 @@ import {
   recordedDayForRecent,
   recordedHeadingForRecent,
   sameViewerCalendarDay,
+  takeRecentLifeDays,
 } from './recent-life';
 
 const SHANGHAI = { timeZone: 'Asia/Shanghai' };
@@ -82,5 +83,32 @@ describe('groupRecentLifeDays', () => {
     expect(recordedHeadingForRecent('9月27日')).toBe('记录于 9月27日');
     expect(recordedHeadingForRecent('记录于 9月27日')).toBe('记录于 9月27日');
     expect(recordedHeadingForRecent('时间未确认')).toBe('记录于 时间未确认');
+  });
+});
+
+describe('takeRecentLifeDays', () => {
+  it('keeps the latest seven recorded days and leaves a shorter list alone', () => {
+    const eight = groupRecentLifeDays(
+      Array.from({ length: 8 }, (_, index) => ({
+        id: `d${8 - index}`,
+        dayKey: `2026-09-${String(8 - index).padStart(2, '0')}`,
+        dayLabel: `9月${8 - index}日`,
+      })),
+    );
+    expect(takeRecentLifeDays(eight).map((day) => day.key)).toEqual([
+      '2026-09-08',
+      '2026-09-07',
+      '2026-09-06',
+      '2026-09-05',
+      '2026-09-04',
+      '2026-09-03',
+      '2026-09-02',
+    ]);
+    expect(takeRecentLifeDays(eight.slice(0, 3)).map((day) => day.key)).toEqual([
+      '2026-09-08',
+      '2026-09-07',
+      '2026-09-06',
+    ]);
+    expect(takeRecentLifeDays([])).toEqual([]);
   });
 });

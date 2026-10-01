@@ -430,4 +430,36 @@ describe('leave occurred date', () => {
     const utcDay = await utcApp.getHistoryDay(2026, 9, 26);
     expect('invalid' in utcDay ? utcDay : utcDay.items.map((item) => item.id)).toEqual([saved.id]);
   });
+
+  it('keeps Recent to the latest seven recorded days', async () => {
+    let now = new Date('2026-09-01T02:00:00.000Z');
+    const clock = { now: () => now };
+    const repos = createMemoryRepositories();
+    const app = createUseCases({ ...repos, clock, timezoneOffsetMinutes: 0 });
+    for (let day = 1; day <= 8; day += 1) {
+      now = new Date(`2026-09-0${day}T02:00:00.000Z`);
+      const draft = await app.restoreOrCreateDraft();
+      await app.updateDraftNote(draft.draftId, `第${day}天`);
+      await app.saveTextMoment(draft.draftId);
+    }
+    const recent = await app.getRecentLife();
+    expect(recent.days.map((day) => day.key)).toEqual([
+      '2026-09-08',
+      '2026-09-07',
+      '2026-09-06',
+      '2026-09-05',
+      '2026-09-04',
+      '2026-09-03',
+      '2026-09-02',
+    ]);
+    expect(recent.items.map((item) => item.note)).toEqual([
+      '第8天',
+      '第7天',
+      '第6天',
+      '第5天',
+      '第4天',
+      '第3天',
+      '第2天',
+    ]);
+  });
 });
