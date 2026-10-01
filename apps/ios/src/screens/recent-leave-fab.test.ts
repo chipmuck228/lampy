@@ -1,8 +1,9 @@
-import { recentFabIntent, RECENT_FAB_IDLE_MS, RECENT_FAB_SHOW_MS } from './recent-leave-fab';
+import { recentFabIntent, RECENT_FAB_HIDE_MS, RECENT_FAB_IDLE_MS, RECENT_FAB_SHOW_MS } from './recent-leave-fab';
 
 describe('recent leave fab scroll', () => {
   it('shows at the top, hides on any scroll, and waits after still motion', () => {
     expect(RECENT_FAB_IDLE_MS).toBe(800);
+    expect(RECENT_FAB_HIDE_MS).toBe(380);
     expect(RECENT_FAB_SHOW_MS).toBe(640);
     expect(recentFabIntent(0, 24)).toBe('show');
     expect(recentFabIntent(6, 80)).toBe('show');

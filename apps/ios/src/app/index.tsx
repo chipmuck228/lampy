@@ -26,7 +26,6 @@ import {
   recentSettings,
   recentType,
   recentWeekdayInk,
-  recentYearInk,
 } from '../screens/recent-visual';
 import {
   RECENT_FAB_HIDE_MS,
@@ -150,7 +149,7 @@ export default function RecentScreen() {
         return;
       }
       const duration = visible ? RECENT_FAB_SHOW_MS : RECENT_FAB_HIDE_MS;
-      const easing = visible ? Easing.out(Easing.cubic) : Easing.in(Easing.quad);
+      const easing = Easing.out(Easing.cubic);
       const next = Animated.parallel([
         Animated.timing(fabOpacity, {
           toValue: visible ? 1 : 0,
@@ -276,7 +275,7 @@ export default function RecentScreen() {
     <View style={styles.safe}>
       <StartupBrandLayer homeSettled={view !== null || error !== null} />
       <RootReadingLayout
-        accessibilityLabel="最近留下的生活"
+        accessibilityLabel="刚刚留下的生活"
         scrollTestID="recent-scroll"
         canvas={recentPaper}
         onScroll={onRecentScroll}
@@ -297,7 +296,7 @@ export default function RecentScreen() {
                 LAMPY · 生活记录
               </Text>
               <Text style={styles.wordmark} accessibilityRole="header" testID="recent-wordmark">
-                最近留下的生活
+                刚刚留下的生活
               </Text>
             </View>
             <LifeIconButton
@@ -375,7 +374,10 @@ export default function RecentScreen() {
           <View
             key={day.key}
             style={[styles.day, dayIndex > 0 && styles.nextDay]}
-            accessibilityLabel={recentDayAccessLabel(recentDayHeading(day.key, day.label), day.items.length)}
+            accessibilityLabel={recentDayAccessLabel(
+              recentDayHeading(day.key, day.label, new Date().getFullYear()),
+              day.items.length,
+            )}
           >
             <RecentDayHeading dayKey={day.key} label={day.label} />
             <View style={styles.dayItems}>
@@ -436,7 +438,7 @@ export default function RecentScreen() {
 }
 
 function RecentDayHeading({ dayKey, label }: { dayKey: string; label: string }) {
-  const heading = recentDayHeading(dayKey, label);
+  const heading = recentDayHeading(dayKey, label, new Date().getFullYear());
   return (
     <View style={styles.sectionHeading}>
       <View style={styles.sectionCopy}>
@@ -444,9 +446,9 @@ function RecentDayHeading({ dayKey, label }: { dayKey: string; label: string }) 
           <Text style={styles.sectionDate} accessibilityRole="header">
             {heading.date}
           </Text>
+          {heading.weekday ? <Text style={styles.sectionDot}>·</Text> : null}
           {heading.weekday ? <Text style={styles.sectionWeekday}>{heading.weekday}</Text> : null}
         </View>
-        {heading.year ? <Text style={styles.sectionYear}>{heading.year}</Text> : null}
       </View>
     </View>
   );
@@ -511,11 +513,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'baseline',
-    gap: 8,
+    gap: 6,
   },
   sectionDate: { ...recentType.date, color: recentInk },
+  sectionDot: { ...recentType.weekday, color: recentWeekdayInk },
   sectionWeekday: { ...recentType.weekday, color: recentWeekdayInk },
-  sectionYear: { ...recentType.year, color: recentYearInk, marginTop: 6 },
   dayItems: { gap: 0 },
   sameDayRule: {
     alignSelf: 'stretch',

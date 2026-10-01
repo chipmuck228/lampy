@@ -2,23 +2,26 @@ import { recentDayAccessLabel, recentDayHeading, recentRecordedClock, recentType
 
 describe('recent visual presentation', () => {
   it('splits a dated heading without a recorded-at field label', () => {
-    expect(recentDayHeading('2026-09-27', '记录于 9月27日')).toEqual({
+    expect(recentDayHeading('2026-09-27', '记录于 9月27日', 2026)).toEqual({
       date: '9月27日',
       weekday: '星期日',
-      year: '2026',
+      year: null,
     });
-    expect(recentDayHeading('2025-09-27', '记录于 2025年9月27日')).toEqual({
-      date: '9月27日',
+    expect(recentDayHeading('2025-09-27', '记录于 2025年9月27日', 2026)).toEqual({
+      date: '2025年9月27日',
       weekday: '星期六',
       year: '2025',
     });
-    expect(recentDayHeading('unknown', '记录于 时间未确认')).toEqual({
+    expect(recentDayHeading('unknown', '记录于 时间未确认', 2026)).toEqual({
       date: '时间未确认',
       weekday: null,
       year: null,
     });
-    expect(recentDayAccessLabel(recentDayHeading('2026-09-27', '记录于 9月27日'), 2)).toBe(
-      '9月27日，星期日，2026，2条记录',
+    expect(recentDayAccessLabel(recentDayHeading('2026-09-27', '记录于 9月27日', 2026), 2)).toBe(
+      '9月27日，星期日，2条记录',
+    );
+    expect(recentDayAccessLabel(recentDayHeading('2025-09-27', '记录于 2025年9月27日', 2026), 1)).toBe(
+      '2025年9月27日，星期六，1条记录',
     );
   });
 

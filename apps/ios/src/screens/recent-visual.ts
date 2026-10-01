@@ -115,6 +115,7 @@ const DAY_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
 export function recentDayHeading(
   key: string,
   label: string,
+  nowYear?: number,
 ): {
   date: string;
   weekday: string | null;
@@ -128,10 +129,11 @@ export function recentDayHeading(
   const year = Number(matched[1]);
   const month = Number(matched[2]);
   const day = Number(matched[3]);
+  const crossYear = nowYear != null && year !== nowYear;
   return {
-    date: `${month}月${day}日`,
+    date: crossYear ? `${year}年${month}月${day}日` : `${month}月${day}日`,
     weekday: lookbackBookWeekdayName(year, month, day),
-    year: String(year),
+    year: crossYear ? String(year) : null,
   };
 }
 
@@ -139,7 +141,7 @@ export function recentDayAccessLabel(
   heading: { date: string; weekday: string | null; year: string | null },
   count: number,
 ): string {
-  return [heading.date, heading.weekday, heading.year, `${count}条记录`].filter(Boolean).join('，');
+  return [heading.date, heading.weekday, `${count}条记录`].filter(Boolean).join('，');
 }
 
 export function recentRecordedClock(recordedAt?: string | null): string | null {
