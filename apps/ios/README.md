@@ -11,6 +11,7 @@ npx expo run:ios
 
 规格与决策（均在 `spec/`）：
 
+- 下一轮最近 / 回看 / 引导视觉：`spec/figma-visual-authority/`
 - 产品：`LAMPY_APP_PRODUCT_DESIGN_GUIDE.md`
 - 审计：`PHASE_0_DOMAIN_AUDIT.md`
 - 实施拆分：`PHASE_0_IMPLEMENTATION_PLAN.md`

@@ -5,6 +5,7 @@
 > 家庭和 AI 仍关。不改 Moment、revision、发生时间精度、个人库归属、媒体保存、本机保护、首次引导完成条件、账号会话。
 > 并排稿：[`storyboard.html`](./storyboard.html)。夹具：[`samples.md`](./samples.md)。路由与状态：[`routes-and-state.md`](./routes-and-state.md)。验收：[`verification-plan.md`](./verification-plan.md)。
 > 静态稿不是运行证据。模拟器实际操作只能写「模拟器 PASS」，不能写「真机 PASS」。
+> **视觉 / 入口 / 三屏 / 发生日切片**以 [`../figma-visual-authority/`](../figma-visual-authority/) 为准。本目录保留回看阅读与播放定位契约。
 
 ---
 

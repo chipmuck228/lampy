@@ -14,7 +14,8 @@
 | `FAMILY_COMMANDS_AND_FAILURES.md` | 命令、失败码、幂等；F1 与未交付分开 |
 | `FAMILY_IMPLEMENTATION_SLICES.md` | F0–F6；本轮仅 F1 |
 | `lookback-book/` | 回看三案对照：A main 跳转、B #36 年页展开、C′ 时间书页。设计稿，不改运行代码 |
-| `recent-lookback-reading/` | 最近扫读与回看停留。阶段 A 设计对照；现网已是 C′ 书页。不改运行代码 |
+| `figma-visual-authority/` | **下一轮唯一设计依据**（Figma 视觉 ＋ 用户取舍 ＋ #50 契约）。只改说明，不写运行代码 |
+| `recent-lookback-reading/` | #50 回看同页阅读与最近扫读的行为底稿。视觉 / 入口以 `figma-visual-authority/` 为准 |
 | `personal-visual-details/` | 感受色点、回看日期行、首次三屏。运行中实现 |
 | `testflight-beta-1/` | 第一份 TestFlight 预发布准备。不上传、不邀请 |
 | `lookback-expand/` | #35 当时的年页展开契约。产品效力见 `lookback-book/`；#36 是 B 的备选实现 |
