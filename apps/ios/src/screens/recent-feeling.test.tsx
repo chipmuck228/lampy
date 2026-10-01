@@ -30,7 +30,7 @@ describe('recent feeling accent', () => {
     );
   });
 
-  it('lets the feeling word grow with Dynamic Type instead of a 20pt line box', async () => {
+  it('keeps the feeling word on the fixed app type scale', async () => {
     const view = await render(
       <RecentFeeling feeling={{ value: '平静', label: '平静', known: true }} testID="recent-feeling" />,
     );
@@ -39,7 +39,7 @@ describe('recent feeling accent', () => {
     expect(row.maxHeight).toBeUndefined();
     expect(row.flexWrap).toBe('wrap');
     const text = StyleSheet.flatten(view.getByText('当时的感受 · 平静').props.style);
-    expect(text.lineHeight).toBeUndefined();
-    expect(view.getByText('当时的感受 · 平静').props.allowFontScaling).not.toBe(false);
+    expect(text.fontSize).toBe(15);
+    expect(view.getByText('当时的感受 · 平静').props.allowFontScaling).toBe(false);
   });
 });

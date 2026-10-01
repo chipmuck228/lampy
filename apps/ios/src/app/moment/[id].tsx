@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, type } from '../../screens/life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -177,19 +178,19 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   backHit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
-  back: { fontSize: 16, lineHeight: 22, color: sage },
+  back: { ...type.action, color: sage },
   block: { gap: 12, width: '100%', maxWidth: '100%', minWidth: 0 },
   page: { gap: 24, width: '100%', maxWidth: '100%', minWidth: 0 },
   entry: { gap: 4, width: '100%' },
-  title: { fontSize: 22, lineHeight: 32, color: ink, flexShrink: 0 },
-  body: { fontSize: 16, lineHeight: 24, color: inkSoft },
-  date: { fontSize: 22, lineHeight: 32, color: sage, flexShrink: 0 },
-  precision: { fontSize: 15, lineHeight: 22, color: inkSoft },
-  note: { fontSize: 21, lineHeight: 32, color: ink },
+  title: { ...type.title, color: ink, flexShrink: 0 },
+  body: { ...type.action, color: inkSoft },
+  date: { ...type.title, color: sage, flexShrink: 0 },
+  precision: { ...type.meta, color: inkSoft },
+  note: { ...type.body, color: ink },
   secondary: { gap: 8, width: '100%' },
-  meta: { fontSize: 14, lineHeight: 20, color: inkSoft },
+  meta: { ...type.meta, color: inkSoft },
   retryHit: { minHeight: 44, justifyContent: 'center' },
-  retry: { fontSize: 18, lineHeight: 24, color: sage },
+  retry: { ...type.action, color: sage },
   shareHit: { minHeight: 44, justifyContent: 'center' },
-  share: { fontSize: 18, lineHeight: 24, color: sage },
+  share: { ...type.action, color: sage },
 });

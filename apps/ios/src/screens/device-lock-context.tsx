@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Text, type } from './life-text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -514,9 +515,9 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
-  title: { fontSize: 28, color: ink },
-  body: { fontSize: 17, color: inkSoft },
-  action: { fontSize: 17, color: sage },
+  title: { ...type.title, color: ink },
+  body: { ...type.body, color: inkSoft },
+  action: { ...type.action, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   settingsRow: {
     minHeight: 44,

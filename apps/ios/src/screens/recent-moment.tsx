@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
+import { Text, type } from './life-text';
 
 import type { RecentLifeItem } from '../application/use-cases';
 import type { PlaybackStatus } from '../infrastructure/media';
@@ -120,7 +121,7 @@ const styles = StyleSheet.create({
   moment: { gap: 8, minHeight: 48, overflow: 'visible' },
   momentMixed: { gap: 16 },
   momentBody: { gap: 8, overflow: 'visible' },
-  note: { fontSize: 21, color: ink },
+  note: { ...type.body, color: ink },
   measure: {
     position: 'absolute',
     opacity: 0,
@@ -128,5 +129,5 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: -1,
   },
-  occurred: { fontSize: 15, color: inkSoft },
+  occurred: { ...type.meta, color: inkSoft },
 });

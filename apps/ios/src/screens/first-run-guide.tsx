@@ -1,17 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  Animated,
-  AppState,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { AccessibilityInfo, Animated, AppState, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text, type } from './life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -214,10 +203,10 @@ const styles = StyleSheet.create({
   page: { overflow: 'hidden' },
   pageScroll: { flex: 1 },
   pageCopy: { paddingHorizontal: 24, gap: 16, flexGrow: 1, justifyContent: 'center' },
-  title: { fontSize: 28, lineHeight: 36, color: ink },
-  body: { fontSize: 17, lineHeight: 26, color: inkSoft },
+  title: { ...type.title, color: ink },
+  body: { ...type.body, color: inkSoft },
   footer: { flexShrink: 0, paddingHorizontal: 24, paddingBottom: 16, gap: 8 },
-  progress: { fontSize: 15, lineHeight: 22, color: inkSoft },
-  action: { fontSize: 20, lineHeight: 28, color: sage },
+  progress: { ...type.meta, color: inkSoft },
+  action: { ...type.action, color: sage },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
 });

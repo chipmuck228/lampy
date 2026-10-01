@@ -8,17 +8,11 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import {
-  findNodeHandle,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { findNodeHandle, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
+import { Text, type } from './life-text';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 import { usePageMetrics } from './use-page-metrics';
 
@@ -116,18 +110,18 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
   );
 }
 
-export function lookbackLayoutFor(width: number, height: number, fontScale: number) {
+export function lookbackLayoutFor(width: number, height: number) {
   return {
     readingWidth: Math.min(width, 720),
-    verticalTime: width < 600 || fontScale >= 1.3,
+    verticalTime: width < 600,
     shortHeight: height < 500,
     maxBar: Math.min(width, 720) - 48,
   };
 }
 
 export function useLookbackLayout() {
-  const { width, height, fontScale } = usePageMetrics();
-  return lookbackLayoutFor(width, height, fontScale);
+  const { width, height } = usePageMetrics();
+  return lookbackLayoutFor(width, height);
 }
 
 export function LookbackScaffold({
@@ -347,7 +341,7 @@ export function LookbackMessage({ children, testID }: { children: string; testID
 
 export const lookbackStyles = StyleSheet.create({
   hit: { minHeight: 44, justifyContent: 'center' },
-  action: { fontSize: 18, lineHeight: 24, color: '#53604F' },
+  action: { ...type.action, color: '#53604F' },
   cell: { minHeight: 44, paddingVertical: 8, gap: 4, flex: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   stack: { gap: 12 },
@@ -366,12 +360,12 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   backHit: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
-  back: { fontSize: 16, lineHeight: 22, color: '#53604F' },
-  title: { fontSize: 28, color: '#25231F', flexShrink: 1, minWidth: 0 },
-  body: { fontSize: 16, lineHeight: 24, color: '#5C5851' },
-  meta: { fontSize: 14, lineHeight: 20, color: '#53604F' },
-  fallback: { fontSize: 14, lineHeight: 20, color: '#5C5851' },
-  note: { fontSize: 20, color: '#25231F' },
+  back: { ...type.action, color: '#53604F' },
+  title: { ...type.title, color: '#25231F', flexShrink: 1, minWidth: 0 },
+  body: { ...type.action, color: '#5C5851' },
+  meta: { ...type.meta, color: '#53604F' },
+  fallback: { ...type.meta, color: '#5C5851' },
+  note: { ...type.body, color: '#25231F' },
   row: {
     gap: 4,
     paddingVertical: 8,

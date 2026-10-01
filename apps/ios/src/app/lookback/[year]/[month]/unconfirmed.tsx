@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Pressable } from 'react-native';
+import { Text } from '../../../../screens/life-text';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../../../application/container';

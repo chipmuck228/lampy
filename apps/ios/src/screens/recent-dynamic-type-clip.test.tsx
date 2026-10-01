@@ -1,16 +1,11 @@
 import { StyleSheet } from 'react-native';
+import { render } from '@testing-library/react-native';
 
 import { LookThisHit } from './life-icons';
 import { MomentAudio } from './moment-audio';
-import { render } from '@testing-library/react-native';
 
-/**
- * Lookback excerpts sit in a plain View and omit lineHeight on the note.
- * Recent reused the same audio / 看这条 styles but wrapped them in Animated.View
- * and kept fixed line boxes that do not grow with Dynamic Type.
- */
-describe('recent vs lookback type boxes', () => {
-  it('keeps Recent audio and 看这条 off a fixed lineHeight', async () => {
+describe('fixed type on recent reading controls', () => {
+  it('keeps Recent audio and 看这条 on the app type scale', async () => {
     const audio = await render(
       <MomentAudio
         audio={{
@@ -27,14 +22,16 @@ describe('recent vs lookback type boxes', () => {
         markedActions
       />,
     );
-    expect(StyleSheet.flatten(audio.getByText('当时的声音').props.style).lineHeight).toBeUndefined();
-    expect(StyleSheet.flatten(audio.getByText('一段声音 · 1秒').props.style).lineHeight).toBeUndefined();
-    expect(StyleSheet.flatten(audio.getByText('播放').props.style).lineHeight).toBeUndefined();
+    expect(audio.getByText('当时的声音').props.allowFontScaling).toBe(false);
+    expect(audio.getByText('一段声音 · 1秒').props.allowFontScaling).toBe(false);
+    expect(audio.getByText('播放').props.allowFontScaling).toBe(false);
+    expect(StyleSheet.flatten(audio.getByText('播放').props.style).fontSize).toBe(17);
 
     const open = await render(
       <LookThisHit caption="看这条" accessibilityLabel="看这条" testID="recent-open-x" onPress={() => undefined} />,
     );
-    expect(StyleSheet.flatten(open.getByTestId('recent-open-label-x').props.style).lineHeight).toBeUndefined();
+    expect(open.getByTestId('recent-open-label-x').props.allowFontScaling).toBe(false);
+    expect(StyleSheet.flatten(open.getByTestId('recent-open-label-x').props.style).fontSize).toBe(17);
     expect(StyleSheet.flatten(open.getByTestId('recent-open-x').props.style).overflow).toBe('visible');
   });
 });

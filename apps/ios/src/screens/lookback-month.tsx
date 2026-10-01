@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from './life-text';
 
 import type { LookbackMonthPage, LookbackMonthWeekCell } from '../application/lookback-month';
 import { pad2 } from '../domain-adapters/calendar';

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, View } from 'react-native';
+import { Text, type } from '../screens/life-text';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -48,14 +49,13 @@ import { usePageMetrics } from '../screens/use-page-metrics';
 export default function RecentScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width, height, fontScale } = usePageMetrics();
+  const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
-  const stackDay = shouldStackRecentDay(width, height, fontScale);
-  const columnWidth = recentColumnWidth(width, height, fontScale);
+  const stackDay = shouldStackRecentDay(width, height);
+  const columnWidth = recentColumnWidth(width, height);
   const pairImages = shouldPairRecentImages(
-    fontScale,
-    recentImageColumnWidth(width, height, fontScale, insets.left, insets.right),
+    recentImageColumnWidth(width, height, insets.left, insets.right),
   );
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -283,16 +283,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  wordmark: { fontSize: 28, color: ink, flex: 1, flexShrink: 1, minWidth: 0 },
+  wordmark: { ...type.title, color: ink, flex: 1, flexShrink: 1, minWidth: 0 },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
-  emptyTitle: { fontSize: 28, lineHeight: 38, color: ink },
-  body: { fontSize: 17, lineHeight: 26, color: inkSoft },
+  emptyTitle: { ...type.title, color: ink },
+  body: { ...type.body, color: inkSoft },
   firstHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  first: { fontSize: 20, lineHeight: 28, color: ink },
-  error: { fontSize: 17, lineHeight: 26, color: clay, paddingVertical: 8 },
+  first: { ...type.action, color: ink },
+  error: { ...type.body, color: clay, paddingVertical: 8 },
   day: { gap: 12, overflow: 'visible' },
   dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
-  date: { fontSize: 16, color: sage, paddingBottom: 4, minWidth: 0 },
+  date: { ...type.meta, color: sage, paddingBottom: 4, minWidth: 0 },
   dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
   dayItems: { gap: 32 },
   dayItemsRegular: { width: READING_MAX, flexShrink: 0 },

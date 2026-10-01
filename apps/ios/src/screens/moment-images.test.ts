@@ -55,21 +55,20 @@ describe('moment image layout', () => {
     ]);
   });
 
-  it('pairs recent portraits only when type is regular and the column is wide enough', () => {
-    expect(shouldPairRecentImages(1, 345)).toBe(true);
-    expect(shouldPairRecentImages(1.3, 345)).toBe(false);
-    expect(shouldPairRecentImages(1, 200)).toBe(false);
-    expect(shouldPairRecentImages(1, recentImageColumnWidth(390, 844, 1))).toBe(true);
-    expect(shouldPairRecentImages(1, recentImageColumnWidth(320, 700, 1))).toBe(false);
-    expect(shouldPairRecentImages(1.3, recentImageColumnWidth(1024, 1366, 1.3))).toBe(false);
+  it('pairs recent portraits when the content column is wide enough', () => {
+    expect(shouldPairRecentImages(345)).toBe(true);
+    expect(shouldPairRecentImages(200)).toBe(false);
+    expect(shouldPairRecentImages(recentImageColumnWidth(390, 844))).toBe(true);
+    expect(shouldPairRecentImages(recentImageColumnWidth(320, 700))).toBe(false);
+    expect(shouldPairRecentImages(recentImageColumnWidth(1024, 1366))).toBe(true);
   });
 
   it('does not pair when the page is wide but the content column is under 280', () => {
-    const column = recentImageColumnWidth(768, 1024, 1, 200, 200);
+    const column = recentImageColumnWidth(768, 1024, 200, 200);
     expect(768).toBeGreaterThanOrEqual(280);
     expect(column).toBeLessThan(280);
-    expect(shouldPairRecentImages(1, column)).toBe(false);
-    expect(shouldPairRecentImages(1, recentImageColumnWidth(768, 1024, 1))).toBe(true);
+    expect(shouldPairRecentImages(column)).toBe(false);
+    expect(shouldPairRecentImages(recentImageColumnWidth(768, 1024))).toBe(true);
   });
 
   it('keeps recent image order and stacks when pairing is off', () => {

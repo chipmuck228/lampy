@@ -1,5 +1,5 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Dimensions, PixelRatio } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LeaveScreen from '../app/leave';
@@ -70,41 +70,41 @@ const liveDraft = {
   occurred: { kind: 'today' as const, label: '今天' },
 };
 
-function setWindowFontScale(fontScale: number, width = 390) {
-  jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(fontScale);
+function setWindow(width = 390, fontScale = 1) {
   Dimensions.set({
     window: { width, height: 844, scale: 3, fontScale },
     screen: { width, height: 844, scale: 3, fontScale },
   });
 }
 
-async function expectLayout(
-  view: { getByTestId: (id: string) => { props: { children?: unknown } } },
-  fontScale: string,
+async function expectFixedType(
+  view: { getByTestId: (id: string) => { props: { children?: unknown; allowFontScaling?: boolean; style?: unknown } } },
   mode: 'row' | 'stack',
 ) {
   await waitFor(() => {
-    expect(view.getByTestId('composer-font-scale').props.children).toBe(fontScale);
+    expect(view.getByTestId('composer-type-policy').props.children).toBe('fixed');
     expect(view.getByTestId('composer-actions-mode').props.children).toBe(mode);
   });
+  expect(view.getByTestId('composer-note').props.allowFontScaling).toBe(false);
+  expect((StyleSheet.flatten(view.getByTestId('composer-note').props.style) as { fontSize?: number }).fontSize).toBe(17);
 }
 
-describe('leave layout follows an in-session fontScale change', () => {
+describe('leave keeps a fixed type scale when the system type changes', () => {
   beforeEach(() => {
     mockRestore.mockReset();
     mockAddCameraImage.mockReset();
     mockSaveTextMoment.mockReset();
     mockRestore.mockResolvedValue(liveDraft);
     mockSaveTextMoment.mockResolvedValue({ id: 'moment_draft' });
-    setWindowFontScale(1, 390);
+    setWindow(390, 1);
   });
 
-  it('rechooses the action band and keeps the draft when type goes regular → max → small → regular', async () => {
+  it('keeps the draft and action row when the system type goes regular → max → small', async () => {
     const view = await render(wrap());
     await waitFor(() => {
       expect(view.getByTestId('composer-note').props.value).toBe('门口的风还在。');
     });
-    await expectLayout(view, '1', 'row');
+    await expectFixedType(view, 'row');
     expect(view.getByLabelText('当时的感受，平静')).toBeTruthy();
     expect(view.getByLabelText('这件事发生在哪一天')).toBeTruthy();
     expect(view.getByText('今天')).toBeTruthy();
@@ -115,15 +115,15 @@ describe('leave layout follows an in-session fontScale change', () => {
       nativeEvent: { contentSize: { width: 300, height: 320 } },
     });
 
-    setWindowFontScale(3.1, 391);
-    await expectLayout(view, '3.1', 'stack');
+    setWindow(390, 3.1);
+    await expectFixedType(view, 'row');
     expect(view.getByTestId('composer-note').props.value).toBe('门口的风还在。');
     expect(view.getByLabelText('当时的感受，平静')).toBeTruthy();
     expect(view.getByLabelText('照片 1/1')).toBeTruthy();
     expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
 
-    setWindowFontScale(1, 389);
-    await expectLayout(view, '1', 'row');
+    setWindow(390, 0.8);
+    await expectFixedType(view, 'row');
     expect(view.getByTestId('composer-note').props.value).toBe('门口的风还在。');
     expect(view.getByLabelText('当时的感受，平静')).toBeTruthy();
     expect(view.getByLabelText('这件事发生在哪一天')).toBeTruthy();
@@ -132,13 +132,9 @@ describe('leave layout follows an in-session fontScale change', () => {
     expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
     expect(view.getByLabelText('拍摄')).toBeEnabled();
     expect(view.getByTestId('composer-save')).toBeEnabled();
-
-    setWindowFontScale(1, 390);
-    await expectLayout(view, '1', 'row');
-    expect(view.getByTestId('composer-note').props.value).toBe('门口的风还在。');
   });
 
-  it('keeps writing after a camera denial while the in-session type shrinks', async () => {
+  it('keeps writing after a camera denial when the system type changes', async () => {
     mockAddCameraImage.mockRejectedValueOnce(
       new ApplicationError(
         'CAMERA_DENIED',
@@ -149,8 +145,8 @@ describe('leave layout follows an in-session fontScale change', () => {
     await waitFor(() => {
       expect(view.getByTestId('composer-note').props.value).toBe('门口的风还在。');
     });
-    setWindowFontScale(3.1, 391);
-    await expectLayout(view, '3.1', 'stack');
+    setWindow(390, 3.1);
+    await expectFixedType(view, 'row');
     fireEvent.press(view.getByTestId('composer-camera'));
     await waitFor(() => {
       expect(view.getByText('相机未打开，草稿还在。')).toBeTruthy();
@@ -159,8 +155,8 @@ describe('leave layout follows an in-session fontScale change', () => {
     expect(view.getByTestId('composer-save')).toBeEnabled();
     expect(view.getByTestId('leave-back')).toBeTruthy();
 
-    setWindowFontScale(1, 389);
-    await expectLayout(view, '1', 'row');
+    setWindow(390, 1);
+    await expectFixedType(view, 'row');
     expect(view.getByText('相机未打开，草稿还在。')).toBeTruthy();
     fireEvent.press(view.getByTestId('composer-feedback-detail'));
     await waitFor(() => {

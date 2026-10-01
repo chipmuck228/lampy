@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text, type } from './life-text';
 import { SymbolView } from 'expo-symbols';
 
 import { inkSoft, sage } from './life-page';
@@ -145,7 +146,7 @@ export function LookThisHit({
           {caption}
         </Text>
         <View accessible={false} testID={ids?.mark} style={styles.lookThisMark}>
-          <LifeIcon name="open" size={12} color={sage} decorative />
+          <LifeIcon name="open" size={16} color={sage} decorative />
         </View>
       </View>
     </Pressable>
@@ -173,7 +174,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   labeledText: {
-    fontSize: 16,
+    ...type.action,
     color: sage,
   },
   lookThis: {
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   lookThisText: {
-    fontSize: 16,
+    ...type.action,
     color: sage,
     flexShrink: 1,
   },

@@ -103,7 +103,7 @@ describe('device lock cover', () => {
     expect(authenticate).not.toHaveBeenCalled();
   });
 
-  it('lets lock-cover copy grow with Dynamic Type instead of clipping into the next line', async () => {
+  it('keeps lock-cover copy on the fixed app type scale', async () => {
     const view = await render(
       wrap(
         { isEnabled: async () => true, setEnabled: async () => undefined },
@@ -113,12 +113,12 @@ describe('device lock cover', () => {
     await waitFor(() => {
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
     });
-    expect(StyleSheet.flatten(view.getByText('这台设备已保护').props.style).lineHeight).toBeUndefined();
+    expect(view.getByText('这台设备已保护').props.allowFontScaling).toBe(false);
+    expect(StyleSheet.flatten(view.getByText('这台设备已保护').props.style).fontSize).toBe(28);
     expect(
-      StyleSheet.flatten(view.getByText('进入 Lampy 前，先确认是这台设备的持有人。记录还在。').props.style)
-        .lineHeight,
-    ).toBeUndefined();
-    expect(StyleSheet.flatten(view.getByText('再试一次').props.style).lineHeight).toBeUndefined();
+      view.getByText('进入 Lampy 前，先确认是这台设备的持有人。记录还在。').props.allowFontScaling,
+    ).toBe(false);
+    expect(view.getByText('再试一次').props.allowFontScaling).toBe(false);
     expect(StyleSheet.flatten(view.getByTestId('device-lock-cover-scroll').props.contentContainerStyle)).toEqual(
       expect.objectContaining({ paddingTop: 71, paddingBottom: 58 }),
     );

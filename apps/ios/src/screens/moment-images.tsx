@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import type { ImageView } from '../application/use-cases';
-import { clay, isLargeType } from './life-page';
+import { clay } from './life-page';
+import { Text } from './life-text';
 
 export const RECENT_IMAGE_PAIR_MIN_WIDTH = 280;
 
@@ -31,8 +32,8 @@ export type DetailImageBand = {
   images: ImageView[];
 };
 
-export function shouldPairRecentImages(fontScale: number, contentWidth: number): boolean {
-  return !isLargeType(fontScale) && contentWidth >= RECENT_IMAGE_PAIR_MIN_WIDTH;
+export function shouldPairRecentImages(contentWidth: number): boolean {
+  return contentWidth >= RECENT_IMAGE_PAIR_MIN_WIDTH;
 }
 
 export function recentImageBands(images: ImageView[], pair: boolean): DetailImageBand[] {

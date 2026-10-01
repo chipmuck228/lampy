@@ -30,9 +30,9 @@ describe('LookThisHit', () => {
     const label = view.getByTestId('recent-open-label-moment_long');
     expect(label.props.children).toBe('看这条，还有正文');
     expect(label.props.numberOfLines).toBeUndefined();
-    expect(label.props.allowFontScaling).not.toBe(false);
+    expect(label.props.allowFontScaling).toBe(false);
     expect(label.props.adjustsFontSizeToFit).toBeFalsy();
-    expect(StyleSheet.flatten(label.props.style).lineHeight).toBeUndefined();
+    expect(StyleSheet.flatten(label.props.style).fontSize).toBe(17);
 
     const hit = view.getByTestId('recent-open-moment_long');
     const hitStyle = StyleSheet.flatten(hit.props.style);

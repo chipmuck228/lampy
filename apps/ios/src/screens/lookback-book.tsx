@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text, type } from './life-text';
 
 import {
   LOOKBACK_BOOK_NOTE_LINES,
@@ -165,10 +166,10 @@ export function LookbackBookExcerptBlock({
 
 const styles = StyleSheet.create({
   chapter: { gap: 8, marginTop: 8 },
-  chapterTitle: { fontSize: 22, color: '#25231F' },
-  meta: { fontSize: 14, color: '#53604F' },
-  clock: { fontSize: 14, color: '#53604F' },
-  note: { fontSize: 20, color: '#25231F' },
+  chapterTitle: { ...type.title, color: '#25231F' },
+  meta: { ...type.meta, color: '#53604F' },
+  clock: { ...type.meta, color: '#53604F' },
+  note: { ...type.body, color: '#25231F' },
   excerpt: {
     gap: 4,
     paddingTop: 4,
@@ -186,8 +187,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   monthCopy: { flex: 1, flexShrink: 1, minWidth: 0, gap: 2 },
-  monthTitle: { fontSize: 20, color: '#25231F' },
-  monthCount: { fontSize: 14, color: '#53604F' },
+  monthTitle: { ...type.action, color: '#25231F' },
+  monthCount: { ...type.meta, color: '#53604F' },
   dayHit: { minHeight: 48, justifyContent: 'center' },
   dayRow: {
     flexDirection: 'row',
@@ -197,8 +198,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   dayCopy: { flex: 1, flexShrink: 1, minWidth: 120, gap: 2 },
-  dayTitle: { fontSize: 17, lineHeight: 24, color: '#25231F' },
-  dayWeekday: { fontSize: 14, lineHeight: 20, color: '#53604F' },
+  dayTitle: { ...type.action, color: '#25231F' },
+  dayWeekday: { ...type.meta, color: '#53604F' },
   dayMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -211,5 +212,5 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
   },
-  dayCount: { fontSize: 14, lineHeight: 18, color: '#53604F' },
+  dayCount: { ...type.meta, color: '#53604F' },
 });

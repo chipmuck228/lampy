@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text, type } from './life-text';
 
 import type { FIRST_RUN_SCREENS } from '../application/first-run';
 import { ink, inkSoft, paper, paperDeep, sage } from './life-page';
@@ -57,7 +58,7 @@ function KeepScene() {
 
 const styles = StyleSheet.create({
   scene: { gap: 10, alignItems: 'flex-start' },
-  hint: { fontSize: 13, lineHeight: 18, color: inkSoft },
+  hint: { ...type.meta, color: inkSoft },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   slip: {
     backgroundColor: paperDeep,
@@ -65,7 +66,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     maxWidth: 160,
   },
-  slipText: { fontSize: 16, lineHeight: 22, color: ink },
+  slipText: { ...type.action, color: ink },
   photo: {
     width: 56,
     height: 72,
@@ -76,8 +77,8 @@ const styles = StyleSheet.create({
   bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 22 },
   bar: { width: 3, backgroundColor: sage },
   lookback: { gap: 6 },
-  date: { fontSize: 15, lineHeight: 22, color: sage },
-  excerpt: { fontSize: 18, lineHeight: 26, color: ink },
+  date: { ...type.meta, color: sage },
+  excerpt: { ...type.body, color: ink },
   quiet: {
     width: 28,
     height: 28,

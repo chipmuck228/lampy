@@ -13,7 +13,6 @@ export const DATE_RAIL_WIDTH = 120;
 export const DATE_RAIL_GAP = 32;
 export const COMPACT_HEIGHT = 500;
 export const REGULAR_WIDTH = 768;
-export const LARGE_TYPE = 1.3;
 
 export function pageGutter(windowWidth: number, windowHeight?: number): number {
   return isRegularWidth(windowWidth, windowHeight) ? 48 : 24;
@@ -53,12 +52,8 @@ export function isCompactHeight(windowHeight: number): boolean {
   return windowHeight < COMPACT_HEIGHT;
 }
 
-export function isLargeType(fontScale: number): boolean {
-  return fontScale >= LARGE_TYPE;
-}
-
-export function shouldUseNavRail(windowWidth: number, windowHeight: number, fontScale: number): boolean {
-  return isRegularWidth(windowWidth, windowHeight) && !isLargeType(fontScale);
+export function shouldUseNavRail(windowWidth: number, windowHeight: number): boolean {
+  return isRegularWidth(windowWidth, windowHeight);
 }
 
 export const NAV_BAND_PAD_X = 32;
@@ -69,13 +64,13 @@ export const NAV_BAND_LEAVE_SIZE = 20;
 
 export type NavBandLayout = 'row' | 'grid' | 'stack';
 
-export function navBandItemMinWidth(label: string, fontSize: number, fontScale: number): number {
-  const textWidth = [...label].length * fontSize * fontScale;
+export function navBandItemMinWidth(label: string, fontSize: number): number {
+  const textWidth = [...label].length * fontSize;
   return Math.max(NAV_BAND_HIT, textWidth + NAV_BAND_LABEL_PAD);
 }
 
-export function navBandItemMinHeight(fontSize: number, fontScale: number): number {
-  return Math.max(NAV_BAND_HIT, Math.ceil(fontSize * 1.45 * fontScale));
+export function navBandItemMinHeight(fontSize: number): number {
+  return Math.max(NAV_BAND_HIT, Math.ceil(fontSize * 1.45));
 }
 
 export function navBandItemsFor(
@@ -93,26 +88,23 @@ export function navBandItemsFor(
   return items;
 }
 
-export function navBandOccupiedWidth(
-  item: { label: string; fontSize: number; measuredWidth?: number },
-  fontScale: number,
-): number {
+export function navBandOccupiedWidth(item: {
+  label: string;
+  fontSize: number;
+  measuredWidth?: number;
+}): number {
   if (item.measuredWidth != null && item.measuredWidth > 0) {
     return Math.max(NAV_BAND_HIT, item.measuredWidth + NAV_BAND_LABEL_PAD);
   }
-  return navBandItemMinWidth(item.label, item.fontSize, fontScale);
+  return navBandItemMinWidth(item.label, item.fontSize);
 }
 
 export function chooseNavBandLayout(input: {
   windowWidth: number;
-  fontScale: number;
   items: { label: string; fontSize: number; measuredWidth?: number }[];
 }): NavBandLayout {
   const available = input.windowWidth - NAV_BAND_PAD_X;
-  const widest = Math.max(
-    NAV_BAND_HIT,
-    ...input.items.map((item) => navBandOccupiedWidth(item, input.fontScale)),
-  );
+  const widest = Math.max(NAV_BAND_HIT, ...input.items.map((item) => navBandOccupiedWidth(item)));
   const count = input.items.length;
   if (count < 1) return 'row';
   if (available >= count * widest) return 'row';
@@ -120,41 +112,35 @@ export function chooseNavBandLayout(input: {
   return 'stack';
 }
 
-export function shouldStackNavBand(
-  windowWidth: number,
-  fontScale: number,
-  itemCount = 3,
-): boolean {
+export function shouldStackNavBand(windowWidth: number, itemCount = 3): boolean {
   return (
     chooseNavBandLayout({
       windowWidth,
-      fontScale,
       items: navBandItemsFor('recent', itemCount >= 4),
     }) === 'stack'
   );
 }
 
-export function shouldStackRecentDay(windowWidth: number, windowHeight: number, fontScale: number): boolean {
-  return !isRegularWidth(windowWidth, windowHeight) || isLargeType(fontScale);
+export function shouldStackRecentDay(windowWidth: number, windowHeight: number): boolean {
+  return !isRegularWidth(windowWidth, windowHeight);
 }
 
-export function recentColumnWidth(windowWidth: number, windowHeight: number, fontScale: number): number {
-  return isLargeType(fontScale) ? readingPageWidth(windowWidth, windowHeight) : pageColumnWidth(windowWidth, windowHeight);
+export function recentColumnWidth(windowWidth: number, windowHeight: number): number {
+  return pageColumnWidth(windowWidth, windowHeight);
 }
 
 /** Width left for photos after gutters, safe edges, and the date rail when it sits beside the items. */
 export function recentImageColumnWidth(
   windowWidth: number,
   windowHeight: number,
-  fontScale: number,
   safeLeft = 0,
   safeRight = 0,
 ): number {
   const gutter = pageGutter(windowWidth, windowHeight);
-  const pageCol = recentColumnWidth(windowWidth, windowHeight, fontScale);
+  const pageCol = recentColumnWidth(windowWidth, windowHeight);
   const used = Math.min(Math.max(0, windowWidth - safeLeft - safeRight), pageCol);
   const inner = used - gutter * 2;
-  if (shouldStackRecentDay(windowWidth, windowHeight, fontScale)) {
+  if (shouldStackRecentDay(windowWidth, windowHeight)) {
     return Math.max(0, inner);
   }
   return Math.max(0, inner - DATE_RAIL_WIDTH - DATE_RAIL_GAP);
@@ -169,9 +155,9 @@ const LEAVE_ACTION_GAP = 20;
 const LEAVE_MEDIA_SIZE = 16;
 const LEAVE_SAVE_SIZE = 18;
 
-export function shouldStackLeaveActions(availableWidth: number, fontScale: number): boolean {
-  const camera = navBandItemMinWidth('拍摄', LEAVE_MEDIA_SIZE, fontScale) + LEAVE_MEDIA_ICON;
-  const photo = navBandItemMinWidth('照片', LEAVE_MEDIA_SIZE, fontScale) + LEAVE_MEDIA_ICON;
-  const save = navBandItemMinWidth('留下', LEAVE_SAVE_SIZE, fontScale);
+export function shouldStackLeaveActions(availableWidth: number): boolean {
+  const camera = navBandItemMinWidth('拍摄', LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
+  const photo = navBandItemMinWidth('照片', LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
+  const save = navBandItemMinWidth('留下', LEAVE_SAVE_SIZE);
   return camera + photo + save + LEAVE_ACTION_GAP * 2 > availableWidth;
 }

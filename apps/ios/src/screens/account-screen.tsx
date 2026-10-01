@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text, TextInput, type } from './life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -527,18 +528,18 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper },
   column: { padding: 24, gap: 16 },
-  title: { fontSize: 28, lineHeight: 36, color: ink },
-  body: { fontSize: 17, lineHeight: 26, color: inkSoft },
-  back: { fontSize: 17, lineHeight: 24, color: sage },
-  action: { fontSize: 17, lineHeight: 24, color: sage },
+  title: { ...type.title, color: ink },
+  body: { ...type.body, color: inkSoft },
+  back: { ...type.action, color: sage },
+  action: { ...type.action, color: sage },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  version: { fontSize: 14, lineHeight: 20, color: inkSoft, marginTop: 8 },
+  version: { ...type.meta, color: inkSoft, marginTop: 8 },
   apple: { width: 240, height: 44 },
   field: {
     minHeight: 44,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: inkSoft,
-    fontSize: 17,
+    ...type.body,
     color: ink,
     paddingVertical: 8,
   },

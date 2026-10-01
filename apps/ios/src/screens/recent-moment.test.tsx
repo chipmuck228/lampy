@@ -114,7 +114,7 @@ describe('recent moment row', () => {
     expect(view.getByTestId('recent-note-moment_late')).toBeTruthy();
   });
 
-  it('does not clip Dynamic Type with a fixed line box or hidden overflow', async () => {
+  it('keeps Recent note and occurred copy on the fixed app type scale', async () => {
     const view = await render(
       <RecentMoment
         item={item({
@@ -135,9 +135,10 @@ describe('recent moment row', () => {
     expect(StyleSheet.flatten(view.getByTestId('recent-fade-moment_type').props.style).overflow).not.toBe(
       'visible',
     );
-    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBeUndefined();
-    expect(StyleSheet.flatten(view.getByTestId('recent-occurred-moment_type').props.style).lineHeight).toBeUndefined();
-    expect(view.getByTestId('recent-note-moment_type').props.allowFontScaling).not.toBe(false);
-    expect(view.getByTestId('recent-occurred-moment_type').props.allowFontScaling).not.toBe(false);
+    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).fontSize).toBe(17);
+    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBe(32);
+    expect(StyleSheet.flatten(view.getByTestId('recent-occurred-moment_type').props.style).fontSize).toBe(15);
+    expect(view.getByTestId('recent-note-moment_type').props.allowFontScaling).toBe(false);
+    expect(view.getByTestId('recent-occurred-moment_type').props.allowFontScaling).toBe(false);
   });
 });

@@ -11,10 +11,6 @@ export function weekdayMondayIndex(year: number, month: number, day: number): nu
   return (sundayIndex + 6) % 7;
 }
 
-export function shouldStackMonthCalendar(fontScale: number): boolean {
-  return fontScale >= 1.3;
-}
-
 export function monthCalendarContentWidth(windowWidth: number, horizontalInset = 0): number {
   const afterSafe = Math.max(0, windowWidth - horizontalInset);
   const column = Math.min(afterSafe, LOOKBACK_READING_MAX);
@@ -22,15 +18,12 @@ export function monthCalendarContentWidth(windowWidth: number, horizontalInset =
 }
 
 export function shouldShowMonthCalendarGrid({
-  fontScale,
   windowWidth,
   horizontalInset = 0,
 }: {
-  fontScale: number;
   windowWidth: number;
   horizontalInset?: number;
 }): boolean {
-  if (shouldStackMonthCalendar(fontScale)) return false;
   return monthCalendarContentWidth(windowWidth, horizontalInset) / LOOKBACK_MONTH_COLUMNS >= LOOKBACK_MONTH_MIN_CELL;
 }
 

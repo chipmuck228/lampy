@@ -4,6 +4,8 @@
 实现分支：`ios/recent-reading`  
 家庭 / AI：关。不改回看。不加最近分页。不覆盖、不重传 TestFlight。不碰 Liuz17。不开始阶段 C。
 
+后续产品决定：个人 MVP 不再跟随系统字号。下面旧 XXXL / Dynamic Type 走查**不是**固定字号版本的 PASS。
+
 夹具只进可丢弃安装。本轮开发构建，后续分发另起 build number。
 
 ---
