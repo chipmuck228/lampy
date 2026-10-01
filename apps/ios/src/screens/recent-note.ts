@@ -10,10 +10,10 @@ export function recentNoteVisibleLineLimit(lineCount: number): number | undefine
   return undefined;
 }
 
-export function recentOpenCaption(truncated: boolean): string {
-  return truncated ? '看这条，还有正文' : '看这条';
+export function recentOpenCaption(_truncated?: boolean): string {
+  return '阅读完整记录';
 }
 
-export function recentOpenAccessLabel(parts: (string | null | undefined)[], truncated: boolean): string {
+export function recentOpenAccessLabel(parts: (string | null | undefined)[], truncated?: boolean): string {
   return [...parts.filter(Boolean), recentOpenCaption(truncated)].join('，');
 }

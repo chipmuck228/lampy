@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   NAV_BAND_HERE_SIZE,
   NAV_BAND_HIT,
-  NAV_BAND_LEAVE_SIZE,
   chooseNavBandLayout,
   ink,
   navBandItemMinHeight,
@@ -23,12 +22,10 @@ import { usePageMetrics } from './use-page-metrics';
 export function RootNavBand({
   here,
   onOther,
-  onLeave,
   onFamily,
 }: {
   here: 'recent' | 'lookback';
   onOther: () => void;
-  onLeave: () => void;
   onFamily?: () => void;
 }) {
   const { width, height } = usePageMetrics();
@@ -37,7 +34,7 @@ export function RootNavBand({
   const otherLabel = here === 'recent' ? '回看' : '最近';
   const items = navBandItemsFor(here, !!onFamily).map((item, index) => ({
     ...item,
-    id: (['here', 'other', 'leave', 'family'] as const)[index],
+    id: (onFamily ? (['here', 'other', 'family'] as const) : (['here', 'other'] as const))[index],
   }));
   const paintedReady = items.every((item) => painted[item.id]);
   const rail = shouldUseNavRail(width, height);
@@ -82,7 +79,6 @@ export function RootNavBand({
 
   const hereMin = itemMin('here', hereLabel, NAV_BAND_HERE_SIZE);
   const otherMin = itemMin('other', otherLabel, NAV_BAND_HERE_SIZE);
-  const leaveMin = itemMin('leave', '留下', NAV_BAND_LEAVE_SIZE);
   const familyMin = itemMin('family', '家庭', NAV_BAND_HERE_SIZE);
   const itemStyle = [
     styles.item,
@@ -112,19 +108,6 @@ export function RootNavBand({
     >
       <Text style={styles.go} onTextLayout={onPainted('other')}>
         {otherLabel}
-      </Text>
-    </Pressable>
-  );
-  const leaveItem = (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="留下"
-      testID={here === 'recent' ? 'home-leave' : 'lookback-leave'}
-      onPress={onLeave}
-      style={[itemStyle, leaveMin]}
-    >
-      <Text style={styles.leave} onTextLayout={onPainted('leave')}>
-        留下
       </Text>
     </Pressable>
   );
@@ -160,7 +143,6 @@ export function RootNavBand({
             {otherItem}
           </View>
           <View testID="root-nav-grid-row-2" style={styles.gridRow}>
-            {leaveItem}
             {familyItem}
           </View>
         </>
@@ -168,7 +150,6 @@ export function RootNavBand({
         <>
           {hereItem}
           {otherItem}
-          {leaveItem}
           {familyItem}
         </>
       )}
@@ -186,6 +167,7 @@ export function RootReadingLayout({
   onScroll,
   onScrollBeginDrag,
   onContentSizeChange,
+  overlay,
 }: {
   accessibilityLabel?: string;
   scrollTestID: string;
@@ -196,6 +178,7 @@ export function RootReadingLayout({
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScrollBeginDrag?: () => void;
   onContentSizeChange?: () => void;
+  overlay?: ReactNode;
 }) {
   const { width, height } = usePageMetrics();
   const rail = shouldUseNavRail(width, height);
@@ -204,19 +187,26 @@ export function RootReadingLayout({
     <SafeAreaView style={styles.safe} accessibilityLabel={accessibilityLabel}>
       <View style={rail ? styles.row : styles.column}>
         {rail ? band : null}
-        <ScrollView
-          ref={scrollRef}
-          testID={scrollTestID}
-          style={styles.scroll}
-          contentContainerStyle={contentContainerStyle}
-          onScroll={onScroll}
-          onScrollBeginDrag={onScrollBeginDrag}
-          onContentSizeChange={onContentSizeChange}
-          scrollEventThrottle={16}
-          keyboardShouldPersistTaps="handled"
-        >
-          {children}
-        </ScrollView>
+        <View style={styles.scroll}>
+          <ScrollView
+            ref={scrollRef}
+            testID={scrollTestID}
+            style={styles.scroll}
+            contentContainerStyle={contentContainerStyle}
+            onScroll={onScroll}
+            onScrollBeginDrag={onScrollBeginDrag}
+            onContentSizeChange={onContentSizeChange}
+            scrollEventThrottle={16}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+          {overlay ? (
+            <View pointerEvents="box-none" style={styles.overlay}>
+              {overlay}
+            </View>
+          ) : null}
+        </View>
         {rail ? null : band}
       </View>
     </SafeAreaView>
@@ -228,6 +218,12 @@ const styles = StyleSheet.create({
   column: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
   scroll: { flex: 1, minWidth: 0 },
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    padding: 16,
+  },
   band: {
     alignSelf: 'stretch',
     flexShrink: 0,
@@ -288,5 +284,4 @@ const styles = StyleSheet.create({
   },
   here: { ...type.action, color: ink, textAlign: 'center', flexShrink: 0 },
   go: { ...type.action, color: sage, textAlign: 'center', flexShrink: 0 },
-  leave: { ...type.action, color: ink, textAlign: 'center', flexShrink: 0 },
 });

@@ -12,7 +12,6 @@ import {
   recentImageColumnWidth,
   chooseNavBandLayout,
   navBandItemMinHeight,
-  navBandItemMinWidth,
   navBandItemsFor,
   shouldShowSameDayRule,
   shouldStackLeaveActions,
@@ -73,25 +72,26 @@ describe('life page measures', () => {
   });
 
   it('picks a band layout from available width and painted label size', () => {
-    const four = navBandItemsFor('recent', true);
-    const three = navBandItemsFor('lookback', false);
-    expect(navBandItemMinWidth('留下', 20)).toBe(48);
+    const withFamily = navBandItemsFor('recent', true);
+    const two = navBandItemsFor('lookback', false);
+    expect(withFamily.map((item) => item.label)).toEqual(['最近', '回看', '家庭']);
+    expect(two.map((item) => item.label)).toEqual(['回看', '最近']);
     expect(navBandItemMinHeight(17)).toBe(48);
-    expect(chooseNavBandLayout({ windowWidth: 390, items: four })).toBe('row');
-    expect(chooseNavBandLayout({ windowWidth: 390, items: three })).toBe('row');
-    expect(chooseNavBandLayout({ windowWidth: 200, items: four })).toBe('grid');
-    expect(chooseNavBandLayout({ windowWidth: 200, items: three })).toBe('row');
-    expect(chooseNavBandLayout({ windowWidth: 1024, items: four })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 390, items: withFamily })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 390, items: two })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 200, items: withFamily })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 200, items: two })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 1024, items: withFamily })).toBe('row');
     expect(
       chooseNavBandLayout({
         windowWidth: 390,
-        items: three.map((item) => ({ ...item, measuredWidth: 120 })),
+        items: two.map((item) => ({ ...item, measuredWidth: 180 })),
       }),
     ).toBe('stack');
     expect(
       chooseNavBandLayout({
         windowWidth: 390,
-        items: three.map((item) => ({ ...item, measuredWidth: 28 })),
+        items: two.map((item) => ({ ...item, measuredWidth: 28 })),
       }),
     ).toBe('row');
     expect(shouldStackNavBand(390, 4)).toBe(false);

@@ -122,13 +122,14 @@ describe('root navigation band', () => {
     );
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
     const contentStyle = StyleSheet.flatten(view.getByTestId('recent-scroll').props.contentContainerStyle);
-    expect(contentStyle?.paddingBottom).toBe(8);
+    expect(contentStyle?.paddingBottom).toBe(88);
     expect(view.getByLabelText('播放，3秒')).toBeTruthy();
-    expect(view.getByTestId('recent-open-label-moment_wind').props.children).toBe('看这条');
+    expect(view.getByTestId('recent-open-label-moment_wind').props.children).toBe('阅读完整记录');
     fireEvent.press(view.getByTestId('home-lookback'));
     expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/lookback\?o=[^&]+$/));
-    fireEvent.press(view.getByTestId('home-leave'));
+    fireEvent.press(view.getByTestId('recent-leave-fab'));
     expect(mockPush).toHaveBeenCalledWith('/leave?from=recent');
+    expect(view.queryByTestId('home-leave')).toBeNull();
     await view.unmount();
   });
 });

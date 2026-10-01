@@ -56,12 +56,15 @@ describe('recent home', () => {
     const view = await render(wrap(<RecentScreen />));
     expect(view.getByLabelText('最近')).toBeTruthy();
     expect(view.getByLabelText('回看')).toBeTruthy();
+    expect(view.getByTestId('recent-leave-fab')).toBeTruthy();
     expect(view.getByLabelText('留下')).toBeTruthy();
+    expect(view.queryByTestId('home-leave')).toBeNull();
     expect(view.getByTestId('recent-scroll')).toBeTruthy();
     await waitFor(() => {
       expect(view.getByText('这里，留下自己的生活。')).toBeTruthy();
     });
-    expect(view.getByText('写一句，拍一张，或留一段声音。以后再回来听见、看见。')).toBeTruthy();
+    expect(view.getByTestId('recent-eyebrow').props.children).toBe('LAMPY · 生活记录');
+    expect(view.getByText('写一句，\n拍一张，\n或留一段声音。')).toBeTruthy();
     expect(view.getByLabelText('留下第一条')).toBeTruthy();
     expect(view.queryByTestId('home-family')).toBeNull();
     expect(view.getByTestId('home-account')).toBeTruthy();

@@ -32,7 +32,6 @@ describe('root nav band layout', () => {
         <RootNavBand
           here="recent"
           onOther={() => undefined}
-          onLeave={() => undefined}
           onFamily={() => undefined}
         />,
       ),
@@ -46,9 +45,7 @@ describe('root nav band layout', () => {
     expect(StyleSheet.flatten(four.getByTestId('home-lookback').props.style)).toEqual(
       expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
     );
-    expect(StyleSheet.flatten(four.getByTestId('home-leave').props.style)).toEqual(
-      expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
-    );
+    expect(four.queryByTestId('home-leave')).toBeNull();
     expect(StyleSheet.flatten(four.getByTestId('home-family').props.style)).toEqual(
       expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
     );
@@ -56,7 +53,7 @@ describe('root nav band layout', () => {
     await four.unmount();
 
     const three = await render(
-      wrap(<RootNavBand here="lookback" onOther={() => undefined} onLeave={() => undefined} />),
+      wrap(<RootNavBand here="lookback" onOther={() => undefined} />),
     );
     expect(StyleSheet.flatten(three.getByTestId('root-nav-here-wrap').props.style)).toEqual(
       expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
@@ -71,7 +68,7 @@ describe('root nav band layout', () => {
       screen: { width: 390, height: 844, scale: 2, fontScale: 1.3 },
     });
     const three = await render(
-      wrap(<RootNavBand here="recent" onOther={() => undefined} onLeave={() => undefined} />),
+      wrap(<RootNavBand here="recent" onOther={() => undefined} />),
     );
     expect(StyleSheet.flatten(three.getByTestId('root-nav-band').props.style)).toEqual(
       expect.objectContaining({ flexDirection: 'row', flexWrap: 'nowrap' }),
@@ -80,7 +77,7 @@ describe('root nav band layout', () => {
     await three.unmount();
   });
 
-  it('uses a 2×2 grid when four items cannot share one row, in 最近 / 回看 / 留下 / 家庭 order', async () => {
+  it('keeps 最近 / 回看 / 家庭 on a narrow phone and never shows 留下 in the band', async () => {
     Dimensions.set({
       window: { width: 200, height: 568, scale: 2, fontScale: 1 },
       screen: { width: 200, height: 568, scale: 2, fontScale: 1 },
@@ -90,21 +87,14 @@ describe('root nav band layout', () => {
         <RootNavBand
           here="recent"
           onOther={() => undefined}
-          onLeave={() => undefined}
           onFamily={() => undefined}
         />,
       ),
     );
-    expect(StyleSheet.flatten(grid.getByTestId('root-nav-band').props.style)).toEqual(
-      expect.objectContaining({ flexDirection: 'column', alignItems: 'stretch' }),
-    );
-    expect(StyleSheet.flatten(grid.getByTestId('root-nav-grid-row-1').props.style)).toEqual(
-      expect.objectContaining({ flexDirection: 'row' }),
-    );
-    expect(grid.getByTestId('root-nav-grid-row-1')).toContainElement(grid.getByTestId('root-nav-here-wrap'));
-    expect(grid.getByTestId('root-nav-grid-row-1')).toContainElement(grid.getByTestId('home-lookback'));
-    expect(grid.getByTestId('root-nav-grid-row-2')).toContainElement(grid.getByTestId('home-leave'));
-    expect(grid.getByTestId('root-nav-grid-row-2')).toContainElement(grid.getByTestId('home-family'));
+    expect(grid.getByTestId('root-nav-here-wrap')).toBeTruthy();
+    expect(grid.getByTestId('home-lookback')).toBeTruthy();
+    expect(grid.getByTestId('home-family')).toBeTruthy();
+    expect(grid.queryByTestId('home-leave')).toBeNull();
     expect(StyleSheet.flatten(grid.getByTestId('root-nav-here-wrap').props.style)).toEqual(
       expect.objectContaining({ minWidth: 48, minHeight: 48, flexGrow: 1, flexBasis: 0 }),
     );
@@ -115,23 +105,14 @@ describe('root nav band layout', () => {
         <RootNavBand
           here="lookback"
           onOther={() => undefined}
-          onLeave={() => undefined}
           onFamily={() => undefined}
         />,
       ),
     );
-    expect(lookbackGrid.getByTestId('root-nav-grid-row-1')).toContainElement(
-      lookbackGrid.getByTestId('root-nav-here-wrap'),
-    );
-    expect(lookbackGrid.getByTestId('root-nav-grid-row-1')).toContainElement(
-      lookbackGrid.getByTestId('lookback-go-recent'),
-    );
-    expect(lookbackGrid.getByTestId('root-nav-grid-row-2')).toContainElement(
-      lookbackGrid.getByTestId('lookback-leave'),
-    );
-    expect(lookbackGrid.getByTestId('root-nav-grid-row-2')).toContainElement(
-      lookbackGrid.getByTestId('home-family'),
-    );
+    expect(lookbackGrid.getByTestId('root-nav-here-wrap')).toBeTruthy();
+    expect(lookbackGrid.getByTestId('lookback-go-recent')).toBeTruthy();
+    expect(lookbackGrid.getByTestId('home-family')).toBeTruthy();
+    expect(lookbackGrid.queryByTestId('lookback-leave')).toBeNull();
     await lookbackGrid.unmount();
   });
 
@@ -141,7 +122,7 @@ describe('root nav band layout', () => {
       screen: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
     });
     const row = await render(
-      wrap(<RootNavBand here="recent" onOther={() => undefined} onLeave={() => undefined} />),
+      wrap(<RootNavBand here="recent" onOther={() => undefined} />),
     );
     expect(StyleSheet.flatten(row.getByTestId('root-nav-band').props.style)).toEqual(
       expect.objectContaining({ flexDirection: 'row', flexWrap: 'nowrap' }),
@@ -161,15 +142,12 @@ describe('root nav band layout', () => {
         <RootNavBand
           here="recent"
           onOther={() => undefined}
-          onLeave={() => undefined}
           onFamily={() => undefined}
         />,
       ),
     );
-    expect(StyleSheet.flatten(grid.getByTestId('root-nav-band').props.style)).toEqual(
-      expect.objectContaining({ flexDirection: 'column', alignItems: 'stretch' }),
-    );
-    expect(grid.getByTestId('root-nav-grid-row-1')).toBeTruthy();
+    expect(grid.queryByTestId('home-leave')).toBeNull();
+    expect(grid.getByTestId('home-family')).toBeTruthy();
     expect(StyleSheet.flatten(grid.getByTestId('root-nav-here-wrap').props.style).minHeight).toBe(48);
     await grid.unmount();
   });
@@ -187,7 +165,6 @@ describe('root nav band layout', () => {
             <RootNavBand
               here="recent"
               onOther={() => undefined}
-              onLeave={() => undefined}
               onFamily={() => undefined}
             />
           }
@@ -208,7 +185,7 @@ describe('root nav band layout', () => {
 
   it('does not restack the band when only the system type changes', async () => {
     const view = await render(
-      wrap(<RootNavBand here="recent" onOther={() => undefined} onLeave={() => undefined} />),
+      wrap(<RootNavBand here="recent" onOther={() => undefined} />),
     );
     await act(async () => {
       view.getByTestId('root-nav-here').props.onTextLayout({

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text, type } from './life-text';
 
 import type { RecentLifeItem } from '../application/use-cases';
 import type { PlaybackStatus } from '../infrastructure/media';
-import { ink, inkSoft } from './life-page';
+import { ink, inkSoft, sage } from './life-page';
 import { LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentImages } from './moment-images';
@@ -21,7 +21,9 @@ export function RecentMoment({
   pairImages,
   echoOpacity,
   echoing = false,
+  expanded = false,
   listen,
+  onToggleExpand,
   onOpen,
   onPlay,
   onPause,
@@ -30,7 +32,9 @@ export function RecentMoment({
   pairImages: boolean;
   echoOpacity: Animated.Value;
   echoing?: boolean;
+  expanded?: boolean;
   listen: { status: PlaybackStatus; currentTimeMs: number };
+  onToggleExpand?: () => void;
   onOpen: () => void;
   onPlay: () => void;
   onPause: () => void;
@@ -68,10 +72,22 @@ export function RecentMoment({
               <Text
                 style={styles.note}
                 testID={`recent-note-${item.id}`}
-                numberOfLines={recentNoteVisibleLineLimit(lineCount)}
+                numberOfLines={expanded ? undefined : recentNoteVisibleLineLimit(lineCount)}
               >
                 {item.note}
               </Text>
+              {truncated ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded }}
+                  accessibilityLabel={expanded ? '收起正文' : '展开正文'}
+                  testID={`recent-expand-${item.id}`}
+                  onPress={onToggleExpand}
+                  style={styles.expandHit}
+                >
+                  <Text style={styles.expand}>{expanded ? '收起正文' : '展开正文'}</Text>
+                </Pressable>
+              ) : null}
             </>
           ) : null}
           {item.occurredLabel ? (
@@ -130,4 +146,6 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   occurred: { ...type.meta, color: inkSoft },
+  expandHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  expand: { ...type.action, color: sage },
 });

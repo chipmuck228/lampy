@@ -189,14 +189,14 @@ describe('recent reading hierarchy', () => {
     expect(view.getAllByText('一段声音 · 4秒').length).toBeGreaterThanOrEqual(2);
     expect(view.getAllByLabelText('播放，4秒')).toHaveLength(2);
     expect(view.getAllByTestId(/recent-sound-.*-mark-asset_voice/).length).toBeGreaterThanOrEqual(2);
-    expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('看这条');
+    expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('阅读完整记录');
     expect(view.queryByTestId('recent-sound-moment_voice-scene-asset_voice')).toBeNull();
     expect(view.queryByTestId('recent-sound-moment_voice-progress-asset_voice')).toBeNull();
-    expect(view.getByTestId('recent-open-label-moment_voice').props.children).toBe('看这条');
+    expect(view.getByTestId('recent-open-label-moment_voice').props.children).toBe('阅读完整记录');
     expect(view.queryByTestId('recent-day-rule-moment_mix')).toBeNull();
     expect(view.getByTestId('recent-day-rule-moment_voice')).toBeTruthy();
     expectBefore(testIdsInTree(view.getByTestId('recent-item-moment_voice')), 'recent-sound-moment_voice-play-asset_voice', 'recent-open-label-moment_voice');
-    expect(minHeightOf(view.getByTestId('home-leave'))).toBeGreaterThanOrEqual(48);
+    expect(minHeightOf(view.getByTestId('recent-leave-fab'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('home-lookback'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('recent-sound-moment_mix-play-asset_voice'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('recent-open-moment_mix'))).toBeGreaterThanOrEqual(48);
@@ -206,7 +206,7 @@ describe('recent reading hierarchy', () => {
     );
     expect(styleOf(view.getByTestId('recent-open-row-moment_mix')).minHeight).toBeUndefined();
     expect(view.getByTestId('recent-open-mark-moment_mix').props.accessible).toBe(false);
-    expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).toContain('看这条');
+    expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).toContain('阅读完整记录');
     expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).not.toContain('›');
     expect(view.queryByTestId('home-family')).toBeNull();
     expect(view.getByTestId('home-account')).toBeTruthy();
@@ -225,7 +225,7 @@ describe('recent reading hierarchy', () => {
     expect(mockPush).toHaveBeenCalledWith('/moment/moment_mix');
   });
 
-  it('renders mixed records as body, then sound, then feeling, then 看这条', async () => {
+  it('renders mixed records as body, then sound, then feeling, then 阅读完整记录', async () => {
     mockGetRecentLife.mockResolvedValue(life(mixedReadingOrder(), missingSound()));
     const view = await render(wrap(<RecentScreen />));
     await waitFor(() => {

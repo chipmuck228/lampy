@@ -82,7 +82,6 @@ export function navBandItemsFor(
   const items = [
     { label: hereLabel, fontSize: NAV_BAND_HERE_SIZE },
     { label: otherLabel, fontSize: NAV_BAND_HERE_SIZE },
-    { label: '留下', fontSize: NAV_BAND_LEAVE_SIZE },
   ];
   if (hasFamily) items.push({ label: '家庭', fontSize: NAV_BAND_HERE_SIZE });
   return items;
@@ -112,7 +111,7 @@ export function chooseNavBandLayout(input: {
   return 'stack';
 }
 
-export function shouldStackNavBand(windowWidth: number, itemCount = 3): boolean {
+export function shouldStackNavBand(windowWidth: number, itemCount = 2): boolean {
   return (
     chooseNavBandLayout({
       windowWidth,

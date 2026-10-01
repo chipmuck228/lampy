@@ -60,6 +60,7 @@ export default function RecentScreen() {
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [echoId, setEchoId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [reduceMotion, setReduceMotion] = useState(true);
   const [echoOpacity] = useState(() => new Animated.Value(1));
   const echoAnim = useRef<Animated.CompositeAnimation | null>(null);
@@ -183,22 +184,37 @@ export default function RecentScreen() {
             maxWidth: columnWidth,
             paddingHorizontal: gutter,
             paddingTop: compact ? 4 : 12,
-            paddingBottom: 8,
+            paddingBottom: 88,
           },
         ]}
         band={
           <RootNavBand
             here="recent"
             onOther={() => router.push(lookbackRootHrefFromRecent())}
-            onLeave={() => router.push(leaveHref('recent'))}
             onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
           />
         }
+        overlay={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="留下"
+            testID="recent-leave-fab"
+            onPress={() => router.push(leaveHref('recent'))}
+            style={styles.fab}
+          >
+            <Text style={styles.fabLabel}>＋ 留下</Text>
+          </Pressable>
+        }
       >
         <View style={styles.hero}>
-          <Text style={styles.wordmark} accessibilityRole="header">
-            最近
-          </Text>
+          <View style={styles.heroCopy}>
+            <Text style={styles.eyebrow} testID="recent-eyebrow">
+              LAMPY · 生活记录
+            </Text>
+            <Text style={styles.wordmark} accessibilityRole="header">
+              最近
+            </Text>
+          </View>
           <LifeIconButton
             name="settings"
             label="本机设置"
@@ -212,7 +228,9 @@ export default function RecentScreen() {
         {view?.isFirstUse && !error ? (
           <View style={styles.empty} testID="recent-empty">
             <Text style={styles.emptyTitle}>这里，留下自己的生活。</Text>
-            <Text style={styles.body}>写一句，拍一张，或留一段声音。以后再回来听见、看见。</Text>
+            <Text style={styles.body} testID="recent-empty-hint">
+              {'写一句，\n拍一张，\n或留一段声音。'}
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="留下第一条"
@@ -245,9 +263,17 @@ export default function RecentScreen() {
                     pairImages={pairImages}
                     echoOpacity={echoOpacity}
                     echoing={echoId === item.id}
+                    expanded={expandedIds.includes(item.id)}
                     listen={
                       item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
                     }
+                    onToggleExpand={() => {
+                      setExpandedIds((current) =>
+                        current.includes(item.id)
+                          ? current.filter((id) => id !== item.id)
+                          : [...current, item.id],
+                      );
+                    }}
                     onOpen={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
                     onPlay={() => {
                       if (!item.audio?.uri) return;
@@ -283,7 +309,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  wordmark: { ...type.title, color: ink, flex: 1, flexShrink: 1, minWidth: 0 },
+  heroCopy: { flex: 1, flexShrink: 1, minWidth: 0, gap: 4 },
+  eyebrow: { ...type.meta, color: sage },
+  wordmark: { ...type.title, color: ink },
+  fab: { minHeight: 48, minWidth: 48, justifyContent: 'center', alignItems: 'flex-end' },
+  fabLabel: { ...type.action, color: ink },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
   emptyTitle: { ...type.title, color: ink },
   body: { ...type.body, color: inkSoft },
@@ -297,7 +327,7 @@ const styles = StyleSheet.create({
   dayItems: { gap: 32 },
   dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
   sameDayRule: {
-    width: 72,
+    alignSelf: 'stretch',
     height: StyleSheet.hairlineWidth,
     backgroundColor: hairline,
     marginTop: -16,
