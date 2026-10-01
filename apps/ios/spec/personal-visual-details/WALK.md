@@ -1,7 +1,8 @@
 # 感受点缀、回看日期行、首次三屏 · 走查
 
 Base：`origin/main` `e7580e33f01429d9945ee2d8a2b5a3980b3c4e92`（#47 merge）。  
-分支 `ios/personal-visual-details`。只改 `apps/ios`。家庭入口关闭。未卸 Liuz17，未清个人库。
+分支 `ios/personal-visual-details`。只改 `apps/ios`。家庭入口关闭。未卸 Liuz17，未清个人库。  
+本轮实际上滑 / Reduce Motion 测试 SHA：`b9dfdbc5f3fb5d65221fa1c44f1b3e8668ad87d4`。
 
 模拟器结果 **不是** 真机 PASS。横屏 / iPad / VoiceOver 未听音，记 **NOT VERIFIED**。
 
