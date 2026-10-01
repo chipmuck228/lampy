@@ -59,6 +59,7 @@ describe('first-run gate errors', () => {
     await waitFor(() => {
       expect(view.getByTestId('first-run-ready')).toBeTruthy();
     });
+    expect(view.getByTestId('first-run-skip-records-unknown')).toBeTruthy();
     expect(view.getByText('app')).toBeTruthy();
     expect(view.queryByTestId('first-run-pending')).toBeNull();
   });
@@ -90,6 +91,7 @@ describe('first-run gate errors', () => {
     await waitFor(() => {
       expect(view.getByTestId('first-run-ready')).toBeTruthy();
     });
+    expect(view.getByTestId('first-run-skip-has-records')).toBeTruthy();
     await act(async () => {
       fireEvent.press(view.getByLabelText('rerender'));
     });

@@ -18,6 +18,7 @@ import {
   FIRST_RUN_SCREENS,
   isFirstRunFinishAction,
   nextFirstRunIndex,
+  settleFirstRunMotion,
 } from '../application/first-run';
 import { ink, inkSoft, isCompactHeight, paper, sage } from './life-page';
 import { FirstRunScene } from './first-run-scene';
@@ -78,15 +79,11 @@ export function FirstRunGuide({
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') {
-        opacity.stopAnimation();
-        shift.stopAnimation();
-      }
+      if (state !== 'active') settleFirstRunMotion({ opacity, shift });
     });
     return () => {
       sub.remove();
-      opacity.stopAnimation();
-      shift.stopAnimation();
+      settleFirstRunMotion({ opacity, shift });
     };
   }, [opacity, shift]);
 

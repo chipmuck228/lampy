@@ -2,6 +2,7 @@ import {
   decideFirstRunGuide,
   isFirstRunFinishAction,
   nextFirstRunIndex,
+  settleFirstRunMotion,
   FIRST_RUN_LAST_INDEX,
   FIRST_RUN_SCREENS,
 } from './first-run';
@@ -37,6 +38,16 @@ describe('first-run guide decision', () => {
     expect(decideFirstRunGuide({ completed: true, hasPersonalRecords: false, recordsUnknown: false }).showGuide).toBe(
       false,
     );
+  });
+
+  it('restores a visible scene when motion is stopped mid-flight', () => {
+    const opacity = { stopAnimation: jest.fn(), setValue: jest.fn() };
+    const shift = { stopAnimation: jest.fn(), setValue: jest.fn() };
+    settleFirstRunMotion({ opacity, shift });
+    expect(opacity.stopAnimation).toHaveBeenCalled();
+    expect(shift.stopAnimation).toHaveBeenCalled();
+    expect(opacity.setValue).toHaveBeenCalledWith(1);
+    expect(shift.setValue).toHaveBeenCalledWith(0);
   });
 
   it('uses this-round copy and does not claim cloud backup or sync', () => {

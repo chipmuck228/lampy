@@ -47,3 +47,13 @@ export function nextFirstRunIndex(index: number) {
 export function isFirstRunFinishAction(index: number) {
   return index >= FIRST_RUN_LAST_INDEX;
 }
+
+export function settleFirstRunMotion(motion: {
+  opacity: { stopAnimation: () => void; setValue: (value: number) => void };
+  shift: { stopAnimation: () => void; setValue: (value: number) => void };
+}) {
+  motion.opacity.stopAnimation();
+  motion.shift.stopAnimation();
+  motion.opacity.setValue(1);
+  motion.shift.setValue(0);
+}
