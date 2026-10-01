@@ -113,7 +113,7 @@ npx jest --ci --runInBand src/screens/leave-draft-screen.test.tsx
 | --- | --- |
 | 基线 SHA | `b79174b346b02cb072f526af7e3ca33dac30473d` |
 | **构建 / 打包 SHA** | `9142760cb2632f0f9a7a24fb7608a902c6f8c8c9`（打进 `main.jsbundle` 的工作区）。本轮未改打包进 App 的源码，未重新 Archive |
-| **文档 / 脚本 head** | 见本文件提交后的 `git rev-parse HEAD`（leave-draft 测试、inspect 脚本、交接文档） |
+| **文档 / 脚本 head** | `56a30ea91c426fa5ae2cd8e3aff2e4723712d57a`（leave-draft 测试、inspect 脚本、交接文档；不是构建 SHA）。若本行之后还有只改文档的提交，以最新 HEAD 为准，构建 SHA 仍为 `9142760` |
 | version / build | `0.1.0` / `1` |
 | Xcode | 26.6（17F113） |
 | Bundle ID / Team | `app.lampy.ios` / `B283NY984J` |
