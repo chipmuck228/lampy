@@ -203,7 +203,7 @@ describe('recent reading hierarchy', () => {
     expect(minHeightOf(view.getByTestId('recent-open-moment_mix'))).toBeGreaterThanOrEqual(48);
     expect(styleOf(view.getByTestId('recent-open-label-moment_mix')).minHeight).toBeUndefined();
     expect(styleOf(view.getByTestId('recent-open-row-moment_mix'))).toEqual(
-      expect.objectContaining({ flexDirection: 'row', alignItems: 'center' }),
+      expect.objectContaining({ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' }),
     );
     expect(styleOf(view.getByTestId('recent-open-row-moment_mix')).minHeight).toBeUndefined();
     expect(view.getByTestId('recent-open-mark-moment_mix').props.accessible).toBe(false);

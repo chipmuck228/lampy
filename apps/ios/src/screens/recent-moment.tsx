@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
-  footFeeling: { flex: 1, minWidth: 0 },
-  footSpacer: { flex: 1 },
+  footFeeling: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
+  footSpacer: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
   open: { ...recentType.open, color: recentOpenInk },
 });

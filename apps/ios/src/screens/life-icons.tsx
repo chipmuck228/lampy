@@ -157,7 +157,10 @@ export function LookThisHit({
         ]}
         testID={ids?.row}
       >
-        <Text style={[styles.lookThisText, captionStyle]} testID={ids?.label}>
+        <Text
+          style={[styles.lookThisText, align === 'end' && styles.lookThisTextEnd, captionStyle]}
+          testID={ids?.label}
+        >
           {caption}
         </Text>
         <View accessible={false} testID={ids?.mark} style={styles.lookThisMark}>
@@ -223,12 +226,18 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   lookThisRowEnd: {
+    flexWrap: 'nowrap',
+    flexShrink: 0,
     justifyContent: 'flex-end',
   },
   lookThisText: {
     ...type.action,
     color: sage,
     flexShrink: 1,
+  },
+  lookThisTextEnd: {
+    flexGrow: 0,
+    flexShrink: 0,
   },
   lookThisMark: {
     flexShrink: 0,
