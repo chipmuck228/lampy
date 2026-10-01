@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>Figma 视觉权威 · 结构对照</title>
+  <style>
+    :root {
+      --paper: #F3F0E9;
+      --ink: #25231F;
+      --soft: #5C5851;
+      --sage: #53604F;
+      --sound: #4F626D;
+      --line: rgba(37, 35, 31, 0.16);
+      --calm: #6F8B86;
+      --unknown: #8B867C;
+      --fab: #2A322C;
+      --btn: #E4E7E1;
+      --phone-w: 280px;
+    }
+    body { margin: 0; background: #e4dfd4; color: var(--ink); font: 16px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 24px 120px; }
+    h1 { font-size: 28px; font-weight: 500; margin: 0 0 8px; }
+    h2 { font-size: 20px; font-weight: 500; margin: 56px 0 12px; }
+    p, li { color: var(--soft); }
+    .lead { max-width: 760px; }
+    .nv { font-size: 12px; color: #87513D; letter-spacing: 0.04em; }
+    .ok { font-size: 13px; color: #3d5340; }
+    .ban { font-size: 13px; color: #87513D; }
+    .row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; margin: 16px 0 8px; }
+    .phone {
+      background: var(--paper);
+      width: var(--phone-w);
+      min-height: 560px;
+      padding: 22px 20px 16px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .phone.short { min-height: 400px; }
+    .phone.wide { width: 420px; min-height: 280px; }
+    .phone.pad { width: 360px; }
+    .phone.xxxl { font-size: 1.12em; }
+    .eyebrow { font-size: 11px; letter-spacing: 0.08em; color: var(--soft); }
+    .hero { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 0 16px; }
+    .title { font-size: 28px; line-height: 1.15; margin: 0; font-weight: 500; }
+    .quiet { font-size: 13px; color: var(--soft); }
+    .gear { color: var(--sage); min-width: 32px; min-height: 32px; display: flex; align-items: center; justify-content: center; }
+    .date { color: var(--soft); font-size: 13px; margin: 0 0 10px; }
+    .note { font-size: 17px; line-height: 28px; margin: 0 0 8px; color: var(--ink); }
+    .note.clamp { max-height: 168px; overflow: hidden; }
+    .occur { font-size: 13px; color: var(--soft); margin: 0 0 8px; }
+    .img { background: #ddd6c8; color: var(--sage); font-size: 11px; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; margin: 6px 0; }
+    .img.l { width: 100%; height: 86px; }
+    .img.p { width: 46%; height: 110px; }
+    .img.miss { background: transparent; color: var(--soft); height: auto; min-height: 48px; }
+    .pair { display: flex; gap: 8px; }
+    .sound { border: 1px solid var(--line); border-radius: 20px; padding: 8px 12px; font-size: 13px; color: var(--sound); margin: 8px 0; }
+    .feel { color: var(--soft); font-size: 13px; display: flex; align-items: center; gap: 6px; margin: 8px 0; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--calm); }
+    .dot.old { background: var(--unknown); }
+    .expand, .full { color: var(--sage); min-height: 48px; display: flex; align-items: center; font-size: 15px; }
+    .rule { width: 100%; height: 1px; background: var(--line); margin: 14px 0; }
+    .gap-day { height: 28px; }
+    .band { margin-top: auto; border-top: 1px solid var(--line); display: flex; justify-content: space-around; padding: 12px 0 4px; font-size: 14px; color: var(--sage); }
+    .fab { position: absolute; right: 16px; bottom: 64px; background: var(--fab); color: #f7f4ee; border-radius: 24px; padding: 10px 14px; font-size: 14px; min-height: 48px; display: flex; align-items: center; }
+    .photo { background: #c8c2b6; height: 168px; color: #fff; display: flex; align-items: flex-end; padding: 10px; font-size: 13px; margin: 0 -20px 18px; }
+    .claim { font-size: 28px; line-height: 36px; margin: 0 0 14px; font-weight: 500; }
+    .explain { font-size: 15px; line-height: 24px; color: var(--soft); margin: 0 0 16px; }
+    .gbtn { background: var(--btn); color: var(--sage); min-height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-top: auto; }
+    .prog { font-size: 12px; color: var(--soft); display: flex; justify-content: space-between; margin: 8px 0; }
+    .empty-title { font-size: 22px; line-height: 30px; margin: 40px 0 10px; }
+    .refs img { width: 120px; height: auto; margin: 0 8px 8px 0; vertical-align: top; }
+    .cap { font-size: 13px; color: var(--sage); max-width: var(--phone-w); margin: 8px 0 0; }
+    .week { font-size: 14px; color: var(--soft); margin: 0 0 16px; }
+    .mo { min-height: 40px; display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="nv">静态结构稿 · 不是运行 PASS · 参考图不是页面背景</p>
+  <h1>最近 / 回看 / 三屏引导</h1>
+  <p class="lead">同一批 #50 合成结构，按本目录取舍重画。Figma 截图只作气质参考。实现切片未开始。</p>
+  <p class="ok">采用：列宽浅线、原位展开 + 完整阅读、两项底带、浮动留下、三层引导文案。</p>
+  <p class="ban">不采用：72pt 短线、底带留下、功能标签、「不必翻找」、截图当背景、未确认前换字体。</p>
+
+  <h2>参考图（只对照，不贴进手机框）</h2>
+  <div class="refs">
+    <img src="references/01-guide-1.png" alt="引导1 参考" />
+    <img src="references/02-guide-2.png" alt="引导2 参考" />
+    <img src="references/03-guide-3.png" alt="引导3 参考" />
+    <img src="references/04-recent-top.png" alt="最近上部 参考" />
+    <img src="references/05-recent-bottom.png" alt="最近下部 参考" />
+    <img src="references/06-lookback-top.png" alt="回看上部 参考" />
+    <img src="references/07-lookback-reading.png" alt="回看阅读 参考" />
+  </div>
+
+  <h2>A. 三屏首次引导</h2>
+  <div class="row">
+    <div>
+      <div class="phone">
+        <div class="eyebrow">Lampy · 01 / 03</div>
+        <div class="photo">一段咖啡，一段午后。 · 待确认</div>
+        <p class="claim">日子，不必特别才值得留下。</p>
+        <p class="explain">自己的生活记录，不必写成故事。只是把这一刻，轻轻留给自己。</p>
+        <div class="gbtn">继续 →</div>
+      </div>
+      <p class="cap">无「留下」标签、无小引言。照片是原型占位。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="eyebrow">Lampy · 02 / 03</div>
+        <div class="photo">今天，也有想记住的光。</div>
+        <p class="claim">轻轻扫过，也能看见日子的样子。</p>
+        <p class="explain">文字、照片和声音，照着它们原来的样子。想再读的时候，可以停下来。</p>
+        <div class="quiet">上一屏</div>
+        <div class="gbtn">继续 →</div>
+      </div>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="eyebrow">Lampy · 03 / 03</div>
+        <div class="photo">有些日子，值得再坐一会儿。</div>
+        <p class="claim">从一个日子，继续读起。</p>
+        <p class="explain">回到那一天，慢慢读完那一天。过往就在这里，允许停留。</p>
+        <div class="quiet">上一屏</div>
+        <div class="gbtn">进入 Lampy →</div>
+      </div>
+      <p class="cap">不采用「不必翻找」。</p>
+    </div>
+  </div>
+
+  <h2>B. 最近 · 同日四条（F-mix / audio / short / one）</h2>
+  <div class="row">
+    <div>
+      <div class="phone" style="min-height: 720px;">
+        <div class="eyebrow">LAMPY · 生活记录</div>
+        <div class="hero"><p class="title">最近</p><div class="gear">⚙</div></div>
+        <div class="date">记录于 10月1日</div>
+        <p class="note clamp">傍晚回家，楼道里还留着白天的热。门开了一半，桌上的杯子没洗。我把窗户推开一点，听见楼下有人在说话…</p>
+        <div class="expand">展开正文 ⌄</div>
+        <p class="occur">发生于 9月28日</p>
+        <div class="pair"><div class="img p">3:4</div><div class="img p">3:4</div></div>
+        <div class="sound">播放 · 0:00 / 0:18</div>
+        <div class="feel"><span class="dot"></span>平静</div>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="rule"></div>
+        <div class="sound">街角的声音 · 0:12</div>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="rule"></div>
+        <p class="note">门口的风还在。</p>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">短文无展开。浅线只在条之间。FAB 避让底带。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="eyebrow">LAMPY · 生活记录</div>
+        <div class="hero"><p class="title">最近</p><div class="gear">⚙</div></div>
+        <div class="date">记录于 9月27日</div>
+        <p class="note">门口那张。</p>
+        <div class="img miss">这张照片暂时找不到了，但这条记录还在。</div>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="rule"></div>
+        <p class="note">那天下过雨。</p>
+        <div class="feel"><span class="dot old"></span>温暖</div>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">F-missing / F-old。换日靠日期，不叠线。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="eyebrow">LAMPY · 生活记录</div>
+        <div class="hero"><p class="title">最近</p><div class="gear">⚙</div></div>
+        <p class="empty-title">还没有留下。</p>
+        <p class="explain">想起来的时候，再写一句、一张照片，或一段声音。</p>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">E-empty。无假记录，空态不再堆第二个留下按钮。</p>
+    </div>
+  </div>
+
+  <h2>C. 回看 · 目录 / 阅读 / 空 / 未确认</h2>
+  <div class="row">
+    <div>
+      <div class="phone">
+        <div class="eyebrow">LAMPY · 时间里的记录</div>
+        <div class="hero"><p class="title">回看</p><span class="quiet">慢慢看</span></div>
+        <div class="date">时间目录</div>
+        <div class="mo"><span>2026年 · 9月</span><span>⌄</span></div>
+        <div class="rule"></div>
+        <div class="mo"><span>27日 · 周六</span><span>11条</span></div>
+        <div class="mo"><span>28日 · 周日</span><span>1条</span></div>
+        <div class="mo"><span>24日 · 周三</span><span>1条</span></div>
+        <p class="occur" style="margin-top:16px">还没有日期的片段</p>
+        <p class="occur">这一年，月份未定</p>
+        <p class="occur">这个月，日子未定</p>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">条数在目录。FAB 是取舍覆盖，截图里没有。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="hero"><p class="title">9月27日</p></div>
+        <p class="week">星期六</p>
+        <p class="quiet">08:10</p>
+        <p class="note">下午的走廊。</p>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="rule"></div>
+        <p class="quiet">09:02</p>
+        <p class="note">那天下过雨。</p>
+        <div class="feel"><span class="dot old"></span>温暖</div>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="rule"></div>
+        <p class="note">门口那张。</p>
+        <div class="img miss">照片暂时找不到了。</div>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">无 2026 · 09，无页首「11条」，条上不重复当天日期。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="quiet">慢慢看</span></div>
+        <p class="empty-title">还没有可以回看的日子。</p>
+        <p class="explain">留下之后，会按发生的日期出现在这里。</p>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">无假日期、假章节、空目录。</p>
+    </div>
+  </div>
+
+  <h2>D. 版式壳（同一 10月1日结构）</h2>
+  <div class="row">
+    <div>
+      <div class="phone xxxl">
+        <div class="eyebrow">LAMPY · 生活记录</div>
+        <div class="hero"><p class="title">最近</p><div class="gear">⚙</div></div>
+        <p class="note" style="font-size:22px;line-height:34px">门口的风还在。</p>
+        <div class="img l">照片纵排 · 可把入口顶出首屏</div>
+        <div class="full" style="min-height:56px">阅读完整记录 ›</div>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">V-xxxl。滚到条尾后入口必须完整可点。</p>
+    </div>
+    <div>
+      <div class="phone short">
+        <div class="eyebrow">LAMPY · 生活记录</div>
+        <div class="hero"><p class="title">最近</p><div class="gear">⚙</div></div>
+        <p class="note">门口的风还在。</p>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">V-short。先减间距，不压行距。</p>
+    </div>
+    <div>
+      <div class="phone wide">
+        <div class="eyebrow">LAMPY · 生活记录</div>
+        <div class="hero"><p class="title">最近</p><div class="gear">⚙</div></div>
+        <p class="note">门口的风还在。</p>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">V-land。阅读列封顶，不是桌面双栏。</p>
+    </div>
+    <div>
+      <div class="phone pad">
+        <div class="eyebrow">LAMPY · 生活记录</div>
+        <div class="hero"><p class="title">最近</p><div class="gear">⚙</div></div>
+        <div class="date">10月1日</div>
+        <p class="note">门口的风还在。</p>
+        <div class="full">阅读完整记录 ›</div>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">V-ipad。日期可走左轨；大字号仍上下叠。</p>
+    </div>
+  </div>
+</main>
+</body>
+</html>
