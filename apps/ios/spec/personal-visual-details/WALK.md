@@ -2,9 +2,9 @@
 
 Base：`origin/main` `e7580e33f01429d9945ee2d8a2b5a3980b3c4e92`（#47 merge）。  
 分支 `ios/personal-visual-details`。只改 `apps/ios`。家庭入口关闭。未卸 Liuz17，未清个人库。  
-本轮实际上滑 / Reduce Motion 测试 SHA：`b9dfdbc5f3fb5d65221fa1c44f1b3e8668ad87d4`。
+运行代码测试 SHA：`b9dfdbc5f3fb5d65221fa1c44f1b3e8668ad87d4`（上滑 / Reduce Motion 隔离机 + 之后真机抽查所跑的 JS）。其后若只有走查/PR 文档提交，不改这个对应关系。
 
-模拟器结果 **不是** 真机 PASS。横屏 / iPad / VoiceOver 未听音，记 **NOT VERIFIED**。
+横屏 / iPad / VoiceOver 未听音，记 **NOT VERIFIED**。
 
 ## 命令
 
@@ -54,14 +54,21 @@ Base：`origin/main` `e7580e33f01429d9945ee2d8a2b5a3980b3c4e92`（#47 merge）�
 | 最大字号日期行 | **PASS**（`accessibility-extra-extra-extra-large` 可见 `18日`、`2条`，折行未裁字；Dev Tools 挡了一部分） |
 | 摘录 → 详情 → 返回 | **PASS**（详情 `门口的风` / `高兴` 无色点；返回可见同日两条。书页摘录条被 Dev Tools 挡住，以详情/日页为准） |
 | 最近色点 / 未选 / 未知旧词 | **PASS**（上一轮示意库，本轮未改存储） |
-| 播放 / 本机保护 | **NOT VERIFIED**（Liuz17 隧道未通，本轮未在真机点） |
+| 播放 / 本机保护 | 模拟器未复验；真机见下 |
 | 横屏 / iPad / VoiceOver | **NOT VERIFIED** |
-| Liuz17 | **NOT VERIFIED** |
+| Liuz17 | **PASS**（见下；未卸、未清库、未重置引导） |
 
 ## 真机 Liuz17
 
-不要卸、不要清库、不要重置首次引导。本轮 **未重置**。
+不要卸、不要清库、不要重置首次引导。本轮 **未重置**。持有人已在该机跑完抽查，对应 JS 仍是 `b9dfdbc`。
 
-`devicectl` 仍显示 `available (paired)`，iOS 26.2 / iPhone 17 Pro。隧道失败（`RemotePairingError` 4），上次成功连接 `2026-09-30 23:18 UTC`。无法截屏或覆盖安装，色点 / 日期行 / 详情返回 / 播放 / 本机保护 **不能记 PASS**。
+| 项 | 结果 |
+| --- | --- |
+| 最近：已选感受有色点，未选无点，详情无色点 | **PASS** |
+| 回看：日期行、摘录 → 详情 → 返回 | **PASS** |
+| 回看：最大字号无裁切 | **PASS** |
+| 播放走一次，无回归 | **PASS** |
+| 本机保护走一次，无回归 | **PASS** |
+| 横屏 / iPad / VoiceOver | **NOT VERIFIED** |
 
 三屏请用 **新建** 模拟器或新设备，不要擦旧模拟器指望 Keychain 会清。
