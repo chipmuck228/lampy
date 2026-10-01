@@ -4,13 +4,19 @@ import { Text } from '../../../../screens/life-text';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../../../application/container';
-import { HISTORY_PAGE_SIZE, type HistoryMomentItem } from '../../../../application/history-use-cases';
+import type { HistoryMomentItem } from '../../../../application/history-use-cases';
 import { lookbackBookIntentFromParts } from '../../../../application/lookback-book';
 import { lookbackDayEntries } from '../../../../application/lookback-day';
 import {
   collectLookbackNeighborDays,
   keepExpandedIds,
+  lookbackMoreInFlightBlocks,
+  lookbackMoreOffset,
+  lookbackReadingResolvedCount,
+  lookbackReadingScopeKey,
   restoreLookbackPages,
+  shouldAcceptLookbackMorePage,
+  type LookbackMoreRequest,
   type LookbackPlacedDay,
 } from '../../../../application/lookback-reading';
 import {
@@ -63,38 +69,61 @@ export default function LookbackDayScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [loadedOffset, setLoadedOffset] = useState(0);
   const [moreError, setMoreError] = useState(false);
+  const [moreLoading, setMoreLoading] = useState(false);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [neighbors, setNeighbors] = useState<{
     previous: LookbackPlacedDay | null;
     next: LookbackPlacedDay | null;
   }>({ previous: null, next: null });
-  const [count, setCount] = useState(0);
+  const [count, setCount] = useState<number | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+  const [pendingRestoreY, setPendingRestoreY] = useState<number | null>(null);
+  const [restoreSeq, setRestoreSeq] = useState(0);
   const generation = useRef(0);
+  const moreInFlight = useRef<LookbackMoreRequest | null>(null);
+  const loadedOffsetRef = useRef(loadedOffset);
+  const previousScopeKey = useRef<string | null>(null);
   const clips = useRecentClipPlayback();
   const clipsRef = useRef(clips);
   useEffect(() => {
     clipsRef.current = clips;
+    loadedOffsetRef.current = loadedOffset;
   });
   const path = `/lookback/${year}/${pad2(month)}/${pad2(day)}`;
+  const scopeKey = lookbackReadingScopeKey({ kind: 'day', year, month, day });
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       const request = generation.current + 1;
       generation.current = request;
+      moreInFlight.current = null;
+      void reloadTick;
       const snapshot = readLookbackReadingSnapshot();
-      const same = snapshot?.scope.kind === 'day' && snapshot.scope.year === year && snapshot.scope.month === month && snapshot.scope.day === day;
+      const same =
+        snapshot?.scope.kind === 'day' &&
+        snapshot.scope.year === year &&
+        snapshot.scope.month === month &&
+        snapshot.scope.day === day;
+      let firstPage: { totalCount?: number } | undefined;
       restoreLookbackPages({
         targetOffset: same ? snapshot.loadedOffset : 0,
         loadPage: async (offset) => {
           const app = await getUseCases();
           const next = await app.getHistoryDay(year, month, day, offset);
           if ('invalid' in next) throw Object.assign(new Error('invalid'), { invalid: true });
-          return { items: next.items, hasMore: next.hasMore, empty: next.isEmpty };
+          if (offset === 0) firstPage = next;
+          return { items: next.items, hasMore: next.hasMore };
         },
       })
         .then((restored) => {
           if (cancelled || generation.current !== request) return;
+          const resolved = lookbackReadingResolvedCount({
+            totalCount: firstPage?.totalCount,
+            loadedCount: restored.items.length,
+            hasMore: restored.hasMore,
+          });
+          setCount(resolved);
           if (!restored.ok && restored.items.length === 0) {
             setError('这一天暂时读不出来，原来的记录还在。');
             return;
@@ -105,15 +134,18 @@ export default function LookbackDayScreen() {
           setHasMore(restored.hasMore);
           setLoadedOffset(restored.loadedOffset);
           setEmpty(restored.items.length === 0);
-          setCount(restored.hasMore ? restored.items.length : restored.items.length);
           const nextExpanded = keepExpandedIds(same ? snapshot.expandedIds : [], restored.items.map((item) => item.id));
           setExpandedIds(nextExpanded);
+          const switched = previousScopeKey.current != null && previousScopeKey.current !== scopeKey;
+          previousScopeKey.current = scopeKey;
           rememberLookbackReadingSnapshot({
             scope: { kind: 'day', year, month, day },
             loadedOffset: restored.loadedOffset,
             expandedIds: nextExpanded,
             scrollY: same ? snapshot.scrollY : 0,
           });
+          setRestoreSeq((current) => current + 1);
+          setPendingRestoreY(same ? snapshot.scrollY : switched ? 0 : null);
         })
         .catch((caught) => {
           if (cancelled || generation.current !== request) return;
@@ -141,10 +173,59 @@ export default function LookbackDayScreen() {
         });
       return () => {
         cancelled = true;
+        generation.current += 1;
+        moreInFlight.current = null;
         void clipsRef.current.pause();
       };
-    }, [year, month, day]),
+    }, [year, month, day, reloadTick, scopeKey]),
   );
+
+  async function loadMore() {
+    if (!hasMore || moreLoading || moreError) return;
+    const request: LookbackMoreRequest = {
+      scopeKey,
+      generation: generation.current,
+      offset: lookbackMoreOffset(loadedOffset),
+    };
+    if (lookbackMoreInFlightBlocks(moreInFlight.current, request)) return;
+    moreInFlight.current = request;
+    setMoreLoading(true);
+    try {
+      const app = await getUseCases();
+      const next = await app.getHistoryDay(year, month, day, request.offset);
+      if (
+        'invalid' in next ||
+        !shouldAcceptLookbackMorePage({
+          request,
+          current: {
+            scopeKey,
+            generation: generation.current,
+            loadedOffset: loadedOffsetRef.current,
+          },
+        })
+      ) {
+        return;
+      }
+      setItems((current) => [...current, ...next.items]);
+      setHasMore(next.hasMore);
+      setLoadedOffset(request.offset);
+      setMoreError(false);
+      patchLookbackReadingSnapshot({ loadedOffset: request.offset });
+    } catch {
+      if (generation.current !== request.generation) return;
+      setMoreError(true);
+    } finally {
+      if (
+        moreInFlight.current &&
+        moreInFlight.current.scopeKey === request.scopeKey &&
+        moreInFlight.current.generation === request.generation &&
+        moreInFlight.current.offset === request.offset
+      ) {
+        moreInFlight.current = null;
+      }
+      setMoreLoading(false);
+    }
+  }
 
   function leaveDay() {
     const intent = lookbackBookIntentFromParts({
@@ -166,11 +247,30 @@ export default function LookbackDayScreen() {
       title={`${month}月${day}日`}
       path={path}
       onBack={leaveDay}
+      pendingRestoreY={pendingRestoreY}
+      restoreSeq={restoreSeq}
+      onReadingScroll={(offsetY) => {
+        patchLookbackReadingSnapshot({ scrollY: offsetY });
+      }}
+      onRestoreDone={() => setPendingRestoreY(null)}
     >
-      {error ? <LookbackMessage>{error}</LookbackMessage> : null}
+      {error ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="重试打开这一天"
+          testID="lookback-day-retry"
+          onPress={() => {
+            setError(null);
+            setReloadTick((current) => current + 1);
+          }}
+          style={lookbackStyles.hit}
+        >
+          <Text style={lookbackStyles.action}>这一天暂时读不出来，原来的记录还在。再试一次</Text>
+        </Pressable>
+      ) : null}
       {invalid ? <LookbackMessage>日历上没有这一天。</LookbackMessage> : null}
       {empty ? <LookbackMessage>这一天还没有留下什么。</LookbackMessage> : null}
-      {!invalid && !empty ? (
+      {!invalid && !empty && !error ? (
         <LookbackReadingHeader year={year} month={month} day={day} count={count} />
       ) : null}
       {lookbackDayEntries(items).map((entry) => (
@@ -206,41 +306,19 @@ export default function LookbackDayScreen() {
           testID="lookback-day-more"
           onPress={() => {
             setMoreError(false);
-            const offset = loadedOffset + HISTORY_PAGE_SIZE;
-            getUseCases()
-              .then((app) => app.getHistoryDay(year, month, day, offset))
-              .then((next) => {
-                if ('invalid' in next) return;
-                setItems((current) => [...current, ...next.items]);
-                setHasMore(next.hasMore);
-                setLoadedOffset(offset);
-                patchLookbackReadingSnapshot({ loadedOffset: offset });
-              })
-              .catch(() => setMoreError(true));
+            void loadMore();
           }}
           style={lookbackStyles.hit}
         >
           <Text style={lookbackStyles.action}>后面的记录暂时读不出来。再试一次</Text>
         </Pressable>
       ) : null}
-      {hasMore && !moreError ? (
+      {hasMore && !moreError && !moreLoading ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="继续往下看"
           testID="lookback-day-more"
-          onPress={() => {
-            const offset = loadedOffset + HISTORY_PAGE_SIZE;
-            getUseCases()
-              .then((app) => app.getHistoryDay(year, month, day, offset))
-              .then((next) => {
-                if ('invalid' in next) return;
-                setItems((current) => [...current, ...next.items]);
-                setHasMore(next.hasMore);
-                setLoadedOffset(offset);
-                patchLookbackReadingSnapshot({ loadedOffset: offset });
-              })
-              .catch(() => setMoreError(true));
-          }}
+          onPress={() => void loadMore()}
           style={lookbackStyles.hit}
         >
           <Text style={lookbackStyles.action}>继续往下看</Text>

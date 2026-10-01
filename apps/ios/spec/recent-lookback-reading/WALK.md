@@ -1,16 +1,16 @@
 # 回看同页连续阅读走查
 
-实现分支 `ios/lookback-continuous-reading`，HEAD `f3dfe561e7214cf87d9817ecc6b5a16f43857a92`，从最新 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #51 旧分支或未合入实现复制。#52 Figma 视觉稿仍独立，本切片未全局替换未落地字体/配色。
+实现分支 `ios/lookback-continuous-reading`（PR #53 OPEN），从最新 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #51 旧分支或未合入实现复制。#52 Figma 视觉稿仍独立，本切片未全局替换未落地字体/配色。
 
-Jest 与静态稿 **≠** 原生页面 PASS。未实际操作的项写 **NOT VERIFIED**。
+审阅补修已落到同分支：分页互斥、范围世代、真实范围计数、换日回顶、失败保留并重试。Jest 与静态稿 **≠** 原生页面 PASS。未实际操作的项写 **NOT VERIFIED**。真机验收仍等这轮补修之后。
 
-## 本机命令（本轮）
+## 本机命令（审阅补修）
 
 在 `apps/ios`：
 
 - `npx tsc --noEmit`：通过
-- 相关 Jest：25 suites / 87 tests 通过（回看 application + screen + locate / race / catalog / reading）
-- 改动文件 `eslint`：无 error（`lookback-chrome` 既有 `tryLocate` hook 依赖警告仍在）
+- 相关 Jest：20 suites / 68 tests 通过（回看 application + screen + locate / race / catalog / reading + 审阅守卫）
+- 改动文件 `eslint`：无 error
 - `git diff --check`：通过
 
 未跑全库 Jest。未重传 TestFlight。未向 Liuz17 写夹具、未卸载或清空该机。
@@ -40,6 +40,9 @@ Jest 与静态稿 **≠** 原生页面 PASS。未实际操作的项写 **NOT VER
 | 目录焦点及底层不可访问 | **PASS**（`lookback-catalog-a11y`） |
 | 播放进度隔离、主动播放 | **PASS**（既有 clip playback 契约 + 回看不自动播；本轮未重跑 `use-recent-clip-playback` 全套） |
 | 年定位滚目录、日定位滚阅读 | **PASS**（`lookback-book-locate` / `locate-day` / switch / stale / drag / rapid） |
+| 重复分页、交错世代、真实总数 | **PASS**（`lookback-reading-guards` / `lookback-reading.test.ts`） |
+| 换日回顶、首次失败重试 | **PASS**（`lookback-reading-page-guards`） |
+| 失败月不跳过相邻日 | **PASS**（`collectLookbackNeighborDays` 抛错） |
 
 ## 真机（Liuz17 / 可丢弃安装）
 

@@ -29,24 +29,31 @@ export function LookbackReadingHeader({
   year: number;
   month: number;
   day: number;
-  count: number;
+  count: number | null;
 }) {
+  const weekday = lookbackReadingDayWeekday(year, month, day);
   return (
     <View testID="lookback-reading-header" style={styles.header}>
       <Text
         style={styles.dayTitle}
         accessibilityRole="header"
         testID="lookback-reading-title"
-        accessibilityLabel={`${year}年${month}月${day}日，${lookbackReadingDayWeekday(year, month, day)}，${lookbackReadingCountLabel(count)}`}
+        accessibilityLabel={
+          count == null
+            ? `${year}年${month}月${day}日，${weekday}`
+            : `${year}年${month}月${day}日，${weekday}，${lookbackReadingCountLabel(count)}`
+        }
       >
         {lookbackReadingDayTitle(year, month, day)}
       </Text>
       <Text style={styles.meta} testID="lookback-reading-weekday">
-        {lookbackReadingDayWeekday(year, month, day)}
+        {weekday}
       </Text>
-      <Text style={styles.meta} testID="lookback-reading-count">
-        {lookbackReadingCountLabel(count)}
-      </Text>
+      {count != null ? (
+        <Text style={styles.meta} testID="lookback-reading-count">
+          {lookbackReadingCountLabel(count)}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -150,7 +157,7 @@ export function LookbackUnconfirmedHeader({
 }: {
   title: string;
   explanation: string;
-  count: number;
+  count: number | null;
 }) {
   return (
     <View testID="lookback-reading-unconfirmed-header" style={styles.header}>
@@ -158,13 +165,18 @@ export function LookbackUnconfirmedHeader({
         style={styles.dayTitle}
         accessibilityRole="header"
         testID="lookback-reading-title"
-        accessibilityLabel={`${title}，${lookbackReadingCountLabel(count)}`}
+        accessibilityLabel={count == null ? title : `${title}，${lookbackReadingCountLabel(count)}`}
       >
         {title}
       </Text>
       <Text style={styles.note} testID="lookback-reading-explanation">
         {explanation}
       </Text>
+      {count != null ? (
+        <Text style={styles.meta} testID="lookback-reading-count">
+          {lookbackReadingCountLabel(count)}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -175,7 +187,7 @@ export function LookbackReadingNeighbors({
   next,
   onOpen,
 }: {
-  current: LookbackPlacedDay;
+  current: { year: number; month: number; day: number };
   previous: LookbackPlacedDay | null;
   next: LookbackPlacedDay | null;
   onOpen: (day: LookbackPlacedDay) => void;

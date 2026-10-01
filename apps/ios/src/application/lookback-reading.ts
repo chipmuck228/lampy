@@ -18,13 +18,19 @@ export type LookbackReadingSnapshot = {
 };
 
 export type LookbackDefaultChoice =
-  | { kind: 'day'; year: number; month: number; day: number }
+  | { kind: 'day'; year: number; month: number; day: number; count: number }
   | { kind: 'catalog' }
   | { kind: 'unknown' }
   | { kind: 'empty' }
   | { kind: 'month-failed'; year: number; month: number };
 
-export type LookbackPlacedDay = { year: number; month: number; day: number };
+export type LookbackPlacedDay = { year: number; month: number; day: number; count: number };
+
+export type LookbackMoreRequest = {
+  scopeKey: string;
+  generation: number;
+  offset: number;
+};
 
 export function lookbackReadingScopeKey(scope: LookbackReadingScope): string {
   if (scope.kind === 'day') return `day:${scope.year}-${pad2(scope.month)}-${pad2(scope.day)}`;
@@ -53,14 +59,50 @@ export function lookbackCandidateMonths(book: LookbackBookView): LookbackPlacedD
   for (const chapter of book.years) {
     const newestFirst = [...chapter.months].sort((left, right) => right.month - left.month);
     for (const month of newestFirst) {
-      months.push({ year: chapter.year, month: month.month, day: 0 });
+      months.push({ year: chapter.year, month: month.month, day: 0, count: 0 });
     }
   }
   return months;
 }
 
-export function lookbackPlacedDaysInMonth(page: HistoryMonthView): number[] {
-  return page.days.filter((day) => day.status === 'filled' && day.count > 0).map((day) => day.day);
+export function lookbackPlacedDaysInMonth(page: HistoryMonthView): { day: number; count: number }[] {
+  return page.days
+    .filter((day) => day.status === 'filled' && day.count > 0)
+    .map((day) => ({ day: day.day, count: day.count }));
+}
+
+export function lookbackMoreOffset(loadedOffset: number): number {
+  return loadedOffset + HISTORY_PAGE_SIZE;
+}
+
+export function lookbackMoreInFlightBlocks(
+  inFlight: LookbackMoreRequest | null,
+  _next: LookbackMoreRequest,
+): boolean {
+  return !!inFlight;
+}
+
+export function shouldAcceptLookbackMorePage(input: {
+  request: LookbackMoreRequest;
+  current: { scopeKey: string; generation: number; loadedOffset: number };
+}): boolean {
+  return (
+    input.request.scopeKey === input.current.scopeKey &&
+    input.request.generation === input.current.generation &&
+    input.request.offset === lookbackMoreOffset(input.current.loadedOffset)
+  );
+}
+
+export function lookbackReadingResolvedCount(input: {
+  known?: number | null;
+  totalCount?: number | null;
+  loadedCount: number;
+  hasMore: boolean;
+}): number | null {
+  if (input.known != null) return input.known;
+  if (input.totalCount != null) return input.totalCount;
+  if (!input.hasMore) return input.loadedCount;
+  return null;
 }
 
 export async function chooseDefaultLookbackScope(input: {
@@ -79,7 +121,8 @@ export async function chooseDefaultLookbackScope(input: {
     if ('invalid' in page) return { kind: 'month-failed', year: month.year, month: month.month };
     const days = lookbackPlacedDaysInMonth(page);
     if (days.length > 0) {
-      return { kind: 'day', year: month.year, month: month.month, day: days[days.length - 1] };
+      const last = days[days.length - 1];
+      return { kind: 'day', year: month.year, month: month.month, day: last.day, count: last.count };
     }
     if (page.dayUnconfirmedCount > 0) yearOrMonthPrecision = true;
   }
@@ -148,15 +191,18 @@ export function lookbackNeighborDays(
   };
 }
 
-export function lookbackNeighborDateLabel(from: LookbackPlacedDay, to: LookbackPlacedDay): string {
+export function lookbackNeighborDateLabel(
+  from: { year: number; month: number; day: number; count?: number },
+  to: { year: number; month: number; day: number; count?: number },
+): string {
   if (from.year !== to.year) return `${to.year}年${to.month}月${to.day}日`;
   return `${to.month}月${to.day}日`;
 }
 
 export function lookbackNeighborCaption(
   direction: 'previous' | 'next',
-  from: LookbackPlacedDay,
-  to: LookbackPlacedDay,
+  from: { year: number; month: number; day: number; count?: number },
+  to: { year: number; month: number; day: number; count?: number },
 ): string {
   const verb = direction === 'previous' ? '前一个有记录日' : '后一个有记录日';
   return `${verb} · ${lookbackNeighborDateLabel(from, to)}`;
@@ -179,7 +225,7 @@ export function lookbackCatalogMonthTitle(year: number, month: number): string {
 }
 
 export async function collectLookbackNeighborDays(input: {
-  current: LookbackPlacedDay;
+  current: { year: number; month: number; day: number; count?: number };
   book: LookbackBookView;
   currentMonth?: HistoryMonthView | null;
   loadMonth: (year: number, month: number) => Promise<HistoryMonthView | { invalid: true }>;
@@ -199,21 +245,27 @@ export async function collectLookbackNeighborDays(input: {
         ? await loadPlacedMonth(input.loadMonth, input.current.year, input.current.month)
         : null;
   const currentDays = currentPage ? lookbackPlacedDaysInMonth(currentPage) : [];
-  const previousInMonth = [...currentDays].reverse().find((day) => day < input.current.day);
-  const nextInMonth = currentDays.find((day) => day > input.current.day);
+  const previousInMonth = [...currentDays].reverse().find((entry) => entry.day < input.current.day);
+  const nextInMonth = currentDays.find((entry) => entry.day > input.current.day);
   let previous = previousInMonth
-    ? { year: input.current.year, month: input.current.month, day: previousInMonth }
+    ? {
+        year: input.current.year,
+        month: input.current.month,
+        day: previousInMonth.day,
+        count: previousInMonth.count,
+      }
     : null;
   let next = nextInMonth
-    ? { year: input.current.year, month: input.current.month, day: nextInMonth }
+    ? { year: input.current.year, month: input.current.month, day: nextInMonth.day, count: nextInMonth.count }
     : null;
   if (!previous) {
     for (let index = here - 1; index >= 0; index -= 1) {
       const month = months[index];
       const page = await loadPlacedMonth(input.loadMonth, month.year, month.month);
-      const days = page ? lookbackPlacedDaysInMonth(page) : [];
+      const days = lookbackPlacedDaysInMonth(page);
       if (days.length === 0) continue;
-      previous = { year: month.year, month: month.month, day: days[days.length - 1] };
+      const last = days[days.length - 1];
+      previous = { year: month.year, month: month.month, day: last.day, count: last.count };
       break;
     }
   }
@@ -221,9 +273,10 @@ export async function collectLookbackNeighborDays(input: {
     for (let index = here + 1; index < months.length; index += 1) {
       const month = months[index];
       const page = await loadPlacedMonth(input.loadMonth, month.year, month.month);
-      const days = page ? lookbackPlacedDaysInMonth(page) : [];
+      const days = lookbackPlacedDaysInMonth(page);
       if (days.length === 0) continue;
-      next = { year: month.year, month: month.month, day: days[0] };
+      const first = days[0];
+      next = { year: month.year, month: month.month, day: first.day, count: first.count };
       break;
     }
   }
@@ -234,11 +287,10 @@ async function loadPlacedMonth(
   loadMonth: (year: number, month: number) => Promise<HistoryMonthView | { invalid: true }>,
   year: number,
   month: number,
-): Promise<HistoryMonthView | null> {
-  try {
-    const page = await loadMonth(year, month);
-    return 'invalid' in page ? null : page;
-  } catch {
-    return null;
+): Promise<HistoryMonthView> {
+  const page = await loadMonth(year, month);
+  if ('invalid' in page) {
+    throw Object.assign(new Error('month-failed'), { year, month, invalid: true });
   }
+  return page;
 }

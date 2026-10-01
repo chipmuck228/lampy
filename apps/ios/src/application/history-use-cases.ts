@@ -43,10 +43,12 @@ export type HistoryMomentItem = HistoryListedMoment & {
 export type HistoryDayViewModel = Omit<HistoryDayView, 'items'> & {
   items: HistoryMomentItem[];
   hasMore: boolean;
+  totalCount?: number;
 };
 
 export type HistoryUnconfirmedViewModel = Omit<HistoryUnconfirmedView, 'items'> & {
   items: HistoryMomentItem[];
+  totalCount?: number;
 };
 
 export function createHistoryUseCases(deps: {
@@ -182,17 +184,27 @@ export function createHistoryUseCases(deps: {
       order: 'occurred-asc',
     });
     const view = projectHistoryDay(page.items, year, month, day, clock);
+    const totalCount =
+      offset === 0
+        ? await deps.moments.countActiveOccurred({
+            startIso: bounds.startIso,
+            endIso: bounds.endIso,
+            precisions: DAY_PRECISIONS,
+          })
+        : undefined;
     return {
       ...view,
       items: await decorate(page.items),
       hasMore: page.hasMore,
+      totalCount,
     };
   }
 
   async function getHistoryUnknown(offset = 0) {
     const page = await deps.moments.listActiveUnknown(HISTORY_PAGE_SIZE, offset);
     const view = projectHistoryUnconfirmed(page.items, { kind: 'unknown' }, clock, page.hasMore);
-    return { ...view, items: await decorate(page.items) };
+    const totalCount = offset === 0 ? await deps.moments.countActiveUnknown() : undefined;
+    return { ...view, items: await decorate(page.items), totalCount };
   }
 
   async function getHistoryYearUnconfirmed(year: number, offset = 0) {
@@ -207,7 +219,15 @@ export function createHistoryUseCases(deps: {
       order: 'occurred-asc',
     });
     const view = projectHistoryUnconfirmed(page.items, { kind: 'year', year }, clock, page.hasMore);
-    return { ...view, items: await decorate(page.items) };
+    const totalCount =
+      offset === 0
+        ? await deps.moments.countActiveOccurred({
+            startIso: bounds.startIso,
+            endIso: bounds.endIso,
+            precisions: ['year'],
+          })
+        : undefined;
+    return { ...view, items: await decorate(page.items), totalCount };
   }
 
   async function getHistoryMonthUnconfirmed(year: number, month: number, offset = 0) {
@@ -227,7 +247,15 @@ export function createHistoryUseCases(deps: {
       clock,
       page.hasMore,
     );
-    return { ...view, items: await decorate(page.items) };
+    const totalCount =
+      offset === 0
+        ? await deps.moments.countActiveOccurred({
+            startIso: bounds.startIso,
+            endIso: bounds.endIso,
+            precisions: ['month'],
+          })
+        : undefined;
+    return { ...view, items: await decorate(page.items), totalCount };
   }
 
   return {

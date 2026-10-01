@@ -10,7 +10,7 @@ import { Text } from '../../screens/life-text';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import { getUseCases } from '../../application/container';
-import { HISTORY_PAGE_SIZE, type HistoryMomentItem } from '../../application/history-use-cases';
+import type { HistoryMomentItem } from '../../application/history-use-cases';
 import {
   lookbackBookLocateId,
   lookbackBookMonthOpenable,
@@ -25,8 +25,13 @@ import {
   chooseDefaultLookbackScope,
   collectLookbackNeighborDays,
   keepExpandedIds,
+  lookbackMoreOffset,
+  lookbackReadingResolvedCount,
+  lookbackReadingScopeKey,
   lookbackScopesEqual,
   restoreLookbackPages,
+  shouldAcceptLookbackMorePage,
+  type LookbackMoreRequest,
   type LookbackPlacedDay,
   type LookbackReadingScope,
   type LookbackReadingSnapshot,
@@ -89,6 +94,7 @@ type ReadingState =
       hasMore: boolean;
       loadedOffset: number;
       moreError?: boolean;
+      moreLoading?: boolean;
     };
 
 function focusRef(node: View | null) {
@@ -125,7 +131,7 @@ export default function LookbackIndexScreen() {
     previous: LookbackPlacedDay | null;
     next: LookbackPlacedDay | null;
   }>({ previous: null, next: null });
-  const [scopeCount, setScopeCount] = useState(0);
+  const [scopeCount, setScopeCount] = useState<number | null>(null);
   const [unconfirmedCopy, setUnconfirmedCopy] = useState<{ title: string; explanation: string } | null>(
     null,
   );
@@ -136,6 +142,7 @@ export default function LookbackIndexScreen() {
   const locateSeqRef = useRef(0);
   const expandGeneration = useRef(0);
   const readingGeneration = useRef(0);
+  const moreInFlight = useRef<LookbackMoreRequest | null>(null);
   const mounted = useRef(true);
   const changeDayRef = useRef<View>(null);
   const catalogCloseRef = useRef<View>(null);
@@ -193,7 +200,14 @@ export default function LookbackIndexScreen() {
     if (target.kind === 'day') {
       const next = await app.getHistoryDay(target.year, target.month, target.day, offset);
       if ('invalid' in next) throw Object.assign(new Error('invalid'), { invalid: true });
-      return { items: next.items, hasMore: next.hasMore, invalid: false as const, title: next.title, empty: next.isEmpty };
+      return {
+        items: next.items,
+        hasMore: next.hasMore,
+        invalid: false as const,
+        title: next.title,
+        empty: next.isEmpty,
+        totalCount: next.totalCount,
+      };
     }
     if (target.kind === 'unknown') {
       const next = await app.getHistoryUnknown(offset);
@@ -202,6 +216,7 @@ export default function LookbackIndexScreen() {
         hasMore: next.hasMore,
         title: next.title,
         explanation: next.explanation,
+        totalCount: next.totalCount,
       };
     }
     if (target.kind === 'year-unconfirmed') {
@@ -212,6 +227,7 @@ export default function LookbackIndexScreen() {
         hasMore: next.hasMore,
         title: next.title,
         explanation: next.explanation,
+        totalCount: next.totalCount,
       };
     }
     const next = await app.getHistoryMonthUnconfirmed(target.year, target.month, offset);
@@ -221,6 +237,7 @@ export default function LookbackIndexScreen() {
       hasMore: next.hasMore,
       title: next.title,
       explanation: next.explanation,
+      totalCount: next.totalCount,
     };
   }, []);
 
@@ -276,31 +293,36 @@ export default function LookbackIndexScreen() {
       setExpandedIds([]);
       setNeighbors({ previous: null, next: null });
       setUnconfirmedCopy(null);
-      if (options.count == null) setScopeCount(0);
+      if (options.count == null) setScopeCount(null);
     }
     if (options.count != null) setScopeCount(options.count);
+    moreInFlight.current = null;
     if (target.kind === 'day') {
       rememberLookbackBookOpen({ year: target.year, month: target.month, day: target.day });
     }
     try {
+      let firstPage:
+        | { title?: string; explanation?: string; totalCount?: number }
+        | undefined;
       const restored = await restoreLookbackPages({
         targetOffset: options.snapshot?.loadedOffset ?? 0,
         loadPage: async (offset) => {
           const page = await loadPageForScope(target, offset);
+          if (offset === 0) firstPage = page;
           return { items: page.items, hasMore: page.hasMore };
         },
       });
       if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
-      if (target.kind !== 'day') {
-        try {
-          const header = await loadPageForScope(target, 0);
-          if (header.title && header.explanation) {
-            setUnconfirmedCopy({ title: header.title, explanation: header.explanation });
-          }
-        } catch {
-          // keep previous copy
-        }
+      if (target.kind !== 'day' && firstPage?.title && firstPage.explanation) {
+        setUnconfirmedCopy({ title: firstPage.title, explanation: firstPage.explanation });
       }
+      const resolvedCount = lookbackReadingResolvedCount({
+        known: options.count,
+        totalCount: firstPage?.totalCount,
+        loadedCount: restored.items.length,
+        hasMore: restored.hasMore,
+      });
+      if (resolvedCount != null) setScopeCount(resolvedCount);
       if (!restored.ok && restored.items.length === 0) {
         setReading({ status: 'error', retry: 'scope' });
         if (options.snapshot) persistSnapshot(options.snapshot);
@@ -315,6 +337,8 @@ export default function LookbackIndexScreen() {
           expandedIds: [],
           scrollY: 0,
         });
+        setRestoreSeq((current) => current + 1);
+        setPendingRestoreY(0);
         if (options.locate && target.kind === 'day') beginLocate(lookbackBookLocateId(target));
         return;
       }
@@ -328,7 +352,6 @@ export default function LookbackIndexScreen() {
         loadedOffset: restored.loadedOffset,
         moreError: !restored.ok,
       });
-      if (options.count == null && !restored.hasMore) setScopeCount(restored.items.length);
       persistSnapshot({
         scope: target,
         loadedOffset: restored.loadedOffset,
@@ -338,9 +361,14 @@ export default function LookbackIndexScreen() {
       if (options.snapshot && restored.ok && options.snapshot.scrollY > 0) {
         setRestoreSeq((current) => current + 1);
         setPendingRestoreY(options.snapshot.scrollY);
+      } else if (!same || options.locate) {
+        setRestoreSeq((current) => current + 1);
+        setPendingRestoreY(0);
       }
       if (options.locate && target.kind === 'day') beginLocate(lookbackBookLocateId(target));
-      if (target.kind === 'day' && viewRef.current) void loadNeighbors(target, viewRef.current, generation);
+      if (target.kind === 'day' && viewRef.current) {
+        void loadNeighbors({ ...target, count: options.count ?? 0 }, viewRef.current, generation);
+      }
       requestAnimationFrame(() => focusRef(readingTitleRef.current));
     } catch (caught) {
       if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
@@ -383,7 +411,7 @@ export default function LookbackIndexScreen() {
         setReading({ status: 'error', retry: 'search' });
         return;
       }
-      await loadScope(choice, { count: undefined });
+      await loadScope(choice, { count: choice.count });
     } catch {
       if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
       setReading({ status: 'error', retry: 'search' });
@@ -513,6 +541,8 @@ export default function LookbackIndexScreen() {
         });
       return () => {
         cancelled = true;
+        readingGeneration.current += 1;
+        moreInFlight.current = null;
         writeCurrentSnapshot();
         if (consumed && !applied) writeLookbackBookIntent(consumed);
         void clipsRef.current.pause();
@@ -547,26 +577,62 @@ export default function LookbackIndexScreen() {
   }
 
   async function loadMore() {
-    if (reading.status !== 'ready' || !reading.hasMore || !scope) return;
+    if (reading.status !== 'ready' || !reading.hasMore || reading.moreLoading || !scope) return;
     const generation = readingGeneration.current;
-    const offset = reading.loadedOffset + HISTORY_PAGE_SIZE;
+    const offset = lookbackMoreOffset(reading.loadedOffset);
+    const request = { scopeKey: lookbackReadingScopeKey(scope), generation, offset };
+    if (moreInFlight.current) return;
+    moreInFlight.current = request;
+    setReading((current) => (current.status === 'ready' ? { ...current, moreLoading: true } : current));
     try {
       const page = await loadPageForScope(scope, offset);
-      if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
-      setReading((current) => {
-        if (current.status !== 'ready') return current;
-        return {
-          ...current,
-          items: [...current.items, ...page.items],
-          hasMore: page.hasMore,
-          loadedOffset: offset,
-          moreError: false,
-        };
+      const current = readingRef.current;
+      const currentScope = scopeRef.current;
+      if (
+        !mounted.current ||
+        current.status !== 'ready' ||
+        !currentScope ||
+        !shouldAcceptLookbackMorePage({
+          request,
+          current: {
+            scopeKey: lookbackReadingScopeKey(currentScope),
+            generation: readingGeneration.current,
+            loadedOffset: current.loadedOffset,
+          },
+        })
+      ) {
+        return;
+      }
+      setReading({
+        ...current,
+        items: [...current.items, ...page.items],
+        hasMore: page.hasMore,
+        loadedOffset: offset,
+        moreError: false,
+        moreLoading: false,
       });
       patchLookbackReadingSnapshot({ loadedOffset: offset });
     } catch {
-      if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
-      setReading((current) => (current.status === 'ready' ? { ...current, moreError: true } : current));
+      if (
+        !mounted.current ||
+        !lookbackBookResponseIsCurrent(readingGeneration.current, generation) ||
+        !scopeRef.current ||
+        lookbackReadingScopeKey(scopeRef.current) !== request.scopeKey
+      ) {
+        return;
+      }
+      setReading((current) =>
+        current.status === 'ready' ? { ...current, moreError: true, moreLoading: false } : current,
+      );
+    } finally {
+      if (
+        moreInFlight.current &&
+        moreInFlight.current.scopeKey === request.scopeKey &&
+        moreInFlight.current.generation === request.generation &&
+        moreInFlight.current.offset === request.offset
+      ) {
+        moreInFlight.current = null;
+      }
     }
   }
 
@@ -848,7 +914,7 @@ export default function LookbackIndexScreen() {
           <Text style={lookbackStyles.action}>后面的记录暂时读不出来。再试一次</Text>
         </Pressable>
       ) : null}
-      {readyReading?.hasMore && !readyReading.moreError ? (
+      {readyReading?.hasMore && !readyReading.moreError && !readyReading.moreLoading ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="继续往下看"
@@ -864,7 +930,12 @@ export default function LookbackIndexScreen() {
           current={selectedDay}
           previous={neighbors.previous}
           next={neighbors.next}
-          onOpen={(day) => void loadScope({ kind: 'day', ...day })}
+          onOpen={(day) =>
+            void loadScope(
+              { kind: 'day', year: day.year, month: day.month, day: day.day },
+              { count: day.count, locate: true },
+            )
+          }
         />
       ) : null}
     </LookbackScaffold>

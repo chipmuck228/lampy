@@ -6,8 +6,11 @@ import {
   lookbackNeighborCaption,
   lookbackNeighborDays,
   lookbackReadingDayTitle,
+  lookbackMoreInFlightBlocks,
+  lookbackReadingResolvedCount,
   lookbackReadingScopeKey,
   restoreLookbackPages,
+  shouldAcceptLookbackMorePage,
 } from './lookback-reading';
 import type { LookbackBookView } from './lookback-book';
 import type { HistoryMonthView } from '../projections/history-projection';
@@ -64,8 +67,8 @@ function book(overrides: Partial<LookbackBookView> = {}): LookbackBookView {
 describe('lookback reading contracts', () => {
   it('lists candidate months newest year then newest month first', () => {
     expect(lookbackCandidateMonths(book())).toEqual([
-      { year: 2026, month: 10, day: 0 },
-      { year: 2026, month: 9, day: 0 },
+      { year: 2026, month: 10, day: 0, count: 0 },
+      { year: 2026, month: 9, day: 0, count: 0 },
     ]);
   });
 
@@ -79,7 +82,7 @@ describe('lookback reading contracts', () => {
         return monthPage(year, month, [24, 27, 28]);
       },
     });
-    expect(choice).toEqual({ kind: 'day', year: 2026, month: 9, day: 28 });
+    expect(choice).toEqual({ kind: 'day', year: 2026, month: 9, day: 28, count: 1 });
     expect(loads).toEqual(['2026-10', '2026-9']);
   });
 
@@ -168,12 +171,12 @@ describe('lookback reading contracts', () => {
   });
 
   it('names neighbor days and writes the year only when the target crosses a year', () => {
-    const current = { year: 2026, month: 9, day: 27 };
+    const current = { year: 2026, month: 9, day: 27, count: 2 };
     const neighbors = lookbackNeighborDays(current, [
-      { year: 2025, month: 11, day: 2 },
-      { year: 2026, month: 9, day: 24 },
-      { year: 2026, month: 9, day: 27 },
-      { year: 2026, month: 9, day: 28 },
+      { year: 2025, month: 11, day: 2, count: 1 },
+      { year: 2026, month: 9, day: 24, count: 2 },
+      { year: 2026, month: 9, day: 27, count: 2 },
+      { year: 2026, month: 9, day: 28, count: 1 },
     ]);
     expect(lookbackNeighborCaption('previous', current, neighbors.previous!)).toBe(
       '前一个有记录日 · 9月24日',
@@ -182,7 +185,7 @@ describe('lookback reading contracts', () => {
       '后一个有记录日 · 9月28日',
     );
     expect(
-      lookbackNeighborCaption('previous', current, { year: 2025, month: 11, day: 2 }),
+      lookbackNeighborCaption('previous', current, { year: 2025, month: 11, day: 2, count: 1 }),
     ).toBe('前一个有记录日 · 2025年11月2日');
     expect(lookbackReadingDayTitle(2026, 9, 27)).toBe('9月27日');
     expect(lookbackReadingScopeKey({ kind: 'day', year: 2026, month: 9, day: 27 })).toBe(
@@ -199,8 +202,81 @@ describe('lookback reading contracts', () => {
         month === 10 ? monthPage(year, month, [], 2) : monthPage(year, month, [24, 27, 28]),
     });
     expect(neighbors).toEqual({
-      previous: { year: 2026, month: 9, day: 27 },
+      previous: { year: 2026, month: 9, day: 27, count: 2 },
       next: null,
     });
+  });
+
+  it('does not skip a failed month when walking to a neighbor day', async () => {
+    await expect(
+      collectLookbackNeighborDays({
+        current: { year: 2026, month: 9, day: 28, count: 1 },
+        book: book({
+          years: [
+            {
+              year: 2026,
+              momentCount: 8,
+              title: '2026年',
+              yearUnconfirmedCount: 0,
+              yearUnconfirmedLabel: '这一年，月份未确认',
+              months: [
+                { month: 11, label: '11月', count: 2, summary: '有2条记录' },
+                { month: 10, label: '10月', count: 2, summary: '有2条记录' },
+                { month: 9, label: '9月', count: 4, summary: '有4条记录' },
+              ],
+            },
+          ],
+        }),
+        currentMonth: monthPage(2026, 9, [24, 27, 28]),
+        loadMonth: async (year, month) => {
+          if (month === 10) throw new Error('october failed');
+          return monthPage(year, month, [2]);
+        },
+      }),
+    ).rejects.toThrow('october failed');
+  });
+
+  it('blocks a second more-request while one is already in flight', () => {
+    const next = { scopeKey: 'day:2026-09-27', generation: 3, offset: 50 };
+    expect(lookbackMoreInFlightBlocks(null, next)).toBe(false);
+    expect(lookbackMoreInFlightBlocks(next, next)).toBe(true);
+  });
+
+  it('accepts a more-page only for the current scope, generation, and next offset', () => {
+    expect(
+      shouldAcceptLookbackMorePage({
+        request: { scopeKey: 'day:2026-09-27', generation: 3, offset: 50 },
+        current: { scopeKey: 'day:2026-09-27', generation: 3, loadedOffset: 0 },
+      }),
+    ).toBe(true);
+    expect(
+      shouldAcceptLookbackMorePage({
+        request: { scopeKey: 'day:2026-09-27', generation: 3, offset: 50 },
+        current: { scopeKey: 'day:2026-09-28', generation: 3, loadedOffset: 0 },
+      }),
+    ).toBe(false);
+    expect(
+      shouldAcceptLookbackMorePage({
+        request: { scopeKey: 'day:2026-09-27', generation: 3, offset: 50 },
+        current: { scopeKey: 'day:2026-09-27', generation: 4, loadedOffset: 0 },
+      }),
+    ).toBe(false);
+    expect(
+      shouldAcceptLookbackMorePage({
+        request: { scopeKey: 'day:2026-09-27', generation: 3, offset: 50 },
+        current: { scopeKey: 'day:2026-09-27', generation: 3, loadedOffset: 50 },
+      }),
+    ).toBe(false);
+  });
+
+  it('does not invent a total from a partial page', () => {
+    expect(
+      lookbackReadingResolvedCount({ known: 11, loadedCount: 2, hasMore: true }),
+    ).toBe(11);
+    expect(
+      lookbackReadingResolvedCount({ totalCount: 61, loadedCount: 50, hasMore: true }),
+    ).toBe(61);
+    expect(lookbackReadingResolvedCount({ loadedCount: 50, hasMore: true })).toBeNull();
+    expect(lookbackReadingResolvedCount({ loadedCount: 3, hasMore: false })).toBe(3);
   });
 });
