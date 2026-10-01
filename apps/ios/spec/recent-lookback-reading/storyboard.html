@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>最近 / 回看 · 改前改后</title>
+  <style>
+    :root {
+      --paper: #F3F0E9;
+      --ink: #25231F;
+      --soft: #5C5851;
+      --sage: #53604F;
+      --sound: #4F626D;
+      --line: rgba(37, 35, 31, 0.16);
+      --mark: #87513D;
+      --ok: #3d5340;
+      --calm: #6F8B86;
+      --unknown: #8B867C;
+      --phone-w: 280px;
+    }
+    body { margin: 0; background: #e4dfd4; color: var(--ink); font: 16px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 24px 120px; }
+    h1 { font-size: 28px; font-weight: 500; margin: 0 0 8px; }
+    h2 { font-size: 20px; font-weight: 500; margin: 56px 0 12px; }
+    h3 { font-size: 16px; font-weight: 500; margin: 0 0 8px; }
+    p, li { color: var(--soft); }
+    code { font-size: 13px; color: var(--ink); }
+    .lead { font-size: 17px; max-width: 760px; }
+    .nv { font-size: 12px; color: var(--mark); letter-spacing: 0.04em; }
+    .ok { font-size: 13px; color: var(--ok); }
+    .ban { font-size: 13px; color: var(--mark); }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; margin: 16px 0 8px; }
+    @media (max-width: 800px) { .pair { grid-template-columns: 1fr; } }
+    .phone {
+      background: var(--paper);
+      width: var(--phone-w);
+      height: 580px;
+      padding: 22px 20px 0;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .phone.tall { height: auto; min-height: 580px; padding-bottom: 16px; }
+    .phone.short { height: 420px; }
+    .phone.wide { width: 420px; height: 300px; }
+    .phone.pad { width: 360px; height: 500px; }
+    .phone.xxxl { font-size: 1.15em; }
+    .title { font-size: 28px; line-height: 36px; margin: 0; }
+    .hero { display: flex; justify-content: space-between; align-items: center; margin: 0 0 14px; }
+    .set { font-size: 13px; color: var(--sage); min-height: 32px; display: flex; align-items: center; }
+    .date { color: var(--sage); font-size: 13px; margin: 18px 0 8px; }
+    .note { font-size: 18px; line-height: 26px; margin: 0 0 6px; color: var(--ink); }
+    .note.clamp { max-height: 156px; overflow: hidden; position: relative; }
+    .note.clamp::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: linear-gradient(transparent, var(--paper)); }
+    .occur { font-size: 13px; color: var(--sage); margin: 0 0 8px; }
+    .sound { color: var(--sound); font-size: 14px; margin: 8px 0 2px; }
+    .feel { color: var(--soft); font-size: 13px; display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--calm); flex-shrink: 0; }
+    .dot.old { background: var(--unknown); }
+    .act { color: var(--sage); min-height: 48px; display: flex; align-items: center; gap: 8px; font-size: 15px; }
+    .act.play { color: var(--sound); }
+    .rule { width: 72px; height: 1px; background: var(--line); margin: 8px 0 16px; }
+    .img { background: #ddd6c8; color: var(--sage); font-size: 11px; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box; margin: 6px 0; }
+    .img.l { width: 100%; height: 86px; }
+    .img.p { width: 46%; height: 110px; }
+    .img.miss { background: transparent; color: var(--soft); height: auto; min-height: 64px; align-items: center; padding: 16px 0; }
+    .row { display: flex; gap: 8px; }
+    .band { margin-top: auto; border-top: 1px solid var(--line); display: flex; justify-content: space-between; padding: 10px 0 16px; font-size: 14px; color: var(--sage); }
+    .cap { font-size: 13px; color: var(--sage); margin: 8px 0 0; max-width: var(--phone-w); }
+    .tag { display: inline-block; font-size: 11px; letter-spacing: .04em; color: var(--sage); border: 1px solid var(--line); padding: 2px 6px; margin-bottom: 8px; }
+    .yr { font-size: 20px; margin: 10px 0 2px; }
+    .mo, .day { min-height: 40px; display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+    .meta { font-size: 13px; color: var(--sage); }
+    .count { font-size: 12px; color: var(--sage); background: #e8e4d8; padding: 2px 6px; border-radius: 6px; }
+    .head { font-size: 20px; margin: 4px 0 2px; }
+    .week { font-size: 14px; color: var(--sage); margin: 0 0 12px; }
+    .nav { display: flex; justify-content: space-between; gap: 12px; margin: 16px 0 8px; }
+    .nav span { font-size: 13px; color: var(--sage); min-height: 48px; display: flex; align-items: center; }
+    .fade { outline: 1px dashed var(--sage); outline-offset: 4px; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 12px 0 24px; }
+    th, td { border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; padding: 8px 10px 8px 0; color: var(--soft); }
+    th { color: var(--ink); font-weight: 500; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>最近 / 回看 · 同一批夹具的改前改后</h1>
+  <p class="lead">基线 <code>origin/main</code> @ <code>d5c0238</code>（#49）。夹具见 <code>samples.md</code>。左栏是现网结构，右栏是采用稿。本页是静态对照，<strong>不是</strong>原生走查，不得记运行 PASS。</p>
+  <p class="nv">结构稿 · 无真机截图 · 不写入 Liuz17</p>
+
+  <h2>夹具索引</h2>
+  <table>
+    <tr><th>ID</th><th>用来看什么</th></tr>
+    <tr><td>F-short / F-one / F-two / F-three / F-audio / F-mix</td><td>最近单态与同日四条</td></tr>
+    <tr><td>F-none / F-old / F-missing / F-unknown</td><td>无感受、旧词、缺失媒体</td></tr>
+    <tr><td>D-dense / D-mixday / D-sparse / Y-only / Y-older</td><td>回看密、疏、多年</td></tr>
+    <tr><td>U-root / U-year / U-month</td><td>三种时间未确认</td></tr>
+    <tr><td>E-empty / E-fail / E-part</td><td>空与失败</td></tr>
+  </table>
+
+  <h2>1. 最近 · 同日四条</h2>
+  <p>记录于 10月1日：F-mix、F-audio、F-short、F-one。F-mix 发生于 9月28日。</p>
+  <div class="pair">
+    <section>
+      <div class="tag">改前 · 现网</div>
+      <div class="phone">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 10月1日</div>
+        <p class="note">傍晚回家，楼道里还留着白天的热。门开了一半，桌上的杯子没洗。我把窗户推开一点，听见楼下有人在说话，听不清在说什么。后来就坐了一会儿。没有特别要记下的事…</p>
+        <p class="occur">发生于 9月28日</p>
+        <div class="img p">竖图</div>
+        <div class="img p">竖图</div>
+        <p class="sound">当时的声音 · 18秒</p>
+        <div class="act play">播放</div>
+        <p class="feel"><span class="dot"></span>平静</p>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">全文铺开，两张竖图各占一行。首屏只看见第一条。没有「还有正文」。</p>
+    </section>
+    <section>
+      <div class="tag">改后 · 采用</div>
+      <div class="phone">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 10月1日</div>
+        <p class="note clamp">傍晚回家，楼道里还留着白天的热。门开了一半，桌上的杯子没洗。我把窗户推开一点，听见楼下有人在说话，听不清在说什么。后来就坐了一会儿。</p>
+        <p class="occur">发生于 9月28日</p>
+        <div class="row"><div class="img p">竖图</div><div class="img p">竖图</div></div>
+        <p class="sound">当时的声音 · 18秒</p>
+        <div class="act play">播放</div>
+        <p class="feel"><span class="dot"></span>平静</p>
+        <div class="act">看这条 · 还有正文</div>
+        <div class="rule"></div>
+        <p class="sound">一段声音 · 12秒</p>
+        <div class="act play">播放</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">长文 6 行预览。两竖图组带。浅线后是独立声音。发生日仍单独写。</p>
+    </section>
+  </div>
+
+  <h2>2. 最近 · 短文字 / 单图 / 两图 / 三图 / 仅声音</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">改前</div>
+      <div class="phone tall">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 10月1日</div>
+        <p class="note">门口的风还在。</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">窗台上的杯子。</p>
+        <div class="img l">4:3 单图</div>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <div class="img p">3:4</div>
+        <div class="img p">3:4</div>
+        <div class="act">看这条</div>
+      </div>
+      <p class="cap">短句已完整，这点保留。两图强制纵排，占高。</p>
+    </section>
+    <section>
+      <div class="tag">改后</div>
+      <div class="phone tall">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 10月1日</div>
+        <p class="note">门口的风还在。</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">窗台上的杯子。</p>
+        <div class="img l">4:3 原比例</div>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <div class="row"><div class="img p">3:4</div><div class="img p">3:4</div></div>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">院子里的光。</p>
+        <div class="img l">4:3</div>
+        <div class="row"><div class="img p">3:4</div><div class="img p">3:4</div></div>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="sound">一段声音 · 12秒</p>
+        <div class="act play">播放</div>
+        <div class="act">看这条</div>
+      </div>
+      <p class="cap">单图原比例。两竖图组带。三图 = 横图 + 两人带。仅声音紧凑，播放与看这条分开。</p>
+    </section>
+  </div>
+
+  <h2>3. 最近 · 无感受 / 旧词 / 缺失媒体</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">改前 = 改后（语义已对）</div>
+      <div class="phone">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 9月27日</div>
+        <p class="note">下午的走廊。</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">那天下过雨。</p>
+        <p class="feel"><span class="dot old"></span>温暖</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">门口那张。</p>
+        <div class="img miss">这张照片暂时找不到了，但这条记录还在。</div>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">F-none 无色点。F-old 未知色。F-missing 纵排说明，不补图。阶段 B 不改这些语义，只保证大字号仍纵排。</p>
+    </section>
+    <section>
+      <div class="tag">禁止</div>
+      <div class="phone">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 9月27日</div>
+        <p class="note" style="background:#e4efe8;padding:12px;margin:0 -8px 12px;">下午的走廊。</p>
+        <p class="meta">连续 3 天 · 今日已留下</p>
+        <p class="note">为你生成的标题：雨后的心情</p>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ban">不要感受铺底、打卡、自动标题。</p>
+    </section>
+  </div>
+
+  <h2>4. 最近 · 保存回到最近</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">改前</div>
+      <div class="phone">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 10月1日</div>
+        <p class="note">门口的风还在。</p>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">dismissTo('/') 后重读。新条在顶上，但无一次回声，刷新也会像刚写下。</p>
+    </section>
+    <section>
+      <div class="tag">改后</div>
+      <div class="phone">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 10月1日</div>
+        <div class="fade">
+          <p class="note">门口的风还在。</p>
+          <div class="act">看这条</div>
+        </div>
+        <div class="rule"></div>
+        <p class="note">窗台上的杯子。</p>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ok">虚线只表示本次保存的一次淡入。再 focus / 回前台不再闪。Reduce Motion 没有这圈。</p>
+    </section>
+  </div>
+
+  <h2>5. 回看 · 进入后默认一天</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">改前 · C′ 书页</div>
+      <div class="phone">
+        <p class="title">回看</p>
+        <p class="meta">时间未确认 · 3条</p>
+        <p class="yr">2026年</p>
+        <p class="meta">42条</p>
+        <div class="mo"><span>9月</span><span class="meta">14条</span></div>
+        <div class="mo"><span>这一年，月份未确认</span><span class="meta">2条</span></div>
+        <p class="yr">2025年</p>
+        <div class="mo"><span>3月</span><span class="meta">1条</span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">进门是目录。要再点月、再点日，才看见最多两条摘录。</p>
+    </section>
+    <section>
+      <div class="tag">改后 · 阅读态</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月28日</p>
+        <p class="week">星期一</p>
+        <p class="note clamp">傍晚回家，楼道里还留着白天的热。门开了一半，桌上的杯子没洗。我把窗户推开一点，听见楼下有人在说话，听不清在说什么。</p>
+        <div class="row"><div class="img p">竖图</div><div class="img p">竖图</div></div>
+        <p class="sound">当时的声音 · 18秒</p>
+        <div class="act play">播放</div>
+        <p class="feel"><span class="dot"></span>平静</p>
+        <div class="act">展开全文</div>
+        <div class="act">看这条</div>
+        <div class="nav"><span></span><span>上一有记录日 · 9月27日</span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">默认最近明确发生日（夹具里是 9月28日的 F-mix）。目录收起。页尾只有实际存在的邻日。</p>
+    </section>
+  </div>
+
+  <h2>6. 回看 · 目录开合</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">改前 · 目录与摘录叠在一起</div>
+      <div class="phone">
+        <p class="title">回看</p>
+        <p class="yr">2026年</p>
+        <div class="mo"><span>9月</span><span class="meta">14条 ▾</span></div>
+        <div class="day"><span>27日　周五</span><span class="count">11条</span></div>
+        <p class="note clamp">下午的走廊。</p>
+        <div class="act">看这条</div>
+        <p class="note clamp">那天下过雨。</p>
+        <div class="act">看这条</div>
+        <p class="meta">这一天还有 9 条</p>
+        <div class="day"><span>24日　周二</span><span class="count">1条</span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">摘录夹在日期列表中间。11 条只露 2 条。第三张图不会出现。</p>
+    </section>
+    <section>
+      <div class="tag">改后 · 同页目录</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">收起</span></div>
+        <p class="meta">时间未确认 · 3条</p>
+        <p class="yr">2026年</p>
+        <div class="mo"><span>9月</span><span class="meta">14条 ▾</span></div>
+        <div class="day"><span>28日　周一</span><span class="count">1条</span></div>
+        <div class="day"><span>27日　周五</span><span class="count">11条</span></div>
+        <div class="day"><span>24日　周二</span><span class="count">1条</span></div>
+        <p class="meta">这个月，日子未确认 · 2条</p>
+        <div class="mo"><span>这一年，月份未确认</span><span class="meta">2条</span></div>
+        <p class="yr">2025年</p>
+        <div class="mo"><span>3月</span><span class="meta">1条</span></div>
+        <p class="yr">2024年</p>
+        <div class="mo"><span>11月</span><span class="meta">2条</span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">同时只开 9 月。点 27日 后目录收起，进入下面第 7 帧。VoiceOver 读完整「2026年9月27日，星期五」。</p>
+    </section>
+  </div>
+
+  <h2>7. 回看 · 密集日连续阅读</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">改前 · 日页（从「还有 N 条」进来）</div>
+      <div class="phone">
+        <p class="set">返回原来的位置</p>
+        <p class="head">2026年9月27日</p>
+        <p class="note">下午的走廊。</p>
+        <p class="meta">整条都是按钮</p>
+        <p class="note">那天下过雨。</p>
+        <p class="feel">温暖</p>
+        <p class="note">门口那张。</p>
+        <div class="img miss">照片暂时找不到了</div>
+        <p class="meta">声音只显示标签，不能播</p>
+        <p class="meta">无邻日 · 无底带</p>
+      </div>
+      <p class="cap">能读完全文，但离开了书页，声不能播，整条误触进详情。</p>
+    </section>
+    <section>
+      <div class="tag">改后 · /lookback 阅读态</div>
+      <div class="phone tall">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月27日</p>
+        <p class="week">星期五</p>
+        <p class="note">下午的走廊。</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">那天下过雨。</p>
+        <p class="feel"><span class="dot old"></span>温暖</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">门口那张。</p>
+        <div class="img miss">这张照片暂时找不到了，但这条记录还在。</div>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="meta">未知的一段，仍在这条里。</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">这一天的第5句。</p>
+        <div class="act">看这条</div>
+        <p class="meta">继续往下看</p>
+        <div class="nav"><span>下一有记录日 · 9月28日</span><span>上一有记录日 · 9月24日</span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">页首日期只写一次。11 条在原位接着读。播放与看这条分开。底带还在。</p>
+    </section>
+  </div>
+
+  <h2>8. 回看 · 多图与长文</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">改前摘录</div>
+      <div class="phone">
+        <p class="title">回看</p>
+        <div class="day"><span>1日　周三</span><span class="count">1条</span></div>
+        <p class="note clamp">院子里的光。</p>
+        <div class="img l">只留第 1 张</div>
+        <p class="meta">共3张</p>
+        <div class="act">看这条</div>
+      </div>
+      <p class="cap ban">另外两张无提示地不在场，只靠「共3张」。长文不能原位展开。</p>
+    </section>
+    <section>
+      <div class="tag">改后阅读</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">10月1日</p>
+        <p class="week">星期四</p>
+        <p class="note">院子里的光。</p>
+        <div class="img l">4:3</div>
+        <div class="row"><div class="img p">3:4</div><div class="img p">3:4</div></div>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ok">三张都在。组带规则与最近相同。</p>
+    </section>
+  </div>
+
+  <h2>9. 稀疏、多年、空、失败</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">多年目录（改后打开「换一天」）</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">收起</span></div>
+        <p class="yr">2026年</p>
+        <div class="mo"><span>9月</span><span class="meta">14条</span></div>
+        <p class="yr">2025年</p>
+        <div class="mo"><span>3月</span><span class="meta">1条</span></div>
+        <p class="yr">2024年</p>
+        <div class="mo"><span>11月</span><span class="meta">2条</span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">只列有记录的年、月。不默认同时展开多年。</p>
+    </section>
+    <section>
+      <div class="tag">稀疏日阅读</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月24日</p>
+        <p class="week">星期三</p>
+        <p class="note">更早的一句。</p>
+        <div class="act">看这条</div>
+        <div class="nav"><span>下一有记录日 · 9月27日</span><span></span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">一天一条也能停下来读。没有更早邻日，左侧不画空按钮。</p>
+    </section>
+  </div>
+  <div class="pair">
+    <section>
+      <div class="tag">E-empty</div>
+      <div class="phone">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <p class="note">这里，留下自己的生活。</p>
+        <p class="meta">写一句，拍一张，或留一段声音。以后再回来听见、看见。</p>
+        <div class="act">留下第一条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">现空态保留。回看空态仍是「以后可以按时间回来看。」不加统计。</p>
+    </section>
+    <section>
+      <div class="tag">E-fail / E-part</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月27日</p>
+        <p class="week">星期五</p>
+        <p class="note">这一天暂时读不出来，原来的记录还在。</p>
+        <div class="act">再试一次</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ban">失败不是空库。目录仍可打开。不得把读失败画成「这一天还没有留下什么。」</p>
+    </section>
+  </div>
+
+  <h2>10. 三种时间未确认</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">改前 / 改后深链页仍在</div>
+      <div class="phone">
+        <p class="set">返回原来的位置</p>
+        <p class="head">时间未确认</p>
+        <p class="week">有些记录还不能放进某一天。这里集中看着。</p>
+        <p class="note">一句没有日期的话。</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">另一句。</p>
+        <div class="act">看这条</div>
+      </div>
+      <p class="cap">说明只在开头。不写星期。三条范围：根 / 年内月份 / 月内日子，计数不混。</p>
+    </section>
+    <section>
+      <div class="tag">全部无明确日时的默认阅读</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">时间未确认</p>
+        <p class="week">有些记录还不能放进某一天。这里集中看着。</p>
+        <p class="note">一句没有日期的话。</p>
+        <div class="act">看这条</div>
+        <div class="nav"><span></span><span></span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">没有 exact/day 时直接进这里。页尾无假邻日。不是「为你精选」。</p>
+    </section>
+  </div>
+
+  <h2>11. 最大字号 · 短屏 · 横屏 · iPad</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">V-xxxl 最近</div>
+      <div class="phone xxxl">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 10月1日</div>
+        <p class="note">门口的风还在。</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <div class="img p" style="width:100%;height:160px">竖图纵排</div>
+        <div class="img p" style="width:100%;height:160px">竖图纵排</div>
+        <div class="act play">播放</div>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">日期轨收起。组带取消，安全纵排。触达仍 ≥ 48pt。</p>
+    </section>
+    <section>
+      <div class="tag">V-short</div>
+      <div class="phone short">
+        <div class="hero"><p class="title">最近</p><span class="set">设置</span></div>
+        <div class="date">记录于 10月1日</div>
+        <p class="note clamp">傍晚回家，楼道里还留着白天的热。</p>
+        <p class="occur">发生于 9月28日</p>
+        <div class="act">看这条 · 还有正文</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">短屏首屏仍是真实记录，不是欢迎横幅。底带在。</p>
+    </section>
+  </div>
+  <div class="pair">
+    <section>
+      <div class="tag">V-land</div>
+      <div class="phone wide">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月28日　星期一</p>
+        <p class="note clamp">傍晚回家，楼道里还留着白天的热。</p>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">横屏沿用现底带 rail。不新增左右双栏。不横滑换日。</p>
+    </section>
+    <section>
+      <div class="tag">V-ipad</div>
+      <div class="phone pad">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月27日</p>
+        <p class="week">星期五</p>
+        <p class="note">下午的走廊。</p>
+        <div class="act">看这条</div>
+        <div class="rule"></div>
+        <p class="note">那天下过雨。</p>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">阅读列封顶，不拉成仪表盘或卡片墙。结构稿，真机仍是 NOT VERIFIED。</p>
+    </section>
+  </div>
+
+  <h2>12. 流程（字）</h2>
+  <table>
+    <tr><th>最近</th><th>回看</th></tr>
+    <tr>
+      <td>打开 → 看见记录日块 → 扫读 / 播放 / 看这条 → 留下 → 保存回最近（一次淡入）→ 底带回看</td>
+      <td>打开 → 默认一天（或恢复位置）→ 连续读 / 展开 / 播放 / 看这条 → 换一天或邻日 → 详情返回仍在原处</td>
+    </tr>
+  </table>
+  <p class="nv">完整表在 routes-and-state.md。本页任何一帧都不是 PASS。</p>
+</main>
+</body>
+</html>
