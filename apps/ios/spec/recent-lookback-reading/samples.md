@@ -100,7 +100,7 @@
 | **L-skip** | 2026-10 只有 U-oct；2026-09 有 D-mixday / D-dense / D-sparse | 不适用 | 默认阅读 **9月28日**（该月最后一个有记录日），不是 10 月，也不是 unknown |
 | **L-ym** | 无任何 exact/day；有 U-year、U-month，可另有 U-root | 不适用 | 进入**目录**。不得用根上 unknown 列表代替 year/month 范围 |
 | **L-unknown** | 只有 U-root，没有 year/month 精度，也没有明确日 | 不适用 | 直接进入「时间未确认」阅读章节 |
-| **L-restore** | D-dense 已展开第 2 条、已「继续往下看」一页、滚到中段后去详情或重挂载 | 不适用 | 先出现原范围内容和展开，再回到原滚动。见 `routes-and-state.md` §5 |
+| **L-restore** | D-dense 已展开第 2 条、已「继续往下看」一页、滚到中段后去详情或重挂载 | 不适用 | 先出现原范围内容和展开，再回到原滚动。若删到不足一页，停在 offset 0，不请求旧快照多余页。见 `routes-and-state.md` §5.3 |
 
 ---
 
