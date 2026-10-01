@@ -140,11 +140,11 @@ export function LookThisHit({
       onPress={onPress}
       style={[styles.lookThis, tight && styles.lookThisTight]}
     >
-      <View style={styles.lookThisRow} testID={ids?.row}>
+      <View style={[styles.lookThisRow, tight && styles.lookThisRowTight]} testID={ids?.row}>
         <Text style={styles.lookThisText} testID={ids?.label}>
           {caption}
         </Text>
-        <View accessible={false} testID={ids?.mark}>
+        <View accessible={false} testID={ids?.mark} style={styles.lookThisMark}>
           <LifeIcon name="open" size={12} color={sage} decorative />
         </View>
       </View>
@@ -185,18 +185,28 @@ const styles = StyleSheet.create({
   lookThisTight: {
     minHeight: 48,
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     justifyContent: 'flex-start',
     paddingTop: 2,
   },
   lookThisRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    maxWidth: '100%',
+  },
+  lookThisRowTight: {
+    justifyContent: 'flex-start',
   },
   lookThisText: {
     fontSize: 16,
     lineHeight: 22,
     color: sage,
+    flexShrink: 1,
+  },
+  lookThisMark: {
+    flexShrink: 0,
   },
 });

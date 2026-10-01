@@ -15,9 +15,9 @@
 | 检查 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | PASS |
-| 相关 Jest | PASS（recent-note / save-echo / moment / images / leave-nav / recent-life / life-page） |
-| 全量 Jest | 132 suites / 697 tests PASS |
-| 改动文件 lint | `index` / `recent-save-echo`：无本轮 error |
+| 相关 Jest | PASS（life-icons / recent-note / save-echo / moment / leave-nav / recent-life） |
+| 全量 Jest | 133 suites / 699 tests PASS |
+| 改动文件 lint | `life-icons`：无本轮 error |
 | `git diff --check` | PASS |
 
 ---
@@ -28,7 +28,7 @@
 
 | 层 | 结论 |
 | --- | --- |
-| 自动化 | PASS（上表）。保存反馈三则资格在 `recent-save-echo.test.ts`：详情失焦后 active 不消费；新 focus 读取未完成不得用旧列表；本次成功只消费一次，刷新/返回不重播。长文初始六行由 `recentNoteVisibleLineLimit` 证明 |
+| 自动化 | PASS（上表）。保存反馈资格仍在 `recent-save-echo.test.ts`。「看这条」在 `life-icons.test.ts`：最大字号窄列下文案完整、可换行、可见 `minHeight` 48、不关 `allowFontScaling`、无 `hitSlop`。长文初始六行由 `recentNoteVisibleLineLimit` 证明 |
 | 模拟器实际操作 / 隔离安装 | **部分 PASS**。见下表。不是全量夹具 F |
 | 真机 | **NOT VERIFIED**。未上物理机，未碰 Liuz17，未重传 TestFlight |
 
@@ -52,7 +52,8 @@
 | 两张可读图组带 | 模拟器 PASS | `shots/07-two-photos.png`：两张竖图并排 |
 | 可读图 + 缺失图 | 模拟器 PASS | `shots/08-mix-missing.png`：瀑布可读；完整提示「这张照片暂时找不到了，但这条记录还在。」 |
 | 常规字号 | 模拟器 PASS | `06` / `07` / `08`（`content_size=large`） |
-| 最大字号稳定画面 | 模拟器 PASS（照片与底栏） | `shots/09-xxxl-stable.png`：等待 8s 后底栏「最近 / 回看 / 留下」完整；大字号不再组带，改为纵排。`09b-xxxl-text.png`：「看这条」在该帧被裁成「看这」，不把整页文案写成 XXXL PASS。`05` 仍是切换中约 3s 的残字，不能当稳定态 |
+| 最大字号稳定画面 | 模拟器 PASS（照片与底栏） | `09-xxxl-stable.png`：等 8s 后底栏完整；大字号纵排。`05` 仍是切换中残字 |
+| 「看这条」最大字号 | 自动化 PASS；实页 **部分** | 常规字号 `09c-before-xxxl.png` 两处「看这条」完整。XXXL 切上后照片把文案顶出屏，`09c-xxxl-look-this.png` **没有**拍到可见的「看这条」，不把 XXXL 实页文案写成 PASS。实现已改为换行，不缩小系统字、不加 `hitSlop` |
 | 小字号稳定画面 | 模拟器 PASS | `shots/10-extra-small.png`：提示完整，长文仍约 6 行 |
 | 声音播放 / 暂停 / 续播 | 模拟器 PASS | `20-playing.png` 正在播放且仍在最近；`21-paused.png` 已暂停 56/59；`22-resumed.png` 从 56 后续播到 57。均未进详情 |
 | 播放与打开分离 | 模拟器 PASS | 最近条同时有「播放 / 暂停」和「看这条」。点播放只改听的状态；点「看这条」才进详情（此前误点已打开详情页 `返回原来的位置`） |
@@ -65,3 +66,5 @@
 - 图：`shouldPairRecentImages`（**非**大字号且**实际正文列** ≥ 280）才组带
 - `RecentMoment` 始终稳定外层
 - 保存反馈必须同时：最近路由当前聚焦、本次 focus 的 `getRecentLife` 已成功、目标 ID 在该次结果中、`AppState === active`。失焦、新读取开始或失败会清掉本次 `loadReady`。active 回调不得用失焦前的旧列表消费 pending。旧读取结果仍按 focus / request generation 拒绝。消费一次后，刷新或详情返回不重播
+- 「看这条」允许换行；可见点击区 `minHeight` 48；不关系统缩放、不用 `hitSlop` 补救
+- Figma Make 视觉取舍（列宽分隔、原位展开、浮动留下、三屏照片、默认今天）见 `../recent-lookback-reading/figma-make-supplement.md`。**不实现于本 PR，不开始阶段 C**
