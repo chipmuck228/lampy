@@ -42,7 +42,7 @@ export function RecentMoment({
   );
   return (
     <Animated.View
-      style={{ opacity: echoing ? echoOpacity : 1 }}
+      style={[styles.shell, { opacity: echoing ? echoOpacity : 1 }]}
       testID={echoing ? `recent-echo-${item.id}` : `recent-shell-${item.id}`}
     >
       <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
@@ -107,9 +107,11 @@ export function RecentMoment({
 }
 
 const styles = StyleSheet.create({
-  moment: { gap: 8, minHeight: 48 },
+  // Native-driver opacity otherwise clips glyph ink that sits outside the RN box.
+  shell: { overflow: 'visible' },
+  moment: { gap: 8, minHeight: 48, overflow: 'visible' },
   momentMixed: { gap: 16 },
-  momentBody: { gap: 8 },
+  momentBody: { gap: 8, overflow: 'visible' },
   note: { fontSize: 21, color: ink },
   measure: {
     position: 'absolute',

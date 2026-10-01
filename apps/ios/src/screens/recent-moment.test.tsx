@@ -1,5 +1,5 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Animated } from 'react-native';
+import { Animated, StyleSheet } from 'react-native';
 
 import { RecentMoment } from './recent-moment';
 import type { RecentLifeItem } from '../application/use-cases';
@@ -112,5 +112,29 @@ describe('recent moment row', () => {
     );
     expect(view.getByTestId('recent-echo-moment_late')).toBeTruthy();
     expect(view.getByTestId('recent-note-moment_late')).toBeTruthy();
+  });
+
+  it('does not clip Dynamic Type with a fixed line box or hidden overflow', async () => {
+    const view = await render(
+      <RecentMoment
+        item={item({
+          id: 'moment_type',
+          note: '门口的风还在。',
+          occurredLabel: '发生于 9月28日',
+        })}
+        pairImages={false}
+        echoOpacity={new Animated.Value(1)}
+        listen={idle}
+        onOpen={() => undefined}
+        onPlay={() => undefined}
+        onPause={() => undefined}
+      />,
+    );
+    const shell = StyleSheet.flatten(view.getByTestId('recent-shell-moment_type').props.style);
+    expect(shell.overflow).toBe('visible');
+    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBeUndefined();
+    expect(StyleSheet.flatten(view.getByTestId('recent-occurred-moment_type').props.style).lineHeight).toBeUndefined();
+    expect(view.getByTestId('recent-note-moment_type').props.allowFontScaling).not.toBe(false);
+    expect(view.getByTestId('recent-occurred-moment_type').props.allowFontScaling).not.toBe(false);
   });
 });

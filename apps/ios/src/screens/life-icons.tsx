@@ -181,6 +181,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'visible',
   },
   lookThisTight: {
     minHeight: 48,
@@ -202,7 +203,6 @@ const styles = StyleSheet.create({
   },
   lookThisText: {
     fontSize: 16,
-    lineHeight: 22,
     color: sage,
     flexShrink: 1,
   },

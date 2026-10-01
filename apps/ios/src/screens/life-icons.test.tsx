@@ -32,6 +32,7 @@ describe('LookThisHit', () => {
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).toBeFalsy();
+    expect(StyleSheet.flatten(label.props.style).lineHeight).toBeUndefined();
 
     const hit = view.getByTestId('recent-open-moment_long');
     const hitStyle = StyleSheet.flatten(hit.props.style);

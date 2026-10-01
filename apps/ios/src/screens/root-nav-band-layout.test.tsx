@@ -212,6 +212,30 @@ describe('root nav band layout', () => {
     await view.unmount();
   });
 
+  it('drops a regular-type paint when Dynamic Type changes so the band can grow', async () => {
+    const view = await render(
+      wrap(<RootNavBand here="recent" onOther={() => undefined} onLeave={() => undefined} />),
+    );
+    await act(async () => {
+      view.getByTestId('root-nav-here').props.onTextLayout({
+        nativeEvent: { lines: [{ width: 40, height: 20 }] },
+      });
+    });
+    expect(StyleSheet.flatten(view.getByTestId('root-nav-here-wrap').props.style).minHeight).toBe(48);
+
+    await act(async () => {
+      Dimensions.set({
+        window: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
+        screen: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
+      });
+    });
+
+    expect(StyleSheet.flatten(view.getByTestId('root-nav-here-wrap').props.style).minHeight).toBeGreaterThan(
+      48,
+    );
+    await view.unmount();
+  });
+
   it('keeps the reading scroll tree mounted when metrics change', async () => {
     let mounts = 0;
     function Child() {

@@ -31,9 +31,10 @@ export function RecentFeeling({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
-    minHeight: 22,
+    minHeight: 48,
   },
   dot: {
     width: 7,
@@ -41,5 +42,5 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     flexShrink: 0,
   },
-  text: { fontSize: 14, lineHeight: 20, color: '#5C5851', flexShrink: 1 },
+  text: { fontSize: 14, color: '#5C5851', flexShrink: 1 },
 });

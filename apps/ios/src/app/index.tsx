@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   firstHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   first: { fontSize: 20, lineHeight: 28, color: ink },
   error: { fontSize: 17, lineHeight: 26, color: clay, paddingVertical: 8 },
-  day: { gap: 12 },
+  day: { gap: 12, overflow: 'visible' },
   dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
   date: { fontSize: 16, color: sage, paddingBottom: 4, minWidth: 0 },
   dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },

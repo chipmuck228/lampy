@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { FEELING_ACCENT, FEELING_ACCENT_UNKNOWN } from '../application/feeling-accent';
 import { RecentFeeling } from './recent-feeling';
@@ -27,5 +28,18 @@ describe('recent feeling accent', () => {
     expect(unknown.getByTestId('recent-feeling-old-dot').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ backgroundColor: FEELING_ACCENT_UNKNOWN })]),
     );
+  });
+
+  it('lets the feeling word grow with Dynamic Type instead of a 20pt line box', async () => {
+    const view = await render(
+      <RecentFeeling feeling={{ value: '平静', label: '平静', known: true }} testID="recent-feeling" />,
+    );
+    const row = StyleSheet.flatten(view.getByTestId('recent-feeling').props.style);
+    expect(row.minHeight).toBeGreaterThanOrEqual(48);
+    expect(row.maxHeight).toBeUndefined();
+    expect(row.flexWrap).toBe('wrap');
+    const text = StyleSheet.flatten(view.getByText('当时的感受 · 平静').props.style);
+    expect(text.lineHeight).toBeUndefined();
+    expect(view.getByText('当时的感受 · 平静').props.allowFontScaling).not.toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type Ref } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -43,6 +43,13 @@ export function RootNavBand({
 }) {
   const { width, height, fontScale } = usePageMetrics();
   const [painted, setPainted] = useState<Partial<Record<string, { width: number; height: number }>>>({});
+  const paintedScale = useRef(fontScale);
+
+  useEffect(() => {
+    if (paintedScale.current === fontScale) return;
+    paintedScale.current = fontScale;
+    setPainted({});
+  }, [fontScale]);
   const hereLabel = here === 'recent' ? '最近' : '回看';
   const otherLabel = here === 'recent' ? '回看' : '最近';
   const items = navBandItemsFor(here, !!onFamily).map((item, index) => ({
@@ -278,6 +285,7 @@ const styles = StyleSheet.create({
     minWidth: 48,
     minHeight: 48,
     justifyContent: 'center',
+    overflow: 'visible',
   },
   columnItem: {
     flexGrow: 1,
