@@ -1,7 +1,9 @@
 #!/usr/bin/env node
+/* global __dirname */
 /**
  * Inspect a Release .xcarchive. Prints reason codes only (no secrets, no bundle snippets).
  * Exit 0 only when Bundle ID / version / build / Team / main.jsbundle match.
+ * This is metadata + a few string probes, not "feature flags closed on device".
  * "jsbundle present" is not "runtime independent of Metro".
  */
 'use strict';
@@ -10,12 +12,22 @@ const { execFileSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const EXPECTED = {
-  bundleId: 'app.lampy.ios',
-  team: 'B283NY984J',
-  version: '0.1.0',
-  build: '1',
-};
+const DEFAULT_APP_JSON = path.join(__dirname, '..', 'app.json');
+
+function expectedFromAppJson(appJsonPath = DEFAULT_APP_JSON) {
+  const raw = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
+  const version = raw?.expo?.version;
+  const build = raw?.expo?.ios?.buildNumber;
+  if (version == null || version === '' || build == null || build === '') {
+    throw new Error('app.json missing expo.version or expo.ios.buildNumber');
+  }
+  return {
+    bundleId: 'app.lampy.ios',
+    team: 'B283NY984J',
+    version: String(version),
+    build: String(build),
+  };
+}
 
 function inspectJsBundleText(text) {
   const problems = [];
@@ -66,7 +78,7 @@ function listPrivacyManifests(app) {
   return found.sort();
 }
 
-function inspectArchive(archivePath, expected = EXPECTED) {
+function inspectArchive(archivePath, expected = expectedFromAppJson()) {
   const problems = [];
   const archive = path.resolve(archivePath);
   const app = path.join(archive, 'Products/Applications/Lampy.app');
@@ -133,6 +145,8 @@ function printReport(report) {
     `build=${report.build || 'MISSING'}`,
     `team=${report.team || 'MISSING'}`,
     `jsbundle_present=${report.jsbundlePresent ? 'yes' : 'no'}`,
+    `inspect_scope=plist_codesign_jsbundle_few_strings`,
+    `flags_release_pages=NOT_VERIFIED`,
     `runtime_metro_independent=${report.runtimeMetroIndependent}`,
     `privacy_manifest_count=${report.privacyManifests.length}`,
     `privacy_manifests=${report.privacyManifests.join(',') || 'NONE'}`,
@@ -141,7 +155,7 @@ function printReport(report) {
   for (const line of lines) console.log(line);
 }
 
-module.exports = { EXPECTED, inspectJsBundleText, inspectArchive };
+module.exports = { expectedFromAppJson, inspectJsBundleText, inspectArchive };
 
 if (require.main === module) {
   const archive = process.argv[2];

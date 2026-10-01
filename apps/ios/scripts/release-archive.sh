@@ -163,5 +163,8 @@ node "$ROOT/scripts/inspect-release-archive.cjs" "$OUT/Lampy.xcarchive" | tee -a
 INSPECT_STATUS=${PIPESTATUS[0]}
 set -e
 echo "inspect_exit=$INSPECT_STATUS" | tee -a "$REPORT"
+echo "flags_build_env=checked (printed EXPO_PUBLIC_* after stash; not a device page check)" | tee -a "$REPORT"
+echo "flags_release_pages=NOT_VERIFIED" | tee -a "$REPORT"
+echo "inspect covers plist/codesign/jsbundle/few strings only; not feature-flag pages." | tee -a "$REPORT"
 echo "jsbundle_present is not runtime_metro_independent; install the TestFlight build to verify." | tee -a "$REPORT"
 exit "$INSPECT_STATUS"

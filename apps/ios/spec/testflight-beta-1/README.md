@@ -24,7 +24,7 @@
 
 Release 环境由 `scripts/release-public-env.sh` 与入库的 `.env.production` 固定。`scripts/release-archive.sh` 会先挪走本机 `.env` / `.env.local`，再 prebuild + Archive，避免把本机调试开关打进包。不要只看本机 `.env` 推断外测包。不要在开发 shell 里 `source` 该 env 脚本（会把 `NODE_ENV=production` 留给 Jest）。
 
-`ios/` 未入库。若本地已有 `apps/ios/ios`，脚本会拒绝 `prebuild --clean`，除非设置 `LAMPY_ALLOW_PREBUILD_CLEAN=1`（先备份到输出目录）。辅助函数单测不能代替对 Archive 内 `main.jsbundle` 的检查：`bash scripts/release-archive.sh --inspect /tmp/lampy-testflight-beta-1/Lampy.xcarchive`。
+`ios/` 未入库。若本地已有 `apps/ios/ios`，脚本会拒绝 `prebuild --clean`，除非设置 `LAMPY_ALLOW_PREBUILD_CLEAN=1`（先备份到输出目录）。`release-archive.sh --inspect` 只核包元数据、`main.jsbundle` 是否存在、以及少量字符串；**不是**「实际 bundle 功能开关关闭态已验证」。功能关闭分两层：构建环境配置已核对；Release / TestFlight 页面须安装后看。`runtime_metro_independent=NOT_VERIFIED`。
 
 ## 1. 在 App Store Connect 创建 App
 
@@ -50,22 +50,31 @@ bash scripts/release-archive.sh
 
 1. **Distribute App**
 2. **App Store Connect**
-3. **Upload**（不要选 Development / Ad Hoc / Enterprise）
+3. **Upload**（不要选 Development / Ad Hoc / Enterprise，**不要选 TestFlight Internal Only**。同一构建还要给外测。）
 4. 分发选项保持默认即可；不要勾选会改签名的额外重新签名，除非证书过期。
 5. 等 Processing 变为 Ready to Submit / Ready to Test。
 
 `archive` 成功 **不能** 代替 TestFlight 安装验收。包内有 `main.jsbundle` 只说明「含 bundle」，**不是**「运行时不依赖 Metro」。后者必须装 TestFlight 包确认。
 
-**建议顺序：** 先上传供本人 Internal Testing → 用 TestFlight 安装包走完 `WALK.md` 六项个人 MVP 回归 → 通过后再建 External Testing 组、提交 Beta 审核、邀请外部用户。本 PR 不代上传、不代提交审核、不代发邀请。
+**顺序（不要跳）：**
+
+1. 上传到 App Store Connect（不要选 Internal Only）
+2. 本人 Internal Testing，安装 TestFlight 包
+3. 走完 `WALK.md` 六项个人 MVP 回归
+4. 建 External Testing 组，提交 **Beta App Review**
+5. 过审后再邀请测试用户
+
+本 PR 不代上传、不代提交审核、不代发邀请。
 
 ## 3. 外部测试必须走 Beta 审核
 
 少量外部用户 **不能** 只用 Internal Testing：
 
-- Internal Testing 只给 App Store Connect 团队成员（Users and Access 里的用户）。**建议本人先走这一步做安装验收。**
+- Internal Testing 只给 App Store Connect 团队成员（Users and Access 里的用户）。本人先走这一步做安装验收。
+- 上传时不要选 **TestFlight Internal Only**，否则同一构建不能再用于外测。
 - 朋友 / 少量外部用户必须建 **External Testing** 组，加入邮箱或之后开限量 Public Link。
 - **第一次外测组需要 Beta App Review。** 未过审前外部测不了。
-- 不要把「只走 Internal」当成外测完成条件；也不要在六项回归未过时申请外测审核。
+- 不要在六项回归未过时申请外测审核。
 
 过审后再邀请；本 PR 不代发邀请。
 

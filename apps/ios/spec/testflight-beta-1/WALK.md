@@ -7,7 +7,7 @@
 
 横屏 / iPad / VoiceOver：**NOT VERIFIED**。
 
-建议：先上传供本人 Internal Testing，用 TestFlight 包走完下面六项，通过后再申请外部 Beta 审核和邀请。
+顺序：上传（不要选 Internal Only）→ 本人 Internal Testing → 六项 MVP 回归 → 外部 Beta 审核 → 邀请测试用户。
 
 ## 命令
 
@@ -20,7 +20,7 @@
 | 本轮 ESLint（leave-draft 测试、release-public-env、inspect-release-archive） | **PASS** |
 | `node --test scripts/inspect-release-archive.test.cjs` | **PASS** |
 | `git diff --check -- apps/ios` | **PASS** |
-| `bash scripts/release-archive.sh --inspect /tmp/lampy-testflight-beta-1/Lampy.xcarchive` | **PASS**（problems=none） |
+| `bash scripts/release-archive.sh --inspect /tmp/lampy-testflight-beta-1/Lampy.xcarchive` | **PASS**（problems=none）。输出含 `flags_release_pages=NOT_VERIFIED`、`runtime_metro_independent=NOT_VERIFIED` |
 | `bash scripts/release-archive.sh`（本地已有 `ios/`，未设 `LAMPY_ALLOW_PREBUILD_CLEAN`） | **exit 2**，未覆盖 `ios/`；dotenv 已恢复 |
 
 ## leave-draft 三项失败：隔离对照
@@ -58,16 +58,13 @@ npx jest --ci --runInBand src/screens/leave-draft-screen.test.tsx
 | Bundle ID | `app.lampy.ios` | Archive `Info.plist` = `app.lampy.ios` |
 | Team | `B283NY984J` | codesign `TeamIdentifier=B283NY984J` |
 | Version / Build | `0.1.0` / `1` | Archive 内 `0.1.0` / `1`。本仓库无既有 TestFlight 上传记录 |
-| 家庭入口 | 关 | 包内无 `family.example`；`EXPO_PUBLIC_FAMILY_*` 键已被 inline 掉 |
-| 家庭 API | 关 | 同上 |
-| 开发诊断 | 关 | 构建时 `EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS=0`。包内出现该标识符是压缩后的标识符碰撞，**不是**值为 1 |
-| 测试登录 | 关 | 诊断关闭后，「本机设置」无测试登录 |
-| AI / 回眸 | 无入口 | `apps/ios/src` 无 memoir/AI 路由 |
-| 含 bundle | 有 `main.jsbundle` | 有（约 3.2MB）。inspect：`jsbundle_present=yes` |
+| 功能开关 · 构建环境 | 已核对 | stash 后报告 `EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS=0`，家庭入口/API/test driver 空。`.env.production` 关闭。**不是**设备页验收 |
+| 功能开关 · Release / TestFlight 页 | 待安装 | **NOT VERIFIED**。inspect **不能**写成「实际 bundle 功能开关关闭态已验证」 |
+| 含 bundle | 有 `main.jsbundle` | 有（约 3.2MB）。inspect 只核元数据、bundle 存在、少量字符串（无 `family.example` / 无开发启动器文案） |
 | 运行时不依赖 Metro | 须安装验证 | **`runtime_metro_independent=NOT_VERIFIED`**。有 bundle ≠ 运行时不依赖 Metro |
 | 个人数据 / Keychain / 本机保护 / 引导 | 不改语义 | 本分支不改 store key 与完成条件 |
 
-本机 `.env` **不是** Release 依据。`release-archive.sh` 会 stash 本地 dotenv；失败或中断后若构建期未生成同名文件则恢复，否则保留构建期文件、原件留在 stash。辅助函数单测不能代替 `--inspect`。
+本机 `.env` **不是** Release 依据。`release-archive.sh` 会 stash 本地 dotenv；失败或中断后若构建期未生成同名文件则恢复，否则保留构建期文件、原件留在 stash。`--inspect` 的 version/build 期望值读 `app.json`，不写死 `0.1.0` / `1`。inspect 不能代替页面上的功能开关验收。
 
 ## 分发配置
 
@@ -113,12 +110,14 @@ npx jest --ci --runInBand src/screens/leave-draft-screen.test.tsx
 | --- | --- |
 | 基线 SHA | `b79174b346b02cb072f526af7e3ca33dac30473d` |
 | **构建 / 打包 SHA** | `9142760cb2632f0f9a7a24fb7608a902c6f8c8c9`（打进 `main.jsbundle` 的工作区）。本轮未改打包进 App 的源码，未重新 Archive |
-| **文档 / 脚本 head** | `56a30ea91c426fa5ae2cd8e3aff2e4723712d57a`（leave-draft 测试、inspect 脚本、交接文档；不是构建 SHA）。若本行之后还有只改文档的提交，以最新 HEAD 为准，构建 SHA 仍为 `9142760` |
+| **文档 / 脚本 head** | 本收尾提交（inspect 结论分层、version/build 读 `app.json`）。**构建 SHA 仍为 `9142760cb2632f0f9a7a24fb7608a902c6f8c8c9`** |
 | version / build | `0.1.0` / `1` |
 | Xcode | 26.6（17F113） |
 | Bundle ID / Team | `app.lampy.ios` / `B283NY984J` |
-| 功能开关 | 家庭关、诊断关、测试登录关、AI 无入口（以 Archive inspect 为准，不以 helper 单测代替） |
-| Archive 结果 | 仍为先前 **SUCCEEDED** → `/tmp/lampy-testflight-beta-1/Lampy.xcarchive`。本轮 `--inspect` problems=none |
+| 功能开关 · 构建环境 | 已核对（打包时的 `EXPO_PUBLIC_*`） |
+| 功能开关 · 页面 | **NOT VERIFIED** |
+| inspect 范围 | plist / Team / version·build（来自 `app.json`）/ `main.jsbundle` / 少量字符串。**不是**功能开关关闭态 |
+| Archive 结果 | 仍为先前 **SUCCEEDED** → `/tmp/lampy-testflight-beta-1/Lampy.xcarchive`。运行代码仍为 `9142760`。本轮只改脚本和文档，保留该 Archive |
 | embedded JS | 有 `main.jsbundle` |
 | 运行时不依赖 Metro | **NOT VERIFIED**（须 TestFlight 安装） |
 | 签名 | 本地 Archive 为 `Apple Development: Zhen Liu (H36468MSTC)`。上传时须在 Organizer 再签 App Store Connect |
