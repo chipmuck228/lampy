@@ -5,6 +5,7 @@ import { Text, type } from './life-text';
 import type { LookbackDayEntry } from '../application/lookback-day';
 import {
   lookbackNeighborCaption,
+  lookbackNeighborDateLabel,
   lookbackReadingCountLabel,
   lookbackReadingDayTitle,
   lookbackReadingDayWeekday,
@@ -201,15 +202,31 @@ export function LookbackNeighborRetry({
   );
 }
 
-export function lookbackNeighborsDirection(
-  availableWidth: number,
-  captions: string[],
-): 'row' | 'column' {
-  if (captions.length <= 1 || availableWidth <= 0) return 'column';
-  const needed = captions.reduce((sum, caption, index) => {
-    return sum + caption.length * type.action.fontSize + (index > 0 ? 8 : 0);
-  }, 0);
-  return needed <= availableWidth ? 'row' : 'column';
+function LookbackNeighborDayHit({
+  direction,
+  current,
+  day,
+  onOpen,
+}: {
+  direction: 'previous' | 'next';
+  current: { year: number; month: number; day: number };
+  day: LookbackPlacedDay;
+  onOpen: (day: LookbackPlacedDay) => void;
+}) {
+  const verb = direction === 'previous' ? '前一个记录日' : '后一个记录日';
+  const date = lookbackNeighborDateLabel(current, day);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={lookbackNeighborCaption(direction, current, day)}
+      testID={direction === 'previous' ? 'lookback-reading-prev-day' : 'lookback-reading-next-day'}
+      onPress={() => onOpen(day)}
+      style={styles.neighborHit}
+    >
+      <Text style={styles.action}>{verb}</Text>
+      <Text style={styles.neighborDate}>{date}</Text>
+    </Pressable>
+  );
 }
 
 export function LookbackReadingNeighbors({
@@ -223,42 +240,15 @@ export function LookbackReadingNeighbors({
   next: LookbackPlacedDay | null;
   onOpen: (day: LookbackPlacedDay) => void;
 }) {
-  const [availableWidth, setAvailableWidth] = useState(0);
   if (!previous && !next) return null;
-  const previousCaption = previous ? lookbackNeighborCaption('previous', current, previous) : null;
-  const nextCaption = next ? lookbackNeighborCaption('next', current, next) : null;
-  const direction = lookbackNeighborsDirection(
-    availableWidth,
-    [previousCaption, nextCaption].filter((caption): caption is string => !!caption),
-  );
   return (
-    <View
-      testID="lookback-reading-neighbors"
-      onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)}
-      style={[styles.neighbors, direction === 'row' ? styles.neighborsRow : styles.neighborsColumn]}
-    >
-      {previous && previousCaption ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={previousCaption}
-          testID="lookback-reading-prev-day"
-          onPress={() => onOpen(previous)}
-          style={[styles.hit, direction === 'row' ? styles.neighborHitRow : styles.neighborHitColumn]}
-        >
-          <Text style={styles.action}>{previousCaption}</Text>
-        </Pressable>
-      ) : null}
-      {next && nextCaption ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={nextCaption}
-          testID="lookback-reading-next-day"
-          onPress={() => onOpen(next)}
-          style={[styles.hit, direction === 'row' ? styles.neighborHitRow : styles.neighborHitColumn]}
-        >
-          <Text style={styles.action}>{nextCaption}</Text>
-        </Pressable>
-      ) : null}
+    <View testID="lookback-reading-neighbors" style={styles.neighbors}>
+      {previous ? (
+        <LookbackNeighborDayHit direction="previous" current={current} day={previous} onOpen={onOpen} />
+      ) : (
+        <View style={styles.neighborSlot} />
+      )}
+      {next ? <LookbackNeighborDayHit direction="next" current={current} day={next} onOpen={onOpen} /> : null}
     </View>
   );
 }
@@ -285,9 +275,20 @@ const styles = StyleSheet.create({
   },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   action: { ...type.action, color: sage },
-  neighbors: { gap: 8, marginTop: 8 },
-  neighborsColumn: { flexDirection: 'column', alignItems: 'stretch' },
-  neighborsRow: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'flex-start' },
-  neighborHitColumn: { alignSelf: 'stretch' },
-  neighborHitRow: { flexShrink: 0 },
+  neighbors: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'flex-start',
+    gap: 16,
+    marginTop: 8,
+  },
+  neighborSlot: { flex: 1, minWidth: 0 },
+  neighborHit: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  neighborDate: { ...type.meta, color: sage },
 });
