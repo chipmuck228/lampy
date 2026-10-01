@@ -168,6 +168,7 @@ export function RootReadingLayout({
   onScrollBeginDrag,
   onContentSizeChange,
   overlay,
+  header,
   canvas = paper,
 }: {
   accessibilityLabel?: string;
@@ -180,6 +181,7 @@ export function RootReadingLayout({
   onScrollBeginDrag?: () => void;
   onContentSizeChange?: () => void;
   overlay?: ReactNode;
+  header?: ReactNode;
   canvas?: string;
 }) {
   const { width, height } = usePageMetrics();
@@ -190,6 +192,9 @@ export function RootReadingLayout({
       <View style={rail ? styles.row : styles.column}>
         {rail ? band : null}
         <View style={styles.scroll}>
+          {header ? (
+            <View style={[styles.header, { backgroundColor: canvas }]}>{header}</View>
+          ) : null}
           <ScrollView
             ref={scrollRef}
             testID={scrollTestID}
@@ -220,6 +225,11 @@ const styles = StyleSheet.create({
   column: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
   scroll: { flex: 1, minWidth: 0 },
+  header: {
+    flexShrink: 0,
+    zIndex: 2,
+    alignSelf: 'stretch',
+  },
   overlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',

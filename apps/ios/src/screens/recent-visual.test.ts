@@ -27,12 +27,14 @@ describe('recent visual presentation', () => {
     expect(recentRecordedClock('not-a-time')).toBeNull();
   });
 
-  it('keeps the attachment Recent type sizes', () => {
+  it('keeps Recent record type on the attachment hierarchy at a readable iOS size', () => {
     expect(recentType.title.fontSize).toBe(29);
-    expect(recentType.date.fontSize).toBe(19);
-    expect(recentType.note.fontSize).toBe(13);
-    expect(recentType.note.lineHeight).toBe(27);
-    expect(recentType.kicker.fontSize).toBe(10);
-    expect(recentType.open.fontSize).toBe(10);
+    expect(recentType.date.fontSize).toBe(22);
+    expect(recentType.note.fontSize).toBe(17);
+    expect(recentType.note.lineHeight).toBe(35);
+    expect(recentType.meta.fontSize).toBe(13);
+    expect(recentType.expand.fontSize).toBe(15);
+    expect(recentType.feeling.fontSize).toBe(15);
+    expect(recentType.open.fontSize).toBe(13);
   });
 });

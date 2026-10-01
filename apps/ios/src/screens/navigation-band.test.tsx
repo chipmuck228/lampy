@@ -117,9 +117,11 @@ describe('root navigation band', () => {
     });
     expect(view.getByLabelText('最近，当前页')).toBeTruthy();
     expect(view.getByLabelText('最近，当前页').props.accessibilityRole).toBe('text');
-    expect(testIdsInTree(view.getByTestId('recent-scroll') as unknown as HostNode)).not.toContain(
-      'root-nav-band',
-    );
+    const scrollIds = testIdsInTree(view.getByTestId('recent-scroll') as unknown as HostNode);
+    expect(scrollIds).not.toContain('root-nav-band');
+    expect(scrollIds).not.toContain('recent-header');
+    expect(scrollIds).not.toContain('home-account');
+    expect(view.getByTestId('recent-header')).toBeTruthy();
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
     const contentStyle = StyleSheet.flatten(view.getByTestId('recent-scroll').props.contentContainerStyle);
     expect(contentStyle?.paddingBottom).toBe(92);

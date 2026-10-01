@@ -39,7 +39,7 @@ describe('recent feeling accent', () => {
     expect(row.maxHeight).toBeUndefined();
     expect(row.flexWrap).toBe('wrap');
     const text = StyleSheet.flatten(view.getByText('当时的感受 · 平静').props.style);
-    expect(text.fontSize).toBe(11);
+    expect(text.fontSize).toBe(15);
     expect(view.getByText('当时的感受 · 平静').props.allowFontScaling).toBe(false);
   });
 });

@@ -186,12 +186,42 @@ export default function RecentScreen() {
         accessibilityLabel="最近"
         scrollTestID="recent-scroll"
         canvas={recentPaper}
+        header={
+          <View
+            testID="recent-header"
+            style={[
+              styles.hero,
+              {
+                maxWidth: columnWidth,
+                paddingHorizontal: gutter,
+                paddingTop: compact ? 12 : 20,
+              },
+            ]}
+          >
+            <View style={styles.heroCopy}>
+              <Text style={styles.eyebrow} testID="recent-eyebrow">
+                LAMPY · 生活记录
+              </Text>
+              <Text style={styles.wordmark} accessibilityRole="header">
+                最近
+              </Text>
+            </View>
+            <LifeIconButton
+              name="settings"
+              label="本机设置"
+              testID="home-account"
+              color={recentSettings}
+              size={20}
+              onPress={() => router.push('/account')}
+            />
+          </View>
+        }
         contentContainerStyle={[
           styles.column,
           {
             maxWidth: columnWidth,
             paddingHorizontal: gutter,
-            paddingTop: compact ? 8 : 0,
+            paddingTop: 4,
             paddingBottom: 92,
           },
         ]}
@@ -214,25 +244,6 @@ export default function RecentScreen() {
           </Pressable>
         }
       >
-        <View style={styles.hero}>
-          <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow} testID="recent-eyebrow">
-              LAMPY · 生活记录
-            </Text>
-            <Text style={styles.wordmark} accessibilityRole="header">
-              最近
-            </Text>
-          </View>
-          <LifeIconButton
-            name="settings"
-            label="本机设置"
-            testID="home-account"
-            color={recentSettings}
-            size={20}
-            onPress={() => router.push('/account')}
-          />
-        </View>
-
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {view?.isFirstUse && !error ? (
@@ -338,7 +349,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingTop: 20,
+    alignSelf: 'center',
+    width: '100%',
     paddingBottom: 17,
     gap: 12,
   },
@@ -365,16 +377,16 @@ const styles = StyleSheet.create({
   first: { ...recentType.expand, color: recentInk },
   error: { ...recentType.note, color: clay, paddingVertical: 8 },
   day: { overflow: 'visible' },
-  nextDay: { marginTop: 26 },
+  nextDay: { marginTop: 28 },
   sectionHeading: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: recentRule,
-    paddingTop: 20,
-    marginTop: 5,
-    marginBottom: 4,
+    paddingTop: 22,
+    marginTop: 6,
+    marginBottom: 8,
   },
   sectionCopy: { flex: 1, minWidth: 0 },
   sectionPrefix: { ...recentType.prefix, color: recentPrefixInk },

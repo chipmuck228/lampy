@@ -23,15 +23,16 @@ export const recentSerif = 'Songti SC';
 export const recentSans = 'PingFang SC';
 
 /**
- * Attachment Recent type scale (CSS px on the 390-wide device frame).
- * Fixed points, not Dynamic Type. Confirm on device.
+ * Attachment Recent hierarchy, in iOS points.
+ * CSS px on the 390-wide web frame (note 13 / meta 10) reads too small on device.
+ * Record copy uses the same file's reading sizes: compose 17, detail 15.
  */
 export const recentType = {
   kicker: {
     fontFamily: recentSans,
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: 1.3,
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: 1.4,
     fontWeight: '600' as const,
   },
   title: {
@@ -43,69 +44,69 @@ export const recentType = {
   },
   prefix: {
     fontFamily: recentSans,
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 1.2,
     fontWeight: '600' as const,
   },
   date: {
     fontFamily: recentSerif,
-    fontSize: 19,
-    lineHeight: 25,
-    letterSpacing: 0.76,
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: 0.88,
     fontWeight: '600' as const,
   },
   weekday: {
     fontFamily: recentSans,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '400' as const,
   },
   year: {
-    fontFamily: recentSans,
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: 0.8,
-  },
-  meta: {
-    fontFamily: recentSans,
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: 0.4,
-  },
-  note: {
-    fontFamily: recentSerif,
-    fontSize: 13,
-    lineHeight: 27,
-    letterSpacing: 0.46,
-  },
-  expand: {
-    fontFamily: recentSans,
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  feeling: {
-    fontFamily: recentSans,
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  open: {
-    fontFamily: recentSans,
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: 0.2,
-  },
-  fab: {
     fontFamily: recentSans,
     fontSize: 12,
     lineHeight: 16,
     letterSpacing: 0.96,
   },
+  meta: {
+    fontFamily: recentSans,
+    fontSize: 13,
+    lineHeight: 20,
+    letterSpacing: 0.52,
+  },
+  note: {
+    fontFamily: recentSerif,
+    fontSize: 17,
+    lineHeight: 35,
+    letterSpacing: 0.6,
+  },
+  expand: {
+    fontFamily: recentSans,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  feeling: {
+    fontFamily: recentSans,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  open: {
+    fontFamily: recentSans,
+    fontSize: 13,
+    lineHeight: 20,
+    letterSpacing: 0.26,
+  },
+  fab: {
+    fontFamily: recentSans,
+    fontSize: 14,
+    lineHeight: 18,
+    letterSpacing: 1.12,
+  },
   end: {
     fontFamily: recentSerif,
-    fontSize: 11,
-    lineHeight: 16,
-    letterSpacing: 0.66,
+    fontSize: 13,
+    lineHeight: 20,
+    letterSpacing: 0.78,
   },
 } as const;
 
