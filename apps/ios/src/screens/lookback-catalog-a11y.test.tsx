@@ -5,19 +5,18 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
 import { resetLookbackSessionForTests } from '../application/lookback-session';
-import { resetRecentClipMemoryForTests } from './recent-clip-memory';
 
-const mockPush = jest.fn();
 const mockGetLookbackBook = jest.fn();
 const mockGetHistoryMonth = jest.fn();
 const mockGetHistoryDay = jest.fn();
+const mockPause = jest.fn(async () => undefined);
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useEffect } = require('react');
   return {
     useRouter: () => ({
-      push: mockPush,
+      push: jest.fn(),
       back: jest.fn(),
       replace: jest.fn(),
       dismissTo: jest.fn(),
@@ -46,9 +45,9 @@ jest.mock('../application/container', () => ({
 
 jest.mock('./use-recent-clip-playback', () => ({
   useRecentClipPlayback: () => ({
-    card: () => ({ status: 'idle', currentTimeMs: 0 }),
+    card: () => ({ status: 'playing', currentTimeMs: 1200 }),
     play: jest.fn(),
-    pause: jest.fn(async () => undefined),
+    pause: mockPause,
   }),
 }));
 
@@ -65,33 +64,29 @@ function wrap(ui: ReactElement) {
   );
 }
 
-describe('lookback book expand', () => {
+describe('lookback catalog overlay a11y', () => {
   beforeEach(() => {
     cleanup();
-    mockPush.mockReset();
     mockGetLookbackBook.mockReset();
     mockGetHistoryMonth.mockReset();
     mockGetHistoryDay.mockReset();
+    mockPause.mockClear();
     resetLookbackSessionForTests();
-    resetRecentClipMemoryForTests();
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 2, fontScale: 1 },
     });
-  });
-
-  it('opens a selected day for continuous reading and keeps the exact id', async () => {
     mockGetLookbackBook.mockResolvedValue({
       unknownCount: 0,
       isEmpty: false,
       years: [
         {
           year: 2026,
-          momentCount: 14,
+          momentCount: 1,
           title: '2026年',
           yearUnconfirmedCount: 0,
           yearUnconfirmedLabel: '这一年，月份未确认',
-          months: [{ month: 9, label: '9月', count: 14, summary: '有14条记录' }],
+          months: [{ month: 9, label: '9月', count: 1, summary: '有1条记录' }],
         },
       ],
     });
@@ -102,17 +97,13 @@ describe('lookback book expand', () => {
       dayUnconfirmedCount: 0,
       dayUnconfirmedLabel: '日子未确认',
       isEmpty: false,
-      days: Array.from({ length: 30 }, (_, index) => {
-        const day = index + 1;
-        const count = day === 27 ? 11 : day === 28 ? 3 : 0;
-        return {
-          day,
-          label: `9月${day}日`,
-          count,
-          status: count > 0 ? 'filled' : 'quiet',
-          summary: count > 0 ? `有${count}条记录` : '安静',
-        };
-      }),
+      days: Array.from({ length: 30 }, (_, index) => ({
+        day: index + 1,
+        label: `9月${index + 1}日`,
+        count: index + 1 === 27 ? 1 : 0,
+        status: index + 1 === 27 ? 'filled' : 'quiet',
+        summary: index + 1 === 27 ? '有1条记录' : '安静',
+      })),
     });
     mockGetHistoryDay.mockResolvedValue({
       year: 2026,
@@ -122,81 +113,43 @@ describe('lookback book expand', () => {
       isEmpty: false,
       items: [
         {
-          id: 'm_first',
-          note: '第一条',
+          id: 'm1',
+          note: '门口的风还在。',
           precision: 'day',
           timeLabel: '2026年9月27日',
           usedRecordedAtFallback: false,
           feeling: null,
           images: [],
-          audio: null,
-          unknownMedia: [],
-        },
-        {
-          id: 'm_second',
-          note: '第二条',
-          precision: 'day',
-          timeLabel: '2026年9月27日',
-          usedRecordedAtFallback: false,
-          feeling: null,
-          images: [],
-          audio: null,
-          unknownMedia: [],
-        },
-        {
-          id: 'm_third',
-          note: '第三条',
-          precision: 'day',
-          timeLabel: '2026年9月27日',
-          usedRecordedAtFallback: false,
-          feeling: null,
-          images: [],
-          audio: null,
+          audio: { id: 'a1', status: 'available', uri: 'memory://a.m4a', durationMs: 4000, label: '一段声音' },
           unknownMedia: [],
         },
       ],
       hasMore: false,
     });
+  });
+
+  it('hides the reading tree from VoiceOver while the catalog is open and does not autoplay on close', async () => {
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-change-day')).toBeTruthy();
+      expect(view.getByTestId('lookback-reading-m1')).toBeTruthy();
     });
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-change-day'));
-      await Promise.resolve();
     });
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
+      expect(view.getByTestId('lookback-catalog')).toBeTruthy();
     });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    expect(mockPause).toHaveBeenCalled();
+    expect(view.getByTestId('lookback-catalog-close')).toBeTruthy();
+    const tree = view.getByTestId('lookback-reading-tree', { includeHiddenElements: true });
+    expect(tree.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(tree.props.accessibilityElementsHidden).toBe(true);
+    expect(view.getByTestId('lookback-reading-m1', { includeHiddenElements: true })).toBeTruthy();
+    fireEvent.press(view.getByTestId('lookback-catalog-close'));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
+      expect(view.queryByTestId('lookback-catalog')).toBeNull();
     });
-    expect(view.queryByTestId('lookback-month-calendar')).toBeNull();
-    expect(view.getByText('28日')).toBeTruthy();
-    expect(view.getByText('周一')).toBeTruthy();
-    expect(view.getByText('3条')).toBeTruthy();
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await waitFor(() => {
-      expect(view.getByTestId('lookback-book-open-m_first')).toBeTruthy();
-    });
-    expect(view.getByLabelText('2026年9月27日，星期日，11条')).toBeTruthy();
-    expect(view.getByText('第一条')).toBeTruthy();
-    expect(view.getByText('第二条')).toBeTruthy();
-    expect(view.getByText('第三条')).toBeTruthy();
-    expect(view.queryByLabelText('这一天还有9条')).toBeNull();
-    fireEvent.press(view.getByTestId('lookback-book-open-m_first'));
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_first' } });
-    view.unmount();
+    expect(view.getByTestId('lookback-change-day')).toBeTruthy();
+    expect(view.getByTestId('lookback-reading-tree').props.accessibilityElementsHidden).toBe(false);
   });
 });

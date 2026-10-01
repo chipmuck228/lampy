@@ -186,6 +186,7 @@ export function RootReadingLayout({
   onScroll,
   onScrollBeginDrag,
   onContentSizeChange,
+  cover,
 }: {
   accessibilityLabel?: string;
   scrollTestID: string;
@@ -196,6 +197,7 @@ export function RootReadingLayout({
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScrollBeginDrag?: () => void;
   onContentSizeChange?: () => void;
+  cover?: ReactNode;
 }) {
   const { width, height } = usePageMetrics();
   const rail = shouldUseNavRail(width, height);
@@ -204,19 +206,22 @@ export function RootReadingLayout({
     <SafeAreaView style={styles.safe} accessibilityLabel={accessibilityLabel}>
       <View style={rail ? styles.row : styles.column}>
         {rail ? band : null}
-        <ScrollView
-          ref={scrollRef}
-          testID={scrollTestID}
-          style={styles.scroll}
-          contentContainerStyle={contentContainerStyle}
-          onScroll={onScroll}
-          onScrollBeginDrag={onScrollBeginDrag}
-          onContentSizeChange={onContentSizeChange}
-          scrollEventThrottle={16}
-          keyboardShouldPersistTaps="handled"
-        >
-          {children}
-        </ScrollView>
+        <View style={styles.scroll}>
+          <ScrollView
+            ref={scrollRef}
+            testID={scrollTestID}
+            style={styles.scroll}
+            contentContainerStyle={contentContainerStyle}
+            onScroll={onScroll}
+            onScrollBeginDrag={onScrollBeginDrag}
+            onContentSizeChange={onContentSizeChange}
+            scrollEventThrottle={16}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+          {cover}
+        </View>
         {rail ? null : band}
       </View>
     </SafeAreaView>

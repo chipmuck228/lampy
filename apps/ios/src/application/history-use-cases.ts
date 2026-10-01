@@ -37,6 +37,7 @@ export type HistoryMomentItem = HistoryListedMoment & {
   images: ImageView[];
   audio: AudioView | null;
   unknownMedia: UnknownMediaView[];
+  recordedElsewhereLabel?: string;
 };
 
 export type HistoryDayViewModel = Omit<HistoryDayView, 'items'> & {
@@ -67,6 +68,7 @@ export function createHistoryUseCases(deps: {
         images: await deps.resolveImages(moment.assetIds),
         audio: await deps.resolveAudio(moment.assetIds),
         unknownMedia: await deps.resolveUnknown(moment.assetIds),
+        recordedElsewhereLabel: recordedElsewhereLabel(moment, clock),
       });
     }
     return decorated;
@@ -238,6 +240,23 @@ export function createHistoryUseCases(deps: {
     getHistoryYearUnconfirmed,
     getHistoryMonthUnconfirmed,
   };
+}
+
+function recordedElsewhereLabel(moment: MomentRecord, clock: HistoryClock): string | undefined {
+  if (moment.time.occurredAtPrecision === 'unknown' || !moment.time.occurredAt) return undefined;
+  const occurred = parseMillis(moment.time.occurredAt);
+  const recorded = parseMillis(moment.time.recordedAt);
+  if (occurred === null || recorded === null) return undefined;
+  const occurredParts = calendarPartsAt(occurred, clock);
+  const recordedParts = calendarPartsAt(recorded, clock);
+  if (
+    occurredParts.year === recordedParts.year &&
+    occurredParts.month === recordedParts.month &&
+    occurredParts.day === recordedParts.day
+  ) {
+    return undefined;
+  }
+  return `记录于 ${recordedParts.month}月${recordedParts.day}日`;
 }
 
 function deviceTimeZone(): string {

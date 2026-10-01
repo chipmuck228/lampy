@@ -19,7 +19,7 @@ import { usePageMetrics } from './use-page-metrics';
 import type { FeelingView } from '../application/feeling';
 import { LOOKBACK_PAGE_GUTTER } from '../application/lookback-month';
 import { lookbackLocateIsCurrent, requestLookbackLocate } from '../application/lookback-locate';
-import { rememberLookbackScroll, readLookbackScroll } from '../application/lookback-session';
+import { rememberLookbackScroll, readLookbackScroll, rememberLookbackCatalogScroll } from '../application/lookback-session';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentFeeling } from './moment-feeling';
@@ -110,6 +110,72 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
   );
 }
 
+export function LookbackCatalogOverlay({
+  children,
+  locateKey,
+  locateSeq,
+  onLocated,
+}: {
+  children: ReactNode;
+  locateKey: string | null;
+  locateSeq: number;
+  onLocated?: () => void;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+  const offsetRef = useRef(0);
+  const locateKeyRef = useRef(locateKey);
+  const locateSeqRef = useRef(locateSeq);
+  const onLocatedRef = useRef(onLocated);
+  useLayoutEffect(() => {
+    locateKeyRef.current = locateKey;
+    locateSeqRef.current = locateSeq;
+    onLocatedRef.current = onLocated;
+  });
+  const locate = useMemo(
+    () => ({
+      locateKey,
+      generation: locateKey ? locateSeq : 0,
+      scrollRef,
+      readOffset: () => offsetRef.current,
+      isCurrent: (id: string, seq: number) =>
+        lookbackLocateIsCurrent(id, seq, locateKeyRef.current, locateSeqRef.current),
+      finishLocate: (id: string, seq: number) => {
+        if (lookbackLocateIsCurrent(id, seq, locateKeyRef.current, locateSeqRef.current)) {
+          onLocatedRef.current?.();
+        }
+      },
+    }),
+    [locateKey, locateSeq],
+  );
+
+  return (
+    <LookbackLocateContext.Provider value={locate}>
+      <View testID="lookback-catalog" style={styles.catalog} accessibilityViewIsModal>
+        {locateKey ? (
+          <View testID="lookback-book-locating" accessibilityLabel={locateKey} />
+        ) : null}
+        <ScrollView
+          ref={scrollRef}
+          testID="lookback-catalog-scroll"
+          style={styles.catalogScroll}
+          contentContainerStyle={styles.catalogColumn}
+          onScroll={(event) => {
+            offsetRef.current = event.nativeEvent.contentOffset.y;
+            rememberLookbackCatalogScroll(event.nativeEvent.contentOffset.y);
+          }}
+          onScrollBeginDrag={() => {
+            if (locateKeyRef.current) onLocatedRef.current?.();
+          }}
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+        >
+          {children}
+        </ScrollView>
+      </View>
+    </LookbackLocateContext.Provider>
+  );
+}
+
 export function lookbackLayoutFor(width: number, height: number) {
   return {
     readingWidth: Math.min(width, 720),
@@ -126,26 +192,44 @@ export function useLookbackLayout() {
 
 export function LookbackScaffold({
   title,
+  subtitle,
+  headerAction,
   path,
   children,
   footer,
+  cover,
   root,
   locateKey = null,
   locateSeq = 0,
+  readingLocked = false,
+  suppressPathRestore = false,
+  pendingRestoreY = null,
+  restoreSeq = 0,
   onLocated,
+  onRestoreDone,
+  onReadingScroll,
   onBack,
   onGoRecent,
   onLeave,
   onFamily,
 }: {
   title: string;
+  subtitle?: string;
+  headerAction?: ReactNode;
   path: string;
   children: ReactNode;
   footer?: ReactNode;
+  cover?: ReactNode;
   root?: boolean;
   locateKey?: string | null;
   locateSeq?: number;
+  readingLocked?: boolean;
+  suppressPathRestore?: boolean;
+  pendingRestoreY?: number | null;
+  restoreSeq?: number;
   onLocated?: () => void;
+  onRestoreDone?: () => void;
+  onReadingScroll?: (offsetY: number) => void;
   onBack?: () => void;
   onGoRecent?: () => void;
   onLeave?: () => void;
@@ -155,6 +239,7 @@ export function LookbackScaffold({
   const { readingWidth, shortHeight } = useLookbackLayout();
   const scrollRef = useRef<ScrollView>(null);
   const restoreOnce = useRef(false);
+  const restoredSeqRef = useRef<number | null>(null);
   const locateKeyRef = useRef(locateKey);
   const locateSeqRef = useRef(locateSeq);
   const onLocatedRef = useRef(onLocated);
@@ -201,17 +286,37 @@ export function LookbackScaffold({
       <Text style={styles.title} accessibilityRole="header">
         {title}
       </Text>
-      {locateKey ? (
+      {subtitle ? (
+        <Text style={styles.body} testID="lookback-subtitle">
+          {subtitle}
+        </Text>
+      ) : null}
+      {headerAction}
+      {locateKey && !readingLocked ? (
         <View testID="lookback-book-locating" accessibilityLabel={locateKey} />
       ) : null}
-      {children}
-      {footer}
+      <View
+        testID="lookback-reading-tree"
+        pointerEvents={readingLocked ? 'none' : 'auto'}
+        importantForAccessibility={readingLocked ? 'no-hide-descendants' : 'auto'}
+        accessibilityElementsHidden={readingLocked}
+      >
+        {children}
+        {footer}
+      </View>
     </>
   );
 
   const scrollProps = {
     onContentSizeChange: () => {
-      if (locateKey) {
+      if (pendingRestoreY != null && restoredSeqRef.current !== restoreSeq) {
+        restoredSeqRef.current = restoreSeq;
+        restoreOnce.current = true;
+        scrollRef.current?.scrollTo({ y: pendingRestoreY, animated: false });
+        onRestoreDone?.();
+        return;
+      }
+      if (locateKey || suppressPathRestore) {
         restoreOnce.current = true;
         return;
       }
@@ -221,9 +326,11 @@ export function LookbackScaffold({
     },
     onScroll: (event: { nativeEvent: { contentOffset: { y: number } } }) => {
       rememberLookbackScroll(path, event.nativeEvent.contentOffset.y);
+      onReadingScroll?.(event.nativeEvent.contentOffset.y);
     },
     onScrollBeginDrag: () => {
       if (locateKeyRef.current) onLocatedRef.current?.();
+      onRestoreDone?.();
     },
   };
 
@@ -239,6 +346,7 @@ export function LookbackScaffold({
         onContentSizeChange={scrollProps.onContentSizeChange}
         onScroll={scrollProps.onScroll}
         onScrollBeginDrag={scrollProps.onScrollBeginDrag}
+        cover={cover}
         band={
           <RootNavBand here="lookback" onOther={onGoRecent} onLeave={onLeave} onFamily={onFamily} />
         }
@@ -349,6 +457,9 @@ export const lookbackStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  catalog: { ...StyleSheet.absoluteFill, backgroundColor: '#F3F0E9' },
+  catalogScroll: { flex: 1 },
+  catalogColumn: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 32, gap: 12 },
   scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,

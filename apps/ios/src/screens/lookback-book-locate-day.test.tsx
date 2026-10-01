@@ -37,6 +37,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -46,6 +47,9 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: async () => ({ items: [], hasMore: false, title: '时间未确认', explanation: '' }),
+    getHistoryYearUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryMonthUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
   }),
 }));
 
@@ -156,8 +160,8 @@ describe('lookback book day locate', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-locating')).toBeTruthy();
     });
-    expect(view.getByTestId('lookback-book-day-2026-09-01')).toBeTruthy();
-    expect(view.getByTestId('lookback-book-day-2026-09-28')).toBeTruthy();
+    expect(view.getByTestId('lookback-reading-title')).toBeTruthy();
+    expect(view.queryByTestId('lookback-catalog')).toBeNull();
     await act(async () => {
       fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-28'), 'layout', {
         nativeEvent: { layout: { x: 0, y: 8, width: 390, height: 8 } },
