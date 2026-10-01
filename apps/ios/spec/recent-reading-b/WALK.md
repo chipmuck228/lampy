@@ -67,4 +67,24 @@
 - `RecentMoment` 始终稳定外层
 - 保存反馈必须同时：最近路由当前聚焦、本次 focus 的 `getRecentLife` 已成功、目标 ID 在该次结果中、`AppState === active`。失焦、新读取开始或失败会清掉本次 `loadReady`。active 回调不得用失焦前的旧列表消费 pending。旧读取结果仍按 focus / request generation 拒绝。消费一次后，刷新或详情返回不重播
 - 「看这条」允许换行；可见点击区 `minHeight` 48；不关系统缩放、不用 `hitSlop` 补救
-- Figma Make 视觉取舍（列宽分隔、原位展开、浮动留下、三屏照片、默认今天）见 `../recent-lookback-reading/figma-make-supplement.md`。**不实现于本 PR，不开始阶段 C**
+- Figma Make 视觉取舍不再以本目录或 `figma-make-supplement.md` 为下一轮唯一依据。下一轮设计权威见独立 PR（`spec/figma-visual-authority/`）。**不实现于本 PR，不开始阶段 C**
+
+---
+
+## 收尾 · 最大字号「看这条」（2026-10-01）
+
+运行 SHA：**`fd6923b24e7bd5520a673a17dcea5fbcf1a93f10`**（与 `origin/ios/recent-reading`、PR #51 head 一致）。  
+环境：隔离机 `Lampy-recent-b-isol` UDID `144E9B83-7C64-46F3-8E15-A1DB3817E092`，iPhone 17 Pro / iOS 26.5，Dev Client `app.lampy.ios`，Metro `8083`。`content_size=accessibility-extra-extra-extra-large`。未碰 Liuz17，未重传 TestFlight。走查后已复位 `large`。
+
+用户口径：最大字号下照片把操作顶出屏外**不算失败**。必须实际滚到该条末尾再判断。
+
+| 项 | 结论 | 证据 |
+| --- | --- | --- |
+| 滚到一条记录末尾 | 模拟器做到 | 先把隔离窗口钉到主屏 `{80,60}`，HID 才能带动列表。`51-xxxl-after-type.png` 照片占满首屏；`51-xxxl-scroll4.png` / `51-xxxl-end1.png` / `51-xxxl-caption-before-tap.png` 已过照片，到条尾控件 |
+| 「看这条」全文 + 箭头完整可见 | **NOT VERIFIED** | 条尾只稳定看到一条短横与箭头（`51-xxxl-caption-before-tap.png`）。未见完整三字「看这条」。自动化仍证明字符串未裁、可换行；**不能**把测试或未见全文的截图写成可达性 PASS |
+| 不被底栏挡住 | 该帧模拟器可见 | `51-xxxl-caption-before-tap.png`：条尾控件在下一张照片之上、底带之上，没有被「最近 / 回看」挡住 |
+| 可点击并进入详情 | **NOT VERIFIED** | 钉窗后在 y=20–27% 连点，画面未进详情（`51-xxxl-tap-y22.png` 与点前相同）。不能证明点到了，也不能证明点不了 |
+| 详情返回位置 | **NOT VERIFIED** | 未进入详情，无返回可验 |
+
+照片顶出屏外：按口径不记失败。  
+本项**不是**运行 PASS。真机仍 **NOT VERIFIED**。
