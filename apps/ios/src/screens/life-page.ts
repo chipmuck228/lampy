@@ -82,7 +82,6 @@ export function navBandItemsFor(
   const items = [
     { label: hereLabel, fontSize: NAV_BAND_HERE_SIZE },
     { label: otherLabel, fontSize: NAV_BAND_HERE_SIZE },
-    { label: '留下', fontSize: NAV_BAND_LEAVE_SIZE },
   ];
   if (hasFamily) items.push({ label: '家庭', fontSize: NAV_BAND_HERE_SIZE });
   return items;
@@ -112,7 +111,7 @@ export function chooseNavBandLayout(input: {
   return 'stack';
 }
 
-export function shouldStackNavBand(windowWidth: number, itemCount = 3): boolean {
+export function shouldStackNavBand(windowWidth: number, itemCount = 2): boolean {
   return (
     chooseNavBandLayout({
       windowWidth,
@@ -129,7 +128,7 @@ export function recentColumnWidth(windowWidth: number, windowHeight: number): nu
   return pageColumnWidth(windowWidth, windowHeight);
 }
 
-/** Width left for photos after gutters, safe edges, and the date rail when it sits beside the items. */
+/** Width left for photos after gutters and safe edges. */
 export function recentImageColumnWidth(
   windowWidth: number,
   windowHeight: number,
@@ -140,10 +139,7 @@ export function recentImageColumnWidth(
   const pageCol = recentColumnWidth(windowWidth, windowHeight);
   const used = Math.min(Math.max(0, windowWidth - safeLeft - safeRight), pageCol);
   const inner = used - gutter * 2;
-  if (shouldStackRecentDay(windowWidth, windowHeight)) {
-    return Math.max(0, inner);
-  }
-  return Math.max(0, inner - DATE_RAIL_WIDTH - DATE_RAIL_GAP);
+  return Math.max(0, inner);
 }
 
 export function shouldShowSameDayRule(indexInDay: number): boolean {

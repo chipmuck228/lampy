@@ -228,7 +228,7 @@ export function LookbackScaffold({
   };
 
   const body =
-    root && onGoRecent && onLeave ? (
+    root && onGoRecent ? (
       <RootReadingLayout
         scrollTestID="lookback-scroll"
         scrollRef={scrollRef}
@@ -240,7 +240,7 @@ export function LookbackScaffold({
         onScroll={scrollProps.onScroll}
         onScrollBeginDrag={scrollProps.onScrollBeginDrag}
         band={
-          <RootNavBand here="lookback" onOther={onGoRecent} onLeave={onLeave} onFamily={onFamily} />
+          <RootNavBand here="lookback" onOther={onGoRecent} onFamily={onFamily} />
         }
       >
         {content}

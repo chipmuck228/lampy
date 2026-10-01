@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 import { Text, type } from './life-text';
 import { SymbolView } from 'expo-symbols';
 
@@ -124,12 +124,16 @@ export function LookThisHit({
   accessibilityLabel,
   caption = '看这条',
   tight,
+  align = 'center',
+  captionStyle,
 }: {
   onPress: () => void;
   testID?: string;
   accessibilityLabel: string;
   caption?: string;
   tight?: boolean;
+  align?: 'center' | 'end';
+  captionStyle?: StyleProp<TextStyle>;
 }) {
   const ids = openChildIds(testID);
   return (
@@ -139,10 +143,24 @@ export function LookThisHit({
       accessibilityHint="打开这条记录"
       testID={testID}
       onPress={onPress}
-      style={[styles.lookThis, tight && styles.lookThisTight]}
+      style={[
+        styles.lookThis,
+        tight && styles.lookThisTight,
+        align === 'end' && styles.lookThisEnd,
+      ]}
     >
-      <View style={[styles.lookThisRow, tight && styles.lookThisRowTight]} testID={ids?.row}>
-        <Text style={styles.lookThisText} testID={ids?.label}>
+      <View
+        style={[
+          styles.lookThisRow,
+          tight && styles.lookThisRowTight,
+          align === 'end' && styles.lookThisRowEnd,
+        ]}
+        testID={ids?.row}
+      >
+        <Text
+          style={[styles.lookThisText, align === 'end' && styles.lookThisTextEnd, captionStyle]}
+          testID={ids?.label}
+        >
           {caption}
         </Text>
         <View accessible={false} testID={ids?.mark} style={styles.lookThisMark}>
@@ -191,6 +209,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingTop: 2,
   },
+  lookThisEnd: {
+    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
+    flexShrink: 0,
+  },
   lookThisRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -202,10 +225,19 @@ const styles = StyleSheet.create({
   lookThisRowTight: {
     justifyContent: 'flex-start',
   },
+  lookThisRowEnd: {
+    flexWrap: 'nowrap',
+    flexShrink: 0,
+    justifyContent: 'flex-end',
+  },
   lookThisText: {
     ...type.action,
     color: sage,
     flexShrink: 1,
+  },
+  lookThisTextEnd: {
+    flexGrow: 0,
+    flexShrink: 0,
   },
   lookThisMark: {
     flexShrink: 0,

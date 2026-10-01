@@ -145,6 +145,29 @@ describe('MomentAudio action marks', () => {
     ).toEqual(expect.objectContaining({ width: '23%' }));
   });
 
+  it('paints Recent row chrome like the attachment player without changing play labels', async () => {
+    const view = await render(
+      <MomentAudio
+        audio={audio}
+        playbackStatus="playing"
+        currentTimeMs={1200}
+        onPlay={() => undefined}
+        onPause={() => undefined}
+        testIDPrefix="row"
+        scene
+        markedActions
+        chrome="row"
+      />,
+    );
+    expect(view.getByLabelText('暂停，4秒')).toBeTruthy();
+    expect(view.getByTestId('row-scene-asset_voice').props.children).toBe('当时的声音');
+    expect(view.getByText('0:01 / 0:04')).toBeTruthy();
+    expect(view.queryByText('暂停')).toBeNull();
+    const track = StyleSheet.flatten(view.getByTestId('row-progress-asset_voice').props.style);
+    expect(track).toEqual(expect.objectContaining({ width: '100%', height: 2 }));
+    expect(StyleSheet.flatten(view.getByTestId('row-play-asset_voice').props.style).minHeight).toBe(48);
+  });
+
   it('keeps the detail idle track when the Recent option is not passed', async () => {
     const detail = await render(<MomentAudio audio={audio} playbackStatus="idle" testIDPrefix="detail" scene />);
     expect(detail.getByTestId('detail-progress-asset_voice')).toBeTruthy();

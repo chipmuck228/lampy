@@ -185,28 +185,30 @@ describe('recent reading hierarchy', () => {
       expect(view.getByText('门口的风')).toBeTruthy();
     });
     expect(view.getByTestId('recent-sound-moment_mix-scene-asset_voice').props.children).toBe('当时的声音');
-    expect(view.queryByTestId('recent-sound-moment_mix-progress-asset_voice')).toBeNull();
-    expect(view.getAllByText('一段声音 · 4秒').length).toBeGreaterThanOrEqual(2);
+    expect(view.getByTestId('recent-sound-moment_mix-progress-asset_voice')).toBeTruthy();
+    expect(view.getAllByText('一段声音 · 4秒').length).toBeGreaterThanOrEqual(1);
+    expect(view.getAllByText('0:00 / 0:04').length).toBeGreaterThanOrEqual(2);
     expect(view.getAllByLabelText('播放，4秒')).toHaveLength(2);
     expect(view.getAllByTestId(/recent-sound-.*-mark-asset_voice/).length).toBeGreaterThanOrEqual(2);
-    expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('看这条');
+    expect(view.getByTestId('recent-image-pause-moment_mix')).toBeTruthy();
+    expect(view.getByTestId('recent-open-label-moment_mix').props.children).toBe('阅读完整记录');
     expect(view.queryByTestId('recent-sound-moment_voice-scene-asset_voice')).toBeNull();
-    expect(view.queryByTestId('recent-sound-moment_voice-progress-asset_voice')).toBeNull();
-    expect(view.getByTestId('recent-open-label-moment_voice').props.children).toBe('看这条');
+    expect(view.getByTestId('recent-sound-moment_voice-progress-asset_voice')).toBeTruthy();
+    expect(view.getByTestId('recent-open-label-moment_voice').props.children).toBe('阅读完整记录');
     expect(view.queryByTestId('recent-day-rule-moment_mix')).toBeNull();
     expect(view.getByTestId('recent-day-rule-moment_voice')).toBeTruthy();
     expectBefore(testIdsInTree(view.getByTestId('recent-item-moment_voice')), 'recent-sound-moment_voice-play-asset_voice', 'recent-open-label-moment_voice');
-    expect(minHeightOf(view.getByTestId('home-leave'))).toBeGreaterThanOrEqual(48);
+    expect(minHeightOf(view.getByTestId('recent-leave-fab'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('home-lookback'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('recent-sound-moment_mix-play-asset_voice'))).toBeGreaterThanOrEqual(48);
     expect(minHeightOf(view.getByTestId('recent-open-moment_mix'))).toBeGreaterThanOrEqual(48);
     expect(styleOf(view.getByTestId('recent-open-label-moment_mix')).minHeight).toBeUndefined();
     expect(styleOf(view.getByTestId('recent-open-row-moment_mix'))).toEqual(
-      expect.objectContaining({ flexDirection: 'row', alignItems: 'center' }),
+      expect.objectContaining({ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' }),
     );
     expect(styleOf(view.getByTestId('recent-open-row-moment_mix')).minHeight).toBeUndefined();
     expect(view.getByTestId('recent-open-mark-moment_mix').props.accessible).toBe(false);
-    expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).toContain('看这条');
+    expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).toContain('阅读完整记录');
     expect(view.getByTestId('recent-open-moment_mix').props.accessibilityLabel).not.toContain('›');
     expect(view.queryByTestId('home-family')).toBeNull();
     expect(view.getByTestId('home-account')).toBeTruthy();
@@ -225,7 +227,7 @@ describe('recent reading hierarchy', () => {
     expect(mockPush).toHaveBeenCalledWith('/moment/moment_mix');
   });
 
-  it('renders mixed records as body, then sound, then feeling, then 看这条', async () => {
+  it('renders mixed records as body, then sound, then feeling, then 阅读完整记录', async () => {
     mockGetRecentLife.mockResolvedValue(life(mixedReadingOrder(), missingSound()));
     const view = await render(wrap(<RecentScreen />));
     await waitFor(() => {
@@ -235,11 +237,11 @@ describe('recent reading hierarchy', () => {
     expectBefore(ids, 'recent-note-moment_order', 'recent-image-moment_order-frame-asset_pic');
     expectBefore(ids, 'recent-image-moment_order-frame-asset_pic', 'recent-image-moment_order-unavailable-asset_gone');
     expectBefore(ids, 'recent-image-moment_order-unavailable-asset_gone', 'recent-unknown-moment_order-unavailable-asset_unknown');
-    expectBefore(ids, 'recent-unknown-moment_order-unavailable-asset_unknown', 'recent-sound-moment_order-scene-asset_voice');
-    expectBefore(ids, 'recent-sound-moment_order-scene-asset_voice', 'recent-sound-moment_order-play-asset_voice');
-    expectBefore(ids, 'recent-sound-moment_order-play-asset_voice', 'recent-feeling-moment_order');
+    expectBefore(ids, 'recent-unknown-moment_order-unavailable-asset_unknown', 'recent-sound-moment_order-play-asset_voice');
+    expectBefore(ids, 'recent-sound-moment_order-play-asset_voice', 'recent-sound-moment_order-scene-asset_voice');
+    expectBefore(ids, 'recent-sound-moment_order-scene-asset_voice', 'recent-feeling-moment_order');
     expectBefore(ids, 'recent-feeling-moment_order', 'recent-open-label-moment_order');
-    expect(view.getAllByText('当时的感受 · 平静')).toHaveLength(2);
+    expect(view.getAllByText('平静')).toHaveLength(2);
     expect(view.getAllByText('这段内容这次打不开，其他内容仍然保留。')).toHaveLength(2);
     const missing = testIdsInTree(view.getByTestId('recent-item-moment_missing_sound'));
     expectBefore(missing, 'recent-unknown-moment_missing_sound-unavailable-asset_unknown', 'recent-sound-moment_missing_sound-unavailable-asset_voice');

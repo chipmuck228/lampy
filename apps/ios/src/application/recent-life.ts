@@ -7,6 +7,7 @@ import {
 
 export const UNKNOWN_RECENT_DAY_KEY = 'unknown';
 export const UNKNOWN_RECENT_DAY_LABEL = '时间未确认';
+export const RECENT_VISIBLE_DAY_COUNT = 7;
 
 export type RecentDayStamp = {
   dayKey: string;
@@ -65,4 +66,12 @@ export function groupRecentLifeDays<T extends RecentDayStamp>(items: T[]): Recen
     }
   }
   return groups;
+}
+
+export function takeRecentLifeDays<T extends RecentDayStamp>(
+  days: RecentDayGroup<T>[],
+  limit = RECENT_VISIBLE_DAY_COUNT,
+): RecentDayGroup<T>[] {
+  if (limit < 1) return [];
+  return days.slice(0, limit);
 }

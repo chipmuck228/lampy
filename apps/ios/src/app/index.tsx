@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, View } from 'react-native';
-import { Text, type } from '../screens/life-text';
+import { AccessibilityInfo, Animated, AppState, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '../screens/life-text';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +12,22 @@ import type { RecentLifeViewModel } from '../application/use-cases';
 import { LifeIconButton } from '../screens/life-icons';
 import { shouldPairRecentImages } from '../screens/moment-images';
 import { RecentMoment } from '../screens/recent-moment';
+import {
+  recentDayAccessLabel,
+  recentDayHeading,
+  recentEndInk,
+  recentInk,
+  recentInkSoft,
+  recentKicker,
+  recentOlive,
+  recentPaper,
+  recentRule,
+  recentHairline,
+  recentSettings,
+  recentType,
+  recentWeekdayInk,
+} from '../screens/recent-visual';
+import { createRecentLeaveFabScroll, recentFabMotion } from '../screens/recent-leave-fab';
 import {
   acceptRecentEchoLoad,
   beginRecentEchoFocus,
@@ -29,19 +45,11 @@ import {
 import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
 import {
   clay,
-  ink,
-  inkSoft,
   isCompactHeight,
-  DATE_RAIL_WIDTH,
-  READING_MAX,
-  hairline,
   pageGutter,
-  paper,
   recentColumnWidth,
   recentImageColumnWidth,
-  sage,
   shouldShowSameDayRule,
-  shouldStackRecentDay,
 } from '../screens/life-page';
 import { StartupBrandLayer } from '../screens/startup-brand-layer';
 import { usePageMetrics } from '../screens/use-page-metrics';
@@ -52,7 +60,6 @@ export default function RecentScreen() {
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
-  const stackDay = shouldStackRecentDay(width, height);
   const columnWidth = recentColumnWidth(width, height);
   const pairImages = shouldPairRecentImages(
     recentImageColumnWidth(width, height, insets.left, insets.right),
@@ -60,14 +67,22 @@ export default function RecentScreen() {
   const [view, setView] = useState<RecentLifeViewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [echoId, setEchoId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [reduceMotion, setReduceMotion] = useState(true);
   const [echoOpacity] = useState(() => new Animated.Value(1));
+  const [fabOpacity] = useState(() => new Animated.Value(1));
+  const [fabShift] = useState(() => new Animated.Value(0));
+  const [fabOpen, setFabOpen] = useState(true);
   const echoAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const fabAnim = useRef<Animated.CompositeAnimation | null>(null);
   const echoSeq = useRef(0);
   const clips = useRecentClipPlayback();
   const days = view?.days ?? [];
   const reduceMotionRef = useRef(reduceMotion);
   const echoGate = useRef(createSaveEchoFocusGate());
+  const fabOpenRef = useRef(true);
+  const fabScroll = useRef<ReturnType<typeof createRecentLeaveFabScroll> | null>(null);
+  const revealFabRef = useRef<(visible: boolean) => void>(() => undefined);
 
   const settleEcho = useCallback(() => {
     echoSeq.current = nextEchoSeq(echoSeq.current);
@@ -103,6 +118,49 @@ export default function RecentScreen() {
     [echoOpacity],
   );
 
+  const openLookback = useCallback(() => {
+    router.push(lookbackRootHrefFromRecent());
+  }, [router]);
+
+  const revealFab = useCallback(
+    (visible: boolean) => {
+      if (fabOpenRef.current === visible) return;
+      fabOpenRef.current = visible;
+      setFabOpen(visible);
+      fabAnim.current?.stop();
+      fabAnim.current = null;
+      const motion = recentFabMotion(visible, reduceMotionRef.current);
+      if (motion.duration === 0) {
+        fabOpacity.setValue(motion.opacity);
+        fabShift.setValue(motion.translateY);
+        return;
+      }
+      const next = Animated.parallel([
+        Animated.timing(fabOpacity, {
+          toValue: motion.opacity,
+          duration: motion.duration,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fabShift, {
+          toValue: motion.translateY,
+          duration: motion.duration,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]);
+      fabAnim.current = next;
+      next.start(({ finished }) => {
+        if (finished) fabAnim.current = null;
+      });
+    },
+    [fabOpacity, fabShift],
+  );
+
+  const onRecentScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    fabScroll.current?.onScroll(event.nativeEvent.contentOffset.y);
+  }, []);
+
   const tryRevealPending = useCallback(() => {
     const id = tryConsumeSaveEcho(echoGate.current, AppState.currentState);
     if (id) revealEcho(id, shouldSkipSaveEchoFade(reduceMotionRef.current));
@@ -111,6 +169,20 @@ export default function RecentScreen() {
   useEffect(() => {
     reduceMotionRef.current = reduceMotion;
   }, [reduceMotion]);
+
+  useEffect(() => {
+    revealFabRef.current = revealFab;
+  }, [revealFab]);
+
+  useEffect(() => {
+    const scroll = createRecentLeaveFabScroll((visible) => revealFabRef.current(visible));
+    fabScroll.current = scroll;
+    return () => {
+      scroll.dispose();
+      if (fabScroll.current === scroll) fabScroll.current = null;
+      fabAnim.current?.stop();
+    };
+  }, []);
 
   useEffect(() => {
     if (reduceMotion) settleEcho();
@@ -140,6 +212,7 @@ export default function RecentScreen() {
       motion.remove();
       app.remove();
       settleEcho();
+      fabAnim.current?.stop();
     };
   }, [settleEcho, tryRevealPending]);
 
@@ -175,44 +248,89 @@ export default function RecentScreen() {
     <View style={styles.safe}>
       <StartupBrandLayer homeSettled={view !== null || error !== null} />
       <RootReadingLayout
-        accessibilityLabel="最近"
+        accessibilityLabel="刚刚留下的生活"
         scrollTestID="recent-scroll"
+        canvas={recentPaper}
+        onScroll={onRecentScroll}
+        header={
+          <View
+            testID="recent-header"
+            style={[
+              styles.hero,
+              {
+                maxWidth: columnWidth,
+                paddingHorizontal: gutter,
+                paddingTop: compact ? 12 : 20,
+              },
+            ]}
+          >
+            <View style={styles.heroCopy}>
+              <Text style={styles.eyebrow} testID="recent-eyebrow">
+                LAMPY · 生活记录
+              </Text>
+              <Text style={styles.wordmark} accessibilityRole="header" testID="recent-wordmark">
+                刚刚留下的生活
+              </Text>
+            </View>
+            <LifeIconButton
+              name="settings"
+              label="本机设置"
+              testID="home-account"
+              color={recentSettings}
+              size={20}
+              onPress={() => router.push('/account')}
+            />
+          </View>
+        }
         contentContainerStyle={[
           styles.column,
           {
             maxWidth: columnWidth,
             paddingHorizontal: gutter,
-            paddingTop: compact ? 4 : 12,
-            paddingBottom: 8,
+            paddingTop: 4,
+            paddingBottom: 92,
           },
         ]}
         band={
           <RootNavBand
             here="recent"
-            onOther={() => router.push(lookbackRootHrefFromRecent())}
-            onLeave={() => router.push(leaveHref('recent'))}
+            onOther={openLookback}
             onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
           />
         }
+        overlay={
+          <Animated.View
+            pointerEvents={fabOpen ? 'box-none' : 'none'}
+            style={[
+              styles.fabWrap,
+              {
+                opacity: fabOpacity,
+                transform: [{ translateY: fabShift }],
+              },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="留下"
+              accessibilityElementsHidden={!fabOpen}
+              importantForAccessibility={fabOpen ? 'yes' : 'no-hide-descendants'}
+              testID="recent-leave-fab"
+              onPress={() => router.push(leaveHref('recent'))}
+              style={styles.fab}
+            >
+              <Text style={styles.fabLabel}>＋ 留下</Text>
+            </Pressable>
+          </Animated.View>
+        }
       >
-        <View style={styles.hero}>
-          <Text style={styles.wordmark} accessibilityRole="header">
-            最近
-          </Text>
-          <LifeIconButton
-            name="settings"
-            label="本机设置"
-            testID="home-account"
-            onPress={() => router.push('/account')}
-          />
-        </View>
-
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {view?.isFirstUse && !error ? (
           <View style={styles.empty} testID="recent-empty">
             <Text style={styles.emptyTitle}>这里，留下自己的生活。</Text>
-            <Text style={styles.body}>写一句，拍一张，或留一段声音。以后再回来听见、看见。</Text>
+            <Text style={styles.body} testID="recent-empty-hint">
+              {'写一句，\n拍一张，\n或留一段声音。'}
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="留下第一条"
@@ -225,16 +343,17 @@ export default function RecentScreen() {
           </View>
         ) : null}
 
-        {days.map((day) => (
+        {days.map((day, dayIndex) => (
           <View
             key={day.key}
-            style={[styles.day, !stackDay && styles.dayRegular]}
-            accessibilityLabel={`${day.label}，${day.items.length}条记录`}
+            style={[styles.day, dayIndex > 0 && styles.nextDay]}
+            accessibilityLabel={recentDayAccessLabel(
+              recentDayHeading(day.key, day.label, new Date().getFullYear()),
+              day.items.length,
+            )}
           >
-            <Text style={[styles.date, !stackDay && styles.dateRail]} accessibilityRole="header">
-              {day.label}
-            </Text>
-            <View style={[styles.dayItems, !stackDay && styles.dayItemsRegular]}>
+            <RecentDayHeading dayKey={day.key} label={day.label} />
+            <View style={styles.dayItems}>
               {day.items.map((item, index) => (
                 <View key={item.id}>
                   {shouldShowSameDayRule(index) ? (
@@ -245,9 +364,17 @@ export default function RecentScreen() {
                     pairImages={pairImages}
                     echoOpacity={echoOpacity}
                     echoing={echoId === item.id}
+                    expanded={expandedIds.includes(item.id)}
                     listen={
                       item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
                     }
+                    onToggleExpand={() => {
+                      setExpandedIds((current) =>
+                        current.includes(item.id)
+                          ? current.filter((id) => id !== item.id)
+                          : [...current, item.id],
+                      );
+                    }}
                     onOpen={() => router.push(`/moment/${encodeURIComponent(item.id)}`)}
                     onPlay={() => {
                       if (!item.audio?.uri) return;
@@ -262,45 +389,133 @@ export default function RecentScreen() {
             </View>
           </View>
         ))}
+        {days.length > 0 ? (
+          <View style={styles.endNote} testID="recent-end-note">
+            <Text style={styles.endCopy}>每一个平常的日子，</Text>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="都在这里，打开回看"
+              testID="recent-end-lookback"
+              hitSlop={12}
+              onPress={openLookback}
+              style={styles.endHit}
+            >
+              <Text style={styles.endLink}>都在这里</Text>
+            </Pressable>
+            <Text style={styles.endCopy}>。</Text>
+          </View>
+        ) : null}
       </RootReadingLayout>
     </View>
   );
 }
 
+function RecentDayHeading({ dayKey, label }: { dayKey: string; label: string }) {
+  const heading = recentDayHeading(dayKey, label, new Date().getFullYear());
+  return (
+    <View style={styles.sectionHeading}>
+      <View style={styles.sectionCopy}>
+        <View style={styles.sectionDateRow}>
+          <Text style={styles.sectionDate} accessibilityRole="header">
+            {heading.date}
+          </Text>
+          {heading.weekday ? <Text style={styles.sectionDot}>·</Text> : null}
+          {heading.weekday ? <Text style={styles.sectionWeekday}>{heading.weekday}</Text> : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: paper },
+  safe: { flex: 1, backgroundColor: recentPaper },
   scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,
     width: '100%',
     maxWidth: '100%',
     alignSelf: 'center',
-    gap: 40,
+    gap: 0,
   },
   hero: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
+    alignSelf: 'center',
+    width: '100%',
+    paddingBottom: 17,
     gap: 12,
   },
-  wordmark: { ...type.title, color: ink, flex: 1, flexShrink: 1, minWidth: 0 },
+  heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
+  eyebrow: { ...recentType.kicker, color: recentKicker },
+  wordmark: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
+  fabWrap: { alignItems: 'flex-end' },
+  fab: {
+    minHeight: 48,
+    height: 48,
+    minWidth: 48,
+    paddingLeft: 13,
+    paddingRight: 17,
+    borderRadius: 50,
+    backgroundColor: recentOlive,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 5,
+  },
+  fabLabel: { ...recentType.fab, color: '#FFFFFF' },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
-  emptyTitle: { ...type.title, color: ink },
-  body: { ...type.body, color: inkSoft },
+  emptyTitle: { ...recentType.title, color: recentInk },
+  body: { ...recentType.note, color: recentInkSoft },
   firstHit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  first: { ...type.action, color: ink },
-  error: { ...type.body, color: clay, paddingVertical: 8 },
-  day: { gap: 12, overflow: 'visible' },
-  dayRegular: { flexDirection: 'row', alignItems: 'flex-start', gap: 32 },
-  date: { ...type.meta, color: sage, paddingBottom: 4, minWidth: 0 },
-  dateRail: { width: DATE_RAIL_WIDTH, flexShrink: 0, paddingTop: 6 },
-  dayItems: { gap: 32 },
-  dayItemsRegular: { width: READING_MAX, flexShrink: 0 },
+  first: { ...recentType.expand, color: recentInk },
+  error: { ...recentType.note, color: clay, paddingVertical: 8 },
+  day: { overflow: 'visible' },
+  nextDay: { marginTop: 28 },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: recentRule,
+    paddingTop: 22,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  sectionCopy: { flex: 1, minWidth: 0 },
+  sectionDateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  sectionDate: { ...recentType.date, color: recentInk },
+  sectionDot: { ...recentType.weekday, color: recentWeekdayInk },
+  sectionWeekday: { ...recentType.weekday, color: recentWeekdayInk },
+  dayItems: { gap: 0 },
   sameDayRule: {
-    width: 72,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: hairline,
-    marginTop: -16,
-    marginBottom: 16,
+    alignSelf: 'stretch',
+    height: 1,
+    backgroundColor: recentHairline,
+  },
+  endNote: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingBottom: 18,
+  },
+  endCopy: {
+    ...recentType.end,
+    color: recentEndInk,
+  },
+  endHit: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  endLink: {
+    ...recentType.end,
+    color: recentOlive,
+    textDecorationLine: 'underline',
   },
 });

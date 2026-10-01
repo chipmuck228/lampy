@@ -111,7 +111,7 @@ describe('feeling display', () => {
 
     const recent = await render(wrap(<RecentScreen />));
     await waitFor(() => {
-      expect(recent.getByText('当时的感受 · 喜悦')).toBeTruthy();
+      expect(recent.getByText('喜悦')).toBeTruthy();
     });
     expect(recent.getByText('旧词还在')).toBeTruthy();
 

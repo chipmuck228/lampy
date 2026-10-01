@@ -15,7 +15,8 @@ describe('recent feeling accent', () => {
     const known = await render(
       <RecentFeeling feeling={{ value: '高兴', label: '高兴', known: true }} testID="recent-feeling" />,
     );
-    expect(known.getByText('当时的感受 · 高兴')).toBeTruthy();
+    expect(known.getByText('高兴')).toBeTruthy();
+    expect(known.queryByText('当时的感受 · 高兴')).toBeNull();
     expect(known.getByLabelText('当时的感受，高兴')).toBeTruthy();
     expect(known.getByTestId('recent-feeling-dot').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ backgroundColor: FEELING_ACCENT.高兴 })]),
@@ -24,7 +25,7 @@ describe('recent feeling accent', () => {
     const unknown = await render(
       <RecentFeeling feeling={{ value: '喜悦', label: '喜悦', known: false }} testID="recent-feeling-old" />,
     );
-    expect(unknown.getByText('当时的感受 · 喜悦')).toBeTruthy();
+    expect(unknown.getByText('喜悦')).toBeTruthy();
     expect(unknown.getByTestId('recent-feeling-old-dot').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ backgroundColor: FEELING_ACCENT_UNKNOWN })]),
     );
@@ -38,8 +39,8 @@ describe('recent feeling accent', () => {
     expect(row.minHeight).toBeGreaterThanOrEqual(48);
     expect(row.maxHeight).toBeUndefined();
     expect(row.flexWrap).toBe('wrap');
-    const text = StyleSheet.flatten(view.getByText('当时的感受 · 平静').props.style);
+    const text = StyleSheet.flatten(view.getByText('平静').props.style);
     expect(text.fontSize).toBe(15);
-    expect(view.getByText('当时的感受 · 平静').props.allowFontScaling).toBe(false);
+    expect(view.getByText('平静').props.allowFontScaling).toBe(false);
   });
 });

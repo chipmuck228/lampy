@@ -17,14 +17,14 @@ describe('recent note preview', () => {
     expect(recentNoteVisibleLineLimit(7)).toBe(6);
   });
 
-  it('mentions remaining text only when the note is actually truncated', () => {
-    expect(recentOpenCaption(false)).toBe('看这条');
-    expect(recentOpenCaption(true)).toBe('看这条，还有正文');
+  it('keeps the full-record action even when the note is truncated', () => {
+    expect(recentOpenCaption(false)).toBe('阅读完整记录');
+    expect(recentOpenCaption(true)).toBe('阅读完整记录');
     expect(recentOpenAccessLabel(['记录于 10月1日', '门口的风还在。'], false)).toBe(
-      '记录于 10月1日，门口的风还在。，看这条',
+      '记录于 10月1日，门口的风还在。，阅读完整记录',
     );
     expect(recentOpenAccessLabel(['记录于 10月1日', null, '傍晚回家'], true)).toBe(
-      '记录于 10月1日，傍晚回家，看这条，还有正文',
+      '记录于 10月1日，傍晚回家，阅读完整记录',
     );
   });
 });

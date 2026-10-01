@@ -52,7 +52,7 @@ describe('recent moment row', () => {
       />,
     );
     expect(view.getByTestId('recent-note-moment_short').props.numberOfLines).toBe(6);
-    expect(view.getByTestId('recent-open-label-moment_short').props.children).toBe('看这条');
+    expect(view.getByTestId('recent-open-label-moment_short').props.children).toBe('阅读完整记录');
     fireEvent(view.getByTestId('recent-note-measure-moment_short', { includeHiddenElements: true }), 'textLayout', {
       nativeEvent: { lines: Array.from({ length: 3 }, () => ({ text: 'line' })) },
     });
@@ -64,7 +64,8 @@ describe('recent moment row', () => {
     });
     await waitFor(() => {
       expect(view.getByTestId('recent-note-moment_short').props.numberOfLines).toBe(6);
-      expect(view.getByTestId('recent-open-label-moment_short').props.children).toBe('看这条，还有正文');
+      expect(view.getByTestId('recent-open-label-moment_short').props.children).toBe('阅读完整记录');
+      expect(view.getByLabelText('展开正文')).toBeTruthy();
     });
   });
 
@@ -114,7 +115,7 @@ describe('recent moment row', () => {
     expect(view.getByTestId('recent-note-moment_late')).toBeTruthy();
   });
 
-  it('keeps Recent note and occurred copy on the fixed app type scale', async () => {
+  it('keeps Recent note and clock on the fixed app type scale and hides occurred dates', async () => {
     const view = await render(
       <RecentMoment
         item={item({
@@ -136,9 +137,65 @@ describe('recent moment row', () => {
       'visible',
     );
     expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).fontSize).toBe(17);
-    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBe(32);
-    expect(StyleSheet.flatten(view.getByTestId('recent-occurred-moment_type').props.style).fontSize).toBe(15);
+    expect(StyleSheet.flatten(view.getByTestId('recent-note-moment_type').props.style).lineHeight).toBe(35);
+    expect(StyleSheet.flatten(view.getByTestId('recent-clock-moment_type').props.style).fontSize).toBe(13);
     expect(view.getByTestId('recent-note-moment_type').props.allowFontScaling).toBe(false);
-    expect(view.getByTestId('recent-occurred-moment_type').props.allowFontScaling).toBe(false);
+    expect(view.getByTestId('recent-clock-moment_type').props.allowFontScaling).toBe(false);
+    expect(view.queryByText('发生于 9月28日')).toBeNull();
+    expect(view.queryByTestId('recent-occurred-moment_type')).toBeNull();
+    expect(StyleSheet.flatten(view.getByTestId('recent-image-pause-moment_type').props.style).marginTop).toBe(22);
+  });
+
+  it('keeps expand with the note, before photos and the full-record action', async () => {
+    const onToggle = jest.fn();
+    const view = await render(
+      <RecentMoment
+        item={item({
+          id: 'moment_order',
+          note: ['一行', '二行', '三行', '四行', '五行', '六行', '七行'].join('\n'),
+        })}
+        pairImages={false}
+        echoOpacity={new Animated.Value(1)}
+        listen={idle}
+        onToggleExpand={onToggle}
+        onOpen={() => undefined}
+        onPlay={() => undefined}
+        onPause={() => undefined}
+      />,
+    );
+    fireEvent(view.getByTestId('recent-note-measure-moment_order', { includeHiddenElements: true }), 'textLayout', {
+      nativeEvent: { lines: Array.from({ length: 7 }, () => ({ text: 'line' })) },
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('recent-expand-moment_order')).toBeTruthy();
+    });
+    const ids: string[] = [];
+    function walk(node: unknown) {
+      if (!node || typeof node !== 'object') return;
+      const next = node as { props?: { testID?: string }; children?: unknown };
+      if (typeof next.props?.testID === 'string') ids.push(next.props.testID);
+      const children = next.children;
+      if (Array.isArray(children)) children.forEach(walk);
+      else walk(children);
+    }
+    walk(view.toJSON());
+    const order = ids.filter((id) =>
+      [
+        'recent-note-moment_order',
+        'recent-expand-moment_order',
+        'recent-image-moment_order-img_keep',
+        'recent-sound-moment_order-play-clip_keep',
+        'recent-open-moment_order',
+      ].includes(id),
+    );
+    expect(order).toEqual([
+      'recent-note-moment_order',
+      'recent-expand-moment_order',
+      'recent-image-moment_order-img_keep',
+      'recent-sound-moment_order-play-clip_keep',
+      'recent-open-moment_order',
+    ]);
+    fireEvent.press(view.getByTestId('recent-expand-moment_order'));
+    expect(onToggle).toHaveBeenCalled();
   });
 });

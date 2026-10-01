@@ -121,8 +121,7 @@ describe('lookback origin on the root screen', () => {
     fireEvent.press(view.getByTestId('lookback-go-recent'));
     expect(mockDismissTo).toHaveBeenCalledWith('/');
     expect(mockBack).not.toHaveBeenCalled();
-    fireEvent.press(view.getByTestId('lookback-leave'));
-    expect(mockPush).toHaveBeenCalledWith('/leave?from=lookback');
+    expect(view.queryByTestId('lookback-leave')).toBeNull();
     expect(view.queryByTestId('home-family')).toBeNull();
     await view.unmount();
   });

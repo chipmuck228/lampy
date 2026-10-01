@@ -1,8 +1,9 @@
 import { StyleSheet, View } from 'react-native';
-import { Text, type } from './life-text';
+import { Text } from './life-text';
 
 import { feelingAccentColor } from '../application/feeling-accent';
 import type { FeelingView } from '../application/feeling';
+import { recentFeelingInk, recentType } from './recent-visual';
 
 export function RecentFeeling({
   feeling,
@@ -24,7 +25,7 @@ export function RecentFeeling({
         importantForAccessibility="no"
         style={[styles.dot, { backgroundColor: feelingAccentColor(feeling) }]}
       />
-      <Text style={styles.text}>当时的感受 · {feeling.label}</Text>
+      <Text style={styles.text}>{feeling.label}</Text>
     </View>
   );
 }
@@ -34,14 +35,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     minHeight: 48,
   },
   dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     flexShrink: 0,
   },
-  text: { ...type.meta, color: '#5C5851', flexShrink: 1 },
+  text: { ...recentType.feeling, color: recentFeelingInk, flexShrink: 1 },
 });
