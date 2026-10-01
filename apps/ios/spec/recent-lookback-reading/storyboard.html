@@ -77,6 +77,9 @@
     .nav { display: flex; justify-content: space-between; gap: 12px; margin: 16px 0 8px; }
     .nav span { font-size: 13px; color: var(--sage); min-height: 48px; display: flex; align-items: center; }
     .fade { outline: 1px dashed var(--sage); outline-offset: 4px; }
+    .cover { position: relative; }
+    .veil { position: absolute; inset: 52px 0 52px 0; background: rgba(243,240,233,0.92); padding: 8px 0 0; box-sizing: border-box; }
+    .ghost { opacity: 0.25; pointer-events: none; }
     table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 12px 0 24px; }
     th, td { border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; padding: 8px 10px 8px 0; color: var(--soft); }
     th { color: var(--ink); font-weight: 500; }
@@ -85,8 +88,8 @@
 <body>
 <main>
   <h1>最近 / 回看 · 同一批夹具的改前改后</h1>
-  <p class="lead">基线 <code>origin/main</code> @ <code>d5c0238</code>（#49）。夹具见 <code>samples.md</code>。左栏是现网结构，右栏是采用稿。本页是静态对照，<strong>不是</strong>原生走查，不得记运行 PASS。</p>
-  <p class="nv">结构稿 · 无真机截图 · 不写入 Liuz17</p>
+  <p class="lead">基线 <code>origin/main</code> @ <code>d5c0238</code>（#49）。夹具见 <code>samples.md</code>。左栏是现网结构，右栏是采用稿。本页是静态对照，<strong>不是</strong>自动化、模拟器或真机 PASS。</p>
+  <p class="nv">结构稿 · 不得当作运行证据 · 不写入 Liuz17</p>
 
   <h2>夹具索引</h2>
   <table>
@@ -94,7 +97,8 @@
     <tr><td>F-short / F-one / F-two / F-three / F-audio / F-mix</td><td>最近单态与同日四条</td></tr>
     <tr><td>F-none / F-old / F-missing / F-unknown</td><td>无感受、旧词、缺失媒体</td></tr>
     <tr><td>D-dense / D-mixday / D-sparse / Y-only / Y-older</td><td>回看密、疏、多年</td></tr>
-    <tr><td>U-root / U-year / U-month</td><td>三种时间未确认</td></tr>
+    <tr><td>U-root / U-year / U-month / U-oct</td><td>三种时间未确认；U-oct 是更新、只有月精度的月</td></tr>
+    <tr><td>L-skip / L-ym / L-unknown / E-search / L-restore</td><td>默认日跳过、year/month 进目录、仅 unknown、查找失败、进程内恢复</td></tr>
     <tr><td>E-empty / E-fail / E-part</td><td>空与失败</td></tr>
   </table>
 
@@ -286,11 +290,65 @@
         <div class="nav"><span></span><span>上一有记录日 · 9月27日</span></div>
         <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
       </div>
-      <p class="cap">默认最近明确发生日（夹具里是 9月28日的 F-mix）。目录收起。页尾只有实际存在的邻日。</p>
+      <p class="cap">有明确日时默认该月最后一日。完整库里若 10 月只有 U-oct，仍应落到 9月28日，见下一帧。</p>
     </section>
   </div>
 
-  <h2>6. 回看 · 目录开合</h2>
+  <h2>5b. 默认日 · 跳过月精度 / 失败即停 / 进目录</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">错误 · 把可展开月当成默认日</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">这个月，日子未确认</p>
+        <p class="week">2026年10月 · 2条</p>
+        <p class="note">一句只有月份的话。</p>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ban">L-skip 若停在 10 月：那个月没有明确日。lookbackBookMonthOpenable 为 true 也不行。</p>
+    </section>
+    <section>
+      <div class="tag">采用 · L-skip</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月28日</p>
+        <p class="week">星期一</p>
+        <p class="note clamp">傍晚回家，楼道里还留着白天的热。</p>
+        <div class="act">看这条 · 还有正文</div>
+        <div class="nav"><span></span><span>上一有记录日 · 9月27日</span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ok">跳过 U-oct，打开 9 月最后一个有记录日。10 月仍留在目录里。</p>
+    </section>
+  </div>
+  <div class="pair">
+    <section>
+      <div class="tag">E-search · 查找失败</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="note">这一段时间暂时读不出来，原来的记录还在。</p>
+        <div class="act">再试一次</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ban">10 月 getHistoryMonth 失败时停在这里。不得假装 10 月没日期再去 9 月，也不得进 unknown。</p>
+    </section>
+    <section>
+      <div class="tag">L-ym · 无明确日，有 year/month</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">收起</span></div>
+        <p class="meta">时间未确认 · 3条</p>
+        <p class="yr">2026年</p>
+        <div class="mo"><span>9月</span><span class="meta">2条</span></div>
+        <p class="meta">这个月，日子未确认 · 2条</p>
+        <div class="mo"><span>这一年，月份未确认</span><span class="meta">2条</span></div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ok">进目录，不是根 unknown 阅读。year / month 条不得出现在「时间未确认」列表里。</p>
+    </section>
+  </div>
+
+  <h2>6. 回看 · 目录覆盖</h2>
   <div class="pair">
     <section>
       <div class="tag">改前 · 目录与摘录叠在一起</div>
@@ -327,7 +385,43 @@
         <div class="mo"><span>11月</span><span class="meta">2条</span></div>
         <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
       </div>
-      <p class="cap">同时只开 9 月。点 27日 后目录收起，进入下面第 7 帧。VoiceOver 读完整「2026年9月27日，星期五」。</p>
+      <p class="cap">覆盖层。点 27日 后收起。VoiceOver 读完整日期。底层阅读此时不可点、不可读。</p>
+    </section>
+  </div>
+  <div class="pair">
+    <section>
+      <div class="tag">打开时 · 声音与底层</div>
+      <div class="phone cover">
+        <div class="hero"><p class="title">回看</p><span class="set">收起</span></div>
+        <div class="ghost">
+          <p class="head">9月28日</p>
+          <p class="week">星期一</p>
+          <p class="sound">当时的声音 · 已暂停 0:07</p>
+          <div class="act play">播放</div>
+          <div class="act">看这条</div>
+        </div>
+        <div class="veil">
+          <p class="yr">2026年</p>
+          <div class="mo"><span>9月</span><span class="meta">14条 ▾</span></div>
+          <div class="day"><span>28日　周一</span><span class="count">1条</span></div>
+          <div class="day"><span>27日　周五</span><span class="count">11条</span></div>
+        </div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">打开先暂停并保存 0:07。阅读树还在（浅色），但不能点、VoiceOver 到不了「播放」「看这条」。必须有「收起」。</p>
+    </section>
+    <section>
+      <div class="tag">关闭后</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月28日</p>
+        <p class="week">星期一</p>
+        <p class="sound">当时的声音 · 停在 0:07</p>
+        <div class="act play">播放</div>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ok">收起不自动播。焦点回「换一天」。再点播放才从 0:07 续。</p>
     </section>
   </div>
 
@@ -482,7 +576,7 @@
       <p class="cap">说明只在开头。不写星期。三条范围：根 / 年内月份 / 月内日子，计数不混。</p>
     </section>
     <section>
-      <div class="tag">全部无明确日时的默认阅读</div>
+      <div class="tag">L-unknown · 只有整体 unknown</div>
       <div class="phone">
         <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
         <p class="head">时间未确认</p>
@@ -492,7 +586,40 @@
         <div class="nav"><span></span><span></span></div>
         <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
       </div>
-      <p class="cap">没有 exact/day 时直接进这里。页尾无假邻日。不是「为你精选」。</p>
+      <p class="cap">仅当全库没有 year/month 精度、也没有明确日时，才直接进这一章。L-ym 不得画成这一帧。</p>
+    </section>
+  </div>
+
+  <h2>10b. 进程内恢复</h2>
+  <div class="pair">
+    <section>
+      <div class="tag">离开前 · L-restore</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月27日</p>
+        <p class="week">星期五</p>
+        <p class="meta">…已加载两页…</p>
+        <p class="note">那天下过雨。</p>
+        <p class="feel"><span class="dot old"></span>温暖</p>
+        <p class="meta">全文已展开</p>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">快照：scope=day:2026-09-27，loadedOffset=50，expandedIds 含这条，scrollY 在中段。</p>
+    </section>
+    <section>
+      <div class="tag">重挂载 / 详情返回</div>
+      <div class="phone">
+        <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
+        <p class="head">9月27日</p>
+        <p class="week">星期五</p>
+        <p class="meta">先铺好两页和展开</p>
+        <p class="note">那天下过雨。</p>
+        <p class="feel"><span class="dot old"></span>温暖</p>
+        <div class="act">看这条</div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap ok">先恢复内容和布局，测完再滚回中段。失败则留在 27 日失败态。用户拖动取消待复位。冷启动不走这帧，回最近。</p>
     </section>
   </div>
 
@@ -529,6 +656,31 @@
   </div>
   <div class="pair">
     <section>
+      <div class="tag">V-short · 目录覆盖</div>
+      <div class="phone short cover">
+        <div class="hero"><p class="title">回看</p><span class="set">收起</span></div>
+        <div class="veil" style="inset:48px 0 48px 0">
+          <p class="yr">2026年</p>
+          <div class="mo"><span>9月</span><span class="meta">14条</span></div>
+        </div>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap">短屏也要立刻够到「收起」和至少一行年月。底下阅读即使露边也不可点。</p>
+    </section>
+    <section>
+      <div class="tag">证据</div>
+      <div class="phone short">
+        <p class="head">本页不是 PASS</p>
+        <p class="week">模拟器实际点过、听过、滑过，才能写「模拟器 PASS」。</p>
+        <p class="note">那一列不能写成「真机 PASS」。</p>
+        <p class="meta">真机列必须是物理设备。</p>
+        <div class="band"><span>最近</span><span>回看</span><span>留下</span></div>
+      </div>
+      <p class="cap nv">storyboard / Jest / 截图都不能顶替对应层的运行证据。</p>
+    </section>
+  </div>
+  <div class="pair">
+    <section>
       <div class="tag">V-land</div>
       <div class="phone wide">
         <div class="hero"><p class="title">回看</p><span class="set">换一天</span></div>
@@ -560,10 +712,10 @@
     <tr><th>最近</th><th>回看</th></tr>
     <tr>
       <td>打开 → 看见记录日块 → 扫读 / 播放 / 看这条 → 留下 → 保存回最近（一次淡入）→ 底带回看</td>
-      <td>打开 → 默认一天（或恢复位置）→ 连续读 / 展开 / 播放 / 看这条 → 换一天或邻日 → 详情返回仍在原处</td>
+      <td>打开 → 快照恢复或默认日查找 → 连续读 → 换一天先暂停再覆盖 → 收起不自动播 → 详情返回先内容后位置</td>
     </tr>
   </table>
-  <p class="nv">完整表在 routes-and-state.md。本页任何一帧都不是 PASS。</p>
+  <p class="nv">完整表在 routes-and-state.md。本页任何一帧都不是自动化、模拟器或真机 PASS。</p>
 </main>
 </body>
 </html>
