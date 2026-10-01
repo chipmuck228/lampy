@@ -66,7 +66,7 @@
 | 项 | 值 |
 | --- | --- |
 | git SHA（基线 / 切开时 HEAD） | `b79174b346b02cb072f526af7e3ca33dac30473d` |
-| 准备分支提交 | （本提交；Archive 工作区已含这些文件） |
+| 准备 / 构建代码 SHA | `9142760cb2632f0f9a7a24fb7608a902c6f8c8c9`（Archive 打进包的 JS）。其后提交只改走查文档 |
 | version / build | `0.1.0` / `1` |
 | Xcode | 26.6（17F113） |
 | Bundle ID / Team | `app.lampy.ios` / `B283NY984J` |
