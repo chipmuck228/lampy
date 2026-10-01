@@ -1,15 +1,15 @@
 # 回看同页连续阅读走查
 
-实现分支 `ios/lookback-continuous-reading`（PR #53 OPEN），审阅补修 HEAD `c412e4ae3e55b394eadee6d697a755c81c081e19`，从最新 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #51 旧分支或未合入实现复制。#52 Figma 视觉稿仍独立，本切片未全局替换未落地字体/配色。
+实现分支 `ios/lookback-continuous-reading`（PR #53 OPEN），审阅补修 `c412e4a`，失败路径补修在其后。从最新 `origin/main`（#51 固定字号已合入，`4e64f4c`）新开。**没有**从 #51 旧分支或未合入实现复制。#52 Figma 视觉稿仍独立，本切片未全局替换未落地字体/配色。
 
-审阅补修已落到同分支：分页互斥、范围世代、真实范围计数、换日回顶、失败保留并重试。Jest 与静态稿 **≠** 原生页面 PASS。未实际操作的项写 **NOT VERIFIED**。真机验收仍等这轮补修之后。
+审阅补修已落到同分支：分页互斥、范围世代、真实范围计数、换日回顶。失败路径再补：分页重试第一次就请求、相邻日查询失败可重试、恢复后续页失败映射成分页错误。Jest 与静态稿 **≠** 原生页面 PASS。未实际操作的项写 **NOT VERIFIED**。失败处理已有页面测试；真机正常路径可并行走查，修好前不要合并。
 
 ## 本机命令（审阅补修）
 
 在 `apps/ios`：
 
 - `npx tsc --noEmit`：通过
-- 相关 Jest：20 suites / 68 tests 通过（回看 application + screen + locate / race / catalog / reading + 审阅守卫）
+- 相关 Jest：回看 application + screen + locate / race / catalog / reading + 审阅守卫 + 失败路径守卫通过
 - 改动文件 `eslint`：无 error
 - `git diff --check`：通过
 
@@ -43,6 +43,9 @@
 | 重复分页、交错世代、真实总数 | **PASS**（`lookback-reading-guards` / `lookback-reading.test.ts`） |
 | 换日回顶、首次失败重试 | **PASS**（`lookback-reading-page-guards`） |
 | 失败月不跳过相邻日 | **PASS**（`collectLookbackNeighborDays` 抛错） |
+| 分页失败只点一次重试即请求并追加 | **PASS**（`lookback-reading-failure-guards` 旧日/未确认） |
+| 恢复后续页失败保留已读并显示分页重试 | **PASS**（`lookback-reading-failure-guards`） |
+| 相邻日查询失败保留当天并提供重试 | **PASS**（`lookback-reading-failure-guards` 根页/旧日页） |
 
 ## 真机（Liuz17 / 可丢弃安装）
 

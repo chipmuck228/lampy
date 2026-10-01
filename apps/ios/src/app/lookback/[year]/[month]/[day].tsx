@@ -40,6 +40,7 @@ import {
   shouldBackToLookbackBook,
 } from '../../../../screens/lookback-origin';
 import {
+  LookbackNeighborRetry,
   LookbackReadingHeader,
   LookbackReadingMoment,
   LookbackReadingNeighbors,
@@ -75,11 +76,13 @@ export default function LookbackDayScreen() {
     previous: LookbackPlacedDay | null;
     next: LookbackPlacedDay | null;
   }>({ previous: null, next: null });
+  const [neighborError, setNeighborError] = useState(false);
   const [count, setCount] = useState<number | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [pendingRestoreY, setPendingRestoreY] = useState<number | null>(null);
   const [restoreSeq, setRestoreSeq] = useState(0);
   const generation = useRef(0);
+  const neighborGeneration = useRef(0);
   const moreInFlight = useRef<LookbackMoreRequest | null>(null);
   const loadedOffsetRef = useRef(loadedOffset);
   const previousScopeKey = useRef<string | null>(null);
@@ -91,6 +94,30 @@ export default function LookbackDayScreen() {
   });
   const path = `/lookback/${year}/${pad2(month)}/${pad2(day)}`;
   const scopeKey = lookbackReadingScopeKey({ kind: 'day', year, month, day });
+
+  const refreshNeighbors = useCallback(() => {
+    const request = neighborGeneration.current + 1;
+    neighborGeneration.current = request;
+    setNeighborError(false);
+    getUseCases()
+      .then(async (app) => {
+        const book = await app.getLookbackBook();
+        return collectLookbackNeighborDays({
+          current: { year, month, day },
+          book,
+          loadMonth: (nextYear, nextMonth) => app.getHistoryMonth(nextYear, nextMonth),
+        });
+      })
+      .then((next) => {
+        if (neighborGeneration.current !== request) return;
+        setNeighbors(next);
+        setNeighborError(false);
+      })
+      .catch(() => {
+        if (neighborGeneration.current !== request) return;
+        setNeighborError(true);
+      });
+  }, [year, month, day]);
 
   useFocusEffect(
     useCallback(() => {
@@ -133,6 +160,7 @@ export default function LookbackDayScreen() {
           setItems(restored.items);
           setHasMore(restored.hasMore);
           setLoadedOffset(restored.loadedOffset);
+          setMoreError(!restored.ok);
           setEmpty(restored.items.length === 0);
           const nextExpanded = keepExpandedIds(same ? snapshot.expandedIds : [], restored.items.map((item) => item.id));
           setExpandedIds(nextExpanded);
@@ -156,32 +184,19 @@ export default function LookbackDayScreen() {
           }
           setError('这一天暂时读不出来，原来的记录还在。');
         });
-      getUseCases()
-        .then(async (app) => {
-          const book = await app.getLookbackBook();
-          return collectLookbackNeighborDays({
-            current: { year, month, day },
-            book,
-            loadMonth: (nextYear, nextMonth) => app.getHistoryMonth(nextYear, nextMonth),
-          });
-        })
-        .then((next) => {
-          if (!cancelled && generation.current === request) setNeighbors(next);
-        })
-        .catch(() => {
-          if (!cancelled && generation.current === request) setNeighbors({ previous: null, next: null });
-        });
+      void refreshNeighbors();
       return () => {
         cancelled = true;
         generation.current += 1;
+        neighborGeneration.current += 1;
         moreInFlight.current = null;
         void clipsRef.current.pause();
       };
-    }, [year, month, day, reloadTick, scopeKey]),
+    }, [year, month, day, reloadTick, scopeKey, refreshNeighbors]),
   );
 
-  async function loadMore() {
-    if (!hasMore || moreLoading || moreError) return;
+  async function loadMore(options: { retry?: boolean } = {}) {
+    if (!hasMore || moreLoading || (moreError && !options.retry)) return;
     const request: LookbackMoreRequest = {
       scopeKey,
       generation: generation.current,
@@ -189,6 +204,7 @@ export default function LookbackDayScreen() {
     };
     if (lookbackMoreInFlightBlocks(moreInFlight.current, request)) return;
     moreInFlight.current = request;
+    setMoreError(false);
     setMoreLoading(true);
     try {
       const app = await getUseCases();
@@ -304,10 +320,7 @@ export default function LookbackDayScreen() {
           accessibilityRole="button"
           accessibilityLabel="继续往下看，再试一次"
           testID="lookback-day-more"
-          onPress={() => {
-            setMoreError(false);
-            void loadMore();
-          }}
+          onPress={() => void loadMore({ retry: true })}
           style={lookbackStyles.hit}
         >
           <Text style={lookbackStyles.action}>后面的记录暂时读不出来。再试一次</Text>
@@ -324,14 +337,18 @@ export default function LookbackDayScreen() {
           <Text style={lookbackStyles.action}>继续往下看</Text>
         </Pressable>
       ) : null}
-      <LookbackReadingNeighbors
-        current={{ year, month, day }}
-        previous={neighbors.previous}
-        next={neighbors.next}
-        onOpen={(next) =>
-          router.replace(`/lookback/${next.year}/${pad2(next.month)}/${pad2(next.day)}` as never)
-        }
-      />
+      {neighborError ? (
+        <LookbackNeighborRetry testID="lookback-day-neighbors-retry" onRetry={() => refreshNeighbors()} />
+      ) : (
+        <LookbackReadingNeighbors
+          current={{ year, month, day }}
+          previous={neighbors.previous}
+          next={neighbors.next}
+          onOpen={(next) =>
+            router.replace(`/lookback/${next.year}/${pad2(next.month)}/${pad2(next.day)}` as never)
+          }
+        />
+      )}
     </LookbackScaffold>
   );
 }

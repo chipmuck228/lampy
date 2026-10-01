@@ -181,6 +181,26 @@ export function LookbackUnconfirmedHeader({
   );
 }
 
+export function LookbackNeighborRetry({
+  testID,
+  onRetry,
+}: {
+  testID: string;
+  onRetry: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="相邻有记录日，再试一次"
+      testID={testID}
+      onPress={onRetry}
+      style={styles.hit}
+    >
+      <Text style={styles.action}>相邻有记录日暂时读不出来。再试一次</Text>
+    </Pressable>
+  );
+}
+
 export function LookbackReadingNeighbors({
   current,
   previous,

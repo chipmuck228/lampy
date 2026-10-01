@@ -69,6 +69,7 @@ import {
   shouldBackToRecent,
 } from '../../screens/lookback-origin';
 import {
+  LookbackNeighborRetry,
   LookbackReadingHeader,
   LookbackReadingMoment,
   LookbackReadingNeighbors,
@@ -131,6 +132,7 @@ export default function LookbackIndexScreen() {
     previous: LookbackPlacedDay | null;
     next: LookbackPlacedDay | null;
   }>({ previous: null, next: null });
+  const [neighborError, setNeighborError] = useState(false);
   const [scopeCount, setScopeCount] = useState<number | null>(null);
   const [unconfirmedCopy, setUnconfirmedCopy] = useState<{ title: string; explanation: string } | null>(
     null,
@@ -242,6 +244,7 @@ export default function LookbackIndexScreen() {
   }, []);
 
   const loadNeighbors = useCallback(async (day: LookbackPlacedDay, book: LookbackBookView, generation: number) => {
+    setNeighborError(false);
     try {
       const app = await getUseCases();
       const next = await collectLookbackNeighborDays({
@@ -266,9 +269,10 @@ export default function LookbackIndexScreen() {
       });
       if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
       setNeighbors(next);
+      setNeighborError(false);
     } catch {
       if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
-      setNeighbors({ previous: null, next: null });
+      setNeighborError(true);
     }
   }, [expand]);
 
@@ -292,6 +296,7 @@ export default function LookbackIndexScreen() {
     if (!same) {
       setExpandedIds([]);
       setNeighbors({ previous: null, next: null });
+      setNeighborError(false);
       setUnconfirmedCopy(null);
       if (options.count == null) setScopeCount(null);
     }
@@ -925,7 +930,20 @@ export default function LookbackIndexScreen() {
           <Text style={lookbackStyles.action}>继续往下看</Text>
         </Pressable>
       ) : null}
-      {selectedDay && readyReading ? (
+      {selectedDay && readyReading && neighborError ? (
+        <LookbackNeighborRetry
+          testID="lookback-reading-neighbors-retry"
+          onRetry={() => {
+            if (!viewRef.current) return;
+            void loadNeighbors(
+              { ...selectedDay, count: scopeCount ?? 0 },
+              viewRef.current,
+              readingGeneration.current,
+            );
+          }}
+        />
+      ) : null}
+      {selectedDay && readyReading && !neighborError ? (
         <LookbackReadingNeighbors
           current={selectedDay}
           previous={neighbors.previous}

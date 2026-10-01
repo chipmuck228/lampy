@@ -107,6 +107,7 @@ export function LookbackUnconfirmedReading({
           setItems(restored.items);
           setHasMore(restored.hasMore);
           setLoadedOffset(restored.loadedOffset);
+          setMoreError(!restored.ok);
           const nextExpanded = keepExpandedIds(same ? snapshot.expandedIds : [], restored.items.map((item) => item.id));
           setExpandedIds(nextExpanded);
           rememberLookbackReadingSnapshot({
@@ -133,8 +134,8 @@ export function LookbackUnconfirmedReading({
     }, [loadPage, scope, knownCount, reloadTick]),
   );
 
-  async function loadMore() {
-    if (!hasMore || moreLoading || moreError) return;
+  async function loadMore(options: { retry?: boolean } = {}) {
+    if (!hasMore || moreLoading || (moreError && !options.retry)) return;
     const request: LookbackMoreRequest = {
       scopeKey: lookbackReadingScopeKey(scope),
       generation: generation.current,
@@ -142,6 +143,7 @@ export function LookbackUnconfirmedReading({
     };
     if (lookbackMoreInFlightBlocks(moreInFlight.current, request)) return;
     moreInFlight.current = request;
+    setMoreError(false);
     setMoreLoading(true);
     try {
       const next = await loadPage(request.offset);
@@ -241,10 +243,7 @@ export function LookbackUnconfirmedReading({
           accessibilityRole="button"
           accessibilityLabel="继续往下看，再试一次"
           testID={moreTestID}
-          onPress={() => {
-            setMoreError(false);
-            void loadMore();
-          }}
+          onPress={() => void loadMore({ retry: true })}
           style={lookbackStyles.hit}
         >
           <Text style={lookbackStyles.action}>后面的记录暂时读不出来。再试一次</Text>
