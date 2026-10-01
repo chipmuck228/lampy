@@ -312,19 +312,20 @@ export default function RecentScreen() {
           </View>
         ))}
         {days.length > 0 ? (
-          <Text style={styles.endNote} testID="recent-end-note">
-            每一个平常的日子，
-            <Text
+          <View style={styles.endNote} testID="recent-end-note">
+            <Text style={styles.endCopy}>每一个平常的日子，</Text>
+            <Pressable
               accessibilityRole="link"
               accessibilityLabel="都在这里，打开回看"
               testID="recent-end-lookback"
+              hitSlop={12}
               onPress={openLookback}
-              style={styles.endLink}
+              style={styles.endHit}
             >
-              都在这里
-            </Text>
-            。
-          </Text>
+              <Text style={styles.endLink}>都在这里</Text>
+            </Pressable>
+            <Text style={styles.endCopy}>。</Text>
+          </View>
         ) : null}
       </RootReadingLayout>
     </View>
@@ -421,11 +422,20 @@ const styles = StyleSheet.create({
     backgroundColor: recentHairline,
   },
   endNote: {
-    ...recentType.end,
-    color: recentEndInk,
-    textAlign: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingTop: 28,
     paddingBottom: 18,
+  },
+  endCopy: {
+    ...recentType.end,
+    color: recentEndInk,
+  },
+  endHit: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
   endLink: {
     ...recentType.end,
