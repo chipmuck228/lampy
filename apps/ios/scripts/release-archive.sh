@@ -34,7 +34,10 @@ restore_dotenv() {
     fi
   done
 }
-trap restore_dotenv EXIT INT TERM HUP
+trap restore_dotenv EXIT
+trap 'restore_dotenv; exit 130' INT
+trap 'restore_dotenv; exit 143' TERM
+trap 'restore_dotenv; exit 129' HUP
 
 for f in .env .env.local .env.development .env.development.local .env.production.local; do
   if [[ -f "$ROOT/$f" ]]; then
