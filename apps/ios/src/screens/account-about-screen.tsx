@@ -11,8 +11,8 @@ import { SettingsAboutMark } from './settings-rows';
 export default function AccountAboutScreen() {
   const router = useRouter();
   const version = lampyAppVersionLabel({
-    version: Constants.expoConfig?.version,
-    build: Constants.expoConfig?.ios?.buildNumber ?? Constants.nativeBuildVersion,
+    version: Constants.nativeAppVersion,
+    build: Constants.nativeBuildVersion,
   });
   return (
     <SettingsPage

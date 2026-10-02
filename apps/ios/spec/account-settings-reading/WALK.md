@@ -12,7 +12,7 @@ Base：`origin/main` `277361ab61ecd7b3c0049c99c1f4e4015d0b744c`（#56 merge）�
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | **PASS** |
-| 相关 Jest（account / device-lock / settings / visibility） | **PASS** 50 |
+| 相关 Jest（account / device-lock / settings / visibility） | **PASS** 53 |
 | 改动文件 `expo lint` | **PASS** |
 | `git diff --check -- apps/ios` | **PASS** |
 
@@ -23,7 +23,7 @@ Base：`origin/main` `277361ab61ecd7b3c0049c99c1f4e4015d0b744c`（#56 merge）�
 | 最近齿轮 → 设置（引言+分组行）→ 两子页 → 返回 | Jest 路由/文案 | **NOT VERIFIED** | **NOT VERIFIED** |
 | 长说明可滚动，末项可操作 | Jest 结构 | **NOT VERIFIED** | **NOT VERIFIED** |
 | 开启/关闭保护、取消认证、后台 | 沿用 device-lock Jest | **NOT VERIFIED** | **NOT VERIFIED** |
-| Release 无开发诊断 / 家庭登录 | Jest 门控 | **NOT VERIFIED** | **NOT VERIFIED** |
-| 短屏 / 横屏 / iPad / VoiceOver | — | **NOT VERIFIED** | **NOT VERIFIED** |
+| Release 深链 `/account-diagnostics` 关闭页铺满、可返回 | Jest 门控 + `flex: 1` | **NOT VERIFIED** | **NOT VERIFIED** |
+| 短屏 / 横屏左右安全区 / iPad 阅读宽 / VoiceOver | Jest 边距 | **NOT VERIFIED** | **NOT VERIFIED** |
 
 静态截图不算通过。

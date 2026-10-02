@@ -10,9 +10,11 @@ describe('settings navigation', () => {
     expect(router.dismissTo).toHaveBeenCalledWith('/account');
   });
 
-  it('prints the real version and build without inventing extra facts', () => {
-    expect(lampyAppVersionLabel({ version: '0.1.0', build: '1' })).toBe('版本 0.1.0（1）');
+  it('prints the installed version and build without inventing a number', () => {
+    expect(lampyAppVersionLabel({ version: '1.2.3', build: '45' })).toBe('版本 1.2.3（45）');
+    expect(lampyAppVersionLabel({ version: '1.2.3' })).toBe('版本 1.2.3');
+    expect(lampyAppVersionLabel({ version: '  ', build: '45' })).toBe('版本信息暂不可用');
+    expect(lampyAppVersionLabel({})).toBe('版本信息暂不可用');
     expect(lampyAppVersionLabel({ version: '0.1.0' })).toBe('版本 0.1.0');
-    expect(lampyAppVersionLabel({})).toBe('版本 0.1.0');
   });
 });

@@ -46,7 +46,9 @@
 
 不写容量、条数、备份状态，不放不可执行按钮，不承诺「永久安全」。不复制附件「让记录留在你选择的地方」「尚未接入」。
 
-关于 Lampy 对照 settings-body：标识、短句「把生活，留给自己。」、浅线下方真实版本/build。没有已存在的隐私政策/支持链接，故不画空入口。
+关于 Lampy 对照 settings-body：标识、短句「把生活，留给自己。」、浅线下方安装包版本。只读 `nativeAppVersion` / `nativeBuildVersion`；都取不到时写「版本信息暂不可用」，不回退 `expoConfig`，不写死 `0.1.0`。没有已存在的隐私政策/支持链接，故不画空入口。
+
+`/account-diagnostics` 在门控关闭时（含 Release 深链）直接渲染关闭页，外壳即 `SettingsPage`（`flex: 1`），不套一层无高度的 View。
 
 ---
 
@@ -54,4 +56,4 @@
 
 暖纸色 / 墨色 / 低饱和绿 / 浅线 / 留白。颜色仍用已落地 `life-page` token，不把附件 `#f8f6ef` / `#b58c58` 收成新色板。字号仍用 `life-text`，`allowFontScaling={false}`。本 PR 不全局换 Noto/DM Sans。
 
-顶栏、行高、分组眉题、子页圈标的间距按 attachments 的 settings-modal / settings-body 收。图标只用 `LifeIcon` + SF Symbols：`gearshape` 齿轮、`chevron.left` 返回、`chevron.right` 向右、`lock` 本机保护、`info.circle` 关于、`internaldrive` 存储。装饰图标不进 VoiceOver。触达 ≥ 48pt。开关用系统 `Switch`，不手写滑块。
+顶栏、行高、分组眉题、子页圈标的间距按 attachments 的 settings-modal / settings-body 收。左右边距取安全区与 `pageGutter` 的较大值，避免横屏顶进刘海；正文宽度仍受 `readingWidth`（最大 520）限制。图标只用 `LifeIcon` + SF Symbols：`gearshape` 齿轮、`chevron.left` 返回、`chevron.right` 向右、`lock` 本机保护、`info.circle` 关于、`internaldrive` 存储。装饰图标不进 VoiceOver。触达 ≥ 48pt。开关用系统 `Switch`，不手写滑块。

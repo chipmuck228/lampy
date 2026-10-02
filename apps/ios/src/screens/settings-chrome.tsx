@@ -2,15 +2,21 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { hairline, ink, paper, sage } from './life-page';
+import { hairline, ink, pageGutter, paper, readingWidth, sage } from './life-page';
 import { LifeIcon } from './life-icons';
 import { Text, type } from './life-text';
+import { usePageMetrics } from './use-page-metrics';
+
+export function settingsEdgePad(inset: number, gutter: number): number {
+  return Math.max(inset, gutter);
+}
 
 export function SettingsPage({
   title,
   backLabel,
   accessibilityLabel,
   testID,
+  pageTestID,
   onBack,
   children,
 }: {
@@ -18,13 +24,28 @@ export function SettingsPage({
   backLabel: string;
   accessibilityLabel: string;
   testID?: string;
+  pageTestID?: string;
   onBack: () => void;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { width, height } = usePageMetrics();
+  const gutter = pageGutter(width, height);
+  const column = readingWidth(width, height);
+  const padLeft = settingsEdgePad(insets.left, gutter);
+  const padRight = settingsEdgePad(insets.right, gutter);
   return (
-    <View style={styles.safe} accessibilityLabel={accessibilityLabel}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+    <View style={styles.safe} accessibilityLabel={accessibilityLabel} testID={pageTestID}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: insets.top,
+            paddingLeft: padLeft,
+            paddingRight: padRight,
+          },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="返回"
@@ -42,12 +63,17 @@ export function SettingsPage({
       </View>
       <ScrollView
         testID={testID ?? 'account-scroll'}
+        style={styles.scroll}
         contentContainerStyle={[
           styles.column,
-          { paddingBottom: Math.max(insets.bottom, 44) },
+          {
+            paddingLeft: padLeft,
+            paddingRight: padRight,
+            paddingBottom: Math.max(insets.bottom, 44),
+          },
         ]}
       >
-        {children}
+        <View style={[styles.reading, { maxWidth: column }]}>{children}</View>
       </ScrollView>
     </View>
   );
@@ -57,7 +83,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper },
   header: {
     minHeight: 66,
-    paddingHorizontal: 22,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: hairline,
     flexDirection: 'row',
@@ -74,8 +99,12 @@ const styles = StyleSheet.create({
   back: { ...type.meta, color: sage },
   title: { ...type.meta, color: ink, textAlign: 'center', flexShrink: 1 },
   headerSpacer: { width: 70, minHeight: 48 },
+  scroll: { flex: 1 },
   column: {
     width: '100%',
-    paddingHorizontal: 25,
+    alignItems: 'center',
+  },
+  reading: {
+    width: '100%',
   },
 });

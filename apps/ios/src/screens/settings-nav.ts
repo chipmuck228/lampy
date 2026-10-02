@@ -10,7 +10,8 @@ export function lampyAppVersionLabel(input: {
   version?: string | null;
   build?: string | null;
 }): string {
-  const version = input.version?.trim() || '0.1.0';
+  const version = input.version?.trim();
   const build = input.build?.trim();
+  if (!version) return '版本信息暂不可用';
   return build ? `版本 ${version}（${build}）` : `版本 ${version}`;
 }

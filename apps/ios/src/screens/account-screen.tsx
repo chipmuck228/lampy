@@ -80,16 +80,15 @@ function testLoginFlags(snapshot: AccountSnapshot | null) {
 export function AccountDiagnosticsClosed() {
   const router = useRouter();
   return (
-    <View testID="account-diagnostics-closed">
-      <SettingsPage
-        title="开发诊断"
-        backLabel="本机设置"
-        accessibilityLabel="开发诊断"
-        onBack={() => dismissToSettingsRoot(router)}
-      >
-        <Text style={styles.body}>这里没有开发诊断。</Text>
-      </SettingsPage>
-    </View>
+    <SettingsPage
+      title="开发诊断"
+      backLabel="本机设置"
+      accessibilityLabel="开发诊断"
+      pageTestID="account-diagnostics-closed"
+      onBack={() => dismissToSettingsRoot(router)}
+    >
+      <Text style={styles.body}>这里没有开发诊断。</Text>
+    </SettingsPage>
   );
 }
 

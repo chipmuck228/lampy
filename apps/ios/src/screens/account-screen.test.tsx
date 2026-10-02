@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ApplicationError } from '../application/errors';
@@ -498,7 +499,9 @@ describe('account screen', () => {
     await waitFor(() => {
       expect(view.getByTestId('account-diagnostics-closed')).toBeTruthy();
     });
+    expect(StyleSheet.flatten(view.getByTestId('account-diagnostics-closed').props.style).flex).toBe(1);
     expect(view.getByText('这里没有开发诊断。')).toBeTruthy();
+    expect(view.getByLabelText('返回')).toBeTruthy();
     expect(view.queryByTestId('account-diagnostics')).toBeNull();
     expect(view.queryByTestId('account-family-preview')).toBeNull();
     expect(view.queryByLabelText('通过 Apple 登录')).toBeNull();
