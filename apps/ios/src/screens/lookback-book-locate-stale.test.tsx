@@ -144,7 +144,7 @@ async function openMonth() {
 async function pickDay(view: Awaited<ReturnType<typeof openMonth>>, day: number) {
   if (!view.queryByTestId('lookback-catalog')) {
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-change-day'));
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
     });
     await waitFor(() => {
       expect(view.getByTestId(`lookback-book-day-2026-09-${String(day).padStart(2, '0')}`)).toBeTruthy();

@@ -238,7 +238,7 @@ describe('lookback reading guards', () => {
       expect(view.getByText('二十八')).toBeTruthy();
     });
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-change-day'));
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
       await Promise.resolve();
     });
     await waitFor(() => {
@@ -249,17 +249,19 @@ describe('lookback reading guards', () => {
       await Promise.resolve();
     });
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-change-day'));
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
       await Promise.resolve();
     });
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
     });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    if (!view.queryByTestId('lookback-book-day-2026-09-27')) {
+      await act(async () => {
+        fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    }
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
     });

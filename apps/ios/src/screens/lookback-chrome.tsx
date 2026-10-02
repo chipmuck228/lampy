@@ -13,12 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
 import { Text, type } from './life-text';
+import { LifeIcon } from './life-icons';
+import { LeaveFab, leaveFabScrollReserve, useLeaveFabMotion } from './leave-fab';
+import { lookbackCatalogToggleLabel } from './lookback-catalog';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 import { usePageMetrics } from './use-page-metrics';
 
 import type { FeelingView } from '../application/feeling';
 import { LOOKBACK_PAGE_GUTTER } from '../application/lookback-month';
-import { lookbackLocateIsCurrent, requestLookbackLocate } from '../application/lookback-locate';
+import { lookbackLocateIsCurrent, lookbackLocateScrollY, requestLookbackLocate } from '../application/lookback-locate';
 import { rememberLookbackScroll, readLookbackScroll, rememberLookbackCatalogScroll } from '../application/lookback-session';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
@@ -110,16 +113,50 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
   );
 }
 
+export function LookbackCatalogToggle({
+  range,
+  expanded,
+  onPress,
+  toggleRef,
+}: {
+  range: string | null;
+  expanded: boolean;
+  onPress: () => void;
+  toggleRef?: RefObject<View | null>;
+}) {
+  return (
+    <Pressable
+      ref={toggleRef}
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={lookbackCatalogToggleLabel(expanded)}
+      testID="lookback-catalog-toggle"
+      onPress={onPress}
+      style={styles.catalogToggle}
+    >
+      <Text style={styles.catalogKicker}>时间目录</Text>
+      <View style={styles.catalogRangeRow}>
+        <Text style={styles.catalogRange} testID="lookback-catalog-range">
+          {range ?? '时间目录'}
+        </Text>
+        <LifeIcon name={expanded ? 'collapse' : 'expand'} size={16} decorative />
+      </View>
+    </Pressable>
+  );
+}
+
 export function LookbackCatalogOverlay({
   children,
   locateKey,
   locateSeq,
   onLocated,
+  maxHeight,
 }: {
   children: ReactNode;
   locateKey: string | null;
   locateSeq: number;
   onLocated?: () => void;
+  maxHeight?: number;
 }) {
   const scrollRef = useRef<ScrollView>(null);
   const offsetRef = useRef(0);
@@ -150,7 +187,7 @@ export function LookbackCatalogOverlay({
 
   return (
     <LookbackLocateContext.Provider value={locate}>
-      <View testID="lookback-catalog" style={styles.catalog} accessibilityViewIsModal>
+      <View testID="lookback-catalog" style={[styles.catalog, maxHeight != null ? { maxHeight } : null]}>
         {locateKey ? (
           <View testID="lookback-book-locating" accessibilityLabel={locateKey} />
         ) : null}
@@ -209,6 +246,10 @@ export function LookbackScaffold({
   onLocated,
   onRestoreDone,
   onReadingScroll,
+  readingAnchorRef,
+  holdWindowY = null,
+  holdSeq = 0,
+  onHoldDone,
   onBack,
   onGoRecent,
   onLeave,
@@ -232,6 +273,10 @@ export function LookbackScaffold({
   onLocated?: () => void;
   onRestoreDone?: () => void;
   onReadingScroll?: (offsetY: number) => void;
+  readingAnchorRef?: RefObject<View | null>;
+  holdWindowY?: number | null;
+  holdSeq?: number;
+  onHoldDone?: () => void;
   onBack?: () => void;
   onGoRecent?: () => void;
   onLeave?: () => void;
@@ -239,17 +284,37 @@ export function LookbackScaffold({
 }) {
   const router = useRouter();
   const { readingWidth, shortHeight } = useLookbackLayout();
+  const leaveFab = useLeaveFabMotion();
   const scrollRef = useRef<ScrollView>(null);
   const restoreOnce = useRef(false);
   const restoredSeqRef = useRef<number | null>(null);
   const locateKeyRef = useRef(locateKey);
   const locateSeqRef = useRef(locateSeq);
   const onLocatedRef = useRef(onLocated);
+  const holdSeqRef = useRef(holdSeq);
   useLayoutEffect(() => {
     locateKeyRef.current = locateKey;
     locateSeqRef.current = locateSeq;
     onLocatedRef.current = onLocated;
+    holdSeqRef.current = holdSeq;
   });
+  useLayoutEffect(() => {
+    if (holdWindowY == null || !readingAnchorRef?.current) return undefined;
+    const seq = holdSeq;
+    const node = readingAnchorRef.current as View & {
+      measureInWindow?: (callback: (x: number, y: number, width: number, height: number) => void) => void;
+    };
+    if (typeof node.measureInWindow !== 'function') return undefined;
+    const frame = requestAnimationFrame(() => {
+      node.measureInWindow?.((_x, y) => {
+        if (seq !== holdSeqRef.current) return;
+        const next = lookbackLocateScrollY(readLookbackScroll(path), y, holdWindowY);
+        scrollRef.current?.scrollTo({ y: next, animated: false });
+        onHoldDone?.();
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [holdSeq, holdWindowY, onHoldDone, path, readingAnchorRef]);
   const locate = useMemo(
     () => ({
       locateKey,
@@ -306,9 +371,9 @@ export function LookbackScaffold({
       ) : null}
       <View
         testID="lookback-reading-tree"
-        pointerEvents={readingLocked ? 'none' : 'auto'}
-        importantForAccessibility={readingLocked ? 'no-hide-descendants' : 'auto'}
-        accessibilityElementsHidden={readingLocked}
+        pointerEvents="auto"
+        importantForAccessibility="auto"
+        accessibilityElementsHidden={false}
       >
         {children}
         {footer}
@@ -335,11 +400,13 @@ export function LookbackScaffold({
     },
     onScroll: (event: { nativeEvent: { contentOffset: { y: number } } }) => {
       rememberLookbackScroll(path, event.nativeEvent.contentOffset.y);
+      if (!readingLocked) leaveFab.onScroll(event.nativeEvent.contentOffset.y);
       onReadingScroll?.(event.nativeEvent.contentOffset.y);
     },
     onScrollBeginDrag: () => {
       if (locateKeyRef.current) onLocatedRef.current?.();
       onRestoreDone?.();
+      onHoldDone?.();
     },
   };
 
@@ -350,7 +417,11 @@ export function LookbackScaffold({
         scrollRef={scrollRef}
         contentContainerStyle={[
           styles.column,
-          { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16, paddingBottom: 8 },
+          {
+            maxWidth: readingWidth,
+            paddingTop: shortHeight ? 8 : 16,
+            paddingBottom: 8 + (onLeave ? leaveFabScrollReserve() : 0),
+          },
         ]}
         onContentSizeChange={scrollProps.onContentSizeChange}
         onScroll={scrollProps.onScroll}
@@ -358,25 +429,13 @@ export function LookbackScaffold({
         cover={cover}
         overlay={
           onLeave ? (
-            <View
-              pointerEvents={readingLocked ? 'none' : 'box-none'}
-              style={[styles.fabWrap, readingLocked ? styles.fabHidden : null]}
-              accessibilityElementsHidden={readingLocked}
-              importantForAccessibility={readingLocked ? 'no-hide-descendants' : 'yes'}
-            >
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="留下"
-                accessibilityElementsHidden={readingLocked}
-                importantForAccessibility={readingLocked ? 'no-hide-descendants' : 'yes'}
-                testID="lookback-leave-fab"
-                disabled={readingLocked}
-                onPress={onLeave}
-                style={styles.fab}
-              >
-                <Text style={styles.fabLabel}>＋ 留下</Text>
-              </Pressable>
-            </View>
+            <LeaveFab
+              testID="lookback-leave-fab"
+              onPress={onLeave}
+              available={leaveFab.open && !readingLocked}
+              opacity={leaveFab.opacity}
+              shift={leaveFab.shift}
+            />
           ) : null
         }
         band={
@@ -490,9 +549,19 @@ export const lookbackStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F0E9' },
-  catalog: { ...StyleSheet.absoluteFill, backgroundColor: '#F3F0E9' },
-  catalogScroll: { flex: 1 },
-  catalogColumn: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 32, gap: 12 },
+  catalog: { alignSelf: 'stretch', backgroundColor: '#F3F0E9' },
+  catalogScroll: { flexGrow: 0 },
+  catalogColumn: { paddingTop: 4, paddingBottom: 12, gap: 8 },
+  catalogToggle: { minHeight: 48, justifyContent: 'center', gap: 4 },
+  catalogKicker: { ...type.meta, color: '#5C5851' },
+  catalogRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    minHeight: 48,
+  },
+  catalogRange: { ...type.action, color: '#25231F', flexShrink: 1, minWidth: 0 },
   scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,
@@ -524,26 +593,4 @@ const styles = StyleSheet.create({
   },
   bandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 20 },
   band: { height: 6, borderRadius: 3, backgroundColor: '#8A9384' },
-  fabWrap: { alignItems: 'flex-end' },
-  fabHidden: { opacity: 0 },
-  fab: {
-    minHeight: 48,
-    height: 48,
-    minWidth: 48,
-    paddingLeft: 13,
-    paddingRight: 17,
-    borderRadius: 50,
-    backgroundColor: '#424B3C',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 5,
-    opacity: 1,
-  },
-  fabLabel: {
-    ...type.action,
-    fontSize: 14,
-    lineHeight: 18,
-    letterSpacing: 1.12,
-    color: '#FFFFFF',
-  },
 });

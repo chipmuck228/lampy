@@ -128,31 +128,62 @@ describe('lookback catalog overlay a11y', () => {
     });
   });
 
-  it('hides the reading tree from VoiceOver while the catalog is open and does not autoplay on close', async () => {
+  it('keeps the reading tree mounted while the in-place catalog is open and does not autoplay on close', async () => {
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
       expect(view.getByTestId('lookback-reading-m1')).toBeTruthy();
     });
+    const toggle = view.getByTestId('lookback-catalog-toggle');
+    expect(toggle.props.accessibilityState?.expanded).toBe(false);
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-change-day'));
+      fireEvent.press(toggle);
     });
     await waitFor(() => {
       expect(view.getByTestId('lookback-catalog')).toBeTruthy();
     });
     expect(mockPause).toHaveBeenCalled();
-    expect(view.getByTestId('lookback-catalog-close')).toBeTruthy();
+    expect(view.getByTestId('lookback-catalog-toggle').props.accessibilityState?.expanded).toBe(true);
+    expect(view.getByLabelText('收起时间目录')).toBeTruthy();
     const fab = view.getByTestId('lookback-leave-fab', { includeHiddenElements: true });
     expect(fab.props.accessibilityElementsHidden).toBe(true);
     expect(fab.props.accessibilityState?.disabled ?? fab.props.disabled).toBeTruthy();
-    const tree = view.getByTestId('lookback-reading-tree', { includeHiddenElements: true });
-    expect(tree.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(tree.props.accessibilityElementsHidden).toBe(true);
-    expect(view.getByTestId('lookback-reading-m1', { includeHiddenElements: true })).toBeTruthy();
-    fireEvent.press(view.getByTestId('lookback-catalog-close'));
+    const tree = view.getByTestId('lookback-reading-tree');
+    expect(tree.props.accessibilityElementsHidden).toBe(false);
+    expect(view.getByTestId('lookback-reading-m1')).toBeTruthy();
+    fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
     await waitFor(() => {
       expect(view.queryByTestId('lookback-catalog')).toBeNull();
     });
-    expect(view.getByTestId('lookback-change-day')).toBeTruthy();
+    expect(view.getByTestId('lookback-catalog-toggle').props.accessibilityState?.expanded).toBe(false);
     expect(view.getByTestId('lookback-reading-tree').props.accessibilityElementsHidden).toBe(false);
+    expect(view.getByTestId('lookback-reading-m1')).toBeTruthy();
+    expect(view.queryByTestId('lookback-book-year-2026')).toBeNull();
+    expect(view.queryByTestId('lookback-book-day-2026-09-27')).toBeNull();
+  });
+
+  it('keeps expanded, selected, and collapsed catalog state aligned', async () => {
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-reading-m1')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
+    });
+    expect(view.getByTestId('lookback-catalog-toggle').props.accessibilityState?.expanded).toBe(true);
+    expect(view.getByLabelText('2026年9月，有1条记录，已展开')).toBeTruthy();
+    expect(view.getByLabelText('2026年9月27日，星期日，有1条记录，已选中')).toBeTruthy();
+    expect(view.getByTestId('lookback-book-selected-day')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
+    });
+    await waitFor(() => {
+      expect(view.queryByTestId('lookback-catalog')).toBeNull();
+    });
+    expect(view.getByTestId('lookback-catalog-toggle').props.accessibilityState?.expanded).toBe(false);
+    expect(view.getByTestId('lookback-reading-m1')).toBeTruthy();
+    expect(view.queryByTestId('lookback-book-locating')).toBeNull();
   });
 });

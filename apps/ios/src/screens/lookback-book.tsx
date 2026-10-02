@@ -101,19 +101,12 @@ export function LookbackBookDayRow({
       )}
       testID={`lookback-book-day-${year}-${pad2(month)}-${pad2(entry.day)}`}
       onPress={onPress}
-      style={styles.dayHit}
+      style={[styles.dayHit, selected ? styles.daySelected : null]}
     >
       <View style={styles.dayRow}>
-        <View style={styles.dayCopy}>
-          <Text style={styles.dayTitle}>{lookbackBookDayPrimaryLabel(entry.day)}</Text>
-          <Text style={styles.dayWeekday}>{lookbackBookDaySecondaryLabel(year, month, entry.day)}</Text>
-        </View>
-        <View style={styles.dayMeta} importantForAccessibility="no">
-          <View style={styles.dayCountTag}>
-            <Text style={styles.dayCount}>{entry.count}条</Text>
-          </View>
-          <LifeIcon name={selected ? 'collapse' : 'expand'} size={16} decorative />
-        </View>
+        <Text style={styles.dayTitle}>
+          {`${lookbackBookDayPrimaryLabel(entry.day)} / ${lookbackBookDaySecondaryLabel(year, month, entry.day)} / ${entry.count}条`}
+        </Text>
       </View>
     </Pressable>
   );
@@ -189,28 +182,13 @@ const styles = StyleSheet.create({
   monthCopy: { flex: 1, flexShrink: 1, minWidth: 0, gap: 2 },
   monthTitle: { ...type.action, color: '#25231F' },
   monthCount: { ...type.meta, color: '#53604F' },
-  dayHit: { minHeight: 48, justifyContent: 'center' },
+  dayHit: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 8 },
+  daySelected: { backgroundColor: paperDeep },
   dayRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
   },
-  dayCopy: { flex: 1, flexShrink: 1, minWidth: 120, gap: 2 },
-  dayTitle: { ...type.action, color: '#25231F' },
-  dayWeekday: { ...type.meta, color: '#53604F' },
-  dayMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-  },
-  dayCountTag: {
-    backgroundColor: paperDeep,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  dayCount: { ...type.meta, color: '#53604F' },
+  dayTitle: { ...type.action, color: '#25231F', flexShrink: 1 },
 });

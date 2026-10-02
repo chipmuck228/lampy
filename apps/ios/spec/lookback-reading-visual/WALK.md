@@ -19,18 +19,18 @@ Not copied: synthetic days, web player timer, Noto/DM Sans, phone chrome, inline
 
 ## Functional base
 
-Latest main after #57 still used the book/excerpt lookback. The visual spec keeps 换一天 overlay, paging, neighbors, expand, and exact Moment IDs — that product is OPEN #53 (`ios/lookback-continuous-reading`). This branch merges #53 onto `aab6726`, then applies visual only. Bottom band / floating 留下 APIs stay on main (`header` / `overlay` / `canvas` + catalog `cover`).
+This PR is **连续阅读＋视觉**, not visual-only. It already includes OPEN #53 (`31a6542`) on `aab6726`. Do not merge #53 again; close it only after #58 lands. Catalog is no longer a 换一天 overlay. It is an in-place **时间目录** on the same page. Recent and lookback share `LeaveFab` / `useLeaveFabMotion` / `createRecentLeaveFabScroll`.
 
 ## Visual choices
 
 - Page chrome: kicker `LAMPY · 时间里的记录`, title `回看`, subtitle `慢慢看`. Tokens only; no font shrink.
-- Catalog stays overlay. 换一天 can show a quiet year/month or known unconfirmed range.
+- In-place 时间目录: collapsed shows the current year/month or known unconfirmed range plus a system chevron. Expanded lists recorded years/months and unconfirmed ranges in a capped inner scroll. Reading stays mounted. Same-day open/close holds the reading line; only a real day change locates the new title.
 - Day heading: year / `9月18日` / `周五 · 3条记录`. VoiceOver still reads the full `星期X` date plus count.
 - Records stay separate. Hairline + gap. No cards. Photos unchanged (original aspect, all reachable).
 - Sound uses existing `MomentAudio` `chrome="row"` with real playback state and 48pt hits. No timer-forged progress.
 - Foot: accent dot + original feeling word; `阅读完整记录` keeps the system chevron and exact Moment ID. Wrap when narrow.
 - End note only when ready, `hasMore=false`, no more error/loading, and restore is not pending. Confirmed day uses `这一日，读到这里。`; unconfirmed ranges use `这一段，读到这里。`
-- Empty library: `日子会慢慢留在这里。` / `先留下一点，以后再回来看看。` Root page wires the existing floating `＋ 留下`; catalog open hides and disables it.
+- Empty library: `日子会慢慢留在这里。` / `先留下一点，以后再回来看看。` Shared floating 留下 uses the system plus icon; catalog open hides and disables it. Scroll padding uses `leaveFabScrollReserve()`, not the nav band.
 - First `getLookbackBook()` failure keeps any already-shown records and offers `再试一次`.
 
 ## Checks
@@ -38,8 +38,8 @@ Latest main after #57 still used the book/excerpt lookback. The visual spec keep
 | Check | Result |
 | --- | --- |
 | `tsc --noEmit` | **PASS** |
-| Jest book-screen / catalog a11y / reading helpers / failure guards / page guards / screen / origin | **PASS** 7 suites / 39 tests |
-| `expo lint` on touched lookback files | **PASS** with one **pre-existing** `react-hooks/exhaustive-deps` warning in `lookback-chrome.tsx` `tryLocate` |
+| Jest catalog / FAB / book-screen / expand / adapt / guards / failure / page / locate / origin / reading helpers | **PASS** 14 suites / 57 tests |
+| `expo lint` on touched lookback and shared FAB files | **PASS** with one **pre-existing** `react-hooks/exhaustive-deps` warning in `lookback-chrome.tsx` `tryLocate` |
 | `git diff --check` | **PASS** |
 
 ## Running shots

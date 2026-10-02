@@ -12,6 +12,13 @@ describe('lookback locate scroll coordinates', () => {
     expect(lookbackLocateScrollY(40, 80, 200)).toBe(0);
   });
 
+  it('holds the same reading line by compensating catalog height instead of reusing the old scrollY', () => {
+    const offsetBefore = 220;
+    const titleYBefore = 360;
+    const titleYAfterCatalogOpens = 520;
+    expect(lookbackLocateScrollY(offsetBefore, titleYAfterCatalogOpens, titleYBefore)).toBe(380);
+  });
+
   it('waits for the late window measure and consumes the container y once', () => {
     const consume = jest.fn();
     let onAnchor: ((x: number, y: number, width: number, height: number) => void) | undefined;
@@ -82,6 +89,28 @@ describe('lookback locate scroll coordinates', () => {
     expect(lookbackLocateIsCurrent('day-2026-09-10', 1, currentId, currentSeq)).toBe(false);
     expect(lookbackLocateIsCurrent('day-2026-09-10', 3, currentId, currentSeq)).toBe(true);
     firstScroll?.(0, 120, 390, 844);
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pending locate when the user starts dragging', () => {
+    const consume = jest.fn();
+    let currentId: string | null = 'day-2026-09-27';
+    let currentSeq = 2;
+    let onAnchor: ((x: number, y: number, width: number, height: number) => void) | undefined;
+    requestLookbackLocate({
+      measureAnchorWindow: (callback) => {
+        onAnchor = callback;
+      },
+      measureScrollWindow: (callback) => {
+        callback(0, 120, 390, 844);
+      },
+      readOffset: () => 80,
+      isCurrent: () => lookbackLocateIsCurrent('day-2026-09-27', 2, currentId, currentSeq),
+      consume,
+    });
+    currentId = null;
+    currentSeq = nextLookbackLocateSeq(currentSeq);
+    onAnchor?.(0, 640, 390, 48);
     expect(consume).not.toHaveBeenCalled();
   });
 

@@ -168,7 +168,7 @@ describe('lookback book screen', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-reading-title')).toBeTruthy();
     });
-    expect(view.getByText('时间未确认')).toBeTruthy();
+    expect(view.getByTestId('lookback-catalog-range').props.children).toBe('时间未确认');
     expect(view.queryByTestId('lookback-empty')).toBeNull();
     view.unmount();
   });
@@ -221,9 +221,9 @@ describe('lookback book screen', () => {
     });
     expect(view.getByText('慢慢看')).toBeTruthy();
     expect(view.getByText('LAMPY · 时间里的记录')).toBeTruthy();
-    expect(view.getByTestId('lookback-change-day')).toBeTruthy();
+    expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
     expect(view.getByTestId('lookback-leave-fab').props.accessibilityElementsHidden).toBe(false);
-    fireEvent.press(view.getByTestId('lookback-change-day'));
+    fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-year-2026')).toBeTruthy();
     });
@@ -232,7 +232,7 @@ describe('lookback book screen', () => {
     expect(hiddenFab.props.accessibilityState?.disabled ?? hiddenFab.props.disabled).toBeTruthy();
     expect(view.getByLabelText('时间未确认，有1条记录')).toBeTruthy();
     expect(view.getByText('9月')).toBeTruthy();
-    expect(view.getByLabelText('2026年9月，有14条记录，已收起')).toBeTruthy();
+    expect(view.getByLabelText('2026年9月，有14条记录，已展开')).toBeTruthy();
     expect(view.queryByTestId('lookback-year-2026')).toBeNull();
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
     expect(view.queryByTestId('lookback-back')).toBeNull();

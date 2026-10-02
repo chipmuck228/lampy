@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, Dimensions, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Dimensions, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../screens/life-text';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +27,7 @@ import {
   recentType,
   recentWeekdayInk,
 } from '../screens/recent-visual';
-import { createRecentLeaveFabScroll, recentFabMotion } from '../screens/recent-leave-fab';
+import { LeaveFab, leaveFabScrollReserve, useLeaveFabMotion } from '../screens/leave-fab';
 import { recentPhotoRevealViewport, settleRecentPhotoRevealSession } from '../screens/recent-photo-reveal';
 import {
   acceptRecentEchoLoad,
@@ -72,19 +72,14 @@ export default function RecentScreen() {
   const [reduceMotion, setReduceMotion] = useState(true);
   const [motionKnown, setMotionKnown] = useState(false);
   const [echoOpacity] = useState(() => new Animated.Value(1));
-  const [fabOpacity] = useState(() => new Animated.Value(1));
-  const [fabShift] = useState(() => new Animated.Value(0));
-  const [fabOpen, setFabOpen] = useState(true);
   const echoAnim = useRef<Animated.CompositeAnimation | null>(null);
-  const fabAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const leaveFab = useLeaveFabMotion();
+  const onLeaveFabScroll = leaveFab.onScroll;
   const echoSeq = useRef(0);
   const clips = useRecentClipPlayback();
   const days = view?.days ?? [];
   const reduceMotionRef = useRef(reduceMotion);
   const echoGate = useRef(createSaveEchoFocusGate());
-  const fabOpenRef = useRef(true);
-  const fabScroll = useRef<ReturnType<typeof createRecentLeaveFabScroll> | null>(null);
-  const revealFabRef = useRef<(visible: boolean) => void>(() => undefined);
 
   const settleEcho = useCallback(() => {
     echoSeq.current = nextEchoSeq(echoSeq.current);
@@ -124,50 +119,15 @@ export default function RecentScreen() {
     router.push(lookbackRootHrefFromRecent());
   }, [router]);
 
-  const revealFab = useCallback(
-    (visible: boolean) => {
-      if (fabOpenRef.current === visible) return;
-      fabOpenRef.current = visible;
-      setFabOpen(visible);
-      fabAnim.current?.stop();
-      fabAnim.current = null;
-      const motion = recentFabMotion(visible, reduceMotionRef.current);
-      if (motion.duration === 0) {
-        fabOpacity.setValue(motion.opacity);
-        fabShift.setValue(motion.translateY);
-        return;
-      }
-      const next = Animated.parallel([
-        Animated.timing(fabOpacity, {
-          toValue: motion.opacity,
-          duration: motion.duration,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(fabShift, {
-          toValue: motion.translateY,
-          duration: motion.duration,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]);
-      fabAnim.current = next;
-      next.start(({ finished }) => {
-        if (finished) fabAnim.current = null;
-      });
-    },
-    [fabOpacity, fabShift],
-  );
-
   const photoReduceMotion = motionKnown && reduceMotion;
 
   const onRecentScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number }; layoutMeasurement: { height: number } } }) => {
-    fabScroll.current?.onScroll(event.nativeEvent.contentOffset.y);
+    onLeaveFabScroll(event.nativeEvent.contentOffset.y);
     recentPhotoRevealViewport.onScroll(
       event.nativeEvent.contentOffset.y,
       Dimensions.get('window').height,
     );
-  }, []);
+  }, [onLeaveFabScroll]);
 
   const onRecentScrollBeginDrag = useCallback(() => {
     recentPhotoRevealViewport.onScrollBeginDrag();
@@ -181,20 +141,6 @@ export default function RecentScreen() {
   useEffect(() => {
     reduceMotionRef.current = reduceMotion;
   }, [reduceMotion]);
-
-  useEffect(() => {
-    revealFabRef.current = revealFab;
-  }, [revealFab]);
-
-  useEffect(() => {
-    const scroll = createRecentLeaveFabScroll((visible) => revealFabRef.current(visible));
-    fabScroll.current = scroll;
-    return () => {
-      scroll.dispose();
-      if (fabScroll.current === scroll) fabScroll.current = null;
-      fabAnim.current?.stop();
-    };
-  }, []);
 
   useEffect(() => {
     if (reduceMotion) settleEcho();
@@ -232,7 +178,6 @@ export default function RecentScreen() {
       motion.remove();
       app.remove();
       settleEcho();
-      fabAnim.current?.stop();
     };
   }, [settleEcho, tryRevealPending]);
 
@@ -310,7 +255,7 @@ export default function RecentScreen() {
             maxWidth: columnWidth,
             paddingHorizontal: gutter,
             paddingTop: 4,
-            paddingBottom: 92,
+            paddingBottom: leaveFabScrollReserve(),
           },
         ]}
         band={
@@ -321,28 +266,13 @@ export default function RecentScreen() {
           />
         }
         overlay={
-          <Animated.View
-            pointerEvents={fabOpen ? 'box-none' : 'none'}
-            style={[
-              styles.fabWrap,
-              {
-                opacity: fabOpacity,
-                transform: [{ translateY: fabShift }],
-              },
-            ]}
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="留下"
-              accessibilityElementsHidden={!fabOpen}
-              importantForAccessibility={fabOpen ? 'yes' : 'no-hide-descendants'}
-              testID="recent-leave-fab"
-              onPress={() => router.push(leaveHref('recent'))}
-              style={styles.fab}
-            >
-              <Text style={styles.fabLabel}>＋ 留下</Text>
-            </Pressable>
-          </Animated.View>
+          <LeaveFab
+            testID="recent-leave-fab"
+            onPress={() => router.push(leaveHref('recent'))}
+            available={leaveFab.open}
+            opacity={leaveFab.opacity}
+            shift={leaveFab.shift}
+          />
         }
       >
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -472,20 +402,6 @@ const styles = StyleSheet.create({
   heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
   eyebrow: { ...recentType.kicker, color: recentKicker },
   wordmark: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
-  fabWrap: { alignItems: 'flex-end' },
-  fab: {
-    minHeight: 48,
-    height: 48,
-    minWidth: 48,
-    paddingLeft: 13,
-    paddingRight: 17,
-    borderRadius: 50,
-    backgroundColor: recentOlive,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 5,
-  },
-  fabLabel: { ...recentType.fab, color: '#FFFFFF' },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },
   emptyTitle: { ...recentType.title, color: recentInk },
   body: { ...recentType.note, color: recentInkSoft },

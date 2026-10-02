@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Text } from '../../screens/life-text';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUseCases } from '../../application/container';
 import type { HistoryMomentItem } from '../../application/history-use-cases';
@@ -57,6 +58,7 @@ import {
 } from '../../screens/lookback-book';
 import {
   LookbackCatalogOverlay,
+  LookbackCatalogToggle,
   LookbackLocateAnchor,
   LookbackMessage,
   LookbackScaffold,
@@ -64,6 +66,9 @@ import {
   momentHref,
   useLookbackLayout,
 } from '../../screens/lookback-chrome';
+import { lookbackCatalogMaxHeight } from '../../screens/lookback-catalog';
+import { shouldUseNavRail } from '../../screens/life-page';
+import { usePageMetrics } from '../../screens/use-page-metrics';
 import {
   firstSearchParam,
   forgetLookbackOrigin,
@@ -124,6 +129,8 @@ export default function LookbackIndexScreen() {
   const { o } = useLocalSearchParams<{ o?: string | string[] }>();
   const originToken = firstSearchParam(o);
   const { readingWidth } = useLookbackLayout();
+  const insets = useSafeAreaInsets();
+  const { width, height } = usePageMetrics();
   const pairImages = shouldPairRecentImages(Math.max(0, readingWidth - 48));
   const [view, setView] = useState<LookbackBookView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -143,15 +150,20 @@ export default function LookbackIndexScreen() {
   );
   const [locateKey, setLocateKey] = useState<string | null>(null);
   const [locateSeq, setLocateSeq] = useState(0);
+  const [catalogLocateKey, setCatalogLocateKey] = useState<string | null>(null);
+  const [catalogLocateSeq, setCatalogLocateSeq] = useState(0);
   const [pendingRestoreY, setPendingRestoreY] = useState<number | null>(null);
   const [restoreSeq, setRestoreSeq] = useState(0);
+  const [toggleHeight, setToggleHeight] = useState(56);
+  const [holdWindowY, setHoldWindowY] = useState<number | null>(null);
+  const [holdSeq, setHoldSeq] = useState(0);
   const locateSeqRef = useRef(0);
+  const catalogLocateSeqRef = useRef(0);
   const expandGeneration = useRef(0);
   const readingGeneration = useRef(0);
   const moreInFlight = useRef<LookbackMoreRequest | null>(null);
   const mounted = useRef(true);
   const changeDayRef = useRef<View>(null);
-  const catalogCloseRef = useRef<View>(null);
   const readingTitleRef = useRef<View>(null);
   const clips = useRecentClipPlayback();
   const clipsRef = useRef(clips);
@@ -161,6 +173,7 @@ export default function LookbackIndexScreen() {
   const expandedIdsRef = useRef(expandedIds);
   const scrollYRef = useRef(0);
   const viewRef = useRef(view);
+  const holdSeqRef = useRef(0);
   useEffect(() => {
     clipsRef.current = clips;
   });
@@ -187,6 +200,16 @@ export default function LookbackIndexScreen() {
 
   const clearLocate = useCallback(() => {
     setLocateKey(null);
+  }, []);
+
+  const beginCatalogLocate = useCallback((id: string) => {
+    catalogLocateSeqRef.current = nextLookbackLocateSeq(catalogLocateSeqRef.current);
+    setCatalogLocateSeq(catalogLocateSeqRef.current);
+    setCatalogLocateKey(id);
+  }, []);
+
+  const clearCatalogLocate = useCallback(() => {
+    setCatalogLocateKey(null);
   }, []);
 
   const writeCurrentSnapshot = useCallback(() => {
@@ -295,6 +318,7 @@ export default function LookbackIndexScreen() {
     if (!options.keepPlayer || !same) void clipsRef.current.pause();
     setScope(target);
     setCatalogOpen(false);
+    setCatalogLocateKey(null);
     setReading({ status: 'loading' });
     setPendingRestoreY(null);
     if (!same) {
@@ -445,27 +469,60 @@ export default function LookbackIndexScreen() {
         return;
       }
       setExpand({ year, month, status: 'ready', page });
-      if (locate) beginLocate(lookbackBookLocateId({ year, month }));
+      if (locate) beginCatalogLocate(lookbackBookLocateId({ year, month }));
     } catch {
       if (!mounted.current || !lookbackBookResponseIsCurrent(expandGeneration.current, generation)) return;
       setExpand({ year, month, status: 'error' });
     }
-  }, [beginLocate]);
+  }, [beginCatalogLocate]);
 
-  const openCatalog = useCallback((focus: 'close' | 'month' = 'month') => {
-    void clipsRef.current.pause();
-    writeCurrentSnapshot();
-    setCatalogOpen(true);
-    requestAnimationFrame(() => {
-      if (focus === 'close') focusRef(catalogCloseRef.current);
-      else focusRef(catalogCloseRef.current);
-    });
-  }, [writeCurrentSnapshot]);
-
-  const closeCatalog = useCallback((focusChangeDay = true) => {
-    setCatalogOpen(false);
-    if (focusChangeDay) requestAnimationFrame(() => focusRef(changeDayRef.current));
+  const cancelHold = useCallback(() => {
+    holdSeqRef.current += 1;
+    setHoldSeq(holdSeqRef.current);
+    setHoldWindowY(null);
   }, []);
+
+  const holdReadingThen = useCallback((run: () => void) => {
+    const seq = holdSeqRef.current + 1;
+    holdSeqRef.current = seq;
+    setHoldSeq(seq);
+    setHoldWindowY(null);
+    const node = readingTitleRef.current as (View & {
+      measureInWindow?: (callback: (x: number, y: number, width: number, height: number) => void) => void;
+    }) | null;
+    if (typeof node?.measureInWindow === 'function') {
+      node.measureInWindow((_x, y) => {
+        if (seq !== holdSeqRef.current) return;
+        setHoldWindowY(y);
+      });
+    }
+    run();
+  }, []);
+
+  const openCatalog = useCallback(() => {
+    void clipsRef.current.pause();
+    const current = scopeRef.current;
+    holdReadingThen(() => {
+      setCatalogOpen(true);
+      if (current?.kind === 'day') {
+        void loadMonth(current.year, current.month);
+        beginCatalogLocate(lookbackBookLocateId(current));
+      } else if (current?.kind === 'month-unconfirmed') {
+        void loadMonth(current.year, current.month, true);
+      } else if (current?.kind === 'year-unconfirmed') {
+        beginCatalogLocate(lookbackBookLocateId({ year: current.year }));
+      }
+      requestAnimationFrame(() => focusRef(changeDayRef.current));
+    });
+  }, [beginCatalogLocate, holdReadingThen, loadMonth]);
+
+  const closeCatalog = useCallback((focusToggle = true) => {
+    holdReadingThen(() => {
+      setCatalogOpen(false);
+      setCatalogLocateKey(null);
+      if (focusToggle) requestAnimationFrame(() => focusRef(changeDayRef.current));
+    });
+  }, [holdReadingThen]);
 
   const loadScopeRef = useRef(loadScope);
   const runDefaultRef = useRef(runDefault);
@@ -503,7 +560,7 @@ export default function LookbackIndexScreen() {
       if (intent) {
         setCatalogOpen(true);
         setExpand(null);
-        beginLocate(lookbackBookLocateId(intent));
+        beginCatalogLocate(lookbackBookLocateId(intent));
         return;
       }
       if (snapshot) {
@@ -519,7 +576,7 @@ export default function LookbackIndexScreen() {
       }
       await runDefaultRef.current(book);
     },
-    [beginLocate],
+    [beginCatalogLocate],
   );
 
   const bookLoadGeneration = useRef(0);
@@ -657,18 +714,20 @@ export default function LookbackIndexScreen() {
   const selectedDay = scope?.kind === 'day' ? scope : null;
   const emptyLibrary = !!view?.isEmpty && !error && reading.status === 'idle' && !scope;
 
+  const catalogMax = lookbackCatalogMaxHeight({
+    windowHeight: height,
+    insetTop: insets.top,
+    insetBottom: insets.bottom,
+    headerHeight: 120 + toggleHeight,
+    rail: shouldUseNavRail(width, height),
+  });
   const catalog = catalogOpen ? (
-    <LookbackCatalogOverlay locateKey={locateKey} locateSeq={locateSeq} onLocated={clearLocate}>
-        <Pressable
-          ref={catalogCloseRef}
-          accessibilityRole="button"
-          accessibilityLabel="收起"
-          testID="lookback-catalog-close"
-          onPress={() => closeCatalog()}
-          style={lookbackStyles.hit}
-        >
-          <Text style={lookbackStyles.action}>收起</Text>
-        </Pressable>
+    <LookbackCatalogOverlay
+      locateKey={catalogLocateKey}
+      locateSeq={catalogLocateSeq}
+      onLocated={clearCatalogLocate}
+      maxHeight={catalogMax}
+    >
         {view && view.unknownCount > 0 ? (
           <Pressable
             accessibilityRole="button"
@@ -799,15 +858,18 @@ export default function LookbackIndexScreen() {
       subtitle="慢慢看"
       path="/lookback"
       root
-      locateKey={locateKey}
+      locateKey={catalogOpen ? null : locateKey}
       locateSeq={locateSeq}
       readingLocked={catalogOpen}
       suppressPathRestore
       pendingRestoreY={pendingRestoreY}
       restoreSeq={restoreSeq}
-      cover={catalog}
       onLocated={clearLocate}
       onRestoreDone={() => setPendingRestoreY(null)}
+      readingAnchorRef={readingTitleRef}
+      holdWindowY={holdWindowY}
+      holdSeq={holdSeq}
+      onHoldDone={cancelHold}
       onReadingScroll={(offsetY) => {
         if (catalogOpenRef.current) return;
         scrollYRef.current = offsetY;
@@ -817,27 +879,22 @@ export default function LookbackIndexScreen() {
       }}
       headerAction={
         view && !emptyLibrary ? (
-          <View>
-            <Pressable
-              ref={changeDayRef}
-              accessibilityRole="button"
-              accessibilityLabel="换一天"
-              testID="lookback-change-day"
-              onPress={() => openCatalog()}
-              style={lookbackStyles.hit}
-            >
-              <Text style={lookbackStyles.action}>换一天</Text>
-            </Pressable>
-            {lookbackCatalogRangeCaption(scope) ? (
-              <Text
-                style={lookbackStyles.quiet}
-                testID="lookback-catalog-range"
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-              >
-                {lookbackCatalogRangeCaption(scope)}
-              </Text>
-            ) : null}
+          <View
+            onLayout={(event) => {
+              const next = Math.ceil(event.nativeEvent.layout.height);
+              if (next > 0) setToggleHeight(next);
+            }}
+          >
+            <LookbackCatalogToggle
+              range={lookbackCatalogRangeCaption(scope)}
+              expanded={catalogOpen}
+              toggleRef={changeDayRef}
+              onPress={() => {
+                if (catalogOpenRef.current) closeCatalog();
+                else openCatalog();
+              }}
+            />
+            {catalog}
           </View>
         ) : null
       }

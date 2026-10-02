@@ -19,6 +19,7 @@ export const LIFE_ICON_NAMES = {
   record: 'mic',
   expand: 'chevron.down',
   collapse: 'chevron.up',
+  plus: 'plus',
 } as const;
 
 export type LifeIconName = keyof typeof LIFE_ICON_NAMES;

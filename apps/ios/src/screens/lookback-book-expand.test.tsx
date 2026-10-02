@@ -159,28 +159,18 @@ describe('lookback book expand', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-change-day')).toBeTruthy();
+      expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
     });
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-change-day'));
-      await Promise.resolve();
-    });
-    await waitFor(() => {
-      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
-    });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-      await Promise.resolve();
-      await Promise.resolve();
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
       await Promise.resolve();
     });
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
     });
+    expect(view.getByLabelText('2026年9月，有14条记录，已展开')).toBeTruthy();
     expect(view.queryByTestId('lookback-month-calendar')).toBeNull();
-    expect(view.getByText('28日')).toBeTruthy();
-    expect(view.getByText('周一')).toBeTruthy();
-    expect(view.getByText('3条')).toBeTruthy();
+    expect(view.getByText('28日 / 周一 / 3条')).toBeTruthy();
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
       await Promise.resolve();

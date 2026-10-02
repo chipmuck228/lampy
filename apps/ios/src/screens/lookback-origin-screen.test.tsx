@@ -117,7 +117,7 @@ describe('lookback origin on the root screen', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-change-day')).toBeTruthy();
+      expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('lookback-go-recent'));
     expect(mockDismissTo).toHaveBeenCalledWith('/');
