@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 import { LifeIcon } from './life-icons';
 import { hairline, ink, pageGutter, paperDeep, sage } from './life-page';
@@ -126,37 +126,36 @@ export function LeaveFab({
       pointerEvents={available ? 'box-none' : 'none'}
       style={[
         styles.wrap,
-        styles.shadow,
         {
           opacity,
           transform: [{ translateY: shift }],
         },
-        !available ? styles.hidden : null,
       ]}
       accessibilityElementsHidden={!available}
       importantForAccessibility={available ? 'yes' : 'no-hide-descendants'}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="留下"
-        accessibilityElementsHidden={!available}
-        importantForAccessibility={available ? 'yes' : 'no-hide-descendants'}
-        accessibilityState={{ disabled: !available }}
-        testID={testID}
-        disabled={!available}
-        onPress={onPress}
-        style={styles.fab}
-      >
-        <LifeIcon name="plus" size={16} color={sage} decorative />
-        <Text style={styles.label}>留下</Text>
-      </Pressable>
+      <View style={styles.shadow} pointerEvents="box-none" accessible={false}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="留下"
+          accessibilityElementsHidden={!available}
+          importantForAccessibility={available ? 'yes' : 'no-hide-descendants'}
+          accessibilityState={{ disabled: !available }}
+          testID={testID}
+          disabled={!available}
+          onPress={onPress}
+          style={styles.fab}
+        >
+          <LifeIcon name="plus" size={16} color={sage} decorative />
+          <Text style={styles.label}>留下</Text>
+        </Pressable>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'flex-end' },
-  hidden: { opacity: 0 },
   shadow: {
     shadowColor: ink,
     shadowOpacity: 0.06,

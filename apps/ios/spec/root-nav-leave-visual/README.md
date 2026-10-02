@@ -81,10 +81,10 @@
 
 调用链：最近 `onRecentScroll` → `leaveFab.onScroll`，`available={leaveFab.open}`。回看根页同样 `onScroll`，目录展开时 `readingLocked` 停止滚动喂给控制器，且 `available={leaveFab.open && !readingLocked}`。每页只挂一份 `LeaveFab`，共用同一组件。
 
-用户看到「滚动时只是背景变淡」：
+真机（米色胶囊之后）：下滚满足条件时整颗变淡，但没有到看不见。
 
-1. **源码规则：** 隐藏是整颗 `opacity` 在 380ms 内到 0，不是单独改背景或文字颜色。慢滑每步 `delta ≤ 12` 记 idle，800ms 后按原规则再出现。这是设计，不是浅色常驻。
-2. **iOS 阴影残留** 仍是待验证假设，不是已确认根因。阴影与填充放在同一显隐外壳，是为了视觉层一起受 `opacity` 控制，不能代替真机手势验收。
+1. **源码规则未改：** 隐藏仍应是整颗 `opacity` 在 380ms 内到 0。慢滑 `delta ≤ 12` 记 idle，停 800ms 后会再出现。
+2. **这次按实现冲突处理，不是改阈值。** 外壳原先同时绑原生动画 `opacity` 和静态 `styles.hidden { opacity: 0 }`。`available` 在动画一开始就变 false，两套 opacity 叠在同一节点上，iOS 上容易停在半透明。已去掉静态 `opacity: 0`，只保留动画值；阴影放到子节点，避免和 native driver 抢同一层。这仍是假设，要再真机下滚确认是否到 0。
 3. **未改等待、阈值或控制器。**
 
 运行环境见 `WALK.md`。属性测试不等于原生显隐或 VoiceOver PASS。

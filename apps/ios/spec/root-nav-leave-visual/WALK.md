@@ -28,7 +28,7 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | 触控区域 ≥ 48pt | **PASS**（Jest） |
 | 末尾避让 = 按钮高 + 距带间距 + 余量，不含导航带高 | **PASS**（Jest） |
 | `recent-leave-fab.test.ts` 显隐预期未改 | **PASS**（Jest，文件无 diff） |
-| 隐藏态外壳 `opacity=0`、不可点、无障碍隐藏 | **PASS**（Jest 属性，不是原生显隐） |
+| 隐藏态不可点、无障碍隐藏；外壳不叠第二层静态 `opacity: 0` | **PASS**（Jest 属性，不是原生显隐） |
 | 无三段高光层；底为 `paperDeep`，字为 `sage` | **PASS**（Jest 属性） |
 
 ## 改前／改后画面
@@ -65,7 +65,7 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | `useLeaveFabMotion` 函数体 | 无行为改动 |
 | `recent-leave-fab.test.ts` | 无 diff，预期行为未改 |
 
-源码结论：隐藏仍是整颗 `opacity` 到 0。380ms 淡出 + 慢滑 idle + 800ms 停后恢复，看起来会像变浅，这是原规则。iOS 阴影残留仍是待验证假设，不能当成已确认根因，也不能代替手势验收。未改阈值、等待或控制器。
+真机报告（米色胶囊）：下滚满足条件后整颗变淡、不消失。源码阈值未改。更可能是外壳同时写了原生动画 opacity 和静态 `opacity: 0`，动画一开始 `available=false` 就叠上去，停在半透明。已去掉静态层。这不是已结案，需再真下滚看是否到 0。未改等待或控制器。
 
 ## 运行环境
 
@@ -91,6 +91,6 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | 项 | 值 |
 | --- | --- |
 | 开分支时 GitHub `main` | `9d15a1648ab6725e212a472580faf15def055949`（#59）。当时 `gh api`，不是永恒基线。 |
-| 本轮开始远端 head | `f40e5425cb0b1153541c41ec71610a800e5f0e9b` |
-| 实现 SHA | `011f72450b5bba74325f8a77c566a8f24da7f4d0`（本地） |
-| PR head | 推送后以 GitHub 为准 |
+| 本轮开始远端 head | `3bb2d300d2a48a9bc402ce797ee153a3d5e430f3` |
+| 实现 SHA | 待提交 |
+| PR head | 待推送 |

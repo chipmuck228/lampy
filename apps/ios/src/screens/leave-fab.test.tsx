@@ -45,9 +45,29 @@ describe('shared LeaveFab', () => {
     expect(fab.props.accessibilityElementsHidden).toBe(true);
     expect(fab.props.accessibilityState?.disabled ?? fab.props.disabled).toBe(true);
     const shell = view.getByTestId('lookback-leave-fab-shell', { includeHiddenElements: true });
-    expect(StyleSheet.flatten(shell.props.style).opacity).toBe(0);
     expect(shell.props.pointerEvents).toBe('none');
     expect(shell.props.accessibilityElementsHidden).toBe(true);
+    view.unmount();
+  });
+
+  it('does not stack a static opacity 0 on the animated shell', async () => {
+    const view = await render(
+      <LeaveFab
+        testID="lookback-leave-fab"
+        onPress={() => undefined}
+        available={false}
+        opacity={new Animated.Value(1)}
+        shift={new Animated.Value(0)}
+      />,
+    );
+    const shell = view.getByTestId('lookback-leave-fab-shell', { includeHiddenElements: true });
+    const layers = (Array.isArray(shell.props.style) ? shell.props.style : [shell.props.style]).filter(Boolean);
+    const opacityLayers = layers.filter(
+      (layer): layer is { opacity: unknown } =>
+        !!layer && typeof layer === 'object' && 'opacity' in layer,
+    );
+    expect(opacityLayers).toHaveLength(1);
+    expect(opacityLayers[0].opacity).not.toBe(0);
     view.unmount();
   });
 
