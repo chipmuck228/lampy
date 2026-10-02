@@ -45,7 +45,7 @@ jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useEffect } = require('react');
   return {
-    useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
+    useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
@@ -462,7 +462,7 @@ describe('account screen', () => {
       expect(view.getByText('本机保护')).toBeTruthy();
       expect(view.getByText('未开启')).toBeTruthy();
     });
-    expect(view.getByText('开启后，进入 Lampy 需要 Face ID 或设备密码。')).toBeTruthy();
+    expect(view.getByText('进入 Lampy 时使用 Face ID 或设备密码。')).toBeTruthy();
     await act(async () => {
       fireEvent(view.getByTestId('account-device-lock-toggle'), 'valueChange', true);
     });
@@ -470,15 +470,16 @@ describe('account screen', () => {
     expect(setEnabled).toHaveBeenCalledWith(true);
   });
 
-  it('keeps 本机设置 to protection, storage, and version', async () => {
+  it('keeps 本机设置 to protection and the two reading entries', async () => {
     const view = await render(wrap(<AccountScreen />));
     await waitFor(() => {
       expect(view.getByLabelText('本机设置')).toBeTruthy();
       expect(view.getByText('本机设置')).toBeTruthy();
     });
-    expect(view.getByTestId('account-personal')).toBeTruthy();
-    expect(view.getByText(/个人记录保存在这台设备/)).toBeTruthy();
-    expect(view.getByTestId('account-version')).toBeTruthy();
+    expect(view.getByLabelText('记录与存储')).toBeTruthy();
+    expect(view.getByLabelText('关于 Lampy')).toBeTruthy();
+    expect(view.queryByTestId('account-personal')).toBeNull();
+    expect(view.queryByTestId('account-version')).toBeNull();
     expect(view.getByLabelText('开发诊断')).toBeTruthy();
     expect(view.queryByTestId('account-diagnostics')).toBeNull();
     expect(view.queryByTestId('account-family-preview')).toBeNull();
@@ -510,8 +511,10 @@ describe('account screen', () => {
     await waitFor(() => {
       expect(view.getByLabelText('本机设置')).toBeTruthy();
     });
-    expect(view.getByTestId('account-personal')).toBeTruthy();
-    expect(view.getByTestId('account-version')).toBeTruthy();
+    expect(view.getByLabelText('记录与存储')).toBeTruthy();
+    expect(view.getByLabelText('关于 Lampy')).toBeTruthy();
+    expect(view.queryByTestId('account-personal')).toBeNull();
+    expect(view.queryByTestId('account-version')).toBeNull();
     expect(view.queryByLabelText('开发诊断')).toBeNull();
     expect(view.queryByTestId('account-diagnostics')).toBeNull();
   });

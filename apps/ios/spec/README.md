@@ -18,6 +18,7 @@
 | `recent-reading-b/` | 阶段 B「最近」实现走查。回看仍不动 |
 | `recent-visual-refinement/` | #54 最近第一轮视觉。从 main 新开，不续写 #53 |
 | `recent-photo-reveal-impl/` | #56 最近照片显现实现走查。真机未观察到效果，已静态退路；不改 #55 spec |
+| `account-settings-reading/` | 本机设置改版。附件源码缺失；只换展示，不重写本机保护 |
 | `personal-visual-details/` | 感受色点、回看日期行、首次三屏。运行中实现 |
 | `testflight-beta-1/` | 第一份 TestFlight 预发布准备。不上传、不邀请 |
 | `lookback-expand/` | #35 当时的年页展开契约。产品效力见 `lookback-book/`；#36 是 B 的备选实现 |

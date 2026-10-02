@@ -33,6 +33,7 @@ import { createSecureDeviceLockStore, type DeviceLockStore } from '../infrastruc
 import { createExpoDeviceAuthenticator, type DeviceAuthenticator } from '../infrastructure/expo-device-auth';
 import { setPrivateSnapshotBlocked } from '../infrastructure/screen-privacy';
 import { ink, inkSoft, paper, sage } from './life-page';
+import { LifeIcon } from './life-icons';
 
 function appIsBackgrounded() {
   return AppState.currentState === 'background';
@@ -471,13 +472,17 @@ export function DeviceLockSettings() {
   const busy = lock.settingsBusy;
   return (
     <View testID="account-device-lock">
-      <Text style={styles.title} accessibilityRole="header">
-        本机保护
-      </Text>
       <View style={styles.settingsRow}>
-        <Text style={styles.action} testID="account-device-lock-state">
-          {displayOn ? '已开启' : '未开启'}
-        </Text>
+        <LifeIcon name="lock" size={20} color={sage} decorative />
+        <View style={styles.settingsCopy}>
+          <Text style={styles.settingsTitle}>本机保护</Text>
+          <Text style={styles.action} testID="account-device-lock-state">
+            {displayOn ? '已开启' : '未开启'}
+          </Text>
+          <Text style={styles.body} testID="account-device-lock-copy">
+            进入 Lampy 时使用 Face ID 或设备密码。
+          </Text>
+        </View>
         <Switch
           value={displayOn}
           disabled={busy}
@@ -490,9 +495,6 @@ export function DeviceLockSettings() {
           testID="account-device-lock-toggle"
         />
       </View>
-      <Text style={styles.body} testID="account-device-lock-copy">
-        开启后，进入 Lampy 需要 Face ID 或设备密码。
-      </Text>
       {lock.message ? (
         <Text style={styles.body} testID="account-device-lock-message">
           {lock.message}
@@ -520,10 +522,12 @@ const styles = StyleSheet.create({
   action: { ...type.action, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   settingsRow: {
-    minHeight: 44,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
+    gap: 12,
+    paddingVertical: 12,
   },
+  settingsCopy: { flex: 1, minWidth: 0, gap: 4 },
+  settingsTitle: { ...type.action, color: ink },
 });

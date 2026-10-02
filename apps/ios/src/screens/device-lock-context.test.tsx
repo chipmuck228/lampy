@@ -197,7 +197,7 @@ describe('device lock cover', () => {
       expect(view.getByText('未开启')).toBeTruthy();
     });
     expect(view.getByText('本机保护')).toBeTruthy();
-    expect(view.getByText('开启后，进入 Lampy 需要 Face ID 或设备密码。')).toBeTruthy();
+    expect(view.getByText('进入 Lampy 时使用 Face ID 或设备密码。')).toBeTruthy();
     await act(async () => {
       flipSettings(view);
     });
