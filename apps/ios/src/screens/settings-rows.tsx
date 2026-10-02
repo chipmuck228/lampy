@@ -97,6 +97,7 @@ export function SettingsLink({
       accessibilityLabel={title}
       testID={testID}
       onPress={onPress}
+      style={styles.linkHit}
     >
       <SettingsRowFrame
         icon={icon}
@@ -191,6 +192,78 @@ export function SettingsAboutMark() {
   );
 }
 
+export function SettingsUpdated({ children, testID }: { children: ReactNode; testID?: string }) {
+  return (
+    <Text style={styles.updated} testID={testID}>
+      {children}
+    </Text>
+  );
+}
+
+export function SettingsChapter({
+  title,
+  children,
+  testID,
+}: {
+  title: string;
+  children: ReactNode;
+  testID?: string;
+}) {
+  return (
+    <View style={styles.chapter} testID={testID}>
+      <Text style={styles.chapterTitle} accessibilityRole="header">
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+export function SettingsParagraph({
+  children,
+  testID,
+}: {
+  children: ReactNode;
+  testID?: string;
+}) {
+  return (
+    <Text style={styles.paragraph} testID={testID}>
+      {children}
+    </Text>
+  );
+}
+
+export function SettingsCopyArticle({
+  updated,
+  updatedTestID,
+  chapters,
+  testIDPrefix,
+}: {
+  updated?: string;
+  updatedTestID?: string;
+  chapters: readonly { title: string; paragraphs: readonly string[] }[];
+  testIDPrefix: string;
+}) {
+  return (
+    <View>
+      {updated ? (
+        <SettingsUpdated testID={updatedTestID}>更新日期：{updated}</SettingsUpdated>
+      ) : null}
+      {chapters.map((chapter, index) => (
+        <SettingsChapter
+          key={chapter.title}
+          title={chapter.title}
+          testID={`${testIDPrefix}-chapter-${index}`}
+        >
+          {chapter.paragraphs.map((paragraph) => (
+            <SettingsParagraph key={paragraph}>{paragraph}</SettingsParagraph>
+          ))}
+        </SettingsChapter>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   intro: {
     alignItems: 'center',
@@ -207,6 +280,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
     marginBottom: 8,
   },
+  linkHit: { minHeight: 48 },
   row: {
     minHeight: 67,
     flexDirection: 'row',
@@ -263,4 +337,18 @@ const styles = StyleSheet.create({
   bodyMark: { width: 48, height: 48 },
   bodyName: { ...type.title, color: ink, marginTop: 23 },
   bodyLine: { ...type.body, color: inkSoft, textAlign: 'center', marginTop: 7 },
+  updated: {
+    ...type.meta,
+    color: inkSoft,
+    marginTop: 28,
+    marginBottom: 8,
+  },
+  chapter: {
+    paddingTop: 28,
+    paddingBottom: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: hairline,
+  },
+  chapterTitle: { ...type.action, color: ink, marginBottom: 10 },
+  paragraph: { ...type.body, color: inkSoft, marginBottom: 12 },
 });
