@@ -1,7 +1,7 @@
 import { lookbackBookWeekdayName } from '../application/lookback-book';
 import { pad2, parseMillis } from '../domain-adapters/calendar';
 
-/** Attachment Recent canvas. Screen-only; do not reuse on Lookback. */
+/** Attachment Recent / Lookback shared page-header tokens. */
 export const recentPaper = '#F8F6EF';
 export const recentInk = '#373B34';
 export const recentInkSoft = '#9D9F91';
@@ -107,6 +107,38 @@ export const recentType = {
     fontSize: 13,
     lineHeight: 20,
     letterSpacing: 0.78,
+  },
+} as const;
+
+/**
+ * Attachment lookback roles. Same iOS-point scale as `recentType`:
+ * display sizes stay near the 390 CSS px; 9–13px copy is lifted so it reads on device.
+ */
+export const lookbackType = {
+  dayYear: recentType.year,
+  dayTitle: {
+    fontFamily: recentSerif,
+    fontSize: 31,
+    lineHeight: 40,
+    letterSpacing: 1.2,
+    fontWeight: '500' as const,
+  },
+  dayMeta: recentType.weekday,
+  note: recentType.note,
+  expand: recentType.expand,
+  feeling: recentType.feeling,
+  open: recentType.open,
+  end: recentType.end,
+  neighbor: {
+    fontFamily: recentSerif,
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 0.4,
+  },
+  neighborDate: {
+    fontFamily: recentSans,
+    fontSize: 12,
+    lineHeight: 16,
   },
 } as const;
 

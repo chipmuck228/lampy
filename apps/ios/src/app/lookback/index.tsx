@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  Animated,
   BackHandler,
   findNodeHandle,
   Pressable,
@@ -55,6 +56,8 @@ import {
   LookbackBookDayRow,
   LookbackBookMonthRow,
   LookbackBookYearChapter,
+  LookbackCatalogNoteRow,
+  LookbackCatalogSplitRow,
 } from '../../screens/lookback-book';
 import {
   LookbackCatalogOverlay,
@@ -84,6 +87,10 @@ import {
   LookbackReadingNeighbors,
   LookbackUnconfirmedHeader,
 } from '../../screens/lookback-reading';
+import {
+  lookbackReadingShouldHoldVisible,
+  useLookbackReadingFade,
+} from '../../screens/lookback-reading-fade';
 import { shouldPairRecentImages } from '../../screens/moment-images';
 import { useRecentClipPlayback } from '../../screens/use-recent-clip-playback';
 
@@ -154,7 +161,6 @@ export default function LookbackIndexScreen() {
   const [catalogLocateSeq, setCatalogLocateSeq] = useState(0);
   const [pendingRestoreY, setPendingRestoreY] = useState<number | null>(null);
   const [restoreSeq, setRestoreSeq] = useState(0);
-  const [toggleHeight, setToggleHeight] = useState(56);
   const [holdWindowY, setHoldWindowY] = useState<number | null>(null);
   const [holdSeq, setHoldSeq] = useState(0);
   const locateSeqRef = useRef(0);
@@ -166,6 +172,7 @@ export default function LookbackIndexScreen() {
   const changeDayRef = useRef<View>(null);
   const readingTitleRef = useRef<View>(null);
   const clips = useRecentClipPlayback();
+  const readingFade = useLookbackReadingFade();
   const clipsRef = useRef(clips);
   const catalogOpenRef = useRef(catalogOpen);
   const scopeRef = useRef(scope);
@@ -315,24 +322,56 @@ export default function LookbackIndexScreen() {
     const generation = readingGeneration.current + 1;
     readingGeneration.current = generation;
     const same = scopeRef.current && lookbackScopesEqual(scopeRef.current, target);
+    const hold = lookbackReadingShouldHoldVisible({
+      hadVisibleReading: readingRef.current.status === 'ready' || readingRef.current.status === 'empty',
+      sameScope: !!same,
+    });
+    const fadeStarted = readingFade.begin();
+    const fadeOutDone = hold ? readingFade.fadeOut(fadeStarted) : Promise.resolve(true);
+    if (!hold) readingFade.hide(fadeStarted);
     if (!options.keepPlayer || !same) void clipsRef.current.pause();
-    setScope(target);
     setCatalogOpen(false);
     setCatalogLocateKey(null);
-    setReading({ status: 'loading' });
     setPendingRestoreY(null);
-    if (!same) {
-      setExpandedIds([]);
-      setNeighbors({ previous: null, next: null });
-      setNeighborError(false);
-      setUnconfirmedCopy(null);
-      if (options.count == null) setScopeCount(null);
+    if (!hold) {
+      setScope(target);
+      setReading({ status: 'loading' });
+      if (!same) {
+        setExpandedIds([]);
+        setNeighbors({ previous: null, next: null });
+        setNeighborError(false);
+        setUnconfirmedCopy(null);
+        if (options.count == null) setScopeCount(null);
+      }
+      if (options.count != null) setScopeCount(options.count);
     }
-    if (options.count != null) setScopeCount(options.count);
     moreInFlight.current = null;
     if (target.kind === 'day') {
       rememberLookbackBookOpen({ year: target.year, month: target.month, day: target.day });
     }
+    const reveal = async () => {
+      await fadeOutDone;
+      if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return false;
+      readingFade.prepareAppear(fadeStarted);
+      return true;
+    };
+    const appear = () => {
+      requestAnimationFrame(() => {
+        if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
+        void readingFade.fadeIn(fadeStarted);
+      });
+    };
+    const showNext = () => {
+      setScope(target);
+      if (!same) {
+        setExpandedIds([]);
+        setNeighbors({ previous: null, next: null });
+        setNeighborError(false);
+        setUnconfirmedCopy(null);
+        if (options.count == null) setScopeCount(null);
+      }
+      if (options.count != null) setScopeCount(options.count);
+    };
     try {
       let firstPage:
         | { title?: string; explanation?: string; totalCount?: number }
@@ -346,6 +385,8 @@ export default function LookbackIndexScreen() {
         },
       });
       if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
+      if (!(await reveal())) return;
+      if (hold) showNext();
       if (target.kind !== 'day' && firstPage?.title && firstPage.explanation) {
         setUnconfirmedCopy({ title: firstPage.title, explanation: firstPage.explanation });
       }
@@ -359,6 +400,7 @@ export default function LookbackIndexScreen() {
       if (!restored.ok && restored.items.length === 0) {
         setReading({ status: 'error', retry: 'scope' });
         if (options.snapshot) persistSnapshot(options.snapshot);
+        appear();
         return;
       }
       if (restored.items.length === 0) {
@@ -373,6 +415,7 @@ export default function LookbackIndexScreen() {
         setRestoreSeq((current) => current + 1);
         setPendingRestoreY(0);
         if (options.locate && target.kind === 'day') beginLocate(lookbackBookLocateId(target));
+        appear();
         return;
       }
       const presentIds = restored.items.map((item) => item.id);
@@ -403,20 +446,27 @@ export default function LookbackIndexScreen() {
         void loadNeighbors({ ...target, count: options.count ?? 0 }, viewRef.current, generation);
       }
       requestAnimationFrame(() => focusRef(readingTitleRef.current));
+      appear();
     } catch (caught) {
       if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
+      if (!(await reveal())) return;
+      if (hold) showNext();
       if (caught && typeof caught === 'object' && 'invalid' in caught) {
         setReading({ status: 'invalid' });
+        appear();
         return;
       }
       setReading({ status: 'error', retry: 'scope' });
       if (options.snapshot) persistSnapshot(options.snapshot);
+      appear();
     }
-  }, [beginLocate, loadNeighbors, loadPageForScope]);
+  }, [beginLocate, loadNeighbors, loadPageForScope, readingFade]);
 
   const runDefault = useCallback(async (book: LookbackBookView) => {
     const generation = readingGeneration.current + 1;
     readingGeneration.current = generation;
+    const fadeStarted = readingFade.begin();
+    readingFade.hide(fadeStarted);
     setReading({ status: 'loading' });
     try {
       const app = await getUseCases();
@@ -428,12 +478,14 @@ export default function LookbackIndexScreen() {
       if (choice.kind === 'empty') {
         setScope(null);
         setReading({ status: 'idle' });
+        readingFade.settle();
         return;
       }
       if (choice.kind === 'catalog') {
         setScope(null);
         setReading({ status: 'idle' });
         setCatalogOpen(true);
+        readingFade.settle();
         return;
       }
       if (choice.kind === 'unknown') {
@@ -442,14 +494,22 @@ export default function LookbackIndexScreen() {
       }
       if (choice.kind === 'month-failed') {
         setReading({ status: 'error', retry: 'search' });
+        requestAnimationFrame(() => {
+          if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
+          void readingFade.fadeIn(fadeStarted);
+        });
         return;
       }
       await loadScope(choice, { count: choice.count });
     } catch {
       if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
       setReading({ status: 'error', retry: 'search' });
+      requestAnimationFrame(() => {
+        if (!mounted.current || !lookbackBookResponseIsCurrent(readingGeneration.current, generation)) return;
+        void readingFade.fadeIn(fadeStarted);
+      });
     }
-  }, [loadScope]);
+  }, [loadScope, readingFade]);
 
   const loadMonth = useCallback(async (year: number, month: number, locate = false) => {
     const generation = expandGeneration.current + 1;
@@ -718,7 +778,7 @@ export default function LookbackIndexScreen() {
     windowHeight: height,
     insetTop: insets.top,
     insetBottom: insets.bottom,
-    headerHeight: 120 + toggleHeight,
+    headerHeight: height < 500 ? 96 : 112,
     rail: shouldUseNavRail(width, height),
   });
   const catalog = catalogOpen ? (
@@ -728,23 +788,13 @@ export default function LookbackIndexScreen() {
       onLocated={clearCatalogLocate}
       maxHeight={catalogMax}
     >
-        {view && view.unknownCount > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`时间未确认，有${view.unknownCount}条记录`}
-            testID="lookback-unconfirmed"
-            onPress={() => void loadScope({ kind: 'unknown' }, { count: view.unknownCount })}
-            style={lookbackStyles.hit}
-          >
-            <Text style={lookbackStyles.action}>时间未确认 · {view.unknownCount}条</Text>
-          </Pressable>
-        ) : null}
         {view?.years.map((chapter) => (
           <LookbackBookYearChapter key={chapter.year} chapter={chapter}>
             <LookbackLocateAnchor id={lookbackBookLocateId({ year: chapter.year })} />
             {chapter.yearUnconfirmedCount > 0 ? (
-              <Pressable
-                accessibilityRole="button"
+              <LookbackCatalogSplitRow
+                left={chapter.yearUnconfirmedLabel}
+                right={`${chapter.yearUnconfirmedCount}条`}
                 accessibilityLabel={`${chapter.yearUnconfirmedLabel}，有${chapter.yearUnconfirmedCount}条记录`}
                 testID={`lookback-book-year-unconfirmed-${chapter.year}`}
                 onPress={() =>
@@ -753,12 +803,7 @@ export default function LookbackIndexScreen() {
                     { count: chapter.yearUnconfirmedCount },
                   )
                 }
-                style={lookbackStyles.hit}
-              >
-                <Text style={lookbackStyles.action}>
-                  {chapter.yearUnconfirmedLabel} · {chapter.yearUnconfirmedCount}条
-                </Text>
-              </Pressable>
+              />
             ) : null}
             {chapter.months.map((month) => {
               const open = readyExpand?.year === chapter.year && readyExpand.month === month.month;
@@ -794,8 +839,9 @@ export default function LookbackIndexScreen() {
                   {open ? (
                     <View testID={`lookback-book-expand-${chapter.year}-${pad2(month.month)}`}>
                       {readyExpand.page.dayUnconfirmedCount > 0 ? (
-                        <Pressable
-                          accessibilityRole="button"
+                        <LookbackCatalogSplitRow
+                          left={readyExpand.page.dayUnconfirmedLabel}
+                          right={`${readyExpand.page.dayUnconfirmedCount}条`}
                           accessibilityLabel={`${readyExpand.page.dayUnconfirmedLabel}，有${readyExpand.page.dayUnconfirmedCount}条记录`}
                           testID={`lookback-book-day-unconfirmed-${chapter.year}-${pad2(month.month)}`}
                           onPress={() =>
@@ -808,12 +854,7 @@ export default function LookbackIndexScreen() {
                               { count: readyExpand.page.dayUnconfirmedCount },
                             )
                           }
-                          style={lookbackStyles.hit}
-                        >
-                          <Text style={lookbackStyles.action}>
-                            {readyExpand.page.dayUnconfirmedLabel} · {readyExpand.page.dayUnconfirmedCount}条
-                          </Text>
-                        </Pressable>
+                        />
                       ) : null}
                       {readyExpand.page.entries.map((entry) => {
                         const selected =
@@ -848,6 +889,18 @@ export default function LookbackIndexScreen() {
             })}
           </LookbackBookYearChapter>
         ))}
+        {view && view.unknownCount > 0 ? (
+          <>
+            <LookbackCatalogNoteRow left="时间未确认" right="按已知范围保留" />
+            <LookbackCatalogSplitRow
+              left="时间未确认"
+              right={`${view.unknownCount}条`}
+              accessibilityLabel={`时间未确认，有${view.unknownCount}条记录`}
+              testID="lookback-unconfirmed"
+              onPress={() => void loadScope({ kind: 'unknown' }, { count: view.unknownCount })}
+            />
+          </>
+        ) : null}
     </LookbackCatalogOverlay>
   ) : null;
 
@@ -879,12 +932,7 @@ export default function LookbackIndexScreen() {
       }}
       headerAction={
         view && !emptyLibrary ? (
-          <View
-            onLayout={(event) => {
-              const next = Math.ceil(event.nativeEvent.layout.height);
-              if (next > 0) setToggleHeight(next);
-            }}
-          >
+          <View>
             <LookbackCatalogToggle
               range={lookbackCatalogRangeCaption(scope)}
               expanded={catalogOpen}
@@ -928,6 +976,13 @@ export default function LookbackIndexScreen() {
           <LookbackMessage>先留下一点，以后再回来看看。</LookbackMessage>
         </View>
       ) : null}
+      <Animated.View
+        testID="lookback-reading-fade"
+        style={{
+          opacity: readingFade.opacity,
+          transform: [{ translateY: readingFade.shift }],
+        }}
+      >
       {reading.status === 'loading' ? (
         <LookbackMessage testID="lookback-reading-loading">这一天正在读出来。</LookbackMessage>
       ) : null}
@@ -1062,6 +1117,7 @@ export default function LookbackIndexScreen() {
       }) ? (
         <LookbackEndNote text={lookbackReadingEndNote(scope?.kind) ?? ''} />
       ) : null}
+      </Animated.View>
     </LookbackScaffold>
   );
 }

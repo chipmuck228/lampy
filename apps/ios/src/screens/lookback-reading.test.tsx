@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import type { LookbackDayEntry } from '../application/lookback-day';
 import type { LookbackPlacedDay } from '../application/lookback-reading';
 import { LookbackReadingHeader, LookbackReadingMoment, LookbackReadingNeighbors } from './lookback-reading';
+import { recentRule } from './recent-visual';
 
 const longNote = [
   '傍晚回家，楼道里还留着白天的热。',
@@ -53,6 +54,18 @@ describe('lookback reading header', () => {
     expect(view.getByTestId('lookback-reading-meta').props.children).toBe('周五 · 3条记录');
     expect(view.getByLabelText('2026年9月18日，星期五，3条')).toBeTruthy();
     expect(view.queryByText('2026年9月18日')).toBeNull();
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-header').props.style)).toEqual(
+      expect.objectContaining({ borderBottomWidth: 1, borderBottomColor: recentRule }),
+    );
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-year').props.style)).toEqual(
+      expect.objectContaining({ fontFamily: 'PingFang SC', fontSize: 12 }),
+    );
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-title').props.style)).toEqual(
+      expect.objectContaining({ fontFamily: 'Songti SC', fontSize: 31 }),
+    );
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-meta').props.style)).toEqual(
+      expect.objectContaining({ fontFamily: 'PingFang SC', fontSize: 13 }),
+    );
   });
 });
 
@@ -73,6 +86,17 @@ describe('lookback reading moment', () => {
     );
     fireEvent.press(view.getByTestId('lookback-book-open-m_mix'));
     expect(onOpen).toHaveBeenCalledWith('m_mix');
+    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-note-m_mix').props.style)).toEqual(
+      expect.objectContaining({ fontFamily: 'Songti SC', fontSize: 17 }),
+    );
+    const openHit = StyleSheet.flatten(view.getByTestId('lookback-book-open-m_mix').props.style);
+    const openRow = StyleSheet.flatten(view.getByTestId('lookback-book-open-row-m_mix').props.style);
+    const openLabel = StyleSheet.flatten(view.getByTestId('lookback-book-open-label-m_mix').props.style);
+    expect(openLabel.fontSize).toBe(13);
+    expect(openLabel.flexShrink).toBe(0);
+    expect(openRow.flexWrap).toBe('nowrap');
+    expect(openRow.flexDirection).toBe('row');
+    expect(openHit.alignSelf).toBe('flex-end');
   });
 
   it('expands a long note in place and still offers the full record', async () => {
@@ -226,8 +250,21 @@ describe('lookback reading neighbors', () => {
     expect(previous.props.allowFontScaling).toBe(false);
     expect(previous.props.maxFontSizeMultiplier).toBe(1);
     expect(view.getByText('9月24日').props.allowFontScaling).toBe(false);
-    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-prev-day').props.style).minHeight).toBe(48);
-    expect(StyleSheet.flatten(view.getByTestId('lookback-reading-prev-day').props.style).flex).toBe(1);
+    const previousHit = StyleSheet.flatten(view.getByTestId('lookback-reading-prev-day').props.style);
+    const nextHit = StyleSheet.flatten(view.getByTestId('lookback-reading-next-day').props.style);
+    expect(previousHit.minHeight).toBe(48);
+    expect(previousHit.flex).toBe(1);
+    expect(previousHit.alignItems).toBe('flex-start');
+    expect(nextHit.alignItems).toBe('flex-end');
+    expect(StyleSheet.flatten(previous.props.style)).toEqual(
+      expect.objectContaining({ textAlign: 'left', fontFamily: 'Songti SC', fontSize: 13 }),
+    );
+    expect(StyleSheet.flatten(view.getByText('后一个记录日').props.style)).toEqual(
+      expect.objectContaining({ textAlign: 'right', fontFamily: 'Songti SC', fontSize: 13 }),
+    );
+    expect(StyleSheet.flatten(view.getByText('9月24日').props.style)).toEqual(
+      expect.objectContaining({ fontFamily: 'PingFang SC', fontSize: 12 }),
+    );
     expect(collectTestIDs(view.toJSON()).filter((id) => id.endsWith('-day'))).toEqual([
       'lookback-reading-prev-day',
       'lookback-reading-next-day',

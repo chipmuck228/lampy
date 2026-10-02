@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Dimensions } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
@@ -221,6 +221,13 @@ describe('lookback book screen', () => {
     });
     expect(view.getByText('慢慢看')).toBeTruthy();
     expect(view.getByText('LAMPY · 时间里的记录')).toBeTruthy();
+    expect(view.getByTestId('lookback-header-rule')).toBeTruthy();
+    const header = StyleSheet.flatten(view.getByTestId('lookback-header').props.style);
+    expect(header.flexDirection).toBe('row');
+    expect(header.paddingTop).toBe(20);
+    const kicker = StyleSheet.flatten(view.getByTestId('lookback-kicker').props.style);
+    expect(kicker.fontFamily).toBe('PingFang SC');
+    expect(kicker.fontSize).toBe(11);
     expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
     expect(view.getByTestId('lookback-leave-fab').props.accessibilityElementsHidden).toBe(false);
     fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
@@ -231,7 +238,9 @@ describe('lookback book screen', () => {
     expect(hiddenFab.props.accessibilityElementsHidden).toBe(true);
     expect(hiddenFab.props.accessibilityState?.disabled ?? hiddenFab.props.disabled).toBeTruthy();
     expect(view.getByLabelText('时间未确认，有1条记录')).toBeTruthy();
-    expect(view.getByText('9月')).toBeTruthy();
+    expect(view.getByText('九月')).toBeTruthy();
+    expect(view.getByText('2026年 · 九月')).toBeTruthy();
+    expect(view.queryByText('14条')).toBeNull();
     expect(view.getByLabelText('2026年9月，有14条记录，已展开')).toBeTruthy();
     expect(view.queryByTestId('lookback-year-2026')).toBeNull();
     expect(view.getByTestId('root-nav-band')).toBeTruthy();

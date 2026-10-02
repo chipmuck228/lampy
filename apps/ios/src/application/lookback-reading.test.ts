@@ -194,7 +194,7 @@ describe('lookback reading contracts', () => {
     expect(lookbackReadingDayTitle(2026, 9, 27)).toBe('9月27日');
     expect(lookbackReadingDayMetaLine(2026, 9, 18, 3)).toBe('周五 · 3条记录');
     expect(lookbackCatalogRangeCaption({ kind: 'day', year: 2026, month: 9, day: 18 })).toBe(
-      '2026年 · 9月',
+      '2026年 · 九月',
     );
     expect(lookbackCatalogRangeCaption({ kind: 'unknown' })).toBe('时间未确认');
     expect(lookbackReadingEndNote('day')).toBe('这一日，读到这里。');

@@ -16,6 +16,7 @@ import { Text, type } from './life-text';
 import { LifeIcon } from './life-icons';
 import { LeaveFab, leaveFabScrollReserve, useLeaveFabMotion } from './leave-fab';
 import { lookbackCatalogToggleLabel } from './lookback-catalog';
+import { recentInk, recentKicker, recentRule, recentType } from './recent-visual';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 import { usePageMetrics } from './use-page-metrics';
 
@@ -337,6 +338,38 @@ export function LookbackScaffold({
     return undefined;
   });
 
+  const pinHeader = !!(root && onGoRecent);
+  const heroPadTop = shortHeight ? 12 : 20;
+  const pageHeader = (
+    <View
+      style={[
+        styles.headerWrap,
+        { maxWidth: readingWidth, paddingHorizontal: LOOKBACK_PAGE_GUTTER },
+      ]}
+    >
+      <View
+        style={[styles.hero, { paddingTop: heroPadTop }]}
+        testID="lookback-header"
+      >
+        <View style={styles.heroCopy}>
+          {kicker ? (
+            <Text style={styles.kicker} testID="lookback-kicker">
+              {kicker}
+            </Text>
+          ) : null}
+          <Text style={styles.title} accessibilityRole="header" testID="lookback-wordmark">
+            {title}
+          </Text>
+        </View>
+        {subtitle ? (
+          <Text style={styles.topMark} testID="lookback-subtitle">
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {root ? <View testID="lookback-header-rule" style={styles.headerRule} /> : null}
+    </View>
+  );
   const content = (
     <>
       {root ? null : (
@@ -350,21 +383,7 @@ export function LookbackScaffold({
           <Text style={styles.back}>返回原来的位置</Text>
         </Pressable>
       )}
-      <View style={styles.titleBlock}>
-        {kicker ? (
-          <Text style={styles.kicker} testID="lookback-kicker">
-            {kicker}
-          </Text>
-        ) : null}
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={styles.body} testID="lookback-subtitle">
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
+      {pinHeader ? null : pageHeader}
       {headerAction}
       {locateKey && !readingLocked ? (
         <View testID="lookback-book-locating" accessibilityLabel={locateKey} />
@@ -419,10 +438,11 @@ export function LookbackScaffold({
           styles.column,
           {
             maxWidth: readingWidth,
-            paddingTop: shortHeight ? 8 : 16,
+            paddingTop: 4,
             paddingBottom: 8 + (onLeave ? leaveFabScrollReserve() : 0),
           },
         ]}
+        header={pageHeader}
         onContentSizeChange={scrollProps.onContentSizeChange}
         onScroll={scrollProps.onScroll}
         onScrollBeginDrag={scrollProps.onScrollBeginDrag}
@@ -452,7 +472,7 @@ export function LookbackScaffold({
           style={styles.scroll}
           contentContainerStyle={[
             styles.column,
-            { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16 },
+            { maxWidth: readingWidth, paddingTop: heroPadTop },
           ]}
           onContentSizeChange={scrollProps.onContentSizeChange}
           onScroll={scrollProps.onScroll}
@@ -552,16 +572,19 @@ const styles = StyleSheet.create({
   catalog: { alignSelf: 'stretch', backgroundColor: '#F3F0E9' },
   catalogScroll: { flexGrow: 0 },
   catalogColumn: { paddingTop: 4, paddingBottom: 12, gap: 8 },
-  catalogToggle: { minHeight: 48, justifyContent: 'center', gap: 4 },
-  catalogKicker: { ...type.meta, color: '#5C5851' },
+  catalogToggle: { minHeight: 48, justifyContent: 'center', gap: 4, paddingTop: 4 },
+  catalogKicker: { ...recentType.prefix, color: recentKicker },
   catalogRangeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
     minHeight: 48,
+    borderBottomWidth: 1,
+    borderBottomColor: recentRule,
+    paddingBottom: 8,
   },
-  catalogRange: { ...type.action, color: '#25231F', flexShrink: 1, minWidth: 0 },
+  catalogRange: { ...recentType.date, color: recentInk, flexShrink: 1, minWidth: 0 },
   scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,
@@ -574,9 +597,32 @@ const styles = StyleSheet.create({
   },
   backHit: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
   back: { ...type.action, color: '#53604F' },
-  titleBlock: { gap: 4, flexShrink: 1, minWidth: 0 },
-  kicker: { ...type.meta, color: '#5C5851', flexShrink: 1, minWidth: 0 },
-  title: { ...type.title, color: '#25231F', flexShrink: 1, minWidth: 0 },
+  headerWrap: { alignSelf: 'center', width: '100%' },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    alignSelf: 'center',
+    width: '100%',
+    gap: 12,
+    paddingBottom: 17,
+  },
+  heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
+  kicker: { ...recentType.kicker, color: recentKicker },
+  title: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
+  topMark: {
+    ...recentType.end,
+    color: recentKicker,
+    letterSpacing: 1.2,
+    marginBottom: 6,
+    flexShrink: 0,
+  },
+  headerRule: {
+    alignSelf: 'stretch',
+    height: 1,
+    backgroundColor: recentRule,
+    marginBottom: 8,
+  },
   body: { ...type.action, color: '#5C5851', flexShrink: 1, minWidth: 0 },
   meta: { ...type.meta, color: '#53604F' },
   fallback: { ...type.meta, color: '#5C5851' },

@@ -186,6 +186,64 @@ describe('lookback in-place catalog reading', () => {
     view.unmount();
   });
 
+  it('keeps the current day visible while the next day is still loading', async () => {
+    let finishDay: ((page: object) => void) | undefined;
+    mockGetHistoryDay.mockImplementation(async (_year: number, _month: number, day: number) => {
+      const page = {
+        year: 2026,
+        month: 9,
+        day,
+        title: `2026年9月${day}日`,
+        isEmpty: false,
+        items: [momentItem(day === 28 ? 'm28' : 'm27', day === 28 ? '二十八' : '二十七', day)],
+        hasMore: false,
+        totalCount: 1,
+      };
+      if (day === 27) {
+        return new Promise((resolve) => {
+          finishDay = resolve;
+        });
+      }
+      return page;
+    });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByText('二十八')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
+      await Promise.resolve();
+    });
+    expect(view.queryByTestId('lookback-reading-loading')).toBeNull();
+    expect(view.getByText('二十八')).toBeTruthy();
+    expect(view.getByTestId('lookback-reading-fade')).toBeTruthy();
+    await act(async () => {
+      finishDay?.({
+        year: 2026,
+        month: 9,
+        day: 27,
+        title: '2026年9月27日',
+        isEmpty: false,
+        items: [momentItem('m27', '二十七', 27)],
+        hasMore: false,
+        totalCount: 1,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByText('二十七')).toBeTruthy();
+    });
+    expect(view.queryByTestId('lookback-reading-loading')).toBeNull();
+    view.unmount();
+  });
+
   it('keeps the same asset pause across catalog toggle and body expand', async () => {
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {

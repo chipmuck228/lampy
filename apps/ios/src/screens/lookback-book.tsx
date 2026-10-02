@@ -5,20 +5,31 @@ import { Text, type } from './life-text';
 import {
   LOOKBACK_BOOK_NOTE_LINES,
   lookbackBookDayAccessLabel,
-  lookbackBookDayPrimaryLabel,
-  lookbackBookDaySecondaryLabel,
+  lookbackBookDayDateLabel,
+  lookbackBookDayMetaLabel,
   lookbackBookMonthAccessLabel,
+  lookbackCatalogMonthHan,
   type LookbackBookExcerpt,
   type LookbackBookYear,
 } from '../application/lookback-book';
 import type { LookbackMonthEntry } from '../application/lookback-month';
 import { pad2 } from '../domain-adapters/calendar';
 import type { PlaybackStatus } from '../infrastructure/media';
-import { hairline, paperDeep } from './life-page';
+import { hairline } from './life-page';
 import { LifeIcon, LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentFeeling } from './moment-feeling';
 import { MomentImages } from './moment-images';
+import {
+  recentInk,
+  recentOlive,
+  recentSans,
+  recentType,
+  recentWeekdayInk,
+  recentYearInk,
+} from './recent-visual';
+
+const CATALOG_SELECTED = '#EEEEE6';
 
 export function LookbackBookYearChapter({
   chapter,
@@ -32,9 +43,6 @@ export function LookbackBookYearChapter({
       <Text style={styles.chapterTitle} accessibilityRole="header">
         {chapter.title}
       </Text>
-      <Text style={styles.meta} accessibilityLabel={`有${chapter.momentCount}条记录`}>
-        {chapter.momentCount}条
-      </Text>
       {children}
     </View>
   );
@@ -43,14 +51,13 @@ export function LookbackBookYearChapter({
 export function LookbackBookMonthRow({
   year,
   month,
-  count,
   summary,
   expanded,
   onPress,
 }: {
   year: number;
   month: number;
-  count: number;
+  count?: number;
   summary: string;
   expanded: boolean;
   onPress: () => void;
@@ -65,10 +72,7 @@ export function LookbackBookMonthRow({
       style={styles.monthHit}
     >
       <View style={styles.monthRow}>
-        <View style={styles.monthCopy}>
-          <Text style={styles.monthTitle}>{month}月</Text>
-          <Text style={styles.monthCount}>{count}条</Text>
-        </View>
+        <Text style={styles.monthTitle}>{lookbackCatalogMonthHan(month)}</Text>
         <LifeIcon name={expanded ? 'collapse' : 'expand'} size={16} decorative />
       </View>
     </Pressable>
@@ -89,9 +93,10 @@ export function LookbackBookDayRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
+    <LookbackCatalogSplitRow
+      left={lookbackBookDayDateLabel(month, entry.day)}
+      right={lookbackBookDayMetaLabel(year, month, entry.day, entry.count)}
+      selected={selected}
       accessibilityLabel={lookbackBookDayAccessLabel(
         year,
         month,
@@ -99,14 +104,59 @@ export function LookbackBookDayRow({
         entry.summary,
         selected,
       )}
+      accessibilityState={{ selected }}
       testID={`lookback-book-day-${year}-${pad2(month)}-${pad2(entry.day)}`}
       onPress={onPress}
-      style={[styles.dayHit, selected ? styles.daySelected : null]}
+    />
+  );
+}
+
+export function LookbackCatalogNoteRow({
+  left,
+  right,
+  testID,
+}: {
+  left: string;
+  right?: string;
+  testID?: string;
+}) {
+  return (
+    <View testID={testID} style={styles.noteRow}>
+      <Text style={styles.splitLeft}>{left}</Text>
+      {right ? <Text style={styles.splitRight}>{right}</Text> : null}
+    </View>
+  );
+}
+
+export function LookbackCatalogSplitRow({
+  left,
+  right,
+  selected,
+  onPress,
+  testID,
+  accessibilityLabel,
+  accessibilityState,
+}: {
+  left: string;
+  right?: string;
+  selected?: boolean;
+  onPress: () => void;
+  testID: string;
+  accessibilityLabel: string;
+  accessibilityState?: { selected?: boolean; expanded?: boolean };
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={accessibilityState}
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      onPress={onPress}
+      style={[styles.splitHit, selected ? styles.daySelected : null]}
     >
-      <View style={styles.dayRow}>
-        <Text style={styles.dayTitle}>
-          {`${lookbackBookDayPrimaryLabel(entry.day)} / ${lookbackBookDaySecondaryLabel(year, month, entry.day)} / ${entry.count}条`}
-        </Text>
+      <View style={styles.splitRow}>
+        <Text style={styles.splitLeft}>{left}</Text>
+        {right ? <Text style={styles.splitRight}>{right}</Text> : null}
       </View>
     </Pressable>
   );
@@ -158,8 +208,8 @@ export function LookbackBookExcerptBlock({
 }
 
 const styles = StyleSheet.create({
-  chapter: { gap: 8, marginTop: 8 },
-  chapterTitle: { ...type.title, color: '#25231F' },
+  chapter: { gap: 2, marginTop: 16 },
+  chapterTitle: { ...recentType.year, color: recentYearInk },
   meta: { ...type.meta, color: '#53604F' },
   clock: { ...type.meta, color: '#53604F' },
   note: { ...type.body, color: '#25231F' },
@@ -174,21 +224,48 @@ const styles = StyleSheet.create({
   monthHit: { minHeight: 48, justifyContent: 'center' },
   monthRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  monthCopy: { flex: 1, flexShrink: 1, minWidth: 0, gap: 2 },
-  monthTitle: { ...type.action, color: '#25231F' },
-  monthCount: { ...type.meta, color: '#53604F' },
-  dayHit: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 8 },
-  daySelected: { backgroundColor: paperDeep },
-  dayRow: {
+  monthTitle: {
+    fontFamily: recentSans,
+    fontSize: 16,
+    lineHeight: 22,
+    color: recentOlive,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  noteRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    minHeight: 44,
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E3D9',
+  },
+  splitHit: { minHeight: 48, justifyContent: 'center', borderRadius: 4 },
+  daySelected: { backgroundColor: CATALOG_SELECTED },
+  splitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
   },
-  dayTitle: { ...type.action, color: '#25231F', flexShrink: 1 },
+  splitLeft: {
+    fontFamily: recentSans,
+    fontSize: 15,
+    lineHeight: 20,
+    color: recentInk,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  splitRight: {
+    ...recentType.weekday,
+    color: recentWeekdayInk,
+    flexShrink: 0,
+  },
 });

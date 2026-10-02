@@ -2,7 +2,11 @@ import { pad2 } from '../domain-adapters/calendar';
 import type { HistoryMonthView } from '../projections/history-projection';
 import { HISTORY_PAGE_SIZE } from './history-use-cases';
 import type { LookbackBookView } from './lookback-book';
-import { lookbackBookDaySecondaryLabel, lookbackBookWeekdayName } from './lookback-book';
+import {
+  lookbackBookDaySecondaryLabel,
+  lookbackBookWeekdayName,
+  lookbackCatalogMonthHan,
+} from './lookback-book';
 
 export type LookbackReadingScope =
   | { kind: 'day'; year: number; month: number; day: number }
@@ -240,7 +244,7 @@ export function lookbackReadingDayMetaLine(
 }
 
 export function lookbackCatalogMonthTitle(year: number, month: number): string {
-  return `${year}年 · ${month}月`;
+  return `${year}年 · ${lookbackCatalogMonthHan(month)}`;
 }
 
 export function lookbackCatalogRangeCaption(scope: LookbackReadingScope | null): string | null {

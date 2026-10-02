@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Text, type } from './life-text';
+import { Text } from './life-text';
 
 import type { LookbackDayEntry } from '../application/lookback-day';
 import { feelingAccentColor } from '../application/feeling-accent';
@@ -17,7 +17,19 @@ import {
   type LookbackPlacedDay,
 } from '../application/lookback-reading';
 import type { PlaybackStatus } from '../infrastructure/media';
-import { hairline, ink, inkSoft, sage } from './life-page';
+import { hairline } from './life-page';
+import {
+  lookbackType,
+  recentEndInk,
+  recentFeelingInk,
+  recentInk,
+  recentOpenInk,
+  recentOlive,
+  recentRule,
+  recentSage,
+  recentWeekdayInk,
+  recentYearInk,
+} from './recent-visual';
 import { LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentImages } from './moment-images';
@@ -122,7 +134,7 @@ export function LookbackReadingMoment({
               onPress={onToggleExpand}
               style={styles.hit}
             >
-              <Text style={styles.action}>{expanded ? '收起正文' : '展开正文'}</Text>
+              <Text style={styles.expand}>{expanded ? '收起正文' : '展开正文'}</Text>
             </Pressable>
           ) : null}
         </>
@@ -189,7 +201,8 @@ function LookbackRecordFoot({
         caption="阅读完整记录"
         accessibilityLabel={`阅读完整记录，${note || id}`}
         testID={`lookback-book-open-${id}`}
-        tight
+        align="end"
+        captionStyle={styles.open}
         onPress={onOpen}
       />
     </View>
@@ -237,7 +250,7 @@ export function LookbackNeighborRetry({
       onPress={onRetry}
       style={styles.hit}
     >
-      <Text style={styles.action}>相邻有记录日暂时读不出来。再试一次</Text>
+      <Text style={styles.expand}>相邻有记录日暂时读不出来。再试一次</Text>
     </Pressable>
   );
 }
@@ -255,16 +268,19 @@ function LookbackNeighborDayHit({
 }) {
   const verb = direction === 'previous' ? '前一个记录日' : '后一个记录日';
   const date = lookbackNeighborDateLabel(current, day);
+  const trailing = direction === 'next';
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={lookbackNeighborCaption(direction, current, day)}
       testID={direction === 'previous' ? 'lookback-reading-prev-day' : 'lookback-reading-next-day'}
       onPress={() => onOpen(day)}
-      style={styles.neighborHit}
+      style={[styles.neighborHit, trailing ? styles.neighborHitEnd : styles.neighborHitStart]}
     >
-      <Text style={styles.action}>{verb}</Text>
-      <Text style={styles.neighborDate}>{date}</Text>
+      <Text style={[styles.neighborVerb, trailing ? styles.neighborCopyEnd : styles.neighborCopyStart]}>{verb}</Text>
+      <Text style={[styles.neighborDate, trailing ? styles.neighborCopyEnd : styles.neighborCopyStart]}>
+        {date}
+      </Text>
     </Pressable>
   );
 }
@@ -296,17 +312,29 @@ export function LookbackReadingNeighbors({
       ) : (
         <View style={styles.neighborSlot} />
       )}
-      {next ? <LookbackNeighborDayHit direction="next" current={current} day={next} onOpen={onOpen} /> : null}
+      {next ? (
+        <LookbackNeighborDayHit direction="next" current={current} day={next} onOpen={onOpen} />
+      ) : (
+        <View style={styles.neighborSlot} />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { gap: 4, marginBottom: 8 },
-  year: { ...type.meta, color: inkSoft },
-  dayTitle: { ...type.title, color: ink },
-  meta: { ...type.meta, color: sage },
-  note: { ...type.body, color: ink },
+  header: {
+    gap: 4,
+    marginBottom: 8,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: recentRule,
+  },
+  year: { ...lookbackType.dayYear, color: recentYearInk },
+  dayTitle: { ...lookbackType.dayTitle, color: recentInk },
+  meta: { ...lookbackType.dayMeta, color: recentWeekdayInk },
+  note: { ...lookbackType.note, color: recentInk },
+  expand: { ...lookbackType.expand, color: recentSage },
+  open: { ...lookbackType.open, color: recentOpenInk },
   measure: {
     position: 'absolute',
     opacity: 0,
@@ -329,6 +357,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     minHeight: 48,
+    width: '100%',
   },
   feeling: {
     flexDirection: 'row',
@@ -345,21 +374,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     flexShrink: 0,
   },
-  feelingWord: { ...type.meta, color: inkSoft, flexShrink: 1 },
+  feelingWord: { ...lookbackType.feeling, color: recentFeelingInk, flexShrink: 1 },
   endNoteWrap: { paddingTop: 24, paddingBottom: 8 },
   endNote: {
-    ...type.meta,
-    color: inkSoft,
+    ...lookbackType.end,
+    color: recentEndInk,
     textAlign: 'center',
     paddingTop: 24,
     paddingBottom: 8,
   },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  action: { ...type.action, color: sage },
+  neighborVerb: { ...lookbackType.neighbor, color: recentOlive },
   neighbors: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: 16,
     marginTop: 8,
   },
@@ -371,5 +401,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
-  neighborDate: { ...type.meta, color: sage },
+  neighborHitStart: { alignItems: 'flex-start' },
+  neighborHitEnd: { alignItems: 'flex-end' },
+  neighborCopyStart: { textAlign: 'left' },
+  neighborCopyEnd: { textAlign: 'right' },
+  neighborDate: { ...lookbackType.neighborDate, color: recentEndInk },
 });

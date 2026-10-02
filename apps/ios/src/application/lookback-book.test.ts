@@ -7,8 +7,11 @@ import {
   LOOKBACK_BOOK_EXCERPT_LIMIT,
   lookbackBookDateLabel,
   lookbackBookDayAccessLabel,
+  lookbackBookDayDateLabel,
+  lookbackBookDayMetaLabel,
   lookbackBookDayPrimaryLabel,
   lookbackBookDaySecondaryLabel,
+  lookbackCatalogMonthHan,
   lookbackBookMonthAccessLabel,
   lookbackBookExcerpts,
   lookbackBookHref,
@@ -72,7 +75,11 @@ describe('lookback book contract', () => {
     expect(lookbackBookMonthAccessLabel(2026, 9, '有14条记录', true)).toBe(
       '2026年9月，有14条记录，已展开',
     );
+    expect(lookbackCatalogMonthHan(9)).toBe('九月');
+    expect(lookbackCatalogMonthHan(11)).toBe('十一月');
     expect(lookbackBookDayPrimaryLabel(18)).toBe('18日');
+    expect(lookbackBookDayDateLabel(9, 18)).toBe('9 / 18');
+    expect(lookbackBookDayMetaLabel(2026, 9, 18, 3)).toBe('周五 · 3条');
     expect(lookbackBookDaySecondaryLabel(2026, 9, 18)).toBe('周五');
     expect(lookbackBookDayAccessLabel(2026, 9, 18, '有1条记录', false)).toBe(
       '2026年9月18日，星期五，有1条记录，未选中',
