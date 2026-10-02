@@ -32,6 +32,7 @@ import {
   lookbackReadingCanShowEndNote,
   lookbackReadingEndNote,
   lookbackReadingResolvedCount,
+  lookbackReadingRestoreY,
   lookbackReadingScopeKey,
   lookbackScopesEqual,
   restoreLookbackPages,
@@ -69,7 +70,7 @@ import {
   momentHref,
   useLookbackLayout,
 } from '../../screens/lookback-chrome';
-import { lookbackCatalogMaxHeight } from '../../screens/lookback-catalog';
+import { lookbackCatalogChromeHeight, lookbackCatalogMaxHeight } from '../../screens/lookback-catalog';
 import { shouldUseNavRail } from '../../screens/life-page';
 import { usePageMetrics } from '../../screens/use-page-metrics';
 import {
@@ -434,9 +435,13 @@ export default function LookbackIndexScreen() {
         expandedIds: nextExpanded,
         scrollY: options.snapshot?.scrollY ?? 0,
       });
-      if (options.snapshot && restored.ok && options.snapshot.scrollY > 0) {
+      const restoreY = lookbackReadingRestoreY({
+        snapshotScrollY: options.snapshot?.scrollY,
+        restoredOk: restored.ok,
+      });
+      if (restoreY != null) {
         setRestoreSeq((current) => current + 1);
-        setPendingRestoreY(options.snapshot.scrollY);
+        setPendingRestoreY(restoreY);
       } else if (!same || options.locate) {
         setRestoreSeq((current) => current + 1);
         setPendingRestoreY(0);
@@ -778,7 +783,7 @@ export default function LookbackIndexScreen() {
     windowHeight: height,
     insetTop: insets.top,
     insetBottom: insets.bottom,
-    headerHeight: height < 500 ? 96 : 112,
+    headerHeight: lookbackCatalogChromeHeight(height < 500),
     rail: shouldUseNavRail(width, height),
   });
   const catalog = catalogOpen ? (

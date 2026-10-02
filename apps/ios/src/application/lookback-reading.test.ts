@@ -12,6 +12,7 @@ import {
   lookbackReadingDayTitle,
   lookbackMoreInFlightBlocks,
   lookbackReadingResolvedCount,
+  lookbackReadingRestoreY,
   lookbackReadingScopeKey,
   restoreLookbackPages,
   shouldAcceptLookbackMorePage,
@@ -340,5 +341,11 @@ describe('lookback reading contracts', () => {
     ).toBe(61);
     expect(lookbackReadingResolvedCount({ loadedCount: 50, hasMore: true })).toBeNull();
     expect(lookbackReadingResolvedCount({ loadedCount: 3, hasMore: false })).toBe(3);
+  });
+
+  it('restores a positive snapshot offset after a successful page restore', () => {
+    expect(lookbackReadingRestoreY({ snapshotScrollY: 180, restoredOk: true })).toBe(180);
+    expect(lookbackReadingRestoreY({ snapshotScrollY: 0, restoredOk: true })).toBeNull();
+    expect(lookbackReadingRestoreY({ snapshotScrollY: 180, restoredOk: false })).toBeNull();
   });
 });

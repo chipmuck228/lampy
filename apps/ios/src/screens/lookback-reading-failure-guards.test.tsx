@@ -425,4 +425,46 @@ describe('lookback reading failure guards', () => {
     expect(view.queryByTestId('lookback-reading-neighbors-retry')).toBeNull();
     view.unmount();
   });
+
+  it('requests the next root page on the first more-retry press', async () => {
+    rememberLookbackReadingSnapshot({
+      scope: { kind: 'day', year: 2026, month: 9, day: 27 },
+      loadedOffset: 0,
+      expandedIds: [],
+      scrollY: 0,
+    });
+    mockGetLookbackBook.mockResolvedValue(twoMonthBook());
+    mockGetHistoryMonth.mockResolvedValue(monthDays(9, { 27: 11 }));
+    let failMore = true;
+    mockGetHistoryDay.mockImplementation(async (_year: number, _month: number, _day: number, offset = 0) => {
+      if (offset === 0) return dayPage(27, [momentItem('m1', '根页第一页')], { hasMore: true, totalCount: 11 });
+      if (failMore) throw new Error('root more down');
+      return dayPage(27, [momentItem('m2', '根页重试页')], { hasMore: false });
+    });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByText('根页第一页')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-reading-more'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-reading-more-retry')).toBeTruthy();
+    });
+    failMore = false;
+    const moreCallsBeforeRetry = mockGetHistoryDay.mock.calls.filter((call) => call[3] === 50).length;
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-reading-more-retry'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByText('根页重试页')).toBeTruthy();
+    });
+    expect(mockGetHistoryDay.mock.calls.filter((call) => call[3] === 50).length).toBe(moreCallsBeforeRetry + 1);
+    expect(view.queryByTestId('lookback-reading-more-retry')).toBeNull();
+    view.unmount();
+  });
 });

@@ -21,6 +21,14 @@ Not copied: synthetic days, web player timer, Noto/DM Sans, phone chrome, inline
 
 This PR is **连续阅读＋视觉**, not visual-only. It already includes OPEN #53 (`31a6542`) on `aab6726`. Do not merge #53 again; close it only after #58 lands. Catalog is no longer a 换一天 overlay. It is an in-place **时间目录** on the same page. Recent and lookback share `LeaveFab` / `useLeaveFabMotion` / `createRecentLeaveFabScroll`.
 
+## Previous review fixes
+
+| 问题 | 结果 |
+| --- | --- |
+| 误提交的 `apps/ios/node_modules` | `e392797` 把 worktree 软链收进了分支。现已 `git rm --cached`，`apps/ios/.gitignore` 写了 `node_modules`。当前 tree **不再跟踪**该路径。 |
+| 目录高度自我反馈 | 上限只用 chrome 高度 `lookbackCatalogChromeHeight`（112 / 短屏 96），不测展开后的目录。Jest：把目录高度喂回 `headerHeight` 会把上限算小，所以实现不能那样测。 |
+| 目录开合异步测量竞态 | 开合用 `holdSeq`；定位用 `lookbackLocateIsCurrent`。迟到的 `measureInWindow` 丢弃。Jest：`lookback-locate` 已覆盖开合补偿、迟到测量、10→28→10。 |
+
 ## Visual choices
 
 - Page chrome matches Recent header rhythm: kicker `LAMPY · 时间里的记录` uses the same `recentType.kicker` as `LAMPY · 生活记录`; title `回看` and mark `慢慢看` sit on one row; the header sits in the same `RootReadingLayout` slot with the same safe-area + `12/20` top inset as Recent; a `recentRule` line sits under the header and again before the day’s records. Reading type follows the attachment lookback roles via `lookbackType` (Songti day title 31, PingFang year/meta, record note/feeling/open/end at the same iOS-point scale as Recent). Tokens only; no web fonts.
@@ -38,7 +46,7 @@ This PR is **连续阅读＋视觉**, not visual-only. It already includes OPEN 
 | Check | Result |
 | --- | --- |
 | `tsc --noEmit` | **PASS** |
-| Jest catalog / FAB / book-screen / expand / adapt / guards / failure / page / locate / origin / reading helpers / day fade | **PASS** 15 suites / 76 tests |
+| Jest catalog / FAB / book-screen / expand / adapt / guards / failure / page / locate / origin / reading helpers / day fade / chrome height | **PASS**（本轮关键回归已跑） |
 | `expo lint` on touched lookback and shared FAB files | **PASS** with one **pre-existing** `react-hooks/exhaustive-deps` warning in `lookback-chrome.tsx` `tryLocate` |
 | `git diff --check` | **PASS** |
 
@@ -67,6 +75,19 @@ Storyboard was not used as a substitute.
 | 短屏 / 横屏 / iPad / VoiceOver | Jest 边距／目录 a11y | **NOT VERIFIED** | **NOT VERIFIED** |
 
 #57 的「用户报告通过，测试 SHA 未确认」只属于设置页，不搬到本分支当实现 SHA。
+
+## Key regression (this pass)
+
+No second visual walk. Jest on the recorded implementation, plus fade interrupt rules:
+
+| 项 | 结果 |
+| --- | --- |
+| 目录开合与换日：同日只收起不定位；换日保留旧文再淡出并定位新题 | **PASS** `lookback-catalog-inplace` |
+| 详情返回位置：快照 `scrollY` 回到原偏移 | **PASS** `lookbackReadingRestoreY` + 日页 `lookback-screen` 偏移恢复 |
+| 播放 → 目录开合暂停且不自动播 → 再按续同一 Asset | **PASS** `lookback-catalog-inplace` |
+| 分页不重复；根页 / 日页 / 未确认失败后第一次重试即请求 | **PASS** guards / failure-guards |
+| Reduce Motion：时长与位移为 0，内容直接到位 | **PASS** `lookback-reading-fade` |
+| 切后台或新一天开始：停掉旧动画，opacity 1 / shift 0；旧序号不再写入新日期 | **PASS** `shouldSettleLookbackReadingFade` / `lookbackReadingFadeIsCurrent` |
 
 静态截图不算通过。隔离机走查仍待另开：
 

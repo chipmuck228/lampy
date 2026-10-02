@@ -278,6 +278,8 @@ describe('lookback in-place catalog reading', () => {
     expect(view.getByTestId('lookback-reading-m28')).toBeTruthy();
     expect(mockPlay).not.toHaveBeenCalled();
     expect(mockCard).toHaveBeenCalledWith('asset-m28');
+    fireEvent.press(view.getByTestId('lookback-reading-sound-m28-play-asset-m28'));
+    expect(mockPlay).toHaveBeenCalledWith('asset-m28', 'memory://m28.m4a');
     view.unmount();
   });
 });

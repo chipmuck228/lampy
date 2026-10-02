@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Easing, type AppStateStatus } from 'react-native';
 
 /** Leaving the current day stays short so the next records can take the page. */
 export const LOOKBACK_READING_FADE_OUT_MS = 240;
@@ -32,12 +32,44 @@ export function lookbackReadingAppearShift(reduceMotion: boolean): number {
   return reduceMotion ? 0 : LOOKBACK_READING_APPEAR_SHIFT;
 }
 
+export function lookbackReadingFadeIsCurrent(started: number, current: number): boolean {
+  return started === current;
+}
+
+export function shouldSettleLookbackReadingFade(state: AppStateStatus | string): boolean {
+  return state !== 'active';
+}
+
+export function settleLookbackReadingMotion(motion: {
+  opacity: { stopAnimation: () => void; setValue: (value: number) => void };
+  shift: { stopAnimation: () => void; setValue: (value: number) => void };
+  stop?: () => void;
+}) {
+  motion.stop?.();
+  motion.opacity.stopAnimation();
+  motion.shift.stopAnimation();
+  motion.opacity.setValue(1);
+  motion.shift.setValue(0);
+}
+
 export function useLookbackReadingFade() {
   const [opacity] = useState(() => new Animated.Value(1));
   const [shift] = useState(() => new Animated.Value(0));
   const reduceMotionRef = useRef(true);
   const anim = useRef<Animated.CompositeAnimation | null>(null);
   const seqRef = useRef(0);
+
+  const settle = useCallback(() => {
+    seqRef.current += 1;
+    settleLookbackReadingMotion({
+      opacity,
+      shift,
+      stop: () => {
+        anim.current?.stop();
+        anim.current = null;
+      },
+    });
+  }, [opacity, shift]);
 
   useEffect(() => {
     let alive = true;
@@ -51,17 +83,21 @@ export function useLookbackReadingFade() {
     const motion = AccessibilityInfo.addEventListener('reduceMotionChanged', (value) => {
       reduceMotionRef.current = value === true;
     });
+    const app = AppState.addEventListener('change', (state) => {
+      if (shouldSettleLookbackReadingFade(state)) settle();
+    });
     return () => {
       alive = false;
       motion?.remove?.();
-      anim.current?.stop();
+      app?.remove?.();
+      settle();
     };
-  }, []);
+  }, [settle]);
 
   const play = useCallback(
     (toOpacity: number, toShift: number, duration: number, started: number) => {
       return new Promise<boolean>((resolve) => {
-        if (started !== seqRef.current) {
+        if (!lookbackReadingFadeIsCurrent(started, seqRef.current)) {
           resolve(false);
           return;
         }
@@ -69,7 +105,7 @@ export function useLookbackReadingFade() {
         if (duration === 0) {
           opacity.setValue(toOpacity);
           shift.setValue(toShift);
-          resolve(started === seqRef.current);
+          resolve(lookbackReadingFadeIsCurrent(started, seqRef.current));
           return;
         }
         const next = Animated.parallel([
@@ -89,7 +125,7 @@ export function useLookbackReadingFade() {
         anim.current = next;
         next.start(({ finished }) => {
           if (anim.current === next) anim.current = null;
-          resolve(finished === true && started === seqRef.current);
+          resolve(finished === true && lookbackReadingFadeIsCurrent(started, seqRef.current));
         });
       });
     },
@@ -104,7 +140,7 @@ export function useLookbackReadingFade() {
 
   const hide = useCallback(
     (started: number) => {
-      if (started !== seqRef.current) return;
+      if (!lookbackReadingFadeIsCurrent(started, seqRef.current)) return;
       anim.current?.stop();
       anim.current = null;
       opacity.setValue(0);
@@ -115,7 +151,7 @@ export function useLookbackReadingFade() {
 
   const prepareAppear = useCallback(
     (started: number) => {
-      if (started !== seqRef.current) return;
+      if (!lookbackReadingFadeIsCurrent(started, seqRef.current)) return;
       anim.current?.stop();
       anim.current = null;
       opacity.setValue(0);
@@ -135,14 +171,6 @@ export function useLookbackReadingFade() {
       play(1, 0, lookbackReadingFadeInDuration(reduceMotionRef.current), started),
     [play],
   );
-
-  const settle = useCallback(() => {
-    seqRef.current += 1;
-    anim.current?.stop();
-    anim.current = null;
-    opacity.setValue(1);
-    shift.setValue(0);
-  }, [opacity, shift]);
 
   return useMemo(
     () => ({ opacity, shift, begin, hide, prepareAppear, fadeOut, fadeIn, settle }),

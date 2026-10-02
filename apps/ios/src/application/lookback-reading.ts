@@ -97,6 +97,15 @@ export function shouldAcceptLookbackMorePage(input: {
   );
 }
 
+export function lookbackReadingRestoreY(input: {
+  snapshotScrollY?: number;
+  restoredOk: boolean;
+}): number | null {
+  if (!input.restoredOk) return null;
+  if (input.snapshotScrollY == null || input.snapshotScrollY <= 0) return null;
+  return input.snapshotScrollY;
+}
+
 export function lookbackReadingResolvedCount(input: {
   known?: number | null;
   totalCount?: number | null;

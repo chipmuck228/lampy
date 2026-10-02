@@ -2,6 +2,13 @@ import { COMPACT_HEIGHT, NAV_BAND_HIT } from './life-page';
 
 export const LOOKBACK_CATALOG_NAV_HEIGHT = 8 + NAV_BAND_HIT;
 export const LOOKBACK_CATALOG_MIN_HEIGHT = 88;
+/** Chrome only: kicker / title / rule. Never the expanded catalog. */
+export const LOOKBACK_CATALOG_CHROME_HEIGHT = 112;
+export const LOOKBACK_CATALOG_CHROME_HEIGHT_SHORT = 96;
+
+export function lookbackCatalogChromeHeight(shortHeight: boolean): number {
+  return shortHeight ? LOOKBACK_CATALOG_CHROME_HEIGHT_SHORT : LOOKBACK_CATALOG_CHROME_HEIGHT;
+}
 
 export function lookbackCatalogMaxHeight(input: {
   windowHeight: number;
