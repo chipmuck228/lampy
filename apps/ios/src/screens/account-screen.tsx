@@ -381,12 +381,44 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
             testID="account-open-storage"
             onPress={() => router.push('/account/storage')}
           />
+        </SettingsGroup>
+        <SettingsGroup title="Lampy">
+          <SettingsLink
+            icon="subscribe"
+            title="订阅与付费"
+            detail="目前没有付费项目"
+            testID="account-open-subscribe"
+            onPress={() => router.push('/account/subscribe')}
+          />
+          <SettingsLink
+            icon="help"
+            title="使用帮助"
+            detail="留下、回看和本机保护"
+            testID="account-open-help"
+            onPress={() => router.push('/account/help')}
+          />
+        </SettingsGroup>
+        <SettingsGroup title="关于">
           <SettingsLink
             icon="info"
             title="关于 Lampy"
             detail="版本与标识"
             testID="account-open-about"
             onPress={() => router.push('/account/about')}
+          />
+          <SettingsLink
+            icon="terms"
+            title="使用条款"
+            detail="使用 Lampy 时适用"
+            testID="account-open-terms"
+            onPress={() => router.push('/account/terms')}
+          />
+          <SettingsLink
+            icon="privacy"
+            title="隐私政策"
+            detail="记录如何保存在这台设备"
+            testID="account-open-privacy"
+            onPress={() => router.push('/account/privacy')}
           />
         </SettingsGroup>
         {showDiagnosticsEntry ? (

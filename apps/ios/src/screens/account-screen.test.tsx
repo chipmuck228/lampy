@@ -471,8 +471,17 @@ describe('account screen', () => {
     expect(setEnabled).toHaveBeenCalledWith(true);
   });
 
-  it('keeps 本机设置 to protection and the two reading entries', async () => {
-    const view = await render(wrap(<AccountScreen />));
+  it('keeps 本机设置 to protection and the grouped reading entries', async () => {
+    const view = await render(
+      wrap(
+        <DeviceLockProvider
+          store={{ isEnabled: async () => false, setEnabled: async () => undefined }}
+          authenticator={{ authenticate: async () => ({ ok: true as const }) }}
+        >
+          <AccountScreen />
+        </DeviceLockProvider>,
+      ),
+    );
     await waitFor(() => {
       expect(view.getByLabelText('本机设置')).toBeTruthy();
       expect(view.getByText('本机设置')).toBeTruthy();
@@ -480,8 +489,18 @@ describe('account screen', () => {
     expect(view.getByText('最近')).toBeTruthy();
     expect(view.getByTestId('account-settings-intro')).toBeTruthy();
     expect(view.getByText('把生活，留给自己。')).toBeTruthy();
+    expect(view.getByText('本机')).toBeTruthy();
+    expect(view.getByText('关于')).toBeTruthy();
+    expect(view.getByLabelText('本机保护')).toBeTruthy();
     expect(view.getByLabelText('记录与存储')).toBeTruthy();
+    expect(view.getByLabelText('订阅与付费')).toBeTruthy();
+    expect(view.getByText('目前没有付费项目')).toBeTruthy();
+    expect(view.getByLabelText('使用帮助')).toBeTruthy();
     expect(view.getByLabelText('关于 Lampy')).toBeTruthy();
+    expect(view.getByLabelText('使用条款')).toBeTruthy();
+    expect(view.getByLabelText('隐私政策')).toBeTruthy();
+    expect(view.queryByLabelText('意见与反馈')).toBeNull();
+    expect(view.queryByText(/购买/)).toBeNull();
     expect(view.queryByTestId('account-personal')).toBeNull();
     expect(view.queryByTestId('account-version')).toBeNull();
     expect(view.getByLabelText('开发诊断')).toBeTruthy();
