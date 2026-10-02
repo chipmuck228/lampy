@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput, type } from './life-text';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import Constants from 'expo-constants';
 
 import {
   accountRefreshFailureMessage,
@@ -21,7 +19,10 @@ import { createSecureFamilySessionStore } from '../infrastructure/secure-family-
 import { isPersonalSettingsDiagnosticsOpen } from '../application/personal-settings-visibility';
 import { DeviceLockSettings } from './device-lock-context';
 import { createFamilyRefreshGate } from './family-refresh';
-import { ink, inkSoft, paper, sage } from './life-page';
+import { ink, inkSoft, sage } from './life-page';
+import { SettingsPage } from './settings-chrome';
+import { dismissSettingsToRecent, dismissToSettingsRoot } from './settings-nav';
+import { SettingsGroup, SettingsIntro, SettingsLink } from './settings-rows';
 
 type Busy = 'idle' | 'signing-in' | 'signing-out' | 'test-login';
 
@@ -79,20 +80,15 @@ function testLoginFlags(snapshot: AccountSnapshot | null) {
 export function AccountDiagnosticsClosed() {
   const router = useRouter();
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="开发诊断" testID="account-diagnostics-closed">
-      <ScrollView contentContainerStyle={styles.column}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          testID="account-back"
-          onPress={() => router.back()}
-          style={styles.hit}
-        >
-          <Text style={styles.back}>返回</Text>
-        </Pressable>
-        <Text style={styles.body}>这里没有开发诊断。</Text>
-      </ScrollView>
-    </SafeAreaView>
+    <SettingsPage
+      title="开发诊断"
+      backLabel="本机设置"
+      accessibilityLabel="开发诊断"
+      pageTestID="account-diagnostics-closed"
+      onBack={() => dismissToSettingsRoot(router)}
+    >
+      <Text style={styles.body}>这里没有开发诊断。</Text>
+    </SettingsPage>
   );
 }
 
@@ -362,37 +358,59 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
   const showAppleButton = snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
   const showTestLoginPanel = Boolean(snapshot && snapshot.kind !== 'service-unavailable' && snapshot.kind !== 'signed-in');
   const showDiagnosticsEntry = !diagnostics && diagnosticsAllowed;
-  const appVersion = Constants.expoConfig?.version ?? '0.1.0';
 
   if (diagnostics && !diagnosticsAllowed) {
     return <AccountDiagnosticsClosed />;
   }
 
+  if (!diagnostics) {
+    return (
+      <SettingsPage
+        title="本机设置"
+        backLabel="最近"
+        accessibilityLabel="本机设置"
+        onBack={() => dismissSettingsToRecent(router)}
+      >
+        <SettingsIntro />
+        <SettingsGroup title="本机">
+          <DeviceLockSettings />
+          <SettingsLink
+            icon="storage"
+            title="记录与存储"
+            detail="保存在这台设备"
+            testID="account-open-storage"
+            onPress={() => router.push('/account/storage')}
+          />
+          <SettingsLink
+            icon="info"
+            title="关于 Lampy"
+            detail="版本与标识"
+            testID="account-open-about"
+            onPress={() => router.push('/account/about')}
+          />
+        </SettingsGroup>
+        {showDiagnosticsEntry ? (
+          <SettingsGroup title="开发">
+            <SettingsLink
+              icon="info"
+              title="开发诊断"
+              testID="account-open-diagnostics"
+              onPress={() => router.push('/account-diagnostics')}
+            />
+          </SettingsGroup>
+        ) : null}
+      </SettingsPage>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel={diagnostics ? '开发诊断' : '本机设置'}>
-      <ScrollView contentContainerStyle={styles.column} testID="account-scroll">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          testID="account-back"
-          onPress={() => router.back()}
-          style={styles.hit}
-        >
-          <Text style={styles.back}>返回</Text>
-        </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
-          {diagnostics ? '开发诊断' : '本机设置'}
-        </Text>
-        {diagnostics ? null : (
-          <>
-            <DeviceLockSettings />
-            <Text style={styles.body} testID="account-personal">
-              个人记录保存在这台设备。目前没有跨设备同步或云备份。
-            </Text>
-          </>
-        )}
-        {diagnostics ? (
-        <View testID="account-diagnostics">
+    <SettingsPage
+      title="开发诊断"
+      backLabel="本机设置"
+      accessibilityLabel="开发诊断"
+      onBack={() => dismissToSettingsRoot(router)}
+    >
+      <View testID="account-diagnostics">
         <View testID="account-family-preview">
           <Text style={styles.body} testID="account-family-copy">
             有些生活，只想交给重要的人。
@@ -500,40 +518,15 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
             {message}
           </Text>
         ) : null}
-        </View>
-        ) : null}
-        {diagnostics ? null : (
-          <>
-            {showDiagnosticsEntry ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="开发诊断"
-                testID="account-open-diagnostics"
-                onPress={() => router.push('/account-diagnostics')}
-                style={styles.hit}
-              >
-                <Text style={styles.action}>开发诊断</Text>
-              </Pressable>
-            ) : null}
-            <Text style={styles.version} testID="account-version">
-              版本 {appVersion}
-            </Text>
-          </>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </SettingsPage>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: paper },
-  column: { padding: 24, gap: 16 },
-  title: { ...type.title, color: ink },
   body: { ...type.body, color: inkSoft },
-  back: { ...type.action, color: sage },
   action: { ...type.action, color: sage },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-  version: { ...type.meta, color: inkSoft, marginTop: 8 },
   apple: { width: 240, height: 44 },
   field: {
     minHeight: 44,

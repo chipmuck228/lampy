@@ -6,7 +6,11 @@ import { inkSoft, sage } from './life-page';
 
 export const LIFE_ICON_NAMES = {
   settings: 'gearshape',
+  back: 'chevron.left',
   open: 'chevron.right',
+  lock: 'lock',
+  info: 'info.circle',
+  storage: 'internaldrive',
   play: 'play.fill',
   pause: 'pause.fill',
   replay: 'gobackward',
