@@ -80,5 +80,5 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | 项 | 值 |
 | --- | --- |
 | 开分支时 GitHub `main` | `9d15a1648ab6725e212a472580faf15def055949`（#59）。以当时 `gh api` 为准，不是永恒基线。 |
-| 实现 SHA | `443a7569b39090f7b355c087ac17c02801098eb3` |
-| PR head | 推送后与实现 SHA 相同，若有文档补记再更新 |
+| 实现 SHA | `443a7569b39090f7b355c087ac17c02801098eb3`（本地）。远端因 HTTPS push 超时，用 Git Data API 写成 `42c0596f13cfa28b78624f2500b15ddd982b2169`，源文件树相同。 |
+| PR head | `42c0596f13cfa28b78624f2500b15ddd982b2169` |
