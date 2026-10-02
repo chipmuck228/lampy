@@ -28,6 +28,7 @@ import {
   lookbackCatalogRangeCaption,
   lookbackMoreOffset,
   lookbackReadingCanShowEndNote,
+  lookbackReadingEndNote,
   lookbackReadingResolvedCount,
   lookbackReadingScopeKey,
   lookbackScopesEqual,
@@ -521,41 +522,48 @@ export default function LookbackIndexScreen() {
     [beginLocate],
   );
 
+  const bookLoadGeneration = useRef(0);
+  const pendingBookIntent = useRef<LookbackBookIntent | null>(null);
+
+  const loadBook = useCallback(() => {
+    const generation = ++bookLoadGeneration.current;
+    pendingBookIntent.current = null;
+    return getUseCases()
+      .then((app) => app.getLookbackBook())
+      .then(async (next) => {
+        if (generation !== bookLoadGeneration.current || !mounted.current) return;
+        const consumed = takeLookbackBookIntent();
+        pendingBookIntent.current = consumed;
+        if (generation !== bookLoadGeneration.current || !mounted.current) return;
+        setView(next);
+        viewRef.current = next;
+        setError(null);
+        const snapshot = consumed ? null : readLookbackReadingSnapshot();
+        await applyIntent(consumed, snapshot, next);
+        if (generation === bookLoadGeneration.current && mounted.current) {
+          pendingBookIntent.current = null;
+        }
+      })
+      .catch(() => {
+        if (generation !== bookLoadGeneration.current || !mounted.current) return;
+        setError('回看暂时读不出来，原来的记录还在。');
+      });
+  }, [applyIntent]);
+
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      let consumed: LookbackBookIntent | null = null;
-      let applied = false;
-      getUseCases()
-        .then((app) => app.getLookbackBook())
-        .then(async (next) => {
-          if (cancelled || !mounted.current) return;
-          consumed = takeLookbackBookIntent();
-          if (cancelled || !mounted.current) {
-            if (consumed) writeLookbackBookIntent(consumed);
-            consumed = null;
-            return;
-          }
-          setView(next);
-          viewRef.current = next;
-          setError(null);
-          const snapshot = consumed ? null : readLookbackReadingSnapshot();
-          await applyIntent(consumed, snapshot, next);
-          if (!cancelled && mounted.current) applied = true;
-          else if (consumed && !applied) writeLookbackBookIntent(consumed);
-        })
-        .catch(() => {
-          if (!cancelled) setError('回看暂时读不出来，原来的记录还在。');
-        });
+      void loadBook();
       return () => {
-        cancelled = true;
+        bookLoadGeneration.current += 1;
         readingGeneration.current += 1;
         moreInFlight.current = null;
         writeCurrentSnapshot();
-        if (consumed && !applied) writeLookbackBookIntent(consumed);
+        const leftover = pendingBookIntent.current;
+        pendingBookIntent.current = null;
+        if (leftover) writeLookbackBookIntent(leftover);
         void clipsRef.current.pause();
       };
-    }, [applyIntent, writeCurrentSnapshot]),
+    }, [loadBook, writeCurrentSnapshot]),
   );
 
   useEffect(() => {
@@ -844,7 +852,19 @@ export default function LookbackIndexScreen() {
       onLeave={() => router.push(leaveHref('lookback'))}
       onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
     >
-      {error ? <LookbackMessage>{error}</LookbackMessage> : null}
+      {error ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="重试打开回看"
+          testID="lookback-book-retry"
+          onPress={() => {
+            void loadBook();
+          }}
+          style={lookbackStyles.hit}
+        >
+          <Text style={lookbackStyles.action}>回看暂时读不出来，原来的记录还在。再试一次</Text>
+        </Pressable>
+      ) : null}
       {emptyLibrary ? (
         <View testID="lookback-empty">
           <LookbackMessage>日子会慢慢留在这里。</LookbackMessage>
@@ -981,8 +1001,9 @@ export default function LookbackIndexScreen() {
         moreError: readyReading?.moreError,
         moreLoading: readyReading?.moreLoading,
         restorePending: pendingRestoreY != null,
+        scopeKind: scope?.kind,
       }) ? (
-        <LookbackEndNote />
+        <LookbackEndNote text={lookbackReadingEndNote(scope?.kind) ?? ''} />
       ) : null}
     </LookbackScaffold>
   );

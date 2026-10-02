@@ -29,16 +29,16 @@ Latest main after #57 still used the book/excerpt lookback. The visual spec keep
 - Records stay separate. Hairline + gap. No cards. Photos unchanged (original aspect, all reachable).
 - Sound uses existing `MomentAudio` `chrome="row"` with real playback state and 48pt hits. No timer-forged progress.
 - Foot: accent dot + original feeling word; `阅读完整记录` keeps the system chevron and exact Moment ID. Wrap when narrow.
-- End note `这一日，读到这里。` only when ready, `hasMore=false`, no more error/loading, and restore is not pending.
-- Empty library: `日子会慢慢留在这里。` / `先留下一点，以后再回来看看。` Existing 留下 entry only.
+- End note only when ready, `hasMore=false`, no more error/loading, and restore is not pending. Confirmed day uses `这一日，读到这里。`; unconfirmed ranges use `这一段，读到这里。`
+- Empty library: `日子会慢慢留在这里。` / `先留下一点，以后再回来看看。` Root page wires the existing floating `＋ 留下`; catalog open hides and disables it.
+- First `getLookbackBook()` failure keeps any already-shown records and offers `再试一次`.
 
 ## Checks
 
 | Check | Result |
 | --- | --- |
 | `tsc --noEmit` | **PASS** |
-| Jest `lookback-reading` / book-screen / catalog / origin / screen / race / expand / moment-audio | **PASS** 12 suites / 63 tests |
-| Jest `--testPathPattern=lookback` (broader match) | **PASS** 146 suites / 768 tests |
+| Jest book-screen / catalog a11y / reading helpers / failure guards / page guards / screen / origin | **PASS** 7 suites / 39 tests |
 | `expo lint` on touched lookback files | **PASS** with one **pre-existing** `react-hooks/exhaustive-deps` warning in `lookback-chrome.tsx` `tryLocate` |
 | `git diff --check` | **PASS** |
 
@@ -60,6 +60,7 @@ For this visual PR, on an isolation install (not Liuz17):
 1. 目录选日 → 连续阅读 → 原位展开 → 精确详情 → 返回原位置.
 2. 播放 → 暂停 → 打开目录 → 关闭／换日：不自动播，进度不串.
 3. 同日长文+两图+声音；短文／单图／仅声音；长文展开收起.
-4. 多页当天、继续加载、真正结束后才见「这一日，读到这里。」
-5. 三种未确认范围、空库、缺失媒体.
-6. 短屏、横屏、iPad.
+4. 多页当天、继续加载、真正结束后才见结束句。确认日用「这一日，读到这里。」；未确认范围用「这一段，读到这里。」
+5. 三种未确认范围、空库（浮动「＋ 留下」可用）、目录打开时浮动按钮隐藏并禁用、缺失媒体。
+6. 目录首次失败 → 点一次重试 → 成功；已有内容仍在。
+7. 短屏、横屏、iPad.

@@ -356,6 +356,29 @@ export function LookbackScaffold({
         onScroll={scrollProps.onScroll}
         onScrollBeginDrag={scrollProps.onScrollBeginDrag}
         cover={cover}
+        overlay={
+          onLeave ? (
+            <View
+              pointerEvents={readingLocked ? 'none' : 'box-none'}
+              style={[styles.fabWrap, readingLocked ? styles.fabHidden : null]}
+              accessibilityElementsHidden={readingLocked}
+              importantForAccessibility={readingLocked ? 'no-hide-descendants' : 'yes'}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="留下"
+                accessibilityElementsHidden={readingLocked}
+                importantForAccessibility={readingLocked ? 'no-hide-descendants' : 'yes'}
+                testID="lookback-leave-fab"
+                disabled={readingLocked}
+                onPress={onLeave}
+                style={styles.fab}
+              >
+                <Text style={styles.fabLabel}>＋ 留下</Text>
+              </Pressable>
+            </View>
+          ) : null
+        }
         band={
           <RootNavBand here="lookback" onOther={onGoRecent} onFamily={onFamily} />
         }
@@ -501,4 +524,26 @@ const styles = StyleSheet.create({
   },
   bandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 20 },
   band: { height: 6, borderRadius: 3, backgroundColor: '#8A9384' },
+  fabWrap: { alignItems: 'flex-end' },
+  fabHidden: { opacity: 0 },
+  fab: {
+    minHeight: 48,
+    height: 48,
+    minWidth: 48,
+    paddingLeft: 13,
+    paddingRight: 17,
+    borderRadius: 50,
+    backgroundColor: '#424B3C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 5,
+    opacity: 1,
+  },
+  fabLabel: {
+    ...type.action,
+    fontSize: 14,
+    lineHeight: 18,
+    letterSpacing: 1.12,
+    color: '#FFFFFF',
+  },
 });

@@ -141,6 +141,9 @@ describe('lookback catalog overlay a11y', () => {
     });
     expect(mockPause).toHaveBeenCalled();
     expect(view.getByTestId('lookback-catalog-close')).toBeTruthy();
+    const fab = view.getByTestId('lookback-leave-fab', { includeHiddenElements: true });
+    expect(fab.props.accessibilityElementsHidden).toBe(true);
+    expect(fab.props.accessibilityState?.disabled ?? fab.props.disabled).toBeTruthy();
     const tree = view.getByTestId('lookback-reading-tree', { includeHiddenElements: true });
     expect(tree.props.importantForAccessibility).toBe('no-hide-descendants');
     expect(tree.props.accessibilityElementsHidden).toBe(true);

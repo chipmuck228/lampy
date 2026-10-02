@@ -13,6 +13,7 @@ import {
   lookbackMoreInFlightBlocks,
   lookbackMoreOffset,
   lookbackReadingCanShowEndNote,
+  lookbackReadingEndNote,
   lookbackReadingResolvedCount,
   lookbackReadingScopeKey,
   restoreLookbackPages,
@@ -357,8 +358,9 @@ export default function LookbackDayScreen() {
         moreError,
         moreLoading,
         restorePending: pendingRestoreY != null,
+        scopeKind: 'day',
       }) ? (
-        <LookbackEndNote />
+        <LookbackEndNote text={lookbackReadingEndNote('day') ?? ''} />
       ) : null}
     </LookbackScaffold>
   );

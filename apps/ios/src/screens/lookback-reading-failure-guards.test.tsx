@@ -161,6 +161,45 @@ describe('lookback reading failure guards', () => {
     });
   });
 
+  it('retries the first lookback book read once and then shows the page', async () => {
+    let allow = false;
+    mockGetLookbackBook.mockImplementation(async () => {
+      if (!allow) throw new Error('book down');
+      return { unknownCount: 1, isEmpty: false, years: [] };
+    });
+    mockGetHistoryUnknown.mockResolvedValue({
+      title: '时间未确认',
+      explanation: '这些记录没有可以确定的发生时间。',
+      items: [momentItem('u1', '未确认重试后还在')],
+      hasMore: false,
+    });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-retry')).toBeTruthy();
+    });
+    expect(view.getByText('回看暂时读不出来，原来的记录还在。再试一次')).toBeTruthy();
+    expect(view.queryByText('未确认重试后还在')).toBeNull();
+    const failedCalls = mockGetLookbackBook.mock.calls.length;
+    allow = true;
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-retry'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByText('未确认重试后还在')).toBeTruthy();
+    });
+    expect(view.queryByTestId('lookback-book-retry')).toBeNull();
+    expect(view.getByTestId('lookback-leave-fab')).toBeTruthy();
+    expect(mockGetLookbackBook.mock.calls.length).toBe(failedCalls + 1);
+    fireEvent(view.getByTestId('lookback-scroll'), 'contentSizeChange');
+    await waitFor(() => {
+      expect(view.getByText('这一段，读到这里。')).toBeTruthy();
+    });
+    expect(view.queryByText('这一日，读到这里。')).toBeNull();
+    view.unmount();
+  });
+
   it('requests the next unconfirmed page on the first more-retry press', async () => {
     let failMore = true;
     mockGetHistoryUnknown.mockImplementation(async (offset = 0) => {

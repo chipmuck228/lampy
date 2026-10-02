@@ -269,10 +269,10 @@ function LookbackNeighborDayHit({
   );
 }
 
-export function LookbackEndNote() {
+export function LookbackEndNote({ text }: { text: string }) {
   return (
     <View testID="lookback-reading-end" style={styles.endNoteWrap} accessible={false}>
-      <Text style={styles.endNote}>这一日，读到这里。</Text>
+      <Text style={styles.endNote}>{text}</Text>
     </View>
   );
 }

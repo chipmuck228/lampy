@@ -7,6 +7,7 @@ import {
   lookbackNeighborDays,
   lookbackCatalogRangeCaption,
   lookbackReadingCanShowEndNote,
+  lookbackReadingEndNote,
   lookbackReadingDayMetaLine,
   lookbackReadingDayTitle,
   lookbackMoreInFlightBlocks,
@@ -196,18 +197,40 @@ describe('lookback reading contracts', () => {
       '2026年 · 9月',
     );
     expect(lookbackCatalogRangeCaption({ kind: 'unknown' })).toBe('时间未确认');
+    expect(lookbackReadingEndNote('day')).toBe('这一日，读到这里。');
+    expect(lookbackReadingEndNote('unknown')).toBe('这一段，读到这里。');
+    expect(lookbackReadingEndNote('year-unconfirmed')).toBe('这一段，读到这里。');
+    expect(lookbackReadingEndNote('month-unconfirmed')).toBe('这一段，读到这里。');
+    expect(lookbackReadingEndNote(null)).toBeNull();
+    expect(
+      lookbackReadingCanShowEndNote({
+        ready: true,
+        hasMore: false,
+        restorePending: false,
+        scopeKind: 'day',
+      }),
+    ).toBe(true);
+    expect(
+      lookbackReadingCanShowEndNote({
+        ready: true,
+        hasMore: false,
+        restorePending: false,
+        scopeKind: 'unknown',
+      }),
+    ).toBe(true);
     expect(
       lookbackReadingCanShowEndNote({
         ready: true,
         hasMore: false,
         restorePending: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       lookbackReadingCanShowEndNote({
         ready: true,
         hasMore: true,
         restorePending: false,
+        scopeKind: 'day',
       }),
     ).toBe(false);
     expect(
@@ -216,6 +239,7 @@ describe('lookback reading contracts', () => {
         hasMore: false,
         moreError: true,
         restorePending: false,
+        scopeKind: 'day',
       }),
     ).toBe(false);
     expect(
@@ -223,6 +247,7 @@ describe('lookback reading contracts', () => {
         ready: true,
         hasMore: false,
         restorePending: true,
+        scopeKind: 'day',
       }),
     ).toBe(false);
     expect(lookbackReadingScopeKey({ kind: 'day', year: 2026, month: 9, day: 27 })).toBe(

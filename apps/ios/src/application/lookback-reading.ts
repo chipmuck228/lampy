@@ -251,14 +251,36 @@ export function lookbackCatalogRangeCaption(scope: LookbackReadingScope | null):
   return '时间未确认';
 }
 
+export function lookbackReadingEndNote(
+  scopeKind: LookbackReadingScope['kind'] | null | undefined,
+): string | null {
+  if (scopeKind === 'day') return '这一日，读到这里。';
+  if (
+    scopeKind === 'unknown' ||
+    scopeKind === 'year-unconfirmed' ||
+    scopeKind === 'month-unconfirmed'
+  ) {
+    return '这一段，读到这里。';
+  }
+  return null;
+}
+
 export function lookbackReadingCanShowEndNote(input: {
   ready: boolean;
   hasMore: boolean;
   moreError?: boolean;
   moreLoading?: boolean;
   restorePending: boolean;
+  scopeKind?: LookbackReadingScope['kind'] | null;
 }): boolean {
-  return input.ready && !input.hasMore && !input.moreError && !input.moreLoading && !input.restorePending;
+  return (
+    input.ready &&
+    !input.hasMore &&
+    !input.moreError &&
+    !input.moreLoading &&
+    !input.restorePending &&
+    lookbackReadingEndNote(input.scopeKind) != null
+  );
 }
 
 export async function collectLookbackNeighborDays(input: {
