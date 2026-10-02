@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 import { LifeIcon } from './life-icons';
 import { ink, pageGutter, sage } from './life-page';
@@ -122,9 +122,11 @@ export function LeaveFab({
 }) {
   return (
     <Animated.View
+      testID={`${testID}-shell`}
       pointerEvents={available ? 'box-none' : 'none'}
       style={[
         styles.wrap,
+        styles.shadow,
         {
           opacity,
           transform: [{ translateY: shift }],
@@ -145,6 +147,22 @@ export function LeaveFab({
         onPress={onPress}
         style={styles.fab}
       >
+        <View
+          testID={`${testID}-sheen`}
+          pointerEvents="none"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.sheen}
+        />
+        <View
+          testID={`${testID}-depth`}
+          pointerEvents="none"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.depth}
+        />
         <LifeIcon name="plus" size={16} color="#FFFFFF" decorative />
         <Text style={styles.label}>留下</Text>
       </Pressable>
@@ -155,6 +173,13 @@ export function LeaveFab({
 const styles = StyleSheet.create({
   wrap: { alignItems: 'flex-end' },
   hidden: { opacity: 0 },
+  shadow: {
+    shadowColor: ink,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
   fab: {
     minHeight: LEAVE_FAB_HIT,
     height: LEAVE_FAB_HIT,
@@ -163,15 +188,29 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     borderRadius: 24,
     backgroundColor: sage,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(243, 240, 233, 0.34)',
+    overflow: 'hidden',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-    shadowColor: ink,
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+  },
+  sheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  depth: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 14,
+    backgroundColor: 'rgba(37, 35, 31, 0.10)',
   },
   label: {
     fontFamily: 'PingFang SC',

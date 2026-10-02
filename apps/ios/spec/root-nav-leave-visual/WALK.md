@@ -13,10 +13,10 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | **PASS** |
-| 相关 Jest（底带、leave-fab 显隐、catalog reserve、navigation-band、lookback-book-adapt、recent-reading-hierarchy、lookback-origin） | **PASS** 9 suites / 40 tests |
-| 本轮 ESLint | **PASS** 0 errors（`lookback-chrome` 原有 hooks warning，非本轮引入） |
+| 相关 Jest（leave-fab 显隐与装饰层、recent-leave-fab 原预期、catalog、底带） | **PASS** |
+| 本轮 ESLint `leave-fab.tsx` / `leave-fab.test.tsx` | **PASS** 0 errors |
 | `git diff --check -- apps/ios` | **PASS** |
-| `git diff` `recent-leave-fab.ts` / `recent-leave-fab.test.ts` | 空，行为文件未改 |
+| `git diff` `recent-leave-fab.ts` / `recent-leave-fab.test.ts` | 空 |
 
 ## 自动化（Jest）
 
@@ -28,6 +28,8 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | 触控区域 ≥ 48pt | **PASS**（Jest） |
 | 末尾避让 = 按钮高 + 距带间距 + 余量，不含导航带高 | **PASS**（Jest） |
 | `recent-leave-fab.test.ts` 显隐预期未改 | **PASS**（Jest，文件无 diff） |
+| 隐藏态外壳 `opacity=0`、不可点、无障碍隐藏 | **PASS**（Jest 属性，不是原生显隐） |
+| 高光 / 底色不拦截点击 | **PASS**（Jest 属性） |
 
 ## 改前／改后画面
 
@@ -57,28 +59,38 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 
 ## 留下显隐行为核对
 
-| 文件 | 相对 `origin/main` |
+| 文件 | 相对本轮开始 `3c9ce30` / `origin/main` |
 | --- | --- |
 | `src/screens/recent-leave-fab.ts` | 无 diff |
-| `useLeaveFabMotion` 函数体 | 与 `origin/main` 逐行相同 |
+| `useLeaveFabMotion` 函数体 | 无行为改动 |
 | `recent-leave-fab.test.ts` | 无 diff，预期行为未改 |
 
-若某项视觉必须改行为，本 PR **不实施**该行为修改。本轮未遇到必须改行为的视觉项。
+源码结论：隐藏条件与原设计一致。380ms 淡出 + 慢滑 idle + 800ms 停后恢复，会看起来像「只是变淡」。阴影若画在胶囊上、不在 `opacity` 外壳上，iOS 可能留下残影；本轮只把阴影和高光收进同一显隐容器。未改阈值、等待或控制器。
+
+## 运行环境
+
+| 项 | 值 |
+| --- | --- |
+| Metro | `192.168.31.139:8085`，`lampy-root-nav-leave`，`ios/root-nav-leave-visual` |
+| 原生安装版本 | **未确认** |
+| 设备已加载 JS SHA | **未确认**（8085 日志有本机保护与「已有个人记录」，未隔离、未截图、未跟手势） |
+| 是否第二套按钮 / 旧版残留 | 源码每页一份 `LeaveFab`。运行中是否叠了旧包 **未确认** |
+
+隔离安装、模拟器画面、真机跟滚、VoiceOver 隐藏态：**NOT VERIFIED**。未卸 Liuz17，未往个人库写夹具。
 
 ## 仍需真机验证
 
-- 回看 `book` 在真机上的实际字形是否够用（已不用未收录的 `book.open`）。
-- 最后一条播放 /「阅读完整记录」滚到浮动按钮之上是否够用。
-- 回看继续加载、重试、相邻日是否被按钮挡住。
-- 目录开合后按钮显隐与改前是否一致。
-- 横屏短屏、iPad 左栏与正文右边距对齐。
-- VoiceOver：当前项能聚焦，读出名称和已选中；图标不重复朗读。Jest 通过不算真机 PASS。
-- 向下 / 向上 / 停止滚动后的留下出现与消失。
+- 持续下滚后整颗按钮（字、plus、底、边、阴影）是否到 0；停 800ms 后是否按原规则回来。
+- 回看目录开合后的显隐。
+- 微光泽在纸色正文上是否过抢。
+- 回看 `book` 字形、VoiceOver 当前项、末条避让。
+- 隐藏态 VoiceOver 不可聚焦。
 
 ## 版本
 
 | 项 | 值 |
 | --- | --- |
-| 开分支时 GitHub `main` | `9d15a1648ab6725e212a472580faf15def055949`（#59）。以当时 `gh api` 为准，不是永恒基线。 |
-| 实现 SHA | `443a7569b39090f7b355c087ac17c02801098eb3`（本地）。远端因 HTTPS push 超时，用 Git Data API 写成 `42c0596f13cfa28b78624f2500b15ddd982b2169`，源文件树相同。 |
-| PR head | `42c0596f13cfa28b78624f2500b15ddd982b2169` |
+| 开分支时 GitHub `main` | `9d15a1648ab6725e212a472580faf15def055949`（#59）。当时 `gh api`，不是永恒基线。 |
+| 本轮开始远端 head | `3c9ce3003ad099f95bca83f1117bcb4383178c09` |
+| 实现 SHA | `be79b58259b75188fb43a7146d7fdcb1d22b2a9e`（本地）。远端 head 以 GitHub PR 为准。 |
+| PR head | 推送后更新 |

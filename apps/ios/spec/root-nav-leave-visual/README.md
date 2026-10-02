@@ -57,11 +57,38 @@
 **本轮视觉：**
 
 - 系统 `plus` +「留下」；触控 ≥ 48pt。
-- 底色改为现有 `sage`；轻阴影；去掉多余 `marginRight`。
+- 墨绿胶囊：底色 `sage`，上部一层很浅的白高光，下部一层很浅的墨色，一圈低透明纸色细边。无渐变库、无 `expo-glass-effect`、无新依赖。
+- 轻阴影画在与 `opacity` / `translateY` 同一层 `Animated.View` 上；高光与底色在胶囊内 `overflow: 'hidden'`，不裁阴影。
+- 装饰层 `pointerEvents="none"`，不进无障碍树。
 - 手机：按钮底边距导航带上沿 14pt（12–16pt 内）。
 - 右侧用 `pageGutter`（手机 24、常规宽 48）对齐正文右边距。iPad 左栏时 overlay 仍在阅读栏内，不套用手机整屏坐标。
 - 动画值绑定、隐藏时的点击 / 无障碍处理保持原样。
 - 不因空库已有「留下第一条」再藏浮动按钮。
+
+## 3b. 显隐核实（源码，不改行为）
+
+对照参数（`recent-leave-fab.ts`，本轮无 diff）：
+
+| 项 | 值 |
+| --- | --- |
+| 顶部视为已回顶 | `offsetY <= 8` → 显示 |
+| 下滚隐藏 | `delta > 12` |
+| 上滚恢复 | `delta < -8` |
+| 停止后恢复 | 800ms |
+| 隐藏动画 | 380ms，`opacity 1→0`，`translateY 0→10` |
+| 显示动画 | 640ms，反向 |
+| Reduce Motion | 时长 0，立即到位 |
+| 缓动 | `Easing.out(cubic)` |
+
+调用链：最近 `onRecentScroll` → `leaveFab.onScroll`，`available={leaveFab.open}`。回看根页同样 `onScroll`，目录展开时 `readingLocked` 停止滚动喂给控制器，且 `available={leaveFab.open && !readingLocked}`。每页只挂一份 `LeaveFab`，共用同一组件。
+
+用户看到「滚动时只是背景变淡」：
+
+1. **设计如此，不是半透明残留目标。** 隐藏是 380ms 淡出，不是瞬间切掉。持续下滚若每步 `delta ≤ 12` 记为 idle，800ms 后会按原规则重新出现。停手后恢复也是设计。
+2. **视觉残留风险（本轮修）：** 阴影原先画在 `Pressable` 上，父层 `opacity` 动画时 iOS 可能把阴影留在外面。现把阴影移到带 `opacity` 的外壳；`available=false` 时外壳仍叠 `opacity: 0`，点击与 VoiceOver 关闭。
+3. **未改等待、阈值或控制器。** 不为「看起来立刻消失」加长 idle。
+
+运行环境见 `WALK.md`。属性测试不等于原生显隐或 VoiceOver PASS。
 
 ## 4. 正文避让
 
