@@ -1,7 +1,8 @@
-import { Animated } from 'react-native';
+import { Animated, StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
 
 import { LeaveFab } from './leave-fab';
+import { sage } from './life-page';
 
 describe('shared LeaveFab', () => {
   it('stays operable and focusable when available', async () => {
@@ -17,6 +18,9 @@ describe('shared LeaveFab', () => {
     const fab = view.getByTestId('recent-leave-fab');
     expect(fab.props.accessibilityElementsHidden).toBe(false);
     expect(fab.props.accessibilityState?.disabled ?? fab.props.disabled).toBe(false);
+    expect(StyleSheet.flatten(fab.props.style)).toEqual(
+      expect.objectContaining({ minHeight: 48, minWidth: 48, backgroundColor: sage }),
+    );
     view.unmount();
   });
 

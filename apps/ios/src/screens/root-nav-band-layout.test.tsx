@@ -1,9 +1,30 @@
 import { useEffect, type ReactElement } from 'react';
-import { act, render } from '@testing-library/react-native';
-import { Dimensions, StyleSheet, Text } from 'react-native';
+import { act, cleanup, fireEvent, render } from '@testing-library/react-native';
+import { Animated, Dimensions, StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { LeaveFab, LEAVE_FAB_GAP_ABOVE_NAV, leaveFabOverlayPadding, leaveFabScrollReserve } from './leave-fab';
+import { NAV_BAND_HIT, pageGutter } from './life-page';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
+
+function collectTestIds(node: unknown, found: string[] = []): string[] {
+  if (!node || typeof node === 'string') return found;
+  const current = node as { props?: { testID?: string }; children?: unknown };
+  if (typeof current.props?.testID === 'string') found.push(current.props.testID);
+  const children = current.children;
+  if (Array.isArray(children)) {
+    for (const child of children) collectTestIds(child, found);
+  } else if (children) {
+    collectTestIds(children, found);
+  }
+  return found;
+}
+
+function bandOrder(view: { toJSON: () => unknown }) {
+  return collectTestIds(view.toJSON()).filter((id) =>
+    ['root-nav-here-wrap', 'home-lookback', 'lookback-go-recent', 'home-family'].includes(id),
+  );
+}
 
 function wrap(ui: ReactElement) {
   return (
@@ -19,11 +40,20 @@ function wrap(ui: ReactElement) {
 }
 
 describe('root nav band layout', () => {
-  beforeEach(() => {
+  function phoneWindow() {
     Dimensions.set({
       window: { width: 390, height: 844, scale: 2, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 2, fontScale: 1 },
     });
+  }
+
+  beforeEach(() => {
+    phoneWindow();
+  });
+
+  afterEach(() => {
+    cleanup();
+    phoneWindow();
   });
 
   it('spreads three or four items across the available width at regular type', async () => {
@@ -234,6 +264,86 @@ describe('root nav band layout', () => {
     expect(view.getByTestId('reading-scroll')).toBeTruthy();
     expect(view.getByTestId('reading-child')).toBeTruthy();
     expect(mounts).toBe(1);
+    await view.unmount();
+  });
+
+  it('keeps 最近 left and 回看 right on the recent root', async () => {
+    const recent = await render(wrap(<RootNavBand here="recent" onOther={() => undefined} />));
+    expect(bandOrder(recent)).toEqual(['root-nav-here-wrap', 'home-lookback']);
+    expect(recent.getByTestId('root-nav-here-wrap').props.accessibilityState?.selected).toBe(true);
+    expect(recent.getByTestId('home-lookback').props.accessibilityState?.selected).toBe(false);
+    expect(StyleSheet.flatten(recent.getByTestId('root-nav-here-wrap').props.style)).toEqual(
+      expect.objectContaining({ minWidth: 48, minHeight: 48 }),
+    );
+    expect(StyleSheet.flatten(recent.getByTestId('home-lookback').props.style)).toEqual(
+      expect.objectContaining({ minWidth: 48, minHeight: 48 }),
+    );
+  });
+
+  it('keeps 最近 left and 回看 right on the lookback root', async () => {
+    const lookback = await render(wrap(<RootNavBand here="lookback" onOther={() => undefined} />));
+    expect(bandOrder(lookback)).toEqual(['lookback-go-recent', 'root-nav-here-wrap']);
+    expect(lookback.getByTestId('root-nav-here-wrap').props.accessibilityState?.selected).toBe(true);
+    expect(lookback.getByTestId('lookback-go-recent').props.accessibilityState?.selected).toBe(false);
+  });
+
+  it('does not navigate when the current recent item is pressed', async () => {
+    const onOther = jest.fn();
+    const recent = await render(wrap(<RootNavBand here="recent" onOther={onOther} />));
+    fireEvent.press(recent.getByTestId('root-nav-here-wrap'));
+    expect(onOther).not.toHaveBeenCalled();
+    fireEvent.press(recent.getByTestId('home-lookback'));
+    expect(onOther).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not navigate when the current lookback item is pressed', async () => {
+    const onOther = jest.fn();
+    const lookback = await render(wrap(<RootNavBand here="lookback" onOther={onOther} />));
+    fireEvent.press(lookback.getByTestId('root-nav-here-wrap'));
+    expect(onOther).not.toHaveBeenCalled();
+    fireEvent.press(lookback.getByTestId('lookback-go-recent'));
+    expect(onOther).toHaveBeenCalledTimes(1);
+  });
+
+  it('reserves FAB clearance without the nav height', () => {
+    expect(leaveFabScrollReserve()).toBeGreaterThanOrEqual(LEAVE_FAB_GAP_ABOVE_NAV + 48);
+    expect(leaveFabScrollReserve()).toBeLessThan(NAV_BAND_HIT + 48 + LEAVE_FAB_GAP_ABOVE_NAV);
+    expect(leaveFabOverlayPadding(390, 844)).toEqual({
+      paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
+      paddingRight: pageGutter(390, 844),
+    });
+    expect(leaveFabOverlayPadding(1024, 1366).paddingRight).toBe(pageGutter(1024, 1366));
+  });
+
+  it('places the leave overlay above the band with the reading gutter, not over the Home Indicator twice', async () => {
+    const view = await render(
+      wrap(
+        <RootReadingLayout
+          scrollTestID="overlay-scroll"
+          overlay={
+            <LeaveFab
+              testID="overlay-leave-fab"
+              onPress={() => undefined}
+              available
+              opacity={new Animated.Value(1)}
+              shift={new Animated.Value(0)}
+            />
+          }
+          band={<RootNavBand here="recent" onOther={() => undefined} />}
+        >
+          <></>
+        </RootReadingLayout>,
+      ),
+    );
+    expect(StyleSheet.flatten(view.getByTestId('root-leave-overlay').props.style)).toEqual(
+      expect.objectContaining({
+        paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
+        paddingRight: pageGutter(390, 844),
+      }),
+    );
+    expect(StyleSheet.flatten(view.getByTestId('overlay-leave-fab').props.style)).toEqual(
+      expect.objectContaining({ minHeight: 48, minWidth: 48 }),
+    );
     await view.unmount();
   });
 });

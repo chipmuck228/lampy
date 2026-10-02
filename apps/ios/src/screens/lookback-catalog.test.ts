@@ -6,7 +6,13 @@ import {
   LOOKBACK_CATALOG_CHROME_HEIGHT_SHORT,
   LOOKBACK_CATALOG_MIN_HEIGHT,
 } from './lookback-catalog';
-import { leaveFabScrollReserve, LEAVE_FAB_HIT } from './leave-fab';
+import {
+  leaveFabScrollReserve,
+  LEAVE_FAB_GAP_ABOVE_NAV,
+  LEAVE_FAB_HIT,
+  LEAVE_FAB_TRAIL,
+} from './leave-fab';
+import { NAV_BAND_HIT } from './life-page';
 
 describe('lookback catalog and shared leave fab helpers', () => {
   it('caps an in-place catalog at half the remaining viewport and keeps a usable short-screen floor', () => {
@@ -50,6 +56,7 @@ describe('lookback catalog and shared leave fab helpers', () => {
   });
 
   it('reserves only the shared leave button occupancy, not the nav band', () => {
-    expect(leaveFabScrollReserve()).toBe(LEAVE_FAB_HIT + 16);
+    expect(leaveFabScrollReserve()).toBe(LEAVE_FAB_HIT + LEAVE_FAB_GAP_ABOVE_NAV + LEAVE_FAB_TRAIL);
+    expect(leaveFabScrollReserve()).toBeLessThan(LEAVE_FAB_HIT + NAV_BAND_HIT + LEAVE_FAB_GAP_ABOVE_NAV);
   });
 });

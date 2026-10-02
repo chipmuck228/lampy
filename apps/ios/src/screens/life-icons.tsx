@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 import { Text, type } from './life-text';
-import { SymbolView } from 'expo-symbols';
+import { SymbolView, type SFSymbol } from 'expo-symbols';
 
 import { inkSoft, sage } from './life-page';
 
@@ -24,6 +24,11 @@ export const LIFE_ICON_NAMES = {
   expand: 'chevron.down',
   collapse: 'chevron.up',
   plus: 'plus',
+  recent: 'line.3.horizontal',
+  // book.open is the iOS 14+ open-book symbol; the local sf-symbols-typescript
+  // catalog omits it, so LifeIcon asserts the name for SymbolView.
+  lookback: 'book.open',
+  family: 'person.2',
 } as const;
 
 export type LifeIconName = keyof typeof LIFE_ICON_NAMES;
@@ -41,7 +46,7 @@ export function LifeIcon({
 }) {
   return (
     <SymbolView
-      name={LIFE_ICON_NAMES[name]}
+      name={LIFE_ICON_NAMES[name] as SFSymbol}
       size={size}
       tintColor={color}
       accessibilityElementsHidden={decorative}

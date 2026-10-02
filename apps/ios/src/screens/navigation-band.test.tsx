@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { resetStartupBrandForTests } from '../application/startup-brand';
 import RecentScreen from '../app/index';
+import { leaveFabScrollReserve } from './leave-fab';
 import { resetLookbackOriginsForTests } from './lookback-origin';
 
 const mockPush = jest.fn();
@@ -115,8 +116,11 @@ describe('root navigation band', () => {
     await waitFor(() => {
       expect(view.getByTestId('recent-open-moment_wind')).toBeTruthy();
     });
-    expect(view.getByLabelText('最近，当前页')).toBeTruthy();
-    expect(view.getByLabelText('最近，当前页').props.accessibilityRole).toBe('text');
+    const current = view.getByLabelText('最近');
+    expect(current.props.accessibilityRole).toBe('tab');
+    expect(current.props.accessibilityState?.selected).toBe(true);
+    fireEvent.press(current);
+    expect(mockPush).not.toHaveBeenCalled();
     const scrollIds = testIdsInTree(view.getByTestId('recent-scroll') as unknown as HostNode);
     expect(scrollIds).not.toContain('root-nav-band');
     expect(scrollIds).not.toContain('recent-header');
@@ -124,7 +128,7 @@ describe('root navigation band', () => {
     expect(view.getByTestId('recent-header')).toBeTruthy();
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
     const contentStyle = StyleSheet.flatten(view.getByTestId('recent-scroll').props.contentContainerStyle);
-    expect(contentStyle?.paddingBottom).toBe(92);
+    expect(contentStyle?.paddingBottom).toBe(leaveFabScrollReserve());
     expect(view.getByLabelText('播放，3秒')).toBeTruthy();
     expect(view.getByTestId('recent-open-label-moment_wind').props.children).toBe('阅读完整记录');
     fireEvent.press(view.getByTestId('home-lookback'));

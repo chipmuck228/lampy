@@ -183,7 +183,7 @@ describe('lookback book adapt surfaces', () => {
       expect(view.getByText('2025年')).toBeTruthy();
     });
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
-    expect(view.getByLabelText('回看，当前页')).toBeTruthy();
+    expect(view.getByLabelText('回看').props.accessibilityState?.selected).toBe(true);
     expect(view.queryByTestId('lookback-back')).toBeNull();
     view.unmount();
   });
@@ -204,7 +204,7 @@ describe('lookback book adapt surfaces', () => {
       expect(view.getByLabelText('2025年4月，有1条记录，已展开')).toBeTruthy();
     });
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
-    expect(view.getByLabelText('回看，当前页')).toBeTruthy();
+    expect(view.getByLabelText('回看').props.accessibilityState?.selected).toBe(true);
     view.unmount();
   });
 });

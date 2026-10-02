@@ -2,13 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { Text } from './life-text';
 import { LifeIcon } from './life-icons';
+import { ink, pageGutter, sage } from './life-page';
 import { createRecentLeaveFabScroll, recentFabMotion } from './recent-leave-fab';
 
 export const LEAVE_FAB_HIT = 48;
-export const LEAVE_FAB_EDGE = 16;
+export const LEAVE_FAB_GAP_ABOVE_NAV = 14;
+export const LEAVE_FAB_TRAIL = 30;
+export const LEAVE_FAB_EDGE = LEAVE_FAB_GAP_ABOVE_NAV;
 
 export function leaveFabScrollReserve(): number {
-  return LEAVE_FAB_HIT + LEAVE_FAB_EDGE;
+  return LEAVE_FAB_HIT + LEAVE_FAB_GAP_ABOVE_NAV + LEAVE_FAB_TRAIL;
+}
+
+export function leaveFabOverlayPadding(windowWidth: number, windowHeight: number) {
+  return {
+    paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
+    paddingRight: pageGutter(windowWidth, windowHeight),
+  };
 }
 
 export function useLeaveFabMotion() {
@@ -149,15 +159,19 @@ const styles = StyleSheet.create({
     minHeight: LEAVE_FAB_HIT,
     height: LEAVE_FAB_HIT,
     minWidth: LEAVE_FAB_HIT,
-    paddingLeft: 13,
-    paddingRight: 17,
-    borderRadius: 50,
-    backgroundColor: '#424B3C',
+    paddingLeft: 14,
+    paddingRight: 16,
+    borderRadius: 24,
+    backgroundColor: sage,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-    marginRight: 5,
+    shadowColor: ink,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   label: {
     fontFamily: 'PingFang SC',

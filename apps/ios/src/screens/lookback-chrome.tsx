@@ -439,7 +439,7 @@ export function LookbackScaffold({
           {
             maxWidth: readingWidth,
             paddingTop: 4,
-            paddingBottom: 8 + (onLeave ? leaveFabScrollReserve() : 0),
+            paddingBottom: onLeave ? leaveFabScrollReserve() : 8,
           },
         ]}
         header={pageHeader}
