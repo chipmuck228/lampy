@@ -8,6 +8,8 @@ import {
   photoRevealMotionKeys,
   photoRevealOverlapsViewport,
   resetRecentPhotoRevealForTests,
+  settleRecentPhotoReveal,
+  settleRecentPhotoRevealSession,
   RECENT_PHOTO_REVEAL_MS,
   RECENT_PHOTO_REVEAL_OPACITY,
   RECENT_PHOTO_REVEAL_SHIFT_Y,
@@ -100,14 +102,12 @@ describe('recent photo reveal', () => {
     });
   });
 
-  it('only changes opacity and translateY, so layout and scroll stay put', () => {
+  it('keeps the spec pose numbers, but not-seen already shows a full still', () => {
     const unseen = photoRevealMotion('not-seen', false);
     const shown = photoRevealMotion('revealed', false);
-    expect(unseen).toEqual({
-      opacity: RECENT_PHOTO_REVEAL_OPACITY,
-      translateY: RECENT_PHOTO_REVEAL_SHIFT_Y,
-      duration: 0,
-    });
+    expect(RECENT_PHOTO_REVEAL_OPACITY).toBe(0.85);
+    expect(RECENT_PHOTO_REVEAL_SHIFT_Y).toBe(8);
+    expect(unseen).toEqual({ opacity: 1, translateY: 0, duration: 0 });
     expect(shown).toEqual({ opacity: 1, translateY: 0, duration: 0 });
     expect(photoRevealMotion('revealing', false)).toEqual({
       opacity: 1,
@@ -139,6 +139,34 @@ describe('recent photo reveal', () => {
     viewport.onScroll(0, 800);
     viewport.onScrollBeginDrag();
     expect(enter).not.toHaveBeenCalled();
+    viewport.dispose();
+  });
+
+  it('settles an unfinished photo to a full still', () => {
+    expect(photoRevealMotion('not-seen', false)).toEqual({ opacity: 1, translateY: 0, duration: 0 });
+    expect(settleRecentPhotoReveal('photo_a')).toBe('revealed');
+    expect(peekRecentPhotoRevealPhase('photo_a')).toBe('revealed');
+    expect(photoRevealMotion(peekRecentPhotoRevealPhase('photo_a'), false)).toEqual({
+      opacity: 1,
+      translateY: 0,
+      duration: 0,
+    });
+
+    beginRecentPhotoReveal('photo_b', false);
+    expect(peekRecentPhotoRevealPhase('photo_b')).toBe('revealing');
+    expect(settleRecentPhotoReveal('photo_b')).toBe('revealed');
+    expect(beginRecentPhotoReveal('photo_b', false)).toBe('revealed');
+  });
+
+  it('settles registered photos that never entered the viewport', () => {
+    const enter = jest.fn();
+    const viewport = createRecentPhotoRevealScroll(enter);
+    viewport.register('photo_a', (report) => report({ y: 80, height: 220 }));
+    viewport.settleRegistered();
+    expect(enter).not.toHaveBeenCalled();
+    expect(peekRecentPhotoRevealPhase('photo_a')).toBe('revealed');
+    settleRecentPhotoRevealSession();
+    expect(peekRecentPhotoRevealPhase('photo_a')).toBe('revealed');
     viewport.dispose();
   });
 });

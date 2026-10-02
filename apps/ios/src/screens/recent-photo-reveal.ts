@@ -59,6 +59,17 @@ export function finishRecentPhotoReveal(id: string): PhotoRevealPhase {
   return next;
 }
 
+export function settleRecentPhotoReveal(id: string): PhotoRevealPhase {
+  phases.set(id, 'revealed');
+  emitRecentPhotoReveal(id, 'revealed');
+  return 'revealed';
+}
+
+export function settleRecentPhotoRevealSession(): void {
+  recentPhotoRevealViewport.settleRegistered();
+  [...phases.keys()].forEach((id) => settleRecentPhotoReveal(id));
+}
+
 export function subscribeRecentPhotoReveal(
   id: string,
   listener: (phase: PhotoRevealPhase) => void,
@@ -78,17 +89,13 @@ function emitRecentPhotoReveal(id: string, phase: PhotoRevealPhase): void {
 }
 
 export function photoRevealMotion(phase: PhotoRevealPhase, reduceMotion: boolean): PhotoRevealMotion {
-  if (reduceMotion || phase === 'revealed') {
+  if (reduceMotion || phase === 'revealed' || phase === 'not-seen') {
     return { opacity: 1, translateY: 0, duration: 0 };
   }
   if (phase === 'revealing') {
     return { opacity: 1, translateY: 0, duration: RECENT_PHOTO_REVEAL_MS };
   }
-  return {
-    opacity: RECENT_PHOTO_REVEAL_OPACITY,
-    translateY: RECENT_PHOTO_REVEAL_SHIFT_Y,
-    duration: 0,
-  };
+  return { opacity: 1, translateY: 0, duration: 0 };
 }
 
 export function photoRevealMotionKeys(motion: PhotoRevealMotion): string[] {
@@ -133,6 +140,13 @@ export function createRecentPhotoRevealScroll(enter: (id: string) => void) {
     },
     unregister(id: string) {
       measures.delete(id);
+    },
+    settleRegistered() {
+      if (!alive) return;
+      measures.forEach((_measure, id) => {
+        entered.add(id);
+        settleRecentPhotoReveal(id);
+      });
     },
     onScroll(offsetY: number, nextViewportHeight: number) {
       if (!alive) return;

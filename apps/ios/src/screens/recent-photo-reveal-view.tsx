@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, View } from 'react-native';
+import { Animated, AppState, Easing, View } from 'react-native';
 
 import {
   beginRecentPhotoReveal,
@@ -7,6 +7,7 @@ import {
   peekRecentPhotoRevealPhase,
   photoRevealMotion,
   recentPhotoRevealViewport,
+  settleRecentPhotoReveal,
   subscribeRecentPhotoReveal,
   type PhotoRevealPhase,
 } from './recent-photo-reveal';
@@ -48,7 +49,11 @@ export function RecentPhotoReveal({
     const host = recentPhotoRevealViewport;
     host.register(photoId, (report) => {
       viewRef.current?.measureInWindow((_x, y, _w, height) => {
-        if (height > 0) report({ y, height });
+        if (height > 0) {
+          report({ y, height });
+          return;
+        }
+        settleRecentPhotoReveal(photoId);
       });
     });
     return () => host.unregister(photoId);
@@ -84,16 +89,30 @@ export function RecentPhotoReveal({
     anim.current = next;
     next.start(({ finished }) => {
       if (anim.current === next) anim.current = null;
-      if (finished) setPhase(finishRecentPhotoReveal(photoId));
+      opacity.setValue(1);
+      shift.setValue(0);
+      setPhase(finished ? finishRecentPhotoReveal(photoId) : settleRecentPhotoReveal(photoId));
     });
   }, [opacity, phase, photoId, reduceMotion, shift]);
 
   useEffect(() => {
-    return () => {
+    const app = AppState.addEventListener('change', (state) => {
+      if (state === 'active') return;
       anim.current?.stop();
       anim.current = null;
+      opacity.setValue(1);
+      shift.setValue(0);
+      setPhase(settleRecentPhotoReveal(photoId));
+    });
+    return () => {
+      app.remove();
+      anim.current?.stop();
+      anim.current = null;
+      opacity.setValue(1);
+      shift.setValue(0);
+      settleRecentPhotoReveal(photoId);
     };
-  }, []);
+  }, [opacity, photoId, shift]);
 
   return (
     <View ref={viewRef} collapsable={false} style={{ width: '100%' }}>

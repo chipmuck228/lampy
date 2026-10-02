@@ -28,7 +28,7 @@ import {
   recentWeekdayInk,
 } from '../screens/recent-visual';
 import { createRecentLeaveFabScroll, recentFabMotion } from '../screens/recent-leave-fab';
-import { recentPhotoRevealViewport } from '../screens/recent-photo-reveal';
+import { recentPhotoRevealViewport, settleRecentPhotoRevealSession } from '../screens/recent-photo-reveal';
 import {
   acceptRecentEchoLoad,
   beginRecentEchoFocus,
@@ -225,6 +225,7 @@ export default function RecentScreen() {
         return;
       }
       settleEcho();
+      settleRecentPhotoRevealSession();
     });
     return () => {
       alive = false;
@@ -259,6 +260,7 @@ export default function RecentScreen() {
       return () => {
         endRecentEchoFocus(echoGate.current);
         settleEcho();
+        settleRecentPhotoRevealSession();
       };
     }, [settleEcho, tryRevealPending]),
   );
