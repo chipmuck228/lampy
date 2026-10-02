@@ -13,7 +13,7 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | 命令 | 结果 |
 | --- | --- |
 | `npx tsc --noEmit` | **PASS** |
-| 相关 Jest（leave-fab 显隐与装饰层、recent-leave-fab 原预期、catalog、底带） | **PASS** |
+| 相关 Jest（leave-fab 均匀底与显隐、recent-leave-fab 原预期、catalog、底带） | **PASS** |
 | 本轮 ESLint `leave-fab.tsx` / `leave-fab.test.tsx` | **PASS** 0 errors |
 | `git diff --check -- apps/ios` | **PASS** |
 | `git diff` `recent-leave-fab.ts` / `recent-leave-fab.test.ts` | 空 |
@@ -29,7 +29,7 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | 末尾避让 = 按钮高 + 距带间距 + 余量，不含导航带高 | **PASS**（Jest） |
 | `recent-leave-fab.test.ts` 显隐预期未改 | **PASS**（Jest，文件无 diff） |
 | 隐藏态外壳 `opacity=0`、不可点、无障碍隐藏 | **PASS**（Jest 属性，不是原生显隐） |
-| 高光 / 底色不拦截点击 | **PASS**（Jest 属性） |
+| 无三段高光层；底为 `paperDeep`，字为 `sage` | **PASS**（Jest 属性） |
 
 ## 改前／改后画面
 
@@ -65,7 +65,7 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | `useLeaveFabMotion` 函数体 | 无行为改动 |
 | `recent-leave-fab.test.ts` | 无 diff，预期行为未改 |
 
-源码结论：隐藏条件与原设计一致。380ms 淡出 + 慢滑 idle + 800ms 停后恢复，会看起来像「只是变淡」。阴影若画在胶囊上、不在 `opacity` 外壳上，iOS 可能留下残影；本轮只把阴影和高光收进同一显隐容器。未改阈值、等待或控制器。
+源码结论：隐藏仍是整颗 `opacity` 到 0。380ms 淡出 + 慢滑 idle + 800ms 停后恢复，看起来会像变浅，这是原规则。iOS 阴影残留仍是待验证假设，不能当成已确认根因，也不能代替手势验收。未改阈值、等待或控制器。
 
 ## 运行环境
 
@@ -82,7 +82,7 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 
 - 持续下滚后整颗按钮（字、plus、底、边、阴影）是否到 0；停 800ms 后是否按原规则回来。
 - 回看目录开合后的显隐。
-- 微光泽在纸色正文上是否过抢。
+- 可见态是否均匀米色、没有三段色带；在纸底和照片上是否可辨。
 - 回看 `book` 字形、VoiceOver 当前项、末条避让。
 - 隐藏态 VoiceOver 不可聚焦。
 
@@ -91,6 +91,6 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | 项 | 值 |
 | --- | --- |
 | 开分支时 GitHub `main` | `9d15a1648ab6725e212a472580faf15def055949`（#59）。当时 `gh api`，不是永恒基线。 |
-| 本轮开始远端 head | `3c9ce3003ad099f95bca83f1117bcb4383178c09` |
-| 实现 SHA | `be79b58259b75188fb43a7146d7fdcb1d22b2a9e`（本地）。远端 head 以 GitHub PR 为准。 |
-| PR head | 推送后更新 |
+| 本轮开始远端 head | `f40e5425cb0b1153541c41ec71610a800e5f0e9b` |
+| 实现 SHA | `011f72450b5bba74325f8a77c566a8f24da7f4d0`（本地） |
+| PR head | 推送后以 GitHub 为准 |

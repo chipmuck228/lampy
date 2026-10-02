@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { Text } from './life-text';
 import { LifeIcon } from './life-icons';
-import { ink, pageGutter, sage } from './life-page';
+import { hairline, ink, pageGutter, paperDeep, sage } from './life-page';
 import { createRecentLeaveFabScroll, recentFabMotion } from './recent-leave-fab';
 
 export const LEAVE_FAB_HIT = 48;
@@ -147,23 +147,7 @@ export function LeaveFab({
         onPress={onPress}
         style={styles.fab}
       >
-        <View
-          testID={`${testID}-sheen`}
-          pointerEvents="none"
-          accessible={false}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={styles.sheen}
-        />
-        <View
-          testID={`${testID}-depth`}
-          pointerEvents="none"
-          accessible={false}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={styles.depth}
-        />
-        <LifeIcon name="plus" size={16} color="#FFFFFF" decorative />
+        <LifeIcon name="plus" size={16} color={sage} decorative />
         <Text style={styles.label}>留下</Text>
       </Pressable>
     </Animated.View>
@@ -175,10 +159,10 @@ const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   shadow: {
     shadowColor: ink,
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   fab: {
     minHeight: LEAVE_FAB_HIT,
@@ -187,36 +171,19 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
     paddingRight: 16,
     borderRadius: 24,
-    backgroundColor: sage,
+    backgroundColor: paperDeep,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(243, 240, 233, 0.34)',
-    overflow: 'hidden',
+    borderColor: hairline,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-  },
-  sheen: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  depth: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 14,
-    backgroundColor: 'rgba(37, 35, 31, 0.10)',
   },
   label: {
     fontFamily: 'PingFang SC',
     fontSize: 14,
     lineHeight: 18,
     letterSpacing: 1.12,
-    color: '#FFFFFF',
+    color: sage,
   },
 });

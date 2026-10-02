@@ -2,7 +2,7 @@ import { Animated, StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
 
 import { LeaveFab } from './leave-fab';
-import { sage } from './life-page';
+import { hairline, paperDeep, sage } from './life-page';
 
 describe('shared LeaveFab', () => {
   it('stays operable and focusable when available', async () => {
@@ -19,8 +19,15 @@ describe('shared LeaveFab', () => {
     expect(fab.props.accessibilityElementsHidden).toBe(false);
     expect(fab.props.accessibilityState?.disabled ?? fab.props.disabled).toBe(false);
     expect(StyleSheet.flatten(fab.props.style)).toEqual(
-      expect.objectContaining({ minHeight: 48, minWidth: 48, backgroundColor: sage }),
+      expect.objectContaining({
+        minHeight: 48,
+        minWidth: 48,
+        backgroundColor: paperDeep,
+        borderColor: hairline,
+      }),
     );
+    expect(view.queryByTestId('recent-leave-fab-sheen')).toBeNull();
+    expect(view.queryByTestId('recent-leave-fab-depth')).toBeNull();
     view.unmount();
   });
 
@@ -44,7 +51,7 @@ describe('shared LeaveFab', () => {
     view.unmount();
   });
 
-  it('keeps sheen and depth from intercepting the hit or the a11y tree', async () => {
+  it('paints plus and 留下 in sage on a single fill', async () => {
     const view = await render(
       <LeaveFab
         testID="recent-leave-fab"
@@ -54,14 +61,8 @@ describe('shared LeaveFab', () => {
         shift={new Animated.Value(0)}
       />,
     );
-    for (const id of ['recent-leave-fab-sheen', 'recent-leave-fab-depth']) {
-      const layer = view.getByTestId(id, { includeHiddenElements: true });
-      expect(layer.props.pointerEvents).toBe('none');
-      expect(layer.props.accessible).toBe(false);
-      expect(layer.props.accessibilityElementsHidden).toBe(true);
-    }
-    expect(StyleSheet.flatten(view.getByTestId('recent-leave-fab').props.style)).toEqual(
-      expect.objectContaining({ minHeight: 48, minWidth: 48, backgroundColor: sage }),
+    expect(StyleSheet.flatten(view.getByText('留下').props.style)).toEqual(
+      expect.objectContaining({ color: sage }),
     );
     view.unmount();
   });
