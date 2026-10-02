@@ -92,5 +92,5 @@ Base：当时 `origin/main`（#59 merge）。分支 `ios/root-nav-leave-visual`�
 | --- | --- |
 | 开分支时 GitHub `main` | `9d15a1648ab6725e212a472580faf15def055949`（#59）。当时 `gh api`，不是永恒基线。 |
 | 本轮开始远端 head | `3bb2d300d2a48a9bc402ce797ee153a3d5e430f3` |
-| 实现 SHA | 待提交 |
-| PR head | 待推送 |
+| 实现 SHA | `3682a9bc7b58451910e0035b075b11650a5d804d`（本地） |
+| PR head | 推送后以 GitHub 为准 |
