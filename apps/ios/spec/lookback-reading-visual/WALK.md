@@ -2,7 +2,7 @@
 
 Branch: `ios/lookback-reading-visual`  
 Base: `origin/main` @ `aab672654a50842deac262a751a43ed607093a35` (#57 merged)  
-Head: recorded after the visual-walk commit on this branch.
+Head: `ecc41a7`（视觉调整＋走查记录；用户报告真机通过，运行 SHA 未从设备核对）.
 
 ## Attachments
 
