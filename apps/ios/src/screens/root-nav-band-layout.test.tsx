@@ -4,6 +4,7 @@ import { Animated, Dimensions, StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LeaveFab, LEAVE_FAB_GAP_ABOVE_NAV, leaveFabOverlayPadding, leaveFabScrollReserve } from './leave-fab';
+import { LIFE_ICON_NAMES } from './life-icons';
 import { NAV_BAND_HIT, pageGutter } from './life-page';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 
@@ -270,6 +271,8 @@ describe('root nav band layout', () => {
   it('keeps 最近 left and 回看 right on the recent root', async () => {
     const recent = await render(wrap(<RootNavBand here="recent" onOther={() => undefined} />));
     expect(bandOrder(recent)).toEqual(['root-nav-here-wrap', 'home-lookback']);
+    expect(recent.getByTestId('root-nav-here-wrap').props.accessible).toBe(true);
+    expect(recent.getByTestId('root-nav-here-wrap').props.accessibilityRole).toBe('tab');
     expect(recent.getByTestId('root-nav-here-wrap').props.accessibilityState?.selected).toBe(true);
     expect(recent.getByTestId('home-lookback').props.accessibilityState?.selected).toBe(false);
     expect(StyleSheet.flatten(recent.getByTestId('root-nav-here-wrap').props.style)).toEqual(
@@ -283,6 +286,8 @@ describe('root nav band layout', () => {
   it('keeps 最近 left and 回看 right on the lookback root', async () => {
     const lookback = await render(wrap(<RootNavBand here="lookback" onOther={() => undefined} />));
     expect(bandOrder(lookback)).toEqual(['lookback-go-recent', 'root-nav-here-wrap']);
+    expect(lookback.getByTestId('root-nav-here-wrap').props.accessible).toBe(true);
+    expect(lookback.getByTestId('root-nav-here-wrap').props.accessibilityRole).toBe('tab');
     expect(lookback.getByTestId('root-nav-here-wrap').props.accessibilityState?.selected).toBe(true);
     expect(lookback.getByTestId('lookback-go-recent').props.accessibilityState?.selected).toBe(false);
   });
@@ -303,6 +308,11 @@ describe('root nav band layout', () => {
     expect(onOther).not.toHaveBeenCalled();
     fireEvent.press(lookback.getByTestId('lookback-go-recent'));
     expect(onOther).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses catalogued system symbols for the band icons', () => {
+    expect(LIFE_ICON_NAMES.recent).toBe('line.3.horizontal');
+    expect(LIFE_ICON_NAMES.lookback).toBe('book');
   });
 
   it('reserves FAB clearance without the nav height', () => {

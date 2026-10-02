@@ -121,6 +121,7 @@ export function RootNavBand({
         <View
           key={dest.id}
           testID="root-nav-here-wrap"
+          accessible
           accessibilityRole="tab"
           accessibilityLabel={dest.label}
           accessibilityState={{ selected: true }}

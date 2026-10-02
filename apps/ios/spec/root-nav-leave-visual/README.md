@@ -19,7 +19,7 @@
 | 位置 | 目的地 | 系统符号 | 类型包核对 |
 | --- | --- | --- | --- |
 | 左 | 最近 | `line.3.horizontal`（横线列表） | `sf-symbols-typescript` 含此名 |
-| 右 | 回看 | `book.open`（打开的书） | iOS 14+ 系统符号；本地 `sf-symbols-typescript@2.2.0` 目录未收录，`LifeIcon` 对 `SymbolView` 做了类型断言。运行时仍走系统符号，缺失时用现有空 `View` fallback |
+| 右 | 回看 | `book`（书） | `sf-symbols-typescript` 含此名。未使用 `book.open`：该名不在本仓库类型目录里，也不对全部 `LifeIcon` 做断言来绕过检查。`book` 是闭着的书，不是打开的书；本轮未在真机核过 `book.open` 是否画出，因此改用已收录符号。 |
 
 - 两项等宽，整块触控 ≥ 48pt。
 - 图标在上、标签在下，居中。图标 23pt，标签 13pt，间距 4pt，固定字号（`allowFontScaling: false`）。
@@ -36,7 +36,7 @@
 
 | 项 | 行为 |
 | --- | --- |
-| 当前项 | `accessibilityRole="tab"`，`accessibilityState.selected=true`，标签读名称。图标 `decorative`。点击不导航、不刷新、不回顶。 |
+| 当前项 | 外层 `View` 显式 `accessible`，`accessibilityRole="tab"`，`accessibilityState.selected=true`，读名称。内部文字 `accessible={false}`，图标 `decorative`，避免重复朗读。点击不导航、不刷新、不回顶。Jest 能找到标签不等于 VoiceOver 已核过。 |
 | 另一项 | 现有 `onOther` / `onFamily`。不改写来源或路由状态。 |
 | 底带 | 仍是滚动区外的兄弟节点，不是覆盖正文的绝对定位层。 |
 
