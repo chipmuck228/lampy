@@ -1,77 +1,20 @@
-import { useCallback, useState } from 'react';
-import { Pressable } from 'react-native';
-import { Text } from '../../screens/life-text';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback } from 'react';
 
 import { getUseCases } from '../../application/container';
-import { HISTORY_PAGE_SIZE, type HistoryUnconfirmedViewModel } from '../../application/history-use-cases';
-import {
-  HistoryMomentRow,
-  LookbackMessage,
-  LookbackScaffold,
-  lookbackStyles,
-  momentHref,
-} from '../../screens/lookback-chrome';
+import { LookbackUnconfirmedReading } from '../../screens/lookback-unconfirmed-reading';
 
 export default function LookbackUnconfirmedScreen() {
-  const router = useRouter();
-  const [view, setView] = useState<HistoryUnconfirmedViewModel | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
-
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      getUseCases()
-        .then((app) => app.getHistoryUnknown(offset))
-        .then((next) => {
-          if (!cancelled) {
-            setView((current) =>
-              offset === 0 || !current
-                ? next
-                : { ...next, items: [...current.items, ...next.items] },
-            );
-            setError(null);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setError('这些记录暂时读不出来，原来的内容还在。');
-        });
-      return () => {
-        cancelled = true;
-      };
-    }, [offset]),
-  );
-
+  const loadPage = useCallback(async (offset: number) => {
+    const app = await getUseCases();
+    return app.getHistoryUnknown(offset);
+  }, []);
   return (
-    <LookbackScaffold title={view?.title || '时间未确认'} path="/lookback/unconfirmed">
-      {error ? <LookbackMessage>{error}</LookbackMessage> : null}
-      {view ? <LookbackMessage>{view.explanation}</LookbackMessage> : null}
-      {view?.items.map((item) => (
-        <HistoryMomentRow
-          key={item.id}
-          id={item.id}
-          note={item.note}
-          timeLabel={item.timeLabel}
-          recordedFallbackLabel={item.recordedFallbackLabel}
-          feeling={item.feeling}
-          images={item.images}
-          audio={item.audio}
-          unknownMedia={item.unknownMedia}
-          onPress={() => router.push(momentHref(item.id))}
-        />
-      ))}
-      {view?.hasMore ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="继续往下看"
-          testID="lookback-unconfirmed-more"
-          onPress={() => setOffset((current) => current + HISTORY_PAGE_SIZE)}
-          style={lookbackStyles.hit}
-        >
-          <Text style={lookbackStyles.action}>继续往下看</Text>
-        </Pressable>
-      ) : null}
-    </LookbackScaffold>
+    <LookbackUnconfirmedReading
+      scope={{ kind: 'unknown' }}
+      path="/lookback/unconfirmed"
+      fallbackTitle="时间未确认"
+      moreTestID="lookback-unconfirmed-more"
+      loadPage={loadPage}
+    />
   );
 }

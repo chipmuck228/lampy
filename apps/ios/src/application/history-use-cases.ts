@@ -37,15 +37,18 @@ export type HistoryMomentItem = HistoryListedMoment & {
   images: ImageView[];
   audio: AudioView | null;
   unknownMedia: UnknownMediaView[];
+  recordedElsewhereLabel?: string;
 };
 
 export type HistoryDayViewModel = Omit<HistoryDayView, 'items'> & {
   items: HistoryMomentItem[];
   hasMore: boolean;
+  totalCount?: number;
 };
 
 export type HistoryUnconfirmedViewModel = Omit<HistoryUnconfirmedView, 'items'> & {
   items: HistoryMomentItem[];
+  totalCount?: number;
 };
 
 export function createHistoryUseCases(deps: {
@@ -67,6 +70,7 @@ export function createHistoryUseCases(deps: {
         images: await deps.resolveImages(moment.assetIds),
         audio: await deps.resolveAudio(moment.assetIds),
         unknownMedia: await deps.resolveUnknown(moment.assetIds),
+        recordedElsewhereLabel: recordedElsewhereLabel(moment, clock),
       });
     }
     return decorated;
@@ -180,17 +184,27 @@ export function createHistoryUseCases(deps: {
       order: 'occurred-asc',
     });
     const view = projectHistoryDay(page.items, year, month, day, clock);
+    const totalCount =
+      offset === 0
+        ? await deps.moments.countActiveOccurred({
+            startIso: bounds.startIso,
+            endIso: bounds.endIso,
+            precisions: DAY_PRECISIONS,
+          })
+        : undefined;
     return {
       ...view,
       items: await decorate(page.items),
       hasMore: page.hasMore,
+      totalCount,
     };
   }
 
   async function getHistoryUnknown(offset = 0) {
     const page = await deps.moments.listActiveUnknown(HISTORY_PAGE_SIZE, offset);
     const view = projectHistoryUnconfirmed(page.items, { kind: 'unknown' }, clock, page.hasMore);
-    return { ...view, items: await decorate(page.items) };
+    const totalCount = offset === 0 ? await deps.moments.countActiveUnknown() : undefined;
+    return { ...view, items: await decorate(page.items), totalCount };
   }
 
   async function getHistoryYearUnconfirmed(year: number, offset = 0) {
@@ -205,7 +219,15 @@ export function createHistoryUseCases(deps: {
       order: 'occurred-asc',
     });
     const view = projectHistoryUnconfirmed(page.items, { kind: 'year', year }, clock, page.hasMore);
-    return { ...view, items: await decorate(page.items) };
+    const totalCount =
+      offset === 0
+        ? await deps.moments.countActiveOccurred({
+            startIso: bounds.startIso,
+            endIso: bounds.endIso,
+            precisions: ['year'],
+          })
+        : undefined;
+    return { ...view, items: await decorate(page.items), totalCount };
   }
 
   async function getHistoryMonthUnconfirmed(year: number, month: number, offset = 0) {
@@ -225,7 +247,15 @@ export function createHistoryUseCases(deps: {
       clock,
       page.hasMore,
     );
-    return { ...view, items: await decorate(page.items) };
+    const totalCount =
+      offset === 0
+        ? await deps.moments.countActiveOccurred({
+            startIso: bounds.startIso,
+            endIso: bounds.endIso,
+            precisions: ['month'],
+          })
+        : undefined;
+    return { ...view, items: await decorate(page.items), totalCount };
   }
 
   return {
@@ -238,6 +268,23 @@ export function createHistoryUseCases(deps: {
     getHistoryYearUnconfirmed,
     getHistoryMonthUnconfirmed,
   };
+}
+
+function recordedElsewhereLabel(moment: MomentRecord, clock: HistoryClock): string | undefined {
+  if (moment.time.occurredAtPrecision === 'unknown' || !moment.time.occurredAt) return undefined;
+  const occurred = parseMillis(moment.time.occurredAt);
+  const recorded = parseMillis(moment.time.recordedAt);
+  if (occurred === null || recorded === null) return undefined;
+  const occurredParts = calendarPartsAt(occurred, clock);
+  const recordedParts = calendarPartsAt(recorded, clock);
+  if (
+    occurredParts.year === recordedParts.year &&
+    occurredParts.month === recordedParts.month &&
+    occurredParts.day === recordedParts.day
+  ) {
+    return undefined;
+  }
+  return `记录于 ${recordedParts.month}月${recordedParts.day}日`;
 }
 
 function deviceTimeZone(): string {

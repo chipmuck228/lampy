@@ -26,6 +26,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -35,6 +36,9 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: async () => ({ items: [], hasMore: false, title: '时间未确认', explanation: '' }),
+    getHistoryYearUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryMonthUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
   }),
 }));
 
@@ -137,16 +141,16 @@ describe('lookback book adapt surfaces', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />, 390, 844));
     await waitFor(() => {
-      expect(view.getByLabelText('2025年4月，有1条记录，已收起')).toBeTruthy();
+      expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
     });
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2025-04'));
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
     });
     await waitFor(() => {
-      expect(view.getByLabelText('2025年4月8日，星期二，有1条记录，已收起')).toBeTruthy();
+      expect(view.getByLabelText('2025年4月，有1条记录，已展开')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-day-2025-04-08')).toBeTruthy();
     });
     expect(view.queryByTestId(/lookback-book-day-2025-04-(?!08)/)).toBeNull();
     await act(async () => {
@@ -158,8 +162,8 @@ describe('lookback book adapt surfaces', () => {
     await waitFor(() => {
       expect(view.getByText('稀疏月一条')).toBeTruthy();
     });
-    expect(view.getByLabelText('看这条，稀疏月一条')).toBeTruthy();
-    expect(StyleSheet.flatten(view.getByLabelText('看这条，稀疏月一条').props.style).minHeight).toBe(48);
+    expect(view.getByLabelText('阅读完整记录，稀疏月一条')).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByLabelText('阅读完整记录，稀疏月一条').props.style).minHeight).toBe(48);
     view.unmount();
   });
 
@@ -169,6 +173,12 @@ describe('lookback book adapt surfaces', () => {
       screen: { width: 852, height: 393, scale: 2, fontScale: 1 },
     });
     const view = await render(wrap(<LookbackIndexScreen />, 852, 393));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
+    });
     await waitFor(() => {
       expect(view.getByText('2025年')).toBeTruthy();
     });
@@ -185,7 +195,13 @@ describe('lookback book adapt surfaces', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />, 1024, 1366));
     await waitFor(() => {
-      expect(view.getByLabelText('2025年4月，有1条记录，已收起')).toBeTruthy();
+      expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
+    });
+    await waitFor(() => {
+      expect(view.getByLabelText('2025年4月，有1条记录，已展开')).toBeTruthy();
     });
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
     expect(view.getByLabelText('回看，当前页')).toBeTruthy();

@@ -118,4 +118,20 @@ describe('lookback book locate measure', () => {
     flushMeasures();
     expect(mockScrollTo).toHaveBeenCalledTimes(1);
   });
+
+  it('cancels a pending locate when the reading scroll is dragged', async () => {
+    const view = await render(wrap(<Probe />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-book-locating')).toBeTruthy();
+    });
+    fireEvent(view.getByTestId('lookback-scroll'), 'scrollBeginDrag');
+    await waitFor(() => {
+      expect(view.queryByTestId('lookback-book-locating')).toBeNull();
+    });
+    await act(async () => {
+      flushMeasures();
+    });
+    expect(mockScrollTo).not.toHaveBeenCalled();
+    view.unmount();
+  });
 });

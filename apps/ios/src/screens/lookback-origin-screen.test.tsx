@@ -30,6 +30,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => mockSearchParams,
     useNavigation: () => ({
       getState: mockGetState,
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -116,7 +117,7 @@ describe('lookback origin on the root screen', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-year-2026')).toBeTruthy();
+      expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('lookback-go-recent'));
     expect(mockDismissTo).toHaveBeenCalledWith('/');

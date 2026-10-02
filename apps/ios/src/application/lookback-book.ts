@@ -59,12 +59,32 @@ export function lookbackBookDateLabel(year: number, month: number, day: number):
   return `${month}月${day}日 · ${lookbackBookWeekdayName(year, month, day)}`;
 }
 
+const LOOKBACK_MONTH_HAN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'] as const;
+
+export function lookbackCatalogMonthHan(month: number): string {
+  const stem = LOOKBACK_MONTH_HAN[month - 1];
+  return stem ? `${stem}月` : `${month}月`;
+}
+
 export function lookbackBookDayPrimaryLabel(day: number): string {
   return `${day}日`;
 }
 
+export function lookbackBookDayDateLabel(month: number, day: number): string {
+  return `${month} / ${day}`;
+}
+
 export function lookbackBookDaySecondaryLabel(year: number, month: number, day: number): string {
   return `周${LOOKBACK_WEEKDAY_LABELS[weekdayMondayIndex(year, month, day)]}`;
+}
+
+export function lookbackBookDayMetaLabel(
+  year: number,
+  month: number,
+  day: number,
+  count: number,
+): string {
+  return `${lookbackBookDaySecondaryLabel(year, month, day)} · ${count}条`;
 }
 
 export function lookbackBookDayAccessLabel(
@@ -72,10 +92,10 @@ export function lookbackBookDayAccessLabel(
   month: number,
   day: number,
   summary: string,
-  expanded: boolean,
+  selected: boolean,
 ): string {
   return `${year}年${month}月${day}日，${lookbackBookWeekdayName(year, month, day)}，${summary}，${
-    expanded ? '已展开' : '已收起'
+    selected ? '已选中' : '未选中'
   }`;
 }
 

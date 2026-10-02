@@ -28,6 +28,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -37,6 +38,9 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryYearUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryMonthUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
   }),
 }));
 
@@ -76,7 +80,7 @@ describe('lookback book expand', () => {
     });
   });
 
-  it('expands one month, excerpts two moments, and opens the exact id', async () => {
+  it('opens a selected day for continuous reading and keeps the exact id', async () => {
     mockGetLookbackBook.mockResolvedValue({
       unknownCount: 0,
       isEmpty: false,
@@ -110,66 +114,91 @@ describe('lookback book expand', () => {
         };
       }),
     });
-    mockGetHistoryDay.mockResolvedValue({
-      year: 2026,
-      month: 9,
-      day: 27,
-      title: '2026年9月27日',
-      isEmpty: false,
-      items: [
-        {
-          id: 'm_first',
-          note: '第一条',
-          precision: 'day',
-          timeLabel: '2026年9月27日',
-          usedRecordedAtFallback: false,
-          feeling: null,
-          images: [],
-          audio: null,
-          unknownMedia: [],
-        },
-        {
-          id: 'm_second',
-          note: '第二条',
-          precision: 'day',
-          timeLabel: '2026年9月27日',
-          usedRecordedAtFallback: false,
-          feeling: null,
-          images: [],
-          audio: null,
-          unknownMedia: [],
-        },
-        {
-          id: 'm_third',
-          note: '第三条',
-          precision: 'day',
-          timeLabel: '2026年9月27日',
-          usedRecordedAtFallback: false,
-          feeling: null,
-          images: [],
-          audio: null,
-          unknownMedia: [],
-        },
-      ],
-      hasMore: false,
+    mockGetHistoryDay.mockImplementation(async (_year: number, _month: number, day: number) => {
+      if (day !== 27) {
+        return {
+          year: 2026,
+          month: 9,
+          day,
+          title: `2026年9月${day}日`,
+          isEmpty: false,
+          items: [
+            {
+              id: `m_${day}`,
+              note: `${day}日`,
+              precision: 'day' as const,
+              timeLabel: `2026年9月${day}日`,
+              usedRecordedAtFallback: false,
+              feeling: null,
+              images: [],
+              audio: null,
+              unknownMedia: [],
+            },
+          ],
+          hasMore: false,
+          totalCount: day === 28 ? 3 : 1,
+        };
+      }
+      return {
+        year: 2026,
+        month: 9,
+        day: 27,
+        title: '2026年9月27日',
+        isEmpty: false,
+        items: [
+          {
+            id: 'm_first',
+            note: '第一条',
+            precision: 'day',
+            timeLabel: '2026年9月27日',
+            usedRecordedAtFallback: false,
+            feeling: null,
+            images: [],
+            audio: null,
+            unknownMedia: [],
+          },
+          {
+            id: 'm_second',
+            note: '第二条',
+            precision: 'day',
+            timeLabel: '2026年9月27日',
+            usedRecordedAtFallback: false,
+            feeling: null,
+            images: [],
+            audio: null,
+            unknownMedia: [],
+          },
+          {
+            id: 'm_third',
+            note: '第三条',
+            precision: 'day',
+            timeLabel: '2026年9月27日',
+            usedRecordedAtFallback: false,
+            feeling: null,
+            images: [],
+            audio: null,
+            unknownMedia: [],
+          },
+        ],
+        hasMore: false,
+        totalCount: 11,
+      };
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
+      expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
     });
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-      await Promise.resolve();
-      await Promise.resolve();
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
       await Promise.resolve();
     });
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
     });
+    expect(view.getByLabelText('2026年9月，有14条记录，已展开')).toBeTruthy();
     expect(view.queryByTestId('lookback-month-calendar')).toBeNull();
-    expect(view.getByText('28日')).toBeTruthy();
-    expect(view.getByText('周一')).toBeTruthy();
-    expect(view.getByText('3条')).toBeTruthy();
+    expect(view.getByText('9 / 28')).toBeTruthy();
+    expect(view.getByText('周一 · 3条')).toBeTruthy();
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
       await Promise.resolve();
@@ -178,12 +207,12 @@ describe('lookback book expand', () => {
     });
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-open-m_first')).toBeTruthy();
+      expect(view.getByLabelText('2026年9月27日，星期日，11条')).toBeTruthy();
     });
-    expect(view.getByLabelText('2026年9月27日，星期日，有11条记录，已展开')).toBeTruthy();
     expect(view.getByText('第一条')).toBeTruthy();
     expect(view.getByText('第二条')).toBeTruthy();
-    expect(view.queryByText('第三条')).toBeNull();
-    expect(view.getByLabelText('这一天还有9条')).toBeTruthy();
+    expect(view.getByText('第三条')).toBeTruthy();
+    expect(view.queryByLabelText('这一天还有9条')).toBeNull();
     fireEvent.press(view.getByTestId('lookback-book-open-m_first'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_first' } });
     view.unmount();

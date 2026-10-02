@@ -13,13 +13,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
 import { Text, type } from './life-text';
+import { LifeIcon } from './life-icons';
+import { LeaveFab, leaveFabScrollReserve, useLeaveFabMotion } from './leave-fab';
+import { lookbackCatalogToggleLabel } from './lookback-catalog';
+import { recentInk, recentKicker, recentRule, recentType } from './recent-visual';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 import { usePageMetrics } from './use-page-metrics';
 
 import type { FeelingView } from '../application/feeling';
 import { LOOKBACK_PAGE_GUTTER } from '../application/lookback-month';
-import { lookbackLocateIsCurrent, requestLookbackLocate } from '../application/lookback-locate';
-import { rememberLookbackScroll, readLookbackScroll } from '../application/lookback-session';
+import { lookbackLocateIsCurrent, lookbackLocateScrollY, requestLookbackLocate } from '../application/lookback-locate';
+import { rememberLookbackScroll, readLookbackScroll, rememberLookbackCatalogScroll } from '../application/lookback-session';
 import type { AudioView, ImageView, UnknownMediaView } from '../application/use-cases';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentFeeling } from './moment-feeling';
@@ -110,6 +114,106 @@ export function LookbackLocateAnchor({ id }: { id: string }) {
   );
 }
 
+export function LookbackCatalogToggle({
+  range,
+  expanded,
+  onPress,
+  toggleRef,
+}: {
+  range: string | null;
+  expanded: boolean;
+  onPress: () => void;
+  toggleRef?: RefObject<View | null>;
+}) {
+  return (
+    <Pressable
+      ref={toggleRef}
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={lookbackCatalogToggleLabel(expanded)}
+      testID="lookback-catalog-toggle"
+      onPress={onPress}
+      style={styles.catalogToggle}
+    >
+      <Text style={styles.catalogKicker}>时间目录</Text>
+      <View style={styles.catalogRangeRow}>
+        <Text style={styles.catalogRange} testID="lookback-catalog-range">
+          {range ?? '时间目录'}
+        </Text>
+        <LifeIcon name={expanded ? 'collapse' : 'expand'} size={16} decorative />
+      </View>
+    </Pressable>
+  );
+}
+
+export function LookbackCatalogOverlay({
+  children,
+  locateKey,
+  locateSeq,
+  onLocated,
+  maxHeight,
+}: {
+  children: ReactNode;
+  locateKey: string | null;
+  locateSeq: number;
+  onLocated?: () => void;
+  maxHeight?: number;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
+  const offsetRef = useRef(0);
+  const locateKeyRef = useRef(locateKey);
+  const locateSeqRef = useRef(locateSeq);
+  const onLocatedRef = useRef(onLocated);
+  useLayoutEffect(() => {
+    locateKeyRef.current = locateKey;
+    locateSeqRef.current = locateSeq;
+    onLocatedRef.current = onLocated;
+  });
+  const locate = useMemo(
+    () => ({
+      locateKey,
+      generation: locateKey ? locateSeq : 0,
+      scrollRef,
+      readOffset: () => offsetRef.current,
+      isCurrent: (id: string, seq: number) =>
+        lookbackLocateIsCurrent(id, seq, locateKeyRef.current, locateSeqRef.current),
+      finishLocate: (id: string, seq: number) => {
+        if (lookbackLocateIsCurrent(id, seq, locateKeyRef.current, locateSeqRef.current)) {
+          onLocatedRef.current?.();
+        }
+      },
+    }),
+    [locateKey, locateSeq],
+  );
+
+  return (
+    <LookbackLocateContext.Provider value={locate}>
+      <View testID="lookback-catalog" style={[styles.catalog, maxHeight != null ? { maxHeight } : null]}>
+        {locateKey ? (
+          <View testID="lookback-book-locating" accessibilityLabel={locateKey} />
+        ) : null}
+        <ScrollView
+          ref={scrollRef}
+          testID="lookback-catalog-scroll"
+          style={styles.catalogScroll}
+          contentContainerStyle={styles.catalogColumn}
+          onScroll={(event) => {
+            offsetRef.current = event.nativeEvent.contentOffset.y;
+            rememberLookbackCatalogScroll(event.nativeEvent.contentOffset.y);
+          }}
+          onScrollBeginDrag={() => {
+            if (locateKeyRef.current) onLocatedRef.current?.();
+          }}
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+        >
+          {children}
+        </ScrollView>
+      </View>
+    </LookbackLocateContext.Provider>
+  );
+}
+
 export function lookbackLayoutFor(width: number, height: number) {
   return {
     readingWidth: Math.min(width, 720),
@@ -126,26 +230,54 @@ export function useLookbackLayout() {
 
 export function LookbackScaffold({
   title,
+  kicker,
+  subtitle,
+  headerAction,
   path,
   children,
   footer,
+  cover,
   root,
   locateKey = null,
   locateSeq = 0,
+  readingLocked = false,
+  suppressPathRestore = false,
+  pendingRestoreY = null,
+  restoreSeq = 0,
   onLocated,
+  onRestoreDone,
+  onReadingScroll,
+  readingAnchorRef,
+  holdWindowY = null,
+  holdSeq = 0,
+  onHoldDone,
   onBack,
   onGoRecent,
   onLeave,
   onFamily,
 }: {
   title: string;
+  kicker?: string;
+  subtitle?: string;
+  headerAction?: ReactNode;
   path: string;
   children: ReactNode;
   footer?: ReactNode;
+  cover?: ReactNode;
   root?: boolean;
   locateKey?: string | null;
   locateSeq?: number;
+  readingLocked?: boolean;
+  suppressPathRestore?: boolean;
+  pendingRestoreY?: number | null;
+  restoreSeq?: number;
   onLocated?: () => void;
+  onRestoreDone?: () => void;
+  onReadingScroll?: (offsetY: number) => void;
+  readingAnchorRef?: RefObject<View | null>;
+  holdWindowY?: number | null;
+  holdSeq?: number;
+  onHoldDone?: () => void;
   onBack?: () => void;
   onGoRecent?: () => void;
   onLeave?: () => void;
@@ -153,16 +285,37 @@ export function LookbackScaffold({
 }) {
   const router = useRouter();
   const { readingWidth, shortHeight } = useLookbackLayout();
+  const leaveFab = useLeaveFabMotion();
   const scrollRef = useRef<ScrollView>(null);
   const restoreOnce = useRef(false);
+  const restoredSeqRef = useRef<number | null>(null);
   const locateKeyRef = useRef(locateKey);
   const locateSeqRef = useRef(locateSeq);
   const onLocatedRef = useRef(onLocated);
+  const holdSeqRef = useRef(holdSeq);
   useLayoutEffect(() => {
     locateKeyRef.current = locateKey;
     locateSeqRef.current = locateSeq;
     onLocatedRef.current = onLocated;
+    holdSeqRef.current = holdSeq;
   });
+  useLayoutEffect(() => {
+    if (holdWindowY == null || !readingAnchorRef?.current) return undefined;
+    const seq = holdSeq;
+    const node = readingAnchorRef.current as View & {
+      measureInWindow?: (callback: (x: number, y: number, width: number, height: number) => void) => void;
+    };
+    if (typeof node.measureInWindow !== 'function') return undefined;
+    const frame = requestAnimationFrame(() => {
+      node.measureInWindow?.((_x, y) => {
+        if (seq !== holdSeqRef.current) return;
+        const next = lookbackLocateScrollY(readLookbackScroll(path), y, holdWindowY);
+        scrollRef.current?.scrollTo({ y: next, animated: false });
+        onHoldDone?.();
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [holdSeq, holdWindowY, onHoldDone, path, readingAnchorRef]);
   const locate = useMemo(
     () => ({
       locateKey,
@@ -185,6 +338,38 @@ export function LookbackScaffold({
     return undefined;
   });
 
+  const pinHeader = !!(root && onGoRecent);
+  const heroPadTop = shortHeight ? 12 : 20;
+  const pageHeader = (
+    <View
+      style={[
+        styles.headerWrap,
+        { maxWidth: readingWidth, paddingHorizontal: LOOKBACK_PAGE_GUTTER },
+      ]}
+    >
+      <View
+        style={[styles.hero, { paddingTop: heroPadTop }]}
+        testID="lookback-header"
+      >
+        <View style={styles.heroCopy}>
+          {kicker ? (
+            <Text style={styles.kicker} testID="lookback-kicker">
+              {kicker}
+            </Text>
+          ) : null}
+          <Text style={styles.title} accessibilityRole="header" testID="lookback-wordmark">
+            {title}
+          </Text>
+        </View>
+        {subtitle ? (
+          <Text style={styles.topMark} testID="lookback-subtitle">
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {root ? <View testID="lookback-header-rule" style={styles.headerRule} /> : null}
+    </View>
+  );
   const content = (
     <>
       {root ? null : (
@@ -198,20 +383,33 @@ export function LookbackScaffold({
           <Text style={styles.back}>返回原来的位置</Text>
         </Pressable>
       )}
-      <Text style={styles.title} accessibilityRole="header">
-        {title}
-      </Text>
-      {locateKey ? (
+      {pinHeader ? null : pageHeader}
+      {headerAction}
+      {locateKey && !readingLocked ? (
         <View testID="lookback-book-locating" accessibilityLabel={locateKey} />
       ) : null}
-      {children}
-      {footer}
+      <View
+        testID="lookback-reading-tree"
+        pointerEvents="auto"
+        importantForAccessibility="auto"
+        accessibilityElementsHidden={false}
+      >
+        {children}
+        {footer}
+      </View>
     </>
   );
 
   const scrollProps = {
     onContentSizeChange: () => {
-      if (locateKey) {
+      if (pendingRestoreY != null && restoredSeqRef.current !== restoreSeq) {
+        restoredSeqRef.current = restoreSeq;
+        restoreOnce.current = true;
+        scrollRef.current?.scrollTo({ y: pendingRestoreY, animated: false });
+        onRestoreDone?.();
+        return;
+      }
+      if (locateKey || suppressPathRestore) {
         restoreOnce.current = true;
         return;
       }
@@ -221,9 +419,13 @@ export function LookbackScaffold({
     },
     onScroll: (event: { nativeEvent: { contentOffset: { y: number } } }) => {
       rememberLookbackScroll(path, event.nativeEvent.contentOffset.y);
+      if (!readingLocked) leaveFab.onScroll(event.nativeEvent.contentOffset.y);
+      onReadingScroll?.(event.nativeEvent.contentOffset.y);
     },
     onScrollBeginDrag: () => {
       if (locateKeyRef.current) onLocatedRef.current?.();
+      onRestoreDone?.();
+      onHoldDone?.();
     },
   };
 
@@ -234,11 +436,28 @@ export function LookbackScaffold({
         scrollRef={scrollRef}
         contentContainerStyle={[
           styles.column,
-          { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16, paddingBottom: 8 },
+          {
+            maxWidth: readingWidth,
+            paddingTop: 4,
+            paddingBottom: 8 + (onLeave ? leaveFabScrollReserve() : 0),
+          },
         ]}
+        header={pageHeader}
         onContentSizeChange={scrollProps.onContentSizeChange}
         onScroll={scrollProps.onScroll}
         onScrollBeginDrag={scrollProps.onScrollBeginDrag}
+        cover={cover}
+        overlay={
+          onLeave ? (
+            <LeaveFab
+              testID="lookback-leave-fab"
+              onPress={onLeave}
+              available={leaveFab.open && !readingLocked}
+              opacity={leaveFab.opacity}
+              shift={leaveFab.shift}
+            />
+          ) : null
+        }
         band={
           <RootNavBand here="lookback" onOther={onGoRecent} onFamily={onFamily} />
         }
@@ -253,7 +472,7 @@ export function LookbackScaffold({
           style={styles.scroll}
           contentContainerStyle={[
             styles.column,
-            { maxWidth: readingWidth, paddingTop: shortHeight ? 8 : 16 },
+            { maxWidth: readingWidth, paddingTop: heroPadTop },
           ]}
           onContentSizeChange={scrollProps.onContentSizeChange}
           onScroll={scrollProps.onScroll}
@@ -342,6 +561,7 @@ export function LookbackMessage({ children, testID }: { children: string; testID
 export const lookbackStyles = StyleSheet.create({
   hit: { minHeight: 44, justifyContent: 'center' },
   action: { ...type.action, color: '#53604F' },
+  quiet: { ...type.meta, color: '#5C5851' },
   cell: { minHeight: 44, paddingVertical: 8, gap: 4, flex: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   stack: { gap: 12 },
@@ -349,6 +569,22 @@ export const lookbackStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F3F0E9' },
+  catalog: { alignSelf: 'stretch', backgroundColor: '#F3F0E9' },
+  catalogScroll: { flexGrow: 0 },
+  catalogColumn: { paddingTop: 4, paddingBottom: 12, gap: 8 },
+  catalogToggle: { minHeight: 48, justifyContent: 'center', gap: 4, paddingTop: 4 },
+  catalogKicker: { ...recentType.prefix, color: recentKicker },
+  catalogRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    minHeight: 48,
+    borderBottomWidth: 1,
+    borderBottomColor: recentRule,
+    paddingBottom: 8,
+  },
+  catalogRange: { ...recentType.date, color: recentInk, flexShrink: 1, minWidth: 0 },
   scroll: { flex: 1, width: '100%' },
   column: {
     flexGrow: 1,
@@ -361,8 +597,33 @@ const styles = StyleSheet.create({
   },
   backHit: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
   back: { ...type.action, color: '#53604F' },
-  title: { ...type.title, color: '#25231F', flexShrink: 1, minWidth: 0 },
-  body: { ...type.action, color: '#5C5851' },
+  headerWrap: { alignSelf: 'center', width: '100%' },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    alignSelf: 'center',
+    width: '100%',
+    gap: 12,
+    paddingBottom: 17,
+  },
+  heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
+  kicker: { ...recentType.kicker, color: recentKicker },
+  title: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
+  topMark: {
+    ...recentType.end,
+    color: recentKicker,
+    letterSpacing: 1.2,
+    marginBottom: 6,
+    flexShrink: 0,
+  },
+  headerRule: {
+    alignSelf: 'stretch',
+    height: 1,
+    backgroundColor: recentRule,
+    marginBottom: 8,
+  },
+  body: { ...type.action, color: '#5C5851', flexShrink: 1, minWidth: 0 },
   meta: { ...type.meta, color: '#53604F' },
   fallback: { ...type.meta, color: '#5C5851' },
   note: { ...type.body, color: '#25231F' },

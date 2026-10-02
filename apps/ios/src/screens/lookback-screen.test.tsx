@@ -45,6 +45,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => mockSearchParams,
     useNavigation: () => ({
       getState: mockGetState,
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -57,6 +58,16 @@ jest.mock('../application/container', () => ({
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
     getHistoryUnknown: mockGetHistoryUnknown,
+    getHistoryYearUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryMonthUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+  }),
+}));
+
+jest.mock('./use-recent-clip-playback', () => ({
+  useRecentClipPlayback: () => ({
+    card: () => ({ status: 'idle', currentTimeMs: 0 }),
+    play: jest.fn(),
+    pause: jest.fn(async () => undefined),
   }),
 }));
 
@@ -88,6 +99,7 @@ describe('lookback screens', () => {
     mockDismissTo.mockReset();
     mockGetState.mockReset();
     mockGetState.mockReturnValue({ index: 0, routes: [{ name: 'lookback/index' }] });
+    mockGetLookbackBook.mockResolvedValue({ unknownCount: 0, isEmpty: false, years: [] });
     delete mockSearchParams.from;
     delete mockSearchParams.o;
     delete mockSearchParams.b;
@@ -168,9 +180,10 @@ describe('lookback screens', () => {
     await waitFor(() => {
       expect(day.getByText('门口的风')).toBeTruthy();
     });
-    expect(day.getByText('当时的感受 · 平静')).toBeTruthy();
+    expect(day.getByText('平静')).toBeTruthy();
+    expect(day.getByLabelText('当时的感受，平静')).toBeTruthy();
     expect(day.getByText('08:15')).toBeTruthy();
-    expect(day.getByText('2026年1月2日')).toBeTruthy();
+    expect(day.getAllByText('1月2日').length).toBeGreaterThan(0);
     expect(day.getByLabelText('照片 1/3')).toBeTruthy();
     expect(day.queryByLabelText('移除这张照片，照片 1/3')).toBeNull();
     expect(day.getByText('这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
@@ -178,9 +191,9 @@ describe('lookback screens', () => {
     expect(day.getByText('这段声音暂时找不到了，其他内容仍然保留。')).toBeTruthy();
     expect(day.getByText('这份内容暂时无法打开。')).toBeTruthy();
     expect(day.queryByText('这条记录现在无法找到')).toBeNull();
-    fireEvent.press(day.getByTestId('lookback-moment-m_exact'));
+    fireEvent.press(day.getByTestId('lookback-book-open-m_exact'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_exact' } });
-    expect(day.getByText('2026年1月2日')).toBeTruthy();
+    expect(day.getByLabelText(/2026年1月2日/)).toBeTruthy();
     expect(readLookbackScroll('/lookback/2026/01/02')).toBe(240);
   });
 
@@ -234,16 +247,17 @@ describe('lookback screens', () => {
       expect(mockGetHistoryUnknown).toHaveBeenCalled();
       expect(shelf.getByText('未确认的一句')).toBeTruthy();
     });
-    expect(shelf.getByText('当时的感受 · 喜悦')).toBeTruthy();
-    expect(shelf.getByText('时间未确认')).toBeTruthy();
+    expect(shelf.getByText('喜悦')).toBeTruthy();
+    expect(shelf.getByLabelText('当时的感受，喜悦')).toBeTruthy();
+    expect(shelf.getAllByText('时间未确认').length).toBeGreaterThan(0);
     expect(shelf.getByLabelText('照片 1/1')).toBeTruthy();
     expect(shelf.queryByLabelText('移除这张照片，照片 1/1')).toBeNull();
     expect(shelf.getByText('这段声音暂时无法播放，其他内容仍然保留。')).toBeTruthy();
     expect(shelf.getByText('这份内容暂时无法打开。')).toBeTruthy();
     expect(shelf.queryByText('这条记录现在无法找到')).toBeNull();
-    fireEvent.press(shelf.getByTestId('lookback-moment-m_unknown'));
+    fireEvent.press(shelf.getByTestId('lookback-book-open-m_unknown'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_unknown' } });
-    expect(shelf.getByText('时间未确认')).toBeTruthy();
+    expect(shelf.getAllByText('时间未确认').length).toBeGreaterThan(0);
     expect(readLookbackScroll('/lookback/unconfirmed')).toBe(120);
   });
 
@@ -320,14 +334,14 @@ describe('lookback screens', () => {
     });
     expect(day.getByTestId('lookback-scroll')).toBeTruthy();
     expect(day.getByLabelText('返回原来的位置')).toBeTruthy();
-    expect(day.getAllByText('2026年1月2日').length).toBeGreaterThan(0);
+    expect(day.getAllByText('1月2日').length).toBeGreaterThan(0);
     expect(day.getByLabelText('照片 1/3')).toBeTruthy();
     expect(day.getByLabelText('照片 3/3。这张照片暂时找不到了，但这条记录还在。')).toBeTruthy();
     expect(day.getByText(longNote)).toBeTruthy();
     expect(day.getByText('这段声音暂时找不到了，其他内容仍然保留。')).toBeTruthy();
     expect(day.getByLabelText('继续往下看')).toBeTruthy();
     expect(readLookbackScroll('/lookback/2026/01/02')).toBe(180);
-    fireEvent.press(day.getByTestId('lookback-moment-m_second'));
+    fireEvent.press(day.getByTestId('lookback-book-open-m_second'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_second' } });
     expect(day.getByLabelText('返回原来的位置')).toBeTruthy();
   });
@@ -389,7 +403,7 @@ describe('lookback screens', () => {
     expect(day.getByText('08:15')).toBeTruthy();
     expect(day.getByText('后来又写了一句')).toBeTruthy();
     expect(day.getAllByText('08:15')).toHaveLength(1);
-    fireEvent.press(day.getByTestId('lookback-moment-m_day'));
+    fireEvent.press(day.getByTestId('lookback-book-open-m_day'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm_day' } });
   });
 

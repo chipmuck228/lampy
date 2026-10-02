@@ -170,6 +170,7 @@ export function RootReadingLayout({
   overlay,
   header,
   canvas = paper,
+  cover,
 }: {
   accessibilityLabel?: string;
   scrollTestID: string;
@@ -183,6 +184,7 @@ export function RootReadingLayout({
   overlay?: ReactNode;
   header?: ReactNode;
   canvas?: string;
+  cover?: ReactNode;
 }) {
   const { width, height } = usePageMetrics();
   const rail = shouldUseNavRail(width, height);
@@ -208,6 +210,7 @@ export function RootReadingLayout({
           >
             {children}
           </ScrollView>
+          {cover}
           {overlay ? (
             <View pointerEvents="box-none" style={styles.overlay}>
               {overlay}

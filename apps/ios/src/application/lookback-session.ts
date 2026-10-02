@@ -1,8 +1,11 @@
 import type { LookbackBookIntent } from './lookback-book';
+import type { LookbackReadingSnapshot } from './lookback-reading';
 
 const scrollOffsets = new Map<string, number>();
 let pendingBookIntent: LookbackBookIntent | null = null;
 let bookOpen: { year: number; month: number; day?: number } | null = null;
+let readingSnapshot: LookbackReadingSnapshot | null = null;
+let catalogScrollY = 0;
 
 export function lookbackScrollKey(path: string): string {
   return path;
@@ -38,10 +41,38 @@ export function readLookbackBookOpen(): { year: number; month: number; day?: num
   return bookOpen;
 }
 
+export function rememberLookbackReadingSnapshot(next: LookbackReadingSnapshot | null): void {
+  readingSnapshot = next ? { ...next, expandedIds: [...next.expandedIds] } : null;
+}
+
+export function readLookbackReadingSnapshot(): LookbackReadingSnapshot | null {
+  return readingSnapshot ? { ...readingSnapshot, expandedIds: [...readingSnapshot.expandedIds] } : null;
+}
+
+export function patchLookbackReadingSnapshot(patch: Partial<LookbackReadingSnapshot>): void {
+  if (!readingSnapshot) return;
+  readingSnapshot = {
+    ...readingSnapshot,
+    ...patch,
+    expandedIds: patch.expandedIds ? [...patch.expandedIds] : [...readingSnapshot.expandedIds],
+    scope: patch.scope ?? readingSnapshot.scope,
+  };
+}
+
+export function rememberLookbackCatalogScroll(offsetY: number): void {
+  catalogScrollY = offsetY;
+}
+
+export function readLookbackCatalogScroll(): number {
+  return catalogScrollY;
+}
+
 export function resetLookbackSessionForTests(): void {
   scrollOffsets.clear();
   pendingBookIntent = null;
   bookOpen = null;
+  readingSnapshot = null;
+  catalogScrollY = 0;
 }
 
 /**
