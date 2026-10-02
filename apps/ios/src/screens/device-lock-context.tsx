@@ -33,7 +33,7 @@ import { createSecureDeviceLockStore, type DeviceLockStore } from '../infrastruc
 import { createExpoDeviceAuthenticator, type DeviceAuthenticator } from '../infrastructure/expo-device-auth';
 import { setPrivateSnapshotBlocked } from '../infrastructure/screen-privacy';
 import { ink, inkSoft, paper, sage } from './life-page';
-import { LifeIcon } from './life-icons';
+import { SettingsSwitchRow } from './settings-rows';
 
 function appIsBackgrounded() {
   return AppState.currentState === 'background';
@@ -471,18 +471,16 @@ export function DeviceLockSettings() {
   const displayOn = lock.switchOn;
   const busy = lock.settingsBusy;
   return (
-    <View testID="account-device-lock">
-      <View style={styles.settingsRow}>
-        <LifeIcon name="lock" size={20} color={sage} decorative />
-        <View style={styles.settingsCopy}>
-          <Text style={styles.settingsTitle}>本机保护</Text>
-          <Text style={styles.action} testID="account-device-lock-state">
-            {displayOn ? '已开启' : '未开启'}
-          </Text>
-          <Text style={styles.body} testID="account-device-lock-copy">
-            进入 Lampy 时使用 Face ID 或设备密码。
-          </Text>
-        </View>
+    <View>
+      <SettingsSwitchRow
+        icon="lock"
+        title="本机保护"
+        detail={displayOn ? '已开启' : '未开启'}
+        detailTestID="account-device-lock-state"
+        note="进入 Lampy 时使用 Face ID 或设备密码。"
+        noteTestID="account-device-lock-copy"
+        testID="account-device-lock"
+      >
         <Switch
           value={displayOn}
           disabled={busy}
@@ -494,7 +492,7 @@ export function DeviceLockSettings() {
           accessibilityState={{ checked: displayOn, disabled: busy }}
           testID="account-device-lock-toggle"
         />
-      </View>
+      </SettingsSwitchRow>
       {lock.message ? (
         <Text style={styles.body} testID="account-device-lock-message">
           {lock.message}
@@ -521,13 +519,4 @@ const styles = StyleSheet.create({
   body: { ...type.body, color: inkSoft },
   action: { ...type.action, color: sage },
   hit: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
-  settingsRow: {
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-  },
-  settingsCopy: { flex: 1, minWidth: 0, gap: 4 },
-  settingsTitle: { ...type.action, color: ink },
 });

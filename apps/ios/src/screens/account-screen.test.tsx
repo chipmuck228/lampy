@@ -476,6 +476,9 @@ describe('account screen', () => {
       expect(view.getByLabelText('本机设置')).toBeTruthy();
       expect(view.getByText('本机设置')).toBeTruthy();
     });
+    expect(view.getByText('最近')).toBeTruthy();
+    expect(view.getByTestId('account-settings-intro')).toBeTruthy();
+    expect(view.getByText('把生活，留给自己。')).toBeTruthy();
     expect(view.getByLabelText('记录与存储')).toBeTruthy();
     expect(view.getByLabelText('关于 Lampy')).toBeTruthy();
     expect(view.queryByTestId('account-personal')).toBeNull();

@@ -22,7 +22,7 @@ import { createFamilyRefreshGate } from './family-refresh';
 import { ink, inkSoft, sage } from './life-page';
 import { SettingsPage } from './settings-chrome';
 import { dismissSettingsToRecent, dismissToSettingsRoot } from './settings-nav';
-import { SettingsLink, SettingsRule } from './settings-rows';
+import { SettingsGroup, SettingsIntro, SettingsLink } from './settings-rows';
 
 type Busy = 'idle' | 'signing-in' | 'signing-out' | 'test-login';
 
@@ -83,6 +83,7 @@ export function AccountDiagnosticsClosed() {
     <View testID="account-diagnostics-closed">
       <SettingsPage
         title="开发诊断"
+        backLabel="本机设置"
         accessibilityLabel="开发诊断"
         onBack={() => dismissToSettingsRoot(router)}
       >
@@ -365,39 +366,51 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
 
   if (!diagnostics) {
     return (
-      <SettingsPage title="本机设置" accessibilityLabel="本机设置" onBack={() => dismissSettingsToRecent(router)}>
-        <DeviceLockSettings />
-        <SettingsRule />
-        <SettingsLink
-          icon="storage"
-          title="记录与存储"
-          testID="account-open-storage"
-          onPress={() => router.push('/account/storage')}
-        />
-        <SettingsRule />
-        <SettingsLink
-          icon="info"
-          title="关于 Lampy"
-          testID="account-open-about"
-          onPress={() => router.push('/account/about')}
-        />
+      <SettingsPage
+        title="本机设置"
+        backLabel="最近"
+        accessibilityLabel="本机设置"
+        onBack={() => dismissSettingsToRecent(router)}
+      >
+        <SettingsIntro />
+        <SettingsGroup title="本机">
+          <DeviceLockSettings />
+          <SettingsLink
+            icon="storage"
+            title="记录与存储"
+            detail="保存在这台设备"
+            testID="account-open-storage"
+            onPress={() => router.push('/account/storage')}
+          />
+          <SettingsLink
+            icon="info"
+            title="关于 Lampy"
+            detail="版本与标识"
+            testID="account-open-about"
+            onPress={() => router.push('/account/about')}
+          />
+        </SettingsGroup>
         {showDiagnosticsEntry ? (
-          <>
-            <SettingsRule />
+          <SettingsGroup title="开发">
             <SettingsLink
               icon="info"
               title="开发诊断"
               testID="account-open-diagnostics"
               onPress={() => router.push('/account-diagnostics')}
             />
-          </>
+          </SettingsGroup>
         ) : null}
       </SettingsPage>
     );
   }
 
   return (
-    <SettingsPage title="开发诊断" accessibilityLabel="开发诊断" onBack={() => dismissToSettingsRoot(router)}>
+    <SettingsPage
+      title="开发诊断"
+      backLabel="本机设置"
+      accessibilityLabel="开发诊断"
+      onBack={() => dismissToSettingsRoot(router)}
+    >
       <View testID="account-diagnostics">
         <View testID="account-family-preview">
           <Text style={styles.body} testID="account-family-copy">

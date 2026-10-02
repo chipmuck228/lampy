@@ -24,6 +24,7 @@
     "src/family-api/listen.ts",
     "src/family-api/listen.test.ts",
     "src/family-api/node-db.ts",
-    "src/family-api/sqlite-repository.test.ts"
+    "src/family-api/sqlite-repository.test.ts",
+    "spec/account-settings-reading/attachments"
   ]
 }

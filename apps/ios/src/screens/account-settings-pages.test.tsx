@@ -27,6 +27,7 @@ describe('account settings pages', () => {
   it('states only checked storage facts and returns to the settings root', async () => {
     const view = await render(wrap(<AccountStorageScreen />));
     expect(view.getByLabelText('记录与存储')).toBeTruthy();
+    expect(view.getByText('本机设置')).toBeTruthy();
     expect(view.getByTestId('account-personal').props.children).toContain('个人记录保存在这台设备');
     expect(view.getByTestId('account-storage-sync').props.children).toContain('没有跨设备同步或云备份');
     expect(view.getByTestId('account-storage-keep').props.children).toContain('卸载或更换设备前');
