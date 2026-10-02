@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Dimensions, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../screens/life-text';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,7 @@ import {
   recentWeekdayInk,
 } from '../screens/recent-visual';
 import { createRecentLeaveFabScroll, recentFabMotion } from '../screens/recent-leave-fab';
+import { recentPhotoRevealViewport, settleRecentPhotoRevealSession } from '../screens/recent-photo-reveal';
 import {
   acceptRecentEchoLoad,
   beginRecentEchoFocus,
@@ -69,6 +70,7 @@ export default function RecentScreen() {
   const [echoId, setEchoId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [reduceMotion, setReduceMotion] = useState(true);
+  const [motionKnown, setMotionKnown] = useState(false);
   const [echoOpacity] = useState(() => new Animated.Value(1));
   const [fabOpacity] = useState(() => new Animated.Value(1));
   const [fabShift] = useState(() => new Animated.Value(0));
@@ -157,8 +159,18 @@ export default function RecentScreen() {
     [fabOpacity, fabShift],
   );
 
-  const onRecentScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+  const photoReduceMotion = motionKnown && reduceMotion;
+
+  const onRecentScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number }; layoutMeasurement: { height: number } } }) => {
     fabScroll.current?.onScroll(event.nativeEvent.contentOffset.y);
+    recentPhotoRevealViewport.onScroll(
+      event.nativeEvent.contentOffset.y,
+      Dimensions.get('window').height,
+    );
+  }, []);
+
+  const onRecentScrollBeginDrag = useCallback(() => {
+    recentPhotoRevealViewport.onScrollBeginDrag();
   }, []);
 
   const tryRevealPending = useCallback(() => {
@@ -192,13 +204,20 @@ export default function RecentScreen() {
     let alive = true;
     AccessibilityInfo.isReduceMotionEnabled()
       .then((value) => {
-        if (alive) setReduceMotion(value === true);
+        if (alive) {
+          setReduceMotion(value === true);
+          setMotionKnown(true);
+        }
       })
       .catch(() => {
-        if (alive) setReduceMotion(true);
+        if (alive) {
+          setReduceMotion(true);
+          setMotionKnown(true);
+        }
       });
     const motion = AccessibilityInfo.addEventListener('reduceMotionChanged', (value) => {
       setReduceMotion(value === true);
+      setMotionKnown(true);
     });
     const app = AppState.addEventListener('change', (state) => {
       if (isRecentForeground(state)) {
@@ -206,6 +225,7 @@ export default function RecentScreen() {
         return;
       }
       settleEcho();
+      settleRecentPhotoRevealSession();
     });
     return () => {
       alive = false;
@@ -240,6 +260,7 @@ export default function RecentScreen() {
       return () => {
         endRecentEchoFocus(echoGate.current);
         settleEcho();
+        settleRecentPhotoRevealSession();
       };
     }, [settleEcho, tryRevealPending]),
   );
@@ -252,6 +273,7 @@ export default function RecentScreen() {
         scrollTestID="recent-scroll"
         canvas={recentPaper}
         onScroll={onRecentScroll}
+        onScrollBeginDrag={onRecentScrollBeginDrag}
         header={
           <View
             testID="recent-header"
@@ -365,6 +387,7 @@ export default function RecentScreen() {
                     echoOpacity={echoOpacity}
                     echoing={echoId === item.id}
                     expanded={expandedIds.includes(item.id)}
+                    reduceMotion={photoReduceMotion}
                     listen={
                       item.audio ? clips.card(item.audio.id) : { status: 'idle', currentTimeMs: 0 }
                     }

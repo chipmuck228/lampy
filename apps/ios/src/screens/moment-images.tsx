@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
@@ -68,16 +69,17 @@ function ImageSlot({
   testIDPrefix,
   onRemoveImage,
   paired,
+  wrapAvailable,
 }: {
   image: ImageView;
   testIDPrefix: string;
   onRemoveImage?: (assetId: string) => void;
   paired?: boolean;
+  wrapAvailable?: (image: ImageView, slot: ReactNode) => ReactNode;
 }) {
   const ratio = momentImageAspectRatio(image);
   const available = image.status === 'available' && !!image.uri;
-  return (
-    <View style={[styles.item, paired && styles.pairedItem]}>
+  const frame = (
       <View
         accessible
         accessibilityRole="image"
@@ -103,6 +105,10 @@ function ImageSlot({
           </View>
         )}
       </View>
+  );
+  return (
+    <View style={[styles.item, paired && styles.pairedItem]}>
+      {available && wrapAvailable ? wrapAvailable(image, frame) : frame}
       {onRemoveImage ? (
         <Pressable
           accessibilityRole="button"
@@ -125,11 +131,13 @@ export function MomentImages({
   testIDPrefix,
   onRemoveImage,
   rhythm = false,
+  wrapAvailable,
 }: {
   images: ImageView[];
   testIDPrefix: string;
   onRemoveImage?: (assetId: string) => void;
   rhythm?: boolean;
+  wrapAvailable?: (image: ImageView, slot: ReactNode) => ReactNode;
 }) {
   if (images.length === 0) return null;
 
@@ -152,6 +160,7 @@ export function MomentImages({
               testIDPrefix={testIDPrefix}
               onRemoveImage={onRemoveImage}
               paired={band.kind === 'pair'}
+              wrapAvailable={wrapAvailable}
             />
           ))}
         </View>

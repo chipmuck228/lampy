@@ -2,6 +2,11 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Animated, StyleSheet } from 'react-native';
 
 import { RecentMoment } from './recent-moment';
+import {
+  beginRecentPhotoReveal,
+  finishRecentPhotoReveal,
+  resetRecentPhotoRevealForTests,
+} from './recent-photo-reveal';
 import type { RecentLifeItem } from '../application/use-cases';
 
 function item(partial: Partial<RecentLifeItem> & Pick<RecentLifeItem, 'id' | 'note'>): RecentLifeItem {
@@ -39,6 +44,10 @@ const idle = { status: 'idle' as const, currentTimeMs: 0 };
 const echoOpacity = new Animated.Value(1);
 
 describe('recent moment row', () => {
+  beforeEach(() => {
+    resetRecentPhotoRevealForTests();
+  });
+
   it('clamps the visible note until a short measure drops the limit', async () => {
     const view = await render(
       <RecentMoment
@@ -197,5 +206,77 @@ describe('recent moment row', () => {
     ]);
     fireEvent.press(view.getByTestId('recent-expand-moment_order'));
     expect(onToggle).toHaveBeenCalled();
+  });
+
+  it('wraps each available photo, and leaves a missing photo without reveal', async () => {
+    const view = await render(
+      <RecentMoment
+        item={item({
+          id: 'moment_photos',
+          note: '两张。',
+          images: [
+            {
+              id: 'img_one',
+              status: 'available',
+              uri: 'memory://assets/one.jpg',
+              width: 900,
+              height: 1200,
+              label: '第一张',
+            },
+            {
+              id: 'img_two',
+              status: 'available',
+              uri: 'memory://assets/two.jpg',
+              width: 900,
+              height: 1200,
+              label: '第二张',
+            },
+            {
+              id: 'img_gone',
+              status: 'unavailable',
+              width: 900,
+              height: 1200,
+              label: '第三张',
+              unavailableLabel: '这张照片暂时找不到了，但这条记录还在。',
+            },
+          ],
+        })}
+        pairImages={false}
+        echoOpacity={new Animated.Value(1)}
+        listen={idle}
+        onOpen={() => undefined}
+        onPlay={() => undefined}
+        onPause={() => undefined}
+      />,
+    );
+    expect(view.getByTestId('recent-image-moment_photos-reveal-img_one')).toBeTruthy();
+    expect(view.getByTestId('recent-image-moment_photos-reveal-img_two')).toBeTruthy();
+    expect(view.queryByTestId('recent-image-moment_photos-reveal-img_gone')).toBeNull();
+    expect(view.getByTestId('recent-image-moment_photos-unavailable-img_gone')).toBeTruthy();
+    const wrap = StyleSheet.flatten(view.getByTestId('recent-image-moment_photos-reveal-img_one').props.style);
+    expect(wrap.height).toBeUndefined();
+    expect(wrap.marginTop).toBeUndefined();
+    expect(wrap.opacity).toBeTruthy();
+    expect(wrap.transform).toEqual([{ translateY: expect.anything() }]);
+  });
+
+  it('keeps an already revealed photo settled after remount', async () => {
+    beginRecentPhotoReveal('img_keep', false);
+    finishRecentPhotoReveal('img_keep');
+    const props = {
+      item: item({ id: 'moment_back', note: '回来。' }),
+      pairImages: false,
+      echoOpacity: new Animated.Value(1),
+      listen: idle,
+      onOpen: () => undefined,
+      onPlay: () => undefined,
+      onPause: () => undefined,
+    };
+    const view = await render(<RecentMoment {...props} />);
+    const wrap = StyleSheet.flatten(view.getByTestId('recent-image-moment_back-reveal-img_keep').props.style);
+    expect(wrap.transform).toEqual([{ translateY: expect.anything() }]);
+    await view.rerender(<RecentMoment {...props} />);
+    expect(view.getByTestId('recent-image-moment_back-reveal-img_keep')).toBeTruthy();
+    expect(view.getByTestId('recent-image-moment_back-img_keep')).toBeTruthy();
   });
 });
