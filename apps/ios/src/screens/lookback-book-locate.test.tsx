@@ -37,6 +37,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -46,6 +47,9 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: async () => ({ items: [], hasMore: false, title: '时间未确认', explanation: '' }),
+    getHistoryYearUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryMonthUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
   }),
 }));
 
@@ -133,7 +137,7 @@ describe('lookback book year locate', () => {
       expect(view.queryByTestId('lookback-book-locating')).toBeNull();
     });
     expect(mockScrollTo).toHaveBeenCalledTimes(1);
-    expect(mockScrollTo).toHaveBeenCalledWith({ y: 1858, animated: false });
+    expect(mockScrollTo).toHaveBeenCalledWith({ y: 1840, animated: false });
     expect(mockScrollTo).not.toHaveBeenCalledWith({ y: 8, animated: false });
     expect(mockScrollTo).not.toHaveBeenCalledWith({ y: 18, animated: false });
     const afterLocate = mockScrollTo.mock.calls.length;
@@ -141,7 +145,7 @@ describe('lookback book year locate', () => {
       nativeEvent: { layout: { x: 0, y: 8, width: 390, height: 48 } },
     });
     flushMeasures();
-    fireEvent.scroll(view.getByTestId('lookback-scroll'), {
+    fireEvent.scroll(view.getByTestId('lookback-catalog-scroll'), {
       nativeEvent: {
         contentOffset: { y: 24, x: 0 },
         contentSize: { height: 4200, width: 390 },

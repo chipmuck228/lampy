@@ -27,7 +27,20 @@ describe('lookback day entries', () => {
       item({ id: 'b', precision: 'day', timeLabel: '2026年9月24日', note: '后来又写了一句' }),
     ]);
     expect(entries).toHaveLength(2);
-    expect(entries[0]).toMatchObject({ id: 'a', clockLabel: '08:15', note: '门口的风' });
+    expect(entries[0]).toMatchObject({ id: 'a', clockLabel: '08:15', note: '门口的风', recordedLabel: null });
     expect(entries[1]).toMatchObject({ id: 'b', clockLabel: null, note: '后来又写了一句' });
+  });
+
+  it('keeps a recorded-time note when it is not the same as the occurred day', () => {
+    const entries = lookbackDayEntries([
+      item({
+        id: 'mix',
+        precision: 'day',
+        timeLabel: '2026年9月28日',
+        note: '长混合',
+        recordedElsewhereLabel: '记录于 10月1日',
+      }),
+    ]);
+    expect(entries[0].recordedLabel).toBe('记录于 10月1日');
   });
 });

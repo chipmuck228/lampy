@@ -27,6 +27,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -36,6 +37,9 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: async () => ({ items: [], hasMore: false, title: '时间未确认', explanation: '' }),
+    getHistoryYearUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryMonthUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
   }),
 }));
 
@@ -132,6 +136,7 @@ describe('lookback book race and intent', () => {
   });
 
   it('ignores a slower previous day once another date is selected', async () => {
+    writeLookbackBookIntent({ year: 2026, month: 9 });
     mockGetLookbackBook.mockResolvedValue(septemberBook());
     mockGetHistoryMonth.mockResolvedValue(septemberDays({ 27: 1, 28: 1 }));
     let releaseTwentySeventh: (value: unknown) => void = () => undefined;
@@ -164,22 +169,10 @@ describe('lookback book race and intent', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
-    });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await waitFor(() => {
       expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
     });
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
-      await Promise.resolve();
-    });
-    await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-28'));
       await Promise.resolve();
       await Promise.resolve();
@@ -263,25 +256,7 @@ describe('lookback book race and intent', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
-    });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await waitFor(() => {
-      expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
-    });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await waitFor(() => {
-      expect(view.getByTestId('lookback-book-sound-m_voice-play-a_voice')).toBeTruthy();
+      expect(view.getByTestId('lookback-reading-sound-m_voice-play-a_voice')).toBeTruthy();
     });
     expect(view.getByTestId('lookback-book-open-m_voice')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-book-open-m_voice'));
@@ -289,6 +264,7 @@ describe('lookback book race and intent', () => {
   });
 
   it('keeps a later same-day success when an earlier failure arrives late', async () => {
+    writeLookbackBookIntent({ year: 2026, month: 9 });
     mockGetLookbackBook.mockResolvedValue(septemberBook());
     mockGetHistoryMonth.mockResolvedValue(septemberDays({ 27: 3 }));
     let rejectFirst: (error: Error) => void = () => undefined;
@@ -318,22 +294,10 @@ describe('lookback book race and intent', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
-    });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await waitFor(() => {
       expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
     });
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
-      await Promise.resolve();
-    });
-    await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-27'));
       await Promise.resolve();
       await Promise.resolve();
@@ -348,10 +312,11 @@ describe('lookback book race and intent', () => {
       await Promise.resolve();
     });
     expect(view.getByText('后到的成功')).toBeTruthy();
-    expect(view.queryByTestId('lookback-book-day-retry')).toBeNull();
+    expect(view.queryByTestId('lookback-reading-retry')).toBeNull();
   });
 
   it('shows a retryable excerpt failure without pretending the day is empty', async () => {
+    writeLookbackBookIntent({ year: 2026, month: 9 });
     mockGetLookbackBook.mockResolvedValue(septemberBook());
     mockGetHistoryMonth.mockResolvedValue(septemberDays({ 27: 11 }));
     mockGetHistoryDay.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce({
@@ -377,15 +342,6 @@ describe('lookback book race and intent', () => {
     });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
-    });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await waitFor(() => {
       expect(view.getByTestId('lookback-book-day-2026-09-27')).toBeTruthy();
     });
     await act(async () => {
@@ -395,15 +351,15 @@ describe('lookback book race and intent', () => {
       await Promise.resolve();
     });
     await waitFor(() => {
-      expect(view.getByTestId('lookback-book-day-retry')).toBeTruthy();
+      expect(view.getByTestId('lookback-reading-retry')).toBeTruthy();
     });
-    expect(view.getByText('27日')).toBeTruthy();
-    expect(view.getByText('周日')).toBeTruthy();
+    expect(view.getByText('9月27日')).toBeTruthy();
+    expect(view.getByText('星期日')).toBeTruthy();
     expect(view.getByText('11条')).toBeTruthy();
     expect(view.queryByLabelText(/这一天还有/)).toBeNull();
-    expect(view.queryByTestId('lookback-book-excerpt-m_recovered')).toBeNull();
+    expect(view.queryByTestId('lookback-reading-m_recovered')).toBeNull();
     await act(async () => {
-      fireEvent.press(view.getByTestId('lookback-book-day-retry'));
+      fireEvent.press(view.getByTestId('lookback-reading-retry'));
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
@@ -411,10 +367,11 @@ describe('lookback book race and intent', () => {
     await waitFor(() => {
       expect(view.getByText('重试后的摘录')).toBeTruthy();
     });
-    expect(view.queryByTestId('lookback-book-day-retry')).toBeNull();
+    expect(view.queryByTestId('lookback-reading-retry')).toBeNull();
   });
 
   it('keeps a later same-month success when an earlier failure arrives late', async () => {
+    writeLookbackBookIntent({ year: 2026 });
     mockGetLookbackBook.mockResolvedValue(septemberBook());
     let rejectFirst: (error: Error) => void = () => undefined;
     const first = new Promise((_, reject) => {

@@ -91,7 +91,7 @@ export function LookbackBookDayRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected, expanded: selected }}
+      accessibilityState={{ selected }}
       accessibilityLabel={lookbackBookDayAccessLabel(
         year,
         month,

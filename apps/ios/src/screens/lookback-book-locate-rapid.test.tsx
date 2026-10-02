@@ -4,7 +4,7 @@ import { Dimensions, ScrollView, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
-import { resetLookbackSessionForTests } from '../application/lookback-session';
+import { resetLookbackSessionForTests, writeLookbackBookIntent } from '../application/lookback-session';
 
 const mockGetLookbackBook = jest.fn();
 const mockGetHistoryMonth = jest.fn();
@@ -38,6 +38,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -47,6 +48,9 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: async () => ({ items: [], hasMore: false, title: '时间未确认', explanation: '' }),
+    getHistoryYearUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryMonthUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
   }),
 }));
 
@@ -125,16 +129,8 @@ function armBook() {
 }
 
 async function openMonth() {
+  writeLookbackBookIntent({ year: 2026, month: 9 });
   const view = await render(wrap(<LookbackIndexScreen />));
-  await waitFor(() => {
-    expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
-  });
-  await act(async () => {
-    fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
   await waitFor(() => {
     expect(view.getByTestId('lookback-book-day-2026-09-28')).toBeTruthy();
   });
@@ -169,6 +165,8 @@ describe('lookback book rapid day locate', () => {
 
   it('keeps only the last day when the user taps days quickly', async () => {
     const view = await openMonth();
+    mockScrollTo.mockClear();
+    pendingMeasures.length = 0;
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-10'));
       fireEvent.press(view.getByTestId('lookback-book-day-2026-09-28'));
@@ -183,11 +181,10 @@ describe('lookback book rapid day locate', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-locating').props.accessibilityLabel).toBe('day-2026-09-28');
     });
+    expect(view.queryByTestId('lookback-catalog')).toBeNull();
+    expect(view.queryByTestId('lookback-book-locate-day-2026-09-10')).toBeNull();
     anchorPageY = 2200;
     await act(async () => {
-      fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-10'), 'layout', {
-        nativeEvent: { layout: { x: 0, y: 8, width: 390, height: 8 } },
-      });
       fireEvent(view.getByTestId('lookback-book-locate-day-2026-09-28'), 'layout', {
         nativeEvent: { layout: { x: 0, y: 8, width: 390, height: 8 } },
       });

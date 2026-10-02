@@ -4,6 +4,7 @@ export type LookbackDayEntry = {
   id: string;
   clockLabel: string | null;
   note: string;
+  recordedLabel: string | null;
   feeling: HistoryMomentItem['feeling'];
   images: HistoryMomentItem['images'];
   audio: HistoryMomentItem['audio'];
@@ -21,6 +22,7 @@ export function lookbackDayEntries(items: HistoryMomentItem[]): LookbackDayEntry
     id: item.id,
     clockLabel: lookbackDayClockLabel(item.precision, item.timeLabel),
     note: item.note,
+    recordedLabel: item.recordedElsewhereLabel ?? item.recordedFallbackLabel ?? null,
     feeling: item.feeling,
     images: item.images,
     audio: item.audio,

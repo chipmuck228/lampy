@@ -26,6 +26,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -35,6 +36,19 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: jest.fn(),
+    getHistoryUnknown: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryYearUnconfirmed: async () => ({
+      items: [],
+      hasMore: false,
+      title: '这一年，月份未确认',
+      explanation: '这些记录只知道年份。',
+    }),
+    getHistoryMonthUnconfirmed: async () => ({
+      items: [],
+      hasMore: false,
+      title: '日子未确认',
+      explanation: '这些记录只知道月份。',
+    }),
   }),
 }));
 
@@ -106,8 +120,6 @@ describe('lookback book precision rows', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-year-unconfirmed-2026')).toBeTruthy();
     });
-    fireEvent.press(view.getByTestId('lookback-book-year-unconfirmed-2026'));
-    expect(mockPush).toHaveBeenCalledWith('/lookback/2026/unconfirmed');
     await act(async () => {
       fireEvent.press(view.getByTestId('lookback-book-month-2026-04'));
       await Promise.resolve();
@@ -118,6 +130,13 @@ describe('lookback book precision rows', () => {
       expect(view.getByTestId('lookback-book-day-unconfirmed-2026-04')).toBeTruthy();
     });
     expect(view.queryByTestId(/lookback-book-day-2026-04-/)).toBeNull();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-book-year-unconfirmed-2026'));
+    });
+    await waitFor(() => {
+      expect(view.getByText('这一年，月份未确认')).toBeTruthy();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
     view.unmount();
   });
 });

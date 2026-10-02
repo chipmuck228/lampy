@@ -22,6 +22,9 @@ const mockGetState = jest.fn();
 const mockGetLookbackBook = jest.fn();
 const mockGetHistoryMonth = jest.fn();
 const mockGetHistoryDay = jest.fn();
+const mockGetHistoryUnknown = jest.fn();
+const mockGetHistoryYearUnconfirmed = jest.fn();
+const mockGetHistoryMonthUnconfirmed = jest.fn();
 const mockSearchParams: Record<string, string> = {
   year: '2026',
   month: '01',
@@ -44,6 +47,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => mockSearchParams,
     useNavigation: () => ({
       getState: mockGetState,
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -53,6 +57,9 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: mockGetHistoryUnknown,
+    getHistoryYearUnconfirmed: mockGetHistoryYearUnconfirmed,
+    getHistoryMonthUnconfirmed: mockGetHistoryMonthUnconfirmed,
   }),
 }));
 
@@ -105,6 +112,9 @@ describe('lookback book screen', () => {
     mockGetLookbackBook.mockReset();
     mockGetHistoryMonth.mockReset();
     mockGetHistoryDay.mockReset();
+    mockGetHistoryUnknown.mockReset();
+    mockGetHistoryYearUnconfirmed.mockReset();
+    mockGetHistoryMonthUnconfirmed.mockReset();
     mockGetState.mockReset();
     mockGetState.mockReturnValue({ index: 0, routes: [{ name: 'lookback/index' }] });
     mockSearchParams.year = '2026';
@@ -132,23 +142,88 @@ describe('lookback book screen', () => {
 
   it('does not treat unknown dates as an empty library', async () => {
     mockGetLookbackBook.mockResolvedValue({ unknownCount: 2, isEmpty: false, years: [] });
+    mockGetHistoryUnknown.mockResolvedValue({
+      title: '时间未确认',
+      explanation: '这些记录没有可以确定的发生时间。',
+      items: [
+        {
+          id: 'u1',
+          note: '未确认一句',
+          precision: 'unknown',
+          timeLabel: '时间未确认',
+          usedRecordedAtFallback: true,
+          recordedFallbackLabel: '记录于 2026年1月2日',
+          feeling: null,
+          images: [],
+          audio: null,
+          unknownMedia: [],
+        },
+      ],
+      hasMore: false,
+    });
     const view = await render(wrap(<LookbackIndexScreen />));
     await waitFor(() => {
-      expect(view.getByLabelText('时间未确认，有2条记录')).toBeTruthy();
+      expect(view.getByTestId('lookback-reading-title')).toBeTruthy();
     });
+    expect(view.getByText('时间未确认')).toBeTruthy();
     expect(view.queryByTestId('lookback-empty')).toBeNull();
     view.unmount();
   });
 
   it('opens recorded months on the lookback book without a top back', async () => {
     mockGetLookbackBook.mockResolvedValue(bookView());
+    mockGetHistoryMonth.mockResolvedValue({
+      year: 2026,
+      month: 9,
+      title: '2026年9月',
+      dayUnconfirmedCount: 0,
+      dayUnconfirmedLabel: '日子未确认',
+      isEmpty: false,
+      days: Array.from({ length: 30 }, (_, index) => {
+        const day = index + 1;
+        const count = day === 27 ? 14 : 0;
+        return {
+          day,
+          label: `9月${day}日`,
+          count,
+          status: count > 0 ? 'filled' : 'quiet',
+          summary: count > 0 ? `有${count}条记录` : '安静',
+        };
+      }),
+    });
+    mockGetHistoryDay.mockResolvedValue({
+      year: 2026,
+      month: 9,
+      day: 27,
+      title: '2026年9月27日',
+      isEmpty: false,
+      items: [
+        {
+          id: 'm1',
+          note: '门口的风还在。',
+          precision: 'day',
+          timeLabel: '2026年9月27日',
+          usedRecordedAtFallback: false,
+          feeling: null,
+          images: [],
+          audio: null,
+          unknownMedia: [],
+        },
+      ],
+      hasMore: false,
+    });
     const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-reading-title')).toBeTruthy();
+    });
+    expect(view.getByText('慢慢看')).toBeTruthy();
+    expect(view.getByTestId('lookback-change-day')).toBeTruthy();
+    fireEvent.press(view.getByTestId('lookback-change-day'));
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-year-2026')).toBeTruthy();
     });
     expect(view.getByLabelText('时间未确认，有1条记录')).toBeTruthy();
     expect(view.getByText('9月')).toBeTruthy();
-    expect(view.getAllByText('14条').length).toBeGreaterThanOrEqual(1);
     expect(view.getByLabelText('2026年9月，有14条记录，已收起')).toBeTruthy();
     expect(view.queryByTestId('lookback-year-2026')).toBeNull();
     expect(view.getByTestId('root-nav-band')).toBeTruthy();

@@ -4,7 +4,7 @@ import { Dimensions, ScrollView, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
-import { resetLookbackSessionForTests } from '../application/lookback-session';
+import { resetLookbackSessionForTests, writeLookbackBookIntent } from '../application/lookback-session';
 
 const mockGetLookbackBook = jest.fn();
 const mockGetHistoryMonth = jest.fn();
@@ -38,6 +38,7 @@ jest.mock('expo-router', () => {
     useLocalSearchParams: () => ({}),
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
+      addListener: () => () => undefined,
     }),
   };
 });
@@ -47,6 +48,9 @@ jest.mock('../application/container', () => ({
     getLookbackBook: mockGetLookbackBook,
     getHistoryMonth: mockGetHistoryMonth,
     getHistoryDay: mockGetHistoryDay,
+    getHistoryUnknown: async () => ({ items: [], hasMore: false, title: '时间未确认', explanation: '' }),
+    getHistoryYearUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
+    getHistoryMonthUnconfirmed: async () => ({ items: [], hasMore: false, title: '', explanation: '' }),
   }),
 }));
 
@@ -129,16 +133,8 @@ function dayId(day: number) {
 }
 
 async function openMonth() {
+  writeLookbackBookIntent({ year: 2026, month: 9 });
   const view = await render(wrap(<LookbackIndexScreen />));
-  await waitFor(() => {
-    expect(view.getByTestId('lookback-book-month-2026-09')).toBeTruthy();
-  });
-  await act(async () => {
-    fireEvent.press(view.getByTestId('lookback-book-month-2026-09'));
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
   await waitFor(() => {
     expect(view.getByTestId('lookback-book-day-2026-09-28')).toBeTruthy();
   });
@@ -146,6 +142,14 @@ async function openMonth() {
 }
 
 async function pickDay(view: Awaited<ReturnType<typeof openMonth>>, day: number) {
+  if (!view.queryByTestId('lookback-catalog')) {
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-change-day'));
+    });
+    await waitFor(() => {
+      expect(view.getByTestId(`lookback-book-day-2026-09-${String(day).padStart(2, '0')}`)).toBeTruthy();
+    });
+  }
   await act(async () => {
     fireEvent.press(view.getByTestId(`lookback-book-day-2026-09-${String(day).padStart(2, '0')}`));
     await Promise.resolve();
@@ -195,6 +199,8 @@ describe('lookback book staggered same-day locate', () => {
 
   it('does not let the first day-10 measure win after 10→28→10', async () => {
     const view = await openMonth();
+    mockScrollTo.mockClear();
+    pendingMeasures.length = 0;
     anchorPageY = 400;
     await pickDay(view, 10);
     await act(async () => {

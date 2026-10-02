@@ -75,10 +75,10 @@ describe('lookback book contract', () => {
     expect(lookbackBookDayPrimaryLabel(18)).toBe('18日');
     expect(lookbackBookDaySecondaryLabel(2026, 9, 18)).toBe('周五');
     expect(lookbackBookDayAccessLabel(2026, 9, 18, '有1条记录', false)).toBe(
-      '2026年9月18日，星期五，有1条记录，已收起',
+      '2026年9月18日，星期五，有1条记录，未选中',
     );
     expect(lookbackBookDayAccessLabel(2026, 9, 18, '有1条记录', true)).toBe(
-      '2026年9月18日，星期五，有1条记录，已展开',
+      '2026年9月18日，星期五，有1条记录，已选中',
     );
   });
 
