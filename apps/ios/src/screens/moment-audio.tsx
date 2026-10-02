@@ -165,10 +165,10 @@ export function MomentAudio({
           <View style={styles.rowPlay}>
             {markedActions ? (
               <View accessible={false} testID={`${testIDPrefix}-mark-${audio.id}`}>
-                <LifeIcon name={playIcon} size={18} color="#FFFFFF" decorative />
+                <LifeIcon name={playIcon} size={18} color={sound} decorative />
               </View>
             ) : (
-              <LifeIcon name={playIcon} size={18} color="#FFFFFF" decorative />
+              <LifeIcon name={playIcon} size={18} color={sound} decorative />
             )}
           </View>
         ) : (
@@ -441,16 +441,10 @@ const styles = StyleSheet.create({
   missing: { ...type.action, color: inkSoft },
   rowChrome: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#DCDED2',
-    borderRadius: 4,
-    backgroundColor: '#F5F3E9',
-    marginTop: 11,
-    marginBottom: 7,
+    gap: 8,
+    minHeight: 48,
   },
   rowPlayHit: {
     minWidth: 48,
@@ -458,36 +452,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    marginLeft: -7,
   },
   rowPlay: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#454C3D',
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowInfo: { flex: 1, minWidth: 0 },
-  rowTitle: {
-    fontFamily: 'PingFang SC',
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#555B4F',
-    marginBottom: 7,
-  },
+  rowInfo: { flexGrow: 1, flexShrink: 1, flexBasis: 120, minWidth: 0, gap: 6 },
+  rowTitle: { ...type.meta, color: sound },
   rowTrack: {
     width: '100%',
     height: 2,
-    backgroundColor: '#D6D8CA',
+    backgroundColor: hairline,
     overflow: 'hidden',
   },
-  rowFill: { height: 2, backgroundColor: '#747D67' },
-  rowTime: {
-    fontFamily: 'PingFang SC',
-    fontSize: 11,
-    lineHeight: 14,
-    color: '#969A8D',
-    flexShrink: 0,
-  },
+  rowFill: { height: 2, backgroundColor: sound },
+  rowTime: { ...type.meta, color: sound, flexShrink: 0, minHeight: 48, textAlignVertical: 'center' },
 });

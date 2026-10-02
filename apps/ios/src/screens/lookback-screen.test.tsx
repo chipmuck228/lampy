@@ -180,7 +180,8 @@ describe('lookback screens', () => {
     await waitFor(() => {
       expect(day.getByText('门口的风')).toBeTruthy();
     });
-    expect(day.getByText('当时的感受 · 平静')).toBeTruthy();
+    expect(day.getByText('平静')).toBeTruthy();
+    expect(day.getByLabelText('当时的感受，平静')).toBeTruthy();
     expect(day.getByText('08:15')).toBeTruthy();
     expect(day.getAllByText('1月2日').length).toBeGreaterThan(0);
     expect(day.getByLabelText('照片 1/3')).toBeTruthy();
@@ -246,7 +247,8 @@ describe('lookback screens', () => {
       expect(mockGetHistoryUnknown).toHaveBeenCalled();
       expect(shelf.getByText('未确认的一句')).toBeTruthy();
     });
-    expect(shelf.getByText('当时的感受 · 喜悦')).toBeTruthy();
+    expect(shelf.getByText('喜悦')).toBeTruthy();
+    expect(shelf.getByLabelText('当时的感受，喜悦')).toBeTruthy();
     expect(shelf.getAllByText('时间未确认').length).toBeGreaterThan(0);
     expect(shelf.getByLabelText('照片 1/1')).toBeTruthy();
     expect(shelf.queryByLabelText('移除这张照片，照片 1/1')).toBeNull();

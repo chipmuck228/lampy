@@ -135,7 +135,8 @@ describe('lookback book screen', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-empty')).toBeTruthy();
     }, { timeout: 10000 });
-    expect(view.getByText('以后可以按时间回来看。')).toBeTruthy();
+    expect(view.getByText('日子会慢慢留在这里。')).toBeTruthy();
+    expect(view.getByText('先留下一点，以后再回来看看。')).toBeTruthy();
     expect(view.queryByTestId('lookback-unconfirmed')).toBeNull();
     view.unmount();
   });
@@ -217,6 +218,7 @@ describe('lookback book screen', () => {
       expect(view.getByTestId('lookback-reading-title')).toBeTruthy();
     });
     expect(view.getByText('慢慢看')).toBeTruthy();
+    expect(view.getByText('LAMPY · 时间里的记录')).toBeTruthy();
     expect(view.getByTestId('lookback-change-day')).toBeTruthy();
     fireEvent.press(view.getByTestId('lookback-change-day'));
     await waitFor(() => {

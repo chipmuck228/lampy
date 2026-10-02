@@ -3,7 +3,7 @@ import { StyleSheet } from 'react-native';
 
 import type { LookbackDayEntry } from '../application/lookback-day';
 import type { LookbackPlacedDay } from '../application/lookback-reading';
-import { LookbackReadingMoment, LookbackReadingNeighbors } from './lookback-reading';
+import { LookbackReadingHeader, LookbackReadingMoment, LookbackReadingNeighbors } from './lookback-reading';
 
 const longNote = [
   '傍晚回家，楼道里还留着白天的热。',
@@ -44,6 +44,17 @@ function entry(partial: Partial<LookbackDayEntry> = {}): LookbackDayEntry {
     ...partial,
   };
 }
+
+describe('lookback reading header', () => {
+  it('stacks year, month-day, and weekday with the real count', async () => {
+    const view = await render(<LookbackReadingHeader year={2026} month={9} day={18} count={3} />);
+    expect(view.getByTestId('lookback-reading-year').props.children).toBe('2026');
+    expect(view.getByTestId('lookback-reading-title').props.children).toBe('9月18日');
+    expect(view.getByTestId('lookback-reading-meta').props.children).toBe('周五 · 3条记录');
+    expect(view.getByLabelText('2026年9月18日，星期五，3条')).toBeTruthy();
+    expect(view.queryByText('2026年9月18日')).toBeNull();
+  });
+});
 
 describe('lookback reading moment', () => {
   it('keeps the exact moment id on the full-record action', async () => {

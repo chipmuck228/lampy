@@ -214,7 +214,7 @@ describe('lookback reading page guards', () => {
     await waitFor(() => {
       expect(view.getByText('日页第一页')).toBeTruthy();
     });
-    expect(view.getByText('11条')).toBeTruthy();
+    expect(view.getByText('周日 · 11条记录')).toBeTruthy();
     await act(async () => {
       const more = view.getByTestId('lookback-day-more');
       fireEvent.press(more);

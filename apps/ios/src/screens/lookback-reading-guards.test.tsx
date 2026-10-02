@@ -307,9 +307,9 @@ describe('lookback reading guards', () => {
     await waitFor(() => {
       expect(view.getByText('已加载一条')).toBeTruthy();
     });
-    expect(view.getByText('11条')).toBeTruthy();
-    expect(view.queryByText('0条')).toBeNull();
-    expect(view.queryByText('2条')).toBeNull();
+    expect(view.getByText('周日 · 11条记录')).toBeTruthy();
+    expect(view.queryByText('周日 · 0条记录')).toBeNull();
+    expect(view.queryByText('周日 · 2条记录')).toBeNull();
     await settleRootNeighbors();
     view.unmount();
   });

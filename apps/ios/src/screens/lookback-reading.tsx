@@ -3,20 +3,24 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text, type } from './life-text';
 
 import type { LookbackDayEntry } from '../application/lookback-day';
+import { feelingAccentColor } from '../application/feeling-accent';
+import type { FeelingView } from '../application/feeling';
 import {
   lookbackNeighborCaption,
   lookbackNeighborDateLabel,
   lookbackReadingCountLabel,
+  lookbackReadingCountPhrase,
+  lookbackReadingDayMetaLine,
   lookbackReadingDayTitle,
   lookbackReadingDayWeekday,
+  lookbackReadingYearLabel,
   type LookbackPlacedDay,
 } from '../application/lookback-reading';
 import type { PlaybackStatus } from '../infrastructure/media';
-import { hairline, ink, sage } from './life-page';
+import { hairline, ink, inkSoft, sage } from './life-page';
 import { LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentImages } from './moment-images';
-import { RecentFeeling } from './recent-feeling';
 import { recentNoteIsTruncated, recentNoteVisibleLineLimit, RECENT_NOTE_PREVIEW_LINES } from './recent-note';
 
 export { RECENT_NOTE_PREVIEW_LINES as LOOKBACK_READING_NOTE_LINES };
@@ -33,8 +37,12 @@ export function LookbackReadingHeader({
   count: number | null;
 }) {
   const weekday = lookbackReadingDayWeekday(year, month, day);
+  const meta = lookbackReadingDayMetaLine(year, month, day, count);
   return (
     <View testID="lookback-reading-header" style={styles.header}>
+      <Text style={styles.year} testID="lookback-reading-year">
+        {lookbackReadingYearLabel(year)}
+      </Text>
       <Text
         style={styles.dayTitle}
         accessibilityRole="header"
@@ -47,14 +55,9 @@ export function LookbackReadingHeader({
       >
         {lookbackReadingDayTitle(year, month, day)}
       </Text>
-      <Text style={styles.meta} testID="lookback-reading-weekday">
-        {weekday}
+      <Text style={styles.meta} testID="lookback-reading-meta">
+        {meta}
       </Text>
-      {count != null ? (
-        <Text style={styles.meta} testID="lookback-reading-count">
-          {lookbackReadingCountLabel(count)}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -138,14 +141,56 @@ export function LookbackReadingMoment({
         onPause={onPause}
         testIDPrefix={`lookback-reading-sound-${entry.id}`}
         compact
+        markedActions
+        progressWhenHeard
+        chrome="row"
       />
-      <RecentFeeling feeling={entry.feeling ?? null} testID={`lookback-reading-feeling-${entry.id}`} />
+      <LookbackRecordFoot
+        id={entry.id}
+        note={entry.note}
+        feeling={entry.feeling ?? null}
+        onOpen={() => onOpen(entry.id)}
+      />
+    </View>
+  );
+}
+
+function LookbackRecordFoot({
+  id,
+  note,
+  feeling,
+  onOpen,
+}: {
+  id: string;
+  note: string;
+  feeling: FeelingView | null;
+  onOpen: () => void;
+}) {
+  return (
+    <View testID={`lookback-reading-foot-${id}`} style={styles.foot}>
+      {feeling ? (
+        <View
+          testID={`lookback-reading-feeling-${id}`}
+          accessibilityLabel={`当时的感受，${feeling.label}`}
+          style={styles.feeling}
+        >
+          <View
+            testID={`lookback-reading-feeling-${id}-dot`}
+            accessible={false}
+            importantForAccessibility="no"
+            style={[styles.feelingDot, { backgroundColor: feelingAccentColor(feeling) }]}
+          />
+          <Text style={styles.feelingWord}>{feeling.label}</Text>
+        </View>
+      ) : (
+        <View style={styles.feelingSlot} />
+      )}
       <LookThisHit
         caption="阅读完整记录"
-        accessibilityLabel={`阅读完整记录，${entry.note || entry.id}`}
-        testID={`lookback-book-open-${entry.id}`}
+        accessibilityLabel={`阅读完整记录，${note || id}`}
+        testID={`lookback-book-open-${id}`}
         tight
-        onPress={() => onOpen(entry.id)}
+        onPress={onOpen}
       />
     </View>
   );
@@ -170,14 +215,9 @@ export function LookbackUnconfirmedHeader({
       >
         {title}
       </Text>
-      <Text style={styles.note} testID="lookback-reading-explanation">
-        {explanation}
+      <Text style={styles.meta} testID="lookback-reading-explanation">
+        {count == null ? explanation : `${explanation} · ${lookbackReadingCountPhrase(count)}`}
       </Text>
-      {count != null ? (
-        <Text style={styles.meta} testID="lookback-reading-count">
-          {lookbackReadingCountLabel(count)}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -229,6 +269,14 @@ function LookbackNeighborDayHit({
   );
 }
 
+export function LookbackEndNote() {
+  return (
+    <View testID="lookback-reading-end" style={styles.endNoteWrap} accessible={false}>
+      <Text style={styles.endNote}>这一日，读到这里。</Text>
+    </View>
+  );
+}
+
 export function LookbackReadingNeighbors({
   current,
   previous,
@@ -255,8 +303,9 @@ export function LookbackReadingNeighbors({
 
 const styles = StyleSheet.create({
   header: { gap: 4, marginBottom: 8 },
+  year: { ...type.meta, color: inkSoft },
   dayTitle: { ...type.title, color: ink },
-  meta: { ...type.meta, color: '#53604F' },
+  meta: { ...type.meta, color: sage },
   note: { ...type.body, color: ink },
   measure: {
     position: 'absolute',
@@ -267,11 +316,43 @@ const styles = StyleSheet.create({
   },
   moment: {
     gap: 8,
-    paddingTop: 8,
+    paddingTop: 16,
     paddingBottom: 16,
     minHeight: 48,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: hairline,
+  },
+  foot: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    minHeight: 48,
+  },
+  feeling: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 48,
+    flexShrink: 1,
+  },
+  feelingSlot: { minHeight: 0, flexGrow: 1, flexBasis: 48 },
+  feelingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  feelingWord: { ...type.meta, color: inkSoft, flexShrink: 1 },
+  endNoteWrap: { paddingTop: 24, paddingBottom: 8 },
+  endNote: {
+    ...type.meta,
+    color: inkSoft,
+    textAlign: 'center',
+    paddingTop: 24,
+    paddingBottom: 8,
   },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   action: { ...type.action, color: sage },

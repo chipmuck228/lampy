@@ -5,6 +5,9 @@ import {
   lookbackCandidateMonths,
   lookbackNeighborCaption,
   lookbackNeighborDays,
+  lookbackCatalogRangeCaption,
+  lookbackReadingCanShowEndNote,
+  lookbackReadingDayMetaLine,
   lookbackReadingDayTitle,
   lookbackMoreInFlightBlocks,
   lookbackReadingResolvedCount,
@@ -188,6 +191,40 @@ describe('lookback reading contracts', () => {
       lookbackNeighborCaption('previous', current, { year: 2025, month: 11, day: 2, count: 1 }),
     ).toBe('前一个有记录日 · 2025年11月2日');
     expect(lookbackReadingDayTitle(2026, 9, 27)).toBe('9月27日');
+    expect(lookbackReadingDayMetaLine(2026, 9, 18, 3)).toBe('周五 · 3条记录');
+    expect(lookbackCatalogRangeCaption({ kind: 'day', year: 2026, month: 9, day: 18 })).toBe(
+      '2026年 · 9月',
+    );
+    expect(lookbackCatalogRangeCaption({ kind: 'unknown' })).toBe('时间未确认');
+    expect(
+      lookbackReadingCanShowEndNote({
+        ready: true,
+        hasMore: false,
+        restorePending: false,
+      }),
+    ).toBe(true);
+    expect(
+      lookbackReadingCanShowEndNote({
+        ready: true,
+        hasMore: true,
+        restorePending: false,
+      }),
+    ).toBe(false);
+    expect(
+      lookbackReadingCanShowEndNote({
+        ready: true,
+        hasMore: false,
+        moreError: true,
+        restorePending: false,
+      }),
+    ).toBe(false);
+    expect(
+      lookbackReadingCanShowEndNote({
+        ready: true,
+        hasMore: false,
+        restorePending: true,
+      }),
+    ).toBe(false);
     expect(lookbackReadingScopeKey({ kind: 'day', year: 2026, month: 9, day: 27 })).toBe(
       'day:2026-09-27',
     );

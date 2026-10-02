@@ -192,6 +192,7 @@ export function useLookbackLayout() {
 
 export function LookbackScaffold({
   title,
+  kicker,
   subtitle,
   headerAction,
   path,
@@ -214,6 +215,7 @@ export function LookbackScaffold({
   onFamily,
 }: {
   title: string;
+  kicker?: string;
   subtitle?: string;
   headerAction?: ReactNode;
   path: string;
@@ -283,14 +285,21 @@ export function LookbackScaffold({
           <Text style={styles.back}>返回原来的位置</Text>
         </Pressable>
       )}
-      <Text style={styles.title} accessibilityRole="header">
-        {title}
-      </Text>
-      {subtitle ? (
-        <Text style={styles.body} testID="lookback-subtitle">
-          {subtitle}
+      <View style={styles.titleBlock}>
+        {kicker ? (
+          <Text style={styles.kicker} testID="lookback-kicker">
+            {kicker}
+          </Text>
+        ) : null}
+        <Text style={styles.title} accessibilityRole="header">
+          {title}
         </Text>
-      ) : null}
+        {subtitle ? (
+          <Text style={styles.body} testID="lookback-subtitle">
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
       {headerAction}
       {locateKey && !readingLocked ? (
         <View testID="lookback-book-locating" accessibilityLabel={locateKey} />
@@ -450,6 +459,7 @@ export function LookbackMessage({ children, testID }: { children: string; testID
 export const lookbackStyles = StyleSheet.create({
   hit: { minHeight: 44, justifyContent: 'center' },
   action: { ...type.action, color: '#53604F' },
+  quiet: { ...type.meta, color: '#5C5851' },
   cell: { minHeight: 44, paddingVertical: 8, gap: 4, flex: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   stack: { gap: 12 },
@@ -472,8 +482,10 @@ const styles = StyleSheet.create({
   },
   backHit: { minHeight: 44, justifyContent: 'center', flexShrink: 0 },
   back: { ...type.action, color: '#53604F' },
+  titleBlock: { gap: 4, flexShrink: 1, minWidth: 0 },
+  kicker: { ...type.meta, color: '#5C5851', flexShrink: 1, minWidth: 0 },
   title: { ...type.title, color: '#25231F', flexShrink: 1, minWidth: 0 },
-  body: { ...type.action, color: '#5C5851' },
+  body: { ...type.action, color: '#5C5851', flexShrink: 1, minWidth: 0 },
   meta: { ...type.meta, color: '#53604F' },
   fallback: { ...type.meta, color: '#5C5851' },
   note: { ...type.body, color: '#25231F' },

@@ -2,7 +2,7 @@ import { pad2 } from '../domain-adapters/calendar';
 import type { HistoryMonthView } from '../projections/history-projection';
 import { HISTORY_PAGE_SIZE } from './history-use-cases';
 import type { LookbackBookView } from './lookback-book';
-import { lookbackBookWeekdayName } from './lookback-book';
+import { lookbackBookDaySecondaryLabel, lookbackBookWeekdayName } from './lookback-book';
 
 export type LookbackReadingScope =
   | { kind: 'day'; year: number; month: number; day: number }
@@ -212,6 +212,10 @@ export function lookbackReadingDayTitle(year: number, month: number, day: number
   return `${month}月${day}日`;
 }
 
+export function lookbackReadingYearLabel(year: number): string {
+  return String(year);
+}
+
 export function lookbackReadingDayWeekday(year: number, month: number, day: number): string {
   return lookbackBookWeekdayName(year, month, day);
 }
@@ -220,8 +224,41 @@ export function lookbackReadingCountLabel(count: number): string {
   return `${count}条`;
 }
 
+export function lookbackReadingCountPhrase(count: number): string {
+  return `${count}条记录`;
+}
+
+export function lookbackReadingDayMetaLine(
+  year: number,
+  month: number,
+  day: number,
+  count: number | null,
+): string {
+  const weekday = lookbackBookDaySecondaryLabel(year, month, day);
+  if (count == null) return weekday;
+  return `${weekday} · ${lookbackReadingCountPhrase(count)}`;
+}
+
 export function lookbackCatalogMonthTitle(year: number, month: number): string {
   return `${year}年 · ${month}月`;
+}
+
+export function lookbackCatalogRangeCaption(scope: LookbackReadingScope | null): string | null {
+  if (!scope) return null;
+  if (scope.kind === 'day') return lookbackCatalogMonthTitle(scope.year, scope.month);
+  if (scope.kind === 'year-unconfirmed') return `${scope.year}年`;
+  if (scope.kind === 'month-unconfirmed') return lookbackCatalogMonthTitle(scope.year, scope.month);
+  return '时间未确认';
+}
+
+export function lookbackReadingCanShowEndNote(input: {
+  ready: boolean;
+  hasMore: boolean;
+  moreError?: boolean;
+  moreLoading?: boolean;
+  restorePending: boolean;
+}): boolean {
+  return input.ready && !input.hasMore && !input.moreError && !input.moreLoading && !input.restorePending;
 }
 
 export async function collectLookbackNeighborDays(input: {

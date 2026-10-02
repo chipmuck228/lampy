@@ -12,6 +12,7 @@ import {
   keepExpandedIds,
   lookbackMoreInFlightBlocks,
   lookbackMoreOffset,
+  lookbackReadingCanShowEndNote,
   lookbackReadingResolvedCount,
   lookbackReadingScopeKey,
   restoreLookbackPages,
@@ -40,6 +41,7 @@ import {
   shouldBackToLookbackBook,
 } from '../../../../screens/lookback-origin';
 import {
+  LookbackEndNote,
   LookbackNeighborRetry,
   LookbackReadingHeader,
   LookbackReadingMoment,
@@ -260,7 +262,7 @@ export default function LookbackDayScreen() {
 
   return (
     <LookbackScaffold
-      title={`${month}月${day}日`}
+      title="回看"
       path={path}
       onBack={leaveDay}
       pendingRestoreY={pendingRestoreY}
@@ -349,6 +351,15 @@ export default function LookbackDayScreen() {
           }
         />
       )}
+      {lookbackReadingCanShowEndNote({
+        ready: items.length > 0 && !invalid && !error,
+        hasMore,
+        moreError,
+        moreLoading,
+        restorePending: pendingRestoreY != null,
+      }) ? (
+        <LookbackEndNote />
+      ) : null}
     </LookbackScaffold>
   );
 }

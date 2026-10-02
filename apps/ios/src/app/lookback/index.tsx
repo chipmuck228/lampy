@@ -25,7 +25,9 @@ import {
   chooseDefaultLookbackScope,
   collectLookbackNeighborDays,
   keepExpandedIds,
+  lookbackCatalogRangeCaption,
   lookbackMoreOffset,
+  lookbackReadingCanShowEndNote,
   lookbackReadingResolvedCount,
   lookbackReadingScopeKey,
   lookbackScopesEqual,
@@ -69,6 +71,7 @@ import {
   shouldBackToRecent,
 } from '../../screens/lookback-origin';
 import {
+  LookbackEndNote,
   LookbackNeighborRetry,
   LookbackReadingHeader,
   LookbackReadingMoment,
@@ -784,6 +787,7 @@ export default function LookbackIndexScreen() {
   return (
     <LookbackScaffold
       title="回看"
+      kicker="LAMPY · 时间里的记录"
       subtitle="慢慢看"
       path="/lookback"
       root
@@ -805,16 +809,28 @@ export default function LookbackIndexScreen() {
       }}
       headerAction={
         view && !emptyLibrary ? (
-          <Pressable
-            ref={changeDayRef}
-            accessibilityRole="button"
-            accessibilityLabel="换一天"
-            testID="lookback-change-day"
-            onPress={() => openCatalog()}
-            style={lookbackStyles.hit}
-          >
-            <Text style={lookbackStyles.action}>换一天</Text>
-          </Pressable>
+          <View>
+            <Pressable
+              ref={changeDayRef}
+              accessibilityRole="button"
+              accessibilityLabel="换一天"
+              testID="lookback-change-day"
+              onPress={() => openCatalog()}
+              style={lookbackStyles.hit}
+            >
+              <Text style={lookbackStyles.action}>换一天</Text>
+            </Pressable>
+            {lookbackCatalogRangeCaption(scope) ? (
+              <Text
+                style={lookbackStyles.quiet}
+                testID="lookback-catalog-range"
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              >
+                {lookbackCatalogRangeCaption(scope)}
+              </Text>
+            ) : null}
+          </View>
         ) : null
       }
       onGoRecent={() => {
@@ -830,7 +846,10 @@ export default function LookbackIndexScreen() {
     >
       {error ? <LookbackMessage>{error}</LookbackMessage> : null}
       {emptyLibrary ? (
-        <LookbackMessage testID="lookback-empty">以后可以按时间回来看。</LookbackMessage>
+        <View testID="lookback-empty">
+          <LookbackMessage>日子会慢慢留在这里。</LookbackMessage>
+          <LookbackMessage>先留下一点，以后再回来看看。</LookbackMessage>
+        </View>
       ) : null}
       {reading.status === 'loading' ? (
         <LookbackMessage testID="lookback-reading-loading">这一天正在读出来。</LookbackMessage>
@@ -955,6 +974,15 @@ export default function LookbackIndexScreen() {
             )
           }
         />
+      ) : null}
+      {lookbackReadingCanShowEndNote({
+        ready: !!readyReading,
+        hasMore: !!readyReading?.hasMore,
+        moreError: readyReading?.moreError,
+        moreLoading: readyReading?.moreLoading,
+        restorePending: pendingRestoreY != null,
+      }) ? (
+        <LookbackEndNote />
       ) : null}
     </LookbackScaffold>
   );
