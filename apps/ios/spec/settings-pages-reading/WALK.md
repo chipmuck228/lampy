@@ -36,8 +36,9 @@ Base：开分支时本地 `origin/main` 为 `d210b8c606de9c1e6ec16b73c39cb5f1f9a
 
 ## 实现 SHA 与 PR
 
-- 实现 SHA：待提交后填写
-- PR head：待推送后填写
+- 基线 `origin/main`：`d210b8c606de9c1e6ec16b73c39cb5f1f9a4e0ad`（#58 merge；fetch 于 2026-10-02 仍为此 SHA）
+- 实现 SHA：`10add6d9abfd156a70bd443482fb92087d8e9a5e`
+- PR head：推送后与实现 SHA 相同，除非又有走查提交
 - PR：待创建后填写，保持 OPEN
 
 ## 尚需人工
