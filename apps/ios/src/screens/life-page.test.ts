@@ -75,7 +75,7 @@ describe('life page measures', () => {
     const withFamily = navBandItemsFor('recent', true);
     const two = navBandItemsFor('lookback', false);
     expect(withFamily.map((item) => item.label)).toEqual(['最近', '回看', '家庭']);
-    expect(two.map((item) => item.label)).toEqual(['回看', '最近']);
+    expect(two.map((item) => item.label)).toEqual(['最近', '回看']);
     expect(navBandItemMinHeight(17)).toBe(48);
     expect(chooseNavBandLayout({ windowWidth: 390, items: withFamily })).toBe('row');
     expect(chooseNavBandLayout({ windowWidth: 390, items: two })).toBe('row');

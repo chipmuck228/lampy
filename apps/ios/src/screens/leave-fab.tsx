@@ -1,14 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 import { LifeIcon } from './life-icons';
+import { hairline, ink, pageGutter, paperDeep, sage } from './life-page';
 import { createRecentLeaveFabScroll, recentFabMotion } from './recent-leave-fab';
 
 export const LEAVE_FAB_HIT = 48;
-export const LEAVE_FAB_EDGE = 16;
+export const LEAVE_FAB_GAP_ABOVE_NAV = 14;
+export const LEAVE_FAB_TRAIL = 30;
+export const LEAVE_FAB_EDGE = LEAVE_FAB_GAP_ABOVE_NAV;
 
 export function leaveFabScrollReserve(): number {
-  return LEAVE_FAB_HIT + LEAVE_FAB_EDGE;
+  return LEAVE_FAB_HIT + LEAVE_FAB_GAP_ABOVE_NAV + LEAVE_FAB_TRAIL;
+}
+
+export function leaveFabOverlayPadding(windowWidth: number, windowHeight: number) {
+  return {
+    paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
+    paddingRight: pageGutter(windowWidth, windowHeight),
+  };
 }
 
 export function useLeaveFabMotion() {
@@ -101,69 +111,90 @@ export function LeaveFab({
   testID,
   onPress,
   available,
+  forcedHidden = false,
   opacity,
   shift,
 }: {
   testID: string;
   onPress: () => void;
   available: boolean;
+  forcedHidden?: boolean;
   opacity: Animated.Value;
   shift: Animated.Value;
 }) {
+  const interactive = available && !forcedHidden;
   return (
-    <Animated.View
-      pointerEvents={available ? 'box-none' : 'none'}
-      style={[
-        styles.wrap,
-        {
-          opacity,
-          transform: [{ translateY: shift }],
-        },
-        !available ? styles.hidden : null,
-      ]}
-      accessibilityElementsHidden={!available}
-      importantForAccessibility={available ? 'yes' : 'no-hide-descendants'}
+    <View
+      testID={`${testID}-force`}
+      pointerEvents={interactive ? 'box-none' : 'none'}
+      style={forcedHidden ? styles.forcedHidden : undefined}
+      accessibilityElementsHidden={!interactive}
+      importantForAccessibility={interactive ? 'yes' : 'no-hide-descendants'}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="留下"
-        accessibilityElementsHidden={!available}
-        importantForAccessibility={available ? 'yes' : 'no-hide-descendants'}
-        accessibilityState={{ disabled: !available }}
-        testID={testID}
-        disabled={!available}
-        onPress={onPress}
-        style={styles.fab}
+      <Animated.View
+        testID={`${testID}-shell`}
+        pointerEvents={interactive ? 'box-none' : 'none'}
+        style={[
+          styles.wrap,
+          {
+            opacity,
+            transform: [{ translateY: shift }],
+          },
+        ]}
+        accessibilityElementsHidden={!interactive}
+        importantForAccessibility={interactive ? 'yes' : 'no-hide-descendants'}
       >
-        <LifeIcon name="plus" size={16} color="#FFFFFF" decorative />
-        <Text style={styles.label}>留下</Text>
-      </Pressable>
-    </Animated.View>
+        <View style={styles.shadow} pointerEvents="box-none" accessible={false}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="留下"
+            accessibilityElementsHidden={!interactive}
+            importantForAccessibility={interactive ? 'yes' : 'no-hide-descendants'}
+            accessibilityState={{ disabled: !interactive }}
+            testID={testID}
+            disabled={!interactive}
+            onPress={onPress}
+            style={styles.fab}
+          >
+            <LifeIcon name="plus" size={16} color={sage} decorative />
+            <Text style={styles.label}>留下</Text>
+          </Pressable>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'flex-end' },
-  hidden: { opacity: 0 },
+  forcedHidden: { opacity: 0 },
+  shadow: {
+    shadowColor: ink,
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
   fab: {
     minHeight: LEAVE_FAB_HIT,
     height: LEAVE_FAB_HIT,
     minWidth: LEAVE_FAB_HIT,
-    paddingLeft: 13,
-    paddingRight: 17,
-    borderRadius: 50,
-    backgroundColor: '#424B3C',
+    paddingLeft: 14,
+    paddingRight: 16,
+    borderRadius: 24,
+    backgroundColor: paperDeep,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: hairline,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
-    marginRight: 5,
   },
   label: {
     fontFamily: 'PingFang SC',
     fontSize: 14,
     lineHeight: 18,
     letterSpacing: 1.12,
-    color: '#FFFFFF',
+    color: sage,
   },
 });

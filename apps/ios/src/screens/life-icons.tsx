@@ -24,6 +24,9 @@ export const LIFE_ICON_NAMES = {
   expand: 'chevron.down',
   collapse: 'chevron.up',
   plus: 'plus',
+  recent: 'line.3.horizontal',
+  lookback: 'book',
+  family: 'person.2',
 } as const;
 
 export type LifeIconName = keyof typeof LIFE_ICON_NAMES;

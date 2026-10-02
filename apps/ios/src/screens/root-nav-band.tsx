@@ -1,23 +1,40 @@
 import { useState, type ReactNode, type Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type TextLayoutEventData, type ViewStyle } from 'react-native';
-import { Text, type } from './life-text';
+import { Text } from './life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LifeIcon, type LifeIconName } from './life-icons';
+import { leaveFabOverlayPadding } from './leave-fab';
 import {
-  NAV_BAND_HERE_SIZE,
   NAV_BAND_HIT,
+  NAV_BAND_ICON_GAP,
+  NAV_BAND_ICON_SIZE,
+  NAV_BAND_LABEL_SIZE,
   chooseNavBandLayout,
-  ink,
+  hairline,
+  inkSoft,
   navBandItemMinHeight,
   navBandItemMinWidth,
   navBandItemsFor,
   navBandOccupiedWidth,
   paper,
-  paperDeep,
   sage,
   shouldUseNavRail,
 } from './life-page';
 import { usePageMetrics } from './use-page-metrics';
+
+type BandDest = 'recent' | 'lookback' | 'family';
+
+const BAND_DESTINATIONS: {
+  id: BandDest;
+  label: string;
+  icon: LifeIconName;
+  goTestID: string;
+}[] = [
+  { id: 'recent', label: '最近', icon: 'recent', goTestID: 'lookback-go-recent' },
+  { id: 'lookback', label: '回看', icon: 'lookback', goTestID: 'home-lookback' },
+  { id: 'family', label: '家庭', icon: 'family', goTestID: 'home-family' },
+];
 
 export function RootNavBand({
   here,
@@ -30,11 +47,10 @@ export function RootNavBand({
 }) {
   const { width, height } = usePageMetrics();
   const [painted, setPainted] = useState<Partial<Record<string, { width: number; height: number }>>>({});
-  const hereLabel = here === 'recent' ? '最近' : '回看';
-  const otherLabel = here === 'recent' ? '回看' : '最近';
+  const destinations = BAND_DESTINATIONS.filter((item) => item.id !== 'family' || onFamily);
   const items = navBandItemsFor(here, !!onFamily).map((item, index) => ({
     ...item,
-    id: (onFamily ? (['here', 'other', 'family'] as const) : (['here', 'other'] as const))[index],
+    id: destinations[index]?.id ?? item.label,
   }));
   const paintedReady = items.every((item) => painted[item.id]);
   const rail = shouldUseNavRail(width, height);
@@ -72,75 +88,85 @@ export function RootNavBand({
         ? navBandOccupiedWidth({ label, fontSize, measuredWidth: measure.width })
         : navBandItemMinWidth(label, fontSize),
       minHeight: measure
-        ? Math.max(NAV_BAND_HIT, Math.ceil(measure.height))
+        ? Math.max(NAV_BAND_HIT, Math.ceil(measure.height + NAV_BAND_ICON_SIZE + NAV_BAND_ICON_GAP))
         : navBandItemMinHeight(fontSize),
     };
   }
 
-  const hereMin = itemMin('here', hereLabel, NAV_BAND_HERE_SIZE);
-  const otherMin = itemMin('other', otherLabel, NAV_BAND_HERE_SIZE);
-  const familyMin = itemMin('family', '家庭', NAV_BAND_HERE_SIZE);
   const itemStyle = [
     styles.item,
     layout === 'rail' ? styles.railItem : layout === 'stack' ? styles.stackItem : styles.columnItem,
   ];
 
-  const hereItem = (
-    <View testID="root-nav-here-wrap" style={[itemStyle, hereMin]}>
-      <Text
-        testID="root-nav-here"
-        style={styles.here}
-        onTextLayout={onPainted('here')}
-        accessibilityRole="text"
-        accessibilityLabel={`${hereLabel}，当前页`}
+  function renderItem(dest: (typeof BAND_DESTINATIONS)[number]) {
+    const selected = dest.id === here;
+    const color = selected ? sage : inkSoft;
+    const min = itemMin(dest.id, dest.label, NAV_BAND_LABEL_SIZE);
+    const inner = (
+      <View style={styles.itemInner} accessible={false}>
+        <LifeIcon name={dest.icon} size={NAV_BAND_ICON_SIZE} color={color} decorative />
+        <Text
+          testID={selected && dest.id !== 'family' ? 'root-nav-here' : undefined}
+          style={[styles.label, { color }]}
+          onTextLayout={onPainted(dest.id)}
+          accessible={false}
+        >
+          {dest.label}
+        </Text>
+      </View>
+    );
+
+    if (selected && dest.id !== 'family') {
+      return (
+        <View
+          key={dest.id}
+          testID="root-nav-here-wrap"
+          accessible
+          accessibilityRole="tab"
+          accessibilityLabel={dest.label}
+          accessibilityState={{ selected: true }}
+          style={[itemStyle, min]}
+        >
+          {inner}
+        </View>
+      );
+    }
+
+    return (
+      <Pressable
+        key={dest.id}
+        accessibilityRole="tab"
+        accessibilityLabel={dest.label}
+        accessibilityState={{ selected: false }}
+        testID={dest.goTestID}
+        onPress={dest.id === 'family' ? onFamily : onOther}
+        style={[itemStyle, min]}
       >
-        {hereLabel}
-      </Text>
-    </View>
-  );
-  const otherItem = (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={otherLabel}
-      testID={here === 'recent' ? 'home-lookback' : 'lookback-go-recent'}
-      onPress={onOther}
-      style={[itemStyle, otherMin]}
-    >
-      <Text style={styles.go} onTextLayout={onPainted('other')}>
-        {otherLabel}
-      </Text>
-    </Pressable>
-  );
-  const familyItem = onFamily ? (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="家庭"
-      testID="home-family"
-      onPress={onFamily}
-      style={[itemStyle, familyMin]}
-    >
-      <Text style={styles.go} onTextLayout={onPainted('family')}>
-        家庭
-      </Text>
-    </Pressable>
-  ) : null;
+        {inner}
+      </Pressable>
+    );
+  }
+
+  const recentItem = renderItem(BAND_DESTINATIONS[0]);
+  const lookbackItem = renderItem(BAND_DESTINATIONS[1]);
+  const familyItem = onFamily ? renderItem(BAND_DESTINATIONS[2]) : null;
 
   return (
     <View
       testID="root-nav-band"
       style={[
         styles.band,
-        layout === 'rail' && styles.rail,
+        layout === 'rail' ? styles.rail : styles.phoneBand,
         layout === 'stack' && styles.stacked,
         layout === 'grid' && styles.grid,
       ]}
-      accessibilityRole="none"
+      accessibilityRole="tablist"
     >
       {layout === 'grid' ? (
         <>
           <View testID="root-nav-grid-row-1" style={styles.gridRow}>
-            {hereItem}
-            {otherItem}
+            {recentItem}
+            {lookbackItem}
           </View>
           <View testID="root-nav-grid-row-2" style={styles.gridRow}>
             {familyItem}
@@ -148,8 +174,8 @@ export function RootNavBand({
         </>
       ) : (
         <>
-          {hereItem}
-          {otherItem}
+          {recentItem}
+          {lookbackItem}
           {familyItem}
         </>
       )}
@@ -188,6 +214,7 @@ export function RootReadingLayout({
 }) {
   const { width, height } = usePageMetrics();
   const rail = shouldUseNavRail(width, height);
+  const overlayPad = leaveFabOverlayPadding(width, height);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: canvas }]} accessibilityLabel={accessibilityLabel}>
@@ -212,7 +239,7 @@ export function RootReadingLayout({
           </ScrollView>
           {cover}
           {overlay ? (
-            <View pointerEvents="box-none" style={styles.overlay}>
+            <View testID="root-leave-overlay" pointerEvents="box-none" style={[styles.overlay, overlayPad]}>
               {overlay}
             </View>
           ) : null}
@@ -237,7 +264,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
-    padding: 16,
   },
   band: {
     alignSelf: 'stretch',
@@ -247,7 +273,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
     paddingHorizontal: 16,
-    backgroundColor: paperDeep,
+    backgroundColor: paper,
+  },
+  phoneBand: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: hairline,
   },
   rail: {
     width: 112,
@@ -280,6 +310,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'visible',
   },
+  itemInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: NAV_BAND_ICON_GAP,
+  },
   columnItem: {
     flexGrow: 1,
     flexShrink: 0,
@@ -295,8 +330,13 @@ const styles = StyleSheet.create({
   railItem: {
     flexGrow: 0,
     flexShrink: 0,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    alignSelf: 'stretch',
   },
-  here: { ...type.action, color: ink, textAlign: 'center', flexShrink: 0 },
-  go: { ...type.action, color: sage, textAlign: 'center', flexShrink: 0 },
+  label: {
+    fontSize: NAV_BAND_LABEL_SIZE,
+    lineHeight: 16,
+    textAlign: 'center',
+    flexShrink: 0,
+  },
 });

@@ -439,7 +439,7 @@ export function LookbackScaffold({
           {
             maxWidth: readingWidth,
             paddingTop: 4,
-            paddingBottom: 8 + (onLeave ? leaveFabScrollReserve() : 0),
+            paddingBottom: onLeave ? leaveFabScrollReserve() : 8,
           },
         ]}
         header={pageHeader}
@@ -452,7 +452,8 @@ export function LookbackScaffold({
             <LeaveFab
               testID="lookback-leave-fab"
               onPress={onLeave}
-              available={leaveFab.open && !readingLocked}
+              available={leaveFab.open}
+              forcedHidden={readingLocked}
               opacity={leaveFab.opacity}
               shift={leaveFab.shift}
             />

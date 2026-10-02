@@ -59,7 +59,10 @@ export function shouldUseNavRail(windowWidth: number, windowHeight: number): boo
 export const NAV_BAND_PAD_X = 32;
 export const NAV_BAND_HIT = 48;
 export const NAV_BAND_LABEL_PAD = 8;
-export const NAV_BAND_HERE_SIZE = 17;
+export const NAV_BAND_HERE_SIZE = 13;
+export const NAV_BAND_LABEL_SIZE = 13;
+export const NAV_BAND_ICON_SIZE = 23;
+export const NAV_BAND_ICON_GAP = 4;
 export const NAV_BAND_LEAVE_SIZE = 20;
 
 export type NavBandLayout = 'row' | 'grid' | 'stack';
@@ -74,16 +77,14 @@ export function navBandItemMinHeight(fontSize: number): number {
 }
 
 export function navBandItemsFor(
-  here: 'recent' | 'lookback',
+  _here: 'recent' | 'lookback',
   hasFamily: boolean,
 ): { label: string; fontSize: number }[] {
-  const hereLabel = here === 'recent' ? '最近' : '回看';
-  const otherLabel = here === 'recent' ? '回看' : '最近';
   const items = [
-    { label: hereLabel, fontSize: NAV_BAND_HERE_SIZE },
-    { label: otherLabel, fontSize: NAV_BAND_HERE_SIZE },
+    { label: '最近', fontSize: NAV_BAND_LABEL_SIZE },
+    { label: '回看', fontSize: NAV_BAND_LABEL_SIZE },
   ];
-  if (hasFamily) items.push({ label: '家庭', fontSize: NAV_BAND_HERE_SIZE });
+  if (hasFamily) items.push({ label: '家庭', fontSize: NAV_BAND_LABEL_SIZE });
   return items;
 }
 
