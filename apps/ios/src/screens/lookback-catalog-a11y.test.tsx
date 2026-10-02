@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Dimensions } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
@@ -185,5 +185,49 @@ describe('lookback catalog overlay a11y', () => {
     expect(view.getByTestId('lookback-catalog-toggle').props.accessibilityState?.expanded).toBe(false);
     expect(view.getByTestId('lookback-reading-m1')).toBeTruthy();
     expect(view.queryByTestId('lookback-book-locating')).toBeNull();
+  });
+
+  it('force-hides the visible leave button when the catalog opens and shows it again when the catalog closes', async () => {
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-leave-fab')).toBeTruthy();
+    });
+    const openFab = view.getByTestId('lookback-leave-fab');
+    expect(openFab.props.accessibilityElementsHidden).toBe(false);
+    expect(openFab.props.accessibilityState?.disabled ?? openFab.props.disabled ?? false).toBe(false);
+    expect(StyleSheet.flatten(view.getByTestId('lookback-leave-fab-force').props.style)?.opacity ?? 1).not.toBe(0);
+
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('lookback-catalog')).toBeTruthy();
+    });
+    const hiddenFab = view.getByTestId('lookback-leave-fab', { includeHiddenElements: true });
+    expect(hiddenFab.props.accessibilityElementsHidden).toBe(true);
+    expect(hiddenFab.props.accessibilityState?.disabled ?? hiddenFab.props.disabled).toBe(true);
+    expect(
+      StyleSheet.flatten(view.getByTestId('lookback-leave-fab-force', { includeHiddenElements: true }).props.style),
+    ).toEqual(expect.objectContaining({ opacity: 0 }));
+    const shell = view.getByTestId('lookback-leave-fab-shell', { includeHiddenElements: true });
+    const layers = (Array.isArray(shell.props.style) ? shell.props.style : [shell.props.style]).filter(Boolean);
+    const opacityLayers = layers.filter(
+      (layer): layer is { opacity: unknown } =>
+        !!layer && typeof layer === 'object' && 'opacity' in layer,
+    );
+    expect(opacityLayers).toHaveLength(1);
+    expect(opacityLayers[0].opacity).not.toBe(0);
+
+    await act(async () => {
+      fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
+    });
+    await waitFor(() => {
+      expect(view.queryByTestId('lookback-catalog')).toBeNull();
+    });
+    const restored = view.getByTestId('lookback-leave-fab');
+    expect(restored.props.accessibilityElementsHidden).toBe(false);
+    expect(restored.props.accessibilityState?.disabled ?? restored.props.disabled ?? false).toBe(false);
+    expect(StyleSheet.flatten(view.getByTestId('lookback-leave-fab-force').props.style)?.opacity ?? 1).not.toBe(0);
+    view.unmount();
   });
 });

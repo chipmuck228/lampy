@@ -50,7 +50,7 @@
 - `createRecentLeaveFabScroll`
 - `recentFabMotion`
 - 滚动方向、阈值、停止等待、动画时长 / 缓动 / 取消、Reduce Motion
-- 聚焦 / 失焦 / 后台、目录展开隐藏与关闭后恢复
+- 聚焦 / 失焦 / 后台。目录仍 `readingLocked` 并停喂滚动；强制隐藏改为立刻藏，不走滚动淡出
 - 空库 / 加载 / 失败的显示规则
 - 点击路由、草稿和保存
 
@@ -61,12 +61,12 @@
 - plus 与「留下」用 `sage`。边为现有 `hairline`。阴影极轻，与 `opacity` 同一外壳，便于整颗一起淡出。无模糊、玻璃、渐变带、纹理图。
 - 手机：按钮底边距导航带上沿 14pt（12–16pt 内）。
 - 右侧用 `pageGutter`（手机 24、常规宽 48）对齐正文右边距。iPad 左栏时 overlay 仍在阅读栏内，不套用手机整屏坐标。
-- 动画值绑定、隐藏时的点击 / 无障碍处理保持原样。
+- 滚动隐藏仍只绑动画值；目录强制隐藏走另一层，立刻到 0，不写进滚动 `opacity` / `shift`。
 - 不因空库已有「留下第一条」再藏浮动按钮。
 
-## 3b. 显隐核实（源码，不改行为）
+## 3b. 两种隐藏（分开，不混用）
 
-对照参数（`recent-leave-fab.ts`，本轮无 diff）：
+**滚动隐藏** — 参数未改（`recent-leave-fab.ts` 无 diff）：
 
 | 项 | 值 |
 | --- | --- |
@@ -79,15 +79,17 @@
 | Reduce Motion | 时长 0，立即到位 |
 | 缓动 | `Easing.out(cubic)` |
 
-调用链：最近 `onRecentScroll` → `leaveFab.onScroll`，`available={leaveFab.open}`。回看根页同样 `onScroll`，目录展开时 `readingLocked` 停止滚动喂给控制器，且 `available={leaveFab.open && !readingLocked}`。每页只挂一份 `LeaveFab`，共用同一组件。
+最近 `available={leaveFab.open}`。回看同样把滚动喂给控制器，但目录展开时 `readingLocked` 停止喂滚动。每页一份 `LeaveFab`。
 
-真机（米色胶囊之后）：下滚满足条件时整颗变淡，但没有到看不见。
+真机滚动显隐（米色胶囊、去掉外壳静态 `opacity: 0` 之后）：**PASS**。持续下滚整颗到看不见；停 / 上滚按原规则回来。慢滑 `delta ≤ 12` 仍记 idle。未扩大到目录路径。
 
-1. **源码规则未改：** 隐藏仍应是整颗 `opacity` 在 380ms 内到 0。慢滑 `delta ≤ 12` 记 idle，停 800ms 后会再出现。
-2. **这次按实现冲突处理，不是改阈值。** 外壳原先同时绑原生动画 `opacity` 和静态 `styles.hidden { opacity: 0 }`。`available` 在动画一开始就变 false，两套 opacity 叠在同一节点上，iOS 上容易停在半透明。已去掉静态 `opacity: 0`，只保留动画值；阴影放到子节点，避免和 native driver 抢同一层。这仍是假设，要再真机下滚确认是否到 0。
-3. **未改等待、阈值或控制器。**
+**目录强制隐藏** — 与滚动动画分开：
 
-运行环境见 `WALK.md`。属性测试不等于原生显隐或 VoiceOver PASS。
+1. 打开目录：外层立刻 `opacity: 0`，同时禁用点击和 VoiceOver。不调用 `reveal`，不改滚动 `opacity` / `shift`。
+2. 关闭目录：拿掉强制层。滚动值若仍是可见，按钮立刻回来，不走 640ms 显示动画。
+3. Jest / 实页：按钮可见 → 打开目录 → 完全隐藏 → 关闭目录后可点。真机目录路径 **NOT VERIFIED**。
+
+运行环境见 `WALK.md`。属性测试不等于原生 VoiceOver PASS。
 
 ## 4. 正文避让
 

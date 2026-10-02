@@ -1,10 +1,13 @@
 import { Animated, StyleSheet } from 'react-native';
-import { render } from '@testing-library/react-native';
+import { cleanup, render } from '@testing-library/react-native';
 
 import { LeaveFab } from './leave-fab';
 import { hairline, paperDeep, sage } from './life-page';
 
 describe('shared LeaveFab', () => {
+  afterEach(() => {
+    cleanup();
+  });
   it('stays operable and focusable when available', async () => {
     const view = await render(
       <LeaveFab
@@ -69,6 +72,35 @@ describe('shared LeaveFab', () => {
     expect(opacityLayers).toHaveLength(1);
     expect(opacityLayers[0].opacity).not.toBe(0);
     view.unmount();
+  });
+
+  it('force-hides immediately without writing opacity onto the scroll shell', async () => {
+    const opacity = new Animated.Value(1);
+    const shift = new Animated.Value(0);
+    const hidden = await render(
+      <LeaveFab
+        testID="lookback-leave-fab"
+        onPress={() => undefined}
+        available
+        forcedHidden
+        opacity={opacity}
+        shift={shift}
+      />,
+    );
+    const force = hidden.getByTestId('lookback-leave-fab-force', { includeHiddenElements: true });
+    expect(StyleSheet.flatten(force.props.style)).toEqual(expect.objectContaining({ opacity: 0 }));
+    const fab = hidden.getByTestId('lookback-leave-fab', { includeHiddenElements: true });
+    expect(fab.props.accessibilityElementsHidden).toBe(true);
+    expect(fab.props.accessibilityState?.disabled ?? fab.props.disabled).toBe(true);
+    const shell = hidden.getByTestId('lookback-leave-fab-shell', { includeHiddenElements: true });
+    const layers = (Array.isArray(shell.props.style) ? shell.props.style : [shell.props.style]).filter(Boolean);
+    const opacityLayers = layers.filter(
+      (layer): layer is { opacity: unknown } =>
+        !!layer && typeof layer === 'object' && 'opacity' in layer,
+    );
+    expect(opacityLayers).toHaveLength(1);
+    expect(opacityLayers[0].opacity).not.toBe(0);
+    hidden.unmount();
   });
 
   it('paints plus and 留下 in sage on a single fill', async () => {

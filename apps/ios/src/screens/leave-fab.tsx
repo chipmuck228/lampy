@@ -111,51 +111,63 @@ export function LeaveFab({
   testID,
   onPress,
   available,
+  forcedHidden = false,
   opacity,
   shift,
 }: {
   testID: string;
   onPress: () => void;
   available: boolean;
+  forcedHidden?: boolean;
   opacity: Animated.Value;
   shift: Animated.Value;
 }) {
+  const interactive = available && !forcedHidden;
   return (
-    <Animated.View
-      testID={`${testID}-shell`}
-      pointerEvents={available ? 'box-none' : 'none'}
-      style={[
-        styles.wrap,
-        {
-          opacity,
-          transform: [{ translateY: shift }],
-        },
-      ]}
-      accessibilityElementsHidden={!available}
-      importantForAccessibility={available ? 'yes' : 'no-hide-descendants'}
+    <View
+      testID={`${testID}-force`}
+      pointerEvents={interactive ? 'box-none' : 'none'}
+      style={forcedHidden ? styles.forcedHidden : undefined}
+      accessibilityElementsHidden={!interactive}
+      importantForAccessibility={interactive ? 'yes' : 'no-hide-descendants'}
     >
-      <View style={styles.shadow} pointerEvents="box-none" accessible={false}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="留下"
-          accessibilityElementsHidden={!available}
-          importantForAccessibility={available ? 'yes' : 'no-hide-descendants'}
-          accessibilityState={{ disabled: !available }}
-          testID={testID}
-          disabled={!available}
-          onPress={onPress}
-          style={styles.fab}
-        >
-          <LifeIcon name="plus" size={16} color={sage} decorative />
-          <Text style={styles.label}>留下</Text>
-        </Pressable>
-      </View>
-    </Animated.View>
+      <Animated.View
+        testID={`${testID}-shell`}
+        pointerEvents={interactive ? 'box-none' : 'none'}
+        style={[
+          styles.wrap,
+          {
+            opacity,
+            transform: [{ translateY: shift }],
+          },
+        ]}
+        accessibilityElementsHidden={!interactive}
+        importantForAccessibility={interactive ? 'yes' : 'no-hide-descendants'}
+      >
+        <View style={styles.shadow} pointerEvents="box-none" accessible={false}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="留下"
+            accessibilityElementsHidden={!interactive}
+            importantForAccessibility={interactive ? 'yes' : 'no-hide-descendants'}
+            accessibilityState={{ disabled: !interactive }}
+            testID={testID}
+            disabled={!interactive}
+            onPress={onPress}
+            style={styles.fab}
+          >
+            <LifeIcon name="plus" size={16} color={sage} decorative />
+            <Text style={styles.label}>留下</Text>
+          </Pressable>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'flex-end' },
+  forcedHidden: { opacity: 0 },
   shadow: {
     shadowColor: ink,
     shadowOpacity: 0.06,

@@ -452,7 +452,8 @@ export function LookbackScaffold({
             <LeaveFab
               testID="lookback-leave-fab"
               onPress={onLeave}
-              available={leaveFab.open && !readingLocked}
+              available={leaveFab.open}
+              forcedHidden={readingLocked}
               opacity={leaveFab.opacity}
               shift={leaveFab.shift}
             />
