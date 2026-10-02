@@ -119,8 +119,15 @@ describe('account settings pages', () => {
       SETTINGS_PRIVACY_UPDATED,
     ]);
     expect(view.getByText(SETTINGS_PRIVACY_CHAPTERS[0].title)).toBeTruthy();
+    expect(
+      view.getByText(
+        '本机保护开启后，进入 Lampy 或从后台返回时，由系统使用 Face ID 或设备密码进行认证。',
+      ),
+    ).toBeTruthy();
     expect(view.getByText(/Lampy 不会取得或保存人脸数据/)).toBeTruthy();
     expect(view.getByText(/不会为个人记录去请求家庭或授权服务/)).toBeTruthy();
+    expect(view.queryByText(/只在你打开本机保护时/)).toBeNull();
+    expect(view.queryByText(/不等于已经核查过安装包/)).toBeNull();
     expect(view.queryByText(/任何数据都不会上传/)).toBeNull();
     expect(view.queryByText(/法律审核/)).toBeNull();
     expect(view.queryByText(/TODO/)).toBeNull();

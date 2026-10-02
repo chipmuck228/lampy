@@ -29,5 +29,10 @@ describe('settings candidate copy', () => {
     expect(text).not.toMatch(/TODO|待确认|@lampy\.|mailto:/);
     expect(text).not.toMatch(/绝不丢失|完全不进入任何备份|重新安装就能恢复/);
     expect(text).not.toMatch(/任何数据都不会上传/);
+    expect(text).not.toMatch(/只在你打开本机保护时/);
+    expect(text).not.toMatch(/不等于已经核查过安装包|全部网络行为/);
+    expect(flatten(SETTINGS_PRIVACY_CHAPTERS)).toContain(
+      '本机保护开启后，进入 Lampy 或从后台返回时，由系统使用 Face ID 或设备密码进行认证。',
+    );
   });
 });
