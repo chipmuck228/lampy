@@ -79,8 +79,7 @@ import { shouldUseNavRail } from '../../screens/life-page';
 import { usePageMetrics } from '../../screens/use-page-metrics';
 import {
   lookbackCollectIsReady,
-  shouldApplyLookbackCollectLoad,
-  shouldApplyLookbackCollectWrite,
+  shouldApplyLookbackCollectResult,
 } from '../../screens/lookback-collect';
 import {
   collectAlbumIdFromParam,
@@ -269,17 +268,14 @@ export default function LookbackIndexScreen() {
     collectOpRef.current += 1;
   }, [collectAlbumId]);
 
-  useEffect(() => {
-    if (!collectAlbumId) return;
-    const albumId = collectAlbumId;
-    const generation = collectOpRef.current;
+  const fetchCollectMembership = useCallback((albumId: string, generation: number) => {
     getUseCases()
       .then((app) => app.getAlbum(albumId))
       .then((view) => {
         if (
-          !shouldApplyLookbackCollectLoad({
+          !shouldApplyLookbackCollectResult({
             targetId: collectTargetRef.current,
-            albumId,
+            requestAlbumId: albumId,
             generation,
             currentGeneration: collectOpRef.current,
           })
@@ -289,14 +285,15 @@ export default function LookbackIndexScreen() {
         collectLoadedRef.current = view.album.id;
         setCollectAlbum({ id: view.album.id, name: view.album.name });
         setCollectedIds(view.album.entries.map((entry) => entry.momentId));
+        setCollectBusyId(null);
         setCollectMissingId(null);
         setCollectError(null);
       })
       .catch((error) => {
         if (
-          !shouldApplyLookbackCollectLoad({
+          !shouldApplyLookbackCollectResult({
             targetId: collectTargetRef.current,
-            albumId,
+            requestAlbumId: albumId,
             generation,
             currentGeneration: collectOpRef.current,
           })
@@ -306,6 +303,7 @@ export default function LookbackIndexScreen() {
         collectLoadedRef.current = null;
         setCollectAlbum(null);
         setCollectedIds([]);
+        setCollectBusyId(null);
         if (toApplicationError(error).code === 'ALBUM_NOT_FOUND') {
           setCollectMissingId(albumId);
           setCollectError(null);
@@ -314,7 +312,20 @@ export default function LookbackIndexScreen() {
         setCollectMissingId(null);
         setCollectError(ALBUM_READ_FAILED);
       });
-  }, [collectAlbumId]);
+  }, []);
+
+  const refreshCollectMembership = useCallback(() => {
+    const albumId = collectTargetRef.current;
+    if (!albumId) return;
+    const generation = collectOpRef.current + 1;
+    collectOpRef.current = generation;
+    fetchCollectMembership(albumId, generation);
+  }, [fetchCollectMembership]);
+
+  useEffect(() => {
+    if (!collectAlbumId) return;
+    fetchCollectMembership(collectAlbumId, collectOpRef.current);
+  }, [collectAlbumId, fetchCollectMembership]);
 
   const loadPageForScope = useCallback(async (target: LookbackReadingScope, offset: number) => {
     const app = await getUseCases();
@@ -688,9 +699,8 @@ export default function LookbackIndexScreen() {
         ? await app.withdrawAlbumEntry({ albumId, momentId })
         : await app.collectAlbumEntry({ albumId, momentId });
       if (
-        !shouldApplyLookbackCollectWrite({
+        !shouldApplyLookbackCollectResult({
           targetId: collectTargetRef.current,
-          loadedId: collectLoadedRef.current,
           requestAlbumId: albumId,
           generation,
           currentGeneration: collectOpRef.current,
@@ -701,9 +711,8 @@ export default function LookbackIndexScreen() {
       setCollectedIds(next.album.entries.map((entry) => entry.momentId));
     } catch {
       if (
-        !shouldApplyLookbackCollectWrite({
+        !shouldApplyLookbackCollectResult({
           targetId: collectTargetRef.current,
-          loadedId: collectLoadedRef.current,
           requestAlbumId: albumId,
           generation,
           currentGeneration: collectOpRef.current,
@@ -714,9 +723,8 @@ export default function LookbackIndexScreen() {
       setCollectFailedIds((current) => (current.includes(momentId) ? current : [...current, momentId]));
     } finally {
       if (
-        shouldApplyLookbackCollectWrite({
+        shouldApplyLookbackCollectResult({
           targetId: collectTargetRef.current,
-          loadedId: collectLoadedRef.current,
           requestAlbumId: albumId,
           generation,
           currentGeneration: collectOpRef.current,
@@ -812,7 +820,8 @@ export default function LookbackIndexScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadBook();
+      refreshCollectMembership();
+      if (!viewRef.current) void loadBook();
       return () => {
         bookLoadGeneration.current += 1;
         readingGeneration.current += 1;
@@ -823,7 +832,7 @@ export default function LookbackIndexScreen() {
         if (leftover) writeLookbackBookIntent(leftover);
         void clipsRef.current.pause();
       };
-    }, [loadBook, writeCurrentSnapshot]),
+    }, [loadBook, refreshCollectMembership, writeCurrentSnapshot]),
   );
 
   useEffect(() => {

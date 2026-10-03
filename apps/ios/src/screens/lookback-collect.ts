@@ -7,13 +7,31 @@ export function lookbackCollectIsReady(
   return !!targetId && loadedId === targetId;
 }
 
+export function shouldApplyLookbackCollectResult(input: {
+  targetId: string | null;
+  requestAlbumId: string;
+  generation: number;
+  currentGeneration: number;
+}): boolean {
+  return (
+    !!input.targetId &&
+    input.targetId === input.requestAlbumId &&
+    input.generation === input.currentGeneration
+  );
+}
+
 export function shouldApplyLookbackCollectLoad(input: {
   targetId: string | null;
   albumId: string;
   generation: number;
   currentGeneration: number;
 }): boolean {
-  return input.targetId === input.albumId && input.generation === input.currentGeneration;
+  return shouldApplyLookbackCollectResult({
+    targetId: input.targetId,
+    requestAlbumId: input.albumId,
+    generation: input.generation,
+    currentGeneration: input.currentGeneration,
+  });
 }
 
 export function shouldApplyLookbackCollectWrite(input: {
@@ -25,7 +43,11 @@ export function shouldApplyLookbackCollectWrite(input: {
 }): boolean {
   return (
     lookbackCollectIsReady(input.targetId, input.loadedId) &&
-    input.requestAlbumId === input.targetId &&
-    input.generation === input.currentGeneration
+    shouldApplyLookbackCollectResult({
+      targetId: input.targetId,
+      requestAlbumId: input.requestAlbumId,
+      generation: input.generation,
+      currentGeneration: input.currentGeneration,
+    })
   );
 }

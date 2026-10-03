@@ -1,6 +1,7 @@
 import {
   lookbackCollectIsReady,
   shouldApplyLookbackCollectLoad,
+  shouldApplyLookbackCollectResult,
   shouldApplyLookbackCollectWrite,
 } from './lookback-collect';
 
@@ -29,6 +30,40 @@ describe('lookback collect generation', () => {
         currentGeneration: 2,
       }),
     ).toBe(true);
+  });
+
+  it('lets refresh and write share the same request eligibility', () => {
+    expect(
+      shouldApplyLookbackCollectResult({
+        targetId: 'album_1',
+        requestAlbumId: 'album_1',
+        generation: 2,
+        currentGeneration: 3,
+      }),
+    ).toBe(false);
+    expect(
+      shouldApplyLookbackCollectResult({
+        targetId: 'album_1',
+        requestAlbumId: 'album_1',
+        generation: 3,
+        currentGeneration: 3,
+      }),
+    ).toBe(true);
+    expect(
+      shouldApplyLookbackCollectLoad({
+        targetId: 'album_1',
+        albumId: 'album_1',
+        generation: 3,
+        currentGeneration: 3,
+      }),
+    ).toBe(
+      shouldApplyLookbackCollectResult({
+        targetId: 'album_1',
+        requestAlbumId: 'album_1',
+        generation: 3,
+        currentGeneration: 3,
+      }),
+    );
   });
 
   it('drops a late write unless it still matches the loaded target', () => {

@@ -20,10 +20,15 @@ const mockCard = jest.fn(() => ({ status: 'paused' as const, currentTimeMs: 900 
 
 let mockSearchParams: { o?: string; collect?: string } = {};
 const mockSearchListeners = new Set<() => void>();
+const mockFocusListeners = new Set<() => void>();
 
 function setMockSearchParams(next: { o?: string; collect?: string }) {
   mockSearchParams = next;
   mockSearchListeners.forEach((listener) => listener());
+}
+
+function emitLookbackFocus() {
+  mockFocusListeners.forEach((listener) => listener());
 }
 
 jest.mock('expo-router', () => {
@@ -38,7 +43,18 @@ jest.mock('expo-router', () => {
       setParams: mockSetParams,
     }),
     useFocusEffect: (effect: () => void | (() => void)) => {
-      useEffect(effect, [effect]);
+      useEffect(() => {
+        let cleanup = effect();
+        const onFocus = () => {
+          if (typeof cleanup === 'function') cleanup();
+          cleanup = effect();
+        };
+        mockFocusListeners.add(onFocus);
+        return () => {
+          mockFocusListeners.delete(onFocus);
+          if (typeof cleanup === 'function') cleanup();
+        };
+      }, [effect]);
     },
     useLocalSearchParams: () => {
       const [params, setParams] = useState(mockSearchParams);
@@ -190,6 +206,7 @@ describe('lookback collect mode', () => {
   beforeEach(() => {
     cleanup();
     mockSearchListeners.clear();
+    mockFocusListeners.clear();
     mockSearchParams = { o: 'lb-keep', collect: 'album_1' };
     mockGetLookbackBook.mockReset();
     mockGetHistoryMonth.mockReset();
@@ -246,6 +263,72 @@ describe('lookback collect mode', () => {
     expect(mockWithdraw).toHaveBeenCalledWith({ albumId: 'album_1', momentId: 'm28' });
     fireEvent.press(view.getByTestId('life-album-collect-exit'));
     expect(mockSetParams).toHaveBeenCalledWith({ collect: undefined, o: 'lb-keep' });
+  });
+
+  it('shows collected after returning from detail collect without reloading reading', async () => {
+    mockWithdraw.mockResolvedValue({
+      album: { id: 'album_1', name: '一些日子', entries: [] },
+    });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByText('正在收进《一些日子》')).toBeTruthy();
+      expect(view.getByLabelText('收进这一册')).toBeTruthy();
+      expect(view.getByTestId('lookback-reading-m28')).toBeTruthy();
+    });
+    const bookCalls = mockGetLookbackBook.mock.calls.length;
+    const dayCalls = mockGetHistoryDay.mock.calls.length;
+    mockGetAlbum.mockResolvedValue(albumView('album_1', '一些日子', ['m28']));
+    await act(async () => {
+      emitLookbackFocus();
+    });
+    await waitFor(() => {
+      expect(view.getByLabelText('已收下')).toBeTruthy();
+    });
+    expect(view.getByTestId('lookback-reading-m28')).toBeTruthy();
+    expect(mockGetLookbackBook.mock.calls.length).toBe(bookCalls);
+    expect(mockGetHistoryDay.mock.calls.length).toBe(dayCalls);
+    expect(mockCollect).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-collect-m28'));
+    });
+    await waitFor(() => {
+      expect(view.getByLabelText('收进这一册')).toBeTruthy();
+    });
+    expect(mockWithdraw).toHaveBeenCalledTimes(1);
+    expect(mockWithdraw).toHaveBeenCalledWith({ albumId: 'album_1', momentId: 'm28' });
+    expect(mockCollect).not.toHaveBeenCalled();
+  });
+
+  it('does not let a stale album read overwrite a newer collect', async () => {
+    const staleRead = deferred<ReturnType<typeof albumView>>();
+    mockCollect.mockResolvedValue({
+      album: {
+        id: 'album_1',
+        name: '一些日子',
+        entries: [{ momentId: 'm28', collectedAt: '2026-10-03T00:00:00.000Z', sourceRevisionAtCollect: 1 }],
+      },
+      inserted: true,
+      alreadyCollected: false,
+    });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByLabelText('收进这一册')).toBeTruthy();
+    });
+    mockGetAlbum.mockImplementation(() => staleRead.promise);
+    await act(async () => {
+      emitLookbackFocus();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-collect-m28'));
+    });
+    await waitFor(() => {
+      expect(view.getByLabelText('已收下')).toBeTruthy();
+    });
+    await act(async () => {
+      staleRead.resolve(albumView('album_1', '一些日子'));
+    });
+    expect(view.getByLabelText('已收下')).toBeTruthy();
+    expect(mockCollect).toHaveBeenCalledWith({ albumId: 'album_1', momentId: 'm28' });
   });
 
   it('hides collect actions while the catalog is open', async () => {
