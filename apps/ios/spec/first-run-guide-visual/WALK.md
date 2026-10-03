@@ -155,7 +155,7 @@ Jest：**首次 hide 失败后重试成功**、**连续失败停在 failed**、*
 
 | 项 | 结果 |
 | --- | --- |
-| 干净 checkout `tsc --noEmit` | **PASS**（exit 0，无输出）。预检树 = `a484ade` + 本轮源文件，无未跟踪 `apps/ios/app/`。工作树里的 `app/` 未删 |
+| 干净 checkout `tsc --noEmit` | **PASS**（exit 0，无输出）。checkout = `f6e46f97eb8ae8a56ee5be8eae3658211d391ccf`，无未跟踪 `apps/ios/app/`。工作树里的 `app/` 未删 |
 
 ## 仍需验证
 
@@ -173,5 +173,5 @@ Jest：**首次 hide 失败后重试成功**、**连续失败停在 failed**、*
 | 开分支时 GitHub `main` | `98e0fb6247ec672f916e7450bff0872847366a04` |
 | 测量／安全区基线 | `a2acdc7f640052baaa42822b85e4f98ed1424365` |
 | 审阅 SHA | `a484adee71b7ec0da446957a4a5e4bb35f8803f3` |
-| 实现 SHA | 推送后以 GitHub 为准 |
+| 实现 SHA | `f6e46f97eb8ae8a56ee5be8eae3658211d391ccf` |
 | PR | https://github.com/chipmuck228/lampy/pull/61 （保持 OPEN） |
