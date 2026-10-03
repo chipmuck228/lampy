@@ -71,5 +71,5 @@ Base：合并 #60 后的 `origin/main`。分支 `ios/first-run-guide-visual`。�
 | 项 | 值 |
 | --- | --- |
 | 开分支时 GitHub `main` | `98e0fb6247ec672f916e7450bff0872847366a04`（#60 merge） |
-| 实现 SHA | 待提交 |
-| PR head | 待推送 |
+| 实现 SHA | `7b93603d6247492dd0e4409cbc89b2062a14d4b4`（本地） |
+| PR head | 推送后以 GitHub 为准 |
