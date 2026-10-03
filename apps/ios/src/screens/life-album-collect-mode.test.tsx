@@ -265,7 +265,7 @@ describe('lookback collect mode', () => {
     expect(mockSetParams).toHaveBeenCalledWith({ collect: undefined, o: 'lb-keep' });
   });
 
-  it('shows collected after returning from detail collect without reloading reading', async () => {
+  it('shows collected after returning from detail collect and still reads the latest day', async () => {
     mockWithdraw.mockResolvedValue({
       album: { id: 'album_1', name: '一些日子', entries: [] },
     });
@@ -285,8 +285,8 @@ describe('lookback collect mode', () => {
       expect(view.getByLabelText('已收下')).toBeTruthy();
     });
     expect(view.getByTestId('lookback-reading-m28')).toBeTruthy();
-    expect(mockGetLookbackBook.mock.calls.length).toBe(bookCalls);
-    expect(mockGetHistoryDay.mock.calls.length).toBe(dayCalls);
+    expect(mockGetLookbackBook.mock.calls.length).toBeGreaterThan(bookCalls);
+    expect(mockGetHistoryDay.mock.calls.length).toBeGreaterThan(dayCalls);
     expect(mockCollect).not.toHaveBeenCalled();
     await act(async () => {
       fireEvent.press(view.getByTestId('life-album-collect-m28'));

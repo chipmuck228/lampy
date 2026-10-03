@@ -211,6 +211,7 @@ export default function LookbackIndexScreen() {
   const expandedIdsRef = useRef(expandedIds);
   const scrollYRef = useRef(0);
   const viewRef = useRef(view);
+  const expandRef = useRef(expand);
   const holdSeqRef = useRef(0);
   useEffect(() => {
     clipsRef.current = clips;
@@ -221,6 +222,7 @@ export default function LookbackIndexScreen() {
     readingRef.current = reading;
     expandedIdsRef.current = expandedIds;
     viewRef.current = view;
+    expandRef.current = expand;
   });
 
   useEffect(() => {
@@ -412,6 +414,7 @@ export default function LookbackIndexScreen() {
       snapshot?: LookbackReadingSnapshot | null;
       locate?: boolean;
       keepPlayer?: boolean;
+      preserveChrome?: boolean;
       count?: number;
     } = {},
   ) => {
@@ -426,8 +429,10 @@ export default function LookbackIndexScreen() {
     const fadeOutDone = hold ? readingFade.fadeOut(fadeStarted) : Promise.resolve(true);
     if (!hold) readingFade.hide(fadeStarted);
     if (!options.keepPlayer || !same) void clipsRef.current.pause();
-    setCatalogOpen(false);
-    setCatalogLocateKey(null);
+    if (!options.preserveChrome) {
+      setCatalogOpen(false);
+      setCatalogLocateKey(null);
+    }
     setPendingRestoreY(null);
     if (!hold) {
       setScope(target);
@@ -611,28 +616,28 @@ export default function LookbackIndexScreen() {
     }
   }, [loadScope, readingFade]);
 
-  const loadMonth = useCallback(async (year: number, month: number, locate = false) => {
+  const loadMonth = useCallback(async (year: number, month: number, locate = false, quiet = false) => {
     const generation = expandGeneration.current + 1;
     expandGeneration.current = generation;
-    setExpand({ year, month, status: 'loading' });
+    if (!quiet) setExpand({ year, month, status: 'loading' });
     try {
       const app = await getUseCases();
       const next = await app.getHistoryMonth(year, month);
       if (!mounted.current || !lookbackBookResponseIsCurrent(expandGeneration.current, generation)) return;
       if ('invalid' in next) {
-        setExpand(null);
+        if (!quiet) setExpand(null);
         return;
       }
       const page = lookbackMonthPage(next);
       if (!lookbackBookMonthOpenable({ dayCount: page.entries.length, dayUnconfirmedCount: page.dayUnconfirmedCount })) {
-        setExpand(null);
+        if (!quiet) setExpand(null);
         return;
       }
       setExpand({ year, month, status: 'ready', page });
       if (locate) beginCatalogLocate(lookbackBookLocateId({ year, month }));
     } catch {
       if (!mounted.current || !lookbackBookResponseIsCurrent(expandGeneration.current, generation)) return;
-      setExpand({ year, month, status: 'error' });
+      if (!quiet) setExpand({ year, month, status: 'error' });
     }
   }, [beginCatalogLocate]);
 
@@ -792,8 +797,9 @@ export default function LookbackIndexScreen() {
 
   const bookLoadGeneration = useRef(0);
   const pendingBookIntent = useRef<LookbackBookIntent | null>(null);
+  const loadBookRef = useRef<(mode?: 'open' | 'refocus') => Promise<void> | void>(() => undefined);
 
-  const loadBook = useCallback(() => {
+  const loadBook = useCallback((mode: 'open' | 'refocus' = 'open') => {
     const generation = ++bookLoadGeneration.current;
     pendingBookIntent.current = null;
     return getUseCases()
@@ -806,6 +812,39 @@ export default function LookbackIndexScreen() {
         setView(next);
         viewRef.current = next;
         setError(null);
+        if (mode === 'refocus' && !consumed) {
+          const current = scopeRef.current;
+          const page = readingRef.current;
+          if (current && (page.status === 'ready' || page.status === 'empty' || page.status === 'error')) {
+            const snapshot =
+              page.status === 'ready'
+                ? {
+                    scope: current,
+                    loadedOffset: page.loadedOffset,
+                    expandedIds: expandedIdsRef.current,
+                    scrollY: scrollYRef.current,
+                  }
+                : readLookbackReadingSnapshot();
+            await loadScope(current, {
+              snapshot,
+              keepPlayer: true,
+              preserveChrome: true,
+            });
+            const opened = expandRef.current;
+            if (
+              generation === bookLoadGeneration.current &&
+              mounted.current &&
+              opened &&
+              (opened.status === 'ready' || opened.status === 'error')
+            ) {
+              await loadMonthRef.current(opened.year, opened.month, false, true);
+            }
+            if (generation === bookLoadGeneration.current && mounted.current) {
+              pendingBookIntent.current = null;
+            }
+            return;
+          }
+        }
         const snapshot = consumed ? null : readLookbackReadingSnapshot();
         await applyIntent(consumed, snapshot, next);
         if (generation === bookLoadGeneration.current && mounted.current) {
@@ -816,12 +855,15 @@ export default function LookbackIndexScreen() {
         if (generation !== bookLoadGeneration.current || !mounted.current) return;
         setError('回看暂时读不出来，原来的记录还在。');
       });
-  }, [applyIntent]);
+  }, [applyIntent, loadScope]);
+  useEffect(() => {
+    loadBookRef.current = loadBook;
+  });
 
   useFocusEffect(
     useCallback(() => {
       refreshCollectMembership();
-      if (!viewRef.current) void loadBook();
+      void loadBookRef.current(viewRef.current ? 'refocus' : 'open');
       return () => {
         bookLoadGeneration.current += 1;
         readingGeneration.current += 1;
@@ -832,7 +874,7 @@ export default function LookbackIndexScreen() {
         if (leftover) writeLookbackBookIntent(leftover);
         void clipsRef.current.pause();
       };
-    }, [loadBook, refreshCollectMembership, writeCurrentSnapshot]),
+    }, [refreshCollectMembership, writeCurrentSnapshot]),
   );
 
   useEffect(() => {
