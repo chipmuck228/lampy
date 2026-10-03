@@ -22,4 +22,5 @@
 | `personal-visual-details/` | 感受色点、回看日期行、首次三屏。运行中实现 |
 | `testflight-beta-1/` | 第一份 TestFlight 预发布准备。不上传、不邀请 |
 | `lookback-expand/` | #35 当时的年页展开契约。产品效力见 `lookback-book/`；#36 是 B 的备选实现 |
+| `life-album/` | 生活册阶段 A：设计、数据契约与合成整册样本。不写运行代码，不开始 B–E |
 | `adr/` | `0001`–`0006`。`0006` 已接受：身份、成员、快照矛盾结论 |

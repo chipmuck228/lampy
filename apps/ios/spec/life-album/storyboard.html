@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <title>生活册 · 同屏状态对照</title>
+  <style>
+    :root { --paper:#F3F0E9; --ink:#25231F; --soft:#5C5851; --sage:#53604F; --line:rgba(37,35,31,.16); --mark:#87513D; }
+    body { margin:0; background:#e4dfd4; color:var(--ink); font:16px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; }
+    main { max-width:1180px; margin:0 auto; padding:32px 24px 100px; }
+    h1 { font-size:28px; font-weight:500; margin:0 0 8px; }
+    h2 { font-size:20px; font-weight:500; margin:48px 0 12px; }
+    p, li { color:var(--soft); }
+    .lead { font-size:17px; max-width:760px; }
+    .row { display:flex; flex-wrap:wrap; gap:24px; align-items:start; }
+    .phone { background:var(--paper); width:260px; height:540px; padding:20px 18px 0; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; }
+    .kicker { font-size:11px; letter-spacing:.1em; color:var(--soft); }
+    .title { font-size:24px; line-height:30px; margin:4px 0 0; }
+    .hero { display:flex; justify-content:space-between; align-items:flex-start; }
+    .icon { width:28px; height:28px; border:1px solid var(--sage); color:var(--sage); font-size:11px; display:flex; align-items:center; justify-content:center; }
+    .meta { font-size:13px; color:var(--sage); }
+    .hit { min-height:40px; display:flex; align-items:center; font-size:15px; color:var(--sage); }
+    .note { font-size:16px; line-height:26px; color:var(--ink); margin:6px 0; }
+    .bar { background:#e8e1d5; margin:0 -18px; padding:8px 18px; font-size:13px; color:var(--ink); display:flex; justify-content:space-between; }
+    .band { margin-top:auto; border-top:1px solid var(--line); display:flex; justify-content:space-between; padding:10px 0 14px; font-size:14px; color:var(--sage); }
+    .fab { align-self:flex-end; background:var(--sage); color:#fff; border-radius:20px; padding:8px 12px; font-size:13px; margin-bottom:8px; }
+    .cap { font-size:13px; color:var(--sage); max-width:260px; margin:8px 0 0; }
+    .sheet { border-top:1px solid var(--line); margin-top:auto; padding:10px 0 16px; }
+    .ban { color:var(--mark); font-size:13px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>生活册 · 同屏状态</h1>
+  <p class="lead">对照稿，不是原生走查。整册纸页见 <a href="sample/index.html">sample/index.html</a>。底带仍是最近／回看。不画假价格。</p>
+
+  <h2>1. 回看：普通 / 收集</h2>
+  <div class="row">
+    <div>
+      <div class="phone">
+        <div class="hero">
+          <div>
+            <div class="kicker">LAMPY · 时间里的记录</div>
+            <div class="title">回看</div>
+            <div class="meta">慢慢看</div>
+          </div>
+          <div class="icon" title="text.book.closed">册</div>
+        </div>
+        <div class="hit">时间目录<br />2024年9月</div>
+        <div class="note">楼下的风比昨天软。</div>
+        <div class="meta">平静</div>
+        <div class="fab">＋ 留下</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">右上生活册图标，与原位「时间目录」分开。留下仍在。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="bar"><span>正在收进「一些日子」</span><span>退出</span></div>
+        <div class="kicker">LAMPY · 时间里的记录</div>
+        <div class="title">回看</div>
+        <div class="hit">时间目录<br />2024年9月</div>
+        <div class="note">楼下的风比昨天软。</div>
+        <div class="hit">收进这一册</div>
+        <div class="note">把杯子洗了。</div>
+        <div class="hit">已收下</div>
+        <div class="hit">看看这一册</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">同一阅读树。低强调收进。退出不等于放弃整册。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="hero">
+          <div>
+            <div class="kicker">LAMPY · 时间里的记录</div>
+            <div class="title">回看</div>
+          </div>
+          <div class="icon" style="opacity:.35">册</div>
+        </div>
+        <div class="hit">时间目录 · 收起<br />2024年9月</div>
+        <div class="meta">2024年</div>
+        <div class="hit">9月 · 有记录</div>
+        <div class="hit">9月3日</div>
+        <div class="note">楼下的风比昨天软。</div>
+        <div class="band"><span>最近</span><span>回看</span></div>
+      </div>
+      <p class="cap">目录原位展开。正文仍挂着、仍可读。生活册与留下禁用。不是覆盖层。</p>
+    </div>
+  </div>
+
+  <h2>2. 空册 / 新建 / 设置</h2>
+  <div class="row">
+    <div>
+      <div class="phone">
+        <div class="hit">本机设置</div>
+        <div class="title">我的生活册</div>
+        <p class="note">把一些日子，放在一起。</p>
+        <p class="meta">先收下一条，也可以慢慢添。</p>
+        <div class="hit">新建一册</div>
+      </div>
+      <p class="cap">空状态三句原文。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="hit">返回</div>
+        <div class="title">新建一册</div>
+        <p class="meta">册名</p>
+        <p class="note">一些日子</p>
+        <div class="hit">做成一册</div>
+      </div>
+      <p class="cap">只填名称。默认「一些日子」。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="title">本机设置</div>
+        <div class="hit">本机保护</div>
+        <div class="hit">记录与存储</div>
+        <div class="hit">我的生活册</div>
+        <div class="hit">订阅与付费 · 目前没有付费项目</div>
+        <p class="ban">此处不出现价格或购买。</p>
+      </div>
+      <p class="cap">设置入口。付费页保持现状句。</p>
+    </div>
+  </div>
+
+  <h2>3. 菜单收进 / 预览</h2>
+  <div class="row">
+    <div>
+      <div class="phone">
+        <div class="hit">返回原来的位置</div>
+        <div class="title">9月3日</div>
+        <p class="note">楼下的风比昨天软。</p>
+        <div class="sheet">
+          <div class="hit">收进生活册</div>
+          <div class="meta">不在正文下做永久大按钮</div>
+        </div>
+      </div>
+      <p class="cap">详情溢出菜单。家庭分享仍只在家庭入口打开时出现。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="title">收进哪一册</div>
+        <div class="hit">一些日子</div>
+        <div class="hit">示例册 · 窗边 · 已在这一册</div>
+        <div class="hit">新建一册</div>
+      </div>
+      <p class="cap">普通模式选册。已收入的不能再收。</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="kicker">看看这一册</div>
+        <div class="title">一些日子</div>
+        <p class="meta">封面页 · 1 / 8</p>
+        <p class="note" style="margin-top:48px;text-align:center">一些日子</p>
+        <div class="band"><span>上一页</span><span>下一页</span></div>
+      </div>
+      <p class="cap">预览用同一份分页。无购买按钮。</p>
+    </div>
+  </div>
+</main>
+</body>
+</html>
