@@ -76,6 +76,28 @@ const MIGRATIONS = [
     prefix TEXT PRIMARY KEY NOT NULL,
     created_at TEXT NOT NULL
   );`,
+  `CREATE TABLE IF NOT EXISTS life_albums (
+    id TEXT PRIMARY KEY NOT NULL,
+    owner_id TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    opening TEXT,
+    cover_kind TEXT NOT NULL,
+    cover_moment_id TEXT,
+    cover_asset_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS life_album_entries (
+    album_id TEXT NOT NULL,
+    moment_id TEXT NOT NULL,
+    collected_at TEXT NOT NULL,
+    source_revision_at_collect INTEGER NOT NULL,
+    sort_order INTEGER NOT NULL,
+    PRIMARY KEY (album_id, moment_id)
+  );`,
+  `CREATE INDEX IF NOT EXISTS life_album_entries_album_order
+    ON life_album_entries (album_id, sort_order);`,
 ];
 
 export async function applyLampySchema(db: SqlDatabase): Promise<void> {

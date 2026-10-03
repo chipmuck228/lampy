@@ -20,6 +20,9 @@ import {
   readingPageWidth,
   sage,
 } from '../../screens/life-page';
+import { ALBUM_COLLECT_MENU } from '../../application/life-album';
+import { LifeAlbumCollectSheet } from '../../screens/life-album-collect-sheet';
+import { LifeIconButton } from '../../screens/life-icons';
 import { useSoundPlayer } from '../../screens/use-sound-player';
 import { usePageMetrics } from '../../screens/use-page-metrics';
 
@@ -34,6 +37,7 @@ export default function MomentDetailScreen() {
   const momentId = rawId ? decodeURIComponent(rawId) : '';
   const [view, setView] = useState<MomentDetailViewModel | null>(null);
   const [loadKey, setLoadKey] = useState(0);
+  const [collectOpen, setCollectOpen] = useState(false);
   const sound = useSoundPlayer();
 
   useEffect(() => {
@@ -71,6 +75,15 @@ export default function MomentDetailScreen() {
         >
           <Text style={styles.back}>返回原来的位置</Text>
         </Pressable>
+        {view?.kind === 'ready' ? (
+          <LifeIconButton
+            name="more"
+            label={ALBUM_COLLECT_MENU}
+            testID="moment-overflow"
+            size={20}
+            onPress={() => setCollectOpen(true)}
+          />
+        ) : null}
       </View>
       <ScrollView
         testID="detail-scroll"
@@ -157,6 +170,13 @@ export default function MomentDetailScreen() {
           </View>
         ) : null}
       </ScrollView>
+      {view?.kind === 'ready' && collectOpen ? (
+        <LifeAlbumCollectSheet
+          visible
+          momentId={view.id}
+          onClose={() => setCollectOpen(false)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -167,6 +187,9 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   scroll: { flex: 1, width: '100%' },
   column: {

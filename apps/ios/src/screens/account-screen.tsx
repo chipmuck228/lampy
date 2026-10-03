@@ -381,6 +381,13 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
             testID="account-open-storage"
             onPress={() => router.push('/account/storage')}
           />
+          <SettingsLink
+            icon="album"
+            title="我的生活册"
+            detail="收在这台设备上"
+            testID="account-open-albums"
+            onPress={() => router.push('/albums')}
+          />
         </SettingsGroup>
         <SettingsGroup title="Lampy">
           <SettingsLink

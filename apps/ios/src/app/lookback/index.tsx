@@ -12,6 +12,8 @@ import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUseCases } from '../../application/container';
+import { toApplicationError } from '../../application/errors';
+import { ALBUM_READ_FAILED } from '../../application/life-album';
 import type { HistoryMomentItem } from '../../application/history-use-cases';
 import {
   lookbackBookLocateId,
@@ -71,13 +73,17 @@ import {
   useLookbackLayout,
 } from '../../screens/lookback-chrome';
 import { lookbackCatalogChromeHeight, lookbackCatalogMaxHeight } from '../../screens/lookback-catalog';
+import { LifeIconButton } from '../../screens/life-icons';
+import { LifeAlbumCollectAction, LifeAlbumCollectBanner } from '../../screens/life-album-collect';
 import { shouldUseNavRail } from '../../screens/life-page';
 import { usePageMetrics } from '../../screens/use-page-metrics';
 import {
+  collectAlbumIdFromParam,
   firstSearchParam,
   forgetLookbackOrigin,
   goToRecentFromLookbackRoot,
   leaveHref,
+  lookbackParamsWithoutCollect,
   shouldBackToRecent,
 } from '../../screens/lookback-origin';
 import {
@@ -134,8 +140,9 @@ function persistSnapshot(next: LookbackReadingSnapshot | null) {
 export default function LookbackIndexScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const { o } = useLocalSearchParams<{ o?: string | string[] }>();
-  const originToken = firstSearchParam(o);
+  const lookbackParams = useLocalSearchParams<{ o?: string | string[]; collect?: string | string[] }>();
+  const originToken = firstSearchParam(lookbackParams.o);
+  const collectAlbumId = collectAlbumIdFromParam(lookbackParams.collect);
   const { readingWidth } = useLookbackLayout();
   const insets = useSafeAreaInsets();
   const { width, height } = usePageMetrics();
@@ -164,6 +171,14 @@ export default function LookbackIndexScreen() {
   const [restoreSeq, setRestoreSeq] = useState(0);
   const [holdWindowY, setHoldWindowY] = useState<number | null>(null);
   const [holdSeq, setHoldSeq] = useState(0);
+  const [collectAlbum, setCollectAlbum] = useState<{ id: string; name: string } | null>(null);
+  const [collectMissingId, setCollectMissingId] = useState<string | null>(null);
+  const [collectError, setCollectError] = useState<string | null>(null);
+  const [collectedIds, setCollectedIds] = useState<string[]>([]);
+  const [collectBusyId, setCollectBusyId] = useState<string | null>(null);
+  const [collectFailedIds, setCollectFailedIds] = useState<string[]>([]);
+  const collectTargetRef = useRef<string | null>(null);
+  const collectOpRef = useRef(0);
   const locateSeqRef = useRef(0);
   const catalogLocateSeqRef = useRef(0);
   const expandGeneration = useRef(0);
@@ -231,6 +246,35 @@ export default function LookbackIndexScreen() {
       scrollY: scrollYRef.current,
     });
   }, []);
+
+  useEffect(() => {
+    collectTargetRef.current = collectAlbumId;
+    if (!collectAlbumId) return;
+    const albumId = collectAlbumId;
+    const generation = collectOpRef.current + 1;
+    collectOpRef.current = generation;
+    getUseCases()
+      .then((app) => app.getAlbum(albumId))
+      .then((view) => {
+        if (collectTargetRef.current !== albumId || collectOpRef.current !== generation) return;
+        setCollectAlbum({ id: view.album.id, name: view.album.name });
+        setCollectedIds(view.album.entries.map((entry) => entry.momentId));
+        setCollectMissingId(null);
+        setCollectError(null);
+      })
+      .catch((error) => {
+        if (collectTargetRef.current !== albumId || collectOpRef.current !== generation) return;
+        setCollectAlbum(null);
+        setCollectedIds([]);
+        if (toApplicationError(error).code === 'ALBUM_NOT_FOUND') {
+          setCollectMissingId(albumId);
+          setCollectError(null);
+          return;
+        }
+        setCollectMissingId(null);
+        setCollectError(ALBUM_READ_FAILED);
+      });
+  }, [collectAlbumId]);
 
   const loadPageForScope = useCallback(async (target: LookbackReadingScope, offset: number) => {
     const app = await getUseCases();
@@ -589,6 +633,32 @@ export default function LookbackIndexScreen() {
     });
   }, [holdReadingThen]);
 
+  const toggleCollect = useCallback(async (momentId: string) => {
+    const albumId = collectTargetRef.current;
+    if (!albumId || catalogOpenRef.current) return;
+    if (collectBusyId === momentId) return;
+    const generation = collectOpRef.current + 1;
+    collectOpRef.current = generation;
+    setCollectBusyId(momentId);
+    setCollectFailedIds((current) => current.filter((id) => id !== momentId));
+    try {
+      const app = await getUseCases();
+      const already = collectedIds.includes(momentId);
+      const next = already
+        ? await app.withdrawAlbumEntry({ albumId, momentId })
+        : await app.collectAlbumEntry({ albumId, momentId });
+      if (collectTargetRef.current !== albumId || collectOpRef.current !== generation) return;
+      setCollectedIds(next.album.entries.map((entry) => entry.momentId));
+    } catch {
+      if (collectTargetRef.current !== albumId || collectOpRef.current !== generation) return;
+      setCollectFailedIds((current) => (current.includes(momentId) ? current : [...current, momentId]));
+    } finally {
+      if (collectTargetRef.current === albumId && collectOpRef.current === generation) {
+        setCollectBusyId(null);
+      }
+    }
+  }, [collectBusyId, collectedIds]);
+
   const loadScopeRef = useRef(loadScope);
   const runDefaultRef = useRef(runDefault);
   const loadMonthRef = useRef(loadMonth);
@@ -935,21 +1005,52 @@ export default function LookbackIndexScreen() {
           patchLookbackReadingSnapshot({ scrollY: offsetY });
         }
       }}
+      headerTrailing={
+        catalogOpen ? null : (
+          <LifeIconButton
+            name="album"
+            label="我的生活册"
+            testID="lookback-life-album"
+            size={20}
+            onPress={() => {
+              writeCurrentSnapshot();
+              router.push('/albums?from=lookback');
+            }}
+          />
+        )
+      }
       headerAction={
-        view && !emptyLibrary ? (
-          <View>
-            <LookbackCatalogToggle
-              range={lookbackCatalogRangeCaption(scope)}
-              expanded={catalogOpen}
-              toggleRef={changeDayRef}
-              onPress={() => {
-                if (catalogOpenRef.current) closeCatalog();
-                else openCatalog();
+        <>
+          {collectAlbumId ? (
+            <LifeAlbumCollectBanner
+              name={collectAlbum?.id === collectAlbumId ? collectAlbum.name : undefined}
+              missing={collectMissingId === collectAlbumId}
+              loading={!collectAlbum && collectMissingId !== collectAlbumId && !collectError}
+              error={collectError}
+              onExit={() => {
+                const kept = lookbackParamsWithoutCollect(lookbackParams);
+                router.setParams({
+                  collect: undefined,
+                  ...(kept.o ? { o: kept.o } : {}),
+                });
               }}
             />
-            {catalog}
-          </View>
-        ) : null
+          ) : null}
+          {view && !emptyLibrary ? (
+            <View>
+              <LookbackCatalogToggle
+                range={lookbackCatalogRangeCaption(scope)}
+                expanded={catalogOpen}
+                toggleRef={changeDayRef}
+                onPress={() => {
+                  if (catalogOpenRef.current) closeCatalog();
+                  else openCatalog();
+                }}
+              />
+              {catalog}
+            </View>
+          ) : null}
+        </>
       }
       onGoRecent={() => {
         const openedFromRecent = shouldBackToRecent({
@@ -1061,6 +1162,20 @@ export default function LookbackIndexScreen() {
               onPause={() => {
                 void clips.pause();
               }}
+              footer={
+                collectAlbumId && collectAlbum && !catalogOpen && collectMissingId !== collectAlbumId ? (
+                  <LifeAlbumCollectAction
+                    collected={collectedIds.includes(entry.id)}
+                    busy={collectBusyId === entry.id}
+                    disabled={!!collectBusyId && collectBusyId !== entry.id}
+                    error={collectFailedIds.includes(entry.id)}
+                    testID={`life-album-collect-${entry.id}`}
+                    onPress={() => {
+                      void toggleCollect(entry.id);
+                    }}
+                  />
+                ) : null
+              }
             />
           ))
         : null}

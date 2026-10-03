@@ -10,6 +10,7 @@ import type {
   MomentRead,
   MomentRepository,
 } from './repositories';
+import { createSqliteLifeAlbumRepository } from './life-album-repository';
 import type { SqlDatabase } from './sql';
 
 const hash = require('@lampy/domain/shared/hash.js') as { hashCode: (value: string) => number };
@@ -142,6 +143,7 @@ export function createSqliteRepositories(db: SqlDatabase): {
   moments: MomentRepository;
   drafts: DraftRepository;
   assets: AssetRepository;
+  albums: ReturnType<typeof createSqliteLifeAlbumRepository>;
 } {
   return {
     moments: {
@@ -411,6 +413,7 @@ export function createSqliteRepositories(db: SqlDatabase): {
         await db.run('DELETE FROM assets WHERE id = ?', [assetId]);
       },
     },
+    albums: createSqliteLifeAlbumRepository(db),
   };
 }
 
