@@ -75,7 +75,11 @@ export function LifeAlbumCollectAction({
         accessibilityState={{ disabled: !!disabled || !!busy, selected: collected }}
         accessibilityLabel={label}
         testID={testID}
-        onPress={disabled || busy ? undefined : onPress}
+        disabled={!!disabled || !!busy}
+        onPress={() => {
+          if (disabled || busy) return;
+          onPress();
+        }}
         style={styles.hit}
       >
         <Text style={[styles.collect, (disabled || busy) && styles.disabled]}>{label}</Text>

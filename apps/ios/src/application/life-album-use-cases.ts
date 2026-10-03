@@ -12,6 +12,8 @@ import {
   ALBUM_GONE,
   ALBUM_WRITE_FAILED,
   LIFE_ALBUM_SCHEMA_VERSION,
+  albumMediaHint,
+  albumNoteExcerpt,
   normalizeAlbumName,
   normalizeAlbumOpening,
   type AlbumCover,
@@ -108,13 +110,6 @@ export function createLifeAlbumUseCases(deps: {
     return album;
   }
 
-  async function sourceOf(momentId: string): Promise<AlbumEntrySource> {
-    const found = await deps.moments.findById(momentId);
-    if (found.kind === 'ready') return 'ready';
-    if (found.kind === 'unreadable') return 'unreadable';
-    return 'missing';
-  }
-
   async function coverAfterRemoving(album: Awaited<ReturnType<typeof requireAlbum>>, momentId: string) {
     if (album.cover.kind === 'image' && album.cover.momentId === momentId) {
       return { kind: 'words' as const };
@@ -183,16 +178,53 @@ export function createLifeAlbumUseCases(deps: {
     return candidates;
   }
 
+  async function describeEntry(momentId: string): Promise<{
+    source: AlbumEntrySource;
+    noteExcerpt: string | null;
+    dateLabel: string | null;
+    mediaHint: string | null;
+  }> {
+    const found = await deps.moments.findById(momentId);
+    if (found.kind !== 'ready') {
+      return {
+        source: found.kind === 'unreadable' ? 'unreadable' : 'missing',
+        noteExcerpt: null,
+        dateLabel: null,
+        mediaHint: null,
+      };
+    }
+    let photoCount = 0;
+    let hasAudio = false;
+    if (deps.assets) {
+      for (const assetId of found.moment.assetIds) {
+        const asset = await deps.assets.findById(assetId);
+        if (asset.kind !== 'ready') continue;
+        if (asset.asset.type === 'image') photoCount += 1;
+        if (asset.asset.type === 'audio') hasAudio = true;
+      }
+    }
+    const occurred = found.moment.time.occurredAt;
+    const dateIso = occurred || found.moment.time.recordedAt;
+    const dated = formatCollectedAt(dateIso, viewerClock);
+    return {
+      source: 'ready',
+      noteExcerpt: albumNoteExcerpt(found.moment.content.note),
+      dateLabel: occurred ? dated : dated ? `记录于 ${dated}` : null,
+      mediaHint: albumMediaHint({ photoCount, hasAudio }),
+    };
+  }
+
   async function toManageView(albumId: string): Promise<AlbumManageView> {
     const album = await requireAlbum(albumId);
     const records = await albums.listEntries(albumId);
     const entries: AlbumEntryView[] = [];
     for (const record of records) {
+      const described = await describeEntry(record.momentId);
       entries.push({
         momentId: record.momentId,
         collectedAt: record.collectedAt,
         sourceRevisionAtCollect: record.sourceRevisionAtCollect,
-        source: await sourceOf(record.momentId),
+        ...described,
       });
     }
     return {

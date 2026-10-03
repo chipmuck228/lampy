@@ -45,7 +45,26 @@ export type AlbumEntrySource = 'ready' | 'missing' | 'unreadable';
 
 export type AlbumEntryView = AlbumEntry & {
   source: AlbumEntrySource;
+  noteExcerpt: string | null;
+  dateLabel: string | null;
+  mediaHint: string | null;
 };
+
+export const ALBUM_NOTE_EXCERPT_MAX = 36;
+
+export function albumNoteExcerpt(note: string | undefined | null, max = ALBUM_NOTE_EXCERPT_MAX): string | null {
+  const trimmed = (note ?? '').replace(/\s+/g, ' ').trim();
+  if (!trimmed) return null;
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max)}…`;
+}
+
+export function albumMediaHint(input: { photoCount: number; hasAudio: boolean }): string | null {
+  const parts: string[] = [];
+  if (input.photoCount > 0) parts.push(input.photoCount === 1 ? '有照片' : `有${input.photoCount}张照片`);
+  if (input.hasAudio) parts.push('有声音');
+  return parts.length ? parts.join(' · ') : null;
+}
 
 export type AlbumListItem = {
   id: string;

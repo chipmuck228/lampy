@@ -19,10 +19,16 @@ const mockPause = jest.fn(async () => undefined);
 const mockCard = jest.fn(() => ({ status: 'paused' as const, currentTimeMs: 900 }));
 
 let mockSearchParams: { o?: string; collect?: string } = {};
+const mockSearchListeners = new Set<() => void>();
+
+function setMockSearchParams(next: { o?: string; collect?: string }) {
+  mockSearchParams = next;
+  mockSearchListeners.forEach((listener) => listener());
+}
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { useEffect } = require('react');
+  const { useEffect, useState } = require('react');
   return {
     useRouter: () => ({
       push: jest.fn(),
@@ -34,7 +40,17 @@ jest.mock('expo-router', () => {
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
-    useLocalSearchParams: () => mockSearchParams,
+    useLocalSearchParams: () => {
+      const [params, setParams] = useState(mockSearchParams);
+      useEffect(() => {
+        const sync = () => setParams(mockSearchParams);
+        mockSearchListeners.add(sync);
+        return () => {
+          mockSearchListeners.delete(sync);
+        };
+      }, []);
+      return params;
+    },
     useNavigation: () => ({
       getState: () => ({ index: 0, routes: [{ name: 'lookback/index' }] }),
       addListener: () => () => undefined,
@@ -97,6 +113,35 @@ function momentItem(id: string, note: string) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
+function albumView(id: string, name: string, momentIds: string[] = []) {
+  return {
+    album: {
+      id,
+      name,
+      opening: null,
+      cover: { kind: 'words' as const },
+      entries: momentIds.map((momentId) => ({
+        momentId,
+        collectedAt: '2026-10-03T00:00:00.000Z',
+        sourceRevisionAtCollect: 1,
+      })),
+      createdAt: '2026-10-03T00:00:00.000Z',
+      updatedAt: '2026-10-03T00:00:00.000Z',
+      schemaVersion: 1,
+    },
+    entries: [],
+    coverCandidates: [],
+  };
+}
+
 function armBook() {
   mockGetLookbackBook.mockResolvedValue({
     unknownCount: 0,
@@ -131,20 +176,7 @@ function armBook() {
     hasMore: false,
     totalCount: 1,
   });
-  mockGetAlbum.mockResolvedValue({
-    album: {
-      id: 'album_1',
-      name: '一些日子',
-      opening: null,
-      cover: { kind: 'words' },
-      entries: [],
-      createdAt: '2026-10-03T00:00:00.000Z',
-      updatedAt: '2026-10-03T00:00:00.000Z',
-      schemaVersion: 1,
-    },
-    entries: [],
-    coverCandidates: [],
-  });
+  mockGetAlbum.mockResolvedValue(albumView('album_1', '一些日子'));
 }
 
 describe('lookback collect mode', () => {
@@ -157,6 +189,7 @@ describe('lookback collect mode', () => {
 
   beforeEach(() => {
     cleanup();
+    mockSearchListeners.clear();
     mockSearchParams = { o: 'lb-keep', collect: 'album_1' };
     mockGetLookbackBook.mockReset();
     mockGetHistoryMonth.mockReset();
@@ -244,5 +277,132 @@ describe('lookback collect mode', () => {
     expect(view.getByTestId('lookback-reading-m28')).toBeTruthy();
     fireEvent.press(view.getByTestId('life-album-collect-exit'));
     expect(mockSetParams).toHaveBeenCalledWith({ collect: undefined, o: 'lb-keep' });
+  });
+
+  it('does not use album A collected state after switching to B', async () => {
+    const loadB = deferred<ReturnType<typeof albumView>>();
+    mockGetAlbum.mockImplementation((id: string) => {
+      if (id === 'album_a') return Promise.resolve(albumView('album_a', '春天', ['m28']));
+      if (id === 'album_b') return loadB.promise;
+      return Promise.reject(new Error(id));
+    });
+    mockCollect.mockResolvedValue({
+      album: {
+        id: 'album_b',
+        name: '夏天',
+        entries: [{ momentId: 'm28', collectedAt: '2026-10-03T00:00:00.000Z', sourceRevisionAtCollect: 1 }],
+      },
+      inserted: true,
+      alreadyCollected: false,
+    });
+    setMockSearchParams({ o: 'lb-keep', collect: 'album_a' });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByText('正在收进《春天》')).toBeTruthy();
+      expect(view.getByLabelText('已收下')).toBeTruthy();
+    });
+    await act(async () => {
+      setMockSearchParams({ o: 'lb-keep', collect: 'album_b' });
+    });
+    expect(view.queryByTestId('life-album-collect-m28')).toBeNull();
+    await act(async () => {
+      loadB.resolve(albumView('album_b', '夏天'));
+    });
+    await waitFor(() => {
+      expect(view.getByText('正在收进《夏天》')).toBeTruthy();
+      expect(view.getByLabelText('收进这一册')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-collect-m28'));
+    });
+    await waitFor(() => {
+      expect(mockCollect).toHaveBeenCalledWith({ albumId: 'album_b', momentId: 'm28' });
+    });
+    expect(mockWithdraw).not.toHaveBeenCalled();
+  });
+
+  it('reloads album A after A to B to A without keeping B', async () => {
+    const loadB = deferred<ReturnType<typeof albumView>>();
+    mockGetAlbum.mockImplementation((id: string) => {
+      if (id === 'album_a') return Promise.resolve(albumView('album_a', '春天', ['m28']));
+      if (id === 'album_b') return loadB.promise;
+      return Promise.reject(new Error(id));
+    });
+    setMockSearchParams({ o: 'lb-keep', collect: 'album_a' });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByText('正在收进《春天》')).toBeTruthy();
+      expect(view.getByLabelText('已收下')).toBeTruthy();
+    });
+    await act(async () => {
+      setMockSearchParams({ o: 'lb-keep', collect: 'album_b' });
+    });
+    expect(view.queryByTestId('life-album-collect-m28')).toBeNull();
+    await act(async () => {
+      setMockSearchParams({ o: 'lb-keep', collect: 'album_a' });
+    });
+    await act(async () => {
+      loadB.resolve(albumView('album_b', '夏天'));
+    });
+    await waitFor(() => {
+      expect(view.getByText('正在收进《春天》')).toBeTruthy();
+      expect(view.getByLabelText('已收下')).toBeTruthy();
+    });
+    expect(view.queryByText('正在收进《夏天》')).toBeNull();
+  });
+
+  it('ignores a late collect result after the target album changed', async () => {
+    const writeA = deferred<{
+      album: { id: string; name: string; entries: { momentId: string }[] };
+    }>();
+    mockGetAlbum.mockImplementation(async (id: string) => {
+      if (id === 'album_a') return albumView('album_a', '春天');
+      if (id === 'album_b') return albumView('album_b', '夏天');
+      throw new Error(id);
+    });
+    mockCollect.mockImplementation((input: { albumId: string }) => {
+      if (input.albumId === 'album_a') return writeA.promise;
+      return Promise.resolve({
+        album: {
+          id: 'album_b',
+          name: '夏天',
+          entries: [{ momentId: 'm28', collectedAt: '2026-10-03T00:00:00.000Z', sourceRevisionAtCollect: 1 }],
+        },
+        inserted: true,
+        alreadyCollected: false,
+      });
+    });
+    setMockSearchParams({ o: 'lb-keep', collect: 'album_a' });
+    const view = await render(wrap(<LookbackIndexScreen />));
+    await waitFor(() => {
+      expect(view.getByText('正在收进《春天》')).toBeTruthy();
+      expect(view.getByTestId('life-album-collect-m28')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-collect-m28'));
+    });
+    await act(async () => {
+      setMockSearchParams({ o: 'lb-keep', collect: 'album_b' });
+    });
+    await waitFor(() => {
+      expect(view.getByText('正在收进《夏天》')).toBeTruthy();
+      expect(view.getByLabelText('收进这一册')).toBeTruthy();
+    });
+    await act(async () => {
+      writeA.resolve({
+        album: {
+          id: 'album_a',
+          name: '春天',
+          entries: [{ momentId: 'm28' }],
+        },
+      });
+    });
+    expect(view.getByLabelText('收进这一册')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-collect-m28'));
+    });
+    await waitFor(() => {
+      expect(mockCollect).toHaveBeenCalledWith({ albumId: 'album_b', momentId: 'm28' });
+    });
   });
 });

@@ -4,7 +4,7 @@ import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
 import { createMemoryLifeAlbumRepository } from '../infrastructure/life-album-repository';
 import { createMemoryRepositories } from '../infrastructure/repositories';
 import { ApplicationError } from './errors';
-import { DEFAULT_ALBUM_NAME } from './life-album';
+import { albumNoteExcerpt, DEFAULT_ALBUM_NAME } from './life-album';
 import { ALBUM_NOT_FOUND, ALBUM_WRITE_FAILED_CODE, createLifeAlbumUseCases } from './life-album-use-cases';
 import { createUseCases } from './use-cases';
 
@@ -186,6 +186,28 @@ describe('life album use cases', () => {
     expect(view.entries).toHaveLength(1);
     expect(view.entries[0].momentId).toBe('moment_gone');
     expect(view.entries[0].source).toBe('missing');
+    expect(view.entries[0].noteExcerpt).toBeNull();
+    expect(view.entries[0].dateLabel).toBeNull();
+    expect(view.entries[0].mediaHint).toBeNull();
+  });
+
+  it('describes a collected entry from the original note, date, and media', async () => {
+    const repos = createMemoryRepositories();
+    await seedImage(repos, 'asset_photo', '2026-10-01T01:00:00.000Z');
+    const note = '门口的风还在，这一句故意写得很长很长很长很长很长';
+    await seedMoment(repos, 'moment_photo', note, '2026-10-01T01:00:00.000Z', ['asset_photo']);
+    const app = createUseCases({
+      ...repos,
+      clock: clockAt('2026-10-03T06:30:00.000Z'),
+      albumId: () => 'album_words',
+    });
+    const album = await app.createAlbum({ name: '可辨认' });
+    await app.collectAlbumEntry({ albumId: album.id, momentId: 'moment_photo' });
+    const view = await app.getAlbum(album.id);
+    expect(view.entries[0].source).toBe('ready');
+    expect(view.entries[0].noteExcerpt).toBe(albumNoteExcerpt(note));
+    expect(view.entries[0].dateLabel).toBe('记录于 2026年10月1日');
+    expect(view.entries[0].mediaHint).toBe('有照片');
   });
 
   it('does not pretend a failed write succeeded', async () => {

@@ -1,5 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
@@ -15,6 +24,14 @@ import {
 import { ink, inkSoft, paper, sage } from './life-page';
 import { Text, TextInput, type } from './life-text';
 
+export function shouldApplyCollectSheetResult(input: {
+  session: number;
+  currentSession: number;
+  cancelled: boolean;
+}): boolean {
+  return !input.cancelled && input.session === input.currentSession;
+}
+
 export function LifeAlbumCollectSheet({
   visible,
   momentId,
@@ -24,135 +41,221 @@ export function LifeAlbumCollectSheet({
   momentId: string;
   onClose: () => void;
 }) {
+  const { height } = useWindowDimensions();
+  const sheetMax = Math.min(560, Math.max(280, Math.round(height * 0.72)));
   const [albums, setAlbums] = useState<AlbumListItem[]>([]);
   const [contained, setContained] = useState<string[]>([]);
   const [name, setName] = useState(DEFAULT_ALBUM_NAME);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadKey, setLoadKey] = useState(0);
+  const sheetKey = `${visible ? 'open' : 'closed'}:${momentId}:${loadKey}`;
+  const [resetKey, setResetKey] = useState(sheetKey);
+  const sessionRef = useRef(0);
+  const cancelledRef = useRef(false);
+  if (resetKey !== sheetKey) {
+    setResetKey(sheetKey);
+    if (visible) {
+      setName(DEFAULT_ALBUM_NAME);
+      setError(null);
+      setBusy(false);
+    }
+  }
+
+  function dismiss() {
+    sessionRef.current += 1;
+    cancelledRef.current = true;
+    onClose();
+  }
 
   useEffect(() => {
-    if (!visible) return;
-    let cancelled = false;
+    sessionRef.current += 1;
+    const session = sessionRef.current;
+    if (!visible) {
+      cancelledRef.current = true;
+      return;
+    }
+    cancelledRef.current = false;
     getUseCases()
       .then(async (app) => {
         const [list, ids] = await Promise.all([
           app.listAlbums(),
           app.albumIdsContainingMoment(momentId),
         ]);
-        if (cancelled) return;
+        if (!shouldApplyCollectSheetResult({
+          session,
+          currentSession: sessionRef.current,
+          cancelled: cancelledRef.current,
+        })) {
+          return;
+        }
         if (list.status === 'ready') setAlbums(list.albums);
         else setError(ALBUM_READ_FAILED);
         setContained(ids);
       })
       .catch(() => {
-        if (!cancelled) setError(ALBUM_READ_FAILED);
+        if (
+          shouldApplyCollectSheetResult({
+            session,
+            currentSession: sessionRef.current,
+            cancelled: cancelledRef.current,
+          })
+        ) {
+          setError(ALBUM_READ_FAILED);
+        }
       });
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [visible, momentId, loadKey]);
 
-  async function collectInto(albumId: string) {
-    if (busy || contained.includes(albumId)) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const app = await getUseCases();
-      await app.collectAlbumEntry({ albumId, momentId });
-      onClose();
-    } catch (caught) {
-      setError(isApplicationError(caught) ? caught.message : ALBUM_WRITE_FAILED);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function createAndCollect() {
+  async function finish(session: number, work: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      const app = await getUseCases();
-      const album = await app.createAlbum({ name });
-      await app.collectAlbumEntry({ albumId: album.id, momentId });
+      await work();
+      if (
+        !shouldApplyCollectSheetResult({
+          session,
+          currentSession: sessionRef.current,
+          cancelled: cancelledRef.current,
+        })
+      ) {
+        return;
+      }
       onClose();
     } catch (caught) {
+      if (
+        !shouldApplyCollectSheetResult({
+          session,
+          currentSession: sessionRef.current,
+          cancelled: cancelledRef.current,
+        })
+      ) {
+        return;
+      }
       setError(isApplicationError(caught) ? caught.message : ALBUM_WRITE_FAILED);
     } finally {
-      setBusy(false);
+      if (
+        shouldApplyCollectSheetResult({
+          session,
+          currentSession: sessionRef.current,
+          cancelled: cancelledRef.current,
+        })
+      ) {
+        setBusy(false);
+      }
     }
   }
 
+  async function collectInto(albumId: string) {
+    if (busy || contained.includes(albumId)) return;
+    const session = sessionRef.current;
+    await finish(session, async () => {
+      const app = await getUseCases();
+      await app.collectAlbumEntry({ albumId, momentId });
+    });
+  }
+
+  async function createAndCollect() {
+    if (busy) return;
+    const session = sessionRef.current;
+    await finish(session, async () => {
+      const app = await getUseCases();
+      const album = await app.createAlbum({ name });
+      await app.collectAlbumEntry({ albumId: album.id, momentId });
+    });
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop} testID="life-album-collect-sheet">
-        <View style={styles.sheet} accessibilityLabel={ALBUM_COLLECT_MENU}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={dismiss}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.backdrop}
+        testID="life-album-collect-sheet"
+      >
+        <View
+          style={[styles.sheet, { maxHeight: sheetMax }]}
+          accessibilityLabel={ALBUM_COLLECT_MENU}
+        >
           <Text style={styles.title}>{ALBUM_COLLECT_MENU}</Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          {albums.map((album) => {
-            const already = contained.includes(album.id);
-            return (
-              <Pressable
-                key={album.id}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: already || busy }}
-                accessibilityLabel={already ? `${album.name}，${ALBUM_ALREADY_IN}` : album.name}
-                testID={`life-album-sheet-${album.id}`}
-                onPress={() => {
-                  void collectInto(album.id);
-                }}
-                style={styles.hit}
-              >
-                <Text style={styles.row}>
-                  {album.name}
-                  {already ? ` · ${ALBUM_ALREADY_IN}` : ''}
-                </Text>
-              </Pressable>
-            );
-          })}
-          <Text style={styles.meta}>{ALBUM_NEW_ACTION}</Text>
-          <TextInput
-            testID="life-album-sheet-name"
-            value={name}
-            onChangeText={setName}
-            editable={!busy}
-            placeholder={DEFAULT_ALBUM_NAME}
-            style={styles.input}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: busy }}
-            accessibilityLabel={ALBUM_NEW_ACTION}
-            testID="life-album-sheet-create"
-            onPress={() => {
-              void createAndCollect();
-            }}
-            style={styles.hit}
+          <ScrollView
+            testID="life-album-collect-sheet-scroll"
+            style={styles.sheetScroll}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
           >
-            <Text style={styles.action}>{ALBUM_NEW_ACTION}</Text>
-          </Pressable>
-          {error ? (
+            {albums.map((album) => {
+              const already = contained.includes(album.id);
+              const blocked = already || busy;
+              return (
+                <Pressable
+                  key={album.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: blocked }}
+                  accessibilityLabel={already ? `${album.name}，${ALBUM_ALREADY_IN}` : album.name}
+                  testID={`life-album-sheet-${album.id}`}
+                  disabled={blocked}
+                  onPress={() => {
+                    if (blocked) return;
+                    void collectInto(album.id);
+                  }}
+                  style={styles.hit}
+                >
+                  <Text style={styles.row}>
+                    {album.name}
+                    {already ? ` · ${ALBUM_ALREADY_IN}` : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <Text style={styles.meta}>{ALBUM_NEW_ACTION}</Text>
+            <TextInput
+              testID="life-album-sheet-name"
+              value={name}
+              onChangeText={setName}
+              editable={!busy}
+              placeholder={DEFAULT_ALBUM_NAME}
+              style={styles.input}
+            />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="再试一次"
-              onPress={() => setLoadKey((value) => value + 1)}
+              accessibilityState={{ disabled: busy }}
+              accessibilityLabel={ALBUM_NEW_ACTION}
+              testID="life-album-sheet-create"
+              disabled={busy}
+              onPress={() => {
+                if (busy) return;
+                void createAndCollect();
+              }}
               style={styles.hit}
             >
-              <Text style={styles.action}>再试一次</Text>
+              <Text style={styles.action}>{ALBUM_NEW_ACTION}</Text>
             </Pressable>
-          ) : null}
+            {error ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="再试一次"
+                onPress={() => setLoadKey((value) => value + 1)}
+                style={styles.hit}
+              >
+                <Text style={styles.action}>再试一次</Text>
+              </Pressable>
+            ) : null}
+          </ScrollView>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="取消"
             testID="life-album-sheet-cancel"
-            onPress={onClose}
+            onPress={dismiss}
             style={styles.hit}
           >
             <Text style={styles.action}>取消</Text>
           </Pressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -169,6 +272,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 18,
     gap: 8,
+  },
+  sheetScroll: {
+    flexGrow: 0,
   },
   title: { ...type.action, color: ink },
   row: { ...type.body, color: ink },

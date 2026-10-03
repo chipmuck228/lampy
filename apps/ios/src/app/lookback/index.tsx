@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -77,6 +77,11 @@ import { LifeIconButton } from '../../screens/life-icons';
 import { LifeAlbumCollectAction, LifeAlbumCollectBanner } from '../../screens/life-album-collect';
 import { shouldUseNavRail } from '../../screens/life-page';
 import { usePageMetrics } from '../../screens/use-page-metrics';
+import {
+  lookbackCollectIsReady,
+  shouldApplyLookbackCollectLoad,
+  shouldApplyLookbackCollectWrite,
+} from '../../screens/lookback-collect';
 import {
   collectAlbumIdFromParam,
   firstSearchParam,
@@ -177,8 +182,19 @@ export default function LookbackIndexScreen() {
   const [collectedIds, setCollectedIds] = useState<string[]>([]);
   const [collectBusyId, setCollectBusyId] = useState<string | null>(null);
   const [collectFailedIds, setCollectFailedIds] = useState<string[]>([]);
-  const collectTargetRef = useRef<string | null>(null);
+  const [collectEpoch, setCollectEpoch] = useState(collectAlbumId);
+  const collectTargetRef = useRef<string | null>(collectAlbumId);
+  const collectLoadedRef = useRef<string | null>(null);
   const collectOpRef = useRef(0);
+  if (collectEpoch !== collectAlbumId) {
+    setCollectEpoch(collectAlbumId);
+    setCollectAlbum(null);
+    setCollectedIds([]);
+    setCollectBusyId(null);
+    setCollectFailedIds([]);
+    setCollectMissingId(null);
+    setCollectError(null);
+  }
   const locateSeqRef = useRef(0);
   const catalogLocateSeqRef = useRef(0);
   const expandGeneration = useRef(0);
@@ -247,23 +263,47 @@ export default function LookbackIndexScreen() {
     });
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     collectTargetRef.current = collectAlbumId;
+    collectLoadedRef.current = null;
+    collectOpRef.current += 1;
+  }, [collectAlbumId]);
+
+  useEffect(() => {
     if (!collectAlbumId) return;
     const albumId = collectAlbumId;
-    const generation = collectOpRef.current + 1;
-    collectOpRef.current = generation;
+    const generation = collectOpRef.current;
     getUseCases()
       .then((app) => app.getAlbum(albumId))
       .then((view) => {
-        if (collectTargetRef.current !== albumId || collectOpRef.current !== generation) return;
+        if (
+          !shouldApplyLookbackCollectLoad({
+            targetId: collectTargetRef.current,
+            albumId,
+            generation,
+            currentGeneration: collectOpRef.current,
+          })
+        ) {
+          return;
+        }
+        collectLoadedRef.current = view.album.id;
         setCollectAlbum({ id: view.album.id, name: view.album.name });
         setCollectedIds(view.album.entries.map((entry) => entry.momentId));
         setCollectMissingId(null);
         setCollectError(null);
       })
       .catch((error) => {
-        if (collectTargetRef.current !== albumId || collectOpRef.current !== generation) return;
+        if (
+          !shouldApplyLookbackCollectLoad({
+            targetId: collectTargetRef.current,
+            albumId,
+            generation,
+            currentGeneration: collectOpRef.current,
+          })
+        ) {
+          return;
+        }
+        collectLoadedRef.current = null;
         setCollectAlbum(null);
         setCollectedIds([]);
         if (toApplicationError(error).code === 'ALBUM_NOT_FOUND') {
@@ -635,7 +675,7 @@ export default function LookbackIndexScreen() {
 
   const toggleCollect = useCallback(async (momentId: string) => {
     const albumId = collectTargetRef.current;
-    if (!albumId || catalogOpenRef.current) return;
+    if (!lookbackCollectIsReady(albumId, collectLoadedRef.current) || catalogOpenRef.current) return;
     if (collectBusyId === momentId) return;
     const generation = collectOpRef.current + 1;
     collectOpRef.current = generation;
@@ -647,13 +687,41 @@ export default function LookbackIndexScreen() {
       const next = already
         ? await app.withdrawAlbumEntry({ albumId, momentId })
         : await app.collectAlbumEntry({ albumId, momentId });
-      if (collectTargetRef.current !== albumId || collectOpRef.current !== generation) return;
+      if (
+        !shouldApplyLookbackCollectWrite({
+          targetId: collectTargetRef.current,
+          loadedId: collectLoadedRef.current,
+          requestAlbumId: albumId,
+          generation,
+          currentGeneration: collectOpRef.current,
+        })
+      ) {
+        return;
+      }
       setCollectedIds(next.album.entries.map((entry) => entry.momentId));
     } catch {
-      if (collectTargetRef.current !== albumId || collectOpRef.current !== generation) return;
+      if (
+        !shouldApplyLookbackCollectWrite({
+          targetId: collectTargetRef.current,
+          loadedId: collectLoadedRef.current,
+          requestAlbumId: albumId,
+          generation,
+          currentGeneration: collectOpRef.current,
+        })
+      ) {
+        return;
+      }
       setCollectFailedIds((current) => (current.includes(momentId) ? current : [...current, momentId]));
     } finally {
-      if (collectTargetRef.current === albumId && collectOpRef.current === generation) {
+      if (
+        shouldApplyLookbackCollectWrite({
+          targetId: collectTargetRef.current,
+          loadedId: collectLoadedRef.current,
+          requestAlbumId: albumId,
+          generation,
+          currentGeneration: collectOpRef.current,
+        })
+      ) {
         setCollectBusyId(null);
       }
     }
@@ -1163,7 +1231,7 @@ export default function LookbackIndexScreen() {
                 void clips.pause();
               }}
               footer={
-                collectAlbumId && collectAlbum && !catalogOpen && collectMissingId !== collectAlbumId ? (
+                lookbackCollectIsReady(collectAlbumId, collectAlbum?.id) && !catalogOpen ? (
                   <LifeAlbumCollectAction
                     collected={collectedIds.includes(entry.id)}
                     busy={collectBusyId === entry.id}
