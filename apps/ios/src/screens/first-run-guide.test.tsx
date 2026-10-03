@@ -26,9 +26,13 @@ describe('first-run guide', () => {
   it('does not finish until the last screen action and can return to the previous screen', async () => {
     const finished = jest.fn();
     const view = await render(wrap(<FirstRunGuide onFinished={finished} />));
-    expect(view.getByText('日子，不必特别才值得留下。')).toBeTruthy();
+    expect(view.getByLabelText('日子，不必特别才值得留下。')).toBeTruthy();
     expect(view.getByTestId('first-run-scene-leave')).toBeTruthy();
-    expect(view.getByText('一段咖啡，一段午后。')).toBeTruthy();
+    expect(view.getByTestId('first-run-mark-row')).toBeTruthy();
+    expect(view.getByText('一杯咖啡，一段午后。')).toBeTruthy();
+    expect(view.queryByText('一段咖啡，一段午后。')).toBeNull();
+    expect(view.queryByText('1 / 3')).toBeNull();
+    expect(view.getByLabelText('第 1 屏，共 3 屏')).toBeTruthy();
     expect(view.queryByTestId('first-run-back')).toBeNull();
     expect(view.queryByText('示意，不是你的记录')).toBeNull();
     expect(view.queryByText('不必翻找')).toBeNull();
@@ -37,11 +41,11 @@ describe('first-run guide', () => {
     fireEvent.press(view.getByTestId('first-run-continue'));
     expect(finished).not.toHaveBeenCalled();
     await waitFor(() => {
-      expect(view.getByText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
+      expect(view.getByLabelText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('first-run-back'));
     await waitFor(() => {
-      expect(view.getByText('日子，不必特别才值得留下。')).toBeTruthy();
+      expect(view.getByLabelText('日子，不必特别才值得留下。')).toBeTruthy();
     });
     expect(finished).not.toHaveBeenCalled();
     fireEvent.press(view.getByTestId('first-run-continue'));

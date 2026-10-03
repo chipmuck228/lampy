@@ -14,7 +14,7 @@ describe('first-run scenes', () => {
     const short = firstRunPhotoBox(390, 480);
     const pad = firstRunPhotoBox(1024, 1366);
     expect(phone.width).toBeLessThanOrEqual(520);
-    expect(phone.height).toBeLessThanOrEqual(280);
+    expect(phone.height).toBeLessThanOrEqual(290);
     expect(short.height).toBeLessThan(phone.height);
     expect(pad.width).toBeLessThanOrEqual(520);
     expect(pad.width).toBeLessThan(1024 - 96);
@@ -39,7 +39,7 @@ describe('first-run scenes', () => {
     expect(leave.getByTestId('first-run-scene-leave')).toBeTruthy();
     expect(leave.getByTestId('first-run-photo-leave')).toBeTruthy();
     expect(leave.getByLabelText(screen.photoAlt)).toBeTruthy();
-    expect(leave.getByText('一段咖啡，一段午后。')).toBeTruthy();
+    expect(leave.getByText('一杯咖啡，一段午后。')).toBeTruthy();
     expect(leave.queryByText('示意，不是你的记录')).toBeNull();
     expect(leave.queryByText('9月18日')).toBeNull();
     expect(StyleSheet.flatten(leave.getByTestId('first-run-scene-leave').props.style).width).toBe(box.width);

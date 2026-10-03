@@ -50,8 +50,7 @@ function swipeCopy(view: RenderResult, id: string, offsetY: number, viewH: numbe
 }
 
 function progressLabel(view: RenderResult) {
-  const children = view.getByTestId('first-run-progress').props.children;
-  return (Array.isArray(children) ? children : [children]).join('');
+  return String(view.getByTestId('first-run-progress').props.accessibilityLabel ?? '');
 }
 
 describe('first-run guide scroll measure', () => {
@@ -70,30 +69,30 @@ describe('first-run guide scroll measure', () => {
 
     fireEvent.press(view.getByTestId('first-run-continue'));
     await waitFor(() => {
-      expect(view.getByText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
+      expect(view.getByLabelText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
     });
     expect(view.getByTestId('first-run-copy-lookback', hidden).props.scrollEnabled).toBe(true);
     swipeCopy(view, 'lookback', 20, 200, 360);
-    expect(view.getByText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
-    expect(progressLabel(view)).toBe('2 / 3');
+    expect(view.getByLabelText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
+    expect(progressLabel(view)).toBe('第 2 屏，共 3 屏');
 
     fireEvent.press(view.getByTestId('first-run-back'));
     await waitFor(() => {
-      expect(view.getByText('日子，不必特别才值得留下。')).toBeTruthy();
+      expect(view.getByLabelText('日子，不必特别才值得留下。')).toBeTruthy();
     });
     expect(view.getByTestId('first-run-copy-leave', hidden).props.scrollEnabled).toBe(true);
     expect(view.getByTestId('first-run-pager', hidden).props.scrollEnabled).toBe(false);
     swipeCopy(view, 'leave', 40, 200, 480);
-    expect(view.getByText('日子，不必特别才值得留下。')).toBeTruthy();
-    expect(progressLabel(view)).toBe('1 / 3');
+    expect(view.getByLabelText('日子，不必特别才值得留下。')).toBeTruthy();
+    expect(progressLabel(view)).toBe('第 1 屏，共 3 屏');
 
     swipeCopy(view, 'leave', 280, 200, 480);
     await waitFor(() => {
-      expect(view.getByText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
+      expect(view.getByLabelText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
     });
     expect(view.getByTestId('first-run-copy-lookback', hidden).props.scrollEnabled).toBe(true);
     swipeCopy(view, 'lookback', 20, 200, 360);
-    expect(progressLabel(view)).toBe('2 / 3');
+    expect(progressLabel(view)).toBe('第 2 屏，共 3 屏');
     expect(finished).not.toHaveBeenCalled();
   });
 });

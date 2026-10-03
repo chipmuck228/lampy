@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Text, type } from './life-text';
+import { AccessibilityInfo, Animated, AppState, Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Text } from './life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   FIRST_RUN_SCREENS,
+  firstRunBodyLines,
   firstRunCopyAllowsInnerScroll,
   firstRunFrameChanged,
   firstRunPageAfterInnerSwipe,
   firstRunPageFromOffset,
   firstRunPagerOffset,
+  firstRunProgressLabel,
   firstRunShouldAnimatePage,
   firstRunShouldInvalidateCopyMeasures,
   invalidateFirstRunCopyMeasures,
@@ -20,8 +22,22 @@ import {
   settleFirstRunMotion,
   type FirstRunCopyMeasures,
 } from '../application/first-run';
-import { hairline, ink, inkSoft, isCompactHeight, pageGutter, paper, paperDeep, readingWidth, sage } from './life-page';
+import { isCompactHeight, pageGutter, readingWidth } from './life-page';
 import { FirstRunScene, firstRunPhotoBox } from './first-run-scene';
+
+const mark = require('../../assets/images/splash-icon.png');
+
+const PAPER = '#f8f6ef';
+const TITLE = '#353b32';
+const TITLE_ACCENT = '#899480';
+const BODY = '#838a7c';
+const STEP = '#d7d9ce';
+const STEP_FILLED = '#788672';
+const BACK = '#848c7d';
+const ACTION = '#414d3d';
+const ACTION_FILL = '#e8ebe1';
+const ACTION_LINE = '#d1d7ca';
+const MARK = '#ae895b';
 
 export function FirstRunGuide({
   onFinished,
@@ -79,13 +95,13 @@ export function FirstRunGuide({
       settleFirstRunMotion({ opacity, shift, photoOpacity });
       return;
     }
-    photoOpacity.setValue(0.65);
+    photoOpacity.setValue(0);
     opacity.setValue(0);
-    shift.setValue(10);
+    shift.setValue(13);
     const anim = Animated.parallel([
-      Animated.timing(photoOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
-      Animated.timing(opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
-      Animated.timing(shift, { toValue: 0, duration: 280, useNativeDriver: true }),
+      Animated.timing(photoOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 580, useNativeDriver: true }),
+      Animated.timing(shift, { toValue: 0, duration: 580, useNativeDriver: true }),
     ]);
     anim.start(({ finished }) => {
       if (!finished || gen !== motionGen.current) return;
@@ -195,6 +211,10 @@ export function FirstRunGuide({
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="Lampy 引导">
+      <View style={[styles.header, { height: compact ? 53 : 61, paddingHorizontal: gutter }]} testID="first-run-mark-row">
+        <Image source={mark} accessibilityLabel="Lampy" style={styles.markIcon} resizeMode="contain" />
+        <Text style={styles.markWord}>Lampy</Text>
+      </View>
       <View testID="first-run-frame" collapsable={false} style={styles.frame} onLayout={onFrameLayout}>
         <ScrollView
           ref={pager}
@@ -226,7 +246,7 @@ export function FirstRunGuide({
                 contentContainerStyle={[
                   styles.pageCopy,
                   {
-                    paddingTop: compact ? 16 : 28,
+                    paddingTop: compact ? 8 : 12,
                     paddingHorizontal: gutter,
                     maxWidth: column + gutter * 2,
                   },
@@ -243,9 +263,6 @@ export function FirstRunGuide({
                 }}
                 onScrollEndDrag={item.id === screen.id ? onInnerEndDrag : undefined}
               >
-                <Text style={styles.mark} accessibilityRole="header">
-                  Lampy
-                </Text>
                 <Animated.View style={{ opacity: item.id === screen.id ? photoOpacity : 1 }}>
                   <FirstRunScene
                     id={item.id}
@@ -260,13 +277,33 @@ export function FirstRunGuide({
                   style={{
                     opacity: item.id === screen.id ? opacity : 1,
                     transform: [{ translateY: item.id === screen.id ? shift : 0 }],
-                    gap: 12,
+                    marginTop: compact ? 16 : 23,
+                    alignSelf: 'stretch',
                   }}
                 >
-                  <Text style={styles.title} accessibilityRole="header">
-                    {item.title}
+                  <Text
+                    style={[styles.title, compact ? styles.titleCompact : null]}
+                    accessibilityRole="header"
+                    accessibilityLabel={item.title}
+                  >
+                    {item.titleLines.map((line, lineIndex) => (
+                      <Text
+                        key={line}
+                        style={lineIndex === item.titleAccentIndex ? styles.titleAccent : undefined}
+                      >
+                        {lineIndex > 0 ? '\n' : ''}
+                        {line}
+                      </Text>
+                    ))}
                   </Text>
-                  <Text style={styles.body}>{item.body}</Text>
+                  <Text style={[styles.body, compact ? styles.bodyCompact : null]}>
+                    {firstRunBodyLines(item.body).map((line, lineIndex) => (
+                      <Text key={line}>
+                        {lineIndex > 0 ? '\n' : ''}
+                        {line}
+                      </Text>
+                    ))}
+                  </Text>
                 </Animated.View>
               </ScrollView>
             </View>
@@ -275,9 +312,20 @@ export function FirstRunGuide({
       </View>
       <View style={[styles.footer, { paddingHorizontal: gutter, maxWidth: column + gutter * 2, alignSelf: 'center', width: '100%' }]}>
         <View style={styles.footerTop}>
-          <Text style={styles.progress} testID="first-run-progress">
-            {index + 1} / {FIRST_RUN_SCREENS.length}
-          </Text>
+          <View
+            style={styles.steps}
+            testID="first-run-progress"
+            accessibilityRole="adjustable"
+            accessibilityLabel={firstRunProgressLabel(index, FIRST_RUN_SCREENS.length)}
+          >
+            {FIRST_RUN_SCREENS.map((item, step) => (
+              <View
+                key={item.id}
+                testID={`first-run-step-${step}`}
+                style={[styles.step, step <= index ? styles.stepFilled : null]}
+              />
+            ))}
+          </View>
           {index > 0 ? (
             <Pressable
               accessibilityRole="button"
@@ -310,33 +358,66 @@ export function FirstRunGuide({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: paper },
+  safe: { flex: 1, backgroundColor: PAPER },
+  header: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  markIcon: { width: 16, height: 16, tintColor: MARK },
+  markWord: {
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '600',
+    letterSpacing: -1.1,
+    color: TITLE,
+  },
   frame: { flex: 1, width: '100%', overflow: 'hidden' },
   pager: { flex: 1, width: '100%' },
   page: { overflow: 'hidden', alignItems: 'center' },
   pageScroll: { flex: 1, width: '100%' },
-  pageCopy: { gap: 18, flexGrow: 1, width: '100%', alignSelf: 'center' },
-  mark: { ...type.action, color: ink, letterSpacing: 0.8 },
-  title: { ...type.title, color: ink },
-  body: { ...type.body, color: inkSoft },
-  footer: { flexShrink: 0, paddingBottom: 16, gap: 8 },
+  pageCopy: { flexGrow: 1, width: '100%', alignSelf: 'center', alignItems: 'flex-start' },
+  title: {
+    fontFamily: 'Songti SC',
+    fontSize: 30,
+    lineHeight: 44,
+    fontWeight: '500',
+    letterSpacing: 0.6,
+    color: TITLE,
+  },
+  titleAccent: { color: TITLE_ACCENT },
+  titleCompact: { fontSize: 25, lineHeight: 34 },
+  body: {
+    fontFamily: 'Songti SC',
+    fontSize: 11,
+    lineHeight: 20,
+    letterSpacing: 0.22,
+    color: BODY,
+    marginTop: 14,
+  },
+  bodyCompact: { fontSize: 10, lineHeight: 16, marginTop: 9 },
+  footer: { flexShrink: 0, paddingBottom: 16, gap: 12 },
   footerTop: {
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  progress: { ...type.meta, color: inkSoft },
-  back: { ...type.meta, color: sage },
+  steps: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  step: { width: 22, height: 2, backgroundColor: STEP },
+  stepFilled: { backgroundColor: STEP_FILLED },
+  back: { fontSize: 11, lineHeight: 16, color: BACK },
   backHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', alignItems: 'flex-end' },
-  action: { ...type.action, color: sage, letterSpacing: 1 },
+  action: { fontSize: 13, lineHeight: 18, color: ACTION, letterSpacing: 1.6 },
   actionHit: {
     minHeight: 48,
+    height: 55,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: paperDeep,
+    backgroundColor: ACTION_FILL,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: hairline,
+    borderColor: ACTION_LINE,
     borderRadius: 16,
     paddingHorizontal: 16,
   },

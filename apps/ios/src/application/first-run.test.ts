@@ -1,7 +1,9 @@
 import {
   decideFirstRunGuide,
+  firstRunBodyLines,
   firstRunCopyAllowsInnerScroll,
   firstRunInnerCanScroll,
+  firstRunProgressLabel,
   firstRunPageAfterInnerSwipe,
   firstRunPageFromOffset,
   firstRunPagerOffset,
@@ -170,7 +172,15 @@ describe('first-run guide decision', () => {
     expect(text).toContain('日子，不必特别才值得留下。');
     expect(text).toContain('轻轻扫过，也能看见日子的样子。');
     expect(text).toContain('从一个日子，继续读起。');
+    expect(text).toContain('一杯咖啡，一段午后。');
+    expect(text).not.toContain('一段咖啡，一段午后。');
     expect(text).toContain('留下瞬间');
+    expect(FIRST_RUN_SCREENS[0].titleLines.join('')).toBe(FIRST_RUN_SCREENS[0].title);
+    expect(firstRunProgressLabel(0, 3)).toBe('第 1 屏，共 3 屏');
+    expect(firstRunBodyLines('不必写成故事。把这一刻，轻轻留给自己。')).toEqual([
+      '不必写成故事。',
+      '把这一刻，轻轻留给自己。',
+    ]);
     expect(text).not.toMatch(/云备份|同步|家庭已开放|已经可以分享给家人|不必翻找|进入 Lampy|自己的生活记录/);
     expect(FIRST_RUN_SCREENS.every((screen) => screen.source.includes('本轮定稿'))).toBe(true);
     expect(FIRST_RUN_SCREENS[2].id).toBe('keep');

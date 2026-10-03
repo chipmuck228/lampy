@@ -19,8 +19,10 @@ export const FIRST_RUN_SCREENS = [
     id: 'leave',
     photo: 'coffee',
     photoAlt: '午后的阳光落在窗边的咖啡桌上',
-    photoNote: '一段咖啡，一段午后。',
+    photoNote: '一杯咖啡，一段午后。',
     title: '日子，不必特别才值得留下。',
+    titleLines: ['日子，不必', '特别才值得', '留下。'],
+    titleAccentIndex: 2,
     body: '不必写成故事。把这一刻，轻轻留给自己。',
     source: '本轮定稿，2026-10-03',
     action: '继续',
@@ -31,6 +33,8 @@ export const FIRST_RUN_SCREENS = [
     photoAlt: '窗边晨光里的白色花朵',
     photoNote: '今天，也有想记住的光。',
     title: '轻轻扫过，也能看见日子的样子。',
+    titleLines: ['轻轻扫过，', '也能看见', '日子的样子。'],
+    titleAccentIndex: 2,
     body: '文字、照片和声音，保留原来的样子。想再读一遍时，随时停下来。',
     source: '本轮定稿，2026-10-03',
     action: '继续',
@@ -41,6 +45,8 @@ export const FIRST_RUN_SCREENS = [
     photoAlt: '窗台上的植物和一盏灯',
     photoNote: '有些日子，值得再坐一会儿。',
     title: '从一个日子，继续读起。',
+    titleLines: ['从一个日子，', '继续读起。'],
+    titleAccentIndex: 1,
     body: '回到那一天，慢慢读完。过往就在这里，允许停留。',
     source: '本轮定稿，2026-10-03',
     action: '留下瞬间',
@@ -78,6 +84,14 @@ export function settleFirstRunMotion(motion: {
 
 export function firstRunShouldAnimatePage(reduceMotion: boolean, appState: string) {
   return reduceMotion === false && appState === 'active';
+}
+
+export function firstRunProgressLabel(index: number, count: number) {
+  return `第 ${index + 1} 屏，共 ${count} 屏`;
+}
+
+export function firstRunBodyLines(body: string) {
+  return body.split(/(?<=。)/).map((part) => part.trim()).filter(Boolean);
 }
 
 export type FirstRunCopyMeasure = {

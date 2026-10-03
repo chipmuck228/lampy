@@ -46,7 +46,7 @@ Base：合并 #60 后的 `origin/main`。分支 `ios/first-run-guide-visual`。�
 | 第三屏 | 未拍旧引导 | `iphone16-screen3.png` | 上一轮 isol 实拍，文案与照片未改 |
 | 留下瞬间之后 | — | `iphone16-after-finish.png` | 上一轮 isol；落到留下页 |
 | 切后台 | — | `iphone16-background-home.png` / `iphone16-after-background.png` | Home 后仍停第一屏，未完成 |
-| 第二屏横屏 | — | `iphone16-landscape-screen2.png` | 仍是 2/3；当时叠了 Expo Inspect overlay |
+| 第二屏横屏 | — | `iphone16-landscape-screen2.png` | 当时进度还是「2/3」，叠了 Expo Inspect overlay |
 | 短屏竖屏 | — | `se3-screen1.png` | Lampy-pr61-se · iPhone SE 3 / iOS 18.6 |
 | 短屏横屏 | — | `se3-landscape.png` | simctl 截图像素是竖幅，画面本身是横屏第一屏 |
 
@@ -73,12 +73,15 @@ Jest 不等于真机 PASS。
 
 - 第一屏照片仍是窗框与暖光，第二屏大面积米色，第三屏植物叶片。裁切差异，不是缺图。
 - iPhone SE 竖屏标题折成两行，footer「继续」仍在屏内。
-- 第二屏旋转后进度仍是 2/3，没有跳到第三屏或露出半页正文。
+- 第二屏旋转后仍停在第二屏，没有跳到第三屏或露出半页正文。当时进度还是数字「2/3」；本轮已改成短线段，该画面未重拍。
 - 切后台再回来没有写成完成、没有重播到留下页。
 - 点按「上一屏」本轮没打中。后半段 HID 点按不再进屏，不把失败写成产品缺陷。
 
+本轮又按 Figma splash 改了字色、右侧留白、照片淡入、文案块淡入、短线段进度、顶栏「图标+Lampy」，并修正「一杯咖啡，一段午后。」。这些画面未重走模拟器，上表旧截图仍是改前数字进度。
+
 ## 仍需验证
 
+- 新字色、短线段进度、淡入和顶栏标识的模拟器／真机观感。
 - 模拟器返回、上滑、短屏长正文真正溢出时的内滚。
 - 原生 VoiceOver。
 - 真机 Reduce Motion 查询在后台返回、真机三屏（Liuz17 已有记录，不应为验收清库）。

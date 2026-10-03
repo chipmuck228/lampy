@@ -1,5 +1,5 @@
 import { Image, StyleSheet, View } from 'react-native';
-import { Text, type } from './life-text';
+import { Text } from './life-text';
 
 import type { FIRST_RUN_SCREENS } from '../application/first-run';
 import { isCompactHeight, pageGutter, paper, readingWidth } from './life-page';
@@ -17,7 +17,7 @@ export function firstRunPhotoBox(windowWidth: number, windowHeight: number) {
   );
   const height = isCompactHeight(windowHeight)
     ? Math.max(112, Math.round(windowHeight * 0.26))
-    : Math.min(Math.round(windowHeight * 0.36), Math.round(width * 0.72), 280);
+    : Math.min(Math.round(windowHeight * 0.34), Math.round(width * 0.72), 290);
   return { width, height };
 }
 
@@ -72,12 +72,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(37,35,31,0.28)',
   },
   note: {
-    ...type.meta,
-    color: paper,
-    paddingHorizontal: 14,
-    paddingBottom: 14,
-    textShadowColor: 'rgba(37,35,31,0.35)',
+    fontFamily: 'Songti SC',
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 0.8,
+    color: '#fffdf5',
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    textShadowColor: 'rgba(34,40,32,0.44)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 7,
   },
 });

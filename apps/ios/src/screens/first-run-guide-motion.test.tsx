@@ -57,7 +57,7 @@ describe('first-run guide motion', () => {
     await app.set('background');
     await app.set('active');
     expect(view.getByLabelText('Lampy 引导')).toBeTruthy();
-    expect(view.getByText('轻轻扫过，也能看见日子的样子。', { includeHiddenElements: true })).toBeTruthy();
+    expect(view.getByLabelText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
     expect(view.getByLabelText('继续')).toBeTruthy();
     expect(finished).not.toHaveBeenCalled();
     app.restore();
@@ -69,17 +69,17 @@ describe('first-run guide motion', () => {
     const finished = jest.fn();
     const view = await render(wrap(<FirstRunGuide onFinished={finished} />));
     await waitFor(() => {
-      expect(view.getByText('日子，不必特别才值得留下。')).toBeTruthy();
+      expect(view.getByLabelText('日子，不必特别才值得留下。')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('first-run-continue'));
     await waitFor(() => {
-      expect(view.getByText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
+      expect(view.getByLabelText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('first-run-continue'));
     await waitFor(() => {
       expect(view.getByLabelText('留下瞬间')).toBeTruthy();
     });
-    expect(view.getByText('从一个日子，继续读起。')).toBeTruthy();
+    expect(view.getByLabelText('从一个日子，继续读起。')).toBeTruthy();
     expect(view.getByTestId('first-run-scene-keep')).toBeTruthy();
     expect(finished).not.toHaveBeenCalled();
     app.restore();
@@ -94,7 +94,7 @@ describe('first-run guide motion', () => {
     await waitFor(() => {
       expect(view.getByLabelText('留下瞬间')).toBeTruthy();
     });
-    expect(view.getByText('从一个日子，继续读起。', { includeHiddenElements: true })).toBeTruthy();
+    expect(view.getByLabelText('从一个日子，继续读起。')).toBeTruthy();
     expect(finished).not.toHaveBeenCalled();
     view.unmount();
   });

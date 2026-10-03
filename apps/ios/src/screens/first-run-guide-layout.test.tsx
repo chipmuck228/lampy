@@ -26,8 +26,7 @@ async function measureFrame(view: RenderResult, width: number, height: number) {
 }
 
 function progressLabel(view: RenderResult) {
-  const children = view.getByTestId('first-run-progress').props.children;
-  return (Array.isArray(children) ? children : [children]).join('');
+  return String(view.getByTestId('first-run-progress').props.accessibilityLabel ?? '');
 }
 
 const portrait = {
@@ -72,12 +71,12 @@ describe('first-run guide layout', () => {
     await measureFrame(view, 390, 600);
     fireEvent.press(view.getByTestId('first-run-continue'));
     await waitFor(() => {
-      expect(view.getByText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
+      expect(view.getByLabelText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
     });
-    expect(progressLabel(view)).toBe('2 / 3');
+    expect(progressLabel(view)).toBe('第 2 屏，共 3 屏');
     await measureFrame(view, 758, 280);
-    expect(view.getByText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
-    expect(progressLabel(view)).toBe('2 / 3');
+    expect(view.getByLabelText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
+    expect(progressLabel(view)).toBe('第 2 屏，共 3 屏');
     expect(StyleSheet.flatten(view.getByTestId('first-run-lookback').props.style)).toMatchObject({
       width: 758,
       height: 280,
