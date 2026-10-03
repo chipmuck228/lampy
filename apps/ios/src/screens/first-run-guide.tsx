@@ -9,17 +9,21 @@ import {
   FIRST_RUN_PHOTO_FADE_MS,
   FIRST_RUN_SCREENS,
   firstRunBodyLines,
-  firstRunCanStartEnterMotion,
   firstRunCopyAllowsInnerScroll,
   firstRunCopyColumnWidth,
+  firstRunEnterIsCurrent,
+  firstRunFontTimeoutMs,
   firstRunFrameChanged,
+  firstRunMotionPrefFromQuery,
+  firstRunMotionPrefTimeoutMs,
   firstRunPageAfterInnerSwipe,
   firstRunPageFromOffset,
+  firstRunPagerIsSettled,
   firstRunPagerOffset,
   firstRunParkedPageOpacity,
   firstRunProgressLabel,
-  firstRunShouldAnimatePage,
   firstRunShouldInvalidateCopyMeasures,
+  firstRunShouldPlayEnter,
   invalidateFirstRunCopyMeasures,
   isFirstRunFinishAction,
   nextFirstRunIndex,
@@ -27,7 +31,9 @@ import {
   rememberFirstRunCopyMeasure,
   settleFirstRunMotion,
   type FirstRunCopyMeasures,
+  type FirstRunFontReady,
   type FirstRunMotionDelay,
+  type FirstRunMotionPref,
   type FirstRunPhotoReady,
 } from '../application/first-run';
 import { FIRST_RUN_MARK, FIRST_RUN_SANS, FIRST_RUN_SERIF, loadFirstRunFonts } from './first-run-fonts';
@@ -74,45 +80,83 @@ export function FirstRunGuide({
   const copyMeasuresRef = useRef<FirstRunCopyMeasures>({});
   const screen = FIRST_RUN_SCREENS[index];
   const innerScrolls = firstRunCopyAllowsInnerScroll(copyMeasures[screen.id]);
-  const [reduceMotion, setReduceMotion] = useState(true);
-  const [fontsReady, setFontsReady] = useState(false);
+  const [motionPref, setMotionPref] = useState<FirstRunMotionPref>('pending');
+  const [fontsReady, setFontsReady] = useState<FirstRunFontReady>('pending');
   const [photoReady, setPhotoReady] = useState<Record<string, FirstRunPhotoReady>>({});
-  const [opacity] = useState(() => new Animated.Value(1));
+  const [settled, setSettled] = useState(false);
+  const [opacity] = useState(() => new Animated.Value(0));
   const [shift] = useState(() => new Animated.Value(0));
-  const [photoOpacity] = useState(() => new Animated.Value(1));
-  const motionGen = useRef(0);
+  const [photoOpacity] = useState(() => new Animated.Value(0));
+  const enterGen = useRef(1);
+  const fadeStartedGen = useRef(0);
+  const solidRef = useRef(false);
+  const settledRef = useRef(false);
+  const motionPrefRef = useRef<FirstRunMotionPref>('pending');
+  const pagerTargetRef = useRef<number | null>(0);
   const copyDelay = useRef<ReturnType<typeof setTimeout> | null>(null);
   const delayHandle: FirstRunMotionDelay = copyDelay;
-  const appStateRef = useRef(AppState.currentState);
+  const appStateRef = useRef(AppState.currentState === 'active' || !AppState.currentState ? 'active' : AppState.currentState);
 
   useEffect(() => {
     let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled) setFontsReady((current) => (current === 'pending' ? 'failed' : current));
+    }, firstRunFontTimeoutMs());
     loadFirstRunFonts()
       .then(() => {
-        if (!cancelled) setFontsReady(true);
+        if (!cancelled) setFontsReady((current) => (current === 'pending' ? 'ready' : current));
       })
       .catch(() => {
-        if (!cancelled) setFontsReady(false);
+        if (!cancelled) setFontsReady((current) => (current === 'pending' ? 'failed' : current));
+      })
+      .finally(() => {
+        clearTimeout(timeout);
       });
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
     };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (cancelled) return;
+      setMotionPref((current) => {
+        if (current !== 'pending') return current;
+        motionPrefRef.current = 'failed';
+        return 'failed';
+      });
+    }, firstRunMotionPrefTimeoutMs());
     AccessibilityInfo.isReduceMotionEnabled()
       .then((enabled) => {
-        if (!cancelled) setReduceMotion(enabled === true);
+        if (cancelled) return;
+        setMotionPref((current) => {
+          if (current !== 'pending' && current !== 'failed') return current;
+          const next = firstRunMotionPrefFromQuery(enabled === true);
+          motionPrefRef.current = next;
+          return next;
+        });
       })
       .catch(() => {
-        if (!cancelled) setReduceMotion(true);
+        if (cancelled) return;
+        setMotionPref((current) => {
+          if (current !== 'pending') return current;
+          motionPrefRef.current = 'failed';
+          return 'failed';
+        });
+      })
+      .finally(() => {
+        clearTimeout(timeout);
       });
     const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
-      setReduceMotion(enabled === true);
+      const next = firstRunMotionPrefFromQuery(enabled === true);
+      motionPrefRef.current = next;
+      setMotionPref(next);
     });
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
       sub?.remove?.();
     };
   }, []);
@@ -120,23 +164,35 @@ export function FirstRunGuide({
   const pagePhotoReady = photoReady[screen.id] ?? 'pending';
 
   useEffect(() => {
-    const gen = ++motionGen.current;
-    if (!firstRunShouldAnimatePage(reduceMotion, appStateRef.current)) {
+    const gen = enterGen.current;
+    const play = firstRunShouldPlayEnter({
+      pref: motionPref,
+      appState: appStateRef.current,
+      settled,
+      photoReady: pagePhotoReady,
+      fontsReady,
+      alreadySolid: solidRef.current,
+    });
+    if (play === 'wait') return undefined;
+    if (play === 'show') {
+      solidRef.current = true;
       settleFirstRunMotion({ opacity, shift, photoOpacity, delay: delayHandle });
-      return;
+      return undefined;
     }
-    if (!firstRunCanStartEnterMotion(pagePhotoReady)) {
-      photoOpacity.setValue(0);
-      opacity.setValue(0);
-      shift.setValue(0);
-      return;
-    }
-    photoOpacity.setValue(0);
-    opacity.setValue(0);
-    shift.setValue(0);
+    if (fadeStartedGen.current === gen) return undefined;
+    fadeStartedGen.current = gen;
     if (pagePhotoReady === 'failed') {
-      settleFirstRunMotion({ opacity, shift, delay: delayHandle });
-      return;
+      if (copyDelay.current != null) {
+        clearTimeout(copyDelay.current);
+        copyDelay.current = null;
+      }
+      opacity.stopAnimation();
+      shift.stopAnimation();
+      photoOpacity.stopAnimation();
+      opacity.setValue(1);
+      shift.setValue(0);
+      photoOpacity.setValue(0);
+      return undefined;
     }
     const photo = Animated.timing(photoOpacity, {
       toValue: 1,
@@ -144,16 +200,16 @@ export function FirstRunGuide({
       useNativeDriver: true,
     });
     photo.start(({ finished }) => {
-      if (!finished || gen !== motionGen.current) return;
+      if (!finished || !firstRunEnterIsCurrent(gen, enterGen.current)) return;
     });
     copyDelay.current = setTimeout(() => {
-      if (gen !== motionGen.current) return;
+      if (!firstRunEnterIsCurrent(gen, enterGen.current)) return;
       Animated.timing(opacity, {
         toValue: 1,
         duration: FIRST_RUN_COPY_FADE_MS,
         useNativeDriver: true,
       }).start(({ finished }) => {
-        if (!finished || gen !== motionGen.current) return;
+        if (!finished || !firstRunEnterIsCurrent(gen, enterGen.current)) return;
       });
     }, FIRST_RUN_COPY_FADE_DELAY_MS);
     return () => {
@@ -163,23 +219,65 @@ export function FirstRunGuide({
         copyDelay.current = null;
       }
     };
-  }, [delayHandle, index, opacity, pagePhotoReady, photoOpacity, reduceMotion, shift]);
+  }, [delayHandle, fontsReady, index, motionPref, opacity, pagePhotoReady, photoOpacity, settled, shift]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       appStateRef.current = state;
       if (state !== 'active') {
-        motionGen.current += 1;
+        enterGen.current += 1;
+        fadeStartedGen.current = 0;
+        solidRef.current = true;
+        settledRef.current = true;
+        setSettled(true);
         setLeavingId(null);
         settleFirstRunMotion({ opacity, shift, photoOpacity, delay: delayHandle });
       }
     });
     return () => {
       sub?.remove?.();
-      motionGen.current += 1;
-      settleFirstRunMotion({ opacity, shift, photoOpacity, delay: delayHandle });
+      enterGen.current += 1;
+      if (copyDelay.current != null) {
+        clearTimeout(copyDelay.current);
+        copyDelay.current = null;
+      }
     };
   }, [delayHandle, opacity, photoOpacity, shift]);
+
+  function holdEnterStart() {
+    if (copyDelay.current != null) {
+      clearTimeout(copyDelay.current);
+      copyDelay.current = null;
+    }
+    photoOpacity.stopAnimation();
+    opacity.stopAnimation();
+    shift.stopAnimation();
+    photoOpacity.setValue(0);
+    opacity.setValue(0);
+    shift.setValue(0);
+  }
+
+  function markSettled(atIndex: number, gen: number) {
+    if (!firstRunEnterIsCurrent(gen, enterGen.current)) return;
+    if (atIndex !== indexRef.current) return;
+    if (settledRef.current) return;
+    settledRef.current = true;
+    pagerTargetRef.current = null;
+    setSettled(true);
+  }
+
+  function retarget(next: number) {
+    enterGen.current += 1;
+    fadeStartedGen.current = 0;
+    solidRef.current = false;
+    settledRef.current = false;
+    pagerTargetRef.current = next;
+    holdEnterStart();
+    setLeavingId(FIRST_RUN_SCREENS[indexRef.current].id);
+    indexRef.current = next;
+    setIndex(next);
+    setSettled(false);
+  }
 
   function alignPager(nextIndex: number, nextPageHeight: number, animated: boolean) {
     if (nextPageHeight <= 0) return;
@@ -200,6 +298,7 @@ export function FirstRunGuide({
     frameRef.current = next;
     setFrame(next);
     alignPager(indexRef.current, next.height, false);
+    if (next.height > 0) markSettled(indexRef.current, enterGen.current);
   }
 
   function recordCopyMeasure(id: string, patch: Partial<{ viewH: number; contentH: number }>) {
@@ -219,21 +318,12 @@ export function FirstRunGuide({
 
   function moveTo(next: number) {
     if (next === indexRef.current) return;
-    motionGen.current += 1;
-    if (copyDelay.current != null) {
-      clearTimeout(copyDelay.current);
-      copyDelay.current = null;
+    retarget(next);
+    const animate = motionPrefRef.current === 'off';
+    alignPager(next, frameRef.current.height, animate);
+    if (!animate && frameRef.current.height > 0) {
+      markSettled(next, enterGen.current);
     }
-    photoOpacity.stopAnimation();
-    opacity.stopAnimation();
-    shift.stopAnimation();
-    photoOpacity.setValue(0);
-    opacity.setValue(0);
-    shift.setValue(0);
-    setLeavingId(FIRST_RUN_SCREENS[indexRef.current].id);
-    indexRef.current = next;
-    setIndex(next);
-    alignPager(next, frameRef.current.height, !reduceMotion);
   }
 
   function onContinue() {
@@ -251,27 +341,27 @@ export function FirstRunGuide({
     moveTo(prevFirstRunIndex(current));
   }
 
-  function onScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    setLeavingId(null);
-    const next = firstRunPageFromOffset(
-      event.nativeEvent.contentOffset.y,
-      frameRef.current.height,
-      FIRST_RUN_SCREENS.length,
-    );
-    if (next === indexRef.current) return;
-    motionGen.current += 1;
-    photoOpacity.stopAnimation();
-    opacity.stopAnimation();
-    shift.stopAnimation();
-    if (copyDelay.current != null) {
-      clearTimeout(copyDelay.current);
-      copyDelay.current = null;
+  function onPagerOffset(offsetY: number, fromUser: boolean) {
+    const height = frameRef.current.height;
+    const gen = enterGen.current;
+    const page = firstRunPageFromOffset(offsetY, height, FIRST_RUN_SCREENS.length);
+    const target = pagerTargetRef.current;
+    if (target != null && page !== target) return;
+    if (fromUser && page !== indexRef.current) {
+      retarget(page);
     }
-    photoOpacity.setValue(0);
-    opacity.setValue(0);
-    shift.setValue(0);
-    indexRef.current = next;
-    setIndex(next);
+    if (firstRunPagerIsSettled(offsetY, height, indexRef.current)) {
+      setLeavingId(null);
+      markSettled(indexRef.current, fromUser ? enterGen.current : gen);
+    }
+  }
+
+  function onPagerScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    onPagerOffset(event.nativeEvent.contentOffset.y, false);
+  }
+
+  function onScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    onPagerOffset(event.nativeEvent.contentOffset.y, true);
   }
 
   function onInnerEndDrag(event: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -288,9 +378,9 @@ export function FirstRunGuide({
     if (next != null) moveTo(next);
   }
 
-  const serif = fontsReady ? FIRST_RUN_SERIF : 'Songti SC';
-  const sans = fontsReady ? FIRST_RUN_SANS : undefined;
-  const markFace = fontsReady ? FIRST_RUN_MARK : undefined;
+  const serif = fontsReady === 'ready' ? FIRST_RUN_SERIF : 'Songti SC';
+  const sans = fontsReady === 'ready' ? FIRST_RUN_SANS : undefined;
+  const markFace = fontsReady === 'ready' ? FIRST_RUN_MARK : undefined;
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="Lampy 引导">
@@ -305,7 +395,10 @@ export function FirstRunGuide({
           scrollEnabled={!innerScrolls}
           testID="first-run-pager"
           onLayout={onFrameLayout}
+          onScroll={onPagerScroll}
+          scrollEventThrottle={16}
           onMomentumScrollEnd={onScrollEnd}
+          onScrollEndDrag={onScrollEnd}
           showsVerticalScrollIndicator={false}
           accessibilityRole="adjustable"
           accessibilityLabel="引导页，上滑翻页"
@@ -348,7 +441,10 @@ export function FirstRunGuide({
                   }}
                   onScrollEndDrag={active ? onInnerEndDrag : undefined}
                 >
-                  <Animated.View style={{ opacity: parked == null ? photoOpacity : parked }}>
+                  <Animated.View
+                    testID={`first-run-photo-fade-${item.id}`}
+                    style={{ opacity: parked == null ? photoOpacity : parked }}
+                  >
                     <FirstRunScene
                       id={item.id}
                       photo={item.photo}

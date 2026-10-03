@@ -70,9 +70,35 @@ export function isFirstRunFinishAction(index: number) {
 export const FIRST_RUN_PHOTO_FADE_MS = 500;
 export const FIRST_RUN_COPY_FADE_MS = 450;
 export const FIRST_RUN_COPY_FADE_DELAY_MS = 100;
+export const FIRST_RUN_MOTION_PREF_TIMEOUT_MS = 800;
+export const FIRST_RUN_FONT_TIMEOUT_MS = 800;
+
+let motionPrefTimeoutMs = FIRST_RUN_MOTION_PREF_TIMEOUT_MS;
+let fontTimeoutMs = FIRST_RUN_FONT_TIMEOUT_MS;
+
+export function firstRunMotionPrefTimeoutMs() {
+  return motionPrefTimeoutMs;
+}
+
+export function firstRunFontTimeoutMs() {
+  return fontTimeoutMs;
+}
+
+export function setFirstRunEnterTimeoutsForTests(input: { motionPref?: number; fonts?: number }) {
+  if (input.motionPref != null) motionPrefTimeoutMs = input.motionPref;
+  if (input.fonts != null) fontTimeoutMs = input.fonts;
+}
+
+export function resetFirstRunEnterTimeoutsForTests() {
+  motionPrefTimeoutMs = FIRST_RUN_MOTION_PREF_TIMEOUT_MS;
+  fontTimeoutMs = FIRST_RUN_FONT_TIMEOUT_MS;
+}
 
 export type FirstRunMotionDelay = { current: ReturnType<typeof setTimeout> | null };
 export type FirstRunPhotoReady = 'pending' | 'loaded' | 'failed';
+export type FirstRunMotionPref = 'pending' | 'on' | 'off' | 'failed';
+export type FirstRunFontReady = 'pending' | 'ready' | 'failed';
+export type FirstRunEnterPlay = 'wait' | 'fade' | 'show';
 
 export function settleFirstRunMotion(motion: {
   opacity: { stopAnimation: () => void; setValue: (value: number) => void };
@@ -96,6 +122,39 @@ export function settleFirstRunMotion(motion: {
 
 export function firstRunShouldAnimatePage(reduceMotion: boolean, appState: string) {
   return reduceMotion === false && appState === 'active';
+}
+
+export function firstRunMotionPrefFromQuery(enabled: boolean): Exclude<FirstRunMotionPref, 'pending' | 'failed'> {
+  return enabled ? 'on' : 'off';
+}
+
+export function firstRunPagerIsSettled(offsetY: number, pageHeight: number, index: number) {
+  if (pageHeight <= 0) return false;
+  return Math.abs(offsetY - firstRunPagerOffset(index, pageHeight)) <= 2;
+}
+
+export function firstRunEnterIsCurrent(eventGen: number, currentGen: number) {
+  return eventGen === currentGen;
+}
+
+export function firstRunShouldPlayEnter(input: {
+  pref: FirstRunMotionPref;
+  appState: string;
+  settled: boolean;
+  photoReady: FirstRunPhotoReady;
+  fontsReady: FirstRunFontReady;
+  alreadySolid?: boolean;
+}): FirstRunEnterPlay {
+  if (input.alreadySolid) return 'show';
+  if (input.pref === 'pending') return 'wait';
+  if (input.pref === 'on' || input.pref === 'failed') {
+    return input.fontsReady === 'pending' ? 'wait' : 'show';
+  }
+  if (input.appState !== 'active') return 'wait';
+  if (!input.settled) return 'wait';
+  if (input.fontsReady === 'pending') return 'wait';
+  if (input.photoReady === 'pending') return 'wait';
+  return 'fade';
 }
 
 export function firstRunProgressLabel(index: number, count: number) {

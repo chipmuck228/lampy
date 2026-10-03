@@ -10,7 +10,7 @@ Base：合并 #60 后的 `origin/main`。分支 `ios/first-run-guide-visual`。�
 
 | 命令 | 结果 |
 | --- | --- |
-| 相关 Jest（first-run 决策、Gate、Guide、Scene、motion、layout、scroll） | **PASS** 25 |
+| 相关 Jest（first-run 决策、Gate、Guide、Scene、motion、enter、layout、scroll） | **PASS** 29 |
 | 本轮 ESLint | **PASS** 0 errors |
 | `git diff --check`（本轮改动文件） | **PASS** |
 | 全量 `tsc --noEmit` | 工作树未跟踪的 `apps/ios/app/` 仍会报找不到 `../screens/*`，不是本轮改动 |
@@ -49,18 +49,39 @@ Base：合并 #60 后的 `origin/main`。分支 `ios/first-run-guide-visual`。�
 | # | 项 | 结果 |
 | --- | --- | --- |
 | 1 | 三屏最终画面 | **PASS** `type-s1.png` / `type-s2.png` / `type-s3.png`。标题墨色 + sage 整短语，解释 16pt，右侧留白，短线段进度，顶栏图标+Lampy，第一屏短句「一杯咖啡，一段午后。」 |
-| 2 | 翻页淡入（视频） | **PASS** `type-fade.mp4`。中间帧 `type-fade-mid.png`：邻屏未先完整出现；照片从浅影起来，文案块更晚出现。`type-fade-copy.png` 文案仍在淡入。Expo「Refreshing...」条是 Dev Client，不是产品层 |
+| 2 | 翻页淡入（视频） | **待复核** `type-fade.mp4`。这是环境记录 A，不能用来关闭「三屏瞬间完整、没有可感知淡入」。中间帧见 `type-fade-mid.png`。该次走查夹了 Expo Refreshing，且未按屏核对到位后的连续帧 |
 | 3 | 上一屏 | Jest **PASS**。模拟器点按多次打到滚动区或连点完成，**未拍到返回后的第一屏**，记 **NOT VERIFIED** |
 | 4 | 最后完成且不重播 | **PASS**。`type-after-finish.png` 落到留下页；再开 `type-relaunch.png` 是「刚刚留下的生活」，没有重播三屏 |
 | 5 | 短屏长正文滚动 | SE 第一屏 `se-type-s1.png` 标题、解释、继续都在屏内，**未见内滚**。定稿文案在 SE 竖屏装得下 |
 | 6 | 真机 / VoiceOver | **NOT VERIFIED** |
 
+## 环境记录 B · 入场资格修复后的冷启动
+
+未改系统 Reduce Motion。未以 Metro Refresh 代替冷启动。未卸 Liuz17，未点「留下瞬间」。
+
+| 项 | 值 |
+| --- | --- |
+| 设备 | `Lampy-pr61-fade-gate` `60DCCC9B-3592-45CF-A376-B92E15C66B68`，iPhone 16 / iOS 18.6 |
+| Metro | pid 60159，cwd `/Users/zhen/WeChatProjects/lampy-first-run-guide/apps/ios`，`127.0.0.1:8086`，`EXPO_ROUTER_APP_ROOT` 指向该工作树 `src/app` |
+| Reduce Motion | 模拟器 `com.apple.Accessibility ReduceMotionEnabled` **0**（读取，未为验收改偏好） |
+| 视频 | 冷启动 1→2：`fade-gate-clean.mp4`。点继续 2→3：`fade-gate-s3-enter.mp4` |
+
+| 屏 | 结论 | 连续帧 |
+| --- | --- | --- |
+| 第一屏 | **待复核**。品牌层下一帧已是完整咖啡照和文案（`fade-gate-c086.png` → `fade-gate-c087.png` / `fade-gate-clean-s1.png`）。12fps 没有入场中间帧。入场很可能在品牌层下面已经播完，用户看见的仍是瞬间完整 | 冷启动 `fade-gate-clean.mp4` |
+| 第二屏 | **可感知淡入**。分页到位后先只有顶栏、进度和「继续 / 上一屏」（`fade-gate-c151.png`），照片再起来（`c157`），文案更晚（`c159` → `c161` / `fade-gate-clean-s2.png`） | 同上 |
+| 第三屏 | **可感知淡入**。到位后先空内容、按钮可用（`fade-gate-e014.png`），照片先淡（`e018`），文案晚一截（`e021` → `fade-gate-s3-now.png`） | `fade-gate-s3-enter.mp4` |
+
+Jest 本轮补了：偏好延迟返回时第一屏不先完整再归零；目标图已加载但分页未到位不消耗入场；快速翻页旧回调不影响新屏。Reduce Motion 开启 / 查询失败 / 字体超时走 `show`，由 `firstRunShouldPlayEnter` 单测覆盖。
+
 ## 仍需验证
 
+- 第一屏在品牌层揭开之后的用户可见淡入（本轮冷启动未见）。
 - 模拟器「上一屏」点按（Jest 已覆盖）。
 - 短屏在正文真正溢出时的内滚（当前文案未溢出）。
 - 原生 VoiceOver。
 - 真机三屏与 Reduce Motion（Liuz17 已有记录，不应为验收清库）。
+- 查询一直不返回的真机超时（Jest 有资格分支，隔离机本次查询立刻返回 0）。
 
 ## 版本
 

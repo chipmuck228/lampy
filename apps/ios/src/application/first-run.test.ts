@@ -4,13 +4,17 @@ import {
   firstRunCanStartEnterMotion,
   firstRunCopyAllowsInnerScroll,
   firstRunCopyColumnWidth,
+  firstRunEnterIsCurrent,
   firstRunInnerCanScroll,
+  firstRunMotionPrefFromQuery,
+  firstRunPagerIsSettled,
   firstRunProgressLabel,
   firstRunPageAfterInnerSwipe,
   firstRunPageFromOffset,
   firstRunPagerOffset,
   firstRunShouldAnimatePage,
   firstRunShouldInvalidateCopyMeasures,
+  firstRunShouldPlayEnter,
   invalidateFirstRunCopyMeasures,
   isFirstRunFinishAction,
   nextFirstRunIndex,
@@ -164,6 +168,117 @@ describe('first-run guide decision', () => {
     expect(firstRunShouldAnimatePage(false, 'background')).toBe(false);
     expect(firstRunShouldAnimatePage(false, 'inactive')).toBe(false);
     expect(firstRunShouldAnimatePage(false, 'active')).toBe(true);
+  });
+
+  it('keeps Reduce Motion pending separate from on, off, and query failure', () => {
+    expect(firstRunMotionPrefFromQuery(true)).toBe('on');
+    expect(firstRunMotionPrefFromQuery(false)).toBe('off');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'pending',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+      }),
+    ).toBe('wait');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'on',
+        appState: 'active',
+        settled: false,
+        photoReady: 'pending',
+        fontsReady: 'ready',
+      }),
+    ).toBe('show');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'failed',
+        appState: 'active',
+        settled: false,
+        photoReady: 'pending',
+        fontsReady: 'failed',
+      }),
+    ).toBe('show');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: false,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+      }),
+    ).toBe('wait');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+      }),
+    ).toBe('fade');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'background',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+      }),
+    ).toBe('wait');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'failed',
+        fontsReady: 'ready',
+      }),
+    ).toBe('fade');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+        alreadySolid: true,
+      }),
+    ).toBe('show');
+    expect(firstRunPagerIsSettled(0, 600, 0)).toBe(true);
+    expect(firstRunPagerIsSettled(300, 600, 1)).toBe(false);
+    expect(firstRunPagerIsSettled(600, 600, 1)).toBe(true);
+    expect(firstRunPagerIsSettled(0, 0, 0)).toBe(false);
+    expect(firstRunEnterIsCurrent(2, 3)).toBe(false);
+    expect(firstRunEnterIsCurrent(3, 3)).toBe(true);
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'on',
+        appState: 'active',
+        settled: true,
+        photoReady: 'failed',
+        fontsReady: 'failed',
+      }),
+    ).toBe('show');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'failed',
+        appState: 'active',
+        settled: true,
+        photoReady: 'pending',
+        fontsReady: 'ready',
+      }),
+    ).toBe('show');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'pending',
+        fontsReady: 'ready',
+      }),
+    ).toBe('wait');
   });
 
   it('restores a visible scene when motion is stopped mid-flight', () => {

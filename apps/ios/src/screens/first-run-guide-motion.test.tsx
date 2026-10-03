@@ -99,4 +99,3 @@ describe('first-run guide motion', () => {
     view.unmount();
   });
 });
-
