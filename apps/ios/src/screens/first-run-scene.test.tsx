@@ -18,6 +18,9 @@ describe('first-run scenes', () => {
     expect(short.height).toBeLessThan(phone.height);
     expect(pad.width).toBeLessThanOrEqual(520);
     expect(pad.width).toBeLessThan(1024 - 96);
+    const insetLandscape = firstRunPhotoBox(758, 280);
+    expect(insetLandscape.width).toBeLessThanOrEqual(758 - 48);
+    expect(insetLandscape.height).toBeLessThan(phone.height);
   });
 
   it('shows the bundled photo and in-photo line without leftover sample chrome', async () => {

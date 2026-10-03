@@ -76,6 +76,62 @@ export function settleFirstRunMotion(motion: {
   }
 }
 
+export function firstRunShouldAnimatePage(reduceMotion: boolean, appState: string) {
+  return reduceMotion === false && appState === 'active';
+}
+
+export type FirstRunCopyMeasure = {
+  viewH: number;
+  contentH: number;
+};
+
+export type FirstRunCopyMeasures = Record<string, FirstRunCopyMeasure>;
+
+export function firstRunCopyMeasureReady(
+  measure?: FirstRunCopyMeasure | null,
+): measure is FirstRunCopyMeasure {
+  return !!measure && measure.viewH > 0 && measure.contentH > 0;
+}
+
+export function rememberFirstRunCopyMeasure(
+  measures: FirstRunCopyMeasures,
+  id: string,
+  next: FirstRunCopyMeasure,
+): FirstRunCopyMeasures {
+  const prev = measures[id];
+  if (prev && prev.viewH === next.viewH && prev.contentH === next.contentH) return measures;
+  return { ...measures, [id]: next };
+}
+
+export function invalidateFirstRunCopyMeasures(): FirstRunCopyMeasures {
+  return {};
+}
+
+export function firstRunFrameChanged(
+  prev: { width: number; height: number },
+  next: { width: number; height: number },
+) {
+  return Math.abs(prev.width - next.width) > 0.5 || Math.abs(prev.height - next.height) > 0.5;
+}
+
+export function firstRunShouldInvalidateCopyMeasures(
+  prev: { width: number; height: number },
+  next: { width: number; height: number },
+) {
+  if (prev.width <= 0 || prev.height <= 0) return false;
+  return firstRunFrameChanged(prev, next);
+}
+
+export function firstRunPagerOffset(index: number, pageHeight: number) {
+  return Math.max(index, 0) * Math.max(pageHeight, 1);
+}
+
+/** Unknown heights must not be treated as “copy fits, no inner scroll”. */
+export function firstRunCopyAllowsInnerScroll(measure?: FirstRunCopyMeasure | null) {
+  if (!firstRunCopyMeasureReady(measure)) return true;
+  return firstRunInnerCanScroll(measure.contentH, measure.viewH);
+}
+
 export function firstRunPageFromOffset(offsetY: number, pageHeight: number, pageCount: number) {
   return Math.max(0, Math.min(Math.round(offsetY / Math.max(pageHeight, 1)), pageCount - 1));
 }

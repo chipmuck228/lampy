@@ -1,11 +1,17 @@
 import {
   decideFirstRunGuide,
+  firstRunCopyAllowsInnerScroll,
   firstRunInnerCanScroll,
   firstRunPageAfterInnerSwipe,
   firstRunPageFromOffset,
+  firstRunPagerOffset,
+  firstRunShouldAnimatePage,
+  firstRunShouldInvalidateCopyMeasures,
+  invalidateFirstRunCopyMeasures,
   isFirstRunFinishAction,
   nextFirstRunIndex,
   prevFirstRunIndex,
+  rememberFirstRunCopyMeasure,
   settleFirstRunMotion,
   FIRST_RUN_LAST_INDEX,
   FIRST_RUN_SCREENS,
@@ -90,6 +96,60 @@ describe('first-run guide decision', () => {
         index: FIRST_RUN_LAST_INDEX,
       }),
     ).toBeNull();
+  });
+
+  it('keeps copy scroll eligibility by screen after paging and does not treat unknown as short', () => {
+    expect(firstRunInnerCanScroll(0, 0)).toBe(false);
+    expect(firstRunCopyAllowsInnerScroll(undefined)).toBe(true);
+    expect(firstRunCopyAllowsInnerScroll({ viewH: 0, contentH: 0 })).toBe(true);
+
+    let measures = rememberFirstRunCopyMeasure({}, 'leave', { viewH: 200, contentH: 480 });
+    measures = rememberFirstRunCopyMeasure(measures, 'lookback', { viewH: 200, contentH: 360 });
+    expect(firstRunCopyAllowsInnerScroll(measures.leave)).toBe(true);
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: firstRunCopyAllowsInnerScroll(measures.leave),
+        offsetY: 40,
+        viewHeight: 200,
+        contentHeight: 480,
+        velocityY: 0.8,
+        index: 0,
+      }),
+    ).toBeNull();
+
+    expect(firstRunCopyAllowsInnerScroll(measures.lookback)).toBe(true);
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: firstRunCopyAllowsInnerScroll(measures.lookback),
+        offsetY: 20,
+        viewHeight: 200,
+        contentHeight: 360,
+        velocityY: 0.8,
+        index: 1,
+      }),
+    ).toBeNull();
+    expect(
+      firstRunPageAfterInnerSwipe({
+        canScroll: firstRunCopyAllowsInnerScroll(measures.lookback),
+        offsetY: 160,
+        viewHeight: 200,
+        contentHeight: 360,
+        velocityY: 0.8,
+        index: 1,
+      }),
+    ).toBe(2);
+
+    expect(firstRunShouldInvalidateCopyMeasures({ width: 0, height: 0 }, { width: 390, height: 600 })).toBe(false);
+    expect(firstRunShouldInvalidateCopyMeasures({ width: 390, height: 600 }, { width: 758, height: 280 })).toBe(true);
+    expect(firstRunCopyAllowsInnerScroll(invalidateFirstRunCopyMeasures().leave)).toBe(true);
+    expect(firstRunPagerOffset(1, 280)).toBe(280);
+  });
+
+  it('starts page motion only while the app is active and Reduce Motion is off', () => {
+    expect(firstRunShouldAnimatePage(true, 'active')).toBe(false);
+    expect(firstRunShouldAnimatePage(false, 'background')).toBe(false);
+    expect(firstRunShouldAnimatePage(false, 'inactive')).toBe(false);
+    expect(firstRunShouldAnimatePage(false, 'active')).toBe(true);
   });
 
   it('restores a visible scene when motion is stopped mid-flight', () => {
