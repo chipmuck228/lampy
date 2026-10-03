@@ -10,10 +10,11 @@ import {
   firstRunPageFromOffset,
   isFirstRunFinishAction,
   nextFirstRunIndex,
+  prevFirstRunIndex,
   settleFirstRunMotion,
 } from '../application/first-run';
-import { ink, inkSoft, isCompactHeight, paper, sage } from './life-page';
-import { FirstRunScene } from './first-run-scene';
+import { hairline, ink, inkSoft, isCompactHeight, pageGutter, paper, paperDeep, readingWidth, sage } from './life-page';
+import { FirstRunScene, firstRunPhotoBox } from './first-run-scene';
 
 export function FirstRunGuide({
   onFinished,
@@ -24,6 +25,9 @@ export function FirstRunGuide({
 }) {
   const { width, height } = useWindowDimensions();
   const compact = isCompactHeight(height);
+  const gutter = pageGutter(width, height);
+  const column = readingWidth(width, height);
+  const photoBox = firstRunPhotoBox(width, height);
   const pager = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const indexRef = useRef(0);
@@ -34,6 +38,8 @@ export function FirstRunGuide({
   const [reduceMotion, setReduceMotion] = useState(true);
   const [opacity] = useState(() => new Animated.Value(1));
   const [shift] = useState(() => new Animated.Value(0));
+  const [photoOpacity] = useState(() => new Animated.Value(1));
+  const motionGen = useRef(0);
   const screen = FIRST_RUN_SCREENS[index];
 
   useEffect(() => {
@@ -55,38 +61,47 @@ export function FirstRunGuide({
   }, []);
 
   useEffect(() => {
+    const gen = ++motionGen.current;
     if (reduceMotion) {
-      opacity.setValue(1);
-      shift.setValue(0);
+      settleFirstRunMotion({ opacity, shift, photoOpacity });
       return;
     }
+    photoOpacity.setValue(0.65);
     opacity.setValue(0);
-    shift.setValue(8);
+    shift.setValue(10);
     const anim = Animated.parallel([
+      Animated.timing(photoOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
       Animated.timing(opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
       Animated.timing(shift, { toValue: 0, duration: 280, useNativeDriver: true }),
     ]);
-    anim.start();
+    anim.start(({ finished }) => {
+      if (!finished || gen !== motionGen.current) return;
+    });
     return () => {
       anim.stop();
     };
-  }, [index, opacity, reduceMotion, shift]);
+  }, [index, opacity, photoOpacity, reduceMotion, shift]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') settleFirstRunMotion({ opacity, shift });
+      if (state !== 'active') {
+        motionGen.current += 1;
+        settleFirstRunMotion({ opacity, shift, photoOpacity });
+      }
     });
     return () => {
       sub?.remove?.();
-      settleFirstRunMotion({ opacity, shift });
+      motionGen.current += 1;
+      settleFirstRunMotion({ opacity, shift, photoOpacity });
     };
-  }, [opacity, shift]);
+  }, [opacity, photoOpacity, shift]);
 
   function moveTo(next: number) {
-    if (next !== indexRef.current) {
-      setCopyViewH(0);
-      setCopyContentH(0);
-    }
+    if (next === indexRef.current) return;
+    motionGen.current += 1;
+    settleFirstRunMotion({ opacity, shift, photoOpacity });
+    setCopyViewH(0);
+    setCopyContentH(0);
     indexRef.current = next;
     setIndex(next);
     pager.current?.scrollTo({ y: next * pageHeight, animated: !reduceMotion });
@@ -101,12 +116,21 @@ export function FirstRunGuide({
     moveTo(nextFirstRunIndex(current));
   }
 
+  function onBack() {
+    const current = indexRef.current;
+    if (current <= 0) return;
+    moveTo(prevFirstRunIndex(current));
+  }
+
   function onScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const next = firstRunPageFromOffset(
       event.nativeEvent.contentOffset.y,
       pageHeight,
       FIRST_RUN_SCREENS.length,
     );
+    if (next === indexRef.current) return;
+    motionGen.current += 1;
+    settleFirstRunMotion({ opacity, shift, photoOpacity });
     indexRef.current = next;
     setIndex(next);
   }
@@ -146,7 +170,14 @@ export function FirstRunGuide({
             <ScrollView
               testID={`first-run-copy-${item.id}`}
               style={styles.pageScroll}
-              contentContainerStyle={[styles.pageCopy, { paddingTop: compact ? 24 : 48 }]}
+              contentContainerStyle={[
+                styles.pageCopy,
+                {
+                  paddingTop: compact ? 16 : 28,
+                  paddingHorizontal: gutter,
+                  maxWidth: column + gutter * 2,
+                },
+              ]}
               scrollEnabled={innerScrolls && item.id === screen.id}
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
@@ -158,26 +189,52 @@ export function FirstRunGuide({
               }}
               onScrollEndDrag={item.id === screen.id ? onInnerEndDrag : undefined}
             >
+              <Text style={styles.mark} accessibilityRole="header">
+                Lampy
+              </Text>
+              <Animated.View style={{ opacity: item.id === screen.id ? photoOpacity : 1 }}>
+                <FirstRunScene
+                  id={item.id}
+                  photo={item.photo}
+                  photoAlt={item.photoAlt}
+                  photoNote={item.photoNote}
+                  photoWidth={photoBox.width}
+                  photoHeight={photoBox.height}
+                />
+              </Animated.View>
               <Animated.View
                 style={{
                   opacity: item.id === screen.id ? opacity : 1,
                   transform: [{ translateY: item.id === screen.id ? shift : 0 }],
+                  gap: 12,
                 }}
               >
-                <FirstRunScene id={item.id} />
+                <Text style={styles.title} accessibilityRole="header">
+                  {item.title}
+                </Text>
+                <Text style={styles.body}>{item.body}</Text>
               </Animated.View>
-              <Text style={styles.title} accessibilityRole="header">
-                {item.title}
-              </Text>
-              <Text style={styles.body}>{item.body}</Text>
             </ScrollView>
           </View>
         ))}
       </ScrollView>
-      <View style={styles.footer}>
-        <Text style={styles.progress} testID="first-run-progress">
-          {index + 1} / {FIRST_RUN_SCREENS.length}
-        </Text>
+      <View style={[styles.footer, { paddingHorizontal: gutter, maxWidth: column + gutter * 2, alignSelf: 'center', width: '100%' }]}>
+        <View style={styles.footerTop}>
+          <Text style={styles.progress} testID="first-run-progress">
+            {index + 1} / {FIRST_RUN_SCREENS.length}
+          </Text>
+          {index > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="上一屏"
+              testID="first-run-back"
+              onPress={onBack}
+              style={styles.backHit}
+            >
+              <Text style={styles.back}>上一屏</Text>
+            </Pressable>
+          ) : null}
+        </View>
         {finishError ? (
           <Text style={styles.body} testID="first-run-finish-error">
             {finishError}
@@ -188,7 +245,7 @@ export function FirstRunGuide({
           accessibilityLabel={screen.action}
           testID="first-run-continue"
           onPress={onContinue}
-          style={styles.hit}
+          style={styles.actionHit}
         >
           <Text style={styles.action}>{screen.action}</Text>
         </Pressable>
@@ -200,13 +257,31 @@ export function FirstRunGuide({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper },
   pager: { flex: 1 },
-  page: { overflow: 'hidden' },
-  pageScroll: { flex: 1 },
-  pageCopy: { paddingHorizontal: 24, gap: 16, flexGrow: 1, justifyContent: 'center' },
+  page: { overflow: 'hidden', alignItems: 'center' },
+  pageScroll: { flex: 1, width: '100%' },
+  pageCopy: { gap: 18, flexGrow: 1, width: '100%', alignSelf: 'center' },
+  mark: { ...type.action, color: ink, letterSpacing: 0.8 },
   title: { ...type.title, color: ink },
   body: { ...type.body, color: inkSoft },
-  footer: { flexShrink: 0, paddingHorizontal: 24, paddingBottom: 16, gap: 8 },
+  footer: { flexShrink: 0, paddingBottom: 16, gap: 8 },
+  footerTop: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   progress: { ...type.meta, color: inkSoft },
-  action: { ...type.action, color: sage },
-  hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  back: { ...type.meta, color: sage },
+  backHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', alignItems: 'flex-end' },
+  action: { ...type.action, color: sage, letterSpacing: 1 },
+  actionHit: {
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: paperDeep,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: hairline,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+  },
 });

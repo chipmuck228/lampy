@@ -5,6 +5,7 @@ import {
   firstRunPageFromOffset,
   isFirstRunFinishAction,
   nextFirstRunIndex,
+  prevFirstRunIndex,
   settleFirstRunMotion,
   FIRST_RUN_LAST_INDEX,
   FIRST_RUN_SCREENS,
@@ -23,6 +24,8 @@ describe('first-run guide decision', () => {
     expect(isFirstRunFinishAction(1)).toBe(false);
     expect(isFirstRunFinishAction(FIRST_RUN_LAST_INDEX)).toBe(true);
     expect(nextFirstRunIndex(0)).toBe(1);
+    expect(prevFirstRunIndex(1)).toBe(0);
+    expect(prevFirstRunIndex(0)).toBe(0);
   });
 
   it('skips the guide when records already exist so an upgrade cannot lose the path in', () => {
@@ -92,20 +95,26 @@ describe('first-run guide decision', () => {
   it('restores a visible scene when motion is stopped mid-flight', () => {
     const opacity = { stopAnimation: jest.fn(), setValue: jest.fn() };
     const shift = { stopAnimation: jest.fn(), setValue: jest.fn() };
-    settleFirstRunMotion({ opacity, shift });
+    const photoOpacity = { stopAnimation: jest.fn(), setValue: jest.fn() };
+    settleFirstRunMotion({ opacity, shift, photoOpacity });
     expect(opacity.stopAnimation).toHaveBeenCalled();
     expect(shift.stopAnimation).toHaveBeenCalled();
+    expect(photoOpacity.stopAnimation).toHaveBeenCalled();
     expect(opacity.setValue).toHaveBeenCalledWith(1);
     expect(shift.setValue).toHaveBeenCalledWith(0);
+    expect(photoOpacity.setValue).toHaveBeenCalledWith(1);
   });
 
-  it('uses this-round copy and does not claim cloud backup or sync', () => {
-    const text = FIRST_RUN_SCREENS.map((screen) => `${screen.title}${screen.body}`).join('');
-    expect(text).toContain('一句话，也值得留下。');
-    expect(text).toContain('记录保存在这台设备');
-    expect(text).not.toMatch(/云备份|同步|家庭已开放|已经可以分享给家人/);
-    expect(FIRST_RUN_SCREENS.every((screen) => screen.source.includes('本轮新文案'))).toBe(true);
+  it('uses this-round copy and does not claim cloud backup, enter, or leftover prototype lines', () => {
+    const text = FIRST_RUN_SCREENS.map((screen) => `${screen.title}${screen.body}${screen.photoNote}${screen.action}`).join('');
+    expect(text).toContain('日子，不必特别才值得留下。');
+    expect(text).toContain('轻轻扫过，也能看见日子的样子。');
+    expect(text).toContain('从一个日子，继续读起。');
+    expect(text).toContain('留下瞬间');
+    expect(text).not.toMatch(/云备份|同步|家庭已开放|已经可以分享给家人|不必翻找|进入 Lampy|自己的生活记录/);
+    expect(FIRST_RUN_SCREENS.every((screen) => screen.source.includes('本轮定稿'))).toBe(true);
     expect(FIRST_RUN_SCREENS[2].id).toBe('keep');
     expect(FIRST_RUN_SCREENS[2].action).toBe('留下瞬间');
+    expect(FIRST_RUN_SCREENS[0].action).toBe('继续');
   });
 });

@@ -17,23 +17,32 @@ export function decideFirstRunGuide(input: {
 export const FIRST_RUN_SCREENS = [
   {
     id: 'leave',
-    title: '一句话，也值得留下。',
-    body: '一张照片，一段声音，或此刻的感受。',
-    source: '本轮新文案，2026-10-01',
+    photo: 'coffee',
+    photoAlt: '午后的阳光落在窗边的咖啡桌上',
+    photoNote: '一段咖啡，一段午后。',
+    title: '日子，不必特别才值得留下。',
+    body: '不必写成故事。把这一刻，轻轻留给自己。',
+    source: '本轮定稿，2026-10-03',
     action: '继续',
   },
   {
     id: 'lookback',
-    title: '那些平常的日子，后来都有了模样。',
-    body: '再读一句原话，再听一次当时的声音。',
-    source: '本轮新文案，2026-10-01',
+    photo: 'flowers',
+    photoAlt: '窗边晨光里的白色花朵',
+    photoNote: '今天，也有想记住的光。',
+    title: '轻轻扫过，也能看见日子的样子。',
+    body: '文字、照片和声音，保留原来的样子。想再读一遍时，随时停下来。',
+    source: '本轮定稿，2026-10-03',
     action: '继续',
   },
   {
     id: 'keep',
-    title: '自己的生活，安心放在这里。',
-    body: '记录保存在这台设备，也可以开启本机保护。',
-    source: '本轮新文案，2026-10-01',
+    photo: 'window',
+    photoAlt: '窗台上的植物和一盏灯',
+    photoNote: '有些日子，值得再坐一会儿。',
+    title: '从一个日子，继续读起。',
+    body: '回到那一天，慢慢读完。过往就在这里，允许停留。',
+    source: '本轮定稿，2026-10-03',
     action: '留下瞬间',
   },
 ] as const;
@@ -44,6 +53,10 @@ export function nextFirstRunIndex(index: number) {
   return Math.min(index + 1, FIRST_RUN_LAST_INDEX);
 }
 
+export function prevFirstRunIndex(index: number) {
+  return Math.max(index - 1, 0);
+}
+
 export function isFirstRunFinishAction(index: number) {
   return index >= FIRST_RUN_LAST_INDEX;
 }
@@ -51,11 +64,16 @@ export function isFirstRunFinishAction(index: number) {
 export function settleFirstRunMotion(motion: {
   opacity: { stopAnimation: () => void; setValue: (value: number) => void };
   shift: { stopAnimation: () => void; setValue: (value: number) => void };
+  photoOpacity?: { stopAnimation: () => void; setValue: (value: number) => void };
 }) {
   motion.opacity.stopAnimation();
   motion.shift.stopAnimation();
   motion.opacity.setValue(1);
   motion.shift.setValue(0);
+  if (motion.photoOpacity) {
+    motion.photoOpacity.stopAnimation();
+    motion.photoOpacity.setValue(1);
+  }
 }
 
 export function firstRunPageFromOffset(offsetY: number, pageHeight: number, pageCount: number) {

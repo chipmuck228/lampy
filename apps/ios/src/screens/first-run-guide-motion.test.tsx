@@ -57,7 +57,7 @@ describe('first-run guide motion', () => {
     await app.set('background');
     await app.set('active');
     expect(view.getByLabelText('Lampy 引导')).toBeTruthy();
-    expect(view.getByText('那些平常的日子，后来都有了模样。', { includeHiddenElements: true })).toBeTruthy();
+    expect(view.getByText('轻轻扫过，也能看见日子的样子。', { includeHiddenElements: true })).toBeTruthy();
     expect(view.getByLabelText('继续')).toBeTruthy();
     expect(finished).not.toHaveBeenCalled();
     app.restore();
@@ -69,19 +69,33 @@ describe('first-run guide motion', () => {
     const finished = jest.fn();
     const view = await render(wrap(<FirstRunGuide onFinished={finished} />));
     await waitFor(() => {
-      expect(view.getByText('一句话，也值得留下。')).toBeTruthy();
+      expect(view.getByText('日子，不必特别才值得留下。')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('first-run-continue'));
     await waitFor(() => {
-      expect(view.getByText('那些平常的日子，后来都有了模样。')).toBeTruthy();
+      expect(view.getByText('轻轻扫过，也能看见日子的样子。')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('first-run-continue'));
     await waitFor(() => {
       expect(view.getByLabelText('留下瞬间')).toBeTruthy();
     });
-    expect(view.getByText('自己的生活，安心放在这里。')).toBeTruthy();
+    expect(view.getByText('从一个日子，继续读起。')).toBeTruthy();
     expect(view.getByTestId('first-run-scene-keep')).toBeTruthy();
     expect(finished).not.toHaveBeenCalled();
     app.restore();
+  });
+
+  it('cancels the previous page motion when the user pages quickly and does not finish', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+    const finished = jest.fn();
+    const view = await render(wrap(<FirstRunGuide onFinished={finished} />));
+    fireEvent.press(view.getByTestId('first-run-continue'));
+    fireEvent.press(view.getByTestId('first-run-continue'));
+    await waitFor(() => {
+      expect(view.getByLabelText('留下瞬间')).toBeTruthy();
+    });
+    expect(view.getByText('从一个日子，继续读起。', { includeHiddenElements: true })).toBeTruthy();
+    expect(finished).not.toHaveBeenCalled();
+    view.unmount();
   });
 });
