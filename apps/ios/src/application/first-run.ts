@@ -99,6 +99,7 @@ export type FirstRunPhotoReady = 'pending' | 'loaded' | 'failed';
 export type FirstRunMotionPref = 'pending' | 'on' | 'off' | 'failed';
 export type FirstRunFontReady = 'pending' | 'ready' | 'failed';
 export type FirstRunEnterPlay = 'wait' | 'fade' | 'show';
+/** failed = hide 调用失败或超时，不表示原生遮挡已经消失。 */
 export type FirstRunStartupOverlay = 'covering' | 'exiting' | 'exited' | 'failed';
 
 export function settleFirstRunMotion(motion: {
@@ -180,6 +181,7 @@ export function firstRunShouldPlayEnter(input: {
   if (input.pref === 'on' || input.pref === 'failed') {
     return input.fontsReady === 'pending' ? 'wait' : 'show';
   }
+  if (input.overlay === 'failed') return 'show';
   if (firstRunStartupCovering(input.overlay ?? 'exited', input.brandCovering === true)) {
     return 'wait';
   }

@@ -4,12 +4,14 @@ export type StartupOverlayState = 'covering' | 'exiting' | 'exited' | 'failed';
 export type StartupOverlayResult = 'exited' | 'failed';
 
 export const STARTUP_OVERLAY_FAILSAFE_MS = 4000;
+export const STARTUP_OVERLAY_MAX_ATTEMPTS = 2;
 
 const listeners = new Set<(state: StartupOverlayState) => void>();
 const brandListeners = new Set<(covering: boolean) => void>();
 
 let state: StartupOverlayState = 'covering';
 let generation = 0;
+let attempts = 0;
 let inFlight: Promise<StartupOverlayResult> | null = null;
 let failsafeTimer: ReturnType<typeof setTimeout> | null = null;
 let hungTimer: ReturnType<typeof setTimeout> | null = null;
@@ -81,18 +83,26 @@ export function subscribeStartupBrandCovering(listener: (covering: boolean) => v
   };
 }
 
-export function requestStartupOverlayExit(): Promise<StartupOverlayResult> {
-  if (state === 'exited' || state === 'failed') return Promise.resolve(state);
-  if (inFlight) return inFlight;
-  state = 'exiting';
-  generation += 1;
-  const startedGen = generation;
-  notifyOverlay();
+function clearHungTimer() {
+  if (hungTimer == null) return;
+  clearTimeout(hungTimer);
+  hungTimer = null;
+}
 
-  if (hungTimer != null) {
-    clearTimeout(hungTimer);
-    hungTimer = null;
+function finish(next: StartupOverlayResult, startedGen: number): StartupOverlayResult {
+  if (startedGen !== generation) {
+    return state === 'exited' || state === 'failed' ? state : next;
   }
+  if (state === 'exited') return 'exited';
+  if (state === 'failed') return 'failed';
+  state = next;
+  inFlight = null;
+  notifyOverlay();
+  return next;
+}
+
+function raceHide(startedGen: number): Promise<StartupOverlayResult> {
+  clearHungTimer();
   const hung = new Promise<StartupOverlayResult>((resolve) => {
     hungTimer = setTimeout(() => resolve('failed'), hideTimeoutMs);
   });
@@ -107,20 +117,38 @@ export function requestStartupOverlayExit(): Promise<StartupOverlayResult> {
     .then(() => 'exited' as const)
     .catch(() => 'failed' as const);
 
-  inFlight = Promise.race([hide, hung]).then((result) => {
-    if (hungTimer != null) {
-      clearTimeout(hungTimer);
-      hungTimer = null;
-    }
+  return Promise.race([hide, hung]).then((result) => {
+    clearHungTimer();
     if (startedGen !== generation) {
       return state === 'exited' || state === 'failed' ? state : result;
     }
     if (state === 'exited' || state === 'failed') return state;
-    state = result;
-    inFlight = null;
-    notifyOverlay();
     return result;
   });
+}
+
+function beginAttempt(): Promise<StartupOverlayResult> {
+  attempts += 1;
+  generation += 1;
+  const startedGen = generation;
+  if (state !== 'exiting') {
+    state = 'exiting';
+    notifyOverlay();
+  }
+  return raceHide(startedGen).then((result) => {
+    if (result === 'exited') return finish('exited', startedGen);
+    if (attempts >= STARTUP_OVERLAY_MAX_ATTEMPTS) return finish('failed', startedGen);
+    return beginAttempt();
+  });
+}
+
+export function requestStartupOverlayExit(): Promise<StartupOverlayResult> {
+  if (state === 'exited') return Promise.resolve('exited');
+  if (inFlight) return inFlight;
+  if (state === 'failed' && attempts >= STARTUP_OVERLAY_MAX_ATTEMPTS) {
+    return Promise.resolve('failed');
+  }
+  inFlight = beginAttempt();
   return inFlight;
 }
 
@@ -154,6 +182,7 @@ export function setStartupOverlayTimeoutsForTests(input: { hide?: number; failsa
 
 export function resetStartupOverlayForTests() {
   generation += 1;
+  attempts = 0;
   state = 'covering';
   inFlight = null;
   brandCovering = false;

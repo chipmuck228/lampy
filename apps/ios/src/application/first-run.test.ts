@@ -317,7 +317,7 @@ describe('first-run guide decision', () => {
         fontsReady: 'ready',
         overlay: 'failed',
       }),
-    ).toBe('fade');
+    ).toBe('show');
     expect(
       firstRunShouldPlayEnter({
         pref: 'off',
@@ -389,6 +389,16 @@ describe('first-run guide decision', () => {
         overlay: 'covering',
       }),
     ).toBe(true);
+    expect(
+      firstRunShouldRequestOverlayExit({
+        index: 0,
+        pref: 'off',
+        fontsReady: 'ready',
+        photoReady: 'loaded',
+        settled: true,
+        overlay: 'failed',
+      }),
+    ).toBe(false);
     expect(
       firstRunShouldPlayEnter({
         pref: 'off',

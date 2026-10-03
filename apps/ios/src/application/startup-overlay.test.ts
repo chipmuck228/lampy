@@ -2,6 +2,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import {
   STARTUP_OVERLAY_FAILSAFE_MS,
+  STARTUP_OVERLAY_MAX_ATTEMPTS,
   ensureStartupOverlayFailsafe,
   isStartupBrandCovering,
   requestStartupOverlayExit,
@@ -74,20 +75,79 @@ describe('startup overlay exit', () => {
     stop();
   });
 
-  it('marks failed when hide throws so the first screen is not stuck transparent', async () => {
-    setStartupOverlayHideForTests(async () => {
-      throw new Error('hide failed');
-    });
-    await expect(requestStartupOverlayExit()).resolves.toBe('failed');
-    expect(startupOverlayState()).toBe('failed');
-    await expect(requestStartupOverlayExit()).resolves.toBe('failed');
+  it('retries once after the first hide fails, then stays exited', async () => {
+    const hide = jest.fn()
+      .mockRejectedValueOnce(new Error('hide failed'))
+      .mockResolvedValueOnce(undefined);
+    setStartupOverlayHideForTests(hide);
+    await expect(requestStartupOverlayExit()).resolves.toBe('exited');
+    expect(hide).toHaveBeenCalledTimes(2);
+    expect(startupOverlayState()).toBe('exited');
+    await expect(requestStartupOverlayExit()).resolves.toBe('exited');
+    expect(hide).toHaveBeenCalledTimes(2);
   });
 
-  it('marks failed when hide never settles', async () => {
+  it('marks failed only after the limited retry also fails', async () => {
+    const hide = jest.fn(async () => {
+      throw new Error('hide failed');
+    });
+    setStartupOverlayHideForTests(hide);
+    await expect(requestStartupOverlayExit()).resolves.toBe('failed');
+    expect(hide).toHaveBeenCalledTimes(STARTUP_OVERLAY_MAX_ATTEMPTS);
+    expect(startupOverlayState()).toBe('failed');
+    await expect(requestStartupOverlayExit()).resolves.toBe('failed');
+    expect(hide).toHaveBeenCalledTimes(STARTUP_OVERLAY_MAX_ATTEMPTS);
+  });
+
+  it('marks failed when both hide attempts time out', async () => {
+    const hide = jest.fn(() => new Promise<void>(() => undefined));
     setStartupOverlayTimeoutsForTests({ hide: 20 });
-    setStartupOverlayHideForTests(() => new Promise(() => undefined));
+    setStartupOverlayHideForTests(hide);
+    await expect(requestStartupOverlayExit()).resolves.toBe('failed');
+    expect(hide).toHaveBeenCalledTimes(STARTUP_OVERLAY_MAX_ATTEMPTS);
+    expect(startupOverlayState()).toBe('failed');
+  });
+
+  it('does not let a hung first hide complete after a newer attempt has started', async () => {
+    const resolvers: (() => void)[] = [];
+    const hide = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    setStartupOverlayTimeoutsForTests({ hide: 20 });
+    setStartupOverlayHideForTests(hide);
+    const pending = requestStartupOverlayExit();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(hide).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(hide).toHaveBeenCalledTimes(2);
+    expect(startupOverlayState()).toBe('exiting');
+    resolvers[0]?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(startupOverlayState()).toBe('exiting');
+    resolvers[1]?.();
+    await expect(pending).resolves.toBe('exited');
+    expect(startupOverlayState()).toBe('exited');
+  });
+
+  it('ignores a late hide after both attempts have already failed', async () => {
+    const resolvers: (() => void)[] = [];
+    setStartupOverlayTimeoutsForTests({ hide: 20 });
+    setStartupOverlayHideForTests(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
     await expect(requestStartupOverlayExit()).resolves.toBe('failed');
     expect(startupOverlayState()).toBe('failed');
+    resolvers[0]?.();
+    resolvers[1]?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(startupOverlayState()).toBe('failed');
+    await expect(requestStartupOverlayExit()).resolves.toBe('failed');
   });
 
   it('lets the failsafe request hide when nobody else has', async () => {
