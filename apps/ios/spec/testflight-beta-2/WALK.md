@@ -106,4 +106,4 @@
 | #61 之后 main | 无后续提交（2026-10-03 再 fetch 仍停在该 SHA） |
 | 打包 SHA | `05c7236215deee5018f502f0eb2b6797f50f759a` |
 | 文档 head | 本收尾提交（走查填入 Archive / 检查数字）。**构建 SHA 仍为 `05c7236`** |
-| PR | 创建后填写（保持 OPEN） |
+| PR | [#62](https://github.com/chipmuck228/lampy/pull/62)（保持 OPEN） |
