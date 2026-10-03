@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { act, cleanup, fireEvent, render, waitFor, type RenderResult } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { firstRunCopyColumnWidth } from '../application/first-run';
 import { FirstRunGuide } from './first-run-guide';
 import { firstRunPhotoBox } from './first-run-scene';
 import { pageGutter } from './life-page';
@@ -55,6 +56,9 @@ describe('first-run guide layout', () => {
     const expected = firstRunPhotoBox(758, 280);
     expect(photo.width).toBe(expected.width);
     expect(expected.width).toBeLessThanOrEqual(758 - pageGutter(758, 280) * 2);
+    const copy = StyleSheet.flatten(view.getByTestId('first-run-copy-block-leave').props.style);
+    expect(copy.width).toBe(firstRunCopyColumnWidth(expected.width, 758, 280));
+    expect(copy.width).toBeLessThan(expected.width);
   });
 
   it('keeps a short landscape page inside the measured frame', async () => {

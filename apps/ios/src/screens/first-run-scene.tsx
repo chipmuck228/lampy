@@ -1,7 +1,7 @@
 import { Image, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 
-import type { FIRST_RUN_SCREENS } from '../application/first-run';
+import type { FIRST_RUN_SCREENS, FirstRunPhotoReady } from '../application/first-run';
 import { isCompactHeight, pageGutter, paper, readingWidth } from './life-page';
 
 const PHOTOS = {
@@ -28,6 +28,8 @@ export function FirstRunScene({
   photoNote,
   photoWidth,
   photoHeight,
+  noteFontFamily,
+  onPhotoReady,
 }: {
   id: (typeof FIRST_RUN_SCREENS)[number]['id'];
   photo: (typeof FIRST_RUN_SCREENS)[number]['photo'];
@@ -35,6 +37,8 @@ export function FirstRunScene({
   photoNote: string;
   photoWidth: number;
   photoHeight: number;
+  noteFontFamily?: string;
+  onPhotoReady?: (ready: FirstRunPhotoReady) => void;
 }) {
   return (
     <View testID={`first-run-scene-${id}`} style={[styles.scene, { width: photoWidth }]}>
@@ -45,9 +49,11 @@ export function FirstRunScene({
           accessibilityLabel={photoAlt}
           resizeMode="cover"
           style={styles.photo}
+          onLoad={() => onPhotoReady?.('loaded')}
+          onError={() => onPhotoReady?.('failed')}
         />
         <View pointerEvents="none" style={styles.shade} />
-        <Text style={styles.note} testID={`first-run-photo-note-${id}`}>
+        <Text style={[styles.note, noteFontFamily ? { fontFamily: noteFontFamily } : null]} testID={`first-run-photo-note-${id}`}>
           {photoNote}
         </Text>
       </View>
@@ -72,10 +78,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(37,35,31,0.28)',
   },
   note: {
-    fontFamily: 'Songti SC',
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: 0.8,
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: 0.6,
     color: '#fffdf5',
     paddingHorizontal: 18,
     paddingBottom: 16,

@@ -4,13 +4,19 @@ import { Text } from './life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  FIRST_RUN_COPY_FADE_DELAY_MS,
+  FIRST_RUN_COPY_FADE_MS,
+  FIRST_RUN_PHOTO_FADE_MS,
   FIRST_RUN_SCREENS,
   firstRunBodyLines,
+  firstRunCanStartEnterMotion,
   firstRunCopyAllowsInnerScroll,
+  firstRunCopyColumnWidth,
   firstRunFrameChanged,
   firstRunPageAfterInnerSwipe,
   firstRunPageFromOffset,
   firstRunPagerOffset,
+  firstRunParkedPageOpacity,
   firstRunProgressLabel,
   firstRunShouldAnimatePage,
   firstRunShouldInvalidateCopyMeasures,
@@ -21,19 +27,22 @@ import {
   rememberFirstRunCopyMeasure,
   settleFirstRunMotion,
   type FirstRunCopyMeasures,
+  type FirstRunMotionDelay,
+  type FirstRunPhotoReady,
 } from '../application/first-run';
-import { isCompactHeight, pageGutter, readingWidth } from './life-page';
+import { FIRST_RUN_MARK, FIRST_RUN_SANS, FIRST_RUN_SERIF, loadFirstRunFonts } from './first-run-fonts';
+import { isCompactHeight, pageGutter } from './life-page';
 import { FirstRunScene, firstRunPhotoBox } from './first-run-scene';
 
 const mark = require('../../assets/images/splash-icon.png');
 
 const PAPER = '#f8f6ef';
-const TITLE = '#353b32';
-const TITLE_ACCENT = '#899480';
-const BODY = '#838a7c';
+const TITLE = '#25231F';
+const TITLE_ACCENT = '#53604F';
+const BODY = '#5C5851';
 const STEP = '#d7d9ce';
 const STEP_FILLED = '#788672';
-const BACK = '#848c7d';
+const BACK = '#5C5851';
 const ACTION = '#414d3d';
 const ACTION_FILL = '#e8ebe1';
 const ACTION_LINE = '#d1d7ca';
@@ -55,21 +64,40 @@ export function FirstRunGuide({
   const layoutHeight = pageHeight > 0 ? pageHeight : height;
   const compact = isCompactHeight(layoutHeight);
   const gutter = pageGutter(layoutWidth, layoutHeight);
-  const column = readingWidth(layoutWidth, layoutHeight);
   const photoBox = firstRunPhotoBox(layoutWidth, layoutHeight);
+  const copyWidth = firstRunCopyColumnWidth(photoBox.width, layoutWidth, layoutHeight);
   const pager = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const indexRef = useRef(0);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [copyMeasures, setCopyMeasures] = useState<FirstRunCopyMeasures>({});
   const copyMeasuresRef = useRef<FirstRunCopyMeasures>({});
   const screen = FIRST_RUN_SCREENS[index];
   const innerScrolls = firstRunCopyAllowsInnerScroll(copyMeasures[screen.id]);
   const [reduceMotion, setReduceMotion] = useState(true);
+  const [fontsReady, setFontsReady] = useState(false);
+  const [photoReady, setPhotoReady] = useState<Record<string, FirstRunPhotoReady>>({});
   const [opacity] = useState(() => new Animated.Value(1));
   const [shift] = useState(() => new Animated.Value(0));
   const [photoOpacity] = useState(() => new Animated.Value(1));
   const motionGen = useRef(0);
+  const copyDelay = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const delayHandle: FirstRunMotionDelay = copyDelay;
   const appStateRef = useRef(AppState.currentState);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadFirstRunFonts()
+      .then(() => {
+        if (!cancelled) setFontsReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setFontsReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,42 +117,69 @@ export function FirstRunGuide({
     };
   }, []);
 
+  const pagePhotoReady = photoReady[screen.id] ?? 'pending';
+
   useEffect(() => {
     const gen = ++motionGen.current;
     if (!firstRunShouldAnimatePage(reduceMotion, appStateRef.current)) {
-      settleFirstRunMotion({ opacity, shift, photoOpacity });
+      settleFirstRunMotion({ opacity, shift, photoOpacity, delay: delayHandle });
+      return;
+    }
+    if (!firstRunCanStartEnterMotion(pagePhotoReady)) {
+      photoOpacity.setValue(0);
+      opacity.setValue(0);
+      shift.setValue(0);
       return;
     }
     photoOpacity.setValue(0);
     opacity.setValue(0);
-    shift.setValue(13);
-    const anim = Animated.parallel([
-      Animated.timing(photoOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-      Animated.timing(opacity, { toValue: 1, duration: 580, useNativeDriver: true }),
-      Animated.timing(shift, { toValue: 0, duration: 580, useNativeDriver: true }),
-    ]);
-    anim.start(({ finished }) => {
+    shift.setValue(0);
+    if (pagePhotoReady === 'failed') {
+      settleFirstRunMotion({ opacity, shift, delay: delayHandle });
+      return;
+    }
+    const photo = Animated.timing(photoOpacity, {
+      toValue: 1,
+      duration: FIRST_RUN_PHOTO_FADE_MS,
+      useNativeDriver: true,
+    });
+    photo.start(({ finished }) => {
       if (!finished || gen !== motionGen.current) return;
     });
+    copyDelay.current = setTimeout(() => {
+      if (gen !== motionGen.current) return;
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: FIRST_RUN_COPY_FADE_MS,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (!finished || gen !== motionGen.current) return;
+      });
+    }, FIRST_RUN_COPY_FADE_DELAY_MS);
     return () => {
-      anim.stop();
+      photo.stop();
+      if (copyDelay.current != null) {
+        clearTimeout(copyDelay.current);
+        copyDelay.current = null;
+      }
     };
-  }, [index, opacity, photoOpacity, reduceMotion, shift]);
+  }, [delayHandle, index, opacity, pagePhotoReady, photoOpacity, reduceMotion, shift]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       appStateRef.current = state;
       if (state !== 'active') {
         motionGen.current += 1;
-        settleFirstRunMotion({ opacity, shift, photoOpacity });
+        setLeavingId(null);
+        settleFirstRunMotion({ opacity, shift, photoOpacity, delay: delayHandle });
       }
     });
     return () => {
       sub?.remove?.();
       motionGen.current += 1;
-      settleFirstRunMotion({ opacity, shift, photoOpacity });
+      settleFirstRunMotion({ opacity, shift, photoOpacity, delay: delayHandle });
     };
-  }, [opacity, photoOpacity, shift]);
+  }, [delayHandle, opacity, photoOpacity, shift]);
 
   function alignPager(nextIndex: number, nextPageHeight: number, animated: boolean) {
     if (nextPageHeight <= 0) return;
@@ -158,10 +213,24 @@ export function FirstRunGuide({
     });
   }
 
+  function recordPhotoReady(id: string, next: FirstRunPhotoReady) {
+    setPhotoReady((current) => (current[id] === next ? current : { ...current, [id]: next }));
+  }
+
   function moveTo(next: number) {
     if (next === indexRef.current) return;
     motionGen.current += 1;
-    settleFirstRunMotion({ opacity, shift, photoOpacity });
+    if (copyDelay.current != null) {
+      clearTimeout(copyDelay.current);
+      copyDelay.current = null;
+    }
+    photoOpacity.stopAnimation();
+    opacity.stopAnimation();
+    shift.stopAnimation();
+    photoOpacity.setValue(0);
+    opacity.setValue(0);
+    shift.setValue(0);
+    setLeavingId(FIRST_RUN_SCREENS[indexRef.current].id);
     indexRef.current = next;
     setIndex(next);
     alignPager(next, frameRef.current.height, !reduceMotion);
@@ -183,6 +252,7 @@ export function FirstRunGuide({
   }
 
   function onScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    setLeavingId(null);
     const next = firstRunPageFromOffset(
       event.nativeEvent.contentOffset.y,
       frameRef.current.height,
@@ -190,7 +260,16 @@ export function FirstRunGuide({
     );
     if (next === indexRef.current) return;
     motionGen.current += 1;
-    settleFirstRunMotion({ opacity, shift, photoOpacity });
+    photoOpacity.stopAnimation();
+    opacity.stopAnimation();
+    shift.stopAnimation();
+    if (copyDelay.current != null) {
+      clearTimeout(copyDelay.current);
+      copyDelay.current = null;
+    }
+    photoOpacity.setValue(0);
+    opacity.setValue(0);
+    shift.setValue(0);
     indexRef.current = next;
     setIndex(next);
   }
@@ -209,11 +288,15 @@ export function FirstRunGuide({
     if (next != null) moveTo(next);
   }
 
+  const serif = fontsReady ? FIRST_RUN_SERIF : 'Songti SC';
+  const sans = fontsReady ? FIRST_RUN_SANS : undefined;
+  const markFace = fontsReady ? FIRST_RUN_MARK : undefined;
+
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="Lampy 引导">
       <View style={[styles.header, { height: compact ? 53 : 61, paddingHorizontal: gutter }]} testID="first-run-mark-row">
         <Image source={mark} accessibilityLabel="Lampy" style={styles.markIcon} resizeMode="contain" />
-        <Text style={styles.markWord}>Lampy</Text>
+        <Text style={[styles.markWord, markFace ? { fontFamily: markFace } : null]}>Lampy</Text>
       </View>
       <View testID="first-run-frame" collapsable={false} style={styles.frame} onLayout={onFrameLayout}>
         <ScrollView
@@ -228,89 +311,95 @@ export function FirstRunGuide({
           accessibilityLabel="引导页，上滑翻页"
           style={styles.pager}
         >
-          {FIRST_RUN_SCREENS.map((item) => (
-            <View
-              key={item.id}
-              style={[
-                styles.page,
-                {
-                  width: pageWidth > 0 ? pageWidth : '100%',
-                  height: pageHeight > 0 ? pageHeight : '100%',
-                },
-              ]}
-              testID={`first-run-${item.id}`}
-            >
-              <ScrollView
-                testID={`first-run-copy-${item.id}`}
-                style={styles.pageScroll}
-                contentContainerStyle={[
-                  styles.pageCopy,
+          {FIRST_RUN_SCREENS.map((item) => {
+            const active = item.id === screen.id;
+            const parked = firstRunParkedPageOpacity(active, item.id === leavingId);
+            return (
+              <View
+                key={item.id}
+                style={[
+                  styles.page,
                   {
-                    paddingTop: compact ? 8 : 12,
-                    paddingHorizontal: gutter,
-                    maxWidth: column + gutter * 2,
+                    width: pageWidth > 0 ? pageWidth : '100%',
+                    height: pageHeight > 0 ? pageHeight : '100%',
                   },
                 ]}
-                scrollEnabled={firstRunCopyAllowsInnerScroll(copyMeasures[item.id]) && item.id === screen.id}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
-                onLayout={(event) => {
-                  recordCopyMeasure(item.id, { viewH: event.nativeEvent.layout.height });
-                }}
-                onContentSizeChange={(_, contentHeight) => {
-                  if (typeof contentHeight !== 'number') return;
-                  recordCopyMeasure(item.id, { contentH: contentHeight });
-                }}
-                onScrollEndDrag={item.id === screen.id ? onInnerEndDrag : undefined}
+                testID={`first-run-${item.id}`}
               >
-                <Animated.View style={{ opacity: item.id === screen.id ? photoOpacity : 1 }}>
-                  <FirstRunScene
-                    id={item.id}
-                    photo={item.photo}
-                    photoAlt={item.photoAlt}
-                    photoNote={item.photoNote}
-                    photoWidth={photoBox.width}
-                    photoHeight={photoBox.height}
-                  />
-                </Animated.View>
-                <Animated.View
-                  style={{
-                    opacity: item.id === screen.id ? opacity : 1,
-                    transform: [{ translateY: item.id === screen.id ? shift : 0 }],
-                    marginTop: compact ? 16 : 23,
-                    alignSelf: 'stretch',
+                <ScrollView
+                  testID={`first-run-copy-${item.id}`}
+                  style={styles.pageScroll}
+                  contentContainerStyle={[
+                    styles.pageCopy,
+                    {
+                      paddingTop: compact ? 8 : 12,
+                      paddingHorizontal: gutter,
+                    },
+                  ]}
+                  scrollEnabled={firstRunCopyAllowsInnerScroll(copyMeasures[item.id]) && active}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                  onLayout={(event) => {
+                    recordCopyMeasure(item.id, { viewH: event.nativeEvent.layout.height });
                   }}
+                  onContentSizeChange={(_, contentHeight) => {
+                    if (typeof contentHeight !== 'number') return;
+                    recordCopyMeasure(item.id, { contentH: contentHeight });
+                  }}
+                  onScrollEndDrag={active ? onInnerEndDrag : undefined}
                 >
-                  <Text
-                    style={[styles.title, compact ? styles.titleCompact : null]}
-                    accessibilityRole="header"
-                    accessibilityLabel={item.title}
+                  <Animated.View style={{ opacity: parked == null ? photoOpacity : parked }}>
+                    <FirstRunScene
+                      id={item.id}
+                      photo={item.photo}
+                      photoAlt={item.photoAlt}
+                      photoNote={item.photoNote}
+                      photoWidth={photoBox.width}
+                      photoHeight={photoBox.height}
+                      noteFontFamily={serif}
+                      onPhotoReady={(next) => recordPhotoReady(item.id, next)}
+                    />
+                  </Animated.View>
+                  <Animated.View
+                    testID={`first-run-copy-block-${item.id}`}
+                    style={{
+                      opacity: parked == null ? opacity : parked,
+                      transform: [{ translateY: parked == null ? shift : 0 }],
+                      marginTop: compact ? 16 : 22,
+                      width: copyWidth,
+                      alignSelf: 'flex-start',
+                    }}
                   >
-                    {item.titleLines.map((line, lineIndex) => (
-                      <Text
-                        key={line}
-                        style={lineIndex === item.titleAccentIndex ? styles.titleAccent : undefined}
-                      >
-                        {lineIndex > 0 ? '\n' : ''}
-                        {line}
-                      </Text>
-                    ))}
-                  </Text>
-                  <Text style={[styles.body, compact ? styles.bodyCompact : null]}>
-                    {firstRunBodyLines(item.body).map((line, lineIndex) => (
-                      <Text key={line}>
-                        {lineIndex > 0 ? '\n' : ''}
-                        {line}
-                      </Text>
-                    ))}
-                  </Text>
-                </Animated.View>
-              </ScrollView>
-            </View>
-          ))}
+                    <View accessibilityRole="header" accessibilityLabel={item.title}>
+                      {item.titleLines.map((line, lineIndex) => (
+                        <Text
+                          key={line}
+                          style={[
+                            styles.title,
+                            compact ? styles.titleCompact : null,
+                            { fontFamily: serif },
+                            lineIndex === item.titleAccentIndex ? styles.titleAccent : null,
+                          ]}
+                        >
+                          {line}
+                        </Text>
+                      ))}
+                    </View>
+                    <View style={styles.bodyBlock}>
+                      {firstRunBodyLines(item.body).map((line) => (
+                        <Text key={line} style={[styles.body, sans ? { fontFamily: sans } : null]}>
+                          {line}
+                        </Text>
+                      ))}
+                    </View>
+                  </Animated.View>
+                </ScrollView>
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
-      <View style={[styles.footer, { paddingHorizontal: gutter, maxWidth: column + gutter * 2, alignSelf: 'center', width: '100%' }]}>
+      <View style={[styles.footer, { paddingHorizontal: gutter, width: '100%' }]}>
         <View style={styles.footerTop}>
           <View
             style={styles.steps}
@@ -334,12 +423,12 @@ export function FirstRunGuide({
               onPress={onBack}
               style={styles.backHit}
             >
-              <Text style={styles.back}>上一屏</Text>
+              <Text style={[styles.back, sans ? { fontFamily: sans } : null]}>上一屏</Text>
             </Pressable>
           ) : null}
         </View>
         {finishError ? (
-          <Text style={styles.body} testID="first-run-finish-error">
+          <Text style={[styles.body, sans ? { fontFamily: sans } : null]} testID="first-run-finish-error">
             {finishError}
           </Text>
         ) : null}
@@ -350,7 +439,7 @@ export function FirstRunGuide({
           onPress={onContinue}
           style={styles.actionHit}
         >
-          <Text style={styles.action}>{screen.action}</Text>
+          <Text style={[styles.action, sans ? { fontFamily: sans } : null]}>{screen.action}</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -379,24 +468,21 @@ const styles = StyleSheet.create({
   pageScroll: { flex: 1, width: '100%' },
   pageCopy: { flexGrow: 1, width: '100%', alignSelf: 'center', alignItems: 'flex-start' },
   title: {
-    fontFamily: 'Songti SC',
-    fontSize: 30,
-    lineHeight: 44,
+    fontSize: 31,
+    lineHeight: 45,
     fontWeight: '500',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     color: TITLE,
   },
   titleAccent: { color: TITLE_ACCENT },
-  titleCompact: { fontSize: 25, lineHeight: 34 },
+  titleCompact: { fontSize: 28, lineHeight: 40 },
+  bodyBlock: { marginTop: 14 },
   body: {
-    fontFamily: 'Songti SC',
-    fontSize: 11,
-    lineHeight: 20,
-    letterSpacing: 0.22,
+    fontSize: 16,
+    lineHeight: 27,
+    letterSpacing: 0.2,
     color: BODY,
-    marginTop: 14,
   },
-  bodyCompact: { fontSize: 10, lineHeight: 16, marginTop: 9 },
   footer: { flexShrink: 0, paddingBottom: 16, gap: 12 },
   footerTop: {
     minHeight: 48,
@@ -407,9 +493,9 @@ const styles = StyleSheet.create({
   steps: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   step: { width: 22, height: 2, backgroundColor: STEP },
   stepFilled: { backgroundColor: STEP_FILLED },
-  back: { fontSize: 11, lineHeight: 16, color: BACK },
+  back: { fontSize: 15, lineHeight: 22, color: BACK },
   backHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', alignItems: 'flex-end' },
-  action: { fontSize: 13, lineHeight: 18, color: ACTION, letterSpacing: 1.6 },
+  action: { fontSize: 16, lineHeight: 22, color: ACTION, letterSpacing: 1.2 },
   actionHit: {
     minHeight: 48,
     height: 55,

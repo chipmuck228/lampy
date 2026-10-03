@@ -67,11 +67,23 @@ export function isFirstRunFinishAction(index: number) {
   return index >= FIRST_RUN_LAST_INDEX;
 }
 
+export const FIRST_RUN_PHOTO_FADE_MS = 500;
+export const FIRST_RUN_COPY_FADE_MS = 450;
+export const FIRST_RUN_COPY_FADE_DELAY_MS = 100;
+
+export type FirstRunMotionDelay = { current: ReturnType<typeof setTimeout> | null };
+export type FirstRunPhotoReady = 'pending' | 'loaded' | 'failed';
+
 export function settleFirstRunMotion(motion: {
   opacity: { stopAnimation: () => void; setValue: (value: number) => void };
   shift: { stopAnimation: () => void; setValue: (value: number) => void };
   photoOpacity?: { stopAnimation: () => void; setValue: (value: number) => void };
+  delay?: FirstRunMotionDelay;
 }) {
+  if (motion.delay) {
+    if (motion.delay.current != null) clearTimeout(motion.delay.current);
+    motion.delay.current = null;
+  }
   motion.opacity.stopAnimation();
   motion.shift.stopAnimation();
   motion.opacity.setValue(1);
@@ -92,6 +104,24 @@ export function firstRunProgressLabel(index: number, count: number) {
 
 export function firstRunBodyLines(body: string) {
   return body.split(/(?<=。)/).map((part) => part.trim()).filter(Boolean);
+}
+
+export function firstRunCopyColumnWidth(photoWidth: number, layoutWidth: number, layoutHeight: number) {
+  if (photoWidth <= 0) return 0;
+  const landscape = layoutWidth > layoutHeight;
+  const compact = layoutHeight < 500;
+  const regular = layoutWidth >= 768 && !compact;
+  const ratio = compact ? 0.9 : landscape ? 0.88 : regular ? 0.72 : 0.82;
+  return Math.min(photoWidth, Math.max(Math.round(photoWidth * ratio), Math.min(220, photoWidth)));
+}
+
+export function firstRunParkedPageOpacity(isCurrent: boolean, isLeaving: boolean) {
+  if (isCurrent) return null;
+  return isLeaving ? 1 : 0;
+}
+
+export function firstRunCanStartEnterMotion(ready: FirstRunPhotoReady) {
+  return ready === 'loaded' || ready === 'failed';
 }
 
 export type FirstRunCopyMeasure = {

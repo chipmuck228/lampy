@@ -1,7 +1,9 @@
 import {
   decideFirstRunGuide,
   firstRunBodyLines,
+  firstRunCanStartEnterMotion,
   firstRunCopyAllowsInnerScroll,
+  firstRunCopyColumnWidth,
   firstRunInnerCanScroll,
   firstRunProgressLabel,
   firstRunPageAfterInnerSwipe,
@@ -145,6 +147,16 @@ describe('first-run guide decision', () => {
     expect(firstRunShouldInvalidateCopyMeasures({ width: 390, height: 600 }, { width: 758, height: 280 })).toBe(true);
     expect(firstRunCopyAllowsInnerScroll(invalidateFirstRunCopyMeasures().leave)).toBe(true);
     expect(firstRunPagerOffset(1, 280)).toBe(280);
+  });
+
+  it('keeps copy narrower than the photo and lets a long title wrap instead of shrinking', () => {
+    expect(firstRunCopyColumnWidth(342, 390, 844)).toBe(Math.round(342 * 0.82));
+    expect(firstRunCopyColumnWidth(342, 390, 844)).toBeLessThan(342);
+    expect(firstRunCopyColumnWidth(520, 1024, 1366)).toBe(Math.round(520 * 0.72));
+    expect(firstRunCopyColumnWidth(342, 375, 480)).toBe(Math.round(342 * 0.9));
+    expect(firstRunCanStartEnterMotion('pending')).toBe(false);
+    expect(firstRunCanStartEnterMotion('loaded')).toBe(true);
+    expect(firstRunCanStartEnterMotion('failed')).toBe(true);
   });
 
   it('starts page motion only while the app is active and Reduce Motion is off', () => {
