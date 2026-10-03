@@ -22,8 +22,10 @@ import {
   firstRunPagerOffset,
   firstRunParkedPageOpacity,
   firstRunProgressLabel,
+  firstRunNeedsStartupHandoff,
   firstRunShouldInvalidateCopyMeasures,
   firstRunShouldPlayEnter,
+  firstRunShouldRequestOverlayExit,
   invalidateFirstRunCopyMeasures,
   isFirstRunFinishAction,
   nextFirstRunIndex,
@@ -35,7 +37,15 @@ import {
   type FirstRunMotionDelay,
   type FirstRunMotionPref,
   type FirstRunPhotoReady,
+  type FirstRunStartupOverlay,
 } from '../application/first-run';
+import {
+  isStartupBrandCovering,
+  requestStartupOverlayExit,
+  subscribeStartupBrandCovering,
+  subscribeStartupOverlay,
+  startupOverlayState,
+} from '../application/startup-overlay';
 import { FIRST_RUN_MARK, FIRST_RUN_SANS, FIRST_RUN_SERIF, loadFirstRunFonts } from './first-run-fonts';
 import { isCompactHeight, pageGutter } from './life-page';
 import { FirstRunScene, firstRunPhotoBox } from './first-run-scene';
@@ -84,6 +94,8 @@ export function FirstRunGuide({
   const [fontsReady, setFontsReady] = useState<FirstRunFontReady>('pending');
   const [photoReady, setPhotoReady] = useState<Record<string, FirstRunPhotoReady>>({});
   const [settled, setSettled] = useState(false);
+  const [overlay, setOverlay] = useState<FirstRunStartupOverlay>(() => startupOverlayState());
+  const [brandCovering, setBrandCovering] = useState(isStartupBrandCovering);
   const [opacity] = useState(() => new Animated.Value(0));
   const [shift] = useState(() => new Animated.Value(0));
   const [photoOpacity] = useState(() => new Animated.Value(0));
@@ -162,6 +174,36 @@ export function FirstRunGuide({
   }, []);
 
   const pagePhotoReady = photoReady[screen.id] ?? 'pending';
+  const handoff = firstRunNeedsStartupHandoff(index);
+
+  useEffect(() => {
+    const offOverlay = subscribeStartupOverlay(setOverlay);
+    const offBrand = subscribeStartupBrandCovering(setBrandCovering);
+    return () => {
+      offOverlay();
+      offBrand();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      !firstRunShouldRequestOverlayExit({
+        index,
+        pref: motionPref,
+        fontsReady,
+        photoReady: pagePhotoReady,
+        settled,
+        overlay,
+      })
+    ) {
+      return;
+    }
+    const gen = enterGen.current;
+    void requestStartupOverlayExit().then((result) => {
+      if (!firstRunEnterIsCurrent(gen, enterGen.current)) return;
+      setOverlay(result);
+    });
+  }, [fontsReady, index, motionPref, overlay, pagePhotoReady, settled]);
 
   useEffect(() => {
     const gen = enterGen.current;
@@ -172,6 +214,8 @@ export function FirstRunGuide({
       photoReady: pagePhotoReady,
       fontsReady,
       alreadySolid: solidRef.current,
+      overlay: handoff ? overlay : 'exited',
+      brandCovering: handoff && brandCovering,
     });
     if (play === 'wait') return undefined;
     if (play === 'show') {
@@ -219,7 +263,20 @@ export function FirstRunGuide({
         copyDelay.current = null;
       }
     };
-  }, [delayHandle, fontsReady, index, motionPref, opacity, pagePhotoReady, photoOpacity, settled, shift]);
+  }, [
+    brandCovering,
+    delayHandle,
+    fontsReady,
+    handoff,
+    index,
+    motionPref,
+    opacity,
+    overlay,
+    pagePhotoReady,
+    photoOpacity,
+    settled,
+    shift,
+  ]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {

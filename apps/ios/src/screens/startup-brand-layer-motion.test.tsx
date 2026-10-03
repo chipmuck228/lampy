@@ -6,11 +6,13 @@ import {
   setBrandReadyTimeoutForTests,
   shouldShowStartupBrand,
 } from '../application/startup-brand';
+import { resetStartupOverlayForTests } from '../application/startup-overlay';
 import { StartupBrandLayer } from './startup-brand-layer';
 
 describe('startup brand layer motion preference', () => {
   beforeEach(() => {
     resetStartupBrandForTests();
+    resetStartupOverlayForTests();
   });
 
   afterEach(() => {

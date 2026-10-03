@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { resetStartupOverlayForTests } from '../application/startup-overlay';
 import { FirstRunGuide } from './first-run-guide';
 
 function wrap(ui: ReactElement) {
@@ -21,6 +22,7 @@ function wrap(ui: ReactElement) {
 describe('first-run guide', () => {
   afterEach(() => {
     cleanup();
+    resetStartupOverlayForTests();
   });
 
   it('does not finish until the last screen action and can return to the previous screen', async () => {

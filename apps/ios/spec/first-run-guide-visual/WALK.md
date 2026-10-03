@@ -10,10 +10,10 @@ Base：合并 #60 后的 `origin/main`。分支 `ios/first-run-guide-visual`。�
 
 | 命令 | 结果 |
 | --- | --- |
-| 相关 Jest（first-run 决策、Gate、Guide、Scene、motion、enter、layout、scroll） | **PASS** 29 |
+| 相关 Jest（first-run 决策、Gate、Guide、overlay、enter、motion、brand、Scene） | **PASS** 45 |
 | 本轮 ESLint | **PASS** 0 errors |
 | `git diff --check`（本轮改动文件） | **PASS** |
-| 全量 `tsc --noEmit` | 工作树未跟踪的 `apps/ios/app/` 仍会报找不到 `../screens/*`，不是本轮改动 |
+| 全量 `tsc --noEmit` | **未作为正式通过**。干净跟踪源（`src/`）无报错；未跟踪的 `apps/ios/app/` 仍有 177 条找不到 `../screens/*`，未删除该目录 |
 
 ## 字体来源
 
@@ -74,10 +74,37 @@ Base：合并 #60 后的 `origin/main`。分支 `ios/first-run-guide-visual`。�
 
 Jest 本轮补了：偏好延迟返回时第一屏不先完整再归零；目标图已加载但分页未到位不消耗入场；快速翻页旧回调不影响新屏。Reduce Motion 开启 / 查询失败 / 字体超时走 `show`，由 `firstRunShouldPlayEnter` 单测覆盖。
 
+## 环境记录 C · 启动交接（本轮）
+
+审阅基线 `6026372f95979c26ae7f3a1f4a0707167fab7f9d`。未卸 Liuz17，未点「留下瞬间」，未以 Metro Refresh 代替冷启动。
+
+### 启动遮挡顺序
+
+首次引导 Gate=`show` 时只挂 `FirstRunGuide`，不挂 Stack，因此 JS `StartupBrandLayer` **不会出现**。挡住第一屏的是原生 `SplashScreen`（Dev Client 冷启动还会叠 Expo Downloading 条）。`AppState=active` 和 `onLayout` 不能当作「用户已经看见页面」。
+
+准备好后（布局 + 图片/字体就绪或失败兜底）普通模式仍保持 opacity=0，再走同一条 `requestStartupOverlayExit`：`hideAsync` → 下一次绘制 → `exited`/`failed`。`_layout` 的 4s 兜底和品牌层退场共用这条路径，不另开猜测等待。Reduce Motion 开启或查询失败直接完整显示并正常请求退场。
+
+### 隔离走查
+
+| 项 | 值 |
+| --- | --- |
+| 设备 | `Lampy-pr61-fade-gate` `60DCCC9B-3592-45CF-A376-B92E15C66B68`，iPhone 16 / iOS 18.6 |
+| Metro | pid 60159，工作树 `apps/ios`，`127.0.0.1:8086`，`EXPO_ROUTER_APP_ROOT` 指向该树 `src/app` |
+| Reduce Motion | 模拟器读取为 **0**，未改偏好 |
+| 冷启动视频 | `handoff-cold.mp4`（`simctl io recordVideo` 源约 7fps；淡入窗另抽 10fps） |
+| 第一屏连续帧 | `handoff-c1-overlay.png` → `c2-overlay-left.png` → `c3-photo-start.png` → `c4-photo-copy.png` → `c5-copy-rising.png` → `c6-solid.png` |
+
+| 屏 | 结论 | 证据 |
+| --- | --- | --- |
+| 第一屏 | **可感知淡入**。遮挡（原生 splash / Downloading 标）退场后，先只剩顶栏、进度和「继续」（`c2`），照片先起（`c3`），文案更晚、更淡（`c4`→`c5`），再到完整（`c6`） | `handoff-cold.mp4` |
+| 第二屏 | **抽查无回归**。花朵页、上一屏、继续都在 | `handoff-s2-spot.png` / `handoff-after-continue2.png` |
+| 第三屏 | **抽查无回归**。植物灯页，「留下瞬间」未点 | `handoff-s3-spot.png` |
+| 上一屏 | **PASS**。第二屏实际点按后回到咖啡第一屏，无「上一屏」按钮 | `handoff-after-back.png` |
+
+Jest 本轮补了：遮挡未退场第一屏不入场；退场只 hide 一次；失败/超时按已离开；Reduce Motion 直接 `show`；卸载后迟到退场回调不启动动画。第二、第三屏仍走目标分页到位后入场。
+
 ## 仍需验证
 
-- 第一屏在品牌层揭开之后的用户可见淡入（本轮冷启动未见）。
-- 模拟器「上一屏」点按（Jest 已覆盖）。
 - 短屏在正文真正溢出时的内滚（当前文案未溢出）。
 - 原生 VoiceOver。
 - 真机三屏与 Reduce Motion（Liuz17 已有记录，不应为验收清库）。

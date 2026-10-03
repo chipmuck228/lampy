@@ -3,6 +3,7 @@ import { AccessibilityInfo, AppState, type AppStateStatus } from 'react-native';
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { resetStartupOverlayForTests } from '../application/startup-overlay';
 import { FirstRunGuide } from './first-run-guide';
 
 function mockAppState() {
@@ -39,6 +40,7 @@ function wrap(ui: ReactElement) {
 describe('first-run guide motion', () => {
   afterEach(() => {
     cleanup();
+    resetStartupOverlayForTests();
     jest.restoreAllMocks();
   });
 

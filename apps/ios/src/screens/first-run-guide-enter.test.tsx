@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, waitFor, type RenderResult } from '@te
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { resetFirstRunEnterTimeoutsForTests } from '../application/first-run';
+import { resetStartupOverlayForTests } from '../application/startup-overlay';
 import { FirstRunGuide } from './first-run-guide';
 
 const hidden = { includeHiddenElements: true } as const;
@@ -76,6 +77,7 @@ describe('first-run guide enter eligibility', () => {
   afterEach(() => {
     cleanup();
     resetFirstRunEnterTimeoutsForTests();
+    resetStartupOverlayForTests();
     jest.restoreAllMocks();
   });
 

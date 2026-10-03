@@ -99,6 +99,7 @@ export type FirstRunPhotoReady = 'pending' | 'loaded' | 'failed';
 export type FirstRunMotionPref = 'pending' | 'on' | 'off' | 'failed';
 export type FirstRunFontReady = 'pending' | 'ready' | 'failed';
 export type FirstRunEnterPlay = 'wait' | 'fade' | 'show';
+export type FirstRunStartupOverlay = 'covering' | 'exiting' | 'exited' | 'failed';
 
 export function settleFirstRunMotion(motion: {
   opacity: { stopAnimation: () => void; setValue: (value: number) => void };
@@ -137,6 +138,33 @@ export function firstRunEnterIsCurrent(eventGen: number, currentGen: number) {
   return eventGen === currentGen;
 }
 
+export function firstRunNeedsStartupHandoff(index: number) {
+  return index === 0;
+}
+
+export function firstRunStartupCovering(
+  overlay: FirstRunStartupOverlay = 'exited',
+  brandCovering = false,
+) {
+  return brandCovering || overlay === 'covering' || overlay === 'exiting';
+}
+
+export function firstRunShouldRequestOverlayExit(input: {
+  index: number;
+  pref: FirstRunMotionPref;
+  fontsReady: FirstRunFontReady;
+  photoReady: FirstRunPhotoReady;
+  settled: boolean;
+  overlay: FirstRunStartupOverlay;
+}) {
+  if (!firstRunNeedsStartupHandoff(input.index)) return false;
+  if (input.overlay !== 'covering') return false;
+  if (input.pref === 'pending') return false;
+  if (input.fontsReady === 'pending') return false;
+  if (input.pref === 'on' || input.pref === 'failed') return true;
+  return input.settled && input.photoReady !== 'pending';
+}
+
 export function firstRunShouldPlayEnter(input: {
   pref: FirstRunMotionPref;
   appState: string;
@@ -144,11 +172,16 @@ export function firstRunShouldPlayEnter(input: {
   photoReady: FirstRunPhotoReady;
   fontsReady: FirstRunFontReady;
   alreadySolid?: boolean;
+  overlay?: FirstRunStartupOverlay;
+  brandCovering?: boolean;
 }): FirstRunEnterPlay {
   if (input.alreadySolid) return 'show';
   if (input.pref === 'pending') return 'wait';
   if (input.pref === 'on' || input.pref === 'failed') {
     return input.fontsReady === 'pending' ? 'wait' : 'show';
+  }
+  if (firstRunStartupCovering(input.overlay ?? 'exited', input.brandCovering === true)) {
+    return 'wait';
   }
   if (input.appState !== 'active') return 'wait';
   if (!input.settled) return 'wait';

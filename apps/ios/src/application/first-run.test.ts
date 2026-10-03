@@ -12,9 +12,12 @@ import {
   firstRunPageAfterInnerSwipe,
   firstRunPageFromOffset,
   firstRunPagerOffset,
+  firstRunNeedsStartupHandoff,
   firstRunShouldAnimatePage,
   firstRunShouldInvalidateCopyMeasures,
   firstRunShouldPlayEnter,
+  firstRunShouldRequestOverlayExit,
+  firstRunStartupCovering,
   invalidateFirstRunCopyMeasures,
   isFirstRunFinishAction,
   nextFirstRunIndex,
@@ -279,6 +282,125 @@ describe('first-run guide decision', () => {
         fontsReady: 'ready',
       }),
     ).toBe('wait');
+    expect(firstRunNeedsStartupHandoff(0)).toBe(true);
+    expect(firstRunNeedsStartupHandoff(1)).toBe(false);
+    expect(firstRunStartupCovering('covering', false)).toBe(true);
+    expect(firstRunStartupCovering('exiting', false)).toBe(true);
+    expect(firstRunStartupCovering('exited', true)).toBe(true);
+    expect(firstRunStartupCovering('failed', false)).toBe(false);
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+        overlay: 'covering',
+      }),
+    ).toBe('wait');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+        overlay: 'exited',
+      }),
+    ).toBe('fade');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+        overlay: 'failed',
+      }),
+    ).toBe('fade');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+        overlay: 'exited',
+        brandCovering: true,
+      }),
+    ).toBe('wait');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'on',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+        overlay: 'covering',
+      }),
+    ).toBe('show');
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'failed',
+        appState: 'active',
+        settled: true,
+        photoReady: 'pending',
+        fontsReady: 'ready',
+        overlay: 'covering',
+      }),
+    ).toBe('show');
+    expect(
+      firstRunShouldRequestOverlayExit({
+        index: 0,
+        pref: 'off',
+        fontsReady: 'ready',
+        photoReady: 'loaded',
+        settled: true,
+        overlay: 'covering',
+      }),
+    ).toBe(true);
+    expect(
+      firstRunShouldRequestOverlayExit({
+        index: 0,
+        pref: 'off',
+        fontsReady: 'ready',
+        photoReady: 'loaded',
+        settled: true,
+        overlay: 'exiting',
+      }),
+    ).toBe(false);
+    expect(
+      firstRunShouldRequestOverlayExit({
+        index: 1,
+        pref: 'off',
+        fontsReady: 'ready',
+        photoReady: 'loaded',
+        settled: true,
+        overlay: 'covering',
+      }),
+    ).toBe(false);
+    expect(
+      firstRunShouldRequestOverlayExit({
+        index: 0,
+        pref: 'on',
+        fontsReady: 'ready',
+        photoReady: 'pending',
+        settled: false,
+        overlay: 'covering',
+      }),
+    ).toBe(true);
+    expect(
+      firstRunShouldPlayEnter({
+        pref: 'off',
+        appState: 'active',
+        settled: true,
+        photoReady: 'loaded',
+        fontsReady: 'ready',
+        overlay: 'exited',
+        alreadySolid: true,
+      }),
+    ).toBe('show');
+    expect(firstRunEnterIsCurrent(4, 5)).toBe(false);
   });
 
   it('restores a visible scene when motion is stopped mid-flight', () => {
