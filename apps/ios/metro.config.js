@@ -16,6 +16,10 @@ config.resolver.extraNodeModules = {
   '@lampy/projections': projectionsRoot,
 };
 config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
+const assetExts = new Set(config.resolver.assetExts || []);
+assetExts.add('ttf');
+assetExts.add('otf');
+config.resolver.assetExts = [...assetExts];
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const aliasRoot = moduleName.startsWith('@lampy/domain/')

@@ -2,11 +2,13 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import { resetStartupBrandForTests, setBrandReadyTimeoutForTests } from '../application/startup-brand';
+import { resetStartupOverlayForTests } from '../application/startup-overlay';
 import { StartupBrandLayer } from './startup-brand-layer';
 
 describe('startup brand layer', () => {
   beforeEach(() => {
     resetStartupBrandForTests();
+    resetStartupOverlayForTests();
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
   });
 

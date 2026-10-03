@@ -1,3 +1,8 @@
+jest.mock('expo-font', () => ({
+  loadAsync: jest.fn(async () => undefined),
+  isLoaded: () => true,
+}));
+
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(async () => undefined),
   hideAsync: jest.fn(async () => undefined),

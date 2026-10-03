@@ -1,88 +1,91 @@
-import { StyleSheet, View } from 'react-native';
-import { Text, type } from './life-text';
+import { Image, StyleSheet, View } from 'react-native';
+import { Text } from './life-text';
 
-import type { FIRST_RUN_SCREENS } from '../application/first-run';
-import { ink, inkSoft, paper, paperDeep, sage } from './life-page';
+import type { FIRST_RUN_SCREENS, FirstRunPhotoReady } from '../application/first-run';
+import { isCompactHeight, pageGutter, paper, readingWidth } from './life-page';
 
-const SAMPLE_HINT = '示意，不是你的记录';
+const PHOTOS = {
+  coffee: require('../../assets/first-run/coffee.jpg'),
+  flowers: require('../../assets/first-run/flowers.jpg'),
+  window: require('../../assets/first-run/window.jpg'),
+} as const;
+
+export function firstRunPhotoBox(windowWidth: number, windowHeight: number) {
+  const width = Math.min(
+    readingWidth(windowWidth, windowHeight),
+    Math.max(windowWidth - pageGutter(windowWidth, windowHeight) * 2, 0),
+  );
+  const height = isCompactHeight(windowHeight)
+    ? Math.max(112, Math.round(windowHeight * 0.26))
+    : Math.min(Math.round(windowHeight * 0.34), Math.round(width * 0.72), 290);
+  return { width, height };
+}
 
 export function FirstRunScene({
   id,
+  photo,
+  photoAlt,
+  photoNote,
+  photoWidth,
+  photoHeight,
+  noteFontFamily,
+  onPhotoReady,
 }: {
   id: (typeof FIRST_RUN_SCREENS)[number]['id'];
+  photo: (typeof FIRST_RUN_SCREENS)[number]['photo'];
+  photoAlt: string;
+  photoNote: string;
+  photoWidth: number;
+  photoHeight: number;
+  noteFontFamily?: string;
+  onPhotoReady?: (ready: FirstRunPhotoReady) => void;
 }) {
   return (
-    <View testID={`first-run-scene-${id}`} style={styles.scene}>
-      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        {id === 'leave' ? <LeaveScene /> : null}
-        {id === 'lookback' ? <LookbackScene /> : null}
-        {id === 'keep' ? <KeepScene /> : null}
-      </View>
-      <Text style={styles.hint} accessibilityRole="text">
-        {SAMPLE_HINT}
-      </Text>
-    </View>
-  );
-}
-
-function LeaveScene() {
-  return (
-    <View style={styles.row}>
-      <View style={styles.slip}>
-        <Text style={styles.slipText}>门口的风。</Text>
-      </View>
-      <View style={styles.photo}>
-        <View style={styles.photoInner} />
-      </View>
-      <View style={styles.bars}>
-        <View style={[styles.bar, { height: 10 }]} />
-        <View style={[styles.bar, { height: 18 }]} />
-        <View style={[styles.bar, { height: 12 }]} />
+    <View testID={`first-run-scene-${id}`} style={[styles.scene, { width: photoWidth }]}>
+      <View style={[styles.photoWrap, { width: photoWidth, height: photoHeight }]}>
+        <Image
+          testID={`first-run-photo-${id}`}
+          source={PHOTOS[photo]}
+          accessibilityLabel={photoAlt}
+          resizeMode="cover"
+          style={styles.photo}
+          onLoad={() => onPhotoReady?.('loaded')}
+          onError={() => onPhotoReady?.('failed')}
+        />
+        <View pointerEvents="none" style={styles.shade} />
+        <Text style={[styles.note, noteFontFamily ? { fontFamily: noteFontFamily } : null]} testID={`first-run-photo-note-${id}`}>
+          {photoNote}
+        </Text>
       </View>
     </View>
   );
-}
-
-function LookbackScene() {
-  return (
-    <View style={styles.lookback}>
-      <Text style={styles.date}>9月18日</Text>
-      <Text style={styles.excerpt}>那天的风还在。</Text>
-    </View>
-  );
-}
-
-function KeepScene() {
-  return <View style={styles.quiet} />;
 }
 
 const styles = StyleSheet.create({
-  scene: { gap: 10, alignItems: 'flex-start' },
-  hint: { ...type.meta, color: inkSoft },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  slip: {
-    backgroundColor: paperDeep,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    maxWidth: 160,
+  scene: { alignSelf: 'center' },
+  photoWrap: {
+    overflow: 'hidden',
+    backgroundColor: paper,
+    justifyContent: 'flex-end',
   },
-  slipText: { ...type.action, color: ink },
-  photo: {
-    width: 56,
-    height: 72,
-    backgroundColor: paperDeep,
-    padding: 4,
+  photo: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  shade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '40%',
+    backgroundColor: 'rgba(37,35,31,0.28)',
   },
-  photoInner: { flex: 1, backgroundColor: paper },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 22 },
-  bar: { width: 3, backgroundColor: sage },
-  lookback: { gap: 6 },
-  date: { ...type.meta, color: sage },
-  excerpt: { ...type.body, color: ink },
-  quiet: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: paperDeep,
+  note: {
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: 0.6,
+    color: '#fffdf5',
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    textShadowColor: 'rgba(34,40,32,0.44)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 7,
   },
 });

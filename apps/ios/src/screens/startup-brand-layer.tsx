@@ -7,8 +7,6 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
-
 import {
   BRAND_FADE_MS,
   type BrandMotionPref,
@@ -19,6 +17,7 @@ import {
   shouldSkipBrandFade,
   shouldStartBrandExit,
 } from '../application/startup-brand';
+import { requestStartupOverlayExit, setStartupBrandCovering } from '../application/startup-overlay';
 import { paper } from './life-page';
 
 const mark = require('../../assets/images/splash-icon.png');
@@ -47,7 +46,12 @@ export function StartupBrandLayer({ homeSettled }: { homeSettled: boolean }) {
   }, []);
 
   useEffect(() => {
-    void SplashScreen.hideAsync().catch(() => undefined);
+    if (visible) setStartupBrandCovering(true);
+    return () => setStartupBrandCovering(false);
+  }, [visible]);
+
+  useEffect(() => {
+    void requestStartupOverlayExit();
   }, []);
 
   useEffect(() => {
