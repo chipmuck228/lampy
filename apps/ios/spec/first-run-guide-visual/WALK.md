@@ -143,11 +143,13 @@ Jest：**首次 hide 失败后重试成功**、**连续失败停在 failed**、*
 
 ### 旧路径抽查（共享 overlay）
 
+本分支 Metro `127.0.0.1:8086`。未卸 Liuz17，未往库里写记录，未改保护开关（该机本来已开）。
+
 | 项 | 结果 |
 | --- | --- |
 | 已完成引导、空库再启动 | **PASS**。fade-gate 重开与 `Lampy-pr61-back` 都进 Recent，不是三屏；原生 splash 有离开。back 上叠了 Expo Dev Menu，不是我们的遮挡 |
-| 已有记录用户启动 | **NOT VERIFIED**。`Lampy-recent-b-isol` 库里有 6 条，但该机 Dev Client 停在旧包 `192.168.31.139:8083` 启动器，未改它的打包地址，也未往库里写记录。决策分支仍由 Jest `has-records` 覆盖 |
-| 本机保护开启时的遮挡 | **NOT VERIFIED**。隔离机未开保护，本轮不改保护规则。锁遮挡仍是 JS `DeviceLockProvider`，不是原生 splash |
+| 已有记录用户启动 | **PASS**。`Lampy-recent-b-isol` `144E9B83-7C64-46F3-8E15-A1DB3817E092`（iOS 26.5，库内 6 条）用 `lampy://expo-development-client/?url=http://127.0.0.1:8086` 载入本分支。冷启动先原生 splash（`lock-cold.png`），不是三屏。解锁后最近页是已有记录（`has-records-after-cold-unlock.png` / `has-records-unlocked.png`） |
+| 本机保护开启时的遮挡 | **PASS**。该机保护已开。后台返回与冷启动都是「这台设备已保护」+ 面容 ID，记录和正文都不露（`lock-after-background.png` / `lock-cold-2.png` / 首次连上 `has-records-after-url.png`）。锁遮挡是 JS `DeviceLockProvider`，叠在共享 splash 退场之后 |
 
 ### 干净 checkout 的 `tsc`
 
@@ -162,8 +164,6 @@ Jest：**首次 hide 失败后重试成功**、**连续失败停在 failed**、*
 - 短屏在正文真正溢出时的内滚（当前文案未溢出）。**NOT VERIFIED**
 - 原生 VoiceOver。**NOT VERIFIED**
 - 真机三屏、真机 Reduce Motion、真机 hide 失败（Liuz17 已有记录，不应为验收清库）。**NOT VERIFIED**
-- 已有记录用户加载本 PR 包后的启动遮挡。**NOT VERIFIED**
-- 本机保护开启时的 JS 遮挡（隔离机未开）。**NOT VERIFIED**
 - 查询一直不返回的真机超时（Jest 有资格分支，隔离机查询立刻返回）。
 
 ## 版本
