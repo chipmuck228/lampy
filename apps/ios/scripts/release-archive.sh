@@ -8,7 +8,7 @@ REPO="$(cd "$ROOT/../.." && pwd)"
 cd "$ROOT"
 
 if [[ "${1:-}" == "--inspect" ]]; then
-  node "$ROOT/scripts/inspect-release-archive.cjs" "${2:-${LAMPY_ARCHIVE_OUT:-/tmp/lampy-testflight-beta-1}/Lampy.xcarchive}"
+  node "$ROOT/scripts/inspect-release-archive.cjs" "${2:-${LAMPY_ARCHIVE_OUT:-/tmp/lampy-testflight-beta-2}/Lampy.xcarchive}"
   exit $?
 fi
 
@@ -53,7 +53,7 @@ if [[ "$DIRTY_COUNT" != "0" ]]; then
   GIT_DIRTY="yes"
 fi
 
-OUT="${LAMPY_ARCHIVE_OUT:-/tmp/lampy-testflight-beta-1}"
+OUT="${LAMPY_ARCHIVE_OUT:-/tmp/lampy-testflight-beta-2}"
 mkdir -p "$OUT"
 REPORT="$OUT/archive-report.txt"
 

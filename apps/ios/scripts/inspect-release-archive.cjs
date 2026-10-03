@@ -134,7 +134,38 @@ function inspectArchive(archivePath, expected = expectedFromAppJson()) {
     problems.push('app_privacyinfo_missing');
   }
 
+  report.firstRunPhotos = listNamedAssets(app, ['coffee.jpg', 'flowers.jpg', 'window.jpg']);
+  report.firstRunFonts = listNamedAssets(app, [
+    'NotoSerifSC-Medium',
+    'NotoSansSC-Regular',
+    'DMSans-SemiBold',
+  ]);
+
   return report;
+}
+
+function listNamedAssets(app, needles) {
+  const found = [];
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (needles.some((needle) => entry.name.includes(needle))) {
+        found.push(path.relative(app, full));
+      }
+    }
+  };
+  walk(app);
+  return found.sort();
 }
 
 function printReport(report) {
@@ -150,6 +181,8 @@ function printReport(report) {
     `runtime_metro_independent=${report.runtimeMetroIndependent}`,
     `privacy_manifest_count=${report.privacyManifests.length}`,
     `privacy_manifests=${report.privacyManifests.join(',') || 'NONE'}`,
+    `first_run_photos=${(report.firstRunPhotos || []).join(',') || 'NONE'}`,
+    `first_run_fonts=${(report.firstRunFonts || []).join(',') || 'NONE'}`,
     `problems=${report.problems.join(',') || 'none'}`,
   ];
   for (const line of lines) console.log(line);
