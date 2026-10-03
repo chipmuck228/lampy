@@ -1,0 +1,114 @@
+{
+  "kind": "lampy-life-album-fixture",
+  "disclaimer": "合成夹具，不是用户生活。禁止写入个人 lampy.db / Liuz17。",
+  "album": {
+    "id": "album_eval_window",
+    "name": "示例册 · 窗边",
+    "opening": "把这几个普通下午放在一起。下面都是合成句子。",
+    "cover": { "kind": "image", "momentId": "moment_album_eval_m04", "assetId": "asset_album_eval_single" },
+    "layoutVersion": "album-a5-v1"
+  },
+  "moments": [
+    {
+      "id": "moment_album_eval_m01",
+      "revision": 1,
+      "occurredAt": "2024-09-03",
+      "occurredAtPrecision": "day",
+      "note": "楼下的风比昨天软。",
+      "feeling": { "value": "平静", "known": true },
+      "media": []
+    },
+    {
+      "id": "moment_album_eval_m02",
+      "revision": 1,
+      "occurredAt": "2024-09-03",
+      "occurredAtPrecision": "day",
+      "note": "把杯子洗了。",
+      "feeling": null,
+      "media": []
+    },
+    {
+      "id": "moment_album_eval_m03",
+      "revision": 1,
+      "occurredAt": "2024-09-12",
+      "occurredAtPrecision": "day",
+      "note": "这是一条合成长文，只用来看跨页，不是谁的日记。下午坐在桌边，把一盏灯拧到刚够写字。窗外没有要拍下来的事，于是写下这一段。第一页应该在句子中间自然断开，第二页接着读，不要出现省略号，也不要改成「六行预览」。写到这里仍然只是纸上的练习：两张几何图和一段未附原件的声音会跟在后面，顺序与记录里一致。",
+      "feeling": { "value": "说不清", "known": true },
+      "media": [
+        { "assetId": "asset_album_eval_pair_a", "type": "image", "status": "available", "file": "pair-a.svg" },
+        { "assetId": "asset_album_eval_pair_b", "type": "image", "status": "available", "file": "pair-b.svg" },
+        { "assetId": "asset_album_eval_sound_long", "type": "audio", "status": "placeholder", "durationMs": 68000 }
+      ]
+    },
+    {
+      "id": "moment_album_eval_m04",
+      "revision": 1,
+      "occurredAt": "2024-09-18",
+      "occurredAtPrecision": "day",
+      "note": "窗台上的影子斜了一点。",
+      "feeling": { "value": "平静", "known": true },
+      "media": [{ "assetId": "asset_album_eval_single", "type": "image", "status": "available", "file": "single.svg" }]
+    },
+    {
+      "id": "moment_album_eval_m05",
+      "revision": 1,
+      "occurredAt": "2024-09-22",
+      "occurredAtPrecision": "day",
+      "note": "",
+      "feeling": null,
+      "media": [
+        { "assetId": "asset_album_eval_sound_short", "type": "audio", "status": "placeholder", "durationMs": 42000 }
+      ]
+    },
+    {
+      "id": "moment_album_eval_m06",
+      "revision": 1,
+      "occurredAt": "2024-10-02",
+      "occurredAtPrecision": "day",
+      "note": "三张纸色练习，不是那天拍的生活。",
+      "feeling": null,
+      "media": [
+        { "assetId": "asset_album_eval_tri_a", "type": "image", "status": "available", "file": "tri-a.svg" },
+        { "assetId": "asset_album_eval_tri_b", "type": "image", "status": "available", "file": "tri-b.svg" },
+        { "assetId": "asset_album_eval_tri_c", "type": "image", "status": "available", "file": "tri-c.svg" }
+      ]
+    },
+    {
+      "id": "moment_album_eval_m07",
+      "revision": 1,
+      "occurredAt": "2024-10-02",
+      "occurredAtPrecision": "day",
+      "note": "出门前把门带上了。",
+      "feeling": { "value": "高兴", "known": true },
+      "media": []
+    },
+    {
+      "id": "moment_album_eval_m08",
+      "revision": 1,
+      "occurredAt": null,
+      "occurredAtPrecision": "unknown",
+      "recordedAt": "2024-10-08",
+      "note": "那次把窗台上的土扫干净了。",
+      "feeling": null,
+      "media": []
+    },
+    {
+      "id": "moment_album_eval_m09",
+      "revision": 1,
+      "occurredAt": "2024-10-14",
+      "occurredAtPrecision": "day",
+      "note": "本想留下窗外的树。",
+      "feeling": { "value": "疲惫", "known": true },
+      "media": [{ "assetId": "asset_album_eval_missing", "type": "image", "status": "missing" }]
+    },
+    {
+      "id": "moment_album_eval_m10",
+      "revision": 1,
+      "occurredAt": "2024-10-20",
+      "occurredAtPrecision": "day",
+      "note": "今天没有更多要写的。",
+      "feeling": { "value": "平静", "known": true },
+      "media": []
+    }
+  ]
+}

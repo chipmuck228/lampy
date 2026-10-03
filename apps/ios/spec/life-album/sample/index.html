@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>示例册 · 窗边（合成夹具）</title>
+  <style>
+    :root {
+      --paper: #f3f0e9;
+      --paper-deep: #e8e1d5;
+      --ink: #25231f;
+      --ink-soft: #5c5851;
+      --sage: #53604f;
+      --calm: #6f8b86;
+      --glad: #c4a06a;
+      --unclear: #8a8680;
+      --tired: #9a8b78;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #d8d0c3; color: var(--ink); }
+    body {
+      font-family: "Songti SC", "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
+    }
+    .banner {
+      position: sticky; top: 0; z-index: 4;
+      padding: 10px 16px;
+      background: #87513d;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .toolbar {
+      display: flex; gap: 12px; align-items: center; justify-content: center;
+      padding: 12px 16px 4px;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      font-size: 15px;
+      color: var(--sage);
+    }
+    .toolbar button {
+      min-height: 44px; min-width: 72px;
+      border: 0; background: var(--paper); color: var(--sage);
+      font-size: 15px; cursor: pointer;
+    }
+    .stage { display: flex; justify-content: center; padding: 12px 16px 48px; }
+    .page {
+      display: none;
+      width: 420px; height: 595px;
+      background: var(--paper);
+      padding: 40px 36px 44px;
+      box-shadow: 0 12px 40px rgba(37, 35, 31, 0.12);
+      overflow: hidden;
+    }
+    .page.on { display: flex; flex-direction: column; }
+    .kicker { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 12px; letter-spacing: 0.12em; color: var(--ink-soft); }
+    .title { font-size: 28px; line-height: 36px; margin: 0; font-weight: 500; }
+    .body { font-size: 17px; line-height: 32px; margin: 0; }
+    .meta { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 15px; line-height: 22px; color: var(--sage); }
+    .soft { color: var(--ink-soft); }
+    .date { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 15px; line-height: 22px; color: var(--sage); margin: 0 0 8px; }
+    .rule { height: 1px; background: rgba(37, 35, 31, 0.16); border: 0; margin: 16px 0; }
+    .feel { display: flex; align-items: center; gap: 8px; min-height: 32px; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 15px; color: var(--ink-soft); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .media { width: 100%; height: auto; display: block; margin: 12px 0; }
+    .media.tall { width: 220px; }
+    .missing {
+      min-height: 120px; display: flex; align-items: center; justify-content: center;
+      border: 1px solid rgba(37, 35, 31, 0.16);
+      color: var(--ink-soft);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      font-size: 15px; line-height: 22px; text-align: center; padding: 16px;
+    }
+    .sound {
+      padding: 16px 0;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      font-size: 15px; line-height: 22px; color: var(--ink-soft);
+    }
+    .foot { margin-top: auto; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 13px; color: var(--ink-soft); }
+    .cover { justify-content: flex-end; }
+    .cover .title { margin: 20px 0 8px; }
+    .close { justify-content: center; text-align: center; gap: 16px; }
+    .list { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 15px; line-height: 28px; color: var(--ink-soft); padding: 0; margin: 12px 0 0; }
+    .list li { margin: 0; }
+    .spread { display: flex; flex-direction: column; gap: 8px; }
+  </style>
+</head>
+<body>
+  <div class="banner">合成夹具 · 不是用户生活 · 图像为原创几何稿 · 声音未附原件 · 静态样本不称运行 PASS</div>
+  <div class="toolbar">
+    <button type="button" id="prev">上一页</button>
+    <span id="mark">1 / 16</span>
+    <button type="button" id="next">下一页</button>
+  </div>
+  <div class="stage">
+    <article class="page on cover" data-page="1">
+      <p class="kicker">LAMPY · 生活册样本</p>
+      <img class="media" src="media/cover.svg" alt="合成封面：窗格几何" />
+      <h1 class="title">示例册 · 窗边</h1>
+      <p class="meta">一套版式 · 十六页 · 默认产品名是「一些日子」</p>
+      <p class="foot">1</p>
+    </article>
+
+    <article class="page" data-page="2">
+      <p class="date">开篇</p>
+      <p class="body">把这几个普通下午放在一起。下面都是合成句子。</p>
+      <p class="body" style="margin-top:24px">开篇由用户自己写。Lampy 不代写标题，也不把后面的记录收成一篇故事。</p>
+      <p class="foot">2</p>
+    </article>
+
+    <article class="page" data-page="3">
+      <p class="date">2024年9月3日</p>
+      <p class="body">楼下的风比昨天软。</p>
+      <div class="feel"><span class="dot" style="background:#6F8B86"></span>平静</div>
+      <hr class="rule" />
+      <p class="body">把杯子洗了。</p>
+      <p class="foot">3 · 同日两条，日期只印一次</p>
+    </article>
+
+    <article class="page" data-page="4">
+      <p class="date">2024年9月12日</p>
+      <p class="body">这是一条合成长文，只用来看跨页，不是谁的日记。下午坐在桌边，把一盏灯拧到刚够写字。窗外没有要拍下来的事，于是写下这一段。第一页应该在句子中间自然断开，第二页接着读，不要出现省略号，也不要改成「六行预览」。</p>
+      <p class="foot">4 · 长文上半，未截断</p>
+    </article>
+
+    <article class="page" data-page="5">
+      <p class="date soft">9月12日 · 续</p>
+      <p class="body">写到这里仍然只是纸上的练习：两张几何图和一段未附原件的声音会跟在后面，顺序与记录里一致。</p>
+      <img class="media" src="media/pair-a.svg" alt="合成图：横向色带" />
+      <p class="foot">5 · 文字与第一张图相邻</p>
+    </article>
+
+    <article class="page" data-page="6">
+      <img class="media tall" src="media/pair-b.svg" alt="合成图：竖向色块" />
+      <div class="sound">一段声音 · 1:08 · 声音占位，未附原件<br />没有真实播放，不画假进度。</div>
+      <div class="feel"><span class="dot" style="background:#8A8680"></span>说不清</div>
+      <p class="foot">6 · 第二图原比例 + 声音占位</p>
+    </article>
+
+    <article class="page" data-page="7">
+      <p class="date">2024年9月18日</p>
+      <img class="media" src="media/single.svg" alt="合成图：斜面单幅" />
+      <p class="body">窗台上的影子斜了一点。</p>
+      <div class="feel"><span class="dot" style="background:#6F8B86"></span>平静</div>
+      <p class="foot">7 · 单图，原比例</p>
+    </article>
+
+    <article class="page" data-page="8">
+      <p class="date">2024年9月22日</p>
+      <div class="sound">一段声音 · 0:42 · 声音占位，未附原件<br />这条没有文字。不补标题，不画正在播放。</div>
+      <p class="foot">8 · 仅声音</p>
+    </article>
+
+    <article class="page" data-page="9">
+      <p class="date">2024年10月2日</p>
+      <div class="spread">
+        <img class="media" src="media/tri-a.svg" alt="合成图：三幅之一" />
+        <img class="media" src="media/tri-b.svg" alt="合成图：三幅之二" />
+        <img class="media" src="media/tri-c.svg" alt="合成图：三幅之三" />
+      </div>
+      <p class="foot">9 · 三图按记录内顺序，跨月无自动章名</p>
+    </article>
+
+    <article class="page" data-page="10">
+      <p class="date soft">10月2日</p>
+      <p class="body">三张纸色练习，不是那天拍的生活。</p>
+      <hr class="rule" />
+      <p class="body">出门前把门带上了。</p>
+      <div class="feel"><span class="dot" style="background:#C4A06A"></span>高兴</div>
+      <p class="foot">10 · 同日：图组之后的短句</p>
+    </article>
+
+    <article class="page" data-page="11">
+      <p class="date">时间未确认</p>
+      <p class="body">那次把窗台上的土扫干净了。</p>
+      <p class="meta" style="margin-top:12px">记录于 2024年10月8日</p>
+      <p class="foot">11 · 不补造发生日</p>
+    </article>
+
+    <article class="page" data-page="12">
+      <p class="date">2024年10月14日</p>
+      <p class="body">本想留下窗外的树。</p>
+      <div class="missing">这张照片现在看不到。<br />没有用别的图顶上，也没有丢掉这条。</div>
+      <div class="feel"><span class="dot" style="background:#9A8B78"></span>疲惫</div>
+      <p class="foot">12 · 缺失媒体可见</p>
+    </article>
+
+    <article class="page" data-page="13">
+      <p class="date">2024年10月20日</p>
+      <p class="body">今天没有更多要写的。</p>
+      <div class="feel"><span class="dot" style="background:#6F8B86"></span>平静</div>
+      <p class="foot">13</p>
+    </article>
+
+    <article class="page" data-page="14">
+      <p class="date soft">空白</p>
+      <p class="body">这一页下部故意留白。排版不为此编一句生活。</p>
+      <p class="foot">14 · 空白比例</p>
+    </article>
+
+    <article class="page" data-page="15">
+      <p class="date">夹具清单（审阅用，第一版成册不自动出目录）</p>
+      <ol class="list">
+        <li>短句 · 同日两条</li>
+        <li>长文 + 两图 + 声音占位</li>
+        <li>单图</li>
+        <li>仅声音</li>
+        <li>三图 · 跨月</li>
+        <li>未确认日期</li>
+        <li>缺失媒体</li>
+      </ol>
+      <p class="foot">15</p>
+    </article>
+
+    <article class="page close" data-page="16">
+      <p class="body">这些日子，先放到这里。</p>
+      <p class="meta">没有条数总结，没有情绪报告。</p>
+      <p class="foot">16</p>
+    </article>
+  </div>
+  <script>
+    const pages = Array.from(document.querySelectorAll(".page"));
+    let i = 0;
+    function show(n) {
+      i = Math.max(0, Math.min(pages.length - 1, n));
+      pages.forEach((p, idx) => p.classList.toggle("on", idx === i));
+      document.getElementById("mark").textContent = i + 1 + " / " + pages.length;
+    }
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.getElementById("next").onclick = () => show(i + 1);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); show(i + 1); }
+      if (e.key === "ArrowLeft") show(i - 1);
+    });
+  </script>
+</body>
+</html>
