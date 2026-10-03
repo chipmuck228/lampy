@@ -13,25 +13,26 @@
 
 | 命令 | 结果 |
 | --- | --- |
-| 干净 checkout `npx tsc --noEmit` | 提交后填写 |
-| `npx jest --ci`（全量） | 提交后填写。失败不得写成全量通过 |
-| 本轮 ESLint（release 脚本、inspect、本 spec） | 提交后填写 |
-| `node --test scripts/inspect-release-archive.test.cjs` | 提交后填写 |
-| `git diff --check -- apps/ios` | 提交后填写 |
-| `bash scripts/release-archive.sh` | 提交后填写。输出默认 `/tmp/lampy-testflight-beta-2` |
-| `bash scripts/release-archive.sh --inspect …` | 提交后填写。`flags_release_pages=NOT_VERIFIED`、`runtime_metro_independent=NOT_VERIFIED` |
+| 干净 checkout `npx tsc --noEmit` | **PASS**（exit 0）。在 `05c7236` dirty=no 的 worktree `/Users/zhen/WeChatProjects/lampy-testflight-beta-2` 跑 |
+| `npx jest --ci --runInBand`（全量） | **156 suites / 833 tests passed，0 failed**，但进程 **exit 1**：`startup-brand-layer.test.tsx` 在 teardown 后仍访问 Jest（残留 timer）。**不能**写成「全量 Jest PASS、exit 0」 |
+| `npx jest --ci --runInBand --forceExit` | **exit 0**，同样 156 / 833，0 failed。本轮用这条收口进程，没有改测试 |
+| 本轮 ESLint（inspect `.cjs` / `.test.cjs`、release 脚本、本 spec） | JS/CJS **0 errors**。`.sh` / `.md` 被 ESLint ignore（0 errors, 4 ignored-file warnings）。**不是**对 shell 的语义检查 |
+| `node --test scripts/inspect-release-archive.test.cjs` | **PASS**（4 tests） |
+| `git diff --check -- apps/ios` | **PASS** |
+| `bash scripts/release-archive.sh` | **archive_exit=0**。`git_sha=05c7236`，`git_dirty=no`。输出 `/tmp/lampy-testflight-beta-2/Lampy.xcarchive`。未设 `LAMPY_ALLOW_PREBUILD_CLEAN`（该树切开时没有 `ios/`） |
+| `bash scripts/release-archive.sh --inspect /tmp/lampy-testflight-beta-2/Lampy.xcarchive` | **inspect_exit=0**，`problems=none`。`flags_release_pages=NOT_VERIFIED`、`runtime_metro_independent=NOT_VERIFIED` |
 
 ## Release 配置
 
 | 项 | 期望 | 实际 |
 | --- | --- | --- |
-| Bundle ID | `app.lampy.ios` | 构建后填 |
-| Team | `B283NY984J` | 构建后填 |
-| Version / Build | `0.1.0` / `2` | `app.json` 已写成 2。**Connect 未读取**，上传前须人工确认 2 未被占用 |
-| 功能开关 · 构建环境 | 家庭 / API / 诊断 / 测试登录关闭 | stash 后报告；**不是**设备页验收 |
+| Bundle ID | `app.lampy.ios` | Archive `Info.plist` = `app.lampy.ios` |
+| Team | `B283NY984J` | codesign `TeamIdentifier=B283NY984J` |
+| Version / Build | `0.1.0` / `2` | Archive 内 `0.1.0` / `2`。相对仓库/第一份 Archive 的 `1` 递增。**Connect 本轮未能读取**，不能写成「已确认 2 空闲」。上传前须在 Connect 核对 |
+| 功能开关 · 构建环境 | 家庭 / API / 诊断 / 测试登录关闭 | stash 后报告 `EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS=0`，家庭入口/API/test driver 空。`.env.production` 关闭。**不是**设备页验收 |
 | 功能开关 · TestFlight 页 | 待安装 | **NOT VERIFIED** |
-| 含 bundle | 有 `main.jsbundle` | 构建后填 |
-| 首次引导照片 / 字体 | coffee / flowers / window + 三份 OFL 子集 | inspect 按文件名列出；缺了要写明，不靠口头 |
+| 含 bundle | 有 `main.jsbundle` | 有（约 3.3MB）。inspect 无 `Searching for development servers` / 无 `family.example` |
+| 首次引导照片 / 字体 | coffee / flowers / window + 三份 OFL 子集 | inspect 列出 `assets/assets/first-run/{coffee,flowers,window}.jpg` 与 `NotoSerifSC-Medium` / `NotoSansSC-Regular` / `DMSans-SemiBold` |
 | 运行时不依赖 Metro | 须安装验证 | **NOT VERIFIED** |
 | 个人数据 / 保护 / 引导 | 不改 store key 与完成条件 | 本分支不改业务语义 |
 
@@ -60,16 +61,22 @@
 
 | 项 | 值 |
 | --- | --- |
-| 基线 SHA | `e1afff0af15740e6162565a1a10fbac0d7456021` |
-| 构建 / 打包 SHA | 打 Archive 时填写；同时记 dirty |
+| 基线 SHA | `e1afff0af15740e6162565a1a10fbac0d7456021`（#61 普通合并；其后 main 无后续） |
+| **构建 / 打包 SHA** | `05c7236215deee5018f502f0eb2b6797f50f759a`，`git_dirty=no`。打进 `main.jsbundle` 的工作区。本收尾只补走查数字，**未重新 Archive** |
 | version / build | `0.1.0` / `2`（Connect 占用情况 **未确认**） |
-| Xcode | 构建后填 |
-| Bundle ID / Team | 构建后填 |
-| Archive 路径 | `/tmp/lampy-testflight-beta-2/Lampy.xcarchive`（默认） |
-| 上传 | **待人工上传**。本会话无 Connect 凭据 |
-| inspect | 只证明对应包属性，不能代替安装 |
+| Xcode | 26.6（17F113） |
+| Bundle ID / Team | `app.lampy.ios` / `B283NY984J` |
+| Archive 路径 | `/tmp/lampy-testflight-beta-2/Lampy.xcarchive`（`** ARCHIVE SUCCEEDED **`） |
+| 签名 | 本地 Archive 为 `Apple Development: Zhen Liu (H36468MSTC)`。上传时 Organizer 再签 App Store Connect |
+| 权限文案 | 相机 / 麦克风 / 相册 / Face ID 与 `app.json` 一致。`ITSAppUsesNonExemptEncryption` **未预写** |
+| Entitlements | 仅 `com.apple.developer.applesignin` = `Default` |
+| 隐私清单 | inspect 列出 **10** 份；主工程含 UserDefaults `CA92.1`、FileTimestamp `C617.1`、SystemBootTime `35F9.1`；无收集类型；`NSPrivacyTracking=false` |
+| 上传 | **待人工上传**。本会话无 ASC API key / AuthKey / fastlane。不得写成已经上传 |
+| inspect | `problems=none`。只证明对应包属性，不能代替安装 |
 
 `expo-dev-client` 仍在 plugin 里。测试员若仍看到开发启动器，这一包不能当外测。
+
+构建成功 ≠ TestFlight 安装验收。有 `main.jsbundle` ≠ 运行时不依赖 Metro。
 
 ## TestFlight 安装后（须本人装包，断开 Metro，冷启动）
 
@@ -96,6 +103,7 @@
 | 项 | 值 |
 | --- | --- |
 | 开分支时 `origin/main` | `e1afff0af15740e6162565a1a10fbac0d7456021` |
-| #61 之后 main | 无后续提交 |
-| 实现 SHA | 推送后以 GitHub 为准 |
+| #61 之后 main | 无后续提交（2026-10-03 再 fetch 仍停在该 SHA） |
+| 打包 SHA | `05c7236215deee5018f502f0eb2b6797f50f759a` |
+| 文档 head | 本收尾提交（走查填入 Archive / 检查数字）。**构建 SHA 仍为 `05c7236`** |
 | PR | 创建后填写（保持 OPEN） |

@@ -13,6 +13,7 @@
 | 项 | 值 |
 | --- | --- |
 | 基线 | `origin/main` = `e1afff0af15740e6162565a1a10fbac0d7456021`（含 #61，无后续） |
+| 打包 SHA | `05c7236215deee5018f502f0eb2b6797f50f759a`（dirty=no）。`/tmp/lampy-testflight-beta-2/Lampy.xcarchive` |
 | Bundle ID | `app.lampy.ios` |
 | Team | `B283NY984J` |
 | Version | `0.1.0`（营销版本不改） |
@@ -39,15 +40,20 @@ cd apps/ios
 bash scripts/release-archive.sh
 ```
 
-Xcode → Organizer 打开脚本打印的 Archive（默认 `/tmp/lampy-testflight-beta-2/Lampy.xcarchive`）：
+脚本把 Archive 写在 `/tmp`，Organizer 不一定自动列出。先打开该包再分发：
 
-1. 选中 **本次** Archive（version `0.1.0`，build `2`）
-2. **Distribute App**
-3. **App Store Connect**
-4. **Upload**
-5. 不要选 Development / Ad Hoc / Enterprise
-6. **不要选 TestFlight Internal Only**（同一构建还要给外测）
-7. 核对 version / build 后再送
+```bash
+open /tmp/lampy-testflight-beta-2/Lampy.xcarchive
+```
+
+Xcode → Organizer 选中 **本次** Archive（version `0.1.0`，build `2`）：
+
+1. **Distribute App**
+2. **App Store Connect**
+3. **Upload**
+4. 不要选 Development / Ad Hoc / Enterprise
+5. **不要选 TestFlight Internal Only**（同一构建还要给外测）
+6. 核对 version / build 后再送
 
 本地 Archive 签名是 Development。上传时 Organizer 再签 App Store Connect。
 
