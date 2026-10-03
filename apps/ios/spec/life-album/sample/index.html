@@ -11,10 +11,6 @@
       --ink: #25231f;
       --ink-soft: #5c5851;
       --sage: #53604f;
-      --calm: #6f8b86;
-      --glad: #c4a06a;
-      --unclear: #8a8680;
-      --tired: #9a8b78;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; background: #d8d0c3; color: var(--ink); }
@@ -62,7 +58,10 @@
     .feel { display: flex; align-items: center; gap: 8px; min-height: 32px; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 15px; color: var(--ink-soft); }
     .dot { width: 7px; height: 7px; border-radius: 50%; }
     .media { width: 100%; height: auto; display: block; margin: 12px 0; }
-    .media.tall { width: 220px; }
+    .media.wide { aspect-ratio: 348 / 240; }
+    .media.band { aspect-ratio: 348 / 160; }
+    .media.tall { width: 220px; aspect-ratio: 220 / 300; }
+    .media.tri { aspect-ratio: 348 / 120; }
     .missing {
       min-height: 120px; display: flex; align-items: center; justify-content: center;
       border: 1px solid rgba(37, 35, 31, 0.16);
@@ -79,31 +78,26 @@
     .cover { justify-content: flex-end; }
     .cover .title { margin: 20px 0 8px; }
     .close { justify-content: center; text-align: center; gap: 16px; }
-    .list { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 15px; line-height: 28px; color: var(--ink-soft); padding: 0; margin: 12px 0 0; }
-    .list li { margin: 0; }
     .spread { display: flex; flex-direction: column; gap: 8px; }
   </style>
 </head>
 <body>
-  <div class="banner">合成夹具 · 不是用户生活 · 图像为原创几何稿 · 声音未附原件 · 静态样本不称运行 PASS</div>
+  <div class="banner">合成夹具 · 不是用户生活 · 图像为原创几何稿 · 声音未附原件 · 静态样本不称运行 PASS · 验收项见 SAMPLES.md，不在纸页上</div>
   <div class="toolbar">
     <button type="button" id="prev">上一页</button>
-    <span id="mark">1 / 16</span>
+    <span id="mark">1 / 14</span>
     <button type="button" id="next">下一页</button>
   </div>
   <div class="stage">
     <article class="page on cover" data-page="1">
-      <p class="kicker">LAMPY · 生活册样本</p>
-      <img class="media" src="media/cover.svg" alt="合成封面：窗格几何" />
+      <p class="kicker">LAMPY</p>
+      <svg class="media wide" viewBox="0 0 348 240" aria-hidden="true"><rect width="348" height="240" fill="#E4D8C8"/><polygon points="0,240 348,80 348,240" fill="#C4A06A" opacity="0.35"/><line x1="0" y1="176" x2="348" y2="48" stroke="#87513D" stroke-width="1" opacity="0.4"/></svg>
       <h1 class="title">示例册 · 窗边</h1>
-      <p class="meta">一套版式 · 十六页 · 默认产品名是「一些日子」</p>
       <p class="foot">1</p>
     </article>
 
     <article class="page" data-page="2">
-      <p class="date">开篇</p>
-      <p class="body">把这几个普通下午放在一起。下面都是合成句子。</p>
-      <p class="body" style="margin-top:24px">开篇由用户自己写。Lampy 不代写标题，也不把后面的记录收成一篇故事。</p>
+      <p class="body">有几个下午，我想把它们放在一起。</p>
       <p class="foot">2</p>
     </article>
 
@@ -113,75 +107,75 @@
       <div class="feel"><span class="dot" style="background:#6F8B86"></span>平静</div>
       <hr class="rule" />
       <p class="body">把杯子洗了。</p>
-      <p class="foot">3 · 同日两条，日期只印一次</p>
+      <p class="foot">3</p>
     </article>
 
     <article class="page" data-page="4">
       <p class="date">2024年9月12日</p>
-      <p class="body">这是一条合成长文，只用来看跨页，不是谁的日记。下午坐在桌边，把一盏灯拧到刚够写字。窗外没有要拍下来的事，于是写下这一段。第一页应该在句子中间自然断开，第二页接着读，不要出现省略号，也不要改成「六行预览」。</p>
-      <p class="foot">4 · 长文上半，未截断</p>
+      <p class="body">下午坐在桌边，把灯拧到刚够看清纸面。窗外没有特别的事，风偶尔把叶子翻过去。我想把这一段留下来，不是因为有什么要宣布，只是日子这样走过，不写就散了。杯子里的水已经凉了。</p>
+      <p class="foot">4</p>
     </article>
 
     <article class="page" data-page="5">
-      <p class="date soft">9月12日 · 续</p>
-      <p class="body">写到这里仍然只是纸上的练习：两张几何图和一段未附原件的声音会跟在后面，顺序与记录里一致。</p>
-      <img class="media" src="media/pair-a.svg" alt="合成图：横向色带" />
-      <p class="foot">5 · 文字与第一张图相邻</p>
+      <p class="date soft">9月12日</p>
+      <p class="body">隔壁有人下楼，脚步到拐角就听不清。我又坐了一会儿，把灯再拧暗一点，听见自己翻纸的声音。</p>
+      <svg class="media band" viewBox="0 0 348 160" aria-hidden="true"><rect width="348" height="160" fill="#DDD4C6"/><rect x="0" y="48" width="348" height="64" fill="#B7C0B3"/><circle cx="70" cy="80" r="18" fill="#F3F0E9"/></svg>
+      <p class="foot">5</p>
     </article>
 
     <article class="page" data-page="6">
-      <img class="media tall" src="media/pair-b.svg" alt="合成图：竖向色块" />
-      <div class="sound">一段声音 · 1:08 · 声音占位，未附原件<br />没有真实播放，不画假进度。</div>
+      <svg class="media tall" viewBox="0 0 220 300" aria-hidden="true"><rect width="220" height="300" fill="#C9B7A4"/><rect x="28" y="36" width="164" height="228" fill="#F3F0E9"/><rect x="28" y="200" width="164" height="64" fill="#8A9384"/></svg>
+      <div class="sound">一段声音 · 1分08秒</div>
       <div class="feel"><span class="dot" style="background:#8A8680"></span>说不清</div>
-      <p class="foot">6 · 第二图原比例 + 声音占位</p>
+      <p class="foot">6</p>
     </article>
 
     <article class="page" data-page="7">
       <p class="date">2024年9月18日</p>
-      <img class="media" src="media/single.svg" alt="合成图：斜面单幅" />
+      <svg class="media wide" viewBox="0 0 348 240" aria-hidden="true"><rect width="348" height="240" fill="#E4D8C8"/><polygon points="0,240 348,80 348,240" fill="#C4A06A" opacity="0.35"/><line x1="0" y1="176" x2="348" y2="48" stroke="#87513D" stroke-width="1" opacity="0.4"/></svg>
       <p class="body">窗台上的影子斜了一点。</p>
       <div class="feel"><span class="dot" style="background:#6F8B86"></span>平静</div>
-      <p class="foot">7 · 单图，原比例</p>
+      <p class="foot">7</p>
     </article>
 
     <article class="page" data-page="8">
       <p class="date">2024年9月22日</p>
-      <div class="sound">一段声音 · 0:42 · 声音占位，未附原件<br />这条没有文字。不补标题，不画正在播放。</div>
-      <p class="foot">8 · 仅声音</p>
+      <div class="sound">一段声音 · 42秒</div>
+      <p class="foot">8</p>
     </article>
 
     <article class="page" data-page="9">
       <p class="date">2024年10月2日</p>
       <div class="spread">
-        <img class="media" src="media/tri-a.svg" alt="合成图：三幅之一" />
-        <img class="media" src="media/tri-b.svg" alt="合成图：三幅之二" />
-        <img class="media" src="media/tri-c.svg" alt="合成图：三幅之三" />
+        <svg class="media tri" viewBox="0 0 348 120" aria-hidden="true"><rect width="348" height="120" fill="#D7CFC2"/><rect x="24" y="24" width="80" height="72" fill="#6F8B86"/></svg>
+        <svg class="media tri" viewBox="0 0 348 120" aria-hidden="true"><rect width="348" height="120" fill="#E8E1D5"/><rect x="134" y="24" width="80" height="72" fill="#B0898C"/></svg>
+        <svg class="media tri" viewBox="0 0 348 120" aria-hidden="true"><rect width="348" height="120" fill="#D4CCC0"/><rect x="244" y="24" width="80" height="72" fill="#9A8B78"/></svg>
       </div>
-      <p class="foot">9 · 三图按记录内顺序，跨月无自动章名</p>
+      <p class="foot">9</p>
     </article>
 
     <article class="page" data-page="10">
       <p class="date soft">10月2日</p>
-      <p class="body">三张纸色练习，不是那天拍的生活。</p>
+      <p class="body">桌上摊开三张纸，颜色都不一样。</p>
       <hr class="rule" />
       <p class="body">出门前把门带上了。</p>
       <div class="feel"><span class="dot" style="background:#C4A06A"></span>高兴</div>
-      <p class="foot">10 · 同日：图组之后的短句</p>
+      <p class="foot">10</p>
     </article>
 
     <article class="page" data-page="11">
       <p class="date">时间未确认</p>
       <p class="body">那次把窗台上的土扫干净了。</p>
       <p class="meta" style="margin-top:12px">记录于 2024年10月8日</p>
-      <p class="foot">11 · 不补造发生日</p>
+      <p class="foot">11</p>
     </article>
 
     <article class="page" data-page="12">
       <p class="date">2024年10月14日</p>
       <p class="body">本想留下窗外的树。</p>
-      <div class="missing">这张照片现在看不到。<br />没有用别的图顶上，也没有丢掉这条。</div>
+      <div class="missing">这张照片现在看不到。</div>
       <div class="feel"><span class="dot" style="background:#9A8B78"></span>疲惫</div>
-      <p class="foot">12 · 缺失媒体可见</p>
+      <p class="foot">12</p>
     </article>
 
     <article class="page" data-page="13">
@@ -191,30 +185,9 @@
       <p class="foot">13</p>
     </article>
 
-    <article class="page" data-page="14">
-      <p class="date soft">空白</p>
-      <p class="body">这一页下部故意留白。排版不为此编一句生活。</p>
-      <p class="foot">14 · 空白比例</p>
-    </article>
-
-    <article class="page" data-page="15">
-      <p class="date">夹具清单（审阅用，第一版成册不自动出目录）</p>
-      <ol class="list">
-        <li>短句 · 同日两条</li>
-        <li>长文 + 两图 + 声音占位</li>
-        <li>单图</li>
-        <li>仅声音</li>
-        <li>三图 · 跨月</li>
-        <li>未确认日期</li>
-        <li>缺失媒体</li>
-      </ol>
-      <p class="foot">15</p>
-    </article>
-
-    <article class="page close" data-page="16">
+    <article class="page close" data-page="14">
       <p class="body">这些日子，先放到这里。</p>
-      <p class="meta">没有条数总结，没有情绪报告。</p>
-      <p class="foot">16</p>
+      <p class="foot">14</p>
     </article>
   </div>
   <script>

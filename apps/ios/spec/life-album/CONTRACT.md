@@ -53,39 +53,103 @@ type AlbumEntry = {
 
 ## 3. 分页结果
 
+`AlbumLayout` 是**已测完的画稿**，不是待排素材。预览和 PDF 是两个渲染器，必须读同一份 JSON，把每一块画进记录的框，用记录的字体和断点。禁止任一端再测一遍、再换行、再缩放图。
+
 ```ts
 type AlbumLayout = {
   albumId: LifeAlbumId;
-  albumUpdatedAt: string;       // 生成时所见的册 updatedAt
-  layoutVersion: string;        // 如 'album-a5-v1'
-  pageSize: { widthPt: number; heightPt: number };
-  pages: AlbumPage[];
+  layoutVersion: string;        // 如 'album-a5-v1'；版本变了必须整份重排
+  pageSize: { widthPt: number; heightPt: number }; // 420 × 595
+  fonts: AlbumFontSpec;
+  sourceFingerprint: AlbumSourceFingerprint;
+  albumUpdatedAt: string;
   generatedAt: string;
+  pages: AlbumPage[];
 };
+
+type AlbumFontSpec = {
+  coverName: { family: 'album-serif'; sizePt: 28; lineHeightPt: 36; color: '#25231F' };
+  body: { family: 'album-serif'; sizePt: 17; lineHeightPt: 32; color: '#25231F' };
+  date: { family: 'album-ui'; sizePt: 15; lineHeightPt: 22; color: '#53604F' };
+  meta: { family: 'album-ui'; sizePt: 15; lineHeightPt: 22; color: '#5C5851' };
+};
+
+/** 生成时所见的册与来源。任一字段与现况不同，预览缓存作废。 */
+type AlbumSourceFingerprint = {
+  name: string;
+  opening: string | null;
+  cover: AlbumCover;
+  entryOrder: string[];         // momentId 顺序
+  moments: {
+    momentId: string;
+    revision: number;
+    media: { assetId: string; role: 'image' | 'audio' | 'unknown'; available: boolean }[];
+  }[];
+};
+
+type AlbumBox = { xPt: number; yPt: number; widthPt: number; heightPt: number };
 
 type AlbumPage = {
   index: number;                // 0 = 封面
-  blocks: AlbumBlock[];
+  blocks: AlbumPlacedBlock[];
+};
+
+type AlbumPlacedBlock = AlbumBlock & {
+  box: AlbumBox;                // 页内绝对坐标，原点为页左上
 };
 
 type AlbumBlock =
-  | { kind: 'cover'; albumId: string }
-  | { kind: 'opening'; albumId: string }
-  | { kind: 'day-rule'; momentId: string; dateKey: string }
-  | { kind: 'note'; momentId: string; revision: number; text: string; continued?: boolean }
-  | { kind: 'image'; momentId: string; assetId: string; status: 'available' | 'missing' }
+  | { kind: 'cover-name'; albumId: string; text: string }
+  | { kind: 'cover-image'; albumId: string; momentId: string; assetId: string; status: 'available' | 'missing' }
+  | { kind: 'opening'; albumId: string; text: string; textRange: { start: number; end: number } }
+  | { kind: 'day-rule'; momentId: string; dateKey: string; text: string }
+  | {
+      kind: 'note';
+      momentId: string;
+      revision: number;
+      textRange: { start: number; end: number }; // 原文 Unicode 码位 [start, end)
+    }
+  | {
+      kind: 'image';
+      momentId: string;
+      assetId: string;
+      status: 'available' | 'missing';
+      intrinsicRatio: number | null; // 宽/高；missing 可空
+    }
   | { kind: 'audio'; momentId: string; assetId: string; status: 'available' | 'missing'; durationMs: number | null }
   | { kind: 'unknown-media'; momentId: string; label: string }
   | { kind: 'feeling'; momentId: string; value: string; known: boolean }
   | { kind: 'recorded-at'; momentId: string; label: string }
   | { kind: 'source-changed'; momentId: string }
   | { kind: 'source-gone'; momentId: string }
-  | { kind: 'close' };
+  | { kind: 'close'; text: string };
 ```
 
-每块能回到精确 Moment / Asset。预览渲染与 PDF 只读这份 `AlbumLayout`，不得各排各的。
+约束：
 
-册一改（改名、调序、移出、开篇、封面），旧 layout 作废，下次预览重排。不把 layout 当用户编辑稿。
+- `textRange` 是分页器切好的断点。渲染器按此切片，不得自行在框内再断一次导致多一行或少一行。
+- 图框 `box` 已含原比例算出的宽高；渲染器只缩放进这个框，不改比例、不裁切。
+- `album-serif` / `album-ui` 的具体字面在阶段 C 钉死（系统中文衬线 + 现网 UI 字体）。预览与 PDF 必须映射到**同一对**字面。
+- 封面图与正文图可以是同一个 `assetId`（复用）。正文里该 `assetId` 仍只出现一次。
+- 不把 layout 当用户编辑稿。册一改，旧 layout 整份作废。
+
+### 3.1 预览缓存何时作废
+
+打开预览前比较现况与 `sourceFingerprint` + `layoutVersion`。下列任一不同，丢掉缓存并重排：
+
+- 册名、开篇、封面、收入顺序
+- 任一 `momentId` 的 `revision`
+- 任一 Asset 的 `available`（可读 ↔ 缺失）
+- 条目增减
+- `layoutVersion` 升级
+
+### 3.2 导出过程中来源变化
+
+1. 开始导出时读取并冻结指纹 `F0`，只用 `F0` 对应的那一份 layout。
+2. 写文件前再读一遍来源。若不等于 `F0`：**整次失败或整次重试**，不得把旧页和新来源拼进同一份 PDF。
+3. 重试则重新读取、重新排（或确认指纹未变后沿用新的一致 layout），再写。
+4. 失败文案：「排的时候记录有变动，这一次没有导出。」临时文件删掉。
+5. 已 `ready` 的旧导出仍不动。
 
 ---
 
@@ -127,7 +191,7 @@ type AlbumExportMedia = {
 | Asset 缺失 | 条目仍在 | 该媒介块 `missing`，可见说明 | 不动 |
 | 改册名 / 开篇 / 封面 / 顺序 / 移出 | 立即保存 | 作废旧 layout | 已导出不动 |
 | 删册 | 删册与条目。可选清该册 `preparing`/`failed` 临时文件与用户确认后的本机导出 | — | App 内文件按用户确认删除；**已分享到 App 外的无法撤回** |
-| 导出中来源变化 | 本次导出以**开始导出时**读到的内容冻结。中途变化不混进这一份 | 不影响进行中的冻结集 | 成功则按冻结集写文件 |
+| 导出中来源变化 | 见 §3.2：与开始时的指纹不一致则整次重试或失败，禁止混版 | 旧预览若指纹已变则作废 | 不写半份、不混两个 revision |
 | 取消 / 失败 | 册不动 | 旧预览可留 | 删除本次临时文件，不留半份 PDF |
 | 用户排除某张图 | 阶段 B 第一版**不做**逐资源排除。整条移出，或整条收入。若复审要排除单张，须另开切片并写进 layout | — | — |
 

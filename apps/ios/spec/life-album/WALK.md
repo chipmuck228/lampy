@@ -10,7 +10,7 @@
 apps/ios/spec/life-album/sample/index.html
 ```
 
-浏览器从第 1 页翻到第 16 页（按钮或左右方向键）。这是静态稿，**不是**运行 PASS。
+浏览器从封面翻到收尾（按钮或左右方向键）。这是静态稿，**不是**运行 PASS。验收项在 `SAMPLES.md`，不在纸页上。
 
 同屏状态：`storyboard.html`。
 
@@ -21,7 +21,7 @@ apps/ios/spec/life-album/sample/index.html
 | 运行代码 | 未改 `apps/ios/src`、微信、家庭、AI、TestFlight |
 | 支付 / PDF 依赖 / StoreKit | 未新增 |
 | 夹具是否写成用户生活 | 封面横幅与册名标明示例 |
-| 16 页是否含要求种类 | 见 `SAMPLES.md` 页表 |
+| 整册是否可读、无验收说明混入 | 见 `SAMPLES.md` 册外审阅 |
 | 图像来源 | `sample/media/SOURCE.md`，原创几何 SVG |
 | 声音 | 仅占位文案 |
 | 真机 / 模拟器 | **NOT VERIFIED**（本轮不做） |

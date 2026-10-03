@@ -4,7 +4,7 @@
   "album": {
     "id": "album_eval_window",
     "name": "示例册 · 窗边",
-    "opening": "把这几个普通下午放在一起。下面都是合成句子。",
+    "opening": "有几个下午，我想把它们放在一起。",
     "cover": { "kind": "image", "momentId": "moment_album_eval_m04", "assetId": "asset_album_eval_single" },
     "layoutVersion": "album-a5-v1"
   },
@@ -32,7 +32,7 @@
       "revision": 1,
       "occurredAt": "2024-09-12",
       "occurredAtPrecision": "day",
-      "note": "这是一条合成长文，只用来看跨页，不是谁的日记。下午坐在桌边，把一盏灯拧到刚够写字。窗外没有要拍下来的事，于是写下这一段。第一页应该在句子中间自然断开，第二页接着读，不要出现省略号，也不要改成「六行预览」。写到这里仍然只是纸上的练习：两张几何图和一段未附原件的声音会跟在后面，顺序与记录里一致。",
+      "note": "下午坐在桌边，把灯拧到刚够看清纸面。窗外没有特别的事，风偶尔把叶子翻过去。我想把这一段留下来，不是因为有什么要宣布，只是日子这样走过，不写就散了。杯子里的水已经凉了。隔壁有人下楼，脚步到拐角就听不清。我又坐了一会儿，把灯再拧暗一点，听见自己翻纸的声音。",
       "feeling": { "value": "说不清", "known": true },
       "media": [
         { "assetId": "asset_album_eval_pair_a", "type": "image", "status": "available", "file": "pair-a.svg" },
@@ -65,7 +65,7 @@
       "revision": 1,
       "occurredAt": "2024-10-02",
       "occurredAtPrecision": "day",
-      "note": "三张纸色练习，不是那天拍的生活。",
+      "note": "桌上摊开三张纸，颜色都不一样。",
       "feeling": null,
       "media": [
         { "assetId": "asset_album_eval_tri_a", "type": "image", "status": "available", "file": "tri-a.svg" },
