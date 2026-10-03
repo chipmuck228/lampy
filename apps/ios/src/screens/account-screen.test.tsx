@@ -493,6 +493,7 @@ describe('account screen', () => {
     expect(view.getByText('关于')).toBeTruthy();
     expect(view.getByLabelText('本机保护')).toBeTruthy();
     expect(view.getByLabelText('记录与存储')).toBeTruthy();
+    expect(view.getByLabelText('我的生活册')).toBeTruthy();
     expect(view.getByLabelText('订阅与付费')).toBeTruthy();
     expect(view.getByText('目前没有付费项目')).toBeTruthy();
     expect(view.getByLabelText('使用帮助')).toBeTruthy();

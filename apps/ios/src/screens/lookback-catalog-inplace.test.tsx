@@ -249,6 +249,7 @@ describe('lookback in-place catalog reading', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-reading-m28')).toBeTruthy();
     });
+    expect(view.getByTestId('lookback-life-album')).toBeTruthy();
     expect(mockCard).toHaveBeenCalledWith('asset-m28');
     mockPause.mockClear();
     mockPlay.mockClear();
@@ -258,6 +259,8 @@ describe('lookback in-place catalog reading', () => {
     await waitFor(() => {
       expect(view.getByTestId('lookback-catalog')).toBeTruthy();
     });
+    expect(view.queryByTestId('lookback-life-album')).toBeNull();
+    expect(view.queryByTestId('life-album-collect-m28')).toBeNull();
     expect(mockPause).toHaveBeenCalled();
     expect(mockPlay).not.toHaveBeenCalled();
     await act(async () => {

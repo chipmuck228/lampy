@@ -2,6 +2,8 @@
 
 基线本地 `origin/main` `e1afff0`。只改 spec。未跑 Metro，未装模拟器，未碰个人库。
 
+已普通合并为 #63 → `0ab1c3c5d45256f4ed8a09b22732c1059654f30d`（parents `e1afff0` + 审阅 head `ad5e9f829697092b95668bceed9ea27b44764d1c`）。静态样本仍**不是**运行 PASS。阶段 B 见 `WALK-B.md`。
+
 ## 查看样本
 
 在仓库里打开：

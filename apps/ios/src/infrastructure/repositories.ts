@@ -1,6 +1,10 @@
 import { validateAsset, type AssetRecord } from '../domain-adapters/asset-commands';
 import { DomainError, ERROR_CODES } from '../domain-adapters/errors';
 import { validateMoment, type MomentRecord } from '../domain-adapters/moment-commands';
+import {
+  createMemoryLifeAlbumRepository,
+  type LifeAlbumRepository,
+} from './life-album-repository';
 
 export type MomentRead =
   | { kind: 'ready'; moment: MomentRecord }
@@ -102,6 +106,7 @@ export function createMemoryRepositories(): {
   moments: MomentRepository;
   drafts: DraftRepository;
   assets: AssetRepository;
+  albums: LifeAlbumRepository;
 } {
   const moments = new Map<string, MomentRecord>();
   const storedAssets = new Map<string, AssetRecord>();
@@ -257,5 +262,6 @@ export function createMemoryRepositories(): {
         storedAssets.delete(assetId);
       },
     },
+    albums: createMemoryLifeAlbumRepository(),
   };
 }

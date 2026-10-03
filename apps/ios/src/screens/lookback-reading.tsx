@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 
@@ -83,6 +83,7 @@ export function LookbackReadingMoment({
   onOpen,
   onPlay,
   onPause,
+  footer,
 }: {
   entry: LookbackDayEntry;
   pairImages: boolean;
@@ -92,6 +93,7 @@ export function LookbackReadingMoment({
   onOpen: (id: string) => void;
   onPlay: () => void;
   onPause: () => void;
+  footer?: ReactNode;
 }) {
   const [lineCount, setLineCount] = useState(0);
   const truncated = recentNoteIsTruncated(lineCount);
@@ -163,6 +165,7 @@ export function LookbackReadingMoment({
         feeling={entry.feeling ?? null}
         onOpen={() => onOpen(entry.id)}
       />
+      {footer}
     </View>
   );
 }

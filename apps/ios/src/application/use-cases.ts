@@ -38,6 +38,8 @@ import {
 import { formatSoundDuration } from './duration';
 import { ApplicationError, toApplicationError } from './errors';
 import { createHistoryUseCases } from './history-use-cases';
+import { createLifeAlbumUseCases } from './life-album-use-cases';
+import type { LifeAlbumRepository } from '../infrastructure/life-album-repository';
 import {
   projectOccurredChoice,
   resolveOccurredPatch,
@@ -293,6 +295,7 @@ export function createUseCases(deps: {
   moments: MomentRepository;
   drafts: DraftRepository;
   assets?: AssetRepository;
+  albums?: LifeAlbumRepository;
   media?: MediaStore;
   library?: ImageSource;
   camera?: ImageSource;
@@ -301,6 +304,7 @@ export function createUseCases(deps: {
   ownerId?: string;
   id?: () => string;
   assetId?: () => string;
+  albumId?: () => string;
   timezoneOffsetMinutes?: number;
   timezone?: HistoryClock;
 }) {
@@ -1136,6 +1140,16 @@ export function createUseCases(deps: {
       resolveImages,
       resolveAudio,
       resolveUnknown,
+    }),
+    ...createLifeAlbumUseCases({
+      albums: deps.albums,
+      moments: deps.moments,
+      assets: deps.assets,
+      media: deps.media,
+      clock,
+      ownerId,
+      id: deps.albumId,
+      timezone: viewerClock,
     }),
     toApplicationError,
   };
