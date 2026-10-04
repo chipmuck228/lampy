@@ -9,6 +9,31 @@ export function firstSearchParam(value: string | string[] | undefined): string |
   return value;
 }
 
+export function collectAlbumIdFromParam(value: string | string[] | undefined): string | null {
+  const raw = firstSearchParam(value)?.trim();
+  return raw ? raw : null;
+}
+
+export function lookbackParamsWithCollect(
+  current: { o?: string | string[]; collect?: string | string[] },
+  albumId: string,
+): { o?: string; collect: string } {
+  const next: { o?: string; collect: string } = { collect: albumId };
+  const origin = firstSearchParam(current.o);
+  if (origin) next.o = origin;
+  return next;
+}
+
+export function lookbackParamsWithoutCollect(current: {
+  o?: string | string[];
+  collect?: string | string[];
+}): { o?: string } {
+  const next: { o?: string } = {};
+  const origin = firstSearchParam(current.o);
+  if (origin) next.o = origin;
+  return next;
+}
+
 export function resetLookbackOriginsForTests(): void {
   issuedOrigins.clear();
   issuedBookOrigins.clear();

@@ -233,6 +233,7 @@ export function LookbackScaffold({
   kicker,
   subtitle,
   headerAction,
+  headerTrailing,
   path,
   children,
   footer,
@@ -260,6 +261,7 @@ export function LookbackScaffold({
   kicker?: string;
   subtitle?: string;
   headerAction?: ReactNode;
+  headerTrailing?: ReactNode;
   path: string;
   children: ReactNode;
   footer?: ReactNode;
@@ -361,11 +363,14 @@ export function LookbackScaffold({
             {title}
           </Text>
         </View>
-        {subtitle ? (
-          <Text style={styles.topMark} testID="lookback-subtitle">
-            {subtitle}
-          </Text>
-        ) : null}
+        <View style={styles.heroTrail}>
+          {subtitle ? (
+            <Text style={styles.topMark} testID="lookback-subtitle">
+              {subtitle}
+            </Text>
+          ) : null}
+          {headerTrailing}
+        </View>
       </View>
       {root ? <View testID="lookback-header-rule" style={styles.headerRule} /> : null}
     </View>
@@ -609,6 +614,12 @@ const styles = StyleSheet.create({
     paddingBottom: 17,
   },
   heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
+  heroTrail: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    flexShrink: 0,
+  },
   kicker: { ...recentType.kicker, color: recentKicker },
   title: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
   topMark: {
