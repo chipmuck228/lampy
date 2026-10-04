@@ -1,17 +1,22 @@
 import {
   ALBUM_FONTS,
+  ALBUM_LAYOUT_UNAVAILABLE_COPY,
   albumFontFace,
   type AlbumFontRole,
   type AlbumTextLine,
 } from './album-layout';
+import { ApplicationError } from './errors';
 import { albumCodePointAt, albumCodePointLength } from './album-unicode';
 import { albumLayoutNativeAvailable, measureTextNative } from '../../modules/lampy-album-layout';
+
+export const ALBUM_LAYOUT_UNAVAILABLE = 'ALBUM_LAYOUT_UNAVAILABLE';
 
 export type AlbumMeasuredLine = {
   start: number;
   end: number;
   widthPt: number;
   heightPt: number;
+  ascentPt: number;
 };
 
 export type AlbumTextMeasurer = {
@@ -40,7 +45,7 @@ export function wrapByGlyphWidth(
   while (index < length) {
     const point = albumCodePointAt(text, index) ?? '';
     if (point === '\n') {
-      lines.push({ start: index, end: index + 1, widthPt: 0, heightPt: lineHeightPt });
+      lines.push({ start: index, end: index + 1, widthPt: 0, heightPt: lineHeightPt, ascentPt: sizePt * 0.8 });
       index += 1;
       continue;
     }
@@ -56,7 +61,7 @@ export function wrapByGlyphWidth(
       if (used >= widthPt && end === index + 1) break;
     }
     if (end === index) end = index + 1;
-    lines.push({ start: index, end, widthPt: used, heightPt: lineHeightPt });
+    lines.push({ start: index, end, widthPt: used, heightPt: lineHeightPt, ascentPt: sizePt * 0.8 });
     index = end;
   }
   return lines;
@@ -86,14 +91,26 @@ export function createNativeTextMeasurer(): AlbumTextMeasurer {
         end: line.end,
         widthPt: line.widthPt,
         heightPt: line.heightPt || role.lineHeightPt,
+        ascentPt: line.ascentPt ?? role.sizePt * 0.8,
       }));
     },
   };
 }
 
+/** Production measurer. Never falls back to the Jest glyph-width double. */
 export function createAlbumTextMeasurer(): AlbumTextMeasurer {
-  if (albumLayoutNativeAvailable()) return createNativeTextMeasurer();
-  return createGlyphWidthMeasurer();
+  if (!albumLayoutNativeAvailable()) {
+    throw new ApplicationError(ALBUM_LAYOUT_UNAVAILABLE, ALBUM_LAYOUT_UNAVAILABLE_COPY);
+  }
+  return createNativeTextMeasurer();
+}
+
+export function spaceForWrappedChunk(input: {
+  remainingPt: number;
+  lineHeightPt: number;
+  continuedHeightPt: number;
+}): { commit: boolean } {
+  return { commit: input.remainingPt < input.continuedHeightPt + input.lineHeightPt };
 }
 
 export async function measurePlacedLines(
@@ -114,6 +131,7 @@ export async function measurePlacedLines(
       yPt: y,
       widthPt: line.widthPt,
       heightPt: line.heightPt,
+      baselineYPt: y + line.ascentPt,
     });
     y += line.heightPt;
   }

@@ -12,7 +12,9 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
+import { ALBUM_LAYOUT_CANCELLED } from '../application/album-layout-use-cases';
 import {
+  ALBUM_CONTENT_WIDTH_PT,
   ALBUM_IMAGE_MISSING,
   ALBUM_PREVIEW_ACTION,
   ALBUM_PREVIEW_CANCEL,
@@ -42,6 +44,8 @@ import { LifeIcon } from './life-icons';
 import { SettingsPage } from './settings-chrome';
 import { useRecentClipPlayback } from './use-recent-clip-playback';
 
+const MIN_HIT = 48;
+
 export default function LifeAlbumPreviewScreen() {
   const router = useRouter();
   const albumId = firstSearchParam(useLocalSearchParams<{ id?: string | string[] }>().id) ?? '';
@@ -59,51 +63,70 @@ export default function LifeAlbumPreviewScreen() {
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(1);
   const signal = useRef({ cancelled: false });
-  const generation = useRef(0);
+  const currentRequest = useRef<{ albumId: string; requestId: number } | null>(null);
 
   const blocked = !!lock?.snapshot.locked;
+  const showPage = !!layout && !loading && !error && !blocked && layout.albumId === albumId;
 
   const load = useCallback(() => {
     if (!albumId || blocked) {
+      currentRequest.current = null;
       setLayout(null);
       setMedia({});
+      setError(null);
       setLoading(false);
       return;
     }
-    const request = generation.current + 1;
-    generation.current = request;
     signal.current = { cancelled: false };
-    setLoading(true);
+    setLayout(null);
+    setMedia({});
+    setPage(0);
+    setZoom(1);
     setError(null);
+    setLoading(true);
     void getUseCases()
-      .then((app) =>
-        app.generateAlbumLayout(albumId, {
-          signal: signal.current,
-          generation: request,
-          privateUnlocked: true,
-        }),
-      )
-      .then((result) => {
-        if (
-          signal.current.cancelled ||
-          !shouldApplyAlbumLayoutResult({
-            albumId,
-            requestAlbumId: result.layout.albumId,
-            generation: request,
-            currentGeneration: generation.current,
-          })
-        ) {
-          return;
+      .then(async (app) => {
+        const began = app.beginAlbumLayout(albumId);
+        currentRequest.current = began;
+        try {
+          const result = await app.generateAlbumLayout(albumId, {
+            signal: signal.current,
+            requestId: began.requestId,
+            privateUnlocked: true,
+          });
+          if (
+            signal.current.cancelled ||
+            !shouldApplyAlbumLayoutResult({
+              albumId,
+              requestAlbumId: result.layout.albumId,
+              requestId: result.requestId,
+              current: currentRequest.current,
+            })
+          ) {
+            return;
+          }
+          setLayout(result.layout);
+          setMedia(result.media);
+          setPage(0);
+          setLoading(false);
+        } catch (caught) {
+          if (
+            signal.current.cancelled ||
+            !shouldApplyAlbumLayoutResult({
+              albumId,
+              requestAlbumId: albumId,
+              requestId: began.requestId,
+              current: currentRequest.current,
+            })
+          ) {
+            return;
+          }
+          if (isApplicationError(caught) && caught.code === ALBUM_LAYOUT_CANCELLED) return;
+          setLayout(null);
+          setMedia({});
+          setLoading(false);
+          setError(isApplicationError(caught) ? caught.message : ALBUM_PREVIEW_FAILED);
         }
-        setLayout(result.layout);
-        setMedia(result.media);
-        setPage(0);
-        setLoading(false);
-      })
-      .catch((caught) => {
-        if (signal.current.cancelled || generation.current !== request) return;
-        setLoading(false);
-        setError(isApplicationError(caught) ? caught.message : ALBUM_PREVIEW_FAILED);
       });
   }, [albumId, blocked]);
 
@@ -112,6 +135,7 @@ export default function LifeAlbumPreviewScreen() {
       load();
       return () => {
         signal.current.cancelled = true;
+        currentRequest.current = null;
         void pauseRef.current();
         void getUseCases().then((app) => app.cancelAlbumLayout());
       };
@@ -129,7 +153,7 @@ export default function LifeAlbumPreviewScreen() {
     return () => sub.remove();
   }, []);
 
-  const current = layout?.pages[page];
+  const current = showPage ? layout?.pages[page] : undefined;
   const pageWidth = Math.max(120, Math.min(width - 32, ((height - 220) * 420) / 595));
   const scale = (pageWidth / 420) * zoom;
 
@@ -164,6 +188,7 @@ export default function LifeAlbumPreviewScreen() {
           testID="life-album-preview-cancel"
           onPress={() => {
             signal.current.cancelled = true;
+            currentRequest.current = null;
             void getUseCases().then((app) => app.cancelAlbumLayout());
             router.back();
           }}
@@ -172,7 +197,7 @@ export default function LifeAlbumPreviewScreen() {
           <Text style={styles.action}>{ALBUM_PREVIEW_CANCEL}</Text>
         </Pressable>
       ) : null}
-      {layout && current && !blocked ? (
+      {showPage && current ? (
         <>
           <Text
             style={styles.meta}
@@ -190,6 +215,7 @@ export default function LifeAlbumPreviewScreen() {
                 style={{ width: 420 * scale, height: 595 * scale, backgroundColor: paper, overflow: 'hidden' }}
               >
                 <View
+                  pointerEvents="none"
                   style={{
                     width: 420,
                     height: 595,
@@ -203,19 +229,39 @@ export default function LifeAlbumPreviewScreen() {
                       block={block}
                       media={media}
                       playing={block.kind === 'audio' ? clips.card(block.assetId).status === 'playing' : false}
-                      onPlay={
-                        block.kind === 'audio' && block.status === 'available' && media[block.assetId]
-                          ? () => {
-                              void clips.play(block.assetId, media[block.assetId]);
-                            }
-                          : undefined
-                      }
-                      onPause={() => {
-                        void pauseRef.current();
-                      }}
                     />
                   ))}
                 </View>
+                {current.blocks.map((block, index) => {
+                  if (block.kind !== 'audio') return null;
+                  const canPlay = block.status === 'available' && !!media[block.assetId];
+                  const playing = clips.card(block.assetId).status === 'playing';
+                  const hitW = Math.max(MIN_HIT, block.box.widthPt * scale);
+                  const hitH = Math.max(MIN_HIT, block.box.heightPt * scale);
+                  return (
+                    <Pressable
+                      key={`audio-hit-${block.assetId}-${index}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={playing ? '暂停' : block.text}
+                      accessibilityState={{ disabled: !canPlay }}
+                      testID={`life-album-preview-audio-${block.assetId}`}
+                      disabled={!canPlay}
+                      onPress={() => {
+                        if (playing) void pauseRef.current();
+                        else if (media[block.assetId]) void clips.play(block.assetId, media[block.assetId]);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        left: block.box.xPt * scale,
+                        top: block.box.yPt * scale,
+                        width: hitW,
+                        height: hitH,
+                        minWidth: MIN_HIT,
+                        minHeight: MIN_HIT,
+                      }}
+                    />
+                  );
+                })}
               </View>
             </ScrollView>
           </ScrollView>
@@ -262,14 +308,10 @@ function AlbumBlockView({
   block,
   media,
   playing,
-  onPlay,
-  onPause,
 }: {
   block: AlbumPlacedBlock;
   media: AlbumLayoutMediaMap;
   playing: boolean;
-  onPlay?: () => void;
-  onPause: () => void;
 }) {
   const box = {
     position: 'absolute' as const,
@@ -290,23 +332,11 @@ function AlbumBlockView({
     );
   }
   if (block.kind === 'audio') {
-    const canPlay = block.status === 'available' && onPlay;
     return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={playing ? '暂停' : block.text}
-        accessibilityState={{ disabled: !canPlay }}
-        testID={`life-album-preview-audio-${block.assetId}`}
-        disabled={!canPlay}
-        onPress={() => {
-          if (playing) onPause();
-          else onPlay?.();
-        }}
-        style={[box, styles.row]}
-      >
-        {canPlay ? <LifeIcon name={playing ? 'pause' : 'play'} size={18} decorative /> : null}
+      <View style={[box, styles.row]}>
+        {block.status === 'available' ? <LifeIcon name={playing ? 'pause' : 'play'} size={18} decorative /> : null}
         <Text style={styles.meta}>{block.text}</Text>
-      </Pressable>
+      </View>
     );
   }
   const copy =
@@ -342,13 +372,15 @@ function AlbumBlockView({
         block.lines.map((line, index) => (
           <Text
             key={`${block.kind}-${index}`}
+            numberOfLines={1}
+            ellipsizeMode="clip"
             style={[
               spec,
               {
                 position: 'absolute',
                 left: line.xPt - block.box.xPt,
                 top: line.yPt - block.box.yPt,
-                width: Math.max(line.widthPt, 1),
+                width: ALBUM_CONTENT_WIDTH_PT,
                 height: line.heightPt,
               },
             ]}
@@ -357,7 +389,9 @@ function AlbumBlockView({
           </Text>
         ))
       ) : (
-        <Text style={spec}>{copy}</Text>
+        <Text numberOfLines={1} ellipsizeMode="clip" style={spec}>
+          {copy}
+        </Text>
       )}
     </View>
   );

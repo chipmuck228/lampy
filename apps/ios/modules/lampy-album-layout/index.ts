@@ -3,6 +3,7 @@ export type AlbumMeasuredLine = {
   end: number;
   widthPt: number;
   heightPt: number;
+  ascentPt: number;
 };
 
 export type AlbumPdfProbeResult = {
@@ -52,7 +53,13 @@ export function measureTextNative(
   if (!native?.measureText) {
     throw new Error('LampyAlbumLayout native module is missing');
   }
-  return native.measureText(text, fontName, sizePt, lineHeightPt, widthPt);
+  return native.measureText(text, fontName, sizePt, lineHeightPt, widthPt).map((line) => ({
+    start: line.start,
+    end: line.end,
+    widthPt: line.widthPt,
+    heightPt: line.heightPt || lineHeightPt,
+    ascentPt: line.ascentPt ?? sizePt * 0.8,
+  }));
 }
 
 export async function writeAlbumProbePdf(

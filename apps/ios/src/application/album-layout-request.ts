@@ -1,8 +1,13 @@
 export function shouldApplyAlbumLayoutResult(input: {
   albumId: string;
   requestAlbumId: string;
-  generation: number;
-  currentGeneration: number;
+  requestId: number;
+  current: { albumId: string; requestId: number } | null;
 }): boolean {
-  return input.albumId === input.requestAlbumId && input.generation === input.currentGeneration;
+  return (
+    !!input.current &&
+    input.albumId === input.current.albumId &&
+    input.requestAlbumId === input.albumId &&
+    input.requestId === input.current.requestId
+  );
 }

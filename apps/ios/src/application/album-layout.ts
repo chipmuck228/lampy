@@ -22,6 +22,7 @@ export const ALBUM_PREVIEW_ACTION = '看看这一册';
 export const ALBUM_PREVIEW_EMPTY = '先收下一条，也可以慢慢添。';
 export const ALBUM_PREVIEW_LOADING = '正在排成一册。';
 export const ALBUM_PREVIEW_FAILED = '这一册暂时排不出来。收进的记录还在。';
+export const ALBUM_LAYOUT_UNAVAILABLE_COPY = '排版能力尚不可用';
 export const ALBUM_PREVIEW_CANCEL = '取消';
 export const ALBUM_PREVIEW_ZOOM = '放大阅读';
 export const ALBUM_PREVIEW_ZOOM_OUT = '恢复整页';
@@ -89,6 +90,7 @@ export type AlbumTextLine = {
   yPt: number;
   widthPt: number;
   heightPt: number;
+  baselineYPt: number;
 };
 
 export type AlbumTextRange = { start: number; end: number; unit: 'unicode-scalar' };

@@ -5,6 +5,7 @@ import { ALBUM_LAYOUT_VERSION } from '../application/album-layout';
 import LifeAlbumPreviewScreen from './life-album-preview-screen';
 
 const mockGenerate = jest.fn();
+const mockBegin = jest.fn();
 const mockCancel = jest.fn();
 const mockPlay = jest.fn(async () => undefined);
 const mockPause = jest.fn(async () => undefined);
@@ -26,6 +27,7 @@ jest.mock('expo-router', () => {
 jest.mock('../application/container', () => ({
   getUseCases: async () => ({
     generateAlbumLayout: mockGenerate,
+    beginAlbumLayout: mockBegin,
     cancelAlbumLayout: mockCancel,
   }),
 }));
@@ -80,7 +82,7 @@ const layout = {
           albumId: 'album_1',
           text: '一些日子',
           textRange: { start: 0, end: 4, unit: 'unicode-scalar' as const },
-          lines: [{ start: 0, end: 4, xPt: 36, yPt: 112, widthPt: 112, heightPt: 36 }],
+          lines: [{ start: 0, end: 4, xPt: 36, yPt: 112, widthPt: 112, heightPt: 36, baselineYPt: 140 }],
           box: { xPt: 36, yPt: 112, widthPt: 348, heightPt: 36 },
         },
       ],
@@ -113,10 +115,17 @@ describe('life album preview screen', () => {
   beforeEach(() => {
     cleanup();
     mockGenerate.mockReset();
+    mockBegin.mockReset();
     mockCancel.mockReset();
     mockPlay.mockClear();
     mockPause.mockClear();
-    mockGenerate.mockResolvedValue({ layout, media: { aud: 'file://documents/clip.m4a' }, fingerprint: layout.sourceFingerprint });
+    mockBegin.mockImplementation(() => ({ albumId: 'album_1', requestId: 7 }));
+    mockGenerate.mockResolvedValue({
+      layout,
+      media: { aud: 'file://documents/clip.m4a' },
+      fingerprint: layout.sourceFingerprint,
+      requestId: 7,
+    });
   });
 
   it('renders measured lines and does not autoplay audio', async () => {
@@ -136,5 +145,34 @@ describe('life album preview screen', () => {
       fireEvent.press(view.getByTestId('life-album-preview-audio-aud'));
     });
     expect(mockPlay).toHaveBeenCalledWith('aud', 'file://documents/clip.m4a');
+    expect(view.getByTestId('life-album-preview-audio-aud').props.style).toEqual(
+      expect.objectContaining({ minHeight: 48, minWidth: 48 }),
+    );
+  });
+
+  it('does not show a page while loading or after failure', async () => {
+    let settle: (value: unknown) => void = () => undefined;
+    mockGenerate.mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          settle = (value: unknown) => {
+            if (value instanceof Error) reject(value);
+            else resolve(value);
+          };
+        }),
+    );
+    const view = await render(wrap());
+    expect(view.getByText('正在排成一册。')).toBeTruthy();
+    expect(view.queryByTestId('life-album-preview-page')).toBeNull();
+    expect(view.queryByText('一些日子')).toBeNull();
+    await act(async () => {
+      settle(new Error('failed'));
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-preview-retry')).toBeTruthy();
+    });
+    expect(view.queryByTestId('life-album-preview-page')).toBeNull();
+    expect(view.queryByText('一些日子')).toBeNull();
   });
 });

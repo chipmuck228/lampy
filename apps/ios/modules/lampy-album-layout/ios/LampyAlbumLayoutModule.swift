@@ -80,14 +80,18 @@ private func measureText(text: String, fontName: String, sizePt: Double, lineHei
       utf16End = min(utf16Count, utf16Start + 1)
     }
     let line = CTTypesetterCreateLine(typesetter, CFRange(location: utf16Start, length: utf16End - utf16Start))
-    let bounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
+    var ascent: CGFloat = 0
+    var descent: CGFloat = 0
+    var leading: CGFloat = 0
+    let advance = CTLineGetTypographicBounds(line, &ascent, &descent, &leading)
     let startScalar = map[min(utf16Start, map.count - 1)]
     let endScalar = map[min(utf16End, map.count - 1)]
     lines.append([
       "start": Double(startScalar),
       "end": Double(max(endScalar, startScalar)),
-      "widthPt": Double(bounds.width),
+      "widthPt": Double(advance),
       "heightPt": lineHeightPt,
+      "ascentPt": Double(ascent),
     ])
     utf16Start = utf16End
   }

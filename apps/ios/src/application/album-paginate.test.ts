@@ -1,7 +1,7 @@
 import type { AlbumLayoutInput } from './album-layout-input';
 import { albumLayoutIntegrity } from './album-layout-integrity';
 import { paginateAlbumLayout } from './album-paginate';
-import { createGlyphWidthMeasurer } from './album-text-measure';
+import { createGlyphWidthMeasurer, spaceForWrappedChunk } from './album-text-measure';
 import { albumCodePointLength } from './album-unicode';
 import type { LifeAlbum } from './life-album';
 
@@ -244,5 +244,43 @@ describe('album layout pagination', () => {
     expect(layout.pages[0].blocks.some((block) => block.kind === 'cover-name')).toBe(true);
     expect(layout.pages.some((page) => page.blocks.some((block) => block.kind === 'opening'))).toBe(false);
     expect(layout.pages[layout.pages.length - 1].blocks.some((block) => block.kind === 'close')).toBe(true);
+  });
+
+  it('keeps a continued date with at least one body line inside the page', async () => {
+    expect(
+      spaceForWrappedChunk({ remainingPt: 50, lineHeightPt: 32, continuedHeightPt: 22 }).commit,
+    ).toBe(true);
+    expect(
+      spaceForWrappedChunk({ remainingPt: 80, lineHeightPt: 32, continuedHeightPt: 22 }).commit,
+    ).toBe(false);
+    const note = '春日庭院里的风，还要再写一段。'.repeat(40);
+    const fixture = input([ready({ momentId: 'm1', note })]);
+    const layout = await paginateAlbumLayout(fixture, measurer, {
+      generatedAt: '2026-10-04T00:00:00.000Z',
+      timezone: clock,
+    });
+    expect(albumLayoutIntegrity(layout, fixture)).toEqual({ ok: true });
+    for (const page of layout.pages) {
+      const continued = page.blocks.find((block) => block.kind === 'day-rule' && block.continued);
+      if (!continued || continued.kind !== 'day-rule') continue;
+      const notes = page.blocks.filter((block) => block.kind === 'note');
+      expect(notes.length).toBeGreaterThan(0);
+      expect(continued.box.yPt + continued.box.heightPt).toBeLessThanOrEqual(511 + 40);
+      expect(notes[0].box.yPt).toBeGreaterThanOrEqual(continued.box.yPt + continued.box.heightPt - 0.5);
+    }
+  });
+
+  it('records typographic width and baseline on placed lines', async () => {
+    const fixture = input([ready({ momentId: 'm1', note: 'Hello，世界。😀  punctuation: “引号”' })]);
+    const layout = await paginateAlbumLayout(fixture, measurer, {
+      generatedAt: '2026-10-04T00:00:00.000Z',
+      timezone: clock,
+    });
+    const note = layout.pages.flatMap((page) => page.blocks).find((block) => block.kind === 'note');
+    expect(note?.kind).toBe('note');
+    if (note?.kind === 'note') {
+      expect(note.lines[0].baselineYPt).toBeGreaterThan(note.lines[0].yPt);
+      expect(note.lines[0].widthPt).toBeGreaterThan(0);
+    }
   });
 });

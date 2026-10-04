@@ -31,7 +31,7 @@ import {
   type AlbumTextLine,
 } from './album-layout';
 import type { AlbumLayoutInput, AlbumLayoutRecordInput } from './album-layout-input';
-import { albumBodyRole, albumCoverRole, albumDateRole, albumMetaRole, type AlbumTextMeasurer } from './album-text-measure';
+import { albumBodyRole, albumCoverRole, albumDateRole, albumMetaRole, spaceForWrappedChunk, type AlbumTextMeasurer } from './album-text-measure';
 import { albumSliceCodePoints } from './album-unicode';
 import type { LifeAlbum } from './life-album';
 
@@ -144,26 +144,42 @@ export async function paginateAlbumLayout(
     let cursor = 0;
     let firstChunk = true;
     while (cursor < measured.length) {
-      startPageIfNeeded(role.lineHeightPt);
-      if (kind === 'note' && !firstChunk && extra.momentId) {
-        const continued = blocks.find((block) => block.kind === 'day-rule');
-        if (!continued && printedDateKey) {
-          const label = `${printedDateLabel ?? printedDateKey} · ${ALBUM_CONTINUED}`;
-          place(
-            {
-              kind: 'day-rule',
-              momentId: extra.momentId,
-              dateKey: printedDateKey,
-              text: label,
-              continued: true,
-              box: { xPt: CONTENT_LEFT, yPt: y, widthPt: ALBUM_CONTENT_WIDTH_PT, heightPt: albumDateRole.lineHeightPt },
-            },
-            albumDateRole.lineHeightPt,
-          );
-        }
+      const needsContinued = kind === 'note' && !firstChunk && !!extra.momentId && !!printedDateKey;
+      const continuedHeight = needsContinued ? albumDateRole.lineHeightPt : 0;
+      if (
+        blocks.length > 0 &&
+        spaceForWrappedChunk({
+          remainingPt: remaining(),
+          lineHeightPt: role.lineHeightPt,
+          continuedHeightPt: blocks.some((block) => block.kind === 'day-rule') ? 0 : continuedHeight,
+        }).commit
+      ) {
+        commitPage();
       }
-      const room = Math.max(1, Math.floor(remaining() / role.lineHeightPt));
-      const take = Math.min(room, measured.length - cursor);
+      if (needsContinued && extra.momentId && printedDateKey && !blocks.some((block) => block.kind === 'day-rule')) {
+        if (remaining() < albumDateRole.lineHeightPt + role.lineHeightPt) commitPage();
+        blocks.push({
+          kind: 'day-rule',
+          momentId: extra.momentId,
+          dateKey: printedDateKey,
+          text: `${printedDateLabel ?? printedDateKey} · ${ALBUM_CONTINUED}`,
+          continued: true,
+          box: { xPt: CONTENT_LEFT, yPt: y, widthPt: ALBUM_CONTENT_WIDTH_PT, heightPt: albumDateRole.lineHeightPt },
+        });
+        y += albumDateRole.lineHeightPt;
+      }
+      if (remaining() < role.lineHeightPt) {
+        if (blocks.length > 0) commitPage();
+      }
+      const room = Math.floor(remaining() / role.lineHeightPt);
+      const take = Math.min(Math.max(room, 0), measured.length - cursor);
+      if (take < 1) {
+        if (blocks.length > 0) {
+          commitPage();
+          continue;
+        }
+        break;
+      }
       const chunk = measured.slice(cursor, cursor + take);
       const start = chunk[0].start;
       const end = chunk[chunk.length - 1].end;
@@ -175,6 +191,7 @@ export async function paginateAlbumLayout(
         yPt: y + index * role.lineHeightPt,
         widthPt: line.widthPt,
         heightPt: line.heightPt,
+        baselineYPt: y + index * role.lineHeightPt + line.ascentPt,
       }));
       const height = take * role.lineHeightPt;
       const box = { xPt: CONTENT_LEFT, yPt: y, widthPt: ALBUM_CONTENT_WIDTH_PT, heightPt: height };

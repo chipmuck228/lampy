@@ -41,7 +41,7 @@
 | 项 | 状态 |
 | --- | --- |
 | Jest / tsc / lint | 本 PR 跑 |
-| Core Text 真机测量 | **未验证**（需 `expo run:ios` 装入本模块；Metro 热更新不算） |
+| Core Text 真机测量 | 隔离模拟器 `Lampy-guide-isol` 已 `expo run:ios` 装入 `LampyAlbumLayout`（Build Succeeded）。整册夹具走查与 PDF 同版仍待记 |
 | 隔离夹具整册预览实拍 | **未验证**（WALK-C 设备 PASS 另记，不写 Liuz17） |
 | 隔离 PDF 探针页对照 | **NOT VERIFIED**（系统字体不嵌入；无用户导出按钮） |
 

@@ -13,29 +13,29 @@ describe('album unicode scalars', () => {
 });
 
 describe('album layout request generations', () => {
-  it('drops a late result after the target album or generation changes', () => {
+  it('drops a late result after the target album or request changes', () => {
     expect(
       shouldApplyAlbumLayoutResult({
         albumId: 'b',
         requestAlbumId: 'a',
-        generation: 1,
-        currentGeneration: 1,
+        requestId: 1,
+        current: { albumId: 'b', requestId: 1 },
       }),
     ).toBe(false);
     expect(
       shouldApplyAlbumLayoutResult({
         albumId: 'a',
         requestAlbumId: 'a',
-        generation: 1,
-        currentGeneration: 2,
+        requestId: 1,
+        current: { albumId: 'a', requestId: 2 },
       }),
     ).toBe(false);
     expect(
       shouldApplyAlbumLayoutResult({
         albumId: 'a',
         requestAlbumId: 'a',
-        generation: 2,
-        currentGeneration: 2,
+        requestId: 2,
+        current: { albumId: 'a', requestId: 2 },
       }),
     ).toBe(true);
   });
