@@ -13,6 +13,15 @@ public final class LampyAlbumLayoutModule: Module {
     AsyncFunction("writeProbePdf") { (layoutJson: String, mediaJson: String, destPath: String) -> [String: Any] in
       try writeProbePdf(layoutJson: layoutJson, mediaJson: mediaJson, destPath: destPath)
     }
+
+    View(AlbumPageView.self) {
+      Prop("pageJson") { (view: AlbumPageView, json: String) in
+        view.pageJson = json
+      }
+      Prop("mediaJson") { (view: AlbumPageView, json: String) in
+        view.mediaJson = json
+      }
+    }
   }
 }
 
@@ -106,13 +115,7 @@ private func writeProbePdf(layoutJson: String, mediaJson: String, destPath: Stri
   else {
     throw NSError(domain: "LampyAlbumLayout", code: 1, userInfo: [NSLocalizedDescriptionKey: "invalid layout json"])
   }
-  let media: [String: String]
-  if let mediaData = mediaJson.data(using: .utf8),
-     let parsed = try JSONSerialization.jsonObject(with: mediaData) as? [String: String] {
-    media = parsed
-  } else {
-    media = [:]
-  }
+  let media = parseAlbumMedia(mediaJson)
   let pageWidth = CGFloat((layout["pageSize"] as? [String: Any])?["widthPt"] as? Double ?? 420)
   let pageHeight = CGFloat((layout["pageSize"] as? [String: Any])?["heightPt"] as? Double ?? 595)
   let bounds = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
@@ -120,49 +123,7 @@ private func writeProbePdf(layoutJson: String, mediaJson: String, destPath: Stri
   let data = renderer.pdfData { context in
     for page in pages {
       context.beginPage()
-      UIColor(red: 0xf3 / 255, green: 0xf0 / 255, blue: 0xe9 / 255, alpha: 1).setFill()
-      context.cgContext.fill(bounds)
-      let blocks = page["blocks"] as? [[String: Any]] ?? []
-      for block in blocks {
-        let box = block["box"] as? [String: Any] ?? [:]
-        let x = CGFloat(box["xPt"] as? Double ?? 0)
-        let y = CGFloat(box["yPt"] as? Double ?? 0)
-        let width = CGFloat(box["widthPt"] as? Double ?? 0)
-        let height = CGFloat(box["heightPt"] as? Double ?? 0)
-        let kind = block["kind"] as? String ?? ""
-        if kind == "image" || kind == "cover-image" {
-          let assetId = block["assetId"] as? String ?? ""
-          if let path = media[assetId], let image = UIImage(contentsOfFile: path.replacingOccurrences(of: "file://", with: "")) {
-            image.draw(in: CGRect(x: x, y: y, width: width, height: height))
-          } else {
-            UIColor(white: 0.9, alpha: 1).setFill()
-            context.cgContext.fill(CGRect(x: x, y: y, width: width, height: height))
-          }
-          continue
-        }
-        let fontName = (kind == "cover-name" || kind == "note" || kind == "opening" || kind == "close") ? "Songti SC" : "PingFang SC"
-        let size = kind == "cover-name" ? 28.0 : kind == "note" || kind == "opening" || kind == "close" ? 17.0 : 15.0
-        let font = resolveFont(name: fontName, size: CGFloat(size))
-        if let lines = block["lines"] as? [[String: Any]], let text = block["text"] as? String, !lines.isEmpty {
-          for line in lines {
-            let start = Int(line["start"] as? Double ?? 0)
-            let end = Int(line["end"] as? Double ?? 0)
-            let lineX = CGFloat(line["xPt"] as? Double ?? x)
-            let lineY = CGFloat(line["yPt"] as? Double ?? y)
-            let slice = sliceScalars(text, start: start, end: end)
-            (slice as NSString).draw(
-              at: CGPoint(x: lineX, y: lineY),
-              withAttributes: [.font: font, .foregroundColor: UIColor(red: 0x25 / 255, green: 0x23 / 255, blue: 0x1f / 255, alpha: 1)]
-            )
-          }
-        } else {
-          let text = (block["text"] as? String) ?? (block["label"] as? String) ?? (block["value"] as? String) ?? ""
-          (text as NSString).draw(
-            in: CGRect(x: x, y: y, width: width, height: height),
-            withAttributes: [.font: font, .foregroundColor: UIColor(red: 0x25 / 255, green: 0x23 / 255, blue: 0x1f / 255, alpha: 1)]
-          )
-        }
-      }
+      drawAlbumPage(page: page, media: media, in: context.cgContext, bounds: bounds)
     }
   }
   let url = URL(fileURLWithPath: destPath)
@@ -176,9 +137,176 @@ private func writeProbePdf(layoutJson: String, mediaJson: String, destPath: Stri
   ]
 }
 
-private func sliceScalars(_ text: String, start: Int, end: Int) -> String {
+private func albumPaperColor() -> UIColor {
+  UIColor(red: 0xf3 / 255, green: 0xf0 / 255, blue: 0xe9 / 255, alpha: 1)
+}
+
+private func albumInkColor() -> UIColor {
+  UIColor(red: 0x25 / 255, green: 0x23 / 255, blue: 0x1f / 255, alpha: 1)
+}
+
+private func albumSageColor() -> UIColor {
+  UIColor(red: 0x53 / 255, green: 0x60 / 255, blue: 0x4f / 255, alpha: 1)
+}
+
+private func albumInkSoftColor() -> UIColor {
+  UIColor(red: 0x5c / 255, green: 0x58 / 255, blue: 0x51 / 255, alpha: 1)
+}
+
+private func sliceAlbumScalars(_ text: String, start: Int, end: Int) -> String {
   let scalars = Array(text.unicodeScalars)
   let lo = max(0, min(start, scalars.count))
   let hi = max(lo, min(end, scalars.count))
   return String(String.UnicodeScalarView(scalars[lo..<hi]))
 }
+
+private func drawAlbumTextAtBaseline(
+  text: String,
+  font: UIFont,
+  color: UIColor,
+  x: CGFloat,
+  baselineY: CGFloat,
+  in context: CGContext
+) {
+  if text.isEmpty { return }
+  let attributed = NSAttributedString(
+    string: text,
+    attributes: [.font: font, .foregroundColor: color]
+  )
+  let line = CTLineCreateWithAttributedString(attributed)
+  context.saveGState()
+  context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
+  context.textPosition = CGPoint(x: x, y: -baselineY)
+  CTLineDraw(line, context)
+  context.restoreGState()
+}
+
+private func albumFontForKind(_ kind: String) -> (name: String, size: CGFloat, color: UIColor) {
+  switch kind {
+  case "cover-name":
+    return ("Songti SC", 28, albumInkColor())
+  case "note", "opening", "close":
+    return ("Songti SC", 17, albumInkColor())
+  case "day-rule":
+    return ("PingFang SC", 15, albumSageColor())
+  default:
+    return ("PingFang SC", 15, albumInkSoftColor())
+  }
+}
+
+private func parseAlbumMedia(_ mediaJson: String) -> [String: String] {
+  guard
+    let mediaData = mediaJson.data(using: .utf8),
+    let parsed = try? JSONSerialization.jsonObject(with: mediaData) as? [String: String]
+  else {
+    return [:]
+  }
+  return parsed
+}
+
+private func drawAlbumPage(page: [String: Any], media: [String: String], in context: CGContext, bounds: CGRect) {
+  albumPaperColor().setFill()
+  context.fill(bounds)
+  let blocks = page["blocks"] as? [[String: Any]] ?? []
+  for block in blocks {
+    let box = block["box"] as? [String: Any] ?? [:]
+    let x = CGFloat(box["xPt"] as? Double ?? 0)
+    let y = CGFloat(box["yPt"] as? Double ?? 0)
+    let width = CGFloat(box["widthPt"] as? Double ?? 0)
+    let height = CGFloat(box["heightPt"] as? Double ?? 0)
+    let kind = block["kind"] as? String ?? ""
+    if kind == "image" || kind == "cover-image" {
+      let assetId = block["assetId"] as? String ?? ""
+      let path = (media[assetId] ?? "").replacingOccurrences(of: "file://", with: "")
+      if let image = UIImage(contentsOfFile: path) {
+        image.draw(in: CGRect(x: x, y: y, width: width, height: height))
+      } else {
+        UIColor(white: 0.9, alpha: 1).setFill()
+        context.fill(CGRect(x: x, y: y, width: width, height: height))
+        let missingFont = resolveFont(name: "PingFang SC", size: 15)
+        drawAlbumTextAtBaseline(
+          text: "这张照片现在看不到。",
+          font: missingFont,
+          color: albumInkSoftColor(),
+          x: x + 8,
+          baselineY: y + missingFont.ascender,
+          in: context
+        )
+      }
+      continue
+    }
+    if kind == "feeling" {
+      let value = block["value"] as? String ?? ""
+      albumSageColor().setFill()
+      context.fillEllipse(in: CGRect(x: x, y: y + 7, width: 8, height: 8))
+      let spec = albumFontForKind(kind)
+      let font = resolveFont(name: spec.name, size: spec.size)
+      drawAlbumTextAtBaseline(
+        text: value,
+        font: font,
+        color: spec.color,
+        x: x + 16,
+        baselineY: y + font.ascender,
+        in: context
+      )
+      continue
+    }
+    let spec = albumFontForKind(kind)
+    let font = resolveFont(name: spec.name, size: spec.size)
+    if let lines = block["lines"] as? [[String: Any]], let text = block["text"] as? String, !lines.isEmpty {
+      for line in lines {
+        let start = Int(line["start"] as? Double ?? 0)
+        let end = Int(line["end"] as? Double ?? 0)
+        let lineX = CGFloat(line["xPt"] as? Double ?? x)
+        let baseline = CGFloat(line["baselineYPt"] as? Double ?? Double(y) + Double(font.ascender))
+        let slice = sliceAlbumScalars(text, start: start, end: end)
+        drawAlbumTextAtBaseline(text: slice, font: font, color: spec.color, x: lineX, baselineY: baseline, in: context)
+      }
+    } else {
+      let text = (block["text"] as? String)
+        ?? (block["label"] as? String)
+        ?? (block["value"] as? String)
+        ?? ""
+      drawAlbumTextAtBaseline(
+        text: text,
+        font: font,
+        color: spec.color,
+        x: x,
+        baselineY: y + font.ascender,
+        in: context
+      )
+    }
+  }
+}
+
+final class AlbumPageView: ExpoView {
+  var pageJson = "" {
+    didSet { setNeedsDisplay() }
+  }
+  var mediaJson = "" {
+    didSet { setNeedsDisplay() }
+  }
+
+  required init(appContext: AppContext?) {
+    super.init(appContext: appContext)
+    isOpaque = true
+    isUserInteractionEnabled = false
+    backgroundColor = albumPaperColor()
+    contentMode = .redraw
+  }
+
+  override func draw(_ rect: CGRect) {
+    guard let context = UIGraphicsGetCurrentContext() else { return }
+    guard
+      let data = pageJson.data(using: .utf8),
+      let page = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      albumPaperColor().setFill()
+      context.fill(rect)
+      return
+    }
+    drawAlbumPage(page: page, media: parseAlbumMedia(mediaJson), in: context, bounds: bounds)
+  }
+}
+
+

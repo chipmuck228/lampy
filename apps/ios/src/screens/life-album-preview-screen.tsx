@@ -32,7 +32,13 @@ import {
   type AlbumPlacedBlock,
 } from '../application/album-layout';
 import type { AlbumLayoutMediaMap } from '../application/album-layout-input';
-import { shouldApplyAlbumLayoutResult } from '../application/album-layout-request';
+import {
+  abandonAlbumPreviewAttempt,
+  shouldApplyAlbumLayoutResult,
+  shouldContinueAlbumPreviewLoad,
+  startAlbumPreviewPageAttempt,
+  type AlbumPreviewPageAttempt,
+} from '../application/album-layout-request';
 import { albumSliceCodePoints } from '../application/album-unicode';
 import { ALBUM_RETRY } from '../application/life-album';
 import { feelingAccentColor } from '../application/feeling-accent';
@@ -43,8 +49,12 @@ import { Text, type } from './life-text';
 import { LifeIcon } from './life-icons';
 import { SettingsPage } from './settings-chrome';
 import { useRecentClipPlayback } from './use-recent-clip-playback';
+import { requireAlbumNativePageView } from '../../modules/lampy-album-layout';
 
 const MIN_HIT = 48;
+const NativeAlbumPageView = requireAlbumNativePageView() as
+  | import('react').ComponentType<{ pageJson: string; mediaJson: string; style?: object }>
+  | null;
 
 export default function LifeAlbumPreviewScreen() {
   const router = useRouter();
@@ -62,84 +72,100 @@ export default function LifeAlbumPreviewScreen() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const signal = useRef({ cancelled: false });
-  const currentRequest = useRef<{ albumId: string; requestId: number } | null>(null);
+  const pageSeq = useRef(0);
+  const attempt = useRef<AlbumPreviewPageAttempt | null>(null);
 
   const blocked = !!lock?.snapshot.locked;
   const showPage = !!layout && !loading && !error && !blocked && layout.albumId === albumId;
 
+  const cancelOwnedRequest = useCallback((requestId: number | null) => {
+    if (requestId == null) return;
+    void getUseCases().then((app) => app.cancelAlbumLayout(requestId));
+  }, []);
+
   const load = useCallback(() => {
+    const previousId = abandonAlbumPreviewAttempt(attempt.current);
+    attempt.current = null;
+    cancelOwnedRequest(previousId);
     if (!albumId || blocked) {
-      currentRequest.current = null;
       setLayout(null);
       setMedia({});
       setError(null);
       setLoading(false);
       return;
     }
-    signal.current = { cancelled: false };
+    pageSeq.current += 1;
+    const seq = pageSeq.current;
+    const next = startAlbumPreviewPageAttempt(albumId, seq);
+    attempt.current = next;
     setLayout(null);
     setMedia({});
     setPage(0);
     setZoom(1);
     setError(null);
     setLoading(true);
-    void getUseCases()
-      .then(async (app) => {
-        const began = app.beginAlbumLayout(albumId);
-        currentRequest.current = began;
-        try {
-          const result = await app.generateAlbumLayout(albumId, {
-            signal: signal.current,
-            requestId: began.requestId,
-            privateUnlocked: true,
-          });
-          if (
-            signal.current.cancelled ||
-            !shouldApplyAlbumLayoutResult({
-              albumId,
-              requestAlbumId: result.layout.albumId,
-              requestId: result.requestId,
-              current: currentRequest.current,
-            })
-          ) {
-            return;
-          }
-          setLayout(result.layout);
-          setMedia(result.media);
-          setPage(0);
-          setLoading(false);
-        } catch (caught) {
-          if (
-            signal.current.cancelled ||
-            !shouldApplyAlbumLayoutResult({
-              albumId,
-              requestAlbumId: albumId,
-              requestId: began.requestId,
-              current: currentRequest.current,
-            })
-          ) {
-            return;
-          }
-          if (isApplicationError(caught) && caught.code === ALBUM_LAYOUT_CANCELLED) return;
-          setLayout(null);
-          setMedia({});
-          setLoading(false);
-          setError(isApplicationError(caught) ? caught.message : ALBUM_PREVIEW_FAILED);
+    void getUseCases().then(async (app) => {
+      if (!shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current })) {
+        return;
+      }
+      const began = app.beginAlbumLayout(albumId);
+      if (!shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current })) {
+        app.cancelAlbumLayout(began.requestId);
+        return;
+      }
+      next.requestId = began.requestId;
+      try {
+        const result = await app.generateAlbumLayout(albumId, {
+          signal: next.signal,
+          requestId: began.requestId,
+          privateUnlocked: true,
+        });
+        if (
+          !shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current }) ||
+          !shouldApplyAlbumLayoutResult({
+            albumId,
+            requestAlbumId: result.layout.albumId,
+            requestId: result.requestId,
+            current: { albumId, requestId: began.requestId },
+          })
+        ) {
+          return;
         }
-      });
-  }, [albumId, blocked]);
+        setLayout(result.layout);
+        setMedia(result.media);
+        setPage(0);
+        setLoading(false);
+      } catch (caught) {
+        if (
+          !shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current }) ||
+          !shouldApplyAlbumLayoutResult({
+            albumId,
+            requestAlbumId: albumId,
+            requestId: began.requestId,
+            current: { albumId, requestId: began.requestId },
+          })
+        ) {
+          return;
+        }
+        if (isApplicationError(caught) && caught.code === ALBUM_LAYOUT_CANCELLED) return;
+        setLayout(null);
+        setMedia({});
+        setLoading(false);
+        setError(isApplicationError(caught) ? caught.message : ALBUM_PREVIEW_FAILED);
+      }
+    });
+  }, [albumId, blocked, cancelOwnedRequest]);
 
   useFocusEffect(
     useCallback(() => {
       load();
       return () => {
-        signal.current.cancelled = true;
-        currentRequest.current = null;
+        const owned = abandonAlbumPreviewAttempt(attempt.current);
+        attempt.current = null;
         void pauseRef.current();
-        void getUseCases().then((app) => app.cancelAlbumLayout());
+        cancelOwnedRequest(owned);
       };
-    }, [load]),
+    }, [load, cancelOwnedRequest]),
   );
 
   useEffect(() => {
@@ -187,9 +213,9 @@ export default function LifeAlbumPreviewScreen() {
           accessibilityLabel={ALBUM_PREVIEW_CANCEL}
           testID="life-album-preview-cancel"
           onPress={() => {
-            signal.current.cancelled = true;
-            currentRequest.current = null;
-            void getUseCases().then((app) => app.cancelAlbumLayout());
+            const owned = abandonAlbumPreviewAttempt(attempt.current);
+            attempt.current = null;
+            cancelOwnedRequest(owned);
             router.back();
           }}
           style={styles.hit}
@@ -223,14 +249,22 @@ export default function LifeAlbumPreviewScreen() {
                     transformOrigin: 'top left',
                   }}
                 >
-                  {current.blocks.map((block, index) => (
-                    <AlbumBlockView
-                      key={`${block.kind}-${index}`}
-                      block={block}
-                      media={media}
-                      playing={block.kind === 'audio' ? clips.card(block.assetId).status === 'playing' : false}
+                  {NativeAlbumPageView ? (
+                    <NativeAlbumPageView
+                      pageJson={JSON.stringify(current)}
+                      mediaJson={JSON.stringify(media)}
+                      style={{ width: 420, height: 595 }}
                     />
-                  ))}
+                  ) : (
+                    current.blocks.map((block, index) => (
+                      <AlbumBlockView
+                        key={`${block.kind}-${index}`}
+                        block={block}
+                        media={media}
+                        playing={block.kind === 'audio' ? clips.card(block.assetId).status === 'playing' : false}
+                      />
+                    ))
+                  )}
                 </View>
                 {current.blocks.map((block, index) => {
                   if (block.kind !== 'audio') return null;
@@ -369,6 +403,8 @@ function AlbumBlockView({
           <Text style={spec}>{block.value}</Text>
         </View>
       ) : 'lines' in block && block.lines.length ? (
+        // Jest / native-view-missing only. Device preview draws with Core Text at baselineYPt.
+        // RN Text at yPt is not evidence that the face or baseline matches measurement.
         block.lines.map((line, index) => (
           <Text
             key={`${block.kind}-${index}`}

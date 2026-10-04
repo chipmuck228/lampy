@@ -54,6 +54,7 @@ export function createAlbumLayoutUseCases(deps: {
   };
   const cache = new Map<string, CacheEntry>();
   let generation = 0;
+  const cancelledIds = new Set<number>();
 
   function assertUnlocked(privateUnlocked?: boolean) {
     if (privateUnlocked === false) {
@@ -75,7 +76,7 @@ export function createAlbumLayoutUseCases(deps: {
   }
 
   function assertCurrent(requestId: number, signal?: { cancelled: boolean }) {
-    if (signal?.cancelled || requestId !== generation) {
+    if (signal?.cancelled || cancelledIds.has(requestId) || requestId !== generation) {
       throw new ApplicationError(ALBUM_LAYOUT_CANCELLED, ALBUM_PREVIEW_FAILED);
     }
   }
@@ -133,8 +134,12 @@ export function createAlbumLayoutUseCases(deps: {
     cache.delete(albumId);
   }
 
-  function cancelAlbumLayout() {
-    generation += 1;
+  function cancelAlbumLayout(requestId?: number) {
+    if (requestId == null) {
+      generation += 1;
+      return;
+    }
+    cancelledIds.add(requestId);
   }
 
   return {

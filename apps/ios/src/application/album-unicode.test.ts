@@ -1,5 +1,5 @@
 import { albumSliceCodePoints, albumCodePointLength } from './album-unicode';
-import { shouldApplyAlbumLayoutResult } from './album-layout-request';
+import { shouldApplyAlbumLayoutResult, startAlbumPreviewPageAttempt, abandonAlbumPreviewAttempt, shouldContinueAlbumPreviewLoad } from './album-layout-request';
 import { albumPdfProbeVerdict, compareAlbumPdfProbe } from './album-pdf-probe';
 import { canOpenAlbumPreview, ALBUM_LAYOUT_VERSION, ALBUM_PAGE_HEIGHT_PT, ALBUM_PAGE_WIDTH_PT, type AlbumLayout } from './album-layout';
 
@@ -38,6 +38,30 @@ describe('album layout request generations', () => {
         current: { albumId: 'a', requestId: 2 },
       }),
     ).toBe(true);
+  });
+
+  it('drops a delayed service fetch after switch or cancel-reopen before begin', () => {
+    const first = startAlbumPreviewPageAttempt('album_a', 1);
+    const second = startAlbumPreviewPageAttempt('album_b', 2);
+    expect(
+      shouldContinueAlbumPreviewLoad({ seq: 1, albumId: 'album_a', current: second }),
+    ).toBe(false);
+    expect(
+      shouldContinueAlbumPreviewLoad({ seq: 2, albumId: 'album_b', current: second }),
+    ).toBe(true);
+    expect(abandonAlbumPreviewAttempt(first)).toBeNull();
+    expect(
+      shouldContinueAlbumPreviewLoad({ seq: 1, albumId: 'album_a', current: first }),
+    ).toBe(false);
+    const reopened = startAlbumPreviewPageAttempt('album_a', 3);
+    expect(
+      shouldContinueAlbumPreviewLoad({ seq: 1, albumId: 'album_a', current: reopened }),
+    ).toBe(false);
+    expect(
+      shouldContinueAlbumPreviewLoad({ seq: 3, albumId: 'album_a', current: reopened }),
+    ).toBe(true);
+    first.requestId = 7;
+    expect(abandonAlbumPreviewAttempt(first)).toBe(7);
   });
 });
 

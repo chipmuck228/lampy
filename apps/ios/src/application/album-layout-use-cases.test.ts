@@ -81,7 +81,7 @@ describe('album layout generation races', () => {
       timezone: { timeZone: 'UTC' },
     });
     const first = useCases.beginAlbumLayout('album_1');
-    useCases.cancelAlbumLayout();
+    useCases.cancelAlbumLayout(first.requestId);
     const second = useCases.beginAlbumLayout('album_1');
     expect(second.requestId).toBeGreaterThan(first.requestId);
     await expect(
@@ -90,6 +90,43 @@ describe('album layout generation races', () => {
     await expect(
       useCases.generateAlbumLayout('album_1', { requestId: second.requestId }),
     ).resolves.toEqual(expect.objectContaining({ requestId: second.requestId, layout: expect.objectContaining({ albumId: 'album_1' }) }));
+  });
+
+  it('does not cancel a later request when an earlier one is abandoned', async () => {
+    const { moments } = createMemoryRepositories();
+    const albums = createMemoryLifeAlbumRepository();
+    const moment = seedActive('门口的风。');
+    await moments.save(moment);
+    await albums.insert({
+      id: 'album_1',
+      ownerId: 'local-user',
+      schemaVersion: 1,
+      name: '一些日子',
+      opening: null,
+      cover: { kind: 'words' },
+      createdAt: '2026-10-01T00:00:00.000Z',
+      updatedAt: '2026-10-01T00:00:00.000Z',
+    });
+    await albums.insertEntry({
+      albumId: 'album_1',
+      momentId: moment.id,
+      collectedAt: '2026-10-01T00:00:00.000Z',
+      sourceRevisionAtCollect: moment.revision,
+      sortOrder: 0,
+    });
+    const useCases = createAlbumLayoutUseCases({
+      albums,
+      moments,
+      ownerId: 'local-user',
+      measurer: createGlyphWidthMeasurer(),
+      timezone: { timeZone: 'UTC' },
+    });
+    const first = useCases.beginAlbumLayout('album_1');
+    const second = useCases.beginAlbumLayout('album_1');
+    useCases.cancelAlbumLayout(first.requestId);
+    await expect(
+      useCases.generateAlbumLayout('album_1', { requestId: second.requestId }),
+    ).resolves.toEqual(expect.objectContaining({ requestId: second.requestId }));
   });
 
   it('fails when the source revision changes between reads', async () => {

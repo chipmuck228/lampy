@@ -11,6 +11,19 @@ const mockPlay = jest.fn(async () => undefined);
 const mockPause = jest.fn(async () => undefined);
 const mockCard = jest.fn(() => ({ status: 'idle' as const, currentTimeMs: 0 }));
 const mockBack = jest.fn();
+const mockPreviewRoute = { id: 'album_1' };
+const mockUseCasesGate = {
+  delay: false,
+  pending: [] as ((value: unknown) => void)[],
+};
+
+function mockAlbumApp() {
+  return {
+    generateAlbumLayout: mockGenerate,
+    beginAlbumLayout: mockBegin,
+    cancelAlbumLayout: mockCancel,
+  };
+}
 
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -20,16 +33,17 @@ jest.mock('expo-router', () => {
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
     },
-    useLocalSearchParams: () => ({ id: 'album_1' }),
+    useLocalSearchParams: () => ({ id: mockPreviewRoute.id }),
   };
 });
 
 jest.mock('../application/container', () => ({
-  getUseCases: async () => ({
-    generateAlbumLayout: mockGenerate,
-    beginAlbumLayout: mockBegin,
-    cancelAlbumLayout: mockCancel,
-  }),
+  getUseCases: () => {
+    if (!mockUseCasesGate.delay) return Promise.resolve(mockAlbumApp());
+    return new Promise((resolve) => {
+      mockUseCasesGate.pending.push(resolve);
+    });
+  },
 }));
 
 jest.mock('./device-lock-context', () => ({
@@ -114,18 +128,21 @@ describe('life album preview screen', () => {
 
   beforeEach(() => {
     cleanup();
+    mockPreviewRoute.id = 'album_1';
+    mockUseCasesGate.delay = false;
+    mockUseCasesGate.pending = [];
     mockGenerate.mockReset();
     mockBegin.mockReset();
     mockCancel.mockReset();
     mockPlay.mockClear();
     mockPause.mockClear();
-    mockBegin.mockImplementation(() => ({ albumId: 'album_1', requestId: 7 }));
-    mockGenerate.mockResolvedValue({
-      layout,
+    mockBegin.mockImplementation((id: string) => ({ albumId: id, requestId: id === 'album_2' ? 8 : 7 }));
+    mockGenerate.mockImplementation(async (id: string) => ({
+      layout: { ...layout, albumId: id },
       media: { aud: 'file://documents/clip.m4a' },
       fingerprint: layout.sourceFingerprint,
-      requestId: 7,
-    });
+      requestId: id === 'album_2' ? 8 : 7,
+    }));
   });
 
   it('renders measured lines and does not autoplay audio', async () => {
@@ -174,5 +191,40 @@ describe('life album preview screen', () => {
     });
     expect(view.queryByTestId('life-album-preview-page')).toBeNull();
     expect(view.queryByText('一些日子')).toBeNull();
+  });
+
+  describe('delayed getUseCases', () => {
+    beforeEach(() => {
+      mockUseCasesGate.delay = true;
+      mockUseCasesGate.pending = [];
+    });
+
+    it('does not let a delayed getUseCases begin after the album changes', async () => {
+      const view = await render(wrap());
+      expect(mockBegin).not.toHaveBeenCalled();
+      expect(mockUseCasesGate.pending.length).toBeGreaterThan(0);
+      mockPreviewRoute.id = 'album_2';
+      view.rerender(wrap());
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(mockUseCasesGate.pending.length).toBeGreaterThanOrEqual(2);
+      const switchedFirst = mockUseCasesGate.pending[0];
+      const switchedSecond = mockUseCasesGate.pending[mockUseCasesGate.pending.length - 1];
+      await act(async () => {
+        switchedFirst(mockAlbumApp());
+        await Promise.resolve();
+      });
+      expect(mockBegin).not.toHaveBeenCalled();
+      await act(async () => {
+        switchedSecond(mockAlbumApp());
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(mockBegin).toHaveBeenCalledTimes(1);
+      });
+      expect(mockBegin).toHaveBeenCalledWith('album_2');
+      expect(mockCancel).not.toHaveBeenCalled();
+    });
   });
 });

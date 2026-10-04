@@ -42,6 +42,29 @@ export function albumLayoutNativeAvailable(): boolean {
   return typeof native?.measureText === 'function';
 }
 
+export function requireAlbumNativePageView(): unknown {
+  if (typeof process !== 'undefined' && process.env.JEST_WORKER_ID) {
+    return null;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const core = require('expo-modules-core') as {
+      requireNativeViewManager?: (moduleName: string, viewName?: string) => unknown;
+    };
+    return (
+      core.requireNativeViewManager?.('LampyAlbumLayout', 'AlbumPageView') ??
+      core.requireNativeViewManager?.('LampyAlbumLayout') ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function albumNativePageViewAvailable(): boolean {
+  return !!requireAlbumNativePageView();
+}
+
 export function measureTextNative(
   text: string,
   fontName: string,
