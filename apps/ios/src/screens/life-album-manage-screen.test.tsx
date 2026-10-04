@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LifeAlbumManageScreen from './life-album-manage-screen';
 
+const mockPush = jest.fn();
 const mockGetAlbum = jest.fn();
 const mockUpdate = jest.fn();
 const mockSetCover = jest.fn();
@@ -16,6 +17,7 @@ jest.mock('expo-router', () => {
   return {
     useRouter: () => ({
       dismissTo: jest.fn(),
+      push: mockPush,
     }),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
@@ -93,7 +95,7 @@ describe('life album manage screen', () => {
 
   beforeEach(() => {
     cleanup();
-    mockGetAlbum.mockReset();
+    mockPush.mockReset();
     mockUpdate.mockReset();
     mockSetCover.mockReset();
     mockMove.mockReset();
@@ -115,6 +117,9 @@ describe('life album manage screen', () => {
     expect(view.getByText('门口的风')).toBeTruthy();
     expect(view.getByText('2026年10月1日')).toBeTruthy();
     expect(view.getByText('有照片')).toBeTruthy();
+    expect(view.getByTestId('life-album-preview-open')).toBeTruthy();
+    fireEvent.press(view.getByTestId('life-album-preview-open'));
+    expect(mockPush).toHaveBeenCalledWith('/albums/album_1/preview');
   });
 
   it('keeps an unsaved opening after cover and rename', async () => {

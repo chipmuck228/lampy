@@ -66,5 +66,10 @@
     "family-identity:accept-test": "node --test ./scripts/family-identity-accept.test.cjs ./scripts/family-identity-volume.test.cjs",
     "prebuild:ios": "expo prebuild --platform ios --no-install"
   },
+  "expo": {
+    "autolinking": {
+      "nativeModulesDir": "./modules"
+    }
+  },
   "private": true
 }

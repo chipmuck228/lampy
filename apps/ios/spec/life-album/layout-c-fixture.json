@@ -1,0 +1,18 @@
+{
+  "note": "Synthetic isolation fixture for Phase C. Not personal library content. Glyph-width test-double pagination, not Core Text device measurement.",
+  "layoutVersion": "album-a5-v1",
+  "pageSize": { "widthPt": 420, "heightPt": 595 },
+  "unicodeUnit": "unicode-scalar",
+  "fontFaces": { "serif": "Songti SC", "ui": "PingFang SC" },
+  "coverage": [
+    "short note",
+    "same-day adjacent records",
+    "long Chinese wrapping across pages",
+    "emoji scalar",
+    "image audio unknown media once each",
+    "year month unknown time",
+    "source-gone vs source-unreadable",
+    "empty opening skipped",
+    "close page"
+  ]
+}

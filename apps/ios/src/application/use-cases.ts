@@ -39,7 +39,9 @@ import { formatSoundDuration } from './duration';
 import { ApplicationError, toApplicationError } from './errors';
 import { createHistoryUseCases } from './history-use-cases';
 import { createLifeAlbumUseCases } from './life-album-use-cases';
+import { createAlbumLayoutUseCases } from './album-layout-use-cases';
 import type { LifeAlbumRepository } from '../infrastructure/life-album-repository';
+import { createMemoryLifeAlbumRepository } from '../infrastructure/life-album-repository';
 import {
   projectOccurredChoice,
   resolveOccurredPatch,
@@ -316,6 +318,7 @@ export function createUseCases(deps: {
     deps.timezone ?? deps.timezoneOffsetMinutes ?? {
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     };
+  const albums = deps.albums ?? createMemoryLifeAlbumRepository();
   let restoreInFlight: Promise<ComposerViewModel> | null = null;
 
   async function loadAsset(assetId: string): Promise<AssetRecord | null> {
@@ -1142,13 +1145,22 @@ export function createUseCases(deps: {
       resolveUnknown,
     }),
     ...createLifeAlbumUseCases({
-      albums: deps.albums,
+      albums,
       moments: deps.moments,
       assets: deps.assets,
       media: deps.media,
       clock,
       ownerId,
       id: deps.albumId,
+      timezone: viewerClock,
+    }),
+    ...createAlbumLayoutUseCases({
+      albums,
+      moments: deps.moments,
+      assets: deps.assets,
+      media: deps.media,
+      ownerId,
+      clock,
       timezone: viewerClock,
     }),
     toApplicationError,

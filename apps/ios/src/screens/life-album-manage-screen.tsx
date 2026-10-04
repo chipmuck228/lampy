@@ -16,6 +16,11 @@ import {
   type AlbumCover,
   type AlbumManageView,
 } from '../application/life-album';
+import {
+  ALBUM_PREVIEW_ACTION,
+  ALBUM_PREVIEW_EMPTY,
+  canOpenAlbumPreview,
+} from '../application/album-layout';
 import { firstSearchParam } from './lookback-origin';
 import { hairline, ink, inkSoft, sage } from './life-page';
 import { Text, TextInput, type } from './life-text';
@@ -178,7 +183,19 @@ export default function LifeAlbumManageScreen() {
             }}
           />
           <Text style={styles.label}>收入的记录</Text>
-          {view.entries.length === 0 ? <Text style={styles.hint}>还没有收下记录。</Text> : null}
+          {canOpenAlbumPreview(view.entries.length) ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={ALBUM_PREVIEW_ACTION}
+              testID="life-album-preview-open"
+              onPress={() => router.push(`/albums/${albumId}/preview`)}
+              style={styles.hit}
+            >
+              <Text style={styles.action}>{ALBUM_PREVIEW_ACTION}</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.hint}>{ALBUM_PREVIEW_EMPTY}</Text>
+          )}
           {view.entries.map((entry, index) => {
             const moveUpDisabled = busy || index === 0;
             const moveDownDisabled = busy || index === view.entries.length - 1;
