@@ -47,7 +47,7 @@
 | 走查 JS／模块 SHA-256 | `life-album-preview-screen.tsx` `76683b96…e752`；`album-preview-speech.ts` `d3dd8243…25ff`；`album-layout.ts` `73551342…8ec8`；`album-paginate.ts` `1d786bb7…edf3`；`album-pdf-probe.ts` `2d3bc357…6487`；`lampy-album-layout/index.ts` `fbead984…e17a` |
 | 上述拼接 SHA-256 | `16975a75ed9be48611af7186392a74986033ce3811f271be5f8ade294c1d7c61` |
 | Swift SHA-256 | `LampyAlbumLayoutModule.swift` `18c2c0d9ea7c813abcf4213cd8015d5521af298404d5c0390aeacf0d0263ceb1` |
-| 完整 commit SHA | 见文末（推送后本地 / 远端 / PR head 应一致） |
+| 完整 commit SHA | `d48753c2c740531ad98717e098ed61a9fe28afda`（推送后本地 / 远端 / PR head 应一致；若有 SHA 回填提交则以其为准） |
 | 探针 | `__DEV__` `isol-album-c-layout.json` / `isol-album-c-fonts.json` / `isol-album-c-probe.pdf` / `isol-album-c-probe-meta.json` |
 
 ### 自动化
@@ -132,5 +132,5 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 | 项 | 值 |
 | --- | --- |
-| 完整 commit | （`git rev-parse HEAD` 推送后填入） |
+| 完整 commit | `d48753c2c740531ad98717e098ed61a9fe28afda`（主变更）；SHA 回填见后续 commit |
 | 本地 / 远端 / PR head | 推送后三者应一致 |
