@@ -1,6 +1,7 @@
 import type { AlbumCover } from './life-album';
 
-export const ALBUM_LAYOUT_VERSION = 'album-a5-v1' as const;
+/** Bumped when font resolve / measure / draw rules change so in-process cache and old probes invalidate. */
+export const ALBUM_LAYOUT_VERSION = 'album-a5-v2' as const;
 export const ALBUM_PAGE_WIDTH_PT = 420;
 export const ALBUM_PAGE_HEIGHT_PT = 595;
 export const ALBUM_MARGIN_TOP_PT = 40;
@@ -14,9 +15,9 @@ export const ALBUM_FILL_RATIO = 0.35;
 export const ALBUM_SERIF_FONT = 'Songti SC';
 export const ALBUM_UI_FONT = 'PingFang SC';
 export const ALBUM_SERIF_LICENSE =
-  'iOS 系统中文衬线 Songti SC / STSong（Apple 随系统授权，不可再分发嵌入授权外副本）';
+  '目标为 iOS 系统中文衬线 Songti SC / STSong（Apple 随系统授权；授权外副本不可再分发）。实际解析字体以设备 diagnoseFonts 为准；PDF 是否嵌入字形须查文件 /Font 资源，与许可是两件事。';
 export const ALBUM_UI_LICENSE =
-  'iOS 系统 UI 字体 PingFang SC（Apple 随系统授权，不可再分发嵌入授权外副本）';
+  '目标为 iOS 系统 UI 字体 PingFang SC（Apple 随系统授权；授权外副本不可再分发）。实际解析与 PDF 嵌入情况分别核实。';
 
 export const ALBUM_PREVIEW_ACTION = '看看这一册';
 export const ALBUM_PREVIEW_EMPTY = '先收下一条，也可以慢慢添。';
@@ -165,7 +166,27 @@ export type AlbumLayout = {
   pageSize: { widthPt: number; heightPt: number };
   margins: { topPt: number; rightPt: number; bottomPt: number; leftPt: number };
   fonts: AlbumFontSpec;
-  fontFaces: { serif: string; ui: string; serifLicense: string; uiLicense: string };
+  fontFaces: {
+    serif: string;
+    ui: string;
+    serifLicense: string;
+    uiLicense: string;
+    /** Populated when native diagnoseFonts runs; never invent Songti after system fallback. */
+    resolvedSerif?: {
+      requested: string;
+      familyName: string;
+      fontName: string;
+      matchedRequestedFamily: boolean;
+      usedSystemFallback: boolean;
+    };
+    resolvedUi?: {
+      requested: string;
+      familyName: string;
+      fontName: string;
+      matchedRequestedFamily: boolean;
+      usedSystemFallback: boolean;
+    };
+  };
   sourceFingerprint: AlbumSourceFingerprint;
   albumUpdatedAt: string;
   generatedAt: string;

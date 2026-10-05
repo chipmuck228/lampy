@@ -6,12 +6,42 @@ export type AlbumMeasuredLine = {
   ascentPt: number;
 };
 
+export type AlbumResolvedFontFace = {
+  requested: string;
+  familyName: string;
+  fontName: string;
+  matchedRequestedFamily: boolean;
+  usedSystemFallback: boolean;
+};
+
+export type AlbumFontDiagnosis = {
+  serif: AlbumResolvedFontFace;
+  ui: AlbumResolvedFontFace;
+  cover: AlbumResolvedFontFace;
+  availableRelatedFamilies: string[];
+  serifCoreTextRunFonts: { familyName: string; postScriptName: string }[];
+  probeSample: string;
+};
+
+export type AlbumPdfFontResource = {
+  baseFont: string;
+  subtype: string;
+  embedStream: 'FontFile' | 'FontFile2' | 'FontFile3' | 'none' | 'unknown' | string;
+};
+
 export type AlbumPdfProbeResult = {
   path: string;
   pageCount: number;
   bytes: number;
-  fontsEmbedded: boolean;
+  /** true only when every listed font resource has a concrete embed stream; null = unknown / not claimed */
+  fontsEmbedded: boolean | null;
   fontNames: string[];
+  fontResources?: AlbumPdfFontResource[];
+  preliminaryFontFileScan?: boolean;
+  resolvedDrawFonts?: {
+    serif: AlbumResolvedFontFace;
+    ui: AlbumResolvedFontFace;
+  };
 };
 
 type NativeModule = {
@@ -22,6 +52,7 @@ type NativeModule = {
     lineHeightPt: number,
     widthPt: number,
   ): AlbumMeasuredLine[];
+  diagnoseFonts?(): AlbumFontDiagnosis;
   writeProbePdf?(layoutJson: string, mediaJson: string, destPath: string): Promise<AlbumPdfProbeResult>;
 };
 
@@ -83,6 +114,12 @@ export function measureTextNative(
     heightPt: line.heightPt || lineHeightPt,
     ascentPt: line.ascentPt ?? sizePt * 0.8,
   }));
+}
+
+export function diagnoseAlbumFonts(): AlbumFontDiagnosis | null {
+  const native = loadNative();
+  if (!native?.diagnoseFonts) return null;
+  return native.diagnoseFonts();
 }
 
 export async function writeAlbumProbePdf(

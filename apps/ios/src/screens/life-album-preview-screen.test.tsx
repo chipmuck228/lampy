@@ -150,7 +150,7 @@ describe('life album preview screen', () => {
     await waitFor(() => {
       expect(view.getByTestId('life-album-preview-page')).toBeTruthy();
     });
-    expect(view.getByText('一些日子')).toBeTruthy();
+    expect(view.getByLabelText('一些日子')).toBeTruthy();
     expect(view.getByText('第1页，共2页')).toBeTruthy();
     expect(mockPlay).not.toHaveBeenCalled();
     await act(async () => {

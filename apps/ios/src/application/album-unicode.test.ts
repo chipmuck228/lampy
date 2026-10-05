@@ -102,5 +102,7 @@ describe('album pdf probe verdict', () => {
     expect(match.pageCount).toBe(true);
     expect(match.boxes).toBe(false);
     expect(albumPdfProbeVerdict({ fontsEmbedded: false }, match)).toBe('NOT VERIFIED');
+    expect(albumPdfProbeVerdict({ fontsEmbedded: null }, match)).toBe('NOT VERIFIED');
+    expect(albumPdfProbeVerdict({ fontsEmbedded: true }, match)).toBe('NOT VERIFIED');
   });
 });

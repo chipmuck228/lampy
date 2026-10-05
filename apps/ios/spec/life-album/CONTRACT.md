@@ -58,7 +58,7 @@ type AlbumEntry = {
 ```ts
 type AlbumLayout = {
   albumId: LifeAlbumId;
-  layoutVersion: string;        // 如 'album-a5-v1'；版本变了必须整份重排
+  layoutVersion: string;        // 如 'album-a5-v2'；版本变了必须整份重排
   pageSize: { widthPt: number; heightPt: number }; // 420 × 595
   fonts: AlbumFontSpec;
   sourceFingerprint: AlbumSourceFingerprint;

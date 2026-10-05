@@ -34,6 +34,28 @@ import type { AlbumLayoutInput, AlbumLayoutRecordInput } from './album-layout-in
 import { albumBodyRole, albumCoverRole, albumDateRole, albumMetaRole, spaceForWrappedChunk, type AlbumTextMeasurer } from './album-text-measure';
 import { albumSliceCodePoints } from './album-unicode';
 import type { LifeAlbum } from './life-album';
+import { diagnoseAlbumFonts } from '../../modules/lampy-album-layout';
+
+function albumResolvedFontFaces(): Pick<AlbumLayout['fontFaces'], 'resolvedSerif' | 'resolvedUi'> {
+  const diagnosis = diagnoseAlbumFonts();
+  if (!diagnosis) return {};
+  return {
+    resolvedSerif: {
+      requested: diagnosis.serif.requested,
+      familyName: diagnosis.serif.familyName,
+      fontName: diagnosis.serif.fontName,
+      matchedRequestedFamily: diagnosis.serif.matchedRequestedFamily,
+      usedSystemFallback: diagnosis.serif.usedSystemFallback,
+    },
+    resolvedUi: {
+      requested: diagnosis.ui.requested,
+      familyName: diagnosis.ui.familyName,
+      fontName: diagnosis.ui.fontName,
+      matchedRequestedFamily: diagnosis.ui.matchedRequestedFamily,
+      usedSystemFallback: diagnosis.ui.usedSystemFallback,
+    },
+  };
+}
 
 const CONTENT_TOP = ALBUM_MARGIN_TOP_PT;
 const CONTENT_LEFT = ALBUM_MARGIN_X_PT;
@@ -404,6 +426,7 @@ export async function paginateAlbumLayout(
       ui: ALBUM_UI_FONT,
       serifLicense: ALBUM_SERIF_LICENSE,
       uiLicense: ALBUM_UI_LICENSE,
+      ...albumResolvedFontFaces(),
     },
     sourceFingerprint: fingerprintFromInput(album, input),
     albumUpdatedAt: album.updatedAt,

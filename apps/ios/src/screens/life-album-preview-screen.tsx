@@ -39,6 +39,7 @@ import {
   startAlbumPreviewPageAttempt,
   type AlbumPreviewPageAttempt,
 } from '../application/album-layout-request';
+import { albumPreviewSpokenText } from '../application/album-preview-speech';
 import { albumSliceCodePoints } from '../application/album-unicode';
 import { ALBUM_RETRY } from '../application/life-album';
 import { feelingAccentColor } from '../application/feeling-accent';
@@ -53,7 +54,7 @@ import { requireAlbumNativePageView } from '../../modules/lampy-album-layout';
 
 const MIN_HIT = 48;
 const NativeAlbumPageView = requireAlbumNativePageView() as
-  | import('react').ComponentType<{ pageJson: string; mediaJson: string; style?: object }>
+  | import('react').ComponentType<{ pageJson: string; mediaJson: string; playingJson: string; style?: object }>
   | null;
 
 export default function LifeAlbumPreviewScreen() {
@@ -135,6 +136,45 @@ export default function LifeAlbumPreviewScreen() {
         setMedia(result.media);
         setPage(0);
         setLoading(false);
+        if (__DEV__) {
+          void (async () => {
+            try {
+              // Isolation probe only. Not product export or system share.
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              const FileSystem = require('expo-file-system/legacy') as {
+                documentDirectory: string | null;
+                writeAsStringAsync(uri: string, contents: string): Promise<void>;
+              };
+              const { diagnoseAlbumFonts, writeAlbumProbePdf } = await import('../../modules/lampy-album-layout');
+              const root = FileSystem.documentDirectory;
+              if (!root) return;
+              // Write layout first so a diagnose/PDF failure cannot leave a stale probe.
+              await FileSystem.writeAsStringAsync(`${root}isol-album-c-layout.json`, JSON.stringify(result.layout));
+              try {
+                const diagnosis = diagnoseAlbumFonts();
+                if (diagnosis) {
+                  await FileSystem.writeAsStringAsync(
+                    `${root}isol-album-c-fonts.json`,
+                    JSON.stringify(diagnosis),
+                  );
+                }
+              } catch {
+                // Font diagnosis must not block layout/PDF probes.
+              }
+              const probe = await writeAlbumProbePdf(
+                JSON.stringify(result.layout),
+                JSON.stringify(result.media),
+                `${root}isol-album-c-probe.pdf`.replace(/^file:\/\//, ''),
+              );
+              await FileSystem.writeAsStringAsync(
+                `${root}isol-album-c-probe-meta.json`,
+                JSON.stringify(probe),
+              );
+            } catch {
+              // Probe failure must not change preview.
+            }
+          })();
+        }
       } catch (caught) {
         if (
           !shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current }) ||
@@ -182,6 +222,10 @@ export default function LifeAlbumPreviewScreen() {
   const current = showPage ? layout?.pages[page] : undefined;
   const pageWidth = Math.max(120, Math.min(width - 32, ((height - 220) * 420) / 595));
   const scale = (pageWidth / 420) * zoom;
+  const playingAssetIds =
+    current?.blocks.flatMap((block) =>
+      block.kind === 'audio' && clips.card(block.assetId).status === 'playing' ? [block.assetId] : [],
+    ) ?? [];
 
   return (
     <SettingsPage
@@ -237,11 +281,13 @@ export default function LifeAlbumPreviewScreen() {
             <ScrollView scrollEnabled={zoom > 1} contentContainerStyle={{ width: 420 * scale, height: 595 * scale }}>
               <View
                 testID="life-album-preview-page"
-                accessibilityLabel={`第${page + 1}页`}
+                accessible={false}
                 style={{ width: 420 * scale, height: 595 * scale, backgroundColor: paper, overflow: 'hidden' }}
               >
                 <View
                   pointerEvents="none"
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
                   style={{
                     width: 420,
                     height: 595,
@@ -251,8 +297,10 @@ export default function LifeAlbumPreviewScreen() {
                 >
                   {NativeAlbumPageView ? (
                     <NativeAlbumPageView
+                      key={`album-page-${page}-${playingAssetIds.join('|') || 'idle'}`}
                       pageJson={JSON.stringify(current)}
                       mediaJson={JSON.stringify(media)}
+                      playingJson={JSON.stringify(playingAssetIds)}
                       style={{ width: 420, height: 595 }}
                     />
                   ) : (
@@ -266,6 +314,27 @@ export default function LifeAlbumPreviewScreen() {
                     ))
                   )}
                 </View>
+                {current.blocks.map((block, index) => {
+                  const label = albumPreviewSpokenText(block);
+                  if (!label) return null;
+                  return (
+                    <View
+                      key={`read-${block.kind}-${index}`}
+                      accessible
+                      accessibilityRole="text"
+                      accessibilityLabel={label}
+                      testID={`life-album-preview-read-${index}`}
+                      pointerEvents="none"
+                      style={{
+                        position: 'absolute',
+                        left: block.box.xPt * scale,
+                        top: block.box.yPt * scale,
+                        width: Math.max(1, block.box.widthPt * scale),
+                        height: Math.max(1, block.box.heightPt * scale),
+                      }}
+                    />
+                  );
+                })}
                 {current.blocks.map((block, index) => {
                   if (block.kind !== 'audio') return null;
                   const canPlay = block.status === 'available' && !!media[block.assetId];
@@ -281,8 +350,13 @@ export default function LifeAlbumPreviewScreen() {
                       testID={`life-album-preview-audio-${block.assetId}`}
                       disabled={!canPlay}
                       onPress={() => {
-                        if (playing) void pauseRef.current();
-                        else if (media[block.assetId]) void clips.play(block.assetId, media[block.assetId]);
+                        if (playing) {
+                          void pauseRef.current();
+                          return;
+                        }
+                        const uri = media[block.assetId];
+                        if (!uri) return;
+                        void clips.play(block.assetId, uri);
                       }}
                       style={{
                         position: 'absolute',
