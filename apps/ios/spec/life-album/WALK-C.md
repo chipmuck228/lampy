@@ -143,5 +143,5 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 | 项 | 值 |
 | --- | --- |
-| 完整 commit | `d48753c2c740531ad98717e098ed61a9fe28afda`（主变更）；SHA 回填见后续 commit |
+| 完整 commit | 入口与放大修复 `9c93c1a6b19d200a3b2e12495e50eaa95e9eb39d`；字体轮 `d48753c` / `ad68fac` |
 | 本地 / 远端 / PR head | 推送后三者应一致 |
