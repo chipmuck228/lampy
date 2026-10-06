@@ -46,8 +46,27 @@ jest.mock('../application/container', () => ({
   },
 }));
 
+const mockLockSnapshot = { locked: false, setting: 'off' as const, sessionUnlocked: true };
+const mockUseDeviceLock = jest.fn(() => ({ snapshot: mockLockSnapshot }));
+const mockWriteAsString = jest.fn(async (_uri: string, _contents: string) => undefined);
+const mockWriteProbePdf = jest.fn(async (_layoutJson: string, _mediaJson: string, _destPath: string) => ({
+  pageCount: 1,
+}));
+
 jest.mock('./device-lock-context', () => ({
-  useDeviceLock: () => ({ snapshot: { locked: false, setting: 'off', sessionUnlocked: true } }),
+  useDeviceLock: () => mockUseDeviceLock(),
+}));
+
+jest.mock('expo-file-system/legacy', () => ({
+  documentDirectory: 'file:///documents/',
+  writeAsStringAsync: (uri: string, contents: string) => mockWriteAsString(uri, contents),
+}));
+
+jest.mock('../../modules/lampy-album-layout', () => ({
+  requireAlbumNativePageView: () => null,
+  diagnoseAlbumFonts: () => ({ requested: 'Songti SC' }),
+  writeAlbumProbePdf: (layoutJson: string, mediaJson: string, destPath: string) =>
+    mockWriteProbePdf(layoutJson, mediaJson, destPath),
 }));
 
 jest.mock('./use-recent-clip-playback', () => ({
@@ -136,6 +155,10 @@ describe('life album preview screen', () => {
     mockCancel.mockReset();
     mockPlay.mockClear();
     mockPause.mockClear();
+    mockWriteAsString.mockClear();
+    mockWriteProbePdf.mockClear();
+    mockLockSnapshot.locked = false;
+    mockUseDeviceLock.mockImplementation(() => ({ snapshot: mockLockSnapshot }));
     mockBegin.mockImplementation((id: string) => ({ albumId: id, requestId: id === 'album_2' ? 8 : 7 }));
     mockGenerate.mockImplementation(async (id: string) => ({
       layout: { ...layout, albumId: id },
@@ -165,6 +188,83 @@ describe('life album preview screen', () => {
     expect(view.getByTestId('life-album-preview-audio-aud').props.style).toEqual(
       expect.objectContaining({ minHeight: 48, minWidth: 48 }),
     );
+    expect(view.queryByTestId('life-album-preview-isol-probe')).toBeNull();
+    expect(mockWriteAsString).not.toHaveBeenCalled();
+    expect(mockWriteProbePdf).not.toHaveBeenCalled();
+  });
+
+  it('does not write JSON or PDF after an ordinary preview succeeds', async () => {
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-preview-page')).toBeTruthy();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(view.queryByTestId('life-album-preview-isol-probe')).toBeNull();
+    expect(mockWriteAsString).not.toHaveBeenCalled();
+    expect(mockWriteProbePdf).not.toHaveBeenCalled();
+  });
+
+  it('does not start a probe after cancel before layout settles', async () => {
+    let settle: (value: unknown) => void = () => undefined;
+    mockGenerate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        }),
+    );
+    const view = await render(wrap());
+    expect(view.getByTestId('life-album-preview-cancel')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-preview-cancel'));
+    });
+    await act(async () => {
+      settle({
+        layout,
+        media: {},
+        fingerprint: layout.sourceFingerprint,
+        requestId: 7,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mockWriteAsString).not.toHaveBeenCalled();
+    expect(mockWriteProbePdf).not.toHaveBeenCalled();
+  });
+
+  it('shows the isol probe action only for the synthetic fixture and skips it after lock', async () => {
+    mockPreviewRoute.id = 'album_eval_window';
+    mockGenerate.mockImplementation(async (id: string) => ({
+      layout: {
+        ...layout,
+        albumId: id,
+        sourceFingerprint: {
+          ...layout.sourceFingerprint,
+          entryOrder: ['moment_album_eval_m01'],
+        },
+      },
+      media: {},
+      fingerprint: layout.sourceFingerprint,
+      requestId: 7,
+    }));
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-preview-isol-probe')).toBeTruthy();
+    });
+    expect(mockWriteAsString).not.toHaveBeenCalled();
+    mockLockSnapshot.locked = true;
+    mockUseDeviceLock.mockImplementation(() => ({ snapshot: { ...mockLockSnapshot, locked: true } }));
+    await act(async () => {
+      view.rerender(wrap());
+    });
+    await waitFor(() => {
+      expect(view.queryByTestId('life-album-preview-isol-probe')).toBeNull();
+    });
+    expect(view.queryByTestId('life-album-preview-page')).toBeNull();
+    expect(mockWriteAsString).not.toHaveBeenCalled();
+    expect(mockWriteProbePdf).not.toHaveBeenCalled();
   });
 
   it('does not show a page while loading or after failure', async () => {

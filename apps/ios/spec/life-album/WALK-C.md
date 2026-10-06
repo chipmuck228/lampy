@@ -48,7 +48,7 @@
 | 上述拼接 SHA-256 | `16975a75ed9be48611af7186392a74986033ce3811f271be5f8ade294c1d7c61` |
 | Swift SHA-256 | `LampyAlbumLayoutModule.swift` `18c2c0d9ea7c813abcf4213cd8015d5521af298404d5c0390aeacf0d0263ceb1` |
 | 完整 commit SHA | `d48753c2c740531ad98717e098ed61a9fe28afda`（推送后本地 / 远端 / PR head 应一致；若有 SHA 回填提交则以其为准） |
-| 探针 | `__DEV__` `isol-album-c-layout.json` / `isol-album-c-fonts.json` / `isol-album-c-probe.pdf` / `isol-album-c-probe-meta.json` |
+| 探针 | 默认不运行。仅开发态、显式「写入隔离探针」、且身份为合成 `album_eval_window` + `moment_album_eval_*` 时才写 Documents。普通预览成功路径不写 JSON／PDF |
 
 ### 自动化
 
@@ -66,6 +66,8 @@
 **PingFang SC（UI）** 解析成功：`PingFangSC-Regular` / `matchedRequestedFamily: true`。
 
 **未静默宣称 Songti：** layout `fontFaces.resolvedSerif` 写入真实 `familyName`/`fontName`/`usedSystemFallback`。排版版本升为 `album-a5-v2`。测量 / 预览 / PDF 共用 `resolveAlbumFont`。
+
+**阶段 C 不因缺 Songti 单独阻塞：** isol 已如实记录系统字体回退。衬线层次留作后续视觉工作，不作为本阶段设备 PASS 的否决项。
 
 **备选（未在本轮实施）：**
 
@@ -117,15 +119,15 @@
 | 整册阅读 | — | PASS（无衬线） | PASS | — |
 | 预览/PDF 同版视觉 | — | PASS | PASS | — |
 | PDF 字体资源 | null / NOT VERIFIED | 已查：无 Songti；嵌入 unknown | — | — |
-| Songti 衬线层次 | diagnose 记录回退 | **FAIL 环境无字体** | 可见无衬线 | — |
+| Songti 衬线层次 | diagnose 已记录回退 | 环境无字体；**不单独阻塞 C** | 可见无衬线，后续视觉 | — |
 | VoiceOver | Jest 朗读序 PASS | AX PASS | — | NOT VERIFIED |
 | 声音播放/图标/暂停/放大 hit | — | 声音 PASS（上一轮）；放大恢复本轮 isol **NOT VERIFIED** | — | — |
 | 收进对话框 / 回看册入口 / 新建胶囊 | Jest：加入不创建、遮罩关闭、进 `/albums/new` | isol **NOT VERIFIED** | — | — |
 | 后台停声 / 进度保留 | — | NOT VERIFIED | — | — |
-| 本机保护盖层（完整开启后） | Jest PASS | 认证遮挡有证据；完整开启后后台盖层 NOT VERIFIED | — | — |
+| 本机保护盖层（完整开启后） | Jest PASS | **需补实页验收**：开启成功后，后台返回与认证期间不露册名、纸页内容。此前仅见认证遮挡，toggle 未完成，**NOT VERIFIED** | — | — |
 | 重新生成 | — | PASS | PASS | — |
 | 正式导出/付费 | 未开始 | 未开始 | — | — |
-| 阶段 C 设备 PASS | **否**（缺 Songti 环境 + 系统 VO + 完整本机保护） | | | |
+| 阶段 C 设备 PASS | **否**（系统 VoiceOver、PDF 字体嵌入、本机保护实页验收仍 NOT VERIFIED；字体回退已记录、不单独否决） | | | |
 
 ### 6. 入口与加入（2026-10-06）
 
@@ -175,9 +177,32 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
+### 9. 探针移出普通预览（2026-10-06）
+
+开发版曾在每次预览成功后只凭 `__DEV__` 把完整排版 JSON、PDF、字体探针写入 Documents。个人册也会生成副本；异步探针不随离开／取消／锁定失效。
+
+现改为：默认不运行。仅开发态、操作者点「写入隔离探针」、且册身份为合成夹具 `album_eval_window`（条目均为 `moment_album_eval_*`）时才写入。取消、离开或锁定后，尚未开始的写入不再执行。不是正式导出。
+
+Jest：普通预览不写 JSON／PDF；取消后未开始的探针不写；锁定后不显示探针按钮。系统 VoiceOver、PDF 字体嵌入继续 **NOT VERIFIED**。
+
 ### 提交 SHA（推送后）
+
+各次走查对应版本（相对 `origin/main`）：
+
+| 走查 / 改动 | SHA |
+| --- | --- |
+| 测量预览初稿 | `761e038` |
+| 原生模块纳入仓库 | `369d30f` |
+| 无 Core Text 失败关闭 | `4d9129c` |
+| 请求绑定 + 基线绘制 | `a6ede66` |
+| 字体回退事实 + PDF 探针收紧 | `d48753c` / WALK 回填 `ad68fac` |
+| 放大恢复与收进 | `9c93c1a` / WALK 回填 `97fd7a8` |
+| 详情页收紧 | `bdc1672` / WALK 回填 `ab33914` |
+| 真机封面路径 + 新建顶栏 | `6e5595c` |
+| 册名 focus 不被顶栏挡住 | `56b8e82` |
+| 短册名 CJK 不被 lineHeight 裁切 | `bcb6ccd` |
+| 探针移出普通预览 | 本提交（push 后与 PR head 一致） |
 
 | 项 | 值 |
 | --- | --- |
-| 完整 commit | 详情页收紧 `bdc16720f0f789049577d2fcdfb25552ca5248c0`；入口与放大 `9c93c1a`；字体轮 `d48753c` / `ad68fac` |
 | 本地 / 远端 / PR head | 推送后三者应一致 |

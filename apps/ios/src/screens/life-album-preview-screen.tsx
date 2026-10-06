@@ -39,6 +39,12 @@ import {
   startAlbumPreviewPageAttempt,
   type AlbumPreviewPageAttempt,
 } from '../application/album-layout-request';
+import {
+  ALBUM_PREVIEW_ISOL_PROBE,
+  isIsolAlbumLayoutFixture,
+  shouldStartAlbumPreviewProbe,
+  writeIsolAlbumPreviewProbe,
+} from '../application/album-preview-probe';
 import { albumPreviewSpokenText } from '../application/album-preview-speech';
 import { albumSliceCodePoints } from '../application/album-unicode';
 import { ALBUM_RETRY } from '../application/life-album';
@@ -75,9 +81,16 @@ export default function LifeAlbumPreviewScreen() {
   const [zoom, setZoom] = useState(1);
   const pageSeq = useRef(0);
   const attempt = useRef<AlbumPreviewPageAttempt | null>(null);
+  const probeAlive = useRef(false);
+  const blockedRef = useRef(false);
 
   const blocked = !!lock?.snapshot.locked;
   const showPage = !!layout && !loading && !error && !blocked && layout.albumId === albumId;
+
+  useEffect(() => {
+    blockedRef.current = blocked;
+    if (blocked) probeAlive.current = false;
+  }, [blocked]);
 
   const cancelOwnedRequest = useCallback((requestId: number | null) => {
     if (requestId == null) return;
@@ -85,6 +98,7 @@ export default function LifeAlbumPreviewScreen() {
   }, []);
 
   const load = useCallback(() => {
+    probeAlive.current = false;
     const previousId = abandonAlbumPreviewAttempt(attempt.current);
     attempt.current = null;
     cancelOwnedRequest(previousId);
@@ -136,45 +150,6 @@ export default function LifeAlbumPreviewScreen() {
         setMedia(result.media);
         setPage(0);
         setLoading(false);
-        if (__DEV__) {
-          void (async () => {
-            try {
-              // Isolation probe only. Not product export or system share.
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              const FileSystem = require('expo-file-system/legacy') as {
-                documentDirectory: string | null;
-                writeAsStringAsync(uri: string, contents: string): Promise<void>;
-              };
-              const { diagnoseAlbumFonts, writeAlbumProbePdf } = await import('../../modules/lampy-album-layout');
-              const root = FileSystem.documentDirectory;
-              if (!root) return;
-              // Write layout first so a diagnose/PDF failure cannot leave a stale probe.
-              await FileSystem.writeAsStringAsync(`${root}isol-album-c-layout.json`, JSON.stringify(result.layout));
-              try {
-                const diagnosis = diagnoseAlbumFonts();
-                if (diagnosis) {
-                  await FileSystem.writeAsStringAsync(
-                    `${root}isol-album-c-fonts.json`,
-                    JSON.stringify(diagnosis),
-                  );
-                }
-              } catch {
-                // Font diagnosis must not block layout/PDF probes.
-              }
-              const probe = await writeAlbumProbePdf(
-                JSON.stringify(result.layout),
-                JSON.stringify(result.media),
-                `${root}isol-album-c-probe.pdf`.replace(/^file:\/\//, ''),
-              );
-              await FileSystem.writeAsStringAsync(
-                `${root}isol-album-c-probe-meta.json`,
-                JSON.stringify(probe),
-              );
-            } catch {
-              // Probe failure must not change preview.
-            }
-          })();
-        }
       } catch (caught) {
         if (
           !shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current }) ||
@@ -200,6 +175,7 @@ export default function LifeAlbumPreviewScreen() {
     useCallback(() => {
       load();
       return () => {
+        probeAlive.current = false;
         const owned = abandonAlbumPreviewAttempt(attempt.current);
         attempt.current = null;
         void pauseRef.current();
@@ -261,6 +237,7 @@ export default function LifeAlbumPreviewScreen() {
           accessibilityLabel={ALBUM_PREVIEW_CANCEL}
           testID="life-album-preview-cancel"
           onPress={() => {
+            probeAlive.current = false;
             const owned = abandonAlbumPreviewAttempt(attempt.current);
             attempt.current = null;
             cancelOwnedRequest(owned);
@@ -437,6 +414,60 @@ export default function LifeAlbumPreviewScreen() {
               >
                 <Text style={styles.action}>{ALBUM_PREVIEW_ZOOM}</Text>
               </Pressable>
+              {__DEV__ &&
+              isIsolAlbumLayoutFixture({
+                albumId,
+                layoutAlbumId: layout.albumId,
+                entryOrder: layout.sourceFingerprint.entryOrder,
+              }) ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={ALBUM_PREVIEW_ISOL_PROBE}
+                  testID="life-album-preview-isol-probe"
+                  onPress={() => {
+                    if (
+                      !shouldStartAlbumPreviewProbe({
+                        isDev: __DEV__,
+                        explicit: true,
+                        locked: blockedRef.current,
+                        cancelled: false,
+                        albumId,
+                        layoutAlbumId: layout.albumId,
+                        entryOrder: layout.sourceFingerprint.entryOrder,
+                      })
+                    ) {
+                      return;
+                    }
+                    probeAlive.current = true;
+                    void (async () => {
+                      try {
+                        // Isolation probe only. Not product export or system share.
+                        // eslint-disable-next-line @typescript-eslint/no-require-imports
+                        const FileSystem = require('expo-file-system/legacy') as {
+                          documentDirectory: string | null;
+                          writeAsStringAsync(uri: string, contents: string): Promise<void>;
+                        };
+                        const { diagnoseAlbumFonts, writeAlbumProbePdf } = await import(
+                          '../../modules/lampy-album-layout'
+                        );
+                        await writeIsolAlbumPreviewProbe({
+                          layout,
+                          media,
+                          files: FileSystem,
+                          diagnoseFonts: diagnoseAlbumFonts,
+                          writePdf: writeAlbumProbePdf,
+                          isStillCurrent: () => probeAlive.current && !blockedRef.current,
+                        });
+                      } catch {
+                        // Probe failure must not change preview.
+                      }
+                    })();
+                  }}
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>{ALBUM_PREVIEW_ISOL_PROBE}</Text>
+                </Pressable>
+              ) : null}
             </View>
           )}
         </>
