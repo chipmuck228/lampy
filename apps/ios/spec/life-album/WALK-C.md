@@ -163,6 +163,14 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 未启动 Liuz17。8081 上已有本 worktree 的 Metro；本轮为 JS，未再 `expo run:ios --device Liuz17`。
 
+### 8. 真机：封面空白与新建顶栏遮挡（2026-10-06）
+
+根因：管理页封面／缩略图用了库存 `localUri`。`exists` 会经 `resolveUri` 找到重装后的容器路径，Image 仍读旧路径，所以编辑封面是空白色块。新建页顶栏「我的生活册」与「新建一册」挤在一行。
+
+改动：封面候选和列表缩略图改走 `resolveUri`，显示用 `expo-image`。顶栏左右各留弹性空位、标题单行；新建册名全宽并加底边，避免和返回文案叠在一起。
+
+真机复验 **NOT VERIFIED**（本轮未再开 Liuz17）。Jest：resolveUri 修复路径 PASS。
+
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
 ### 提交 SHA（推送后）

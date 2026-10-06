@@ -83,7 +83,10 @@ export function createLifeAlbumUseCases(deps: {
   albums?: LifeAlbumRepository;
   moments: MomentRepository;
   assets?: AssetRepository;
-  media?: { exists(uri: string): Promise<boolean> };
+  media?: {
+    exists(uri: string): Promise<boolean>;
+    resolveUri?(uri: string): Promise<string | null>;
+  };
   clock?: Clock;
   ownerId?: string;
   id?: () => string;
@@ -108,6 +111,13 @@ export function createLifeAlbumUseCases(deps: {
       throw new ApplicationError(ALBUM_NOT_FOUND, ALBUM_GONE);
     }
     return album;
+  }
+
+  async function locateDisplayUri(stored: string | undefined): Promise<string | null> {
+    if (!stored) return null;
+    if (deps.media?.resolveUri) return deps.media.resolveUri(stored);
+    if (deps.media) return (await deps.media.exists(stored)) ? stored : null;
+    return stored;
   }
 
   async function coverAfterRemoving(album: Awaited<ReturnType<typeof requireAlbum>>, momentId: string) {
@@ -165,13 +175,12 @@ export function createLifeAlbumUseCases(deps: {
       for (const assetId of found.moment.assetIds) {
         const asset = await deps.assets.findById(assetId);
         if (asset.kind !== 'ready' || asset.asset.type !== 'image') continue;
-        const uri = asset.asset.localUri;
-        const available = deps.media ? await deps.media.exists(uri) : Boolean(uri);
+        const uri = await locateDisplayUri(asset.asset.localUri);
         candidates.push({
           momentId: entry.momentId,
           assetId,
-          uri: available ? uri : undefined,
-          available,
+          uri: uri ?? undefined,
+          available: Boolean(uri),
         });
       }
     }
@@ -223,9 +232,7 @@ export function createLifeAlbumUseCases(deps: {
         if (asset.asset.type === 'image') {
           photoCount += 1;
           if (!thumbnailUri) {
-            const uri = asset.asset.localUri;
-            const available = deps.media ? await deps.media.exists(uri) : Boolean(uri);
-            thumbnailUri = available ? uri : null;
+            thumbnailUri = await locateDisplayUri(asset.asset.localUri);
           }
           continue;
         }

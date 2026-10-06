@@ -214,6 +214,45 @@ describe('life album use cases', () => {
     expect(view.entries[0].thumbnailUri).toBe('memory://asset_photo.jpg');
   });
 
+  it('repairs stored photo URIs before showing cover chips', async () => {
+    const repos = createMemoryRepositories();
+    await seedImage(repos, 'asset_cover', '2026-10-01T01:00:00.000Z');
+    await seedMoment(repos, 'moment_cover', '窗边', '2026-10-01T01:00:00.000Z', ['asset_cover']);
+    const app = createUseCases({
+      ...repos,
+      media: {
+        async exists() {
+          return true;
+        },
+        async resolveUri() {
+          return 'file://documents/lampy-assets/asset_cover.jpg';
+        },
+        async persistImage() {
+          return { localUri: 'memory://asset_cover.jpg' };
+        },
+        async persistAudio() {
+          return { localUri: 'memory://audio' };
+        },
+        async canDecode() {
+          return true;
+        },
+        async canPlay() {
+          return true;
+        },
+        async removeAppOwned() {
+          return false;
+        },
+      },
+      clock: clockAt('2026-10-03T07:00:00.000Z'),
+      albumId: () => 'album_cover_uri',
+    });
+    const album = await app.createAlbum({ name: '有封面' });
+    await app.collectAlbumEntry({ albumId: album.id, momentId: 'moment_cover' });
+    const view = await app.getAlbum(album.id);
+    expect(view.entries[0].thumbnailUri).toBe('file://documents/lampy-assets/asset_cover.jpg');
+    expect(view.coverCandidates[0]?.uri).toBe('file://documents/lampy-assets/asset_cover.jpg');
+  });
+
   it('does not pretend a failed write succeeded', async () => {
     const albums = createMemoryLifeAlbumRepository();
     const repos = createMemoryRepositories();

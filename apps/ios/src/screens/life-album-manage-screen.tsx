@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
@@ -167,7 +168,12 @@ export default function LifeAlbumManageScreen() {
           <View style={styles.hero}>
             <View style={styles.heroCover} testID="life-album-manage-cover">
               {selectedCoverUri ? (
-                <Image source={{ uri: selectedCoverUri }} style={styles.heroImage} accessibilityIgnoresInvertColors />
+                <Image
+                  source={{ uri: selectedCoverUri }}
+                  style={styles.heroImage}
+                  contentFit="cover"
+                  accessibilityIgnoresInvertColors
+                />
               ) : (
                 <Text style={styles.heroWords} numberOfLines={3}>
                   {view.album.name}
@@ -412,7 +418,13 @@ function AlbumEntryRow({
         style={styles.entryHit}
       >
         {ready && entry.thumbnailUri ? (
-          <Image source={{ uri: entry.thumbnailUri }} style={styles.thumb} testID={`life-album-entry-thumb-${entry.momentId}`} accessibilityIgnoresInvertColors />
+          <Image
+            source={{ uri: entry.thumbnailUri }}
+            style={styles.thumb}
+            contentFit="cover"
+            testID={`life-album-entry-thumb-${entry.momentId}`}
+            accessibilityIgnoresInvertColors
+          />
         ) : null}
         <View style={styles.entryCopy}>
           {ready ? (
@@ -550,11 +562,11 @@ function CoverChoice({
             style={[styles.coverHit, active && styles.coverHitOn]}
           >
             {candidate.uri ? (
-              <Image source={{ uri: candidate.uri }} style={styles.coverImage} />
+              <Image source={{ uri: candidate.uri }} style={styles.coverImage} contentFit="cover" />
             ) : (
               <Text style={styles.hint}>这张照片现在看不到</Text>
             )}
-            {active ? <Text style={styles.selectedMark}>已选</Text> : null}
+            {active ? <Text style={styles.coverSelectedMark}>已选</Text> : null}
           </Pressable>
         );
       })}
@@ -635,9 +647,26 @@ const styles = StyleSheet.create({
   },
   coverChipOn: { borderColor: sage, backgroundColor: paperDeep },
   coverChipLabel: { ...type.action, color: sage },
-  coverHit: { minHeight: 48, minWidth: 48, justifyContent: 'center' },
-  coverHitOn: { borderWidth: StyleSheet.hairlineWidth, borderColor: sage, borderRadius: 6, padding: 2 },
-  coverImage: { width: 56, height: 56, borderRadius: 4 },
+  coverHit: {
+    width: 56,
+    height: 56,
+    minHeight: 48,
+    minWidth: 48,
+    borderRadius: 6,
+    overflow: 'hidden',
+    backgroundColor: paperDeep,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverHitOn: { borderWidth: StyleSheet.hairlineWidth, borderColor: sage },
+  coverImage: { width: 56, height: 56 },
+  coverSelectedMark: {
+    ...type.meta,
+    color: sage,
+    position: 'absolute',
+    bottom: 2,
+    alignSelf: 'center',
+  },
   selectedMark: { ...type.meta, color: sage },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
 });

@@ -52,6 +52,8 @@ export default function LifeAlbumNewScreen() {
         onChangeText={setName}
         placeholder={DEFAULT_ALBUM_NAME}
         editable={!saving}
+        autoCorrect={false}
+        autoCapitalize="none"
         style={styles.input}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -75,12 +77,16 @@ export default function LifeAlbumNewScreen() {
 }
 
 const styles = StyleSheet.create({
-  label: { ...type.meta, color: inkSoft, marginBottom: 8 },
+  label: { ...type.meta, color: inkSoft, marginBottom: 8, marginTop: 8 },
   input: {
     ...type.body,
     color: ink,
+    width: '100%',
     minHeight: 48,
     paddingVertical: 10,
+    paddingRight: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: sage,
   },
   action: { ...type.action, color: sage },
   disabled: { opacity: 0.45 },

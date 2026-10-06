@@ -56,9 +56,11 @@ export function SettingsPage({
           style={styles.backHit}
         >
           <LifeIcon name="back" size={19} color={sage} decorative />
-          <Text style={styles.back}>{backLabel}</Text>
+          <Text style={styles.back} numberOfLines={1}>
+            {backLabel}
+          </Text>
         </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
+        <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>
           {title}
         </Text>
         <View style={styles.headerSpacer} />
@@ -67,6 +69,8 @@ export function SettingsPage({
         testID={testID ?? 'account-scroll'}
         style={styles.scroll}
         scrollEnabled={scrollEnabled}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         contentContainerStyle={[
           styles.column,
           {
@@ -94,15 +98,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backHit: {
+    flex: 1,
     minWidth: 70,
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
-  back: { ...type.meta, color: sage },
-  title: { ...type.meta, color: ink, textAlign: 'center', flexShrink: 1 },
-  headerSpacer: { width: 70, minHeight: 48 },
+  back: { ...type.meta, color: sage, flexShrink: 1 },
+  title: { ...type.meta, color: ink, textAlign: 'center', flexShrink: 1, maxWidth: '42%' },
+  headerSpacer: { flex: 1, minWidth: 70, minHeight: 48 },
   scroll: { flex: 1 },
   column: {
     width: '100%',
