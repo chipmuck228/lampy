@@ -20,6 +20,14 @@ describe('fixed app type', () => {
     expect(view.getByTestId('life-input').props.value).toBe('草稿');
   });
 
+  it('does not clip CJK in a short field by forwarding body lineHeight', async () => {
+    const view = await render(
+      <TextInput testID="life-input-cjk" value="一些日子" style={type.body} />,
+    );
+    expect(StyleSheet.flatten(view.getByTestId('life-input-cjk').props.style).fontSize).toBe(17);
+    expect(StyleSheet.flatten(view.getByTestId('life-input-cjk').props.style).lineHeight).toBeUndefined();
+  });
+
   it('ignores a caller that tries to turn scaling back on', async () => {
     const view = await render(
       <Text testID="forced" allowFontScaling maxFontSizeMultiplier={3}>

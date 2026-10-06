@@ -80,11 +80,12 @@ export default function LifeAlbumNewScreen() {
 const styles = StyleSheet.create({
   label: { ...type.meta, color: inkSoft, marginBottom: 8, marginTop: 8 },
   input: {
-    ...type.body,
+    fontSize: type.body.fontSize,
     color: ink,
     width: '100%',
     minHeight: 48,
-    paddingVertical: 10,
+    paddingTop: 12,
+    paddingBottom: 12,
     paddingRight: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: sage,

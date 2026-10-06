@@ -1,5 +1,6 @@
 import {
   Animated,
+  StyleSheet,
   Text as RNText,
   TextInput as RNTextInput,
   type TextInputProps,
@@ -26,8 +27,21 @@ export function Text(props: TextProps) {
   return <RNText {...props} allowFontScaling={false} maxFontSizeMultiplier={1} />;
 }
 
-export function TextInput(props: TextInputProps) {
-  return <RNTextInput {...props} allowFontScaling={false} maxFontSizeMultiplier={1} />;
+export function TextInput({ style, ...props }: TextInputProps) {
+  const flat = StyleSheet.flatten(style);
+  let next = style;
+  if (flat && typeof flat === 'object' && 'lineHeight' in flat) {
+    next = { ...flat };
+    delete (next as { lineHeight?: number }).lineHeight;
+  }
+  return (
+    <RNTextInput
+      {...props}
+      allowFontScaling={false}
+      maxFontSizeMultiplier={1}
+      style={next}
+    />
+  );
 }
 
 export function AnimatedText(props: Animated.AnimatedProps<TextProps>) {
