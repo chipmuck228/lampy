@@ -183,34 +183,76 @@ export function createLifeAlbumUseCases(deps: {
     noteExcerpt: string | null;
     dateLabel: string | null;
     mediaHint: string | null;
+    photoCount: number;
+    hasAudio: boolean;
+    unknownCount: number;
+    audioDurationMs: number | null;
+    thumbnailUri: string | null;
+    occurredSortKey: number | null;
   }> {
+    const empty = {
+      noteExcerpt: null,
+      dateLabel: null,
+      mediaHint: null,
+      photoCount: 0,
+      hasAudio: false,
+      unknownCount: 0,
+      audioDurationMs: null,
+      thumbnailUri: null,
+      occurredSortKey: null,
+    };
     const found = await deps.moments.findById(momentId);
     if (found.kind !== 'ready') {
       return {
         source: found.kind === 'unreadable' ? 'unreadable' : 'missing',
-        noteExcerpt: null,
-        dateLabel: null,
-        mediaHint: null,
+        ...empty,
       };
     }
     let photoCount = 0;
     let hasAudio = false;
+    let unknownCount = 0;
+    let audioDurationMs: number | null = null;
+    let thumbnailUri: string | null = null;
     if (deps.assets) {
       for (const assetId of found.moment.assetIds) {
         const asset = await deps.assets.findById(assetId);
-        if (asset.kind !== 'ready') continue;
-        if (asset.asset.type === 'image') photoCount += 1;
-        if (asset.asset.type === 'audio') hasAudio = true;
+        if (asset.kind !== 'ready') {
+          unknownCount += 1;
+          continue;
+        }
+        if (asset.asset.type === 'image') {
+          photoCount += 1;
+          if (!thumbnailUri) {
+            const uri = asset.asset.localUri;
+            const available = deps.media ? await deps.media.exists(uri) : Boolean(uri);
+            thumbnailUri = available ? uri : null;
+          }
+          continue;
+        }
+        if (asset.asset.type === 'audio') {
+          hasAudio = true;
+          const duration = asset.asset.metadata?.durationMs;
+          if (typeof duration === 'number' && duration > 0) audioDurationMs = duration;
+          continue;
+        }
+        unknownCount += 1;
       }
     }
     const occurred = found.moment.time.occurredAt;
     const dateIso = occurred || found.moment.time.recordedAt;
     const dated = formatCollectedAt(dateIso, viewerClock);
+    const occurredSortKey = dateIso ? parseMillis(dateIso) : null;
     return {
       source: 'ready',
       noteExcerpt: albumNoteExcerpt(found.moment.content.note),
       dateLabel: occurred ? dated : dated ? `记录于 ${dated}` : null,
-      mediaHint: albumMediaHint({ photoCount, hasAudio }),
+      mediaHint: albumMediaHint({ photoCount, hasAudio, unknownCount }),
+      photoCount,
+      hasAudio,
+      unknownCount,
+      audioDurationMs,
+      thumbnailUri,
+      occurredSortKey,
     };
   }
 

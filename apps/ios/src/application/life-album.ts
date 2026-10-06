@@ -49,9 +49,15 @@ export type AlbumEntryView = AlbumEntry & {
   noteExcerpt: string | null;
   dateLabel: string | null;
   mediaHint: string | null;
+  photoCount: number;
+  hasAudio: boolean;
+  unknownCount: number;
+  audioDurationMs: number | null;
+  thumbnailUri: string | null;
+  occurredSortKey: number | null;
 };
 
-export const ALBUM_NOTE_EXCERPT_MAX = 36;
+export const ALBUM_NOTE_EXCERPT_MAX = 72;
 
 export function albumNoteExcerpt(note: string | undefined | null, max = ALBUM_NOTE_EXCERPT_MAX): string | null {
   const trimmed = (note ?? '').replace(/\s+/g, ' ').trim();
@@ -60,10 +66,11 @@ export function albumNoteExcerpt(note: string | undefined | null, max = ALBUM_NO
   return `${trimmed.slice(0, max)}…`;
 }
 
-export function albumMediaHint(input: { photoCount: number; hasAudio: boolean }): string | null {
+export function albumMediaHint(input: { photoCount: number; hasAudio: boolean; unknownCount?: number }): string | null {
   const parts: string[] = [];
   if (input.photoCount > 0) parts.push(input.photoCount === 1 ? '有照片' : `有${input.photoCount}张照片`);
   if (input.hasAudio) parts.push('有声音');
+  if (input.unknownCount) parts.push('还有一种现在打不开的媒介。');
   return parts.length ? parts.join(' · ') : null;
 }
 
@@ -109,4 +116,24 @@ export function albumCollectingLabel(name: string): string {
 
 export function albumEntryCountLabel(count: number): string {
   return `${count}条`;
+}
+
+export function albumDateRangeLabel(entries: { occurredSortKey: number | null; dateLabel: string | null }[]): string | null {
+  const dated = entries
+    .filter((entry) => entry.occurredSortKey != null && entry.dateLabel)
+    .sort((left, right) => (left.occurredSortKey ?? 0) - (right.occurredSortKey ?? 0));
+  if (!dated.length) return null;
+  const first = dated[0].dateLabel;
+  const last = dated[dated.length - 1].dateLabel;
+  if (!first || !last || first === last) return first;
+  return `${first} — ${last}`;
+}
+
+export function formatAlbumAudioDuration(durationMs: number | null): string | null {
+  if (durationMs == null || durationMs <= 0) return null;
+  const total = Math.round(durationMs / 1000);
+  if (total < 60) return `${total}秒`;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return seconds ? `${minutes}分${seconds}秒` : `${minutes}分钟`;
 }

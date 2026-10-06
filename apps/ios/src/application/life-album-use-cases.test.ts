@@ -189,6 +189,8 @@ describe('life album use cases', () => {
     expect(view.entries[0].noteExcerpt).toBeNull();
     expect(view.entries[0].dateLabel).toBeNull();
     expect(view.entries[0].mediaHint).toBeNull();
+    expect(view.entries[0].thumbnailUri).toBeNull();
+    expect(view.entries[0].unknownCount).toBe(0);
   });
 
   it('describes a collected entry from the original note, date, and media', async () => {
@@ -208,6 +210,8 @@ describe('life album use cases', () => {
     expect(view.entries[0].noteExcerpt).toBe(albumNoteExcerpt(note));
     expect(view.entries[0].dateLabel).toBe('记录于 2026年10月1日');
     expect(view.entries[0].mediaHint).toBe('有照片');
+    expect(view.entries[0].photoCount).toBe(1);
+    expect(view.entries[0].thumbnailUri).toBe('memory://asset_photo.jpg');
   });
 
   it('does not pretend a failed write succeeded', async () => {
