@@ -183,4 +183,16 @@ describe('account settings pages', () => {
     expect(StyleSheet.flatten(header?.props.style).paddingLeft).toBe(47);
     expect(StyleSheet.flatten(header?.props.style).paddingRight).toBe(24);
   });
+
+  it('does not let the keyboard scroll a focused field under the header', async () => {
+    const view = await render(
+      wrap(
+        <SettingsPage title="本机设置" backLabel="最近" accessibilityLabel="本机设置" onBack={() => undefined}>
+          {null}
+        </SettingsPage>,
+      ),
+    );
+    expect(view.getByTestId('account-scroll').props.automaticallyAdjustKeyboardInsets).toBe(false);
+    expect(view.getByTestId('account-scroll').props.contentInsetAdjustmentBehavior).toBe('never');
+  });
 });

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { hairline, ink, pageGutter, paper, readingWidth, sage } from './life-page';
@@ -65,24 +65,31 @@ export function SettingsPage({
         </Text>
         <View style={styles.headerSpacer} />
       </View>
-      <ScrollView
-        testID={testID ?? 'account-scroll'}
+      <KeyboardAvoidingView
         style={styles.scroll}
-        scrollEnabled={scrollEnabled}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-        contentContainerStyle={[
-          styles.column,
-          {
-            paddingLeft: padLeft,
-            paddingRight: padRight,
-            paddingBottom: Math.max(insets.bottom, 44),
-            ...(scrollEnabled ? null : { flexGrow: 1 }),
-          },
-        ]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.reading, { maxWidth: column }]}>{children}</View>
-      </ScrollView>
+        <ScrollView
+          testID={testID ?? 'account-scroll'}
+          style={styles.scroll}
+          scrollEnabled={scrollEnabled}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={false}
+          contentInsetAdjustmentBehavior="never"
+          contentContainerStyle={[
+            styles.column,
+            {
+              paddingLeft: padLeft,
+              paddingRight: padRight,
+              paddingBottom: Math.max(insets.bottom, 44),
+              ...(scrollEnabled ? null : { flexGrow: 1 }),
+            },
+          ]}
+        >
+          <View style={[styles.reading, { maxWidth: column }]}>{children}</View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

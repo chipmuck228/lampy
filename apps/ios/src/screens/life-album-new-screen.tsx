@@ -43,6 +43,7 @@ export default function LifeAlbumNewScreen() {
       backLabel="我的生活册"
       accessibilityLabel="新建一册"
       pageTestID="life-album-new"
+      scrollEnabled={false}
       onBack={() => router.back()}
     >
       <Text style={styles.label}>册名</Text>

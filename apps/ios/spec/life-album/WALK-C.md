@@ -171,6 +171,8 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 真机复验 **NOT VERIFIED**（本轮未再开 Liuz17）。Jest：resolveUri 修复路径 PASS。
 
+新建页 focus 时 iOS 会把 ScrollView 滚到输入框，册名被顶栏挡住。设置页关闭 `automaticallyAdjustKeyboardInsets`，顶栏下用 `KeyboardAvoidingView`；新建页关闭滚动。
+
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
 ### 提交 SHA（推送后）
