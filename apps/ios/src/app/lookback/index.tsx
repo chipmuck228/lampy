@@ -75,7 +75,7 @@ import {
 import { lookbackCatalogChromeHeight, lookbackCatalogMaxHeight } from '../../screens/lookback-catalog';
 import { LifeIconButton } from '../../screens/life-icons';
 import { LifeAlbumCollectAction, LifeAlbumCollectBanner } from '../../screens/life-album-collect';
-import { shouldUseNavRail } from '../../screens/life-page';
+import { sage, shouldUseNavRail } from '../../screens/life-page';
 import { usePageMetrics } from '../../screens/use-page-metrics';
 import {
   lookbackCollectIsReady,
@@ -1130,7 +1130,8 @@ export default function LookbackIndexScreen() {
             name="album"
             label="我的生活册"
             testID="lookback-life-album"
-            size={20}
+            size={22}
+            color={sage}
             onPress={() => {
               writeCurrentSnapshot();
               router.push('/albums?from=lookback');

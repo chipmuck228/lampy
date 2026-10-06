@@ -616,9 +616,10 @@ const styles = StyleSheet.create({
   heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
   heroTrail: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: 4,
     flexShrink: 0,
+    minHeight: 48,
   },
   kicker: { ...recentType.kicker, color: recentKicker },
   title: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
@@ -626,7 +627,6 @@ const styles = StyleSheet.create({
     ...recentType.end,
     color: recentKicker,
     letterSpacing: 1.2,
-    marginBottom: 6,
     flexShrink: 0,
   },
   headerRule: {

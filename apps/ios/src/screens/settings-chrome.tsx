@@ -18,6 +18,7 @@ export function SettingsPage({
   testID,
   pageTestID,
   onBack,
+  scrollEnabled = true,
   children,
 }: {
   title: string;
@@ -26,6 +27,7 @@ export function SettingsPage({
   testID?: string;
   pageTestID?: string;
   onBack: () => void;
+  scrollEnabled?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -64,12 +66,14 @@ export function SettingsPage({
       <ScrollView
         testID={testID ?? 'account-scroll'}
         style={styles.scroll}
+        scrollEnabled={scrollEnabled}
         contentContainerStyle={[
           styles.column,
           {
             paddingLeft: padLeft,
             paddingRight: padRight,
             paddingBottom: Math.max(insets.bottom, 44),
+            ...(scrollEnabled ? null : { flexGrow: 1 }),
           },
         ]}
       >

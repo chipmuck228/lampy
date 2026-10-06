@@ -220,8 +220,11 @@ export default function LifeAlbumPreviewScreen() {
   }, []);
 
   const current = showPage ? layout?.pages[page] : undefined;
+  const zoomed = zoom > 1;
   const pageWidth = Math.max(120, Math.min(width - 32, ((height - 220) * 420) / 595));
   const scale = (pageWidth / 420) * zoom;
+  const paperWidth = 420 * scale;
+  const paperHeight = 595 * scale;
   const playingAssetIds =
     current?.blocks.flatMap((block) =>
       block.kind === 'audio' && clips.card(block.assetId).status === 'playing' ? [block.assetId] : [],
@@ -233,6 +236,7 @@ export default function LifeAlbumPreviewScreen() {
       backLabel="这一册"
       accessibilityLabel="看看这一册"
       pageTestID="life-album-preview"
+      scrollEnabled={!zoomed}
       onBack={() => router.back()}
     >
       {blocked ? <Text style={styles.body}>{ALBUM_PREVIEW_FAILED}</Text> : null}
@@ -273,16 +277,42 @@ export default function LifeAlbumPreviewScreen() {
             style={styles.meta}
             accessibilityRole="text"
           >{`第${page + 1}页，共${layout.pages.length}页`}</Text>
-          <ScrollView
-            horizontal={zoom > 1}
-            scrollEnabled={zoom > 1}
-            style={styles.stage}
+          <View
+            testID="life-album-preview-stage"
+            style={[styles.stageFrame, zoomed && styles.stageFrameZoomed]}
           >
-            <ScrollView scrollEnabled={zoom > 1} contentContainerStyle={{ width: 420 * scale, height: 595 * scale }}>
+            {zoomed ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={ALBUM_PREVIEW_ZOOM_OUT}
+                testID="life-album-preview-zoom-restore"
+                onPress={() => setZoom(1)}
+                style={styles.restoreHit}
+              >
+                <Text style={styles.restoreLabel}>{ALBUM_PREVIEW_ZOOM_OUT}</Text>
+              </Pressable>
+            ) : null}
+            <ScrollView
+              testID="life-album-preview-zoom-scroll"
+              scrollEnabled={zoomed}
+              nestedScrollEnabled
+              bounces
+              style={styles.stage}
+              contentContainerStyle={
+                zoomed ? { minHeight: paperHeight } : { alignItems: 'center' }
+              }
+            >
+              <ScrollView
+                horizontal={zoomed}
+                scrollEnabled={zoomed}
+                nestedScrollEnabled
+                bounces
+                contentContainerStyle={{ width: paperWidth, height: paperHeight }}
+              >
               <View
                 testID="life-album-preview-page"
                 accessible={false}
-                style={{ width: 420 * scale, height: 595 * scale, backgroundColor: paper, overflow: 'hidden' }}
+                style={{ width: paperWidth, height: paperHeight, backgroundColor: paper }}
               >
                 <View
                   pointerEvents="none"
@@ -371,41 +401,44 @@ export default function LifeAlbumPreviewScreen() {
                   );
                 })}
               </View>
+              </ScrollView>
             </ScrollView>
-          </ScrollView>
-          <View style={styles.row}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={ALBUM_PREVIEW_PREV}
-              accessibilityState={{ disabled: page === 0 }}
-              testID="life-album-preview-prev"
-              disabled={page === 0}
-              onPress={() => setPage((value) => Math.max(0, value - 1))}
-              style={styles.hit}
-            >
-              <Text style={[styles.action, page === 0 && styles.disabled]}>{ALBUM_PREVIEW_PREV}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={ALBUM_PREVIEW_NEXT}
-              accessibilityState={{ disabled: page >= layout.pages.length - 1 }}
-              testID="life-album-preview-next"
-              disabled={page >= layout.pages.length - 1}
-              onPress={() => setPage((value) => Math.min(layout.pages.length - 1, value + 1))}
-              style={styles.hit}
-            >
-              <Text style={[styles.action, page >= layout.pages.length - 1 && styles.disabled]}>{ALBUM_PREVIEW_NEXT}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={zoom > 1 ? ALBUM_PREVIEW_ZOOM_OUT : ALBUM_PREVIEW_ZOOM}
-              testID="life-album-preview-zoom"
-              onPress={() => setZoom((value) => (value > 1 ? 1 : 2))}
-              style={styles.hit}
-            >
-              <Text style={styles.action}>{zoom > 1 ? ALBUM_PREVIEW_ZOOM_OUT : ALBUM_PREVIEW_ZOOM}</Text>
-            </Pressable>
           </View>
+          {zoomed ? null : (
+            <View style={styles.row}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={ALBUM_PREVIEW_PREV}
+                accessibilityState={{ disabled: page === 0 }}
+                testID="life-album-preview-prev"
+                disabled={page === 0}
+                onPress={() => setPage((value) => Math.max(0, value - 1))}
+                style={styles.hit}
+              >
+                <Text style={[styles.action, page === 0 && styles.disabled]}>{ALBUM_PREVIEW_PREV}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={ALBUM_PREVIEW_NEXT}
+                accessibilityState={{ disabled: page >= layout.pages.length - 1 }}
+                testID="life-album-preview-next"
+                disabled={page >= layout.pages.length - 1}
+                onPress={() => setPage((value) => Math.min(layout.pages.length - 1, value + 1))}
+                style={styles.hit}
+              >
+                <Text style={[styles.action, page >= layout.pages.length - 1 && styles.disabled]}>{ALBUM_PREVIEW_NEXT}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={ALBUM_PREVIEW_ZOOM}
+                testID="life-album-preview-zoom"
+                onPress={() => setZoom(2)}
+                style={styles.hit}
+              >
+                <Text style={styles.action}>{ALBUM_PREVIEW_ZOOM}</Text>
+              </Pressable>
+            </View>
+          )}
         </>
       ) : null}
     </SettingsPage>
@@ -514,7 +547,24 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' },
-  stage: { backgroundColor: paper },
+  stageFrame: { backgroundColor: paper, overflow: 'hidden' },
+  stageFrameZoomed: { flexGrow: 1, minHeight: 280 },
+  stage: { backgroundColor: paper, flexGrow: 1 },
+  restoreHit: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 2,
+    minHeight: 48,
+    minWidth: 48,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    backgroundColor: paper,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: sage,
+    borderRadius: 24,
+  },
+  restoreLabel: { ...type.action, color: sage },
   missing: { backgroundColor: 'rgba(37,35,31,0.06)', justifyContent: 'center', padding: 8 },
   dot: { width: 8, height: 8, borderRadius: 4 },
 });

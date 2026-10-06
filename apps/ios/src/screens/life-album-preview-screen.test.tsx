@@ -193,6 +193,31 @@ describe('life album preview screen', () => {
     expect(view.queryByText('一些日子')).toBeNull();
   });
 
+  it('keeps the same page after zoom restore and does not rebuild audio', async () => {
+    const view = await render(wrap());
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-preview-page')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-preview-next'));
+    });
+    await waitFor(() => {
+      expect(view.getByText('第2页，共2页')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-preview-zoom'));
+    });
+    expect(view.getByTestId('life-album-preview-zoom-restore')).toBeTruthy();
+    expect(view.queryByTestId('life-album-preview-next')).toBeNull();
+    expect(view.getByText('第2页，共2页')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-preview-zoom-restore'));
+    });
+    expect(view.getByText('第2页，共2页')).toBeTruthy();
+    expect(view.getByTestId('life-album-preview-zoom')).toBeTruthy();
+    expect(mockPlay).not.toHaveBeenCalled();
+  });
+
   describe('delayed getUseCases', () => {
     beforeEach(() => {
       mockUseCasesGate.delay = true;

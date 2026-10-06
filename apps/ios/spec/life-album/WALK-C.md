@@ -98,7 +98,7 @@
 
 | 项 | 结果 |
 | --- | --- |
-| 放大 | PASS（「恢复整页」、不重排） |
+| 放大 | 上一轮「恢复整页」会被 SettingsPage 外层滚动卷走，且 `overflow: hidden` + 嵌套横向 ScrollView 裁切。本轮改为放大时关闭外层滚动、固定「恢复原尺寸」、内容区按放大后宽高滚动。Jest：同页恢复、不自动播。isol 设备因 8081 被其它 `expo run:ios` 占用 **本轮 UI NOT VERIFIED**（未启动 Liuz17） |
 | 播放三角→暂停双杠 | **PASS**（合成 `asset_album_eval_sound_long` 8s m4a；AX 变「暂停」；截图见双杠；`playingJson` 重挂载 + 原生 `setNeedsDisplay`） |
 | 再点暂停停声 | **PASS**（播放后立刻按「暂停」，AX 回到「一段声音 · 8秒」） |
 | 放大点击区域 ≥ 48pt | **PASS**（放大后音频 hit AX `584×80`） |
@@ -119,12 +119,23 @@
 | PDF 字体资源 | null / NOT VERIFIED | 已查：无 Songti；嵌入 unknown | — | — |
 | Songti 衬线层次 | diagnose 记录回退 | **FAIL 环境无字体** | 可见无衬线 | — |
 | VoiceOver | Jest 朗读序 PASS | AX PASS | — | NOT VERIFIED |
-| 声音播放/图标/暂停/放大 hit | — | PASS | PASS | — |
+| 声音播放/图标/暂停/放大 hit | — | 声音 PASS（上一轮）；放大恢复本轮 isol **NOT VERIFIED** | — | — |
+| 收进对话框 / 回看册入口 / 新建胶囊 | Jest：加入不创建、遮罩关闭、进 `/albums/new` | isol **NOT VERIFIED** | — | — |
 | 后台停声 / 进度保留 | — | NOT VERIFIED | — | — |
 | 本机保护盖层（完整开启后） | Jest PASS | 认证遮挡有证据；完整开启后后台盖层 NOT VERIFIED | — | — |
 | 重新生成 | — | PASS | PASS | — |
 | 正式导出/付费 | 未开始 | 未开始 | — | — |
 | 阶段 C 设备 PASS | **否**（缺 Songti 环境 + 系统 VO + 完整本机保护） | | | |
+
+### 6. 入口与加入（2026-10-06）
+
+根因（放大）：预览嵌在 `SettingsPage` 的外层 `ScrollView` 里。放大后纸页变高，翻页/恢复按钮滚出视口；舞台 `overflow: 'hidden'` 裁切 `transform: scale`；外层横向、内层纵向在 iOS 上常锁死一个方向。
+
+改动：放大时 `scrollEnabled={false}` 外层；「恢复原尺寸」绝对定位在舞台上、不随正文滚走；舞台按 `420×595 × scale` 可纵向+横向滚动；放大时隐藏翻页；恢复不改 `page`、不重建播放器。不重排分页 / textRange / PDF。
+
+收进对话框：去掉无回调的「新建一册」标签；「加入此册」胶囊只走 `collectAlbumEntry`；已加入显示「已在此册」；真正创建走 `/albums/new`；取消与遮罩关闭不写入。回看入口改 `book.closed.fill` 并与「慢慢看」垂直居中。列表「新建一册」改为淡暖金胶囊，仍进命名页。
+
+isol 本轮 UI：8081 被其它进程占用，未在 isol 热加载本提交 → 入口与放大 **NOT VERIFIED**。系统 VO / PDF 嵌入 / 后台音频 / 完整本机保护仍 **NOT VERIFIED**。
 
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 

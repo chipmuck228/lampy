@@ -14,7 +14,7 @@ import {
   albumEntryCountLabel,
   type AlbumListItem,
 } from '../application/life-album';
-import { ink, inkSoft, sage } from './life-page';
+import { ink, inkSoft, paperDeep, sage } from './life-page';
 import { Text, type } from './life-text';
 import { SettingsPage } from './settings-chrome';
 import { firstSearchParam } from './lookback-origin';
@@ -111,9 +111,9 @@ export default function LifeAlbumListScreen() {
           accessibilityLabel={ALBUM_NEW_ACTION}
           testID="life-album-new"
           onPress={() => router.push('/albums/new')}
-          style={styles.hit}
+          style={styles.createHit}
         >
-          <Text style={styles.action}>{ALBUM_NEW_ACTION}</Text>
+          <Text style={styles.createLabel}>＋ {ALBUM_NEW_ACTION}</Text>
         </Pressable>
       ) : null}
     </SettingsPage>
@@ -134,4 +134,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  createHit: {
+    minHeight: 48,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: paperDeep,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: sage,
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    shadowColor: ink,
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  createLabel: { ...type.action, color: ink },
 });

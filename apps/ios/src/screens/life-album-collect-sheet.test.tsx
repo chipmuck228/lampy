@@ -6,6 +6,11 @@ const mockCollect = jest.fn();
 const mockCreate = jest.fn();
 const mockList = jest.fn();
 const mockContaining = jest.fn();
+const mockPush = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
+}));
 
 jest.mock('../application/container', () => ({
   getUseCases: async () => ({
@@ -42,6 +47,7 @@ describe('life album collect sheet', () => {
     mockContaining.mockResolvedValue([]);
     mockCreate.mockReset();
     mockCollect.mockReset();
+    mockPush.mockReset();
   });
 
   it('keeps the album list scrollable and pins cancel', async () => {
@@ -101,5 +107,54 @@ describe('life album collect sheet', () => {
     expect(
       shouldApplyCollectSheetResult({ session: 2, currentSession: 2, cancelled: false }),
     ).toBe(true);
+  });
+
+  it('joins an existing album without creating one', async () => {
+    const view = await render(
+      <LifeAlbumCollectSheet visible momentId="moment_ready" onClose={() => undefined} />,
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-sheet-album_1')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-sheet-album_1'));
+    });
+    await waitFor(() => {
+      expect(mockCollect).toHaveBeenCalledWith({ albumId: 'album_1', momentId: 'moment_ready' });
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('opens the named create screen instead of creating from the sheet', async () => {
+    const onClose = jest.fn();
+    const view = await render(
+      <LifeAlbumCollectSheet visible momentId="moment_ready" onClose={onClose} />,
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-sheet-create')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-sheet-create'));
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockCollect).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/albums/new');
+  });
+
+  it('closes from the mask without collecting', async () => {
+    const onClose = jest.fn();
+    const view = await render(
+      <LifeAlbumCollectSheet visible momentId="moment_ready" onClose={onClose} />,
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-sheet-mask')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-sheet-mask'));
+    });
+    expect(onClose).toHaveBeenCalled();
+    expect(mockCollect).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 });
