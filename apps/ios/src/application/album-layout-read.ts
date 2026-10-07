@@ -8,11 +8,27 @@ import type { AlbumLayoutInput, AlbumLayoutMediaInput, AlbumLayoutMediaMap, Albu
 import type { AlbumSourceMediaState } from './album-layout';
 import type { LifeAlbum } from './life-album';
 
+async function locateLayoutDisplayUri(
+  stored: string | undefined,
+  media?: {
+    exists(uri: string): Promise<boolean>;
+    resolveUri?(uri: string): Promise<string | null>;
+  },
+): Promise<string | null> {
+  if (!stored) return null;
+  if (media?.resolveUri) return media.resolveUri(stored);
+  if (media) return (await media.exists(stored)) ? stored : null;
+  return stored;
+}
+
 export async function readAlbumLayoutInput(deps: {
   albums: LifeAlbumRepository;
   moments: MomentRepository;
   assets?: AssetRepository;
-  media?: { exists(uri: string): Promise<boolean> };
+  media?: {
+    exists(uri: string): Promise<boolean>;
+    resolveUri?(uri: string): Promise<string | null>;
+  };
   ownerId?: string;
   albumId: string;
 }): Promise<{ input: AlbumLayoutInput; media: AlbumLayoutMediaMap }> {
@@ -76,14 +92,11 @@ export async function readAlbumLayoutInput(deps: {
       }
       const role: AlbumLayoutMediaInput['role'] =
         asset.asset.type === 'image' ? 'image' : asset.asset.type === 'audio' ? 'audio' : 'unknown';
-      let availability: AlbumSourceMediaState = 'available';
-      const uri = asset.asset.localUri;
-      if (deps.media) {
-        availability = (await deps.media.exists(uri)) ? 'available' : 'missing';
-      } else if (!uri) {
-        availability = 'missing';
-      }
-      if (availability === 'available' && uri) mediaMap[assetId] = uri;
+      // Prefer resolveUri so remapped container paths (stale Application UUID) reach
+      // native UIImage / RN Image — exists() alone can be true while the stored URI is dead.
+      const displayUri = await locateLayoutDisplayUri(asset.asset.localUri, deps.media);
+      const availability: AlbumSourceMediaState = displayUri ? 'available' : 'missing';
+      if (displayUri) mediaMap[assetId] = displayUri;
       const width = asset.asset.metadata.width;
       const height = asset.asset.metadata.height;
       media.push({
@@ -92,7 +105,7 @@ export async function readAlbumLayoutInput(deps: {
         availability,
         intrinsicRatio: width && height ? width / height : role === 'image' ? 1 : null,
         durationMs: asset.asset.metadata.durationMs ?? null,
-        uri: availability === 'available' ? uri : undefined,
+        uri: displayUri ?? undefined,
       });
     }
     records.push({

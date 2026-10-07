@@ -41,7 +41,10 @@ export function createAlbumLayoutUseCases(deps: {
   albums: LifeAlbumRepository;
   moments: MomentRepository;
   assets?: AssetRepository;
-  media?: { exists(uri: string): Promise<boolean> };
+  media?: {
+    exists(uri: string): Promise<boolean>;
+    resolveUri?(uri: string): Promise<string | null>;
+  };
   ownerId?: string;
   measurer?: AlbumTextMeasurer;
   clock?: { now: () => Date };
