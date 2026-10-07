@@ -273,7 +273,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 探针移出普通预览 | `ce66e62` / WALK 回填 `c3ca4fe` |
 | 本机保护实页验收 | `741bdc1` / WALK 回填 `4b9ef3a` |
 | 三项根导航 + 封面墙 | `25467d817e980120d32da9db4e5e04735eae8644` |
-| 选册封面墙 + 宽度／滚动／引导 | `7b48ced32f7bb9e4915826046aefa4a742dac56b` |
+| 选册封面墙 + 宽度／滚动／引导 | `db2f1a8f681e15f588dd15e4854ff5f8d5564424` |
 
 | 项 | 值 |
 | --- | --- |
