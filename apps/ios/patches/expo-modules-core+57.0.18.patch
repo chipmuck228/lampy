@@ -1,0 +1,28 @@
+--- a/node_modules/expo-modules-core/ios/Core/Events/EventEmitter.swift
++++ b/node_modules/expo-modules-core/ios/Core/Events/EventEmitter.swift
+@@ -46,10 +46,10 @@
+     // safe here because the scheduled closure only calls `withEventTarget`, which touches `@JavaScriptActor`-
+     // isolated or `Sendable` state (the JS object, the registry, `appContext`) and the emitter's identity -
+     // never the module's own mutable state.
+-    nonisolated(unsafe) weak let emitter = self
++    let emitter = NonisolatedUnsafeWeakVar(self)
+ 
+     runtime.schedule {
+-      guard let emitter else {
++      guard let emitter = emitter.value else {
+         return
+       }
+       let dispatched = emitter.withEventTarget { target in
+@@ -73,10 +73,10 @@
+     // See the note in `emit(event:payload:)` above - the emitter is captured as `nonisolated(unsafe)`
+     // because it isn't necessarily `Sendable`, and the scheduled closure only reaches `@JavaScriptActor`-
+     // isolated or `Sendable` state through it.
+-    nonisolated(unsafe) weak let emitter = self
++    let emitter = NonisolatedUnsafeWeakVar(self)
+ 
+     runtime.schedule { [weak appContext] in
+-      guard let emitter, let appContext else {
++      guard let emitter = emitter.value, let appContext else {
+         return
+       }
+       let jsPayload: JavaScriptValue

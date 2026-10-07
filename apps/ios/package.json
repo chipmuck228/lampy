@@ -65,7 +65,10 @@
     "family-identity:accept:require": "node ./scripts/family-identity-accept.cjs --require-accepted",
     "family-identity:volume-probe": "node ./scripts/family-identity-volume-probe.cjs",
     "family-identity:accept-test": "node --test ./scripts/family-identity-accept.test.cjs ./scripts/family-identity-volume.test.cjs",
-    "prebuild:ios": "expo prebuild --platform ios --no-install"
+    "prebuild:ios": "expo prebuild --platform ios --no-install",
+    "postinstall": "node ./scripts/apply-native-patches.cjs",
+    "native:patch": "node ./scripts/apply-native-patches.cjs",
+    "build-tools:test": "node --test ./scripts/inspect-release-archive.test.cjs ./scripts/native-build-fix.test.cjs"
   },
   "expo": {
     "autolinking": {
