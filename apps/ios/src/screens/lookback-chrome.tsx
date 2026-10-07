@@ -254,6 +254,7 @@ export function LookbackScaffold({
   onHoldDone,
   onBack,
   onGoRecent,
+  onGoAlbums,
   onLeave,
   onFamily,
 }: {
@@ -282,6 +283,7 @@ export function LookbackScaffold({
   onHoldDone?: () => void;
   onBack?: () => void;
   onGoRecent?: () => void;
+  onGoAlbums?: () => void;
   onLeave?: () => void;
   onFamily?: () => void;
 }) {
@@ -465,7 +467,14 @@ export function LookbackScaffold({
           ) : null
         }
         band={
-          <RootNavBand here="lookback" onOther={onGoRecent} onFamily={onFamily} />
+          <RootNavBand
+            here="lookback"
+            onGo={(dest) => {
+              if (dest === 'recent') onGoRecent?.();
+              if (dest === 'albums') onGoAlbums?.();
+            }}
+            onFamily={onFamily}
+          />
         }
       >
         {content}

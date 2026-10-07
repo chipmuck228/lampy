@@ -73,9 +73,8 @@ import {
   useLookbackLayout,
 } from '../../screens/lookback-chrome';
 import { lookbackCatalogChromeHeight, lookbackCatalogMaxHeight } from '../../screens/lookback-catalog';
-import { LifeIconButton } from '../../screens/life-icons';
 import { LifeAlbumCollectAction, LifeAlbumCollectBanner } from '../../screens/life-album-collect';
-import { sage, shouldUseNavRail } from '../../screens/life-page';
+import { shouldUseNavRail } from '../../screens/life-page';
 import { usePageMetrics } from '../../screens/use-page-metrics';
 import {
   lookbackCollectIsReady,
@@ -1124,21 +1123,6 @@ export default function LookbackIndexScreen() {
           patchLookbackReadingSnapshot({ scrollY: offsetY });
         }
       }}
-      headerTrailing={
-        catalogOpen ? null : (
-          <LifeIconButton
-            name="album"
-            label="我的生活册"
-            testID="lookback-life-album"
-            size={22}
-            color={sage}
-            onPress={() => {
-              writeCurrentSnapshot();
-              router.push('/albums?from=lookback');
-            }}
-          />
-        )
-      }
       headerAction={
         <>
           {collectAlbumId ? (
@@ -1173,12 +1157,18 @@ export default function LookbackIndexScreen() {
         </>
       }
       onGoRecent={() => {
+        if (catalogOpenRef.current) closeCatalog();
         const openedFromRecent = shouldBackToRecent({
           originToken,
           navigationState: navigation.getState?.(),
         });
         goToRecentFromLookbackRoot(router, openedFromRecent);
         forgetLookbackOrigin(originToken);
+      }}
+      onGoAlbums={() => {
+        if (catalogOpenRef.current) closeCatalog();
+        writeCurrentSnapshot();
+        router.dismissTo('/albums');
       }}
       onLeave={() => router.push(leaveHref('lookback'))}
       onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}

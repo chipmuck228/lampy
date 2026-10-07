@@ -203,6 +203,35 @@ Jest：普通预览不写 JSON／PDF；取消后未开始的探针不写；锁�
 
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
+### 11. 三项根导航 + 生活册封面墙（2026-10-07）
+
+在 `ios/life-album-layout-preview` 上将「生活册」提升为底带第三根入口；`/albums` 改为根页封面墙 + 轻量引导。不改排版算法、字体、PDF 探针、声音播放器、Moment、schema、本机保护规则。未开始正式导出／付费。
+
+**根页切换契约：** 见 `src/screens/root-nav-switch.ts`。根之间优先 `dismissTo`；最近→回看仍用既有 origin token；生活册不套用该 token；离开回看时关闭目录。
+
+**自动化：** tsc PASS；相关 Jest（root-nav / albums list / cover-wall / collect / catalog）PASS；eslint 改动 TS 仅既有 lookback-chrome warning；`git diff --check` PASS。
+
+**isol（`Lampy-guide-isol`）：**
+
+| 项 | 结果 |
+| --- | --- |
+| 底带顺序 最近／回看／生活册；sage 当前项；纸色浅顶线 | **PASS** |
+| 回看右上重复「我的生活册」已移除 | **PASS**（顶栏仍为「慢慢看」） |
+| 生活册封面墙两列；册名+条数；文字封面回退；无 LeaveFab；子页预览无底带 | **PASS** |
+| 引导收起后出现「怎么使用」 | **PASS** |
+| 深链在三根之间切换 | **PASS**（`lampy://` / `lookback` / `albums`） |
+| 收集模式 `?collect=` 横幅仍指向目标册 | **PASS**（正在收进《隔离册 · 改名》） |
+| HID 连续点底带两轮位置保留 | 坐标点按不稳 **NOT VERIFIED**；深链切换可用 |
+| 引导冷启动持久收起 | **NOT VERIFIED**（本轮未完整复验重启后 SecureStore） |
+| 目录打开后切根、播放离开暂停 | **NOT VERIFIED** |
+| 短屏／横屏／iPad 底带与列数 | **NOT VERIFIED** |
+| 本机保护抽查（新根不绕过） | **NOT VERIFIED**（规则未改；§10 仍有效） |
+| VoiceOver 逐册 | **NOT VERIFIED** |
+
+截图不入库：`isol-nav-*.png`。
+
+PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
+
 ### 提交 SHA（推送后）
 
 各次走查对应版本（相对 `origin/main`）：
@@ -219,8 +248,9 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 真机封面路径 + 新建顶栏 | `6e5595c` |
 | 册名 focus 不被顶栏挡住 | `56b8e82` |
 | 短册名 CJK 不被 lineHeight 裁切 | `bcb6ccd` |
-| 探针移出普通预览 | `ce66e62` / WALK 回填 `c3ca4fe`（当时 head） |
-| 本机保护实页验收 | `741bdc114748a31608c2a78c051bc0208ef8e4f5` |
+| 探针移出普通预览 | `ce66e62` / WALK 回填 `c3ca4fe` |
+| 本机保护实页验收 | `741bdc1` / WALK 回填 `4b9ef3a` |
+| 三项根导航 + 封面墙 | 本提交（push 后与 PR head 一致） |
 
 | 项 | 值 |
 | --- | --- |

@@ -77,12 +77,13 @@ export function navBandItemMinHeight(fontSize: number): number {
 }
 
 export function navBandItemsFor(
-  _here: 'recent' | 'lookback',
+  _here: 'recent' | 'lookback' | 'albums',
   hasFamily: boolean,
 ): { label: string; fontSize: number }[] {
   const items = [
     { label: '最近', fontSize: NAV_BAND_LABEL_SIZE },
     { label: '回看', fontSize: NAV_BAND_LABEL_SIZE },
+    { label: '生活册', fontSize: NAV_BAND_LABEL_SIZE },
   ];
   if (hasFamily) items.push({ label: '家庭', fontSize: NAV_BAND_LABEL_SIZE });
   return items;
@@ -112,7 +113,7 @@ export function chooseNavBandLayout(input: {
   return 'stack';
 }
 
-export function shouldStackNavBand(windowWidth: number, itemCount = 2): boolean {
+export function shouldStackNavBand(windowWidth: number, itemCount = 3): boolean {
   return (
     chooseNavBandLayout({
       windowWidth,

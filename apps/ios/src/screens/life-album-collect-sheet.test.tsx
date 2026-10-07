@@ -40,7 +40,7 @@ describe('life album collect sheet', () => {
           entryCount: 0,
           lastCollectedAt: null,
           lastCollectedLabel: null,
-          cover: { kind: 'words' },
+          cover: { kind: 'words' }, coverUri: null,
         },
       ],
     });

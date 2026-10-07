@@ -27,7 +27,7 @@ export const LIFE_ICON_NAMES = {
   recent: 'line.3.horizontal',
   lookback: 'book',
   family: 'person.2',
-  album: 'book.closed.fill',
+  album: 'text.book.closed',
   more: 'ellipsis',
 } as const;
 

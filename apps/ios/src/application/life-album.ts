@@ -3,6 +3,12 @@ export const DEFAULT_ALBUM_NAME = '一些日子';
 
 export const ALBUM_EMPTY_LEAD = '把一些日子，放在一起。';
 export const ALBUM_EMPTY_HINT = '先收下一条，也可以慢慢添。';
+export const ALBUM_GUIDE_TITLE = '把一些日子，收成一册。';
+export const ALBUM_GUIDE_BODY =
+  '给册子起个名字，再去回看，把想留在一起的片段收进来。随后，看看这一册。';
+export const ALBUM_GUIDE_DISMISS = '收起说明';
+export const ALBUM_GUIDE_REOPEN = '怎么使用';
+export const ALBUM_ROOT_LABEL = '生活册';
 export const ALBUM_NEW_ACTION = '新建一册';
 export const ALBUM_MISSING_SOURCE = '这条已经不在';
 export const ALBUM_COLLECT_ACTION = '收进这一册';
@@ -81,6 +87,8 @@ export type AlbumListItem = {
   lastCollectedAt: string | null;
   lastCollectedLabel: string | null;
   cover: AlbumCover;
+  /** Resolved display URI for an image cover; null → warm words cover. */
+  coverUri: string | null;
 };
 
 export type AlbumCoverCandidate = {

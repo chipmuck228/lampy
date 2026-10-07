@@ -52,7 +52,7 @@ describe('moment detail collect menu', () => {
   beforeEach(() => {
     mockList.mockResolvedValue({
       status: 'ready',
-      albums: [{ id: 'album_1', name: '一些日子', entryCount: 0, lastCollectedAt: null, lastCollectedLabel: null, cover: { kind: 'words' } }],
+      albums: [{ id: 'album_1', name: '一些日子', entryCount: 0, lastCollectedAt: null, lastCollectedLabel: null, cover: { kind: 'words' }, coverUri: null }],
     });
     mockContaining.mockResolvedValue(['album_1']);
     mockCreate.mockReset();

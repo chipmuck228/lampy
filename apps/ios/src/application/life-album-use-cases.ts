@@ -156,6 +156,13 @@ export function createLifeAlbumUseCases(deps: {
       if (!latest || entry.collectedAt > latest) return entry.collectedAt;
       return latest;
     }, null);
+    let coverUri: string | null = null;
+    if (album.cover.kind === 'image' && deps.assets) {
+      const asset = await deps.assets.findById(album.cover.assetId);
+      if (asset.kind === 'ready' && asset.asset.type === 'image') {
+        coverUri = await locateDisplayUri(asset.asset.localUri);
+      }
+    }
     return {
       id: album.id,
       name: album.name,
@@ -163,6 +170,7 @@ export function createLifeAlbumUseCases(deps: {
       lastCollectedAt,
       lastCollectedLabel: formatCollectedAt(lastCollectedAt, viewerClock),
       cover: album.cover,
+      coverUri,
     };
   }
 
