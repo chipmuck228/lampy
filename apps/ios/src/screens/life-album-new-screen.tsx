@@ -52,6 +52,8 @@ export default function LifeAlbumNewScreen() {
   /** Real name returned by createAlbum — used after partial failure / success. */
   const [createdAlbumName, setCreatedAlbumName] = useState<string | null>(null);
   const savingRef = useRef(false);
+  /** Only this requestId may clear savingRef / saving. */
+  const lockOwnerRef = useRef<number | null>(null);
   const finishedRef = useRef(false);
   const requestGenRef = useRef(0);
   const sourceKeyRef = useRef(sourceKey);
@@ -67,10 +69,21 @@ export default function LifeAlbumNewScreen() {
     });
   }
 
+  function releaseSubmitLock(requestId: number): boolean {
+    if (lockOwnerRef.current !== requestId) return false;
+    lockOwnerRef.current = null;
+    savingRef.current = false;
+    setSaving(false);
+    return true;
+  }
+
   useEffect(() => {
     if (sourceKeyRef.current === sourceKey) return;
     sourceKeyRef.current = sourceKey;
     invalidateRequests();
+    // New source owns a clean slate; drop any prior lock without attributing release
+    // to the old requestId (that request must not clear a later lock).
+    lockOwnerRef.current = null;
     savingRef.current = false;
     finishedRef.current = false;
     setSaving(false);
@@ -125,6 +138,7 @@ export default function LifeAlbumNewScreen() {
     const capturedSourceKey = sourceKey;
 
     savingRef.current = true;
+    lockOwnerRef.current = requestId;
     setSaving(true);
     setError(null);
 
@@ -211,13 +225,12 @@ export default function LifeAlbumNewScreen() {
       setError(isApplicationError(caught) ? caught.message : ALBUM_WRITE_FAILED);
     } finally {
       if (!isEligible(requestId)) {
-        savingRef.current = false;
-        if (sourceKeyRef.current === capturedSourceKey) setSaving(false);
+        // Stale request: release only if it still owns the lock (never clear B's).
+        releaseSubmitLock(requestId);
         return;
       }
       if (!finishedRef.current) {
-        savingRef.current = false;
-        setSaving(false);
+        releaseSubmitLock(requestId);
       }
     }
   }

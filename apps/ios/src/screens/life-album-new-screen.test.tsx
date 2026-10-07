@@ -371,6 +371,73 @@ describe('life album new screen', () => {
     expect(view.getByLabelText(ALBUM_CREATE_AND_COLLECT_ACTION)).toBeTruthy();
   });
 
+  it('keeps B submitting when A finishes after a source switch', async () => {
+    const writeA = deferred<{ id: string; name: string; entries: never[] }>();
+    const writeB = deferred<{ id: string; name: string; entries: never[] }>();
+    mockCreate
+      .mockReturnValueOnce(writeA.promise)
+      .mockReturnValueOnce(writeB.promise);
+    const first = albumCollectCreateHref('moment_old');
+    mockParams = first.params;
+    const view = await render(wrap(<LifeAlbumNewScreen />));
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-new-save'));
+    });
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+
+    const second = albumCollectCreateHref('moment_new');
+    mockGetState.mockReturnValue({
+      index: 1,
+      routes: [
+        { name: 'moment/[id]', params: { id: 'moment_new' } },
+        { name: 'albums/new' },
+      ],
+    });
+    await act(async () => {
+      mockParams = second.params;
+      view.rerender(wrap(<LifeAlbumNewScreen />));
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-new-save'));
+    });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(view.getByTestId('life-album-new-save').props.accessibilityState?.disabled).toBe(
+      true,
+    );
+    expect(view.getByText('正在创建')).toBeTruthy();
+
+    await act(async () => {
+      writeA.resolve({ id: 'album_old', name: '旧册', entries: [] });
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // A must not unlock B or start collect/alert for the old source.
+    expect(mockCollect).not.toHaveBeenCalled();
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(view.getByTestId('life-album-new-save').props.accessibilityState?.disabled).toBe(
+      true,
+    );
+    expect(view.getByText('正在创建')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-new-save'));
+    });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      writeB.resolve({ id: 'album_new', name: '新册', entries: [] });
+    });
+    await waitFor(() => {
+      expect(mockCollect).toHaveBeenCalledTimes(1);
+      expect(mockCollect).toHaveBeenCalledWith({
+        albumId: 'album_new',
+        momentId: 'moment_new',
+      });
+    });
+  });
+
   it('retries collect against the same albumId after a collect failure', async () => {
     mockCreate.mockResolvedValue({
       id: 'album_new',

@@ -275,8 +275,8 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 | 项 | 结果 |
 | --- | --- |
-| 多册封面墙＋磨砂背景、边缘柔和、文字清楚 | **NOT VERIFIED**（未可靠点进详情「…」选册） |
-| 加入／取消／新建；底层不可误点 | **NOT VERIFIED** |
+| 多册封面墙＋磨砂背景、边缘柔和、文字清楚 | **真机 PASS**（用户报告；运行 SHA 未确认） |
+| 加入／取消／新建；底层不可误点 | **NOT VERIFIED**（不因磨砂 PASS 顺带记过） |
 | 多册＋键盘列表可滚、取消可达 | **NOT VERIFIED** |
 | Reduce Transparency 开／关实色退路 | **NOT VERIFIED**（Jest 覆盖；设备未切系统设置） |
 | 短屏／横屏无越界或底裁 | **NOT VERIFIED** |
@@ -311,14 +311,14 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 项 | 结果 |
 | --- | --- |
 | 冷启动／Metro 连上后主页可见（runtime 修复后） | **PASS**（抽查 boot；不替代弹层验收） |
-| 多册列表可滚，底栏新建＋取消始终可达 | **NOT VERIFIED** |
-| 点已有册加入／取消／遮罩 | **NOT VERIFIED** |
-| 详情→新建→创建并收入→返回；新册含原记录 | **NOT VERIFIED** |
+| 多册列表可滚，底栏新建＋取消始终可达 | **真机 PASS**（用户报告；运行 SHA 未确认） |
+| 点已有册加入／取消／遮罩 | **NOT VERIFIED**（不因底栏 PASS 顺带记过） |
+| 详情→新建→创建并收入→返回；新册含原记录 | **NOT VERIFIED**（见 §15／§16；不因底栏／磨砂 PASS 记过） |
 | 新建中取消，无写入 | **NOT VERIFIED**（Jest 覆盖） |
 | 短屏／横屏底栏完整 | **NOT VERIFIED** |
-| Reduce Transparency／GlassView 磨砂外观 | **NOT VERIFIED**（未见实页磨砂前不记 PASS；§13 仍有效） |
+| Reduce Transparency／GlassView 磨砂外观 | **真机 PASS**（用户报告；运行 SHA 未确认；同 §13） |
 
-此前 §1–§12 已验收项不重测；§13 磨砂仍 NOT VERIFIED。
+此前 §1–§12 已验收项不重测。底栏／磨砂真机 PASS **不**扩展为创建并收入已通过。
 
 截图不入库：`isol-c-footer-*.png`。
 
@@ -337,15 +337,30 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 离开时创建已完成 | 不继续收入；册子保留在库 |
 | 部分失败 | 只读真实册名；重试同一 `albumId` |
 
-**自动化：** `npx tsc --noEmit` PASS；Jest（new-screen 交错／intent／collect-sheet／request helper）PASS（33）；eslint 改动 TS PASS；`git diff --check` PASS。
+**自动化：** `npx tsc --noEmit` PASS；Jest（new-screen 交错／intent／collect-sheet／request helper）PASS；eslint 改动 TS PASS；`git diff --check` PASS。
 
 **isol：**
 
 | 项 | 结果 |
 | --- | --- |
-| 详情→新建→创建并加入→返回；原记录在新册、册名正确 | **NOT VERIFIED**（本轮以自动化交错为主；用户曾验通过预览 URI，不替代本条） |
-| 失败／迟到／换来源不污染新页 | **自动化 PASS**；设备 **NOT VERIFIED** |
-| 底栏／磨砂／横屏等 §13–14 未走项 | 仍 **NOT VERIFIED** |
+| 详情→新建→创建并加入→返回；原记录在新册、册名正确 | **NOT VERIFIED**（见 §16） |
+| 失败／迟到／换来源不污染新页；提交锁按 requestId 持有 | **自动化 PASS**；设备 **NOT VERIFIED** |
+| 底栏／磨砂 | **真机 PASS**（用户报告；运行 SHA 未确认；**不**扩展为本条创建并收入 PASS） |
+
+PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
+
+### 16. 新建提交锁归属 + 创建并收入实页（2026-10-07）
+
+提交锁由所属 `requestId` 持有，只有持有者能释放 `savingRef`／`saving`；旧请求结束不得清除新请求的提交中状态。来源切换后 A 等待结束、B 仍保持提交中，再点不会重复创建（Jest）。
+
+**自动化：** `npx tsc --noEmit` PASS；Jest new-screen（含 A→换源→B 锁仍提交中、不重复创建）／request helper PASS；eslint 改动 TS PASS；`git diff --check` PASS。
+
+**isol：**
+
+| 项 | 结果 |
+| --- | --- |
+| 详情「…」→ 新建一册 → 创建并加入 → 返回原详情；记录已收入 | **NOT VERIFIED**（本环境 HID／坐标点按无法稳定进入详情「…」；不把底栏／磨砂真机 PASS 记作本条通过） |
+| 底栏／磨砂 | 不重测；沿用用户报告真机 PASS（运行 SHA 未确认） |
 
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
@@ -373,6 +388,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 选册底栏 + 新建并收入契约 | `b10cfeef92e5e101a7b2c00bc5fc8a0ddf725bdf` |
 | 预览媒体 resolveUri 重映射 | `c9e66b697a1acffed31ef276d2a674a95b9d6ec6` |
 | 新建页请求资格 + 部分失败册名 | `40c5d91e247170eebe16907824122395bf6b4646` |
+| 新建提交锁归属（requestId） | （推送后回填） |
 
 | 项 | 值 |
 | --- | --- |
