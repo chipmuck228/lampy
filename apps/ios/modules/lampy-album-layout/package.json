@@ -1,0 +1,10 @@
+{
+  "name": "lampy-album-layout",
+  "version": "0.1.0",
+  "main": "index.ts",
+  "types": "index.ts",
+  "description": "Core Text measurement and isolated PDF probe for Lampy albums",
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/local/lampy-album-layout",
+  "author": "Lampy"
+}

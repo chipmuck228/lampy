@@ -8,6 +8,7 @@ import { getUseCases } from '../application/container';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { leaveHref, lookbackRootHrefFromRecent } from '../screens/lookback-origin';
 import { RootNavBand, RootReadingLayout } from '../screens/root-nav-band';
+import { dismissToRootNav } from '../screens/root-nav-switch';
 import type { RecentLifeViewModel } from '../application/use-cases';
 import { LifeIconButton } from '../screens/life-icons';
 import { shouldPairRecentImages } from '../screens/moment-images';
@@ -261,7 +262,13 @@ export default function RecentScreen() {
         band={
           <RootNavBand
             here="recent"
-            onOther={openLookback}
+            onGo={(dest) => {
+              if (dest === 'lookback') {
+                openLookback();
+                return;
+              }
+              if (dest === 'albums') dismissToRootNav(router, 'albums');
+            }}
             onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
           />
         }

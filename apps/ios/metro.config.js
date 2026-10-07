@@ -9,13 +9,15 @@ const projectionsRoot = path.resolve(repoRoot, 'projections');
 
 const config = getDefaultConfig(projectRoot);
 
+// Keep shared package folders watched. Do not set resolver.nodeModulesPaths /
+// disableHierarchicalLookup — Expo SDK 52+ configures monorepo resolution, and
+// forcing nodeModulesPaths can break Hermes with "property is not writable".
 config.watchFolders = [domainRoot, projectionsRoot];
 config.resolver.extraNodeModules = {
   ...(config.resolver.extraNodeModules || {}),
   '@lampy/domain': domainRoot,
   '@lampy/projections': projectionsRoot,
 };
-config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
 const assetExts = new Set(config.resolver.assetExts || []);
 assetExts.add('ttf');
 assetExts.add('otf');

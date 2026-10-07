@@ -23,7 +23,7 @@ function collectTestIds(node: unknown, found: string[] = []): string[] {
 
 function bandOrder(view: { toJSON: () => unknown }) {
   return collectTestIds(view.toJSON()).filter((id) =>
-    ['root-nav-here-wrap', 'home-lookback', 'lookback-go-recent', 'home-family'].includes(id),
+    ['root-nav-here-wrap', 'home-lookback', 'lookback-go-recent', 'home-albums', 'home-family'].includes(id),
   );
 }
 
@@ -57,12 +57,44 @@ describe('root nav band layout', () => {
     phoneWindow();
   });
 
+  it('places the leave overlay above the band with the reading gutter, not over the Home Indicator twice', async () => {
+    phoneWindow();
+    const view = await render(
+      wrap(
+        <RootReadingLayout
+          scrollTestID="overlay-scroll"
+          overlay={
+            <LeaveFab
+              testID="overlay-leave-fab"
+              onPress={() => undefined}
+              available
+              opacity={new Animated.Value(1)}
+              shift={new Animated.Value(0)}
+            />
+          }
+          band={<Text testID="overlay-band">band</Text>}
+        >
+          <Text>page</Text>
+        </RootReadingLayout>,
+      ),
+    );
+    expect(view.getByTestId('overlay-band')).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByTestId('root-leave-overlay').props.style)).toEqual(
+      expect.objectContaining({
+        paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
+        paddingRight: pageGutter(390, 844),
+      }),
+    );
+    expect(StyleSheet.flatten(view.getByTestId('overlay-leave-fab').props.style)).toEqual(
+      expect.objectContaining({ minHeight: 48, minWidth: 48 }),
+    );
+  });
   it('spreads three or four items across the available width at regular type', async () => {
     const four = await render(
       wrap(
         <RootNavBand
           here="recent"
-          onOther={() => undefined}
+          onGo={() => undefined}
           onFamily={() => undefined}
         />,
       ),
@@ -84,7 +116,7 @@ describe('root nav band layout', () => {
     await four.unmount();
 
     const three = await render(
-      wrap(<RootNavBand here="lookback" onOther={() => undefined} />),
+      wrap(<RootNavBand here="lookback" onGo={() => undefined} />),
     );
     expect(StyleSheet.flatten(three.getByTestId('root-nav-here-wrap').props.style)).toEqual(
       expect.objectContaining({ flexGrow: 1, flexBasis: 0, alignItems: 'center' }),
@@ -99,7 +131,7 @@ describe('root nav band layout', () => {
       screen: { width: 390, height: 844, scale: 2, fontScale: 1.3 },
     });
     const three = await render(
-      wrap(<RootNavBand here="recent" onOther={() => undefined} />),
+      wrap(<RootNavBand here="recent" onGo={() => undefined} />),
     );
     expect(StyleSheet.flatten(three.getByTestId('root-nav-band').props.style)).toEqual(
       expect.objectContaining({ flexDirection: 'row', flexWrap: 'nowrap' }),
@@ -117,7 +149,7 @@ describe('root nav band layout', () => {
       wrap(
         <RootNavBand
           here="recent"
-          onOther={() => undefined}
+          onGo={() => undefined}
           onFamily={() => undefined}
         />,
       ),
@@ -135,7 +167,7 @@ describe('root nav band layout', () => {
       wrap(
         <RootNavBand
           here="lookback"
-          onOther={() => undefined}
+          onGo={() => undefined}
           onFamily={() => undefined}
         />,
       ),
@@ -153,7 +185,7 @@ describe('root nav band layout', () => {
       screen: { width: 390, height: 844, scale: 2, fontScale: 3.1 },
     });
     const row = await render(
-      wrap(<RootNavBand here="recent" onOther={() => undefined} />),
+      wrap(<RootNavBand here="recent" onGo={() => undefined} />),
     );
     expect(StyleSheet.flatten(row.getByTestId('root-nav-band').props.style)).toEqual(
       expect.objectContaining({ flexDirection: 'row', flexWrap: 'nowrap' }),
@@ -172,7 +204,7 @@ describe('root nav band layout', () => {
       wrap(
         <RootNavBand
           here="recent"
-          onOther={() => undefined}
+          onGo={() => undefined}
           onFamily={() => undefined}
         />,
       ),
@@ -195,7 +227,7 @@ describe('root nav band layout', () => {
           band={
             <RootNavBand
               here="recent"
-              onOther={() => undefined}
+              onGo={() => undefined}
               onFamily={() => undefined}
             />
           }
@@ -216,7 +248,7 @@ describe('root nav band layout', () => {
 
   it('does not restack the band when only the system type changes', async () => {
     const view = await render(
-      wrap(<RootNavBand here="recent" onOther={() => undefined} />),
+      wrap(<RootNavBand here="recent" onGo={() => undefined} />),
     );
     await act(async () => {
       view.getByTestId('root-nav-here').props.onTextLayout({
@@ -268,51 +300,51 @@ describe('root nav band layout', () => {
     await view.unmount();
   });
 
-  it('keeps 最近 left and 回看 right on the recent root', async () => {
-    const recent = await render(wrap(<RootNavBand here="recent" onOther={() => undefined} />));
-    expect(bandOrder(recent)).toEqual(['root-nav-here-wrap', 'home-lookback']);
+  it('keeps 最近 / 回看 / 生活册 order on the recent root', async () => {
+    const recent = await render(wrap(<RootNavBand here="recent" onGo={() => undefined} />));
+    expect(bandOrder(recent)).toEqual(['root-nav-here-wrap', 'home-lookback', 'home-albums']);
     expect(recent.getByTestId('root-nav-here-wrap').props.accessible).toBe(true);
     expect(recent.getByTestId('root-nav-here-wrap').props.accessibilityRole).toBe('tab');
     expect(recent.getByTestId('root-nav-here-wrap').props.accessibilityState?.selected).toBe(true);
     expect(recent.getByTestId('home-lookback').props.accessibilityState?.selected).toBe(false);
+    expect(recent.getByTestId('home-albums').props.accessibilityState?.selected).toBe(false);
     expect(StyleSheet.flatten(recent.getByTestId('root-nav-here-wrap').props.style)).toEqual(
       expect.objectContaining({ minWidth: 48, minHeight: 48 }),
     );
-    expect(StyleSheet.flatten(recent.getByTestId('home-lookback').props.style)).toEqual(
+    expect(StyleSheet.flatten(recent.getByTestId('home-albums').props.style)).toEqual(
       expect.objectContaining({ minWidth: 48, minHeight: 48 }),
     );
   });
 
-  it('keeps 最近 left and 回看 right on the lookback root', async () => {
-    const lookback = await render(wrap(<RootNavBand here="lookback" onOther={() => undefined} />));
-    expect(bandOrder(lookback)).toEqual(['lookback-go-recent', 'root-nav-here-wrap']);
-    expect(lookback.getByTestId('root-nav-here-wrap').props.accessible).toBe(true);
-    expect(lookback.getByTestId('root-nav-here-wrap').props.accessibilityRole).toBe('tab');
+  it('keeps 最近 / 回看 / 生活册 order on the lookback and albums roots', async () => {
+    const lookback = await render(wrap(<RootNavBand here="lookback" onGo={() => undefined} />));
+    expect(bandOrder(lookback)).toEqual(['lookback-go-recent', 'root-nav-here-wrap', 'home-albums']);
     expect(lookback.getByTestId('root-nav-here-wrap').props.accessibilityState?.selected).toBe(true);
-    expect(lookback.getByTestId('lookback-go-recent').props.accessibilityState?.selected).toBe(false);
+    await lookback.unmount();
+    const albums = await render(wrap(<RootNavBand here="albums" onGo={() => undefined} />));
+    expect(bandOrder(albums)).toEqual(['lookback-go-recent', 'home-lookback', 'root-nav-here-wrap']);
+    expect(albums.getByTestId('root-nav-here-wrap').props.accessibilityState?.selected).toBe(true);
+    await albums.unmount();
   });
 
-  it('does not navigate when the current recent item is pressed', async () => {
-    const onOther = jest.fn();
-    const recent = await render(wrap(<RootNavBand here="recent" onOther={onOther} />));
+  it('routes band presses to other roots and ignores the selected item', async () => {
+    phoneWindow();
+    const onGo = jest.fn();
+    const recent = await render(wrap(<RootNavBand here="recent" onGo={onGo} />));
     fireEvent.press(recent.getByTestId('root-nav-here-wrap'));
-    expect(onOther).not.toHaveBeenCalled();
+    expect(onGo).not.toHaveBeenCalled();
     fireEvent.press(recent.getByTestId('home-lookback'));
-    expect(onOther).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not navigate when the current lookback item is pressed', async () => {
-    const onOther = jest.fn();
-    const lookback = await render(wrap(<RootNavBand here="lookback" onOther={onOther} />));
-    fireEvent.press(lookback.getByTestId('root-nav-here-wrap'));
-    expect(onOther).not.toHaveBeenCalled();
-    fireEvent.press(lookback.getByTestId('lookback-go-recent'));
-    expect(onOther).toHaveBeenCalledTimes(1);
+    expect(onGo).toHaveBeenCalledWith('lookback');
+    fireEvent.press(recent.getByTestId('home-albums'));
+    expect(onGo).toHaveBeenCalledWith('albums');
+    expect(recent.getByTestId('home-lookback').props.accessibilityRole).toBe('tab');
+    expect(recent.getByTestId('home-albums').props.accessibilityRole).toBe('tab');
   });
 
   it('uses catalogued system symbols for the band icons', () => {
     expect(LIFE_ICON_NAMES.recent).toBe('line.3.horizontal');
     expect(LIFE_ICON_NAMES.lookback).toBe('book');
+    expect(LIFE_ICON_NAMES.album).toBe('text.book.closed');
   });
 
   it('reserves FAB clearance without the nav height', () => {
@@ -325,35 +357,4 @@ describe('root nav band layout', () => {
     expect(leaveFabOverlayPadding(1024, 1366).paddingRight).toBe(pageGutter(1024, 1366));
   });
 
-  it('places the leave overlay above the band with the reading gutter, not over the Home Indicator twice', async () => {
-    const view = await render(
-      wrap(
-        <RootReadingLayout
-          scrollTestID="overlay-scroll"
-          overlay={
-            <LeaveFab
-              testID="overlay-leave-fab"
-              onPress={() => undefined}
-              available
-              opacity={new Animated.Value(1)}
-              shift={new Animated.Value(0)}
-            />
-          }
-          band={<RootNavBand here="recent" onOther={() => undefined} />}
-        >
-          <></>
-        </RootReadingLayout>,
-      ),
-    );
-    expect(StyleSheet.flatten(view.getByTestId('root-leave-overlay').props.style)).toEqual(
-      expect.objectContaining({
-        paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
-        paddingRight: pageGutter(390, 844),
-      }),
-    );
-    expect(StyleSheet.flatten(view.getByTestId('overlay-leave-fab').props.style)).toEqual(
-      expect.objectContaining({ minHeight: 48, minWidth: 48 }),
-    );
-    await view.unmount();
-  });
 });

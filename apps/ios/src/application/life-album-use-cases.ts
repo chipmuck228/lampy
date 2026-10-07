@@ -83,7 +83,10 @@ export function createLifeAlbumUseCases(deps: {
   albums?: LifeAlbumRepository;
   moments: MomentRepository;
   assets?: AssetRepository;
-  media?: { exists(uri: string): Promise<boolean> };
+  media?: {
+    exists(uri: string): Promise<boolean>;
+    resolveUri?(uri: string): Promise<string | null>;
+  };
   clock?: Clock;
   ownerId?: string;
   id?: () => string;
@@ -108,6 +111,13 @@ export function createLifeAlbumUseCases(deps: {
       throw new ApplicationError(ALBUM_NOT_FOUND, ALBUM_GONE);
     }
     return album;
+  }
+
+  async function locateDisplayUri(stored: string | undefined): Promise<string | null> {
+    if (!stored) return null;
+    if (deps.media?.resolveUri) return deps.media.resolveUri(stored);
+    if (deps.media) return (await deps.media.exists(stored)) ? stored : null;
+    return stored;
   }
 
   async function coverAfterRemoving(album: Awaited<ReturnType<typeof requireAlbum>>, momentId: string) {
@@ -146,6 +156,13 @@ export function createLifeAlbumUseCases(deps: {
       if (!latest || entry.collectedAt > latest) return entry.collectedAt;
       return latest;
     }, null);
+    let coverUri: string | null = null;
+    if (album.cover.kind === 'image' && deps.assets) {
+      const asset = await deps.assets.findById(album.cover.assetId);
+      if (asset.kind === 'ready' && asset.asset.type === 'image') {
+        coverUri = await locateDisplayUri(asset.asset.localUri);
+      }
+    }
     return {
       id: album.id,
       name: album.name,
@@ -153,6 +170,7 @@ export function createLifeAlbumUseCases(deps: {
       lastCollectedAt,
       lastCollectedLabel: formatCollectedAt(lastCollectedAt, viewerClock),
       cover: album.cover,
+      coverUri,
     };
   }
 
@@ -165,13 +183,12 @@ export function createLifeAlbumUseCases(deps: {
       for (const assetId of found.moment.assetIds) {
         const asset = await deps.assets.findById(assetId);
         if (asset.kind !== 'ready' || asset.asset.type !== 'image') continue;
-        const uri = asset.asset.localUri;
-        const available = deps.media ? await deps.media.exists(uri) : Boolean(uri);
+        const uri = await locateDisplayUri(asset.asset.localUri);
         candidates.push({
           momentId: entry.momentId,
           assetId,
-          uri: available ? uri : undefined,
-          available,
+          uri: uri ?? undefined,
+          available: Boolean(uri),
         });
       }
     }
@@ -183,34 +200,74 @@ export function createLifeAlbumUseCases(deps: {
     noteExcerpt: string | null;
     dateLabel: string | null;
     mediaHint: string | null;
+    photoCount: number;
+    hasAudio: boolean;
+    unknownCount: number;
+    audioDurationMs: number | null;
+    thumbnailUri: string | null;
+    occurredSortKey: number | null;
   }> {
+    const empty = {
+      noteExcerpt: null,
+      dateLabel: null,
+      mediaHint: null,
+      photoCount: 0,
+      hasAudio: false,
+      unknownCount: 0,
+      audioDurationMs: null,
+      thumbnailUri: null,
+      occurredSortKey: null,
+    };
     const found = await deps.moments.findById(momentId);
     if (found.kind !== 'ready') {
       return {
         source: found.kind === 'unreadable' ? 'unreadable' : 'missing',
-        noteExcerpt: null,
-        dateLabel: null,
-        mediaHint: null,
+        ...empty,
       };
     }
     let photoCount = 0;
     let hasAudio = false;
+    let unknownCount = 0;
+    let audioDurationMs: number | null = null;
+    let thumbnailUri: string | null = null;
     if (deps.assets) {
       for (const assetId of found.moment.assetIds) {
         const asset = await deps.assets.findById(assetId);
-        if (asset.kind !== 'ready') continue;
-        if (asset.asset.type === 'image') photoCount += 1;
-        if (asset.asset.type === 'audio') hasAudio = true;
+        if (asset.kind !== 'ready') {
+          unknownCount += 1;
+          continue;
+        }
+        if (asset.asset.type === 'image') {
+          photoCount += 1;
+          if (!thumbnailUri) {
+            thumbnailUri = await locateDisplayUri(asset.asset.localUri);
+          }
+          continue;
+        }
+        if (asset.asset.type === 'audio') {
+          hasAudio = true;
+          const duration = asset.asset.metadata?.durationMs;
+          if (typeof duration === 'number' && duration > 0) audioDurationMs = duration;
+          continue;
+        }
+        unknownCount += 1;
       }
     }
     const occurred = found.moment.time.occurredAt;
     const dateIso = occurred || found.moment.time.recordedAt;
     const dated = formatCollectedAt(dateIso, viewerClock);
+    const occurredSortKey = dateIso ? parseMillis(dateIso) : null;
     return {
       source: 'ready',
       noteExcerpt: albumNoteExcerpt(found.moment.content.note),
       dateLabel: occurred ? dated : dated ? `记录于 ${dated}` : null,
-      mediaHint: albumMediaHint({ photoCount, hasAudio }),
+      mediaHint: albumMediaHint({ photoCount, hasAudio, unknownCount }),
+      photoCount,
+      hasAudio,
+      unknownCount,
+      audioDurationMs,
+      thumbnailUri,
+      occurredSortKey,
     };
   }
 

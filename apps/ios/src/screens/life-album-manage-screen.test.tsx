@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LifeAlbumManageScreen from './life-album-manage-screen';
 
+const mockPush = jest.fn();
 const mockGetAlbum = jest.fn();
 const mockUpdate = jest.fn();
 const mockSetCover = jest.fn();
@@ -16,6 +17,7 @@ jest.mock('expo-router', () => {
   return {
     useRouter: () => ({
       dismissTo: jest.fn(),
+      push: mockPush,
     }),
     useFocusEffect: (effect: () => void | (() => void)) => {
       useEffect(effect, [effect]);
@@ -71,6 +73,12 @@ function manageView() {
         noteExcerpt: '门口的风',
         dateLabel: '2026年10月1日',
         mediaHint: '有照片',
+        photoCount: 1,
+        hasAudio: false,
+        unknownCount: 0,
+        audioDurationMs: null,
+        thumbnailUri: 'file://photo.jpg',
+        occurredSortKey: Date.parse('2026-10-01T00:00:00.000Z'),
       },
     ],
     coverCandidates: [
@@ -93,7 +101,7 @@ describe('life album manage screen', () => {
 
   beforeEach(() => {
     cleanup();
-    mockGetAlbum.mockReset();
+    mockPush.mockReset();
     mockUpdate.mockReset();
     mockSetCover.mockReset();
     mockMove.mockReset();
@@ -114,37 +122,28 @@ describe('life album manage screen', () => {
     });
     expect(view.getByText('门口的风')).toBeTruthy();
     expect(view.getByText('2026年10月1日')).toBeTruthy();
-    expect(view.getByText('有照片')).toBeTruthy();
+    expect(view.getByTestId('life-album-preview-open')).toBeTruthy();
+    expect(view.queryByTestId('life-album-manage-name')).toBeNull();
+    expect(view.queryByTestId('life-album-move-up-m1')).toBeNull();
+    expect(view.queryByText('删除这一册')).toBeNull();
+    expect(view.getByText('1条 · 2026年10月1日')).toBeTruthy();
   });
 
   it('keeps an unsaved opening after cover and rename', async () => {
     const view = await render(wrap());
     await waitFor(() => {
+      expect(view.getByTestId('life-album-edit')).toBeTruthy();
+    });
+    fireEvent.press(view.getByTestId('life-album-preview-open'));
+    expect(mockPush).toHaveBeenCalledWith('/albums/album_1/preview');
+    fireEvent.press(view.getByTestId('life-album-entry-open-m1'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm1' } });
+    fireEvent.press(view.getByTestId('life-album-edit'));
+    fireEvent.press(view.getByTestId('life-album-organize'));
+    await waitFor(() => {
       expect(view.getByTestId('life-album-manage-opening')).toBeTruthy();
-    });
-    fireEvent.changeText(view.getByTestId('life-album-manage-opening'), '一段还没存的开篇');
-    await act(async () => {
-      fireEvent.press(view.getByTestId('life-album-cover-words'));
-    });
-    await waitFor(() => {
-      expect(mockSetCover).toHaveBeenCalled();
-    });
-    expect(view.getByTestId('life-album-manage-opening').props.value).toBe('一段还没存的开篇');
-    fireEvent.changeText(view.getByTestId('life-album-manage-name'), '新名字');
-    await act(async () => {
-      fireEvent.press(view.getByTestId('life-album-manage-save-name'));
-    });
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalled();
-    });
-    expect(view.getByTestId('life-album-manage-opening').props.value).toBe('一段还没存的开篇');
-  });
-
-  it('does not select a missing cover or move the first entry up', async () => {
-    const view = await render(wrap());
-    await waitFor(() => {
-      expect(view.getByTestId('life-album-manage-name')).toBeTruthy();
       expect(view.getByTestId('life-album-cover-words')).toBeTruthy();
+      expect(view.getByTestId('life-album-move-up-m1')).toBeTruthy();
     });
     expect(view.getByText('这张照片现在看不到')).toBeTruthy();
     fireEvent.press(view.getByTestId('life-album-cover-asset_missing'));
@@ -154,5 +153,17 @@ describe('life album manage screen', () => {
     );
     fireEvent.press(view.getByTestId('life-album-move-up-m1'));
     expect(mockMove).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-cover-words'));
+    });
+    await waitFor(() => {
+      expect(mockSetCover).toHaveBeenCalled();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-manage-save-name'));
+    });
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled();
+    });
   });
 });

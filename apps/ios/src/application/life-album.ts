@@ -3,7 +3,19 @@ export const DEFAULT_ALBUM_NAME = '一些日子';
 
 export const ALBUM_EMPTY_LEAD = '把一些日子，放在一起。';
 export const ALBUM_EMPTY_HINT = '先收下一条，也可以慢慢添。';
+export const ALBUM_GUIDE_TITLE = '把一些日子，收成一册。';
+export const ALBUM_GUIDE_BODY =
+  '给册子起个名字，再去回看，把想留在一起的片段收进来。随后，看看这一册。';
+export const ALBUM_GUIDE_DISMISS = '收起说明';
+export const ALBUM_GUIDE_REOPEN = '怎么使用';
+/** Shown when dismiss succeeded in-session but SecureStore write failed. */
+export const ALBUM_GUIDE_PERSIST_FAILED = '说明还没记牢，下次可能还会出现。';
+export const ALBUM_ROOT_LABEL = '生活册';
 export const ALBUM_NEW_ACTION = '新建一册';
+/** Submit label when creating from the collect sheet (create + collect). */
+export const ALBUM_CREATE_AND_COLLECT_ACTION = '创建并加入此册';
+/** Submit label when creating from the album list (create only). */
+export const ALBUM_CREATE_ONLY_ACTION = '创建这一册';
 export const ALBUM_MISSING_SOURCE = '这条已经不在';
 export const ALBUM_COLLECT_ACTION = '收进这一册';
 export const ALBUM_COLLECTED_ACTION = '已收下';
@@ -12,10 +24,15 @@ export const ALBUM_READ_FAILED = '生活册暂时读不出来，原来的记录�
 export const ALBUM_RETRY = '再试一次';
 export const ALBUM_DELETE_CONFIRM = '只删这一册，不删原来的记录。';
 export const ALBUM_COLLECT_MENU = '收进生活册';
-export const ALBUM_ALREADY_IN = '已在这一册';
+export const ALBUM_ALREADY_IN = '已在此册';
+export const ALBUM_JOIN_ACTION = '加入此册';
 export const ALBUM_MY_ALBUMS = '我的生活册';
 export const ALBUM_GONE = '这一册已经不在。原来的记录还在。';
 export const ALBUM_WRITE_FAILED = '这一册还没记下。原来的记录还在，可以再试。';
+/** Album row exists; collect into it failed — do not claim full success. */
+export const ALBUM_CREATED_COLLECT_FAILED = '册子已创建，这条还没有加入。可以再试。';
+export const ALBUM_CREATE_COLLECT_SUCCESS = '已加入此册';
+export const ALBUM_CREATE_COLLECT_RETRY = '再试加入';
 export const ALBUM_LOADING = '生活册正在读出来。';
 export const ALBUM_WORDS_COVER = '文字封面';
 export const ALBUM_OPENING_HINT = '可以写一段开篇，也可以留空。';
@@ -48,9 +65,15 @@ export type AlbumEntryView = AlbumEntry & {
   noteExcerpt: string | null;
   dateLabel: string | null;
   mediaHint: string | null;
+  photoCount: number;
+  hasAudio: boolean;
+  unknownCount: number;
+  audioDurationMs: number | null;
+  thumbnailUri: string | null;
+  occurredSortKey: number | null;
 };
 
-export const ALBUM_NOTE_EXCERPT_MAX = 36;
+export const ALBUM_NOTE_EXCERPT_MAX = 72;
 
 export function albumNoteExcerpt(note: string | undefined | null, max = ALBUM_NOTE_EXCERPT_MAX): string | null {
   const trimmed = (note ?? '').replace(/\s+/g, ' ').trim();
@@ -59,10 +82,11 @@ export function albumNoteExcerpt(note: string | undefined | null, max = ALBUM_NO
   return `${trimmed.slice(0, max)}…`;
 }
 
-export function albumMediaHint(input: { photoCount: number; hasAudio: boolean }): string | null {
+export function albumMediaHint(input: { photoCount: number; hasAudio: boolean; unknownCount?: number }): string | null {
   const parts: string[] = [];
   if (input.photoCount > 0) parts.push(input.photoCount === 1 ? '有照片' : `有${input.photoCount}张照片`);
   if (input.hasAudio) parts.push('有声音');
+  if (input.unknownCount) parts.push('还有一种现在打不开的媒介。');
   return parts.length ? parts.join(' · ') : null;
 }
 
@@ -73,6 +97,8 @@ export type AlbumListItem = {
   lastCollectedAt: string | null;
   lastCollectedLabel: string | null;
   cover: AlbumCover;
+  /** Resolved display URI for an image cover; null → warm words cover. */
+  coverUri: string | null;
 };
 
 export type AlbumCoverCandidate = {
@@ -108,4 +134,24 @@ export function albumCollectingLabel(name: string): string {
 
 export function albumEntryCountLabel(count: number): string {
   return `${count}条`;
+}
+
+export function albumDateRangeLabel(entries: { occurredSortKey: number | null; dateLabel: string | null }[]): string | null {
+  const dated = entries
+    .filter((entry) => entry.occurredSortKey != null && entry.dateLabel)
+    .sort((left, right) => (left.occurredSortKey ?? 0) - (right.occurredSortKey ?? 0));
+  if (!dated.length) return null;
+  const first = dated[0].dateLabel;
+  const last = dated[dated.length - 1].dateLabel;
+  if (!first || !last || first === last) return first;
+  return `${first} — ${last}`;
+}
+
+export function formatAlbumAudioDuration(durationMs: number | null): string | null {
+  if (durationMs == null || durationMs <= 0) return null;
+  const total = Math.round(durationMs / 1000);
+  if (total < 60) return `${total}秒`;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return seconds ? `${minutes}分${seconds}秒` : `${minutes}分钟`;
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { hairline, ink, pageGutter, paper, readingWidth, sage } from './life-page';
@@ -18,6 +18,7 @@ export function SettingsPage({
   testID,
   pageTestID,
   onBack,
+  scrollEnabled = true,
   children,
 }: {
   title: string;
@@ -26,6 +27,7 @@ export function SettingsPage({
   testID?: string;
   pageTestID?: string;
   onBack: () => void;
+  scrollEnabled?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -54,27 +56,40 @@ export function SettingsPage({
           style={styles.backHit}
         >
           <LifeIcon name="back" size={19} color={sage} decorative />
-          <Text style={styles.back}>{backLabel}</Text>
+          <Text style={styles.back} numberOfLines={1}>
+            {backLabel}
+          </Text>
         </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
+        <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>
           {title}
         </Text>
         <View style={styles.headerSpacer} />
       </View>
-      <ScrollView
-        testID={testID ?? 'account-scroll'}
+      <KeyboardAvoidingView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.column,
-          {
-            paddingLeft: padLeft,
-            paddingRight: padRight,
-            paddingBottom: Math.max(insets.bottom, 44),
-          },
-        ]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.reading, { maxWidth: column }]}>{children}</View>
-      </ScrollView>
+        <ScrollView
+          testID={testID ?? 'account-scroll'}
+          style={styles.scroll}
+          scrollEnabled={scrollEnabled}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={false}
+          contentInsetAdjustmentBehavior="never"
+          contentContainerStyle={[
+            styles.column,
+            {
+              paddingLeft: padLeft,
+              paddingRight: padRight,
+              paddingBottom: Math.max(insets.bottom, 44),
+              ...(scrollEnabled ? null : { flexGrow: 1 }),
+            },
+          ]}
+        >
+          <View style={[styles.reading, { maxWidth: column }]}>{children}</View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -90,15 +105,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backHit: {
+    flex: 1,
     minWidth: 70,
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
-  back: { ...type.meta, color: sage },
-  title: { ...type.meta, color: ink, textAlign: 'center', flexShrink: 1 },
-  headerSpacer: { width: 70, minHeight: 48 },
+  back: { ...type.meta, color: sage, flexShrink: 1 },
+  title: { ...type.meta, color: ink, textAlign: 'center', flexShrink: 1, maxWidth: '42%' },
+  headerSpacer: { flex: 1, minWidth: 70, minHeight: 48 },
   scroll: { flex: 1 },
   column: {
     width: '100%',

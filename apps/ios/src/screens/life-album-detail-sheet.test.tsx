@@ -52,7 +52,7 @@ describe('moment detail collect menu', () => {
   beforeEach(() => {
     mockList.mockResolvedValue({
       status: 'ready',
-      albums: [{ id: 'album_1', name: '一些日子', entryCount: 0, lastCollectedAt: null, lastCollectedLabel: null, cover: { kind: 'words' } }],
+      albums: [{ id: 'album_1', name: '一些日子', entryCount: 0, lastCollectedAt: null, lastCollectedLabel: null, cover: { kind: 'words' }, coverUri: null }],
     });
     mockContaining.mockResolvedValue(['album_1']);
     mockCreate.mockReset();
@@ -67,7 +67,7 @@ describe('moment detail collect menu', () => {
     fireEvent.press(view.getByTestId('moment-overflow'));
     await waitFor(() => {
       expect(view.getByTestId('life-album-collect-sheet')).toBeTruthy();
-      expect(view.getByLabelText('一些日子，已在这一册')).toBeTruthy();
+      expect(view.getByLabelText('一些日子，已在此册')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('life-album-sheet-cancel'));
     await waitFor(() => {

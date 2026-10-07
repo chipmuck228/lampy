@@ -1,5 +1,5 @@
 import { useState, type ReactNode, type Ref } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type TextLayoutEventData, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type TextLayoutEventData, type ViewStyle } from 'react-native';
 import { Text } from './life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,8 +22,9 @@ import {
   shouldUseNavRail,
 } from './life-page';
 import { usePageMetrics } from './use-page-metrics';
+import { shouldIgnoreRootNavPress, type RootNavDest } from './root-nav-switch';
 
-type BandDest = 'recent' | 'lookback' | 'family';
+type BandDest = RootNavDest | 'family';
 
 const BAND_DESTINATIONS: {
   id: BandDest;
@@ -33,16 +34,17 @@ const BAND_DESTINATIONS: {
 }[] = [
   { id: 'recent', label: '最近', icon: 'recent', goTestID: 'lookback-go-recent' },
   { id: 'lookback', label: '回看', icon: 'lookback', goTestID: 'home-lookback' },
+  { id: 'albums', label: '生活册', icon: 'album', goTestID: 'home-albums' },
   { id: 'family', label: '家庭', icon: 'family', goTestID: 'home-family' },
 ];
 
 export function RootNavBand({
   here,
-  onOther,
+  onGo,
   onFamily,
 }: {
-  here: 'recent' | 'lookback';
-  onOther: () => void;
+  here: RootNavDest;
+  onGo: (dest: RootNavDest) => void;
   onFamily?: () => void;
 }) {
   const { width, height } = usePageMetrics();
@@ -139,7 +141,14 @@ export function RootNavBand({
         accessibilityLabel={dest.label}
         accessibilityState={{ selected: false }}
         testID={dest.goTestID}
-        onPress={dest.id === 'family' ? onFamily : onOther}
+        onPress={() => {
+          if (dest.id === 'family') {
+            onFamily?.();
+            return;
+          }
+          if (shouldIgnoreRootNavPress(here, dest.id)) return;
+          onGo(dest.id);
+        }}
         style={[itemStyle, min]}
       >
         {inner}
@@ -149,7 +158,8 @@ export function RootNavBand({
 
   const recentItem = renderItem(BAND_DESTINATIONS[0]);
   const lookbackItem = renderItem(BAND_DESTINATIONS[1]);
-  const familyItem = onFamily ? renderItem(BAND_DESTINATIONS[2]) : null;
+  const albumsItem = renderItem(BAND_DESTINATIONS[2]);
+  const familyItem = onFamily ? renderItem(BAND_DESTINATIONS[3]) : null;
 
   return (
     <View
@@ -169,6 +179,7 @@ export function RootNavBand({
             {lookbackItem}
           </View>
           <View testID="root-nav-grid-row-2" style={styles.gridRow}>
+            {albumsItem}
             {familyItem}
           </View>
         </>
@@ -176,6 +187,7 @@ export function RootNavBand({
         <>
           {recentItem}
           {lookbackItem}
+          {albumsItem}
           {familyItem}
         </>
       )}
@@ -193,6 +205,7 @@ export function RootReadingLayout({
   onScroll,
   onScrollBeginDrag,
   onContentSizeChange,
+  onScrollLayout,
   overlay,
   header,
   canvas = paper,
@@ -206,7 +219,8 @@ export function RootReadingLayout({
   scrollRef?: Ref<ScrollView>;
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScrollBeginDrag?: () => void;
-  onContentSizeChange?: () => void;
+  onContentSizeChange?: (contentWidth: number, contentHeight: number) => void;
+  onScrollLayout?: (event: LayoutChangeEvent) => void;
   overlay?: ReactNode;
   header?: ReactNode;
   canvas?: string;
@@ -232,6 +246,7 @@ export function RootReadingLayout({
             onScroll={onScroll}
             onScrollBeginDrag={onScrollBeginDrag}
             onContentSizeChange={onContentSizeChange}
+            onLayout={onScrollLayout}
             scrollEventThrottle={16}
             keyboardShouldPersistTaps="handled"
           >
