@@ -1,3 +1,4 @@
+import { leaveVoiceHref } from '../screens/leave-voice-intent';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Dimensions, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../screens/life-text';
@@ -276,6 +277,7 @@ export default function RecentScreen() {
           <LeaveFab
             testID="recent-leave-fab"
             onPress={() => router.push(leaveHref('recent'))}
+            onRecordVoice={() => { const href = leaveVoiceHref('recent'); if (href) router.push(href); }}
             available={leaveFab.open}
             opacity={leaveFab.opacity}
             shift={leaveFab.shift}

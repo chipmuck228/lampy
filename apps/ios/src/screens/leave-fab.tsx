@@ -110,6 +110,7 @@ export function useLeaveFabMotion() {
 export function LeaveFab({
   testID,
   onPress,
+  onRecordVoice,
   available,
   forcedHidden = false,
   opacity,
@@ -117,12 +118,14 @@ export function LeaveFab({
 }: {
   testID: string;
   onPress: () => void;
+  onRecordVoice?: () => void;
   available: boolean;
   forcedHidden?: boolean;
   opacity: Animated.Value;
   shift: Animated.Value;
 }) {
   const interactive = available && !forcedHidden;
+  const longPressed = useRef(false);
   return (
     <View
       testID={`${testID}-force`}
@@ -153,7 +156,20 @@ export function LeaveFab({
             accessibilityState={{ disabled: !interactive }}
             testID={testID}
             disabled={!interactive}
-            onPress={onPress}
+            onPressIn={() => { longPressed.current = false; }}
+            delayLongPress={500}
+            onLongPress={onRecordVoice ? () => {
+              if (!interactive || longPressed.current) return;
+              longPressed.current = true;
+              onRecordVoice();
+            } : undefined}
+            onPress={() => {
+              if (!longPressed.current) onPress();
+            }}
+            accessibilityActions={onRecordVoice ? [{ name: 'recordVoice', label: '录一段声音' }] : undefined}
+            onAccessibilityAction={(event) => {
+              if (interactive && event.nativeEvent.actionName === 'recordVoice') onRecordVoice?.();
+            }}
             style={styles.fab}
           >
             <LifeIcon name="plus" size={16} color={sage} decorative />

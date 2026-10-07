@@ -249,7 +249,8 @@ export function createExpoAudioCapture(): AudioCapture {
       const result = await native.requestRecordingPermissionsAsync();
       return result.granted ? 'granted' : 'denied';
     },
-    async start() {
+    async start(canStart) {
+      if (canStart && !canStart()) throw new Error('recording cancelled');
       if (recorder?.isRecording) {
         throw new Error('already recording');
       }
@@ -261,6 +262,7 @@ export function createExpoAudioCapture(): AudioCapture {
         const next = new Recorder(RECORDING_OPTIONS);
         try {
           await next.prepareToRecordAsync(RECORDING_OPTIONS);
+          if (canStart && !canStart()) throw new Error('recording cancelled');
           next.record();
           recorder = next;
           startedAt = Date.now();

@@ -4,6 +4,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LeaveScreen from '../app/leave';
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    const React = jest.requireActual('react');
+    React.useEffect(effect, [effect]);
+  },
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
   useLocalSearchParams: () => ({}),
 }));
@@ -77,4 +81,10 @@ describe('leave screen', () => {
     expect(view.getByLabelText('放弃这份草稿')).toBeTruthy();
     expect(view.getByLabelText('移除这张照片，照片 1/1')).toBeTruthy();
   });
+});
+
+// Page tests model a foreground navigation screen.
+beforeEach(() => {
+  const { AppState } = jest.requireActual('react-native');
+  Object.defineProperty(AppState, 'currentState', { value: 'active', writable: true, configurable: true });
 });

@@ -1,5 +1,5 @@
 import { Animated, StyleSheet } from 'react-native';
-import { cleanup, render } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render } from '@testing-library/react-native';
 
 import { LeaveFab } from './leave-fab';
 import { hairline, paperDeep, sage } from './life-page';
@@ -117,5 +117,37 @@ describe('shared LeaveFab', () => {
       expect.objectContaining({ color: sage }),
     );
     view.unmount();
+  });
+});
+
+
+describe('LeaveFab voice gesture', () => {
+  it('long press suppresses tap, while a new short tap stays unchanged', async () => {
+    const tap = jest.fn(); const voice = jest.fn();
+    const view = await render(<LeaveFab testID="fab" onPress={tap} onRecordVoice={voice}
+      available opacity={new Animated.Value(1)} shift={new Animated.Value(0)} />);
+    await act(async () => {
+      fireEvent(view.getByTestId('fab'), 'pressIn');
+      fireEvent(view.getByTestId('fab'), 'longPress');
+      fireEvent.press(view.getByTestId('fab'));
+    });
+    expect(voice).toHaveBeenCalledTimes(1); expect(tap).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent(view.getByTestId('fab'), 'pressIn');
+      fireEvent.press(view.getByTestId('fab'));
+      fireEvent(view.getByTestId('fab'), 'accessibilityAction', { nativeEvent: { actionName: 'recordVoice' } });
+    });
+    expect(tap).toHaveBeenCalledTimes(1); expect(voice).toHaveBeenCalledTimes(2);
+  });
+  it('does not authorize voice while the catalog force-hides the button', async () => {
+    const voice = jest.fn();
+    const view = await render(<LeaveFab testID="fab" onPress={() => {}} onRecordVoice={voice}
+      available forcedHidden opacity={new Animated.Value(1)} shift={new Animated.Value(0)} />);
+    const fab = view.getByTestId('fab', { includeHiddenElements: true });
+    await act(async () => {
+      fireEvent(fab, 'longPress');
+      fireEvent(fab, 'accessibilityAction', { nativeEvent: { actionName: 'recordVoice' } });
+    });
+    expect(voice).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,10 @@ const mockRestore = jest.fn();
 const mockUpdateDraftEmotion = jest.fn();
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    const React = jest.requireActual('react');
+    React.useEffect(effect, [effect]);
+  },
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
   useLocalSearchParams: () => ({}),
 }));
@@ -120,4 +124,10 @@ describe('leave feeling picker', () => {
     expect(view.getByLabelText('当时的感受，高兴').props.accessibilityState.selected).toBe(false);
     expect(view.getByLabelText('清除当时的感受')).toBeTruthy();
   });
+});
+
+// Page tests model a foreground navigation screen.
+beforeEach(() => {
+  const { AppState } = jest.requireActual('react-native');
+  Object.defineProperty(AppState, 'currentState', { value: 'active', writable: true, configurable: true });
 });

@@ -11,6 +11,10 @@ const mockSaveTextMoment = jest.fn();
 let mockSearchParams: Record<string, string | undefined> = {};
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    const React = jest.requireActual('react');
+    React.useEffect(effect, [effect]);
+  },
   useRouter: () => ({
     push: jest.fn(),
     back: mockBack,
@@ -116,4 +120,10 @@ describe('leave entry copy and save dismiss', () => {
     expect(mockReplace).not.toHaveBeenCalled();
     expect(peekJustSavedMomentId()).toBe('moment_draft');
   });
+});
+
+// Page tests model a foreground navigation screen.
+beforeEach(() => {
+  const { AppState } = jest.requireActual('react-native');
+  Object.defineProperty(AppState, 'currentState', { value: 'active', writable: true, configurable: true });
 });

@@ -658,6 +658,18 @@ describe('expo audio session routing', () => {
     expect(player.play).toHaveBeenCalledTimes(1);
   });
 
+  it('checks startup eligibility again after native preparation', async () => {
+    const { capture } = loadAdapters();
+    const record = jest.spyOn(AudioRecorder.prototype, 'record');
+    const eligible = jest.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
+    await expect(capture.start(eligible)).rejects.toThrow('recording cancelled');
+    expect(record).not.toHaveBeenCalled();
+    record.mockRestore();
+    expect(createdRecorders[0].release).toHaveBeenCalled();
+    expect(capture.isRecording()).toBe(false);
+    expect(sessionOrder.at(-1)).toBe('playback');
+  });
+
   it('leaves recording mode if prepare fails', async () => {
     failPrepare = true;
     const { capture } = loadAdapters();
