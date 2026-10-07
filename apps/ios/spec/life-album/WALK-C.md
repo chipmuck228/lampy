@@ -389,7 +389,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 预览媒体 resolveUri 重映射 | `c9e66b697a1acffed31ef276d2a674a95b9d6ec6` |
 | 新建页请求资格 + 部分失败册名 | `40c5d91e247170eebe16907824122395bf6b4646` |
 | 新建提交锁归属（requestId） | `11bbab1a78433613d15b6558f4d4305489652b00` |
-| 创建并收入真机 PASS 记入 WALK | （推送后回填） |
+| 创建并收入真机 PASS 记入 WALK | `71441badc92d9894eb3c9999493ab39a6399f145` |
 
 | 项 | 值 |
 | --- | --- |
