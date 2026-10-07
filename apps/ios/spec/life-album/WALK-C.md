@@ -324,6 +324,31 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
+### 15. 新建页请求资格 + 部分失败册名（2026-10-07）
+
+在 `ios/life-album-layout-preview` 上收紧 `/albums/new`：提交捕获独立 requestId／intent／momentId／输入；失焦、卸载、`beforeRemove`、来源参数变化作废旧请求；各 await 与成功框「好」前回资格。创建已落库不撤回、不自动删册；失效后不再启动收入／弹框／导航。收入失败保留真实 `albumId`＋`album.name`，册名只读，文案「册子已创建，这条还没有加入」，重试「再试加入」只收入同一本。未改排版、播放器、本机保护、LeaveFab、导出／付费。
+
+**语义：**
+| 路径 | 行为 |
+| --- | --- |
+| 列表新建 | 只 `createAlbum` → 管理页；无收入 |
+| 详情／选册新建 | 可信 intent → 创建并收入；成功 Alert 后可信返回 |
+| 离开时尚未创建 | 不创建、不导航副作用 |
+| 离开时创建已完成 | 不继续收入；册子保留在库 |
+| 部分失败 | 只读真实册名；重试同一 `albumId` |
+
+**自动化：** `npx tsc --noEmit` PASS；Jest（new-screen 交错／intent／collect-sheet／request helper）PASS（33）；eslint 改动 TS PASS；`git diff --check` PASS。
+
+**isol：**
+
+| 项 | 结果 |
+| --- | --- |
+| 详情→新建→创建并加入→返回；原记录在新册、册名正确 | **NOT VERIFIED**（本轮以自动化交错为主；用户曾验通过预览 URI，不替代本条） |
+| 失败／迟到／换来源不污染新页 | **自动化 PASS**；设备 **NOT VERIFIED** |
+| 底栏／磨砂／横屏等 §13–14 未走项 | 仍 **NOT VERIFIED** |
+
+PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
+
 ### 提交 SHA（推送后）
 
 各次走查对应版本（相对 `origin/main`）：
@@ -346,6 +371,8 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 选册封面墙 + 宽度／滚动／引导 | `db2f1a8f681e15f588dd15e4854ff5f8d5564424` |
 | 选册弹层暖纸磨砂外观 | `b815c3ebd3ff9659f4e0bea4b4a8cd15d82cd59f` |
 | 选册底栏 + 新建并收入契约 | `b10cfeef92e5e101a7b2c00bc5fc8a0ddf725bdf` |
+| 预览媒体 resolveUri 重映射 | `c9e66b697a1acffed31ef276d2a674a95b9d6ec6` |
+| 新建页请求资格 + 部分失败册名 | （推送后回填） |
 
 | 项 | 值 |
 | --- | --- |
