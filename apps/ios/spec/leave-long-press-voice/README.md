@@ -19,8 +19,8 @@ recording uses the existing interrupt-and-preserve path.
 
 `expo-haptics ~57.0.3` is added: a light impact occurs only after successful gesture
 recording startup; unavailable feedback is harmless. Rebuild the native app for this
-dependency. Do not use Metro-only reload as haptic/native verification. This change
-has not been installed on Liuz17 or uploaded to TestFlight; Build 3 is unchanged.
+dependency. Do not use Metro-only reload as haptic/native verification. The user built and tested this branch locally with Xcode 26.3. TestFlight Build 3
+is unchanged; this feature has not been uploaded.
 
 ## Device verification — NOT VERIFIED
 
@@ -45,3 +45,21 @@ available in this Linux environment; automated PASS does not mean device PASS.
   untouched `84a3540` checkout with the same dependencies: `life-page.test.ts`
   still expects a bottom band without 生活册; `life-album-detail-sheet.test.tsx`
   expects the old `一些日子，已在此册` label. No unrelated fixes were bundled here.
+
+## User-reported real-device acceptance — 2026-10-07
+
+Reported PASS: recent/lookback ordinary tap vs 500ms hold; release keeps recording;
+stop/listen/save and playback; restored text/photo draft remains; existing sound is
+not overwritten; microphone refusal still allows writing; background while permission
+is pending does not later auto-start; local protection masks during authentication;
+background interrupts active recording and preserves captured audio in the draft;
+FAB scroll/catalog visibility stays unchanged.
+
+Light haptic was not clearly perceptible: effect remains unconfirmed, not a device PASS.
+Exact installed JS SHA, device and OS were not independently rechecked for this report.
+System VoiceOver, short screen, landscape and iPad remain NOT VERIFIED. The checklist
+above remains for paths not specifically covered by the report.
+
+Pre-merge recheck: TypeScript PASS; targeted Jest 8 suites / 71 tests PASS (act warnings
+remain); changed implementation lint and diff checks recorded in the PR. Earlier broad
+suite baseline failures remain explicitly documented, not represented as full PASS.
