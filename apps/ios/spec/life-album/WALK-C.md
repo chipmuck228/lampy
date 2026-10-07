@@ -372,7 +372,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 选册弹层暖纸磨砂外观 | `b815c3ebd3ff9659f4e0bea4b4a8cd15d82cd59f` |
 | 选册底栏 + 新建并收入契约 | `b10cfeef92e5e101a7b2c00bc5fc8a0ddf725bdf` |
 | 预览媒体 resolveUri 重映射 | `c9e66b697a1acffed31ef276d2a674a95b9d6ec6` |
-| 新建页请求资格 + 部分失败册名 | （推送后回填） |
+| 新建页请求资格 + 部分失败册名 | `40c5d91e247170eebe16907824122395bf6b4646` |
 
 | 项 | 值 |
 | --- | --- |
