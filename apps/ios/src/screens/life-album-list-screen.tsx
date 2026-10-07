@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
@@ -9,6 +8,7 @@ import {
   ALBUM_EMPTY_LEAD,
   ALBUM_GUIDE_BODY,
   ALBUM_GUIDE_DISMISS,
+  ALBUM_GUIDE_PERSIST_FAILED,
   ALBUM_GUIDE_REOPEN,
   ALBUM_GUIDE_TITLE,
   ALBUM_LOADING,
@@ -22,12 +22,12 @@ import {
 } from '../application/life-album';
 import { createSecureAlbumListGuideStore } from '../infrastructure/album-list-guide-store';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
+import { AlbumCoverFace, AlbumCoverMeta } from './album-cover-tile';
+import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
 import {
-  albumCoverTileHeight,
-  albumCoverTileWidth,
-  albumCoverWallColumns,
-  ALBUM_COVER_WALL_GAP,
-} from './album-cover-wall';
+  albumListRestoreScrollY,
+  albumListShouldRecordScrollOffset,
+} from './album-list-scroll-restore';
 import { peekAlbumListScroll, rememberAlbumListScroll } from './album-list-session';
 import { hairline, ink, inkSoft, pageGutter, paper, paperDeep, sage } from './life-page';
 import { Text, type } from './life-text';
@@ -42,26 +42,54 @@ export default function LifeAlbumListScreen() {
   const router = useRouter();
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
-  const contentWidth = Math.max(0, width - gutter * 2);
-  const columns = albumCoverWallColumns(contentWidth);
-  const tileWidth = albumCoverTileWidth(contentWidth, columns);
-  const tileHeight = albumCoverTileHeight(tileWidth);
+  const [wallWidth, setWallWidth] = useState<number | null>(null);
+  const wallLayout = albumCoverWallLayout(wallWidth);
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [albums, setAlbums] = useState<AlbumListItem[]>([]);
   const [loadKey, setLoadKey] = useState(0);
+  const [focusEpoch, setFocusEpoch] = useState(0);
   const [guideOpen, setGuideOpen] = useState(true);
   const [guideReady, setGuideReady] = useState(false);
+  const [guidePersistHint, setGuidePersistHint] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
-  const restorePending = useRef(true);
+  const restorePendingRef = useRef(false);
+  const contentSizedRef = useRef(false);
+  const contentHeightRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+
+  const tryRestoreScroll = useCallback(() => {
+    const decision = albumListRestoreScrollY({
+      restorePending: restorePendingRef.current,
+      savedY: peekAlbumListScroll(),
+      listReady: status === 'ready' || status === 'error',
+      guideReady,
+      contentSized: contentSizedRef.current,
+      contentHeight: contentHeightRef.current,
+      viewportHeight: viewportHeightRef.current,
+    });
+    if (decision.action === 'wait') return;
+    restorePendingRef.current = false;
+    if (decision.action === 'restore') {
+      scrollRef.current?.scrollTo({ y: decision.y, animated: false });
+    }
+  }, [status, guideReady]);
 
   useEffect(() => {
     let cancelled = false;
-    void guideStore.isDismissed().then((dismissed) => {
-      if (cancelled) return;
-      setGuideOpen(!dismissed);
-      setGuideReady(true);
-    });
+    void guideStore
+      .isDismissed()
+      .then((dismissed) => {
+        if (cancelled) return;
+        setGuideOpen(!dismissed);
+        setGuideReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Read failed: show guide and finish pending; cover wall still loads.
+        setGuideOpen(true);
+        setGuideReady(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -69,32 +97,56 @@ export default function LifeAlbumListScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const requestId = loadKey;
-      let cancelled = false;
-      setStatus(requestId >= 0 ? 'loading' : 'loading');
-      getUseCases()
-        .then((app) => app.listAlbums())
-        .then((view) => {
-          if (cancelled) return;
-          if (view.status === 'ready') {
-            setAlbums(view.albums);
-            setStatus('ready');
-            return;
-          }
-          setStatus('error');
-        })
-        .catch(() => {
-          if (!cancelled) setStatus('error');
-        });
-      return () => {
-        cancelled = true;
-      };
-    }, [loadKey]),
+      // Returning from detail / another root: arm restore from saved offset.
+      // Retry (loadKey) must not re-arm while the user stays on this page.
+      if (peekAlbumListScroll() > 0) {
+        restorePendingRef.current = true;
+        contentSizedRef.current = false;
+      }
+      setFocusEpoch((value) => value + 1);
+    }, []),
   );
+
+  useEffect(() => {
+    if (focusEpoch === 0) return;
+    let cancelled = false;
+    contentSizedRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- album list load is bound to focus/retry
+    setStatus('loading');
+    getUseCases()
+      .then((app) => app.listAlbums())
+      .then((view) => {
+        if (cancelled) return;
+        if (view.status === 'ready') {
+          setAlbums(view.albums);
+          setStatus('ready');
+          return;
+        }
+        setStatus('error');
+      })
+      .catch(() => {
+        if (!cancelled) setStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusEpoch, loadKey]);
+
+  useEffect(() => {
+    tryRestoreScroll();
+  }, [status, guideReady, albums.length, guideOpen, tryRestoreScroll]);
 
   const dismissGuide = useCallback(() => {
     setGuideOpen(false);
-    void guideStore.markDismissed();
+    void guideStore.markDismissed().then(
+      () => {
+        setGuidePersistHint(null);
+      },
+      () => {
+        // In-session dismiss kept; do not claim persistence.
+        setGuidePersistHint(ALBUM_GUIDE_PERSIST_FAILED);
+      },
+    );
   }, []);
 
   const empty = status === 'ready' && albums.length === 0;
@@ -108,24 +160,40 @@ export default function LifeAlbumListScreen() {
       contentContainerStyle={[
         styles.column,
         {
-          maxWidth: contentWidth + gutter * 2,
           paddingHorizontal: gutter,
           paddingTop: 4,
           paddingBottom: 24,
         },
       ]}
       onScroll={(event) => {
-        rememberAlbumListScroll(event.nativeEvent.contentOffset.y);
-      }}
-      onContentSizeChange={() => {
-        if (!restorePending.current) return;
-        const y = peekAlbumListScroll();
-        if (y <= 0) {
-          restorePending.current = false;
+        const offsetY = event.nativeEvent.contentOffset.y;
+        if (
+          !albumListShouldRecordScrollOffset({
+            restorePending: restorePendingRef.current,
+            listLoading: status === 'loading',
+            offsetY,
+          })
+        ) {
           return;
         }
-        scrollRef.current?.scrollTo({ y, animated: false });
-        restorePending.current = false;
+        rememberAlbumListScroll(offsetY);
+      }}
+      onScrollBeginDrag={() => {
+        if (restorePendingRef.current) {
+          restorePendingRef.current = false;
+        }
+      }}
+      onScrollLayout={(event) => {
+        viewportHeightRef.current = event.nativeEvent.layout.height;
+        tryRestoreScroll();
+      }}
+      onContentSizeChange={(_w, contentHeight) => {
+        contentHeightRef.current = contentHeight;
+        // Loading collapse must not count as the restore target layout.
+        if (status !== 'loading') {
+          contentSizedRef.current = true;
+        }
+        tryRestoreScroll();
       }}
       header={
         <View style={[styles.header, { paddingHorizontal: gutter }]} testID="life-album-list-header">
@@ -139,7 +207,10 @@ export default function LifeAlbumListScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={ALBUM_GUIDE_REOPEN}
                 testID="life-album-guide-reopen"
-                onPress={() => setGuideOpen(true)}
+                onPress={() => {
+                  setGuidePersistHint(null);
+                  setGuideOpen(true);
+                }}
                 style={styles.reopenHit}
               >
                 <Text style={styles.reopenLabel}>{ALBUM_GUIDE_REOPEN}</Text>
@@ -152,7 +223,9 @@ export default function LifeAlbumListScreen() {
         <RootNavBand
           here="albums"
           onGo={(dest) => {
-            rememberAlbumListScroll(peekAlbumListScroll());
+            if (!restorePendingRef.current) {
+              rememberAlbumListScroll(peekAlbumListScroll());
+            }
             if (dest === 'recent') {
               dismissToRootNav(router, 'recent');
               return;
@@ -187,6 +260,12 @@ export default function LifeAlbumListScreen() {
           </View>
         ) : null}
 
+        {guidePersistHint ? (
+          <Text testID="life-album-guide-persist-hint" style={styles.meta}>
+            {guidePersistHint}
+          </Text>
+        ) : null}
+
         {status === 'loading' ? <Text style={styles.meta}>{ALBUM_LOADING}</Text> : null}
         {status === 'error' ? (
           <View>
@@ -219,6 +298,10 @@ export default function LifeAlbumListScreen() {
             testID="life-album-cover-wall"
             style={[styles.wall, { gap: ALBUM_COVER_WALL_GAP }]}
             accessibilityLabel={ALBUM_ROOT_LABEL}
+            onLayout={(event) => {
+              const next = Math.round(event.nativeEvent.layout.width);
+              setWallWidth((prev) => (prev === next ? prev : next));
+            }}
           >
             {albums.map((album) => (
               <Pressable
@@ -227,28 +310,16 @@ export default function LifeAlbumListScreen() {
                 accessibilityLabel={`${album.name}，${albumEntryCountLabel(album.entryCount)}`}
                 testID={`life-album-tile-${album.id}`}
                 onPress={() => router.push({ pathname: '/albums/[id]', params: { id: album.id } })}
-                style={[styles.tile, { width: tileWidth }]}
+                style={[styles.tile, { width: wallLayout.tileWidth }]}
               >
-                <View style={[styles.cover, { width: tileWidth, height: tileHeight }]}>
-                  {album.coverUri ? (
-                    <Image
-                      source={{ uri: album.coverUri }}
-                      style={StyleSheet.absoluteFill}
-                      contentFit="cover"
-                      accessibilityIgnoresInvertColors
-                    />
-                  ) : (
-                    <View style={styles.wordsCover} testID={`life-album-words-cover-${album.id}`}>
-                      <Text style={styles.wordsName} numberOfLines={3}>
-                        {album.name}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.tileName} numberOfLines={2}>
-                  {album.name}
-                </Text>
-                <Text style={styles.tileMeta}>{albumEntryCountLabel(album.entryCount)}</Text>
+                <AlbumCoverFace
+                  name={album.name}
+                  coverUri={album.coverUri}
+                  width={wallLayout.tileWidth}
+                  height={wallLayout.tileHeight}
+                  wordsTestID={`life-album-words-cover-${album.id}`}
+                />
+                <AlbumCoverMeta name={album.name} entryCount={album.entryCount} />
               </Pressable>
             ))}
           </View>
@@ -272,7 +343,7 @@ export default function LifeAlbumListScreen() {
 }
 
 const styles = StyleSheet.create({
-  column: { alignSelf: 'center', width: '100%' },
+  column: { alignSelf: 'stretch', width: '100%' },
   body: { gap: 16 },
   header: { paddingTop: 8, paddingBottom: 8, gap: 4, backgroundColor: paper },
   headerRow: {
@@ -307,28 +378,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'flex-start',
+    alignSelf: 'stretch',
   },
   tile: {
     minHeight: 48,
     gap: 6,
   },
-  cover: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: paperDeep,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: hairline,
-  },
-  wordsCover: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    justifyContent: 'flex-end',
-    backgroundColor: paperDeep,
-  },
-  wordsName: { ...type.action, color: ink, fontSize: 17, lineHeight: 24 },
-  tileName: { ...type.action, color: ink, fontSize: 16, lineHeight: 22 },
-  tileMeta: { ...type.meta, color: inkSoft },
   createHit: {
     minHeight: 48,
     marginTop: 4,

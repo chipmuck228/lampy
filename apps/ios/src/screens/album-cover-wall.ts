@@ -22,3 +22,37 @@ export function albumCoverTileWidth(contentWidth: number, columns: number): numb
 export function albumCoverTileHeight(tileWidth: number): number {
   return Math.round(tileWidth * ALBUM_COVER_WALL_ASPECT);
 }
+
+export type AlbumCoverWallLayout = {
+  columns: number;
+  tileWidth: number;
+  tileHeight: number;
+  contentWidth: number;
+  measured: boolean;
+};
+
+/**
+ * Layout from the wall container's **content** width (after padding / rail).
+ * Unmeasured → one column at min tile (never paint overflowing multi-col).
+ * Do not subtract gutter again from a padded onLayout width.
+ */
+export function albumCoverWallLayout(measuredContentWidth: number | null | undefined): AlbumCoverWallLayout {
+  if (measuredContentWidth == null || !(measuredContentWidth > 0)) {
+    return {
+      columns: 1,
+      tileWidth: ALBUM_COVER_WALL_MIN_TILE,
+      tileHeight: albumCoverTileHeight(ALBUM_COVER_WALL_MIN_TILE),
+      contentWidth: 0,
+      measured: false,
+    };
+  }
+  const columns = albumCoverWallColumns(measuredContentWidth);
+  const tileWidth = albumCoverTileWidth(measuredContentWidth, columns);
+  return {
+    columns,
+    tileWidth,
+    tileHeight: albumCoverTileHeight(tileWidth),
+    contentWidth: measuredContentWidth,
+    measured: true,
+  };
+}

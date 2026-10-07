@@ -8,6 +8,8 @@ export const ALBUM_GUIDE_BODY =
   '给册子起个名字，再去回看，把想留在一起的片段收进来。随后，看看这一册。';
 export const ALBUM_GUIDE_DISMISS = '收起说明';
 export const ALBUM_GUIDE_REOPEN = '怎么使用';
+/** Shown when dismiss succeeded in-session but SecureStore write failed. */
+export const ALBUM_GUIDE_PERSIST_FAILED = '说明还没记牢，下次可能还会出现。';
 export const ALBUM_ROOT_LABEL = '生活册';
 export const ALBUM_NEW_ACTION = '新建一册';
 export const ALBUM_MISSING_SOURCE = '这条已经不在';

@@ -14,14 +14,17 @@ import { useRouter } from 'expo-router';
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
 import {
-  ALBUM_ALREADY_IN,
   ALBUM_COLLECT_MENU,
+  ALBUM_COLLECTED_ACTION,
   ALBUM_JOIN_ACTION,
   ALBUM_NEW_ACTION,
   ALBUM_READ_FAILED,
   ALBUM_WRITE_FAILED,
+  albumEntryCountLabel,
   type AlbumListItem,
 } from '../application/life-album';
+import { AlbumCoverFace, AlbumCoverMeta } from './album-cover-tile';
+import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
 import { hairline, ink, inkSoft, paper, paperDeep, sage } from './life-page';
 import { Text, type } from './life-text';
 
@@ -50,17 +53,27 @@ export function LifeAlbumCollectSheet({
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loadKey, setLoadKey] = useState(0);
+  const [wallWidth, setWallWidth] = useState<number | null>(null);
+  const wallLayout = albumCoverWallLayout(wallWidth);
   const sheetKey = `${visible ? 'open' : 'closed'}:${momentId}:${loadKey}`;
   const [resetKey, setResetKey] = useState(sheetKey);
   const sessionRef = useRef(0);
   const cancelledRef = useRef(false);
+  const busyRef = useRef(false);
   if (resetKey !== sheetKey) {
     setResetKey(sheetKey);
     if (visible) {
       setError(null);
       setBusyId(null);
+      setWallWidth(null);
     }
   }
+
+  useEffect(() => {
+    if (!visible) return;
+    busyRef.current = false;
+  }, [visible, momentId, loadKey]);
+
 
   function dismiss() {
     sessionRef.current += 1;
@@ -110,8 +123,9 @@ export function LifeAlbumCollectSheet({
   }, [visible, momentId, loadKey]);
 
   async function collectInto(albumId: string) {
-    if (busyId || contained.includes(albumId)) return;
+    if (busyRef.current || busyId || contained.includes(albumId)) return;
     const session = sessionRef.current;
+    busyRef.current = true;
     setBusyId(albumId);
     setError(null);
     try {
@@ -146,6 +160,7 @@ export function LifeAlbumCollectSheet({
           cancelled: cancelledRef.current,
         })
       ) {
+        busyRef.current = false;
         setBusyId(null);
       }
     }
@@ -183,39 +198,72 @@ export function LifeAlbumCollectSheet({
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
           >
-            {albums.map((album) => {
-              const already = contained.includes(album.id);
-              const joining = busyId === album.id;
-              return (
-                <View key={album.id} style={styles.albumRow}>
-                  <Text style={styles.rowName}>{album.name}</Text>
-                  {already ? (
-                    <Text
-                      accessibilityRole="text"
-                      accessibilityLabel={`${album.name}，${ALBUM_ALREADY_IN}`}
-                      testID={`life-album-sheet-status-${album.id}`}
-                      style={styles.status}
-                    >
-                      {ALBUM_ALREADY_IN}
-                    </Text>
-                  ) : (
+            <View
+              testID="life-album-collect-cover-wall"
+              style={[styles.wall, { gap: ALBUM_COVER_WALL_GAP }]}
+              onLayout={(event) => {
+                const next = Math.round(event.nativeEvent.layout.width);
+                setWallWidth((prev) => (prev === next ? prev : next));
+              }}
+            >
+              {albums.map((album) => {
+                const already = contained.includes(album.id);
+                const joining = busyId === album.id;
+                const busy = !!busyId;
+                const statusLabel = already ? ALBUM_COLLECTED_ACTION : ALBUM_JOIN_ACTION;
+                const a11y = `${album.name}，${albumEntryCountLabel(album.entryCount)}，${statusLabel}`;
+                return (
+                  <View key={album.id} style={[styles.tile, { width: wallLayout.tileWidth }]}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityState={{ disabled: !!busyId }}
-                      accessibilityLabel={`${ALBUM_JOIN_ACTION}，${album.name}`}
-                      testID={`life-album-sheet-${album.id}`}
-                      disabled={!!busyId}
+                      accessibilityState={{ disabled: busy || already }}
+                      accessibilityLabel={a11y}
+                      testID={`life-album-sheet-tile-${album.id}`}
+                      disabled={busy || already}
                       onPress={() => {
                         void collectInto(album.id);
                       }}
-                      style={[styles.capsule, !!busyId && styles.capsuleDisabled]}
+                      style={styles.tileHit}
                     >
-                      <Text style={styles.capsuleLabel}>{joining ? '正在加入' : ALBUM_JOIN_ACTION}</Text>
+                      <AlbumCoverFace
+                        name={album.name}
+                        coverUri={album.coverUri}
+                        width={wallLayout.tileWidth}
+                        height={wallLayout.tileHeight}
+                        wordsTestID={`life-album-sheet-words-cover-${album.id}`}
+                      />
+                      <AlbumCoverMeta name={album.name} entryCount={album.entryCount} />
                     </Pressable>
-                  )}
-                </View>
-              );
-            })}
+                    {already ? (
+                      <Text
+                        accessibilityRole="text"
+                        accessibilityLabel={a11y}
+                        testID={`life-album-sheet-status-${album.id}`}
+                        style={styles.status}
+                      >
+                        {ALBUM_COLLECTED_ACTION}
+                      </Text>
+                    ) : (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: busy }}
+                        accessibilityLabel={a11y}
+                        testID={`life-album-sheet-${album.id}`}
+                        disabled={busy}
+                        onPress={() => {
+                          void collectInto(album.id);
+                        }}
+                        style={[styles.capsule, busy && styles.capsuleDisabled]}
+                      >
+                        <Text style={styles.capsuleLabel}>
+                          {joining ? '正在加入' : ALBUM_JOIN_ACTION}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={ALBUM_NEW_ACTION}
@@ -270,35 +318,47 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   title: { ...type.action, color: ink },
-  albumRow: {
+  wall: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    minHeight: 52,
-    paddingVertical: 6,
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    alignSelf: 'stretch',
   },
-  rowName: { ...type.body, color: ink, flex: 1, flexShrink: 1, minWidth: 0 },
-  status: { ...type.meta, color: inkSoft, flexShrink: 0 },
+  tile: {
+    gap: 8,
+    marginBottom: 4,
+  },
+  tileHit: {
+    minHeight: 48,
+    gap: 6,
+  },
+  status: {
+    ...type.meta,
+    color: inkSoft,
+    minHeight: 48,
+    textAlignVertical: 'center',
+    paddingTop: 12,
+  },
   error: { ...type.meta, color: inkSoft },
   action: { ...type.action, color: sage },
   hit: { minHeight: 48, justifyContent: 'center' },
   capsule: {
-    minHeight: 40,
+    minHeight: 48,
     minWidth: 88,
     paddingHorizontal: 14,
-    borderRadius: 20,
+    borderRadius: 24,
     backgroundColor: paperDeep,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: sage,
     justifyContent: 'center',
     alignItems: 'center',
-    flexShrink: 0,
+    alignSelf: 'stretch',
   },
   capsuleDisabled: { opacity: 0.45 },
   capsuleLabel: { ...type.action, color: ink, fontSize: 14 },
   createHit: {
     minHeight: 48,
-    marginTop: 8,
+    marginTop: 12,
     borderRadius: 24,
     backgroundColor: paperDeep,
     borderWidth: StyleSheet.hairlineWidth,

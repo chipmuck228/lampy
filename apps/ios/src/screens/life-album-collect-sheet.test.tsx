@@ -21,6 +21,12 @@ jest.mock('../application/container', () => ({
   }),
 }));
 
+jest.mock('expo-image', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View } = require('react-native');
+  return { Image: View };
+});
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((next) => {
@@ -29,20 +35,21 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+const albumRow = {
+  id: 'album_1',
+  name: '一些日子',
+  entryCount: 2,
+  lastCollectedAt: null,
+  lastCollectedLabel: null,
+  cover: { kind: 'words' as const },
+  coverUri: null,
+};
+
 describe('life album collect sheet', () => {
   beforeEach(() => {
     mockList.mockResolvedValue({
       status: 'ready',
-      albums: [
-        {
-          id: 'album_1',
-          name: '一些日子',
-          entryCount: 0,
-          lastCollectedAt: null,
-          lastCollectedLabel: null,
-          cover: { kind: 'words' }, coverUri: null,
-        },
-      ],
+      albums: [albumRow],
     });
     mockContaining.mockResolvedValue([]);
     mockCreate.mockReset();
@@ -58,6 +65,18 @@ describe('life album collect sheet', () => {
       expect(view.getByTestId('life-album-collect-sheet-scroll')).toBeTruthy();
       expect(view.getByTestId('life-album-sheet-cancel')).toBeTruthy();
     });
+  });
+
+  it('renders a cover wall with join action and words fallback', async () => {
+    const view = await render(
+      <LifeAlbumCollectSheet visible momentId="moment_ready" onClose={() => undefined} />,
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-collect-cover-wall')).toBeTruthy();
+      expect(view.getByTestId('life-album-sheet-words-cover-album_1')).toBeTruthy();
+      expect(view.getByTestId('life-album-sheet-album_1')).toBeTruthy();
+    });
+    expect(view.getAllByLabelText('一些日子，2条，加入此册').length).toBeGreaterThanOrEqual(1);
   });
 
   it('does not close a reopened sheet from a cancelled save', async () => {
@@ -123,6 +142,33 @@ describe('life album collect sheet', () => {
       expect(mockCollect).toHaveBeenCalledWith({ albumId: 'album_1', momentId: 'moment_ready' });
     });
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('collects from the cover tile through the same path without double submit', async () => {
+    const write = deferred<void>();
+    mockCollect.mockReturnValue(write.promise);
+    const view = await render(
+      <LifeAlbumCollectSheet visible momentId="moment_ready" onClose={() => undefined} />,
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-sheet-tile-album_1')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-sheet-tile-album_1'));
+      fireEvent.press(view.getByTestId('life-album-sheet-album_1'));
+    });
+    expect(mockCollect).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      write.resolve();
+    });
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-sheet-status-album_1')).toBeTruthy();
+      expect(view.getByText('已收下')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-sheet-tile-album_1'));
+    });
+    expect(mockCollect).toHaveBeenCalledTimes(1);
   });
 
   it('opens the named create screen instead of creating from the sheet', async () => {

@@ -1,5 +1,5 @@
 import { useState, type ReactNode, type Ref } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type TextLayoutEventData, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type TextLayoutEventData, type ViewStyle } from 'react-native';
 import { Text } from './life-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -205,6 +205,7 @@ export function RootReadingLayout({
   onScroll,
   onScrollBeginDrag,
   onContentSizeChange,
+  onScrollLayout,
   overlay,
   header,
   canvas = paper,
@@ -218,7 +219,8 @@ export function RootReadingLayout({
   scrollRef?: Ref<ScrollView>;
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScrollBeginDrag?: () => void;
-  onContentSizeChange?: () => void;
+  onContentSizeChange?: (contentWidth: number, contentHeight: number) => void;
+  onScrollLayout?: (event: LayoutChangeEvent) => void;
   overlay?: ReactNode;
   header?: ReactNode;
   canvas?: string;
@@ -244,6 +246,7 @@ export function RootReadingLayout({
             onScroll={onScroll}
             onScrollBeginDrag={onScrollBeginDrag}
             onContentSizeChange={onContentSizeChange}
+            onLayout={onScrollLayout}
             scrollEventThrottle={16}
             keyboardShouldPersistTaps="handled"
           >

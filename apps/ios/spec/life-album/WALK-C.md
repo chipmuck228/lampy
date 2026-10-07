@@ -232,6 +232,28 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
+### 12. 选册封面墙 + 宽度／滚动／引导存储（2026-10-07）
+
+在 `ios/life-album-layout-preview` 上：抽出共享封面呈现；「收进生活册」弹层改为封面墙；列表与弹层按容器实测内容宽算列；生活册列表滚动恢复门闩；引导 SecureStore 失败可退化。不改 LeaveFab 参数、RootNavBand 顺序、收集幂等、排版／PDF、本机保护、schema。未开始导出／分享／付费。
+
+**自动化：** `npx tsc --noEmit` PASS；相关 Jest（cover-wall / list / collect-sheet / scroll-restore）PASS（28）；eslint 改动 TS PASS；`git diff --check` PASS。
+
+**isol（`Lampy-guide-isol`）：**
+
+| 项 | 结果 |
+| --- | --- |
+| 生活册根仍见封面墙两列、册名+条数、文字封面、「怎么使用」、底带三根 | **PASS**（深链／截图抽查；JS 热更后根页可见） |
+| 详情「…」→ 选册封面墙（多册、长册名、无／缺失封面） | **NOT VERIFIED**（本轮无可靠 HID／AX 点进详情菜单） |
+| 加入成功／失败重试／连点不重复／取消不收入 | **NOT VERIFIED** |
+| 多册＋键盘可滚、取消可点；新建后收入路径 | **NOT VERIFIED** |
+| 滚到底→详情→返回位置恢复；切根两轮 | **NOT VERIFIED**（Jest 覆盖门闩；设备未复验） |
+| 引导收起冷启动；短屏／横屏列数与底带 | **NOT VERIFIED** |
+| 回看目录打开后切根、播放离开暂停、收集返回目标册 | **NOT VERIFIED**（规则未改；未本轮重测） |
+
+截图不入库：`isol-sheet-wall-*.png`。
+
+PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
+
 ### 提交 SHA（推送后）
 
 各次走查对应版本（相对 `origin/main`）：
@@ -251,6 +273,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 探针移出普通预览 | `ce66e62` / WALK 回填 `c3ca4fe` |
 | 本机保护实页验收 | `741bdc1` / WALK 回填 `4b9ef3a` |
 | 三项根导航 + 封面墙 | `25467d817e980120d32da9db4e5e04735eae8644` |
+| 选册封面墙 + 宽度／滚动／引导 | 推送后回填 |
 
 | 项 | 值 |
 | --- | --- |
