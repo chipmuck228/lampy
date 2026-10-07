@@ -285,6 +285,45 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
+### 14. 选册底栏 + 新建并收入契约（2026-10-07）
+
+在 `ios/life-album-layout-preview` 上继续「收进生活册」弹层：底部固定「新建一册」(2/3)＋「取消」(1/3)；滚动列表内不再重复新建入口；从选册新建携带可信 `momentId` intent，创建后调用既有 `collectAlbumEntry`；列表新建仅建册。未改封面墙宽度测量、收入幂等／撤回、请求世代、普通册 PDF 探针门控、根导航／LeaveFab／播放器／排版／本机保护。未开始导出／分享／付费。
+
+**契约要点：**
+- 选册→新建：`albumCollectCreateHref(momentId)` 发会话 token（`c`）+ `m`；提交文案「创建并加入此册」；成功 Alert 后经可信栈 `back`／`dismissTo` 回详情。
+- 列表→新建：无 collect 参数；文案「创建这一册」；成功进该册管理页，不收入任何记录。
+- 创建与收入分步：先 `createAlbum` 记下 `albumId`，收入失败可重试同一册；文案区分「册子已建、收入失败」与「记录找不到」。
+- 取消／返回：不创建、不收入；消费／遗忘 intent，不接受任意返回 URL。
+- Metro：去掉强制 `resolver.nodeModulesPaths`（SDK 52+ Hermes `property is not writable` 踩坑），保留 `@lampy/*` watch／alias。
+
+**设备 / 构建：**
+
+| 项 | 实际 |
+| --- | --- |
+| 模拟器 | `Lampy-guide-isol` UDID `DEB86847-34C6-4ADA-B3C6-9657C897E4E7` |
+| 机型 / 系统 | iPhone 17 Pro，iOS 26.5（Liuz17 未启动） |
+| 运行 JS | Metro `8081`；原生未为本轮另编 |
+
+**自动化：** `npx tsc --noEmit` PASS；Jest（collect-sheet / chrome / create-intent / new-screen）PASS（30）；eslint 改动 TS PASS；`git diff --check` PASS。
+
+**isol：**
+
+| 项 | 结果 |
+| --- | --- |
+| 冷启动／Metro 连上后主页可见（runtime 修复后） | **PASS**（抽查 boot；不替代弹层验收） |
+| 多册列表可滚，底栏新建＋取消始终可达 | **NOT VERIFIED** |
+| 点已有册加入／取消／遮罩 | **NOT VERIFIED** |
+| 详情→新建→创建并收入→返回；新册含原记录 | **NOT VERIFIED** |
+| 新建中取消，无写入 | **NOT VERIFIED**（Jest 覆盖） |
+| 短屏／横屏底栏完整 | **NOT VERIFIED** |
+| Reduce Transparency／GlassView 磨砂外观 | **NOT VERIFIED**（未见实页磨砂前不记 PASS；§13 仍有效） |
+
+此前 §1–§12 已验收项不重测；§13 磨砂仍 NOT VERIFIED。
+
+截图不入库：`isol-c-footer-*.png`。
+
+PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
+
 ### 提交 SHA（推送后）
 
 各次走查对应版本（相对 `origin/main`）：
@@ -306,6 +345,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 三项根导航 + 封面墙 | `25467d817e980120d32da9db4e5e04735eae8644` |
 | 选册封面墙 + 宽度／滚动／引导 | `db2f1a8f681e15f588dd15e4854ff5f8d5564424` |
 | 选册弹层暖纸磨砂外观 | `b815c3ebd3ff9659f4e0bea4b4a8cd15d82cd59f` |
+| 选册底栏 + 新建并收入契约 | `5689a3ba406f91dfcb473b2682b8f8c2c887a875` |
 
 | 项 | 值 |
 | --- | --- |

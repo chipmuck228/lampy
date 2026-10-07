@@ -89,16 +89,21 @@ describe('life album collect sheet', () => {
     jest.restoreAllMocks();
   });
 
-  it('keeps the album list scrollable and pins cancel', async () => {
+  it('keeps the album list scrollable and pins create+cancel outside the scroll', async () => {
     const view = await render(
       wrap(<LifeAlbumCollectSheet visible momentId="moment_ready" onClose={() => undefined} />),
     );
     await waitFor(() => {
       expect(view.getByTestId('life-album-collect-sheet-scroll')).toBeTruthy();
+      expect(view.getByTestId('life-album-sheet-footer')).toBeTruthy();
+      expect(view.getByTestId('life-album-sheet-create')).toBeTruthy();
       expect(view.getByTestId('life-album-sheet-cancel')).toBeTruthy();
     });
     expect(view.getByTestId('life-album-sheet-panel')).toBeTruthy();
     expect(view.getByTestId('life-album-sheet-lift')).toBeTruthy();
+    // Single create entry for the whole sheet (footer only).
+    expect(view.getAllByTestId('life-album-sheet-create')).toHaveLength(1);
+    expect(view.queryByText(/＋/)).toBeNull();
   });
 
   it('renders a cover wall with join action and words fallback', async () => {
@@ -258,7 +263,7 @@ describe('life album collect sheet', () => {
     expect(mockCollect).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the named create screen instead of creating from the sheet', async () => {
+  it('opens create with a trusted collect intent for this momentId', async () => {
     const onClose = jest.fn();
     const view = await render(
       wrap(<LifeAlbumCollectSheet visible momentId="moment_ready" onClose={onClose} />),
@@ -272,7 +277,37 @@ describe('life album collect sheet', () => {
     expect(mockCreate).not.toHaveBeenCalled();
     expect(mockCollect).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/albums/new');
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/albums/new',
+        params: expect.objectContaining({ m: 'moment_ready', c: expect.stringMatching(/^ac/) }),
+      }),
+    );
+  });
+
+  it('disables create while a join is in flight but still allows cancel', async () => {
+    const write = deferred<void>();
+    mockCollect.mockReturnValue(write.promise);
+    const onClose = jest.fn();
+    const view = await render(
+      wrap(<LifeAlbumCollectSheet visible momentId="moment_ready" onClose={onClose} />),
+    );
+    await waitFor(() => {
+      expect(view.getByTestId('life-album-sheet-album_1')).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-sheet-album_1'));
+    });
+    expect(view.getByTestId('life-album-sheet-create').props.accessibilityState?.disabled).toBe(
+      true,
+    );
+    await act(async () => {
+      fireEvent.press(view.getByTestId('life-album-sheet-cancel'));
+    });
+    expect(onClose).toHaveBeenCalled();
+    await act(async () => {
+      write.resolve();
+    });
   });
 
   it('closes from the mask without collecting', async () => {

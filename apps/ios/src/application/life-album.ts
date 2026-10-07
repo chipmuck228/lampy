@@ -12,6 +12,10 @@ export const ALBUM_GUIDE_REOPEN = '怎么使用';
 export const ALBUM_GUIDE_PERSIST_FAILED = '说明还没记牢，下次可能还会出现。';
 export const ALBUM_ROOT_LABEL = '生活册';
 export const ALBUM_NEW_ACTION = '新建一册';
+/** Submit label when creating from the collect sheet (create + collect). */
+export const ALBUM_CREATE_AND_COLLECT_ACTION = '创建并加入此册';
+/** Submit label when creating from the album list (create only). */
+export const ALBUM_CREATE_ONLY_ACTION = '创建这一册';
 export const ALBUM_MISSING_SOURCE = '这条已经不在';
 export const ALBUM_COLLECT_ACTION = '收进这一册';
 export const ALBUM_COLLECTED_ACTION = '已收下';
@@ -25,6 +29,10 @@ export const ALBUM_JOIN_ACTION = '加入此册';
 export const ALBUM_MY_ALBUMS = '我的生活册';
 export const ALBUM_GONE = '这一册已经不在。原来的记录还在。';
 export const ALBUM_WRITE_FAILED = '这一册还没记下。原来的记录还在，可以再试。';
+/** Album row exists; collect into it failed — do not claim full success. */
+export const ALBUM_CREATED_COLLECT_FAILED =
+  '这一册已经建好，这条还没收下。原来的记录还在，可以再试。';
+export const ALBUM_CREATE_COLLECT_SUCCESS = '已加入此册';
 export const ALBUM_LOADING = '生活册正在读出来。';
 export const ALBUM_WORDS_COVER = '文字封面';
 export const ALBUM_OPENING_HINT = '可以写一段开篇，也可以留空。';

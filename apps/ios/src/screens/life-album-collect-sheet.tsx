@@ -26,6 +26,7 @@ import {
   albumEntryCountLabel,
   type AlbumListItem,
 } from '../application/life-album';
+import { albumCollectCreateHref } from './album-collect-create-intent';
 import { AlbumCoverFace, AlbumCoverMeta } from './album-cover-tile';
 import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
 import {
@@ -37,10 +38,15 @@ import {
   collectSheetUsesBackdropBlur,
   shouldApplyCollectSheetResult,
 } from './life-album-collect-sheet-chrome';
+import { LifeIcon } from './life-icons';
 import { ink, inkSoft, paperDeep, sage } from './life-page';
 import { Text, type } from './life-text';
 
 export { shouldApplyCollectSheetResult } from './life-album-collect-sheet-chrome';
+
+const FOOTER_GAP = 12;
+/** Below this inner width, stack create/cancel so labels stay uncropped. */
+const FOOTER_STACK_BELOW = 300;
 
 export function LifeAlbumCollectSheet({
   visible,
@@ -65,8 +71,10 @@ export function LifeAlbumCollectSheet({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loadKey, setLoadKey] = useState(0);
   const [wallWidth, setWallWidth] = useState<number | null>(null);
+  const [footerWidth, setFooterWidth] = useState<number | null>(null);
   const [reduceTransparency, setReduceTransparency] = useState<boolean | null>(null);
   const wallLayout = albumCoverWallLayout(wallWidth);
+  const footerStacked = footerWidth != null && footerWidth < FOOTER_STACK_BELOW;
   // expo-glass-effect already linked (iOS 26+). Falls back to solid when unavailable.
   const blurAvailable = Platform.OS === 'ios' && isLiquidGlassAvailable();
   const usesBlur = collectSheetUsesBackdropBlur({
@@ -203,12 +211,15 @@ export function LifeAlbumCollectSheet({
   }
 
   function openCreate() {
+    if (busyRef.current || busyId) return;
+    const href = albumCollectCreateHref(momentId);
     dismiss();
-    router.push('/albums/new');
+    router.push(href);
   }
 
   const paperFill = collectSheetPaperColor(usesBlur);
   const maskColor = collectSheetMaskColor(usesBlur);
+  const createBusy = !!busyId;
 
   return (
     <Modal
@@ -333,16 +344,6 @@ export function LifeAlbumCollectSheet({
                   );
                 })}
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={ALBUM_NEW_ACTION}
-                testID="life-album-sheet-create"
-                disabled={!!busyId}
-                onPress={openCreate}
-                style={styles.createHit}
-              >
-                <Text style={styles.createLabel}>＋ {ALBUM_NEW_ACTION}</Text>
-              </Pressable>
               {error ? (
                 <Pressable
                   accessibilityRole="button"
@@ -354,15 +355,47 @@ export function LifeAlbumCollectSheet({
                 </Pressable>
               ) : null}
             </ScrollView>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="取消"
-              testID="life-album-sheet-cancel"
-              onPress={dismiss}
-              style={styles.cancelHit}
+            <View
+              testID="life-album-sheet-footer"
+              style={[styles.footer, footerStacked && styles.footerStacked]}
+              onLayout={(event) => {
+                const next = Math.round(event.nativeEvent.layout.width);
+                setFooterWidth((prev) => (prev === next ? prev : next));
+              }}
             >
-              <Text style={styles.cancelLabel}>取消</Text>
-            </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={ALBUM_NEW_ACTION}
+                accessibilityState={{ disabled: createBusy }}
+                testID="life-album-sheet-create"
+                disabled={createBusy}
+                onPress={openCreate}
+                style={[
+                  styles.createHit,
+                  footerStacked ? styles.createHitStacked : styles.createHitRow,
+                  createBusy && styles.createHitDisabled,
+                ]}
+              >
+                <LifeIcon name="plus" size={18} color={ink} decorative />
+                <Text style={styles.createLabel} numberOfLines={1}>
+                  {ALBUM_NEW_ACTION}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="取消"
+                testID="life-album-sheet-cancel"
+                onPress={dismiss}
+                style={[
+                  styles.cancelHit,
+                  footerStacked ? styles.cancelHitStacked : styles.cancelHitRow,
+                ]}
+              >
+                <Text style={styles.cancelLabel} numberOfLines={1}>
+                  取消
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -436,26 +469,50 @@ const styles = StyleSheet.create({
   },
   capsuleDisabled: { opacity: 0.45 },
   capsuleLabel: { ...type.action, color: ink, fontSize: 14 },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: FOOTER_GAP,
+    marginTop: 2,
+    paddingBottom: 2,
+  },
+  footerStacked: {
+    flexDirection: 'column',
+  },
   createHit: {
     minHeight: 48,
-    marginTop: 12,
-    borderRadius: 24,
+    borderRadius: 22,
     backgroundColor: paperDeep,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: sage,
+    borderColor: 'rgba(90, 100, 90, 0.28)',
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 14,
   },
+  createHitRow: {
+    flex: 2,
+  },
+  createHitStacked: {
+    alignSelf: 'stretch',
+  },
+  createHitDisabled: { opacity: 0.45 },
   createLabel: { ...type.action, color: ink },
   cancelHit: {
     minHeight: 48,
     borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(90, 100, 90, 0.35)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
-    // Visual tighten only — hit stays ≥48pt.
-    paddingVertical: 0,
+    paddingHorizontal: 12,
+  },
+  cancelHitRow: {
+    flex: 1,
+  },
+  cancelHitStacked: {
+    alignSelf: 'stretch',
   },
   cancelLabel: { ...type.action, color: sage },
 });
