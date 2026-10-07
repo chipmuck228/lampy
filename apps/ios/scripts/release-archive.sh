@@ -87,6 +87,7 @@ if [[ -d "$ROOT/ios" ]]; then
   echo "backed_up_ios=$IOS_BACKUP" | tee -a "$REPORT"
 fi
 
+node "$ROOT/scripts/apply-native-patches.cjs"
 set +e
 npx expo prebuild --platform ios --clean --no-install
 PREBUILD_STATUS=$?
@@ -101,7 +102,7 @@ if [[ "$PREBUILD_STATUS" -ne 0 ]]; then
   exit "$PREBUILD_STATUS"
 fi
 
-pod install --project-directory=ios
+EXPO_USE_PRECOMPILED_MODULES=0 pod install --project-directory=ios
 
 PLIST="$ROOT/ios/Lampy/Info.plist"
 ENT="$ROOT/ios/Lampy/Lampy.entitlements"
