@@ -250,7 +250,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 短册名 CJK 不被 lineHeight 裁切 | `bcb6ccd` |
 | 探针移出普通预览 | `ce66e62` / WALK 回填 `c3ca4fe` |
 | 本机保护实页验收 | `741bdc1` / WALK 回填 `4b9ef3a` |
-| 三项根导航 + 封面墙 | 本提交（push 后与 PR head 一致） |
+| 三项根导航 + 封面墙 | `25467d817e980120d32da9db4e5e04735eae8644` |
 
 | 项 | 值 |
 | --- | --- |
