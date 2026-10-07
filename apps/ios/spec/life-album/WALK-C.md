@@ -106,7 +106,7 @@
 | 放大点击区域 ≥ 48pt | **PASS**（放大后音频 hit AX `584×80`） |
 | 翻页暂停、返回不自动播 | **PASS**（播中翻页再回；AX 非「暂停」） |
 | 离开 / 后台暂停、同 Asset 进度保留 | 代码路径在；后台专项 **NOT VERIFIED**（本轮未单独听完后台停声） |
-| 本机保护遮挡册名正文 | Jest 盖层 PASS；开启流程弹出系统密码页时界面被系统遮挡（无册名/正文露出）**部分证据**；因认证未完成开关仍为「未开启」，后台返回盖层 **NOT VERIFIED**（未改保护规则） |
+| 本机保护遮挡册名正文 | Jest 盖层 PASS；isol 完整开启后实页验收见 §10 **PASS** |
 
 ### 5. 重新生成
 
@@ -124,10 +124,10 @@
 | 声音播放/图标/暂停/放大 hit | — | 声音 PASS（上一轮）；放大恢复本轮 isol **NOT VERIFIED** | — | — |
 | 收进对话框 / 回看册入口 / 新建胶囊 | Jest：加入不创建、遮罩关闭、进 `/albums/new` | isol **NOT VERIFIED** | — | — |
 | 后台停声 / 进度保留 | — | NOT VERIFIED | — | — |
-| 本机保护盖层（完整开启后） | Jest PASS | **需补实页验收**：开启成功后，后台返回与认证期间不露册名、纸页内容。此前仅见认证遮挡，toggle 未完成，**NOT VERIFIED** | — | — |
+| 本机保护盖层（完整开启后） | Jest PASS | **PASS**（见 §10：开启成功后，切换器与认证期间不露册名／纸页；解锁后预览仍可用） | — | — |
 | 重新生成 | — | PASS | PASS | — |
 | 正式导出/付费 | 未开始 | 未开始 | — | — |
-| 阶段 C 设备 PASS | **否**（系统 VoiceOver、PDF 字体嵌入、本机保护实页验收仍 NOT VERIFIED；字体回退已记录、不单独否决） | | | |
+| 阶段 C 设备 PASS | **否**（系统 VoiceOver、PDF 字体嵌入仍 NOT VERIFIED；本机保护实页已 PASS；字体回退已记录、不单独否决） | | | |
 
 ### 6. 入口与加入（2026-10-06）
 
@@ -185,6 +185,24 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 Jest：普通预览不写 JSON／PDF；取消后未开始的探针不写；锁定后不显示探针按钮。系统 VoiceOver、PDF 字体嵌入继续 **NOT VERIFIED**。
 
+### 10. 本机保护实页验收（2026-10-07）
+
+设备：`Lampy-guide-isol`（iPhone 17 Pro / iOS 26.5）。代码 head：`c3ca4fe`。未启动 Liuz17。未开始正式导出／付费。验收后已关闭本机保护，便于后续 isol 使用。
+
+| 步骤 | 结果 |
+| --- | --- |
+| 本机设置开启「本机保护」并完成 Face ID | **PASS**。状态「已开启」 |
+| 打开合成册预览 `album_eval_window` | **PASS**。前台可见「隔离册 · 改名」、第1页／共13页、翻页与「写入隔离探针」 |
+| 切后台 → App Switcher | **PASS**。卡片仅为盖层「这台设备已保护」+「进入 Lampy 前…记录还在。」；**不见**册名、纸页正文或页码 |
+| 从切换器返回、认证期间 | **PASS**。盖层 + 系统「面容 ID」；**不见**册名与纸页 |
+| 认证通过后 | **PASS**。预览仍可用（第1页／共13页、「隔离册 · 改名」、翻页／放大／探针按钮） |
+
+截图（不入库）：`isol-c-lock-press2.png`（已开启）、`isol-c-lock-preview-open.png`、`isol-c-lock-switcher.png`、`isol-c-lock-auth-return.png`、`isol-c-lock-unlocked-preview.png`。
+
+系统 VoiceOver、PDF 字体嵌入继续 **NOT VERIFIED**。
+
+PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
+
 ### 提交 SHA（推送后）
 
 各次走查对应版本（相对 `origin/main`）：
@@ -201,7 +219,8 @@ Jest：普通预览不写 JSON／PDF；取消后未开始的探针不写；锁�
 | 真机封面路径 + 新建顶栏 | `6e5595c` |
 | 册名 focus 不被顶栏挡住 | `56b8e82` |
 | 短册名 CJK 不被 lineHeight 裁切 | `bcb6ccd` |
-| 探针移出普通预览 | `ce66e62c27a8d3f0fbe727bf08c3bd709e1d45ba` |
+| 探针移出普通预览 | `ce66e62` / WALK 回填 `c3ca4fe`（当时 head） |
+| 本机保护实页验收 | 本提交（push 后与 PR head 一致） |
 
 | 项 | 值 |
 | --- | --- |
