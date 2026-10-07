@@ -256,6 +256,7 @@ export function LookbackScaffold({
   onGoRecent,
   onGoAlbums,
   onLeave,
+  onRecordVoice,
   onFamily,
 }: {
   title: string;
@@ -285,6 +286,7 @@ export function LookbackScaffold({
   onGoRecent?: () => void;
   onGoAlbums?: () => void;
   onLeave?: () => void;
+  onRecordVoice?: () => void;
   onFamily?: () => void;
 }) {
   const router = useRouter();
@@ -459,6 +461,7 @@ export function LookbackScaffold({
             <LeaveFab
               testID="lookback-leave-fab"
               onPress={onLeave}
+              onRecordVoice={onRecordVoice}
               available={leaveFab.open}
               forcedHidden={readingLocked}
               opacity={leaveFab.opacity}

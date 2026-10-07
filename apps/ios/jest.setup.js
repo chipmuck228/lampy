@@ -79,3 +79,8 @@ jest.mock('expo-symbols', () => {
       React.createElement(View, { accessibilityLabel, testID }),
   };
 });
+
+jest.mock('expo-haptics', () => ({
+  ImpactFeedbackStyle: { Light: 'light' },
+  impactAsync: jest.fn(async () => undefined),
+}));

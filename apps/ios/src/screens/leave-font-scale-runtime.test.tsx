@@ -10,6 +10,10 @@ const mockAddCameraImage = jest.fn();
 const mockSaveTextMoment = jest.fn();
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    const React = jest.requireActual('react');
+    React.useEffect(effect, [effect]);
+  },
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
   useLocalSearchParams: () => ({}),
 }));
@@ -179,4 +183,10 @@ describe('leave keeps a fixed type scale when the system type changes', () => {
     expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
     expect(view.getByTestId('composer-save')).toBeEnabled();
   });
+});
+
+// Page tests model a foreground navigation screen.
+beforeEach(() => {
+  const { AppState } = jest.requireActual('react-native');
+  Object.defineProperty(AppState, 'currentState', { value: 'active', writable: true, configurable: true });
 });

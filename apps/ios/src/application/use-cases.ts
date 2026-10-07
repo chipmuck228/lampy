@@ -872,7 +872,7 @@ export function createUseCases(deps: {
 
   async function beginDraftRecording(
     draftId: string,
-    options?: { replace?: boolean },
+    options?: { replace?: boolean; canStart?: () => boolean; waitUntilReady?: () => Promise<boolean> },
   ): Promise<void> {
     const draft = await requireDraft(draftId);
     if (!options?.replace) {
@@ -887,11 +887,20 @@ export function createUseCases(deps: {
     if (deps.capture.isRecording()) {
       throw new ApplicationError('AUDIO_BUSY', '正在录一段声音。');
     }
+    if (options?.canStart && !options.canStart()) {
+      throw new ApplicationError('RECORDING_CANCELLED', '这次录音没有开始，可以再点录音。');
+    }
     const permission = await deps.capture.requestPermission();
     if (permission !== 'granted') {
       throw new ApplicationError('MIC_DENIED', MIC_DENIED_MESSAGE);
     }
-    await deps.capture.start();
+    if (options?.waitUntilReady && !(await options.waitUntilReady())) {
+      throw new ApplicationError('RECORDING_CANCELLED', '这次录音没有开始，可以再点录音。');
+    }
+    if (options?.canStart && !options.canStart()) {
+      throw new ApplicationError('RECORDING_CANCELLED', '这次录音没有开始，可以再点录音。');
+    }
+    await deps.capture.start(options?.canStart);
   }
 
   async function addRecordedAudio(draftId: string, recorded: RecordedAudio): Promise<ComposerViewModel> {

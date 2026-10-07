@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput, type } from '../screens/life-text';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { composerPermissionNotice } from '../application/composer-notice';
@@ -57,11 +57,30 @@ import { finishLeaveToRecent, leaveOpenedFromLookback } from '../screens/lookbac
 import { writeJustSavedMomentId } from '../screens/recent-save-echo';
 import { usePageMetrics } from '../screens/use-page-metrics';
 
+import { useDeviceLock } from '../screens/device-lock-context';
+import { forgetLeaveVoiceIntent, takeLeaveVoiceIntent } from '../screens/leave-voice-intent';
+import { waitForRecordingForeground } from '../screens/recording-foreground';
+import { recordingStartedFeedback } from '../infrastructure/recording-feedback';
+
 export const DRAFT_RESTORED_COPY = '上次没保存的内容已放回来。';
 
 export default function LeaveScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[] }>();
+  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[]; voice?: string | string[] }>();
+  const lock = useDeviceLock();
+  const lockRef = useRef(lock);
+  lockRef.current = lock;
+  const recordingGeneration = useRef(0);
+  const focusedRef = useRef(false);
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
+    return () => {
+      focusedRef.current = false;
+      recordingGeneration.current += 1;
+      forgetLeaveVoiceIntent(params.voice);
+      interruptRef.current();
+    };
+  }, [params.voice]));
   const fromLookback = leaveOpenedFromLookback(params.from);
   const { width, height } = usePageMetrics();
   const insets = useSafeAreaInsets();
@@ -115,6 +134,7 @@ export default function LeaveScreen() {
   const interruptRef = useRef<() => void>(() => {});
   const mountedRef = useRef(true);
   const seededTodayRef = useRef(false);
+  const restoreStartedRef = useRef(false);
   const occurredEpochRef = useRef(0);
   const pendingTodaySeedRef = useRef<string | null>(null);
   const sound = useSoundPlayer();
@@ -183,9 +203,14 @@ export default function LeaveScreen() {
   }, []);
 
   useEffect(() => {
+    if (lock?.snapshot.locked || restoreStartedRef.current) return;
+    restoreStartedRef.current = true;
     let cancelled = false;
     getUseCases()
-      .then((app) => app.restoreOrCreateDraft())
+      .then((app) => {
+        if (cancelled || !mountedRef.current) throw new Error('draft read cancelled');
+        return app.restoreOrCreateDraft();
+      })
       .then((draft) => {
         if (cancelled || !mountedRef.current) return;
         draftIdRef.current = draft.draftId;
@@ -216,8 +241,9 @@ export default function LeaveScreen() {
       });
     return () => {
       cancelled = true;
+      if (!draftIdRef.current) restoreStartedRef.current = false;
     };
-  }, []);
+  }, [lock?.snapshot.locked]);
 
   useEffect(() => {
     if (phase !== 'recording') return;
@@ -237,6 +263,7 @@ export default function LeaveScreen() {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') recordingGeneration.current += 1;
       if (state !== 'active' && phaseRef.current === 'recording') {
         interruptRef.current();
       }
@@ -391,9 +418,16 @@ export default function LeaveScreen() {
       });
   }
 
-  function startRecording() {
+  function startRecording(fromGesture = false) {
     const id = draftIdRef.current;
-    if (!id || busyRef.current || abandoningRef.current) return;
+    if (!id || busyRef.current || abandoningRef.current || phaseRef.current === 'recording') return;
+    const generation = ++recordingGeneration.current;
+    const stillHere = () => mountedRef.current && focusedRef.current &&
+      generation === recordingGeneration.current && draftIdRef.current === id &&
+      !abandoningRef.current;
+    const canStart = () => stillHere() && AppState.currentState === 'active' &&
+      (!lockRef.current || !lockRef.current.snapshot.locked);
+    if (!canStart()) return;
     busyRef.current = true;
     setBusy('record');
     setElapsedMs(0);
@@ -402,17 +436,26 @@ export default function LeaveScreen() {
     void sound.stop();
     void enqueue(async () => {
       const app = await getUseCases();
-      await app.beginDraftRecording(id);
+      if (!stillHere()) throw new Error('recording cancelled');
+      await app.beginDraftRecording(id, {
+        canStart,
+        waitUntilReady: () => waitForRecordingForeground(stillHere, canStart),
+      });
+      if (!canStart()) {
+        await app.interruptDraftRecording(id);
+        throw new Error('recording cancelled');
+      }
     })
       .then(() => {
-        if (abandoningRef.current || draftIdRef.current !== id) return;
+        if (!canStart()) return;
         setRecordPhase('recording');
+        if (fromGesture) void recordingStartedFeedback();
         setMessage(null);
       })
       .catch((error) => {
         busyRef.current = false;
-        setBusy('idle');
-        if (abandoningRef.current || draftIdRef.current !== id) return;
+        if (mountedRef.current) setBusy('idle');
+        if (!mountedRef.current || !focusedRef.current || abandoningRef.current || draftIdRef.current !== id) return;
         if (isApplicationError(error) && error.code === 'MIC_DENIED') {
           setRecordPhase('ready');
           setDeniedMessage(error.code, error.message);
@@ -427,6 +470,25 @@ export default function LeaveScreen() {
         setMessage(shownError(error, '这次没有录下声音。可以再试，也可以继续写字。'));
       });
   }
+
+  useEffect(() => {
+    let alive = true;
+    const tryStart = () => {
+      if (!alive || !focusedRef.current || !draftIdRef.current || busyRef.current ||
+          AppState.currentState !== 'active' || lockRef.current?.snapshot.locked) return;
+      if (!takeLeaveVoiceIntent(params.voice)) return;
+      if (audio) { setMessage('草稿里已经有一段声音。'); return; }
+      startRecording(true);
+    };
+    tryStart();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') forgetLeaveVoiceIntent(params.voice);
+      if (state === 'active') tryStart();
+    });
+    return () => { alive = false; sub.remove(); };
+    // The gesture is consumed once; rerenders cannot restart it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftId, audio, params.voice, lock?.snapshot.locked]);
 
   function stopRecording() {
     const id = draftIdRef.current;
@@ -463,7 +525,7 @@ export default function LeaveScreen() {
       return app.interruptDraftRecording(id);
     })
       .then((result) => {
-        if (abandoningRef.current || draftIdRef.current !== id) return;
+        if (!mountedRef.current || abandoningRef.current || draftIdRef.current !== id) return;
         applyComposer(result.composer);
         setRecordPhase(result.composer.audio ? 'stopped' : 'ready');
         void sound.stop();
@@ -475,12 +537,12 @@ export default function LeaveScreen() {
         );
       })
       .catch((error) => {
-        if (abandoningRef.current || draftIdRef.current !== id) return;
+        if (!mountedRef.current || abandoningRef.current || draftIdRef.current !== id) return;
         setRecordPhase('failed');
         setMessage(shownError(error, '录音被打断。可以再试，也可以继续写字。'));
       })
       .finally(() => {
-        if (abandoningRef.current || removingRef.current) return;
+        if (!mountedRef.current || abandoningRef.current || removingRef.current) return;
         busyRef.current = false;
         setBusy('idle');
       });
@@ -866,7 +928,7 @@ export default function LeaveScreen() {
             currentTimeMs={previewBoundId === audio?.id ? sound.currentTimeMs : 0}
             disabled={composerLocked}
             removeDisabled={busy !== 'idle' || confirmingAbandon}
-            onStart={startRecording}
+            onStart={() => startRecording()}
             onStop={stopRecording}
             onPlay={() => {
               if (!audio?.uri) return;

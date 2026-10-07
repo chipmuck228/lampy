@@ -1,3 +1,4 @@
+import { leaveVoiceHref } from '../../screens/leave-voice-intent';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -1171,6 +1172,7 @@ export default function LookbackIndexScreen() {
         router.dismissTo('/albums');
       }}
       onLeave={() => router.push(leaveHref('lookback'))}
+      onRecordVoice={() => { const href = leaveVoiceHref('lookback'); if (href) router.push(href); }}
       onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
     >
       {error ? (

@@ -553,3 +553,14 @@ describe('audio personal moment use cases', () => {
     });
   });
 });
+
+it('does not start capture after a delayed permission loses eligibility', async () => {
+  const { app, capture } = createAudioApp();
+  const draft = await app.restoreOrCreateDraft();
+  let eligible = true;
+  capture.requestPermission = async () => { eligible = false; return 'granted'; };
+  const start = jest.spyOn(capture, 'start');
+  await expect(app.beginDraftRecording(draft.draftId, { canStart: () => eligible }))
+    .rejects.toMatchObject({ code: 'RECORDING_CANCELLED' });
+  expect(start).not.toHaveBeenCalled();
+});
