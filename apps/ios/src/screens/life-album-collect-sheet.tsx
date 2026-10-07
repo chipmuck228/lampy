@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -9,7 +10,9 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUseCases } from '../application/container';
 import { isApplicationError } from '../application/errors';
@@ -25,16 +28,19 @@ import {
 } from '../application/life-album';
 import { AlbumCoverFace, AlbumCoverMeta } from './album-cover-tile';
 import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
-import { hairline, ink, inkSoft, paper, paperDeep, sage } from './life-page';
+import {
+  COLLECT_SHEET_RADIUS,
+  collectSheetMaskColor,
+  collectSheetMaxHeight,
+  collectSheetPaperColor,
+  collectSheetShadowColor,
+  collectSheetUsesBackdropBlur,
+  shouldApplyCollectSheetResult,
+} from './life-album-collect-sheet-chrome';
+import { ink, inkSoft, paperDeep, sage } from './life-page';
 import { Text, type } from './life-text';
 
-export function shouldApplyCollectSheetResult(input: {
-  session: number;
-  currentSession: number;
-  cancelled: boolean;
-}): boolean {
-  return !input.cancelled && input.session === input.currentSession;
-}
+export { shouldApplyCollectSheetResult } from './life-album-collect-sheet-chrome';
 
 export function LifeAlbumCollectSheet({
   visible,
@@ -47,14 +53,26 @@ export function LifeAlbumCollectSheet({
 }) {
   const router = useRouter();
   const { height } = useWindowDimensions();
-  const sheetMax = Math.min(560, Math.max(280, Math.round(height * 0.72)));
+  const insets = useSafeAreaInsets();
+  const sheetMax = collectSheetMaxHeight({
+    windowHeight: height,
+    topInset: insets.top,
+    bottomInset: insets.bottom,
+  });
   const [albums, setAlbums] = useState<AlbumListItem[]>([]);
   const [contained, setContained] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loadKey, setLoadKey] = useState(0);
   const [wallWidth, setWallWidth] = useState<number | null>(null);
+  const [reduceTransparency, setReduceTransparency] = useState<boolean | null>(null);
   const wallLayout = albumCoverWallLayout(wallWidth);
+  // expo-glass-effect already linked (iOS 26+). Falls back to solid when unavailable.
+  const blurAvailable = Platform.OS === 'ios' && isLiquidGlassAvailable();
+  const usesBlur = collectSheetUsesBackdropBlur({
+    reduceTransparency,
+    blurAvailable,
+  });
   const sheetKey = `${visible ? 'open' : 'closed'}:${momentId}:${loadKey}`;
   const [resetKey, setResetKey] = useState(sheetKey);
   const sessionRef = useRef(0);
@@ -74,6 +92,24 @@ export function LifeAlbumCollectSheet({
     busyRef.current = false;
   }, [visible, momentId, loadKey]);
 
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo.isReduceTransparencyEnabled()
+      .then((value) => {
+        if (alive) setReduceTransparency(value === true);
+      })
+      .catch(() => {
+        // Query failed → solid paper + plain mask (no blur claimed).
+        if (alive) setReduceTransparency(true);
+      });
+    const sub = AccessibilityInfo.addEventListener('reduceTransparencyChanged', (value) => {
+      setReduceTransparency(value === true);
+    });
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
 
   function dismiss() {
     sessionRef.current += 1;
@@ -171,129 +207,163 @@ export function LifeAlbumCollectSheet({
     router.push('/albums/new');
   }
 
+  const paperFill = collectSheetPaperColor(usesBlur);
+  const maskColor = collectSheetMaskColor(usesBlur);
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={dismiss}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={dismiss}
+      accessibilityViewIsModal
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.backdrop}
         testID="life-album-collect-sheet"
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="关闭"
-          testID="life-album-sheet-mask"
-          onPress={dismiss}
-          style={StyleSheet.absoluteFill}
-        />
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          {usesBlur ? (
+            <GlassView
+              testID="life-album-sheet-blur"
+              glassEffectStyle="regular"
+              colorScheme="light"
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+              accessible={false}
+              importantForAccessibility="no"
+            />
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="关闭"
+            testID="life-album-sheet-mask"
+            onPress={dismiss}
+            style={[StyleSheet.absoluteFill, { backgroundColor: maskColor }]}
+          />
+        </View>
+
+        {/* Outer lift: soft shadow. Inner clip: continuous radius + paper fill. */}
         <View
-          style={[styles.sheet, { maxHeight: sheetMax }]}
-          accessibilityLabel={ALBUM_COLLECT_MENU}
-          onStartShouldSetResponder={() => true}
+          style={styles.sheetLift}
+          testID="life-album-sheet-lift"
+          pointerEvents="box-none"
         >
-          <Text style={styles.title}>{ALBUM_COLLECT_MENU}</Text>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <ScrollView
-            testID="life-album-collect-sheet-scroll"
-            style={styles.sheetScroll}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
+          <View
+            style={[
+              styles.sheetClip,
+              { maxHeight: sheetMax, backgroundColor: paperFill },
+            ]}
+            accessibilityLabel={ALBUM_COLLECT_MENU}
+            testID="life-album-sheet-panel"
+            onStartShouldSetResponder={() => true}
           >
-            <View
-              testID="life-album-collect-cover-wall"
-              style={[styles.wall, { gap: ALBUM_COVER_WALL_GAP }]}
-              onLayout={(event) => {
-                const next = Math.round(event.nativeEvent.layout.width);
-                setWallWidth((prev) => (prev === next ? prev : next));
-              }}
+            <Text style={styles.title}>{ALBUM_COLLECT_MENU}</Text>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <ScrollView
+              testID="life-album-collect-sheet-scroll"
+              style={styles.sheetScroll}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
             >
-              {albums.map((album) => {
-                const already = contained.includes(album.id);
-                const joining = busyId === album.id;
-                const busy = !!busyId;
-                const statusLabel = already ? ALBUM_COLLECTED_ACTION : ALBUM_JOIN_ACTION;
-                const a11y = `${album.name}，${albumEntryCountLabel(album.entryCount)}，${statusLabel}`;
-                return (
-                  <View key={album.id} style={[styles.tile, { width: wallLayout.tileWidth }]}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: busy || already }}
-                      accessibilityLabel={a11y}
-                      testID={`life-album-sheet-tile-${album.id}`}
-                      disabled={busy || already}
-                      onPress={() => {
-                        void collectInto(album.id);
-                      }}
-                      style={styles.tileHit}
-                    >
-                      <AlbumCoverFace
-                        name={album.name}
-                        coverUri={album.coverUri}
-                        width={wallLayout.tileWidth}
-                        height={wallLayout.tileHeight}
-                        wordsTestID={`life-album-sheet-words-cover-${album.id}`}
-                      />
-                      <AlbumCoverMeta name={album.name} entryCount={album.entryCount} />
-                    </Pressable>
-                    {already ? (
-                      <Text
-                        accessibilityRole="text"
-                        accessibilityLabel={a11y}
-                        testID={`life-album-sheet-status-${album.id}`}
-                        style={styles.status}
-                      >
-                        {ALBUM_COLLECTED_ACTION}
-                      </Text>
-                    ) : (
+              <View
+                testID="life-album-collect-cover-wall"
+                style={[styles.wall, { gap: ALBUM_COVER_WALL_GAP }]}
+                onLayout={(event) => {
+                  const next = Math.round(event.nativeEvent.layout.width);
+                  setWallWidth((prev) => (prev === next ? prev : next));
+                }}
+              >
+                {albums.map((album) => {
+                  const already = contained.includes(album.id);
+                  const joining = busyId === album.id;
+                  const busy = !!busyId;
+                  const statusLabel = already ? ALBUM_COLLECTED_ACTION : ALBUM_JOIN_ACTION;
+                  const a11y = `${album.name}，${albumEntryCountLabel(album.entryCount)}，${statusLabel}`;
+                  return (
+                    <View key={album.id} style={[styles.tile, { width: wallLayout.tileWidth }]}>
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityState={{ disabled: busy }}
+                        accessibilityState={{ disabled: busy || already }}
                         accessibilityLabel={a11y}
-                        testID={`life-album-sheet-${album.id}`}
-                        disabled={busy}
+                        testID={`life-album-sheet-tile-${album.id}`}
+                        disabled={busy || already}
                         onPress={() => {
                           void collectInto(album.id);
                         }}
-                        style={[styles.capsule, busy && styles.capsuleDisabled]}
+                        style={styles.tileHit}
                       >
-                        <Text style={styles.capsuleLabel}>
-                          {joining ? '正在加入' : ALBUM_JOIN_ACTION}
-                        </Text>
+                        <AlbumCoverFace
+                          name={album.name}
+                          coverUri={album.coverUri}
+                          width={wallLayout.tileWidth}
+                          height={wallLayout.tileHeight}
+                          wordsTestID={`life-album-sheet-words-cover-${album.id}`}
+                        />
+                        <AlbumCoverMeta name={album.name} entryCount={album.entryCount} />
                       </Pressable>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={ALBUM_NEW_ACTION}
-              testID="life-album-sheet-create"
-              disabled={!!busyId}
-              onPress={openCreate}
-              style={styles.createHit}
-            >
-              <Text style={styles.createLabel}>＋ {ALBUM_NEW_ACTION}</Text>
-            </Pressable>
-            {error ? (
+                      {already ? (
+                        <Text
+                          accessibilityRole="text"
+                          accessibilityLabel={a11y}
+                          testID={`life-album-sheet-status-${album.id}`}
+                          style={styles.status}
+                        >
+                          {ALBUM_COLLECTED_ACTION}
+                        </Text>
+                      ) : (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{ disabled: busy }}
+                          accessibilityLabel={a11y}
+                          testID={`life-album-sheet-${album.id}`}
+                          disabled={busy}
+                          onPress={() => {
+                            void collectInto(album.id);
+                          }}
+                          style={[styles.capsule, busy && styles.capsuleDisabled]}
+                        >
+                          <Text style={styles.capsuleLabel}>
+                            {joining ? '正在加入' : ALBUM_JOIN_ACTION}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="再试一次"
-                onPress={() => setLoadKey((value) => value + 1)}
-                style={styles.hit}
+                accessibilityLabel={ALBUM_NEW_ACTION}
+                testID="life-album-sheet-create"
+                disabled={!!busyId}
+                onPress={openCreate}
+                style={styles.createHit}
               >
-                <Text style={styles.action}>再试一次</Text>
+                <Text style={styles.createLabel}>＋ {ALBUM_NEW_ACTION}</Text>
               </Pressable>
-            ) : null}
-          </ScrollView>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="取消"
-            testID="life-album-sheet-cancel"
-            onPress={dismiss}
-            style={styles.cancelHit}
-          >
-            <Text style={styles.cancelLabel}>取消</Text>
-          </Pressable>
+              {error ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="再试一次"
+                  onPress={() => setLoadKey((value) => value + 1)}
+                  style={styles.hit}
+                >
+                  <Text style={styles.action}>再试一次</Text>
+                </Pressable>
+              ) : null}
+            </ScrollView>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="取消"
+              testID="life-album-sheet-cancel"
+              onPress={dismiss}
+              style={styles.cancelHit}
+            >
+              <Text style={styles.cancelLabel}>取消</Text>
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -303,16 +373,26 @@ export function LifeAlbumCollectSheet({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(37,35,31,0.28)',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  sheet: {
-    backgroundColor: paper,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    gap: 8,
+  sheetLift: {
     zIndex: 1,
+    borderRadius: COLLECT_SHEET_RADIUS,
+    shadowColor: collectSheetShadowColor,
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
+  },
+  sheetClip: {
+    borderRadius: COLLECT_SHEET_RADIUS,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 10,
+    gap: 8,
   },
   sheetScroll: {
     flexGrow: 0,
@@ -370,13 +450,12 @@ const styles = StyleSheet.create({
   createLabel: { ...type.action, color: ink },
   cancelHit: {
     minHeight: 48,
-    borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: hairline,
-    backgroundColor: paper,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
+    // Visual tighten only — hit stays ≥48pt.
+    paddingVertical: 0,
   },
   cancelLabel: { ...type.action, color: sage },
 });

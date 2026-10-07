@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { albumEntryCountLabel } from '../application/life-album';
+import { ALBUM_COVER_RADIUS } from './album-cover-wall';
 import { hairline, ink, inkSoft, paperDeep } from './life-page';
 import { Text, type } from './life-text';
 
@@ -58,7 +59,8 @@ export function AlbumCoverMeta({ name, entryCount }: { name: string; entryCount:
 
 const styles = StyleSheet.create({
   cover: {
-    borderRadius: 8,
+    borderRadius: ALBUM_COVER_RADIUS,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     backgroundColor: paperDeep,
     borderWidth: StyleSheet.hairlineWidth,

@@ -254,6 +254,37 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 
 PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
 
+### 13. 选册弹层暖纸磨砂外观（2026-10-07）
+
+在 `ios/life-album-layout-preview` 上收紧「收进生活册」弹层视觉：连续圆角外壳、外层轻阴影／内层裁切、暖纸实色（约 96% 填色而非整层 opacity）、背后轻微磨砂＋低透明墨色遮罩。行为（collect 幂等、busy、取消、迟到世代、新建、点外关闭）不变。未开始导出／分享／付费。
+
+**模糊实现：** 复用已链接的 `expo-glass-effect`（`GlassView` + `isLiquidGlassAvailable`）。**未**新增 `expo-blur`（本机 `pod install` 因 hermes/cmake 失败；且项目已有玻璃能力）。Reduce Transparency 开启／查询失败 → 实色纸底＋普通遮罩；运行中偏好变化会更新。无 Liquid Glass 时同样实色回退，不用透明度冒充毛玻璃。
+
+**设备 / 构建：**
+
+| 项 | 实际 |
+| --- | --- |
+| 模拟器 | `Lampy-guide-isol` UDID `DEB86847-34C6-4ADA-B3C6-9657C897E4E7` |
+| 机型 / 系统 | iPhone 17 Pro，iOS 26.5 |
+| 原生重建 | **未**为本轮另编；`expo-glass-effect` 已在既有 Dev Client 中 |
+| 运行 JS | Metro `8087` 热更本轮 TS；原生玻璃能力依赖既有安装 |
+
+**自动化：** `npx tsc --noEmit` PASS；Jest（collect-sheet / chrome / list）PASS（24）；eslint 改动 TS PASS；`git diff --check` PASS。
+
+**isol：**
+
+| 项 | 结果 |
+| --- | --- |
+| 多册封面墙＋磨砂背景、边缘柔和、文字清楚 | **NOT VERIFIED**（未可靠点进详情「…」选册） |
+| 加入／取消／新建；底层不可误点 | **NOT VERIFIED** |
+| 多册＋键盘列表可滚、取消可达 | **NOT VERIFIED** |
+| Reduce Transparency 开／关实色退路 | **NOT VERIFIED**（Jest 覆盖；设备未切系统设置） |
+| 短屏／横屏无越界或底裁 | **NOT VERIFIED** |
+
+截图不入库（若有）：`isol-sheet-frost-*.png`。
+
+PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D/E。
+
 ### 提交 SHA（推送后）
 
 各次走查对应版本（相对 `origin/main`）：
@@ -274,6 +305,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 本机保护实页验收 | `741bdc1` / WALK 回填 `4b9ef3a` |
 | 三项根导航 + 封面墙 | `25467d817e980120d32da9db4e5e04735eae8644` |
 | 选册封面墙 + 宽度／滚动／引导 | `db2f1a8f681e15f588dd15e4854ff5f8d5564424` |
+| 选册弹层暖纸磨砂外观 | 推送后回填 |
 
 | 项 | 值 |
 | --- | --- |

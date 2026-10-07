@@ -2,6 +2,8 @@ export const ALBUM_COVER_WALL_GAP = 12;
 export const ALBUM_COVER_WALL_MIN_TILE = 148;
 export const ALBUM_COVER_WALL_MAX_TILE = 200;
 export const ALBUM_COVER_WALL_MAX_COLS = 4;
+/** Cover face radius — a step below collect-sheet shell (~28). */
+export const ALBUM_COVER_RADIUS = 10;
 /** Portrait paper ratio close to album A5 preview. */
 export const ALBUM_COVER_WALL_ASPECT = 4 / 3;
 
