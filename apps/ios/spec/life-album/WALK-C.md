@@ -345,7 +345,7 @@ PR [#65](https://github.com/chipmuck228/lampy/pull/65) 保持 OPEN。不开始 D
 | 三项根导航 + 封面墙 | `25467d817e980120d32da9db4e5e04735eae8644` |
 | 选册封面墙 + 宽度／滚动／引导 | `db2f1a8f681e15f588dd15e4854ff5f8d5564424` |
 | 选册弹层暖纸磨砂外观 | `b815c3ebd3ff9659f4e0bea4b4a8cd15d82cd59f` |
-| 选册底栏 + 新建并收入契约 | `5689a3ba406f91dfcb473b2682b8f8c2c887a875` |
+| 选册底栏 + 新建并收入契约 | `b10cfeef92e5e101a7b2c00bc5fc8a0ddf725bdf` |
 
 | 项 | 值 |
 | --- | --- |
