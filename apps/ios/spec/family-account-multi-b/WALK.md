@@ -59,3 +59,15 @@
 UNAUTHENTICATED 在目录状态中单独归为 signed-out，清除列表与选中值；页面不再显示读取失败/重试，而是系统家庭图标、生活化标题、简短说明与「登录家庭」。入口走现有受控诊断登录页，未新增正式注册或放开 Release 诊断。网络故障仍独立显示连接失败/重试，不伪装为空或未登录。
 
 相关 Jest 4 suites /21 tests PASS；tsc、改动文件 lint、diff --check PASS。本轮新视觉、英文/中文实页、认证往返 NOT VERIFIED。未重跑全量，不扩大旧设备 PASS；仍 OPEN。
+
+## 2026-10-08 新 UI 与双模拟器用户验收
+
+用户提供测试 checkout `6c6ebc1a414593babb94cd8dc1a527992f0c9a67`，git status 为 `M app.json`、`M metro.config.js`。本机测试配置有修改，最终 diff 未取得；不是干净 tree 或真机验收。已知一台为 iPhone 17 Pro Max，第二台型号与两台系统版本未提供。
+
+模拟器 PASS（用户操作报告）：
+- 新 UI：计数/满额提示及未登录页调整，用户报告测试通过。
+- 同一 A 账号在两台登录，均能查看家庭；第一台退出后第二台重新进入仍能读取。
+- A/B 分别在不同模拟器登录，显示各自家庭，无串号。先前一度疑似相同列表，经用户重新确认不同账号登录后排除；不记为已确认源码 bug。
+- 10 家庭上限实页此前用户已报告 PASS（旧 checkout 42781c2），不把旧走查 SHA 改成本次版本。
+
+真机双设备、公网/生产、系统 VoiceOver仍 NOT VERIFIED。既有其他 PASS 保留原走查版本。未部署、未上传 TestFlight，PR 仍 OPEN。
