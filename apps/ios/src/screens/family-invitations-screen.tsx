@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import {
+  Alert,
   AppState,
   Image,
   Pressable,
@@ -32,12 +33,14 @@ export default function FamilyInvitationsScreen() {
   >(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [ready, setReady] = useState(false);
   const seq = useRef(0);
   const owner = useRef<number | null>(null);
   const load = useCallback(async () => {
     const n = ++seq.current;
     setReady(false);
+    setLoadError(false);
     try {
       const u = await getFamilyUseCases();
       if (n !== seq.current) return;
@@ -46,8 +49,8 @@ export default function FamilyInvitationsScreen() {
       setItems(result);
       setReady(true);
       setMessage(null);
-    } catch (e) {
-      if (n === seq.current) setMessage(familyInviteError(e));
+    } catch {
+      if (n === seq.current) { setLoadError(true); setMessage(tr("邀请暂时读不出来。")); }
     }
   }, [familyId]);
   useFocusEffect(
@@ -73,7 +76,7 @@ export default function FamilyInvitationsScreen() {
       };
     }, [allowed, load]),
   );
-  async function act(id?: string) {
+  async function act(id?: string, replace = false) {
     if (
       !allowed ||
       !ready ||
@@ -94,7 +97,16 @@ export default function FamilyInvitationsScreen() {
         await u.revokeInviteLink(id, current);
         if (current()) {
           setCreated(null);
-          await load();
+          setItems(old => old.map(item => item.invitationId === id ? { ...item, status: "revoked" } : item));
+          if (replace) {
+            const result = await u.createInviteLink(familyId, current);
+            if (!current()) return;
+            setCreated(result);
+            setItems(old => [result, ...old]);
+            await Share.share({ message: result.link });
+          } else {
+            await load();
+          }
         }
       } else {
         const result = await u.createInviteLink(familyId, current);
@@ -107,7 +119,7 @@ export default function FamilyInvitationsScreen() {
       if (current())
         setMessage(
           id
-            ? familyInviteError(e)
+            ? (replace ? tr("新邀请未确认生成。请刷新查看，原邀请可能已经失效。") : familyInviteError(e))
             : tr("邀请未确认生成。请刷新查看，必要时撤销旧邀请后重新生成。"),
         );
     } finally {
@@ -176,7 +188,7 @@ export default function FamilyInvitationsScreen() {
             accessibilityRole="button"
             onPress={() => void load()}
           >
-            <Text>{tr("再试一次")}</Text>
+            <Text>{tr(loadError ? "重新加载" : "刷新")}</Text>
           </Pressable>
           {items.map((i) => (
             <View key={i.invitationId} style={styles.row}>
@@ -192,6 +204,19 @@ export default function FamilyInvitationsScreen() {
                         : "已撤销",
                 )}
               </Text>
+              {i.status === "pending" && created?.invitationId !== i.invitationId ? (
+                <>
+                  <Text style={styles.body}>{tr("邀请仍有效，已分享的链接仍可使用。")}</Text>
+                  <Pressable style={styles.hit} disabled={busy || !ready}
+                    accessibilityRole="button"
+                    onPress={() => Alert.alert(tr("重新生成并分享"), tr("原邀请将失效。生成新的邀请后，再分享给家人。"), [
+                      { text: tr("取消"), style: "cancel" },
+                      { text: tr("重新生成并分享"), onPress: () => void act(i.invitationId, true) },
+                    ])}>
+                    <Text>{tr("重新生成并分享")}</Text>
+                  </Pressable>
+                </>
+              ) : null}
               {i.status === "pending" ? (
                 <Pressable
                   style={styles.hit}

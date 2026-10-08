@@ -636,5 +636,12 @@
   "先登录家庭": "Sign in to family",
   "重新确认当前账号": "Confirm your current account again",
   "邀请未确认生成。请刷新查看，必要时撤销旧邀请后重新生成。": "Invitation creation is unconfirmed. Refresh the list and revoke the old invitation if needed before creating another.",
-  "请稍后再试。": "Try again later."
+  "请稍后再试。": "Try again later.",
+  "邀请暂时读不出来。": "Invitations could not be loaded.",
+  "重新加载": "Reload",
+  "刷新": "Refresh",
+  "邀请仍有效，已分享的链接仍可使用。": "This invitation is still valid. Links already shared still work.",
+  "重新生成并分享": "Replace and share",
+  "原邀请将失效。生成新的邀请后，再分享给家人。": "The original invitation will stop working. Create a new invitation to share with your family.",
+  "新邀请未确认生成。请刷新查看，原邀请可能已经失效。": "New invitation creation is unconfirmed. Refresh the list; the original invitation may already be inactive."
 }

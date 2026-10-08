@@ -34,6 +34,12 @@ Simulator/native app actual invitation flow; QR decoding/scanning from external 
 
 Two simulators: iPhone 17 Pro Max / iOS 26.3 (`12595415-0F6B-4B9C-9407-69D29806E801`) and Lampy-family-second / iOS 26.5 (`4CD31657-C2FD-40AC-AD50-B31DA3F157C1`). Tester B generated an invitation and tester A received it. User reports the other previously listed scenarios passed: viewing/cancelling does not join, explicit joining/family count, repeated confirmation does not duplicate membership, revoked invitation ends. Recorded as simulator user report; installed native and running JS SHA not independently confirmed. Not a real-device/public-HTTPS result.
 
-Issue: iOS Copy yielded two concatenated invitation URLs. Source supplied the same link in both `Share.share.message` and `.url`. Fix sends exactly one message item; link parsing remains strict and rejects concatenated links. Never store real invitation bearers in this WALK. Regression checks cover the actual page share call and concatenated-link rejection. Device retest of Copy after this fix is NOT VERIFIED.
+Issue: iOS Copy yielded two concatenated invitation URLs. Source supplied the same link in both `Share.share.message` and `.url`. Fix sends exactly one message item; link parsing remains strict and rejects concatenated links. Never store real invitation bearers in this WALK. Regression checks cover the actual page share call and concatenated-link rejection. After Reload, the user reports both simulators passed the Copy retest (runtime SHA not independently confirmed).
 
 Copy-fix checks: actual-page share and link-parser tests 2 suites / 4 tests PASS; tsc, changed ESLint and diff check PASS. Full suite was not repeated for this one-field share change; preceding Phase C full-suite result above remains historical evidence.
+
+## Invitation list follow-up
+
+Pending invitations without the one-time link show that previously shared links remain valid. Replace and share asks confirmation, revokes the old invitation first, then creates and shares a single new link; revocation failure does not create/share. Creation uncertainty asks for a list refresh and does not silently retry. No bearer persistence added. Normal list control is Refresh; list failure is Reload. Chinese/English copy added.
+
+Checks: targeted page/parser Jest 2 suites / 7 tests PASS; tsc, changed ESLint and diff check PASS. Replacement/share and reload controls on simulator/device remain NOT VERIFIED. PR remains OPEN.
