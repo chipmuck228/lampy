@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 export function dismissSettingsToRecent(router: { dismissTo: (href: '/') => void }): void {
   router.dismissTo('/');
 }
@@ -12,6 +13,6 @@ export function lampyAppVersionLabel(input: {
 }): string {
   const version = input.version?.trim();
   const build = input.build?.trim();
-  if (!version) return '版本信息暂不可用';
-  return build ? `版本 ${version}（${build}）` : `版本 ${version}`;
+  if (!version) return tr("版本信息暂不可用");
+  return build ? tr('版本 {0}（{1}）', [version, build]) : tr('版本 {0}', [version]);
 }

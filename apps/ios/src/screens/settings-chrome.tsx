@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,7 +51,7 @@ export function SettingsPage({
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="返回"
+          accessibilityLabel={tr("返回")}
           testID="account-back"
           onPress={onBack}
           style={styles.backHit}
