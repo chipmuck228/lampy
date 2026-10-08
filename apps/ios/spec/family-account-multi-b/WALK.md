@@ -10,7 +10,7 @@
 - 新测试：真实 SQLite 16→19 保留旧 ID/角色；migration 18 写入失败回滚；跨连接第 10 个名额；幂等与重开；双会话/单设备退出；同名邮箱不合并；v1 歧义拒绝；HTTP 认证/名称；账号迟到读取/401；稳定创建 key；取消前不发送；列表与锁定门控。
 - 全量 Jest：TZ=Asia/Shanghai npx jest --ci --runInBand，196 suites：194 passed / 2 failed；1035 tests：1033 passed / 2 failed。未称全量 PASS。
 - 最后失焦清空视图修补后，页面与 application 资格测试 2 suites / 8 tests PASS；tsc 与改动文件 eslint 再核 PASS。此前全量与该修补分别记录。
-- 新增测试共 14 项；包括跨连接 SQLite、迁移回滚、目录状态和页面门控。
+- 新增测试共 15 项；包括跨连接 SQLite、迁移回滚、目录状态和页面门控。
 - 实现 SHA 以独立 PR head 为准；设备运行 SHA 尚不存在。
 
 ## 基线对照
