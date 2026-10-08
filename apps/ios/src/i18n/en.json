@@ -568,5 +568,7 @@
   "{0}分钟": "{{0}} min",
   "完成": "Done",
   "好": "OK",
-  "已收进「{0}」": "Collected in “{{0}}”"
+  "已收进「{0}」": "Collected in “{{0}}”",
+  "继续": "Continue",
+  "留下瞬间": "Capture a moment"
 }

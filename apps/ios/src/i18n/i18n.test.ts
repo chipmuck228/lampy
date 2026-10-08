@@ -52,3 +52,16 @@ describe('personal UI languages', () => {
     }
   });
 });
+
+
+it.each([
+  ['en-US', ['Continue', 'Continue', 'Capture a moment']],
+  ['zh-CN', ['继续', '继续', '留下瞬间']],
+])('localizes all onboarding action labels for %s', (tag, expected) => {
+  jest.isolateModules(() => {
+    jest.doMock('expo-localization', () => ({ getLocales: () => [{ languageTag: tag }] }));
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { FIRST_RUN_SCREENS } = require('../application/first-run');
+    expect(FIRST_RUN_SCREENS.map((screen: { action: string }) => screen.action)).toEqual(expected);
+  });
+});
