@@ -13,3 +13,8 @@ Implementation base: local `f02c3d3` (same tree as #88 remote `584d3c5`).
 Actual English/Chinese welcome pages, short-screen overflow and swipe, animation/Reduce Motion, Settings scrolling and return, native system-font rendering, VoiceOver, app-lock masking and offline reading on a simulator or device. No iOS build, personal-device data access, TestFlight upload or merge was performed.
 
 English diagnostics while enabled and bilingual albums/native paper remain outside this slice. Legal notices remain candidate copy.
+
+## User device report, 2026-10-08
+User reports PASS for core button/date/count/playback translations, English Settings returns and scrolling, unchanged original content/media, and protection during foreground authentication. Test workspace started from #89 `fe0ca54` and locally merged #87 build compatibility fixes. Native build fingerprint and final merged working tree were not independently inspected. Welcome pages were not part of this report.
+
+Two observed English visual issues are corrected after that test: both neighbor captions explicitly break before “with moments”; composer keeps horizontal icon/label actions with tighter 12pt gaps and a conservative Latin width allowance. Narrow columns retain stacking. No font shrinking or recording/save/navigation behavior changes. These two corrections still need device retest.

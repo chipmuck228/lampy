@@ -1,4 +1,4 @@
-import { tr, feelingLabel } from '../i18n';
+import { appLanguage, tr, feelingLabel } from '../i18n';
 import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
@@ -271,6 +271,7 @@ function LookbackNeighborDayHit({
   onOpen: (day: LookbackPlacedDay) => void;
 }) {
   const verb = direction === 'previous' ? tr("前一个记录日") : tr("后一个记录日");
+  const displayVerb = appLanguage === 'en' ? verb.replace(' with ', '\nwith ') : verb;
   const date = lookbackNeighborDateLabel(current, day);
   const trailing = direction === 'next';
   return (
@@ -281,7 +282,7 @@ function LookbackNeighborDayHit({
       onPress={() => onOpen(day)}
       style={[styles.neighborHit, trailing ? styles.neighborHitEnd : styles.neighborHitStart]}
     >
-      <Text style={[styles.neighborVerb, trailing ? styles.neighborCopyEnd : styles.neighborCopyStart]}>{verb}</Text>
+      <Text style={[styles.neighborVerb, trailing ? styles.neighborCopyEnd : styles.neighborCopyStart]}>{displayVerb}</Text>
       <Text style={[styles.neighborDate, trailing ? styles.neighborCopyEnd : styles.neighborCopyStart]}>
         {date}
       </Text>
