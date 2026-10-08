@@ -12,7 +12,7 @@
 
 Prebuild/autolinking is configuration evidence, not Swift compilation or installation evidence. This environment has no Xcode/UIKit compiler. No simulator or user device has been run, and no TestFlight upload has been performed.
 
-## Required device walk: all NOT VERIFIED
+## Initial device checklist (before user reports below)
 
 Record installed native build, JS SHA, device/iOS and app language. Rebuild and install; do not reset the user's records.
 
@@ -31,3 +31,14 @@ Record installed native build, JS SHA, device/iOS and app language. Rebuild and 
 Liuz17 / iOS26.2 / Release / Chinese and English, local integration SHA `8ba37872e07cb25c971bc5fbcb86df307ce39e2`: user reports PASS for cold/warm shortcuts, draft preservation and media limits, permission refusal/background cancellation, local protection/cancelled authentication, sharing only the website, existing composer reuse and FAB regressions. This integration SHA is distinct from PR head.
 
 User's iPhone17ProMax / iOS26.3 simulator screenshots show the four English shortcut titles/icons correctly. They also exposed untranslated onboarding action labels: first/second screen Continue and final Capture a moment now go through tr(), shared by visible text and accessibilityLabel. Existing onboarding motion/navigation/completion are unchanged. tsc, onboarding/i18n Jest 5 suites/28 tests, changed-source eslint and diff check PASS. Updated onboarding screens need a fresh simulator run; not yet labelled runtime PASS. Onboarding-shortcut completion flow remains device NOT VERIFIED.
+
+
+## Merge closeout — 2026-10-08
+
+- User reports the corrected English onboarding buttons PASS on iPhone17ProMax simulator / iOS26.2. Simulator build SHA was not supplied; do not attach the earlier physical-device integration SHA to this later run.
+- Physical-device shortcut/regression PASS remains tied to user-supplied integration SHA `8ba37872e07cb25c971bc5fbcb86df307ce39e2`, Liuz17 / iOS26.2 / Release / Chinese and English. Native compilation/install is thereby user-reported, not independently performed in this environment.
+- Onboarding-completion shortcut execution, iPad and system VoiceOver remain NOT VERIFIED. The simulator report confirms translated onboarding controls, not all those paths.
+- Final focused checks: tsc PASS; combined quick-action/onboarding/i18n Jest 9 suites / 65 tests PASS; focused ESLint and diff check PASS. Earlier full Jest remains 1016 pass / 2 baseline failures, not full PASS.
+- Source review: four allowlisted IDs; one-use composer tokens; foreground/navigator/local-lock gates; camera permission recheck; no replacement of existing audio or full photo drafts; sharing uses public URL only; background clears tokens even before composer mount. No new blocking source issue found.
+- GitHub at review head `39717b2`: OPEN→main, base `98ba119`, MERGEABLE/CLEAN, no submitted reviews or review comments. Cursor Bugbot NEUTRAL because usage limit prevented analysis; it is not a successful automated code review.
+- This closeout changes documentation only. User authorized ordinary merge. No TestFlight upload, #87 merge, private-data reset or device operation is performed here.
