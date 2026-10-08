@@ -1,0 +1,7 @@
+{
+  "name": "lampy-quick-actions",
+  "version": "0.1.0",
+  "main": "index.ts",
+  "description": "Lampy iOS home screen shortcut delivery",
+  "license": "UNLICENSED"
+}

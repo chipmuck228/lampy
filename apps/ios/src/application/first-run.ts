@@ -26,7 +26,7 @@ export const FIRST_RUN_SCREENS = [
     titleAccentIndex: 2,
     body: tr("不必写成故事。把这一刻，轻轻留给自己。"),
     source: '本轮定稿，2026-10-03',
-    action: '继续',
+    action: tr('继续'),
   },
   {
     id: 'lookback',
@@ -38,7 +38,7 @@ export const FIRST_RUN_SCREENS = [
     titleAccentIndex: 2,
     body: tr("文字、照片和声音，保留原来的样子。想再读一遍时，随时停下来。"),
     source: '本轮定稿，2026-10-03',
-    action: '继续',
+    action: tr('继续'),
   },
   {
     id: 'keep',
@@ -50,7 +50,7 @@ export const FIRST_RUN_SCREENS = [
     titleAccentIndex: 1,
     body: tr("回到那一天，慢慢读完。过往就在这里，允许停留。"),
     source: '本轮定稿，2026-10-03',
-    action: '留下瞬间',
+    action: tr('留下瞬间'),
   },
 ] as const;
 
