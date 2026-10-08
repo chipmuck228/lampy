@@ -65,3 +65,9 @@ it.each([
     expect(FIRST_RUN_SCREENS.map((screen: { action: string }) => screen.action)).toEqual(expected);
   });
 });
+
+it('interpolates family capacity in both app languages', () => {
+  expect(localized('en-US').tr('{0} / 10',[10])).toBe('10 / 10');
+  expect(localized('zh-CN').tr('{0} / 10',[2])).toBe('2 / 10');
+  expect(localized('en-US').tr('已加入 {0} / 10 个家庭',[10])).toBe('Families: 10 / 10');
+});

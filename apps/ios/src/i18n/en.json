@@ -589,10 +589,21 @@
   "成员": "Member",
   "本机与账户": "Device and account",
   "未能创建家庭。请检查名称后再试。": "Could not create the family. Check the name and try again.",
-  "已加入 {0} / 10 个家庭": "Families: {0} / 10",
+  "已加入 {0} / 10 个家庭": "Families: {{0}} / 10",
   "创建的家庭和加入的家庭，合计最多10个。": "You can create or join up to 10 families in total.",
   "已达到家庭上限，暂时不能创建或加入新的家庭。": "You have reached the family limit. You cannot create or join another family right now.",
   "给这个家起个名字": "Give this family a name",
   "创建这一家": "Create this family",
-  "已选择": "Selected"
+  "已选择": "Selected",
+  "给重要的人，留一个位置。": "A place for the people close to you.",
+  "有些日子，想和家人一起留着。": "Some days are worth keeping together.",
+  "登录后，可以创建自己的家庭。": "Sign in to create a family of your own.",
+  "登录家庭": "Sign in for Family",
+  "自己的记录，仍在这台设备上。": "Your personal moments stay on this device.",
+  "暂时连不上，稍后再看看。": "We can’t connect right now.",
+  "你的家庭没有因此消失。": "Your families are still there.",
+  "我的家庭": "My families",
+  "{0} / 10": "{{0}} / 10",
+  "你已在10个家庭中，暂时不能再创建或加入。": "You’re in 10 families. You can’t create or join another right now.",
+  "最多可创建或加入10个家庭。": "Create or join up to 10 families."
 }

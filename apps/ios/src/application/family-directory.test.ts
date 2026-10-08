@@ -24,3 +24,12 @@ it('retains a selected id only when the fresh list still authorizes it; failure 
   await directory.load(async () => { throw new Error('offline'); });
   expect(directory.snapshot()).toMatchObject({ status:'failed',families:[],selectedId:null });
 });
+
+it('distinguishes an absent or expired account from connectivity failure', async () => {
+  const directory=createFamilyDirectory();
+  await directory.load(async () => list('A'));
+  await directory.load(async () => { throw {code:'UNAUTHENTICATED'}; });
+  expect(directory.snapshot()).toMatchObject({status:'signed-out',families:[],selectedId:null});
+  await directory.load(async () => { throw {code:'NETWORK'}; });
+  expect(directory.snapshot().status).toBe('failed');
+});

@@ -51,3 +51,11 @@
 检查：相关 Jest 4 suites / 19 tests PASS；TypeScript、改动文件 eslint、diff --check PASS（最终核对后提交）。没有重跑全量，之前两项基线失败记录保留。
 
 新布局、长家庭名、中英、横屏/短屏、真实 VoiceOver：NOT VERIFIED。先前用户实测路径不重写成本轮 UI 已验收。PR 保持 OPEN，未部署或上传 TestFlight。
+
+## 中英文计数与未登录页修正
+
+用户截图反馈上一版英文容量出现 `{0}`、未登录被画为失败。本轮英文占位符改为 i18next 双括号，并加中英文真实 tr 插值测试。页面容量改为「我的家庭」与 `N / 10` 小标签，仅一行容量说明；满额说明保留且按钮确实禁用。
+
+UNAUTHENTICATED 在目录状态中单独归为 signed-out，清除列表与选中值；页面不再显示读取失败/重试，而是系统家庭图标、生活化标题、简短说明与「登录家庭」。入口走现有受控诊断登录页，未新增正式注册或放开 Release 诊断。网络故障仍独立显示连接失败/重试，不伪装为空或未登录。
+
+相关 Jest 4 suites /21 tests PASS；tsc、改动文件 lint、diff --check PASS。本轮新视觉、英文/中文实页、认证往返 NOT VERIFIED。未重跑全量，不扩大旧设备 PASS；仍 OPEN。

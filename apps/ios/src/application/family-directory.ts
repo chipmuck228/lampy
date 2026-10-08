@@ -1,7 +1,7 @@
 import type { FamilyListView, FamilySummary } from '../family-api/types';
 
 export type FamilyDirectoryState = {
-  status: 'idle' | 'loading' | 'ready' | 'failed';
+  status: 'idle' | 'loading' | 'ready' | 'failed' | 'signed-out';
   families: FamilySummary[];
   selectedId: string | null;
   error: unknown;
@@ -33,7 +33,10 @@ export function createFamilyDirectory() {
         const selectedId = result.families.some(f => f.familyId === preferredId) ? preferredId : null;
         state = { status: 'ready', families: result.families, selectedId, error: null };
       } catch (error) {
-        if (request === generation) state = { status: 'failed', families: [], selectedId: null, error };
+        if (request === generation) {
+          const signedOut = error && typeof error === 'object' && 'code' in error && error.code === 'UNAUTHENTICATED';
+          state = { status: signedOut ? 'signed-out' : 'failed', families: [], selectedId: null, error };
+        }
       }
     },
   };

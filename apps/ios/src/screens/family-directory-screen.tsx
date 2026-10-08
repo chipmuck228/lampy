@@ -96,18 +96,26 @@ export default function FamilyDirectoryScreen() {
   const chosen = state.status === 'ready' ? state.families.find(f => f.familyId === state.selectedId) : null;
   return <SettingsPage title={tr('家庭')} backLabel={tr('最近')} accessibilityLabel={tr('家庭')} onBack={() => router.dismissTo('/')}>
     {!isFamilyProductEntryOpen() ? <Text>{tr('敬请期待。')}</Text> : allowed ? <>
-      <Text>{tr('和家人分享你愿意留下的片段。')}</Text>
+      {state.status !== 'signed-out' ? <Text style={styles.intro}>{tr('给重要的人，留一个位置。')}</Text> : null}
       {state.status === 'loading' ? <Text>{tr('正在读取家庭。')}</Text> : null}
-      {state.status === 'failed' ? <>
-        <Text>{tr('暂时读不到家庭。请确认登录后再试。')}</Text>
-        <Pressable style={styles.hit} onPress={() => router.push('/account')} accessibilityRole="button"><Text>{tr('本机与账户')}</Text></Pressable>
-        <Pressable style={styles.hit} onPress={() => void refresh()} accessibilityRole="button"><Text>{tr('再试一次')}</Text></Pressable>
-      </> : null}
+      {state.status === 'signed-out' ? <View style={styles.welcome} testID="family-signed-out">
+        <View style={styles.welcomeMark}><LifeIcon name="family" size={44} color={sage} /></View>
+        <Text style={styles.welcomeTitle}>{tr('有些日子，想和家人一起留着。')}</Text>
+        <Text style={styles.welcomeBody}>{tr('登录后，可以创建自己的家庭。')}</Text>
+        <Pressable style={styles.createHit} testID="family-sign-in" accessibilityRole="button"
+          onPress={() => router.push('/account-diagnostics')}><Text style={styles.action}>{tr('登录家庭')}</Text></Pressable>
+        <Text style={styles.privacyHint}>{tr('自己的记录，仍在这台设备上。')}</Text>
+      </View> : null}
+      {state.status === 'failed' ? <View style={styles.connection} testID="family-connection-failed">
+        <Text style={styles.name}>{tr('暂时连不上，稍后再看看。')}</Text>
+        <Text style={styles.meta}>{tr('你的家庭没有因此消失。')}</Text>
+        <Pressable style={styles.createHit} onPress={() => void refresh()} accessibilityRole="button"><Text style={styles.action}>{tr('再试一次')}</Text></Pressable>
+      </View> : null}
       {state.status === 'ready' ? <>
         <View style={styles.capacity} testID="family-capacity">
-          <Text style={styles.capacityTitle}>{tr('已加入 {0} / 10 个家庭', [state.families.length])}</Text>
-          <Text style={styles.meta}>{tr('创建的家庭和加入的家庭，合计最多10个。')}</Text>
-          {state.families.length >= 10 ? <Text style={styles.limit} testID="family-limit-hint">{tr('已达到家庭上限，暂时不能创建或加入新的家庭。')}</Text> : null}
+          <View style={styles.capacityRow}><Text style={styles.capacityTitle}>{tr('我的家庭')}</Text>
+            <Text style={styles.capacityCount} testID="family-count" accessibilityLabel={tr('已加入 {0} / 10 个家庭', [state.families.length])}>{tr('{0} / 10', [state.families.length])}</Text></View>
+          {state.families.length >= 10 ? <Text style={styles.limit} testID="family-limit-hint">{tr('你已在10个家庭中，暂时不能再创建或加入。')}</Text> : <Text style={styles.meta}>{tr('最多可创建或加入10个家庭。')}</Text>}
         </View>
         <Pressable style={[styles.createHit, (busy || (state.families.length >= 10 && !retrying)) && styles.disabled]}
           testID="family-open-create" accessibilityRole="button" accessibilityLabel={tr('创建家庭')}
@@ -154,6 +162,15 @@ export default function FamilyDirectoryScreen() {
   </SettingsPage>;
 }
 const styles = StyleSheet.create({
+  intro: { ...type.body, color: inkSoft, marginTop: 12 },
+  welcome: { gap: 20, paddingTop: 40, paddingBottom: 32, alignItems: 'flex-start' },
+  welcomeMark: { width: 80, height: 80, borderRadius: 24, backgroundColor: paperDeep, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  welcomeTitle: { ...type.title, fontSize: 26, lineHeight: 38, color: ink, maxWidth: 300 },
+  welcomeBody: { ...type.body, color: inkSoft, maxWidth: 300 },
+  privacyHint: { ...type.meta, color: inkSoft },
+  connection: { gap: 12, paddingVertical: 28 },
+  capacityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  capacityCount: { ...type.meta, color: inkSoft, backgroundColor: paperDeep, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   hit: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
   capacity: { gap: 4, marginTop: 16, marginBottom: 12 },
   capacityTitle: { ...type.action, color: ink },
