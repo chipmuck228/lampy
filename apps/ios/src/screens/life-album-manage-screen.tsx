@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -142,9 +143,9 @@ export default function LifeAlbumManageScreen() {
 
   return (
     <SettingsPage
-      title={view?.album.name || '这一册'}
-      backLabel="我的生活册"
-      accessibilityLabel="这一册"
+      title={view?.album.name || tr("这一册")}
+      backLabel={tr("我的生活册")}
+      accessibilityLabel={tr("这一册")}
       pageTestID="life-album-manage"
       onBack={() => router.dismissTo('/albums')}
     >
@@ -204,7 +205,7 @@ export default function LifeAlbumManageScreen() {
             </View>
             <LifeIconButton
               name="more"
-              label="册子菜单"
+              label={tr("册子菜单")}
               testID="life-album-manage-menu"
               onPress={() => setMenuOpen((open) => !open)}
             />
@@ -213,16 +214,16 @@ export default function LifeAlbumManageScreen() {
             <View style={styles.menu}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="删除这一册"
+                accessibilityLabel={tr("删除这一册")}
                 testID="life-album-delete"
                 disabled={busy}
                 onPress={() => {
                   if (busyRef.current) return;
                   setMenuOpen(false);
-                  Alert.alert('删除这一册', ALBUM_DELETE_CONFIRM, [
-                    { text: '取消', style: 'cancel' },
+                  Alert.alert(tr("删除这一册"), ALBUM_DELETE_CONFIRM, [
+                    { text: tr("取消"), style: 'cancel' },
                     {
-                      text: '删除这一册',
+                      text: tr("删除这一册"),
                       style: 'destructive',
                       onPress: () => {
                         if (busyRef.current) return;
@@ -236,7 +237,7 @@ export default function LifeAlbumManageScreen() {
                 }}
                 style={styles.hit}
               >
-                <Text style={[styles.danger, busy && styles.disabled]}>删除这一册</Text>
+                <Text style={[styles.danger, busy && styles.disabled]}>{tr("删除这一册")}</Text>
               </Pressable>
             </View>
           ) : null}
@@ -244,17 +245,17 @@ export default function LifeAlbumManageScreen() {
             {editing ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="取消"
+                accessibilityLabel={tr("取消")}
                 testID="life-album-cancel-edit"
                 onPress={closeEditor}
                 style={styles.hit}
               >
-                <Text style={styles.action}>取消</Text>
+                <Text style={styles.action}>{tr("取消")}</Text>
               </Pressable>
             ) : (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="编辑册子"
+                accessibilityLabel={tr("编辑册子")}
                 testID="life-album-edit"
                 onPress={() => {
                   setMenuOpen(false);
@@ -262,23 +263,23 @@ export default function LifeAlbumManageScreen() {
                 }}
                 style={styles.hit}
               >
-                <Text style={styles.action}>编辑册子</Text>
+                <Text style={styles.action}>{tr("编辑册子")}</Text>
               </Pressable>
             )}
             {organizing ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="完成"
+                accessibilityLabel={tr('完成')}
                 testID="life-album-organize-done"
                 onPress={() => setOrganizing(false)}
                 style={styles.doneHit}
               >
-                <Text style={styles.doneLabel}>完成</Text>
+                <Text style={styles.doneLabel}>{tr('完成')}</Text>
               </Pressable>
             ) : (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="整理"
+                accessibilityLabel={tr("整理")}
                 testID="life-album-organize"
                 onPress={() => {
                   setMenuOpen(false);
@@ -286,13 +287,13 @@ export default function LifeAlbumManageScreen() {
                 }}
                 style={styles.hit}
               >
-                <Text style={styles.action}>整理</Text>
+                <Text style={styles.action}>{tr("整理")}</Text>
               </Pressable>
             )}
           </View>
           {editing ? (
             <View testID="life-album-editor" style={styles.edit}>
-              <Text style={styles.label}>册名</Text>
+              <Text style={styles.label}>{tr("册名")}</Text>
               <TextInput
                 testID="life-album-manage-name"
                 value={name}
@@ -303,7 +304,7 @@ export default function LifeAlbumManageScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ disabled: busy }}
-                accessibilityLabel="保存册名"
+                accessibilityLabel={tr("保存册名")}
                 testID="life-album-manage-save-name"
                 disabled={busy}
                 onPress={() => {
@@ -312,9 +313,9 @@ export default function LifeAlbumManageScreen() {
                 }}
                 style={styles.hit}
               >
-                <Text style={[styles.action, busy && styles.disabled]}>保存册名</Text>
+                <Text style={[styles.action, busy && styles.disabled]}>{tr("保存册名")}</Text>
               </Pressable>
-              <Text style={styles.label}>开篇</Text>
+              <Text style={styles.label}>{tr("开篇")}</Text>
               <Text style={styles.hint}>{ALBUM_OPENING_HINT}</Text>
               <TextInput
                 testID="life-album-manage-opening"
@@ -327,7 +328,7 @@ export default function LifeAlbumManageScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ disabled: busy }}
-                accessibilityLabel="保存开篇"
+                accessibilityLabel={tr("保存开篇")}
                 testID="life-album-manage-save-opening"
                 disabled={busy}
                 onPress={() => {
@@ -336,9 +337,9 @@ export default function LifeAlbumManageScreen() {
                 }}
                 style={styles.hit}
               >
-                <Text style={[styles.action, busy && styles.disabled]}>保存开篇</Text>
+                <Text style={[styles.action, busy && styles.disabled]}>{tr("保存开篇")}</Text>
               </Pressable>
-              <Text style={styles.label}>封面</Text>
+              <Text style={styles.label}>{tr("封面")}</Text>
               <CoverChoice
                 selected={view.album.cover}
                 candidates={view.coverCandidates}
@@ -411,7 +412,7 @@ function AlbumEntryRow({
     <View style={styles.entry} testID={`life-album-entry-${entry.momentId}`}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={ready ? entry.noteExcerpt || `第${index + 1}条` : ALBUM_MISSING_SOURCE}
+        accessibilityLabel={ready ? entry.noteExcerpt || tr('第{0}条', [index + 1]) : ALBUM_MISSING_SOURCE}
         testID={`life-album-entry-open-${entry.momentId}`}
         disabled={organizing}
         onPress={onOpen}
@@ -443,28 +444,24 @@ function AlbumEntryRow({
                 <View style={styles.mediaRow}>
                   {entry.photoCount > 1 ? (
                     <Text testID={`life-album-entry-media-${entry.momentId}`} style={styles.hint}>
-                      {entry.photoCount}张照片
+                      {tr('{0}张照片', [entry.photoCount])}
                     </Text>
                   ) : entry.photoCount === 1 && !entry.thumbnailUri ? (
-                    <Text testID={`life-album-entry-media-${entry.momentId}`} style={styles.hint}>
-                      有照片
-                    </Text>
+                    <Text testID={`life-album-entry-media-${entry.momentId}`} style={styles.hint}>{tr("有照片")}</Text>
                   ) : null}
                   {entry.hasAudio ? (
                     <View style={styles.audioMark} testID={`life-album-entry-audio-${entry.momentId}`}>
                       <LifeIcon name="record" size={16} decorative />
-                      <Text style={styles.hint}>{duration ? duration : '有声音'}</Text>
+                      <Text style={styles.hint}>{duration ? duration : tr("有声音")}</Text>
                     </View>
                   ) : null}
                   {entry.unknownCount > 0 ? (
-                    <Text testID={`life-album-entry-unknown-${entry.momentId}`} style={styles.hint}>
-                      还有一种现在打不开的媒介。
-                    </Text>
+                    <Text testID={`life-album-entry-unknown-${entry.momentId}`} style={styles.hint}>{tr("还有一种现在打不开的媒介。")}</Text>
                   ) : null}
                 </View>
               ) : null}
               {!entry.noteExcerpt && !entry.dateLabel && !entry.mediaHint ? (
-                <Text style={styles.hint}>第{index + 1}条</Text>
+                <Text style={styles.hint}>{tr('第{0}条', [index + 1])}</Text>
               ) : null}
             </>
           ) : (
@@ -477,35 +474,35 @@ function AlbumEntryRow({
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ disabled: moveUpDisabled }}
-            accessibilityLabel="上移"
+            accessibilityLabel={tr("上移")}
             testID={`life-album-move-up-${entry.momentId}`}
             disabled={moveUpDisabled}
             onPress={onMoveUp}
             style={styles.hit}
           >
-            <Text style={[styles.action, moveUpDisabled && styles.disabled]}>上移</Text>
+            <Text style={[styles.action, moveUpDisabled && styles.disabled]}>{tr("上移")}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ disabled: moveDownDisabled }}
-            accessibilityLabel="下移"
+            accessibilityLabel={tr("下移")}
             testID={`life-album-move-down-${entry.momentId}`}
             disabled={moveDownDisabled}
             onPress={onMoveDown}
             style={styles.hit}
           >
-            <Text style={[styles.action, moveDownDisabled && styles.disabled]}>下移</Text>
+            <Text style={[styles.action, moveDownDisabled && styles.disabled]}>{tr("下移")}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ disabled: busy }}
-            accessibilityLabel="移出"
+            accessibilityLabel={tr("移出")}
             testID={`life-album-remove-${entry.momentId}`}
             disabled={busy}
             onPress={onRemove}
             style={styles.hit}
           >
-            <Text style={[styles.action, busy && styles.disabled]}>移出</Text>
+            <Text style={[styles.action, busy && styles.disabled]}>{tr("移出")}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -539,7 +536,7 @@ function CoverChoice({
         style={[styles.coverChip, selected.kind === 'words' && styles.coverChipOn]}
       >
         <Text style={[styles.coverChipLabel, disabled && styles.disabled]}>{ALBUM_WORDS_COVER}</Text>
-        {selected.kind === 'words' ? <Text style={styles.selectedMark}>已选</Text> : null}
+        {selected.kind === 'words' ? <Text style={styles.selectedMark}>{tr("已选")}</Text> : null}
       </Pressable>
       {candidates.map((candidate) => {
         const active =
@@ -552,7 +549,7 @@ function CoverChoice({
             key={`${candidate.momentId}:${candidate.assetId}`}
             accessibilityRole="button"
             accessibilityState={{ selected: active, disabled: blocked }}
-            accessibilityLabel={active ? '已选这张照片做封面' : '选这张照片做封面'}
+            accessibilityLabel={active ? tr("已选这张照片做封面") : tr("选这张照片做封面")}
             testID={`life-album-cover-${candidate.assetId}`}
             disabled={blocked}
             onPress={() => {
@@ -564,9 +561,9 @@ function CoverChoice({
             {candidate.uri ? (
               <Image source={{ uri: candidate.uri }} style={styles.coverImage} contentFit="cover" />
             ) : (
-              <Text style={styles.hint}>这张照片现在看不到</Text>
+              <Text style={styles.hint}>{tr("这张照片现在看不到")}</Text>
             )}
-            {active ? <Text style={styles.coverSelectedMark}>已选</Text> : null}
+            {active ? <Text style={styles.coverSelectedMark}>{tr("已选")}</Text> : null}
           </Pressable>
         );
       })}

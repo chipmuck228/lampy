@@ -52,7 +52,7 @@ type NativeModule = {
     lineHeightPt: number,
     widthPt: number,
   ): AlbumMeasuredLine[];
-  diagnoseFonts?(): AlbumFontDiagnosis;
+  diagnoseFonts?(serif: string, ui: string): AlbumFontDiagnosis;
   writeProbePdf?(layoutJson: string, mediaJson: string, destPath: string): Promise<AlbumPdfProbeResult>;
 };
 
@@ -116,10 +116,10 @@ export function measureTextNative(
   }));
 }
 
-export function diagnoseAlbumFonts(): AlbumFontDiagnosis | null {
+export function diagnoseAlbumFonts(serif = 'Songti SC', ui = 'PingFang SC'): AlbumFontDiagnosis | null {
   const native = loadNative();
   if (!native?.diagnoseFonts) return null;
-  return native.diagnoseFonts();
+  return native.diagnoseFonts(serif, ui);
 }
 
 export async function writeAlbumProbePdf(
