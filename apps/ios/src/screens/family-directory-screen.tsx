@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
 import { createFamilyDirectory } from '../application/family-directory';
@@ -7,8 +7,11 @@ import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { tr } from '../i18n';
 import { useDeviceLock } from './device-lock-context';
 import { SettingsPage } from './settings-chrome';
-import { Text, TextInput } from './life-text';
-import { hairline, ink, sage } from './life-page';
+import { Text, TextInput, type } from './life-text';
+import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
+import { AlbumCoverFace } from './album-cover-tile';
+import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
+import { LifeIcon } from './life-icons';
 
 export default function FamilyDirectoryScreen() {
   const router = useRouter();
@@ -19,6 +22,9 @@ export default function FamilyDirectoryScreen() {
   const [retrying, setRetrying] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [wallWidth, setWallWidth] = useState<number | null>(null);
+  const wall = albumCoverWallLayout(wallWidth);
   const [message, setMessage] = useState<string | null>(null);
   const sequence = useRef(0);
   const submitOwner = useRef<number | null>(null);
@@ -33,6 +39,7 @@ export default function FamilyDirectoryScreen() {
         operation.current = null;
         setRetrying(false);
         setName('');
+        setFormOpen(false);
       }
       accountId.current = result.userId;
       return result;
@@ -55,7 +62,7 @@ export default function FamilyDirectoryScreen() {
   }, [allowed, directory, refresh]));
 
   async function create() {
-    if (!allowed || submitOwner.current !== null || !name.trim()) return;
+    if (!allowed || state.status !== 'ready' || submitOwner.current !== null || !name.trim() || (state.families.length >= 10 && !retrying)) return;
     const request = sequence.current;
     submitOwner.current = request;
     setBusy(true);
@@ -72,6 +79,7 @@ export default function FamilyDirectoryScreen() {
       operation.current = null;
       setRetrying(false);
       setName('');
+      setFormOpen(false);
       await refresh();
     } catch (error) {
       if (request !== sequence.current) return;
@@ -96,25 +104,75 @@ export default function FamilyDirectoryScreen() {
         <Pressable style={styles.hit} onPress={() => void refresh()} accessibilityRole="button"><Text>{tr('再试一次')}</Text></Pressable>
       </> : null}
       {state.status === 'ready' ? <>
-        {state.families.length === 0 ? <Text>{tr('现在还没有家庭。')}</Text> : null}
-        {state.families.map(f => <Pressable key={f.familyId} testID={`family-select-${f.familyId}`} style={styles.hit}
-          disabled={busy} accessibilityRole="button" accessibilityState={{ selected: f.familyId === state.selectedId, disabled: busy }}
-          onPress={() => { directory.select(f.familyId); setState(directory.snapshot()); }}>
-          <Text style={styles.name}>{f.name || tr('未命名家庭')}</Text>
-          <Text>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
-        </Pressable>)}
-        {chosen ? <Text testID="family-selected">{tr('当前家庭：{0}', [chosen.name || tr('未命名家庭')])}</Text> : null}
-        <TextInput accessibilityLabel={tr('家庭名称')} placeholder={tr('家庭名称')} value={name} editable={!busy && !retrying}
-          onChangeText={setName} maxLength={80} style={styles.input} />
-        <Pressable style={styles.hit} accessibilityRole="button" disabled={busy || !name.trim() || (state.families.length >= 10 && !retrying)}
-          onPress={() => void create()}><Text>{tr(busy ? '正在创建家庭。' : retrying ? '再试创建' : '创建家庭')}</Text></Pressable>
+        <View style={styles.capacity} testID="family-capacity">
+          <Text style={styles.capacityTitle}>{tr('已加入 {0} / 10 个家庭', [state.families.length])}</Text>
+          <Text style={styles.meta}>{tr('创建的家庭和加入的家庭，合计最多10个。')}</Text>
+          {state.families.length >= 10 ? <Text style={styles.limit} testID="family-limit-hint">{tr('已达到家庭上限，暂时不能创建或加入新的家庭。')}</Text> : null}
+        </View>
+        <Pressable style={[styles.createHit, (busy || (state.families.length >= 10 && !retrying)) && styles.disabled]}
+          testID="family-open-create" accessibilityRole="button" accessibilityLabel={tr('创建家庭')}
+          accessibilityState={{ disabled: busy || (state.families.length >= 10 && !retrying), expanded: formOpen }}
+          disabled={busy || (state.families.length >= 10 && !retrying)} onPress={() => setFormOpen(true)}>
+          <LifeIcon name="plus" color={sage} />
+          <Text style={styles.action}>{tr('创建家庭')}</Text>
+        </Pressable>
+        {formOpen || retrying ? <View style={styles.form} testID="family-create-form">
+          <Text style={styles.name}>{tr('给这个家起个名字')}</Text>
+          <TextInput accessibilityLabel={tr('家庭名称')} placeholder={tr('家庭名称')} value={name} editable={!busy && !retrying}
+            onChangeText={setName} maxLength={80} style={styles.input} />
+          <View style={styles.formActions}>
+            <Pressable style={styles.createHit} testID="family-create-submit" accessibilityRole="button"
+              disabled={busy || !name.trim() || (state.families.length >= 10 && !retrying)}
+              onPress={() => void create()}><Text style={styles.action}>{tr(busy ? '正在创建家庭。' : retrying ? '再试创建' : '创建这一家')}</Text></Pressable>
+            {!retrying && !busy ? <Pressable style={styles.hit} accessibilityRole="button" onPress={() => setFormOpen(false)}><Text style={styles.meta}>{tr('取消')}</Text></Pressable> : null}
+          </View>
+        </View> : null}
+        {state.families.length === 0 ? <Text style={styles.empty}>{tr('现在还没有家庭。')}</Text> : null}
+        <View style={styles.wall} testID="family-cover-wall" onLayout={event => {
+          const next = Math.round(event.nativeEvent.layout.width);
+          setWallWidth(previous => previous === next ? previous : next);
+        }}>
+          {state.families.map(f => <Pressable key={f.familyId} testID={`family-select-${f.familyId}`}
+            style={[styles.tile, { width: wall.tileWidth }]} disabled={busy} accessibilityRole="button"
+            accessibilityLabel={`${f.name || tr('未命名家庭')}，${tr(f.role === 'creator' ? '创建者' : '成员')}，${tr('家庭成员：{0}人', [f.memberCount])}`}
+            accessibilityState={{ selected: f.familyId === state.selectedId, disabled: busy }}
+            onPress={() => { directory.select(f.familyId); setState(directory.snapshot()); }}>
+            <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+              style={[styles.cover, f.familyId === state.selectedId && styles.selectedCover]}>
+              <AlbumCoverFace name="" coverUri={null} width={Math.max(1, wall.tileWidth - 2)} height={wall.tileHeight - 2} />
+              <View style={styles.coverMark}><LifeIcon name="family" size={36} color={sage} /></View>
+            </View>
+            <Text style={styles.name}>{f.name || tr('未命名家庭')}</Text>
+            <Text style={styles.meta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
+            {f.familyId === state.selectedId ? <Text style={styles.selected}>{tr('已选择')}</Text> : null}
+          </Pressable>)}
+        </View>
+        {chosen ? <Text testID="family-selected" style={styles.meta}>{tr('当前家庭：{0}', [chosen.name || tr('未命名家庭')])}</Text> : null}
       </> : null}
       {message ? <Text>{message}</Text> : null}
     </> : null}
   </SettingsPage>;
 }
 const styles = StyleSheet.create({
-  hit: { minHeight: 48, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },
-  name: { fontSize: 20, color: sage },
-  input: { minHeight: 48, color: ink, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },
+  hit: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
+  capacity: { gap: 4, marginTop: 16, marginBottom: 12 },
+  capacityTitle: { ...type.action, color: ink },
+  meta: { ...type.meta, color: inkSoft },
+  limit: { ...type.action, color: sage, marginTop: 8 },
+  name: { ...type.action, fontSize: 18, lineHeight: 26, color: ink },
+  action: { ...type.action, color: sage },
+  createHit: { minHeight: 48, paddingHorizontal: 16, borderRadius: 24, backgroundColor: paperDeep,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: sage, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 12 },
+  disabled: { opacity: 0.5 },
+  form: { gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline, marginBottom: 16 },
+  formActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
+  input: { ...type.action, minHeight: 48, color: ink, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },
+  empty: { ...type.body, color: inkSoft, marginVertical: 20 },
+  wall: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: ALBUM_COVER_WALL_GAP, marginTop: 12, marginBottom: 16 },
+  tile: { minHeight: 48, gap: 6, paddingBottom: 12 },
+  cover: { borderRadius: 10, borderWidth: 1, borderColor: 'transparent', overflow: 'hidden' },
+  selectedCover: { borderColor: sage },
+  coverMark: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
+  selected: { ...type.meta, color: sage },
 });

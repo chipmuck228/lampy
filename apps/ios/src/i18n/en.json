@@ -588,5 +588,11 @@
   "创建者": "Creator",
   "成员": "Member",
   "本机与账户": "Device and account",
-  "未能创建家庭。请检查名称后再试。": "Could not create the family. Check the name and try again."
+  "未能创建家庭。请检查名称后再试。": "Could not create the family. Check the name and try again.",
+  "已加入 {0} / 10 个家庭": "Families: {0} / 10",
+  "创建的家庭和加入的家庭，合计最多10个。": "You can create or join up to 10 families in total.",
+  "已达到家庭上限，暂时不能创建或加入新的家庭。": "You have reached the family limit. You cannot create or join another family right now.",
+  "给这个家起个名字": "Give this family a name",
+  "创建这一家": "Create this family",
+  "已选择": "Selected"
 }

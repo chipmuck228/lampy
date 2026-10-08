@@ -35,12 +35,37 @@ it('keeps an uncertain name read-only and retries the same operation once', asyn
   mockOpen.mockReturnValue(true);mockCreate.mockRejectedValueOnce({code:'NETWORK'}).mockResolvedValueOnce({familyId:'new'});
   const page=await render(<FamilyDirectoryScreen/>);
   await waitFor(() => expect(page.getByText('Our home')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('family-open-create'));
   await fireEvent.changeText(page.getByLabelText('家庭名称'),'New home');
-  await fireEvent.press(page.getByText('创建家庭'));
+  await fireEvent.press(page.getByTestId('family-create-submit'));
   await waitFor(() => expect(page.getByText('再试创建')).toBeTruthy());
   expect(page.getByLabelText('家庭名称').props.editable).toBe(false);
   const first=mockCreate.mock.calls[0];
   await act(async () => { await fireEvent.press(page.getByText('再试创建')); });
   await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(2));
   expect(mockCreate.mock.calls[1].slice(0,2)).toEqual(first.slice(0,2));
+});
+
+it('shows capacity before creation and explains the full limit without a request', async () => {
+  mockOpen.mockReturnValue(true);
+  mockFamilies.mockResolvedValue({userId:'a',limit:10,families:Array.from({length:10},(_,i)=>({familyId:`h${i}`,name:`Home ${i}`,role:'creator',memberCount:1}))});
+  const page=await render(<FamilyDirectoryScreen/>);
+  await waitFor(() => expect(page.getByText('已加入 10 / 10 个家庭')).toBeTruthy());
+  expect(page.getByTestId('family-limit-hint')).toBeTruthy();
+  expect(page.getByTestId('family-open-create').props.accessibilityState.disabled).toBe(true);
+  await fireEvent.press(page.getByTestId('family-open-create'));
+  expect(page.queryByTestId('family-create-form')).toBeNull();
+  expect(mockCreate).not.toHaveBeenCalled();
+  expect(page.getByTestId('family-cover-wall')).toBeTruthy();
+});
+it('opens and cancels the name form without creating a family', async () => {
+  mockOpen.mockReturnValue(true);
+  const page=await render(<FamilyDirectoryScreen/>);
+  await waitFor(() => expect(page.getByText('已加入 1 / 10 个家庭')).toBeTruthy());
+  expect(page.queryByLabelText('家庭名称')).toBeNull();
+  await fireEvent.press(page.getByTestId('family-open-create'));
+  expect(page.getByLabelText('家庭名称')).toBeTruthy();
+  await fireEvent.press(page.getByText('取消'));
+  expect(page.queryByTestId('family-create-form')).toBeNull();
+  expect(mockCreate).not.toHaveBeenCalled();
 });
