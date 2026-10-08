@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import {
   calendarDayBounds,
   calendarMonthBounds,
@@ -284,7 +285,7 @@ function recordedElsewhereLabel(moment: MomentRecord, clock: HistoryClock): stri
   ) {
     return undefined;
   }
-  return `记录于 ${recordedParts.month}月${recordedParts.day}日`;
+  return tr("记录于 {0}月{1}日", [recordedParts.month, recordedParts.day]);
 }
 
 function deviceTimeZone(): string {

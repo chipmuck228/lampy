@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { DeviceAuthResult } from '../application/device-lock';
 
 export type DeviceAuthenticator = {
@@ -81,7 +82,7 @@ export function createExpoDeviceAuthenticator(): DeviceAuthenticator {
         const result = await LocalAuthentication.authenticateAsync({
           promptMessage: reason,
           disableDeviceFallback: false,
-          cancelLabel: '取消',
+          cancelLabel: tr("取消"),
         });
         if (result.success) return { ok: true };
         return mapLocalAuthError(result.error);

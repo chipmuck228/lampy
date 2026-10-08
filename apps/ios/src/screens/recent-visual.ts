@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { lookbackBookWeekdayName } from '../application/lookback-book';
 import { pad2, parseMillis } from '../domain-adapters/calendar';
 
@@ -163,7 +164,7 @@ export function recentDayHeading(
   const day = Number(matched[3]);
   const crossYear = nowYear != null && year !== nowYear;
   return {
-    date: crossYear ? `${year}年${month}月${day}日` : `${month}月${day}日`,
+    date: crossYear ? tr("{0}年{1}月{2}日", [year, month, day]) : tr("{0}月{1}日", [month, day]),
     weekday: lookbackBookWeekdayName(year, month, day),
     year: crossYear ? String(year) : null,
   };
@@ -173,7 +174,7 @@ export function recentDayAccessLabel(
   heading: { date: string; weekday: string | null; year: string | null },
   count: number,
 ): string {
-  return [heading.date, heading.weekday, `${count}条记录`].filter(Boolean).join('，');
+  return [heading.date, heading.weekday, tr("{0}条记录", [count])].filter(Boolean).join('，');
 }
 
 export function recentRecordedClock(recordedAt?: string | null): string | null {

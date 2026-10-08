@@ -1,3 +1,4 @@
+import { tr, feelingLabel } from '../i18n';
 import {
   createContext,
   useContext,
@@ -135,10 +136,10 @@ export function LookbackCatalogToggle({
       onPress={onPress}
       style={styles.catalogToggle}
     >
-      <Text style={styles.catalogKicker}>时间目录</Text>
+      <Text style={styles.catalogKicker}>{tr("时间目录")}</Text>
       <View style={styles.catalogRangeRow}>
         <Text style={styles.catalogRange} testID="lookback-catalog-range">
-          {range ?? '时间目录'}
+          {range ?? tr("时间目录")}
         </Text>
         <LifeIcon name={expanded ? 'collapse' : 'expand'} size={16} decorative />
       </View>
@@ -384,12 +385,12 @@ export function LookbackScaffold({
       {root ? null : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="返回原来的位置"
+          accessibilityLabel={tr("返回原来的位置")}
           testID="lookback-back"
           onPress={() => (onBack ? onBack() : router.back())}
           style={styles.backHit}
         >
-          <Text style={styles.back}>返回原来的位置</Text>
+          <Text style={styles.back}>{tr("返回原来的位置")}</Text>
         </Pressable>
       )}
       {pinHeader ? null : pageHeader}
@@ -544,10 +545,10 @@ export function HistoryMomentRow({
       ...images.map((image) => image.label),
       audio?.label || '',
       ...unknownMedia.map((item) => item.label),
-      feeling ? `当时的感受，${feeling.label}` : '',
+      feeling ? tr("当时的感受，{0}", [feelingLabel(feeling.label)]) : '',
     ]
       .filter(Boolean)
-      .join('，') || '一条记录';
+      .join('，') || tr("一条记录");
   return (
     <Pressable
       accessibilityRole="button"

@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -100,7 +101,7 @@ function ImageSlot({
         ) : (
           <View testID={`${testIDPrefix}-unavailable-${image.id}`} style={styles.missing}>
             <Text style={styles.missingText} accessible={false}>
-              {image.unavailableLabel || '这张照片暂时找不到了，但这条记录还在。'}
+              {image.unavailableLabel || tr("这张照片暂时找不到了，但这条记录还在。")}
             </Text>
           </View>
         )}
@@ -112,14 +113,14 @@ function ImageSlot({
       {onRemoveImage ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`移除这张照片，${image.label}`}
+          accessibilityLabel={tr("移除这张照片，{0}", [image.label])}
           testID={`${testIDPrefix}-remove-${image.id}`}
           onPress={() => {
             onRemoveImage(image.id);
           }}
           style={styles.removeHit}
         >
-          <Text style={styles.remove}>移除这张照片</Text>
+          <Text style={styles.remove}>{tr("移除这张照片")}</Text>
         </Pressable>
       ) : null}
     </View>

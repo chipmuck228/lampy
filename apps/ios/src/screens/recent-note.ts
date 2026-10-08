@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 export const RECENT_NOTE_PREVIEW_LINES = 6;
 
 export function recentNoteIsTruncated(lineCount: number): boolean {
@@ -11,7 +12,7 @@ export function recentNoteVisibleLineLimit(lineCount: number): number | undefine
 }
 
 export function recentOpenCaption(_truncated?: boolean): string {
-  return '阅读完整记录';
+  return tr("阅读完整记录");
 }
 
 export function recentOpenAccessLabel(parts: (string | null | undefined)[], truncated?: boolean): string {

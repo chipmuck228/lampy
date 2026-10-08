@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Lampy uses the camera when you take a photo to keep in a moment.",
+    "NSMicrophoneUsageDescription": "Lampy uses the microphone when you record a sound to keep in a moment.",
+    "NSPhotoLibraryUsageDescription": "Lampy accesses your photos when you choose one to keep in a moment.",
+    "NSPhotoLibraryAddUsageDescription": "Lampy does not save moments to your system photo library.",
+    "NSFaceIDUsageDescription": "When App Lock is on, the system uses Face ID or your device passcode to authenticate when you enter Lampy or return from the background. Lampy does not receive face data."
+  }
+}

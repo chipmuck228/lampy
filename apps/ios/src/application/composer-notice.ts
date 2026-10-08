@@ -1,6 +1,7 @@
-export const CAMERA_DENIED_STATUS = '相机未打开，草稿还在。';
-export const LIBRARY_DENIED_STATUS = '相册未打开，草稿还在。';
-export const MIC_DENIED_STATUS = '麦克风未打开，草稿还在。';
+import { tr } from '../i18n';
+export const CAMERA_DENIED_STATUS = tr("相机未打开，草稿还在。");
+export const LIBRARY_DENIED_STATUS = tr("相册未打开，草稿还在。");
+export const MIC_DENIED_STATUS = tr("麦克风未打开，草稿还在。");
 
 export function composerPermissionNotice(
   code: string,

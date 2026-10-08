@@ -1,3 +1,4 @@
+import { tr, feelingLabel } from '../i18n';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
@@ -24,7 +25,7 @@ export function FeelingPicker({
     <View style={styles.block}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={selected ? `当时的感受，${selected}` : '当时的感受'}
+        accessibilityLabel={selected ? tr("当时的感受，{0}", [feelingLabel(selected)]) : tr("当时的感受")}
         accessibilityState={{ expanded: chipsVisible, disabled: !!disabled }}
         testID="composer-feeling-toggle"
         disabled={disabled}
@@ -33,7 +34,7 @@ export function FeelingPicker({
       >
         <View style={styles.toggleRow}>
           <Text key={`feeling-heading-${layoutRevision ?? 1}`} style={styles.heading}>
-            {selected || '当时的感受'}
+            {(selected ? feelingLabel(selected) : '') || tr("当时的感受")}
           </Text>
           <LifeIcon name={chipsVisible ? 'collapse' : 'expand'} size={14} decorative />
         </View>
@@ -47,16 +48,16 @@ export function FeelingPicker({
                 key={word}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  isSelected ? `当时的感受，${word}，已选中` : `当时的感受，${word}`
+                  isSelected ? tr("当时的感受，{0}，已选中", [feelingLabel(word)]) : tr("当时的感受，{0}", [feelingLabel(word)])
                 }
                 accessibilityState={{ selected: isSelected, disabled: !!disabled }}
-                accessibilityHint={isSelected ? '再点可清除' : '可选，不是必须'}
+                accessibilityHint={isSelected ? tr("再点可清除") : tr("可选，不是必须")}
                 testID={`composer-feeling-${word}`}
                 disabled={disabled}
                 onPress={() => onChange(isSelected ? '' : word)}
                 style={[styles.chip, isSelected && styles.chipSelected]}
               >
-                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{word}</Text>
+                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{feelingLabel(word)}</Text>
               </Pressable>
             );
           })}
@@ -65,13 +66,13 @@ export function FeelingPicker({
       {selected ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="清除当时的感受"
+          accessibilityLabel={tr("清除当时的感受")}
           testID="composer-feeling-clear"
           disabled={disabled}
           onPress={() => onChange('')}
           style={styles.clearHit}
         >
-          <Text style={styles.clear}>清除</Text>
+          <Text style={styles.clear}>{tr("清除")}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -89,10 +90,10 @@ export function MomentFeeling({
   return (
     <Text
       testID={testID}
-      accessibilityLabel={`当时的感受，${feeling.label}`}
+      accessibilityLabel={tr("当时的感受，{0}", [feelingLabel(feeling.label)])}
       style={styles.display}
     >
-      当时的感受 · {feeling.label}
+      {tr("当时的感受 ·")}{' '}{feelingLabel(feeling.label)}
     </Text>
   );
 }

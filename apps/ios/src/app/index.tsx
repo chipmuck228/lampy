@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { leaveVoiceHref } from '../screens/leave-voice-intent';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Dimensions, Pressable, StyleSheet, View } from 'react-native';
@@ -202,7 +203,7 @@ export default function RecentScreen() {
         })
         .catch(() => {
           if (!rejectRecentEchoLoad(echoGate.current, request)) return;
-          setError('最近的记录暂时读不出来，原来的内容还在这台设备上。');
+          setError(tr("最近的记录暂时读不出来，原来的内容还在这台设备上。"));
         });
       return () => {
         endRecentEchoFocus(echoGate.current);
@@ -216,7 +217,7 @@ export default function RecentScreen() {
     <View style={styles.safe}>
       <StartupBrandLayer homeSettled={view !== null || error !== null} />
       <RootReadingLayout
-        accessibilityLabel="刚刚留下的生活"
+        accessibilityLabel={tr("刚刚留下的生活")}
         scrollTestID="recent-scroll"
         canvas={recentPaper}
         onScroll={onRecentScroll}
@@ -235,15 +236,13 @@ export default function RecentScreen() {
           >
             <View style={styles.heroCopy}>
               <Text style={styles.eyebrow} testID="recent-eyebrow">
-                LAMPY · 生活记录
-              </Text>
+                {tr("LAMPY · 生活记录")}</Text>
               <Text style={styles.wordmark} accessibilityRole="header" testID="recent-wordmark">
-                刚刚留下的生活
-              </Text>
+                {tr("刚刚留下的生活")}</Text>
             </View>
             <LifeIconButton
               name="settings"
-              label="本机设置"
+              label={tr("本机设置")}
               testID="home-account"
               color={recentSettings}
               size={20}
@@ -288,18 +287,18 @@ export default function RecentScreen() {
 
         {view?.isFirstUse && !error ? (
           <View style={styles.empty} testID="recent-empty">
-            <Text style={styles.emptyTitle}>这里，留下自己的生活。</Text>
+            <Text style={styles.emptyTitle}>{tr("这里，留下自己的生活。")}</Text>
             <Text style={styles.body} testID="recent-empty-hint">
               {'写一句，\n拍一张，\n或留一段声音。'}
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="留下第一条"
+              accessibilityLabel={tr("留下第一条")}
               testID="home-leave-first"
               onPress={() => router.push(leaveHref('recent'))}
               style={styles.firstHit}
             >
-              <Text style={styles.first}>留下第一条</Text>
+              <Text style={styles.first}>{tr("留下第一条")}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -353,16 +352,16 @@ export default function RecentScreen() {
         ))}
         {days.length > 0 ? (
           <View style={styles.endNote} testID="recent-end-note">
-            <Text style={styles.endCopy}>每一个平常的日子，</Text>
+            <Text style={styles.endCopy}>{tr("每一个平常的日子，")}</Text>
             <Pressable
               accessibilityRole="link"
-              accessibilityLabel="都在这里，打开回看"
+              accessibilityLabel={tr("都在这里，打开回看")}
               testID="recent-end-lookback"
               hitSlop={12}
               onPress={openLookback}
               style={styles.endHit}
             >
-              <Text style={styles.endLink}>都在这里</Text>
+              <Text style={styles.endLink}>{tr("都在这里")}</Text>
             </Pressable>
             <Text style={styles.endCopy}>。</Text>
           </View>

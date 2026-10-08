@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text, type } from './life-text';
@@ -175,7 +176,7 @@ export function LookbackBookExcerptBlock({
   onPause: () => void;
   onOpen: (id: string) => void;
 }) {
-  const imageHint = excerpt.extraImageCount > 0 ? `共${excerpt.images.length + excerpt.extraImageCount}张` : null;
+  const imageHint = excerpt.extraImageCount > 0 ? tr("共{0}张", [excerpt.images.length + excerpt.extraImageCount]) : null;
   return (
     <View testID={`lookback-book-excerpt-${excerpt.id}`} style={styles.excerpt}>
       {excerpt.clockLabel ? <Text style={styles.clock}>{excerpt.clockLabel}</Text> : null}
@@ -198,7 +199,7 @@ export function LookbackBookExcerptBlock({
       <MomentUnknownMedia items={excerpt.unknownMedia} testIDPrefix={`lookback-book-unknown-${excerpt.id}`} />
       <MomentFeeling feeling={excerpt.feeling ?? null} testID={`lookback-book-feeling-${excerpt.id}`} />
       <LookThisHit
-        accessibilityLabel={`看这条，${excerpt.note || excerpt.id}`}
+        accessibilityLabel={tr("看这条，{0}", [excerpt.note || excerpt.id])}
         testID={`lookback-book-open-${excerpt.id}`}
         tight
         onPress={() => onOpen(excerpt.id)}

@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { COMPACT_HEIGHT, NAV_BAND_HIT } from './life-page';
 
 export const LOOKBACK_CATALOG_NAV_HEIGHT = 8 + NAV_BAND_HIT;
@@ -29,5 +30,5 @@ export function lookbackCatalogMaxHeight(input: {
 }
 
 export function lookbackCatalogToggleLabel(expanded: boolean): string {
-  return expanded ? '收起时间目录' : '打开时间目录';
+  return expanded ? tr("收起时间目录") : tr("打开时间目录");
 }

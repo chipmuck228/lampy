@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
@@ -150,7 +151,7 @@ export function LeaveFab({
         <View style={styles.shadow} pointerEvents="box-none" accessible={false}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="留下"
+            accessibilityLabel={tr("留下")}
             accessibilityElementsHidden={!interactive}
             importantForAccessibility={interactive ? 'yes' : 'no-hide-descendants'}
             accessibilityState={{ disabled: !interactive }}
@@ -166,14 +167,14 @@ export function LeaveFab({
             onPress={() => {
               if (!longPressed.current) onPress();
             }}
-            accessibilityActions={onRecordVoice ? [{ name: 'recordVoice', label: '录一段声音' }] : undefined}
+            accessibilityActions={onRecordVoice ? [{ name: 'recordVoice', label: tr("录一段声音") }] : undefined}
             onAccessibilityAction={(event) => {
               if (interactive && event.nativeEvent.actionName === 'recordVoice') onRecordVoice?.();
             }}
             style={styles.fab}
           >
             <LifeIcon name="plus" size={16} color={sage} decorative />
-            <Text style={styles.label}>留下</Text>
+            <Text style={styles.label}>{tr("留下")}</Text>
           </Pressable>
         </View>
       </Animated.View>
