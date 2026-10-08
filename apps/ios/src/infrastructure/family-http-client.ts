@@ -1,6 +1,8 @@
 import { ApplicationError } from '../application/errors';
 import type {
   FamilyView,
+  FamilyListView,
+  FamilySummary,
   InvitationView,
   MediaObjectView,
   MembershipListView,
@@ -58,6 +60,8 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 
 export type FamilyApiClient = {
   health(): Promise<FamilyHealth>;
+  listFamilies?(sessionToken: string): Promise<FamilyListView>;
+  createNamedFamily?(sessionToken: string, name: string, idempotencyKey: string): Promise<FamilySummary>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createFamily(sessionToken: string, idempotencyKey: string): Promise<FamilyView>;
@@ -137,6 +141,12 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     },
     signInWithTestAccount(input) {
       return send({ method: 'POST', path: '/v1/auth/test-account', body: input });
+    },
+    listFamilies(sessionToken) {
+      return send({ method: 'GET', path: '/v2/me/families', sessionToken });
+    },
+    createNamedFamily(sessionToken, name, idempotencyKey) {
+      return send({ method: 'POST', path: '/v2/families', sessionToken, idempotencyKey, body: { name } });
     },
     createFamily(sessionToken, idempotencyKey) {
       return send({ method: 'POST', path: '/v1/families', sessionToken, idempotencyKey });

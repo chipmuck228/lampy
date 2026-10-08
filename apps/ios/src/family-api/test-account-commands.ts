@@ -201,7 +201,6 @@ export function createTestAccountCommands(deps: {
           expiresAt: iso(new Date(deps.clock.now().getTime() + deps.sessionTtlMs)),
         };
         await tx.saveSession(session);
-        await tx.deleteOtherSessions(credential.userId, session.token);
         return {
           userId: credential.userId,
           sessionToken: session.token,

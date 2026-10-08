@@ -1,3 +1,4 @@
+import { FamilyError, FAMILY_ERROR } from './errors';
 import type {
   Account,
   AuthRateLimit,
@@ -167,6 +168,8 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       replaceBy(store.families, (row) => row.familyId, family);
     },
     async findActiveMembershipForUser(userId) {
+      const rows = store.memberships.filter(row => row.userId === userId && row.status === 'active' && store.families.some(f => f.familyId === row.familyId && f.status === 'active'));
+      if (rows.length > 1) throw new FamilyError(FAMILY_ERROR.FAMILY_SELECTION_REQUIRED, 'Choose a family with the updated app.');
       return findActiveMembershipForUser(store, userId);
     },
     async findActiveMembership(familyId, userId) {
@@ -189,11 +192,16 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       const conflict = store.memberships.find(
         (row) =>
           row.userId === membership.userId &&
+          row.familyId === membership.familyId &&
           row.status === 'active' &&
           membership.status === 'active' &&
           row.membershipId !== membership.membershipId,
       );
       if (conflict) throw new FamilyStoreConstraintError('active_membership');
+      if (membership.status === 'active' && membership.role === 'creator' && store.memberships.some(row =>
+        row.familyId === membership.familyId && row.role === 'creator' && row.status === 'active' && row.membershipId !== membership.membershipId)) {
+        throw new FamilyStoreConstraintError('active_membership');
+      }
       replaceBy(store.memberships, (row) => row.membershipId, membership);
     },
     async findInvitationByCode(code) {

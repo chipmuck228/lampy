@@ -62,21 +62,17 @@ describe('family identity and membership commands', () => {
     const second = await signIn(commands, 'apple_alice');
     expect(first.userId).toBe(second.userId);
     expect(first.sessionToken).not.toBe(second.sessionToken);
-    await expect(commands.listMembership(first.sessionToken)).rejects.toMatchObject({
-      code: FAMILY_ERROR.UNAUTHENTICATED,
-    });
+    expect((await commands.listMembership(first.sessionToken)).family).toBeNull();
     expect((await commands.listMembership(second.sessionToken)).family).toBeNull();
   });
 
-  it('revokes only that account\'s previous sessions after a successful sign-in', async () => {
+  it('keeps device sessions independent after a successful sign-in', async () => {
     const { commands } = setup();
     const alice = await signIn(commands, 'apple_alice');
     const bob = await signIn(commands, 'apple_bob');
     await commands.createFamily(alice.sessionToken);
     const aliceAgain = await signIn(commands, 'apple_alice');
-    await expect(commands.listMembership(alice.sessionToken)).rejects.toMatchObject({
-      code: FAMILY_ERROR.UNAUTHENTICATED,
-    });
+    expect((await commands.listMembership(alice.sessionToken)).family?.role).toBe('creator');
     expect((await commands.listMembership(aliceAgain.sessionToken)).family?.role).toBe('creator');
     expect((await commands.listMembership(bob.sessionToken)).family).toBeNull();
   });

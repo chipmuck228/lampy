@@ -1,3 +1,4 @@
+import { FamilyError, FAMILY_ERROR } from './errors';
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilySql } from './schema';
 import type { IdempotentRecord } from './store';
@@ -44,6 +45,7 @@ type SessionRow = {
 };
 
 type FamilyRow = {
+  name: string;
   family_id: string;
   created_at: string;
   status: string;
@@ -158,7 +160,7 @@ function sessionFrom(row: SessionRow): Session {
 }
 
 function familyFrom(row: FamilyRow): Family {
-  return { familyId: row.family_id, createdAt: row.created_at, status: row.status as Family['status'] };
+  return { familyId: row.family_id, name: row.name, createdAt: row.created_at, status: row.status as Family['status'] };
 }
 
 function membershipFrom(row: MembershipRow): Membership {
@@ -186,7 +188,8 @@ function invitationFrom(row: InvitationRow): Invitation {
 
 export function mapFamilySqlConstraint(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  if (/family_memberships_one_active_per_user|family_memberships\.user_id/i.test(message)) {
+  if (/family_limit_reached/.test(message)) return new FamilyError(FAMILY_ERROR.FAMILY_LIMIT_REACHED, 'You can belong to at most 10 active families.');
+  if (/family_memberships_one_active_creator|family_memberships_one_active_per_user|family_memberships\.user_id/i.test(message)) {
     return new FamilyStoreConstraintError('active_membership');
   }
   if (/family_invitations\.code/i.test(message)) {
@@ -305,27 +308,28 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findFamily(familyId) {
       const row = await db.getFirst<FamilyRow>(
-        'SELECT family_id, created_at, status FROM family_families WHERE family_id = ?',
+        'SELECT family_id, name, created_at, status FROM family_families WHERE family_id = ?',
         [familyId],
       );
       return row ? familyFrom(row) : null;
     },
     async saveFamily(family) {
       await db.run(
-        `INSERT INTO family_families (family_id, created_at, status) VALUES (?, ?, ?)
-         ON CONFLICT(family_id) DO UPDATE SET status = excluded.status`,
-        [family.familyId, family.createdAt, family.status],
+        `INSERT INTO family_families (family_id, name, created_at, status) VALUES (?, ?, ?, ?)
+         ON CONFLICT(family_id) DO UPDATE SET status = excluded.status, name = excluded.name`,
+        [family.familyId, family.name ?? '', family.createdAt, family.status],
       );
     },
     async findActiveMembershipForUser(userId) {
-      const row = await db.getFirst<MembershipRow>(
+      const rows = await db.getAll<MembershipRow>(
         `SELECT m.membership_id, m.family_id, m.user_id, m.role, m.status, m.joined_at
          FROM family_memberships m
          JOIN family_families f ON f.family_id = m.family_id
          WHERE m.user_id = ? AND m.status = 'active' AND f.status = 'active'`,
         [userId],
       );
-      return row ? membershipFrom(row) : null;
+      if (rows.length > 1) throw new FamilyError(FAMILY_ERROR.FAMILY_SELECTION_REQUIRED, 'Choose a family with the updated app.');
+      return rows[0] ? membershipFrom(rows[0]) : null;
     },
     async findActiveMembership(familyId, userId) {
       const family = await this.findFamily(familyId);

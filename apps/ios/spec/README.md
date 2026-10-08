@@ -8,6 +8,7 @@
 | `PHASE_0_IMPLEMENTATION_PLAN.md` | 按独立 PR 拆分；PR-1 必须是纯文字个人闭环 |
 | `PHASE_0_UNIMPLEMENTED.md` | 尚未真实存在的能力 |
 | `PHASE_0_VERIFICATION.md` | 本轮命令与结果 |
+| `family-account-multi-b/` | 阶段 B 账号与多家庭基础；门控保持关闭，运行边界见 WALK |
 | `family-invite-share-design/` | 家庭邀请与分享新版阶段 A：多家庭、7 天单名额、历史分享、离开/转交/30 天清理；纯设计，入口关闭，公开注册须先实现账号删除 |
 | `FAMILY_CAPABILITY_AUDIT.md` | 家庭能力：产品已决定 vs 仓库已实现 |
 | `FAMILY_DOMAIN_MODEL.md` | Family / Membership / 接收快照是家庭缓存 |

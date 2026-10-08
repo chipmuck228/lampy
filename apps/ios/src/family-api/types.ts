@@ -38,6 +38,7 @@ export type Session = {
 };
 
 export type Family = {
+  name?: string;
   familyId: string;
   createdAt: string;
   status: FamilyStatus;
@@ -73,6 +74,9 @@ export type FamilyView = {
   role: MembershipRole;
   members: FamilyMemberView[];
 };
+
+export type FamilySummary = { familyId: string; name: string; role: MembershipRole; memberCount: number };
+export type FamilyListView = { families: FamilySummary[]; limit: 10 };
 
 export type MembershipListView = {
   family: FamilyView | null;
