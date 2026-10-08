@@ -106,7 +106,7 @@ describe('family HTTP contract', () => {
       path: '/v1/me/membership',
       headers: { authorization: `Bearer ${aliceToken}` },
     });
-    expect(stale.status).toBe(401);
+    expect(stale.status).toBe(200);
     const listedAgain = await dispatchFamilyApi(commands, {
       method: 'GET',
       path: '/v1/me/membership',

@@ -10,6 +10,8 @@ import { createFamilyStore, type FamilyStore, type IdempotentRecord } from './st
 import type {
   AppleVerifier,
   FamilyClock,
+  FamilyListView,
+  FamilySummary,
   FamilyHealth,
   FamilyIds,
   FamilyView,
@@ -42,6 +44,8 @@ export type FamilyCommands = {
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createTestAccount(login: string, password: string): Promise<{ userId: string; created: true }>;
   disableTestAccount(login: string): Promise<{ disabled: true; userId: string }>;
+  listFamilies(sessionToken: string): Promise<FamilyListView>;
+  createNamedFamily(sessionToken: string, name: string, idempotencyKey: string): Promise<FamilySummary>;
   createFamily(sessionToken: string, idempotencyKey?: string): Promise<FamilyView>;
   inviteMember(sessionToken: string, familyId: string, idempotencyKey?: string): Promise<InvitationView>;
   revokeInvitation(sessionToken: string, invitationId: string): Promise<InvitationView>;
@@ -312,12 +316,54 @@ export function createFamilyCommands(deps: {
           expiresAt: iso(new Date(clock.now().getTime() + sessionTtlMs)),
         };
         await tx.saveSession(session);
-        await tx.deleteOtherSessions(account.userId, session.token);
         return {
           userId: account.userId,
           sessionToken: session.token,
           expiresAt: session.expiresAt,
         };
+      });
+    },
+
+    listFamilies(sessionToken) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        const families: FamilySummary[] = [];
+        for (const membership of await tx.findMembershipsForUser(userId)) {
+          if (membership.status !== 'active') continue;
+          const family = await tx.findFamily(membership.familyId);
+          if (!family || family.status !== 'active') continue;
+          families.push({ familyId: family.familyId, name: family.name || '', role: membership.role,
+            memberCount: (await tx.listActiveMembers(family.familyId)).length });
+        }
+        families.sort((a, b) => a.familyId.localeCompare(b.familyId));
+        return { families, limit: 10 as const };
+      });
+    },
+    createNamedFamily(sessionToken, rawName, idempotencyKey) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        const name = rawName.trim();
+        if (!name || Array.from(name).length > 40 || /[\u0000-\u001f\u007f]/.test(name) || !idempotencyKey || idempotencyKey.length > 128) {
+          throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'A family name (1–40 characters) and operation key are required.');
+        }
+        const fingerprint = JSON.stringify({ version: 2, name });
+        const cached = await readIdempotent<FamilySummary>(tx, userId, 'createNamedFamily', idempotencyKey, fingerprint);
+        if (cached) {
+          const family = await requireActiveFamily(tx, cached.familyId);
+          const member = await tx.findActiveMembership(family.familyId, userId);
+          if (!member) throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Membership has ended.');
+          return { familyId: family.familyId, name: family.name || '', role: member.role,
+            memberCount: (await tx.listActiveMembers(family.familyId)).length };
+        }
+        let count = 0;
+        for (const membership of await tx.findMembershipsForUser(userId)) {
+          if (membership.status === 'active' && (await tx.findFamily(membership.familyId))?.status === 'active') count++;
+        }
+        if (count >= 10) throw new FamilyError(FAMILY_ERROR.FAMILY_LIMIT_REACHED, 'You can belong to at most 10 active families.');
+        const now = iso(clock.now());
+        const familyId = ids.familyId();
+        await tx.saveFamily({ familyId, name, createdAt: now, status: 'active' });
+        await tx.saveMembership({ membershipId: ids.membershipId(), familyId, userId, role: 'creator', status: 'active', joinedAt: now });
+        return writeIdempotent(tx, userId, 'createNamedFamily', idempotencyKey, fingerprint,
+          { familyId, name, role: 'creator' as const, memberCount: 1 });
       });
     },
 

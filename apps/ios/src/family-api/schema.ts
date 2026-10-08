@@ -100,6 +100,23 @@ const MIGRATIONS = [
     window_started_at TEXT NOT NULL,
     hit_count INTEGER NOT NULL
   );`,
+  `ALTER TABLE family_families ADD COLUMN name TEXT NOT NULL DEFAULT '';`,
+  `DROP INDEX family_memberships_one_active_per_user;
+   CREATE UNIQUE INDEX family_memberships_one_active_per_pair
+     ON family_memberships(user_id, family_id) WHERE status = 'active';
+   CREATE UNIQUE INDEX family_memberships_one_active_creator
+     ON family_memberships(family_id) WHERE status = 'active' AND role = 'creator';`,
+  `CREATE TRIGGER family_memberships_limit_insert BEFORE INSERT ON family_memberships
+   WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM family_memberships m
+     JOIN family_families f ON f.family_id = m.family_id
+     WHERE m.user_id = NEW.user_id AND m.status = 'active' AND f.status = 'active') >= 10
+   BEGIN SELECT RAISE(ABORT, 'family_limit_reached'); END;
+   CREATE TRIGGER family_memberships_limit_update BEFORE UPDATE OF status,user_id,family_id ON family_memberships
+   WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM family_memberships m
+     JOIN family_families f ON f.family_id = m.family_id
+     WHERE m.user_id = NEW.user_id AND m.membership_id != OLD.membership_id
+       AND m.status = 'active' AND f.status = 'active') >= 10
+   BEGIN SELECT RAISE(ABORT, 'family_limit_reached'); END;`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;
@@ -118,11 +135,20 @@ export async function applyFamilyApiSchema(db: FamilySql, options?: { upTo?: num
       [version],
     );
     if (!applied) {
-      await db.exec(sql);
-      await db.run('INSERT INTO family_schema_migrations (version, applied_at) VALUES (?, ?)', [
-        version,
-        new Date().toISOString(),
-      ]);
+      // New multi-statement migrations must not leave half-replaced constraints.
+      const atomic = version >= 17;
+      if (atomic) await db.exec('BEGIN IMMEDIATE');
+      try {
+        await db.exec(sql);
+        await db.run('INSERT INTO family_schema_migrations (version, applied_at) VALUES (?, ?)', [
+          version,
+          new Date().toISOString(),
+        ]);
+        if (atomic) await db.exec('COMMIT');
+      } catch (error) {
+        if (atomic) await db.exec('ROLLBACK');
+        throw error;
+      }
     }
   }
 }

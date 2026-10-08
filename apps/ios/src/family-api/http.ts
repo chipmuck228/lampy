@@ -49,6 +49,8 @@ function statusFor(code: string) {
     case FAMILY_ERROR.INVITE_ALREADY_USED:
     case FAMILY_ERROR.FAMILY_DISSOLVED:
     case FAMILY_ERROR.CONFLICT:
+    case FAMILY_ERROR.FAMILY_SELECTION_REQUIRED:
+    case FAMILY_ERROR.FAMILY_LIMIT_REACHED:
     case FAMILY_ERROR.TEST_ACCOUNT_EXISTS:
       return 409;
     case FAMILY_ERROR.BAD_REQUEST:
@@ -126,6 +128,13 @@ export async function dispatchFamilyApi(
 
     if (method === 'POST' && path === '/v1/auth/sign-out') {
       return { status: 200, body: await commands.signOut(token || '') };
+    }
+
+    if (method === 'GET' && path === '/v2/me/families') {
+      return { status: 200, body: await commands.listFamilies(token || '') };
+    }
+    if (method === 'POST' && path === '/v2/families') {
+      return { status: 200, body: await commands.createNamedFamily(token || '', readString(body, 'name'), idempotencyKey || '') };
     }
 
     if (method === 'POST' && path === '/v1/families') {

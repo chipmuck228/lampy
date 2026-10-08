@@ -25,6 +25,8 @@ import type {
 import { DEFAULT_SESSION_TTL_MS } from '../family-api/ids';
 import type {
   FamilyMemberView,
+  FamilyListView,
+  FamilySummary,
   FamilyView,
   InvitationView,
   MediaObjectView,
@@ -115,6 +117,7 @@ export type FamilyMembershipView =
   | { kind: 'unauthenticated' }
   | { kind: 'unconfirmed'; reason: 'unreachable' | 'unauthenticated' }
   | { kind: 'none' }
+  | { kind: 'selection-required' }
   | { kind: 'ready'; familyId: string; role: 'creator' | 'member'; members: FamilyMemberView[] };
 
 export type InviteMemberOptions = {
@@ -406,7 +409,63 @@ export function createFamilyUseCases(deps: {
     return { userId: result.userId };
   }
 
+  async function assertSameAccount(account: { userId: string; sessionToken: string }) {
+    if (await deps.session.getSessionToken() !== account.sessionToken || await deps.session.getUserId() !== account.userId) {
+      throw new ApplicationError('STALE_FAMILY_REQUEST', 'The account changed during this request.');
+    }
+  }
+
   return {
+    async getFamilies(): Promise<FamilyListView & { userId: string }> {
+      await flushPendingRevoke();
+      const account = await requireAccount();
+      if (!deps.client.listFamilies) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED', 'Family service must be upgraded.');
+      try {
+        const result = await deps.client.listFamilies(account.sessionToken);
+        await assertSameAccount(account);
+        return { ...result, userId: account.userId };
+      } catch (error) {
+        await assertSameAccount(account);
+        const appError = asApplicationError(error);
+        if (appError.code === 'UNAUTHENTICATED') {
+          await deps.session.clearSession();
+          await cache.clear();
+          await safeIsolateAccount(account.userId);
+        }
+        throw appError;
+      }
+    },
+    async createNamedFamily(name: string, operationId: string, isCurrent: () => boolean = () => true): Promise<FamilySummary> {
+      if (!operationId || operationId.length > 100) throw new ApplicationError('BAD_REQUEST', 'A bounded operation id is required.');
+      const account = await requireAccount();
+      const assertCurrent = async () => {
+        await assertSameAccount(account);
+        if (!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'The creation screen is no longer active.');
+      };
+      await assertCurrent();
+      if (!deps.client.createNamedFamily) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED', 'Family service must be upgraded.');
+      const id = `named:${operationId}`;
+      const requestFingerprint = JSON.stringify({ version: 2, name: name.trim() });
+      const existing = await pending.find(account.userId, 'createFamily', id);
+      await assertCurrent();
+      if (existing && existing.requestFingerprint !== requestFingerprint) throw new ApplicationError('PENDING_CONFLICT', 'Retry the same family name.');
+      const key = existing?.idempotencyKey ?? `named:${operationId}`;
+      if (!existing) await pending.save({ userId: account.userId, command: 'createFamily', operationId: id,
+        requestFingerprint, idempotencyKey: key, createdAt: clock.now().toISOString() });
+      await assertCurrent();
+      try {
+        const result = await deps.client.createNamedFamily(account.sessionToken, name, key);
+        await assertCurrent();
+        await pending.remove(account.userId, 'createFamily', id);
+        await assertCurrent();
+        return result;
+      } catch (error) {
+        await assertCurrent();
+        const appError = asApplicationError(error);
+        if (!isUnconfirmedNetwork(appError)) await pending.remove(account.userId, 'createFamily', id);
+        throw appError;
+      }
+    },
     async getAuthHealth() {
       try {
         return await deps.client.health();
@@ -473,6 +532,7 @@ export function createFamilyUseCases(deps: {
           if (userId) await safeIsolateAccount(userId);
           return { kind: 'unconfirmed', reason: 'unauthenticated' };
         }
+        if (appError.code === 'FAMILY_SELECTION_REQUIRED') return { kind: 'selection-required' };
         if (appError.code === 'SERVER_UNREACHABLE' || appError.code === 'NETWORK') {
           return { kind: 'unconfirmed', reason: 'unreachable' };
         }
