@@ -42,7 +42,7 @@ export function tr(key: CopyKey, values: readonly unknown[] = []): string {
   }
   const options: TOptions = Object.fromEntries(values.map((value, index) => [String(index), String(value ?? '')]));
   const countIndex = key === '{0}，有{1}条记录' || key === '{0} · {1}条' ? 1 : 0;
-  const hasCount = ['{0}条', '{0}条记录', '有{0}条记录', '时间未确认，有{0}条记录', '{0}，有{1}条记录', '{0} · {1}条', '共{0}张'].includes(key);
+  const hasCount = ['{0}条', '{0}条记录', '有{0}条记录', '时间未确认，有{0}条记录', '{0}，有{1}条记录', '{0} · {1}条', '共{0}张', '有{0}张照片', '{0}张照片'].includes(key);
   if (hasCount) options.count = Number(values[countIndex]);
   return String(instance.t(key, options));
 }

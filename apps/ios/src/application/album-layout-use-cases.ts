@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { HistoryClock } from '../domain-adapters/calendar';
 import type { AssetRepository, MomentRepository } from '../infrastructure/repositories';
 import type { LifeAlbumRepository } from '../infrastructure/life-album-repository';
@@ -127,7 +128,7 @@ export function createAlbumLayoutUseCases(deps: {
     assertCurrent(requestId, options?.signal);
     const after = fingerprintFromInput(second.input.album, second.input);
     if (!fingerprintsEqual(fingerprint, after)) {
-      throw new ApplicationError(ALBUM_LAYOUT_STALE, '排的时候记录有变动，这一次没有排成。');
+      throw new ApplicationError(ALBUM_LAYOUT_STALE, tr("排的时候记录有变动，这一次没有排成。"));
     }
     cache.set(albumId, { albumId, layout, fingerprint });
     return { layout, media: first.media, fingerprint, requestId };

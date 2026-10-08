@@ -1,3 +1,4 @@
+import { feelingLabel, tr } from '../i18n';
 import {
   ALBUM_IMAGE_MISSING,
   ALBUM_SOURCE_CHANGED,
@@ -22,13 +23,13 @@ export function albumPreviewSpokenText(block: AlbumPlacedBlock): string | null {
     case 'day-rule':
       return block.text;
     case 'cover-image':
-      return block.status === 'available' ? '封面照片' : ALBUM_IMAGE_MISSING;
+      return block.status === 'available' ? tr("封面照片") : ALBUM_IMAGE_MISSING;
     case 'image':
-      return block.status === 'available' ? '一张照片' : ALBUM_IMAGE_MISSING;
+      return block.status === 'available' ? tr("一张照片") : ALBUM_IMAGE_MISSING;
     case 'unknown-media':
       return block.label;
     case 'feeling':
-      return block.value;
+      return block.known ? feelingLabel(block.value) : block.value;
     case 'recorded-at':
       return block.label;
     case 'source-gone':
