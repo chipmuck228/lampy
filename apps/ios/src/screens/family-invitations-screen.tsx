@@ -160,7 +160,6 @@ export default function FamilyInvitationsScreen() {
                   if (allowed && AppState.currentState === "active")
                     void Share.share({
                       message: created.link,
-                      url: created.link,
                     }).catch(() => undefined);
                 }}
               >

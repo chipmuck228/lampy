@@ -29,3 +29,11 @@ Simulator/native app actual invitation flow; QR decoding/scanning from external 
 5. Cancel/lock/background before action, repeated tapping, account switch and late responses cannot initiate a new acceptance or reveal another account.
 6. Local moments/album/audio paths remain usable. Authentication cover hides invite name/QR and family list.
 7. Chinese/English controls and accessible hit targets, page scroll/short-screen landscape.
+
+## User simulator report — 2026-10-08
+
+Two simulators: iPhone 17 Pro Max / iOS 26.3 (`12595415-0F6B-4B9C-9407-69D29806E801`) and Lampy-family-second / iOS 26.5 (`4CD31657-C2FD-40AC-AD50-B31DA3F157C1`). Tester B generated an invitation and tester A received it. User reports the other previously listed scenarios passed: viewing/cancelling does not join, explicit joining/family count, repeated confirmation does not duplicate membership, revoked invitation ends. Recorded as simulator user report; installed native and running JS SHA not independently confirmed. Not a real-device/public-HTTPS result.
+
+Issue: iOS Copy yielded two concatenated invitation URLs. Source supplied the same link in both `Share.share.message` and `.url`. Fix sends exactly one message item; link parsing remains strict and rejects concatenated links. Never store real invitation bearers in this WALK. Regression checks cover the actual page share call and concatenated-link rejection. Device retest of Copy after this fix is NOT VERIFIED.
+
+Copy-fix checks: actual-page share and link-parser tests 2 suites / 4 tests PASS; tsc, changed ESLint and diff check PASS. Full suite was not repeated for this one-field share change; preceding Phase C full-suite result above remains historical evidence.

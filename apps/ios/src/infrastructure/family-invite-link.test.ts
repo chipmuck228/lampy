@@ -36,3 +36,8 @@ it("late cancellation cannot discard a new invite; bearer only lives in process 
   forgetFamilyInvite(next.generation);
   expect(currentFamilyInvite()).toBeNull();
 });
+
+it('rejects a clipboard containing two concatenated links instead of silently choosing one', () => {
+  const link = makeFamilyInviteLink('http://127.0.0.1:8787', token);
+  expect(parseFamilyInviteLink(link + link, 'http://127.0.0.1:8787')).toBeNull();
+});
