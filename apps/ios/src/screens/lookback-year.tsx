@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 
@@ -30,12 +31,12 @@ export function LookbackYearEntries({
   if (page.entries.length === 0) return null;
   return (
     <View testID="lookback-year-entries" style={styles.entries}>
-      <Text style={styles.entryHeading}>有记录的月份</Text>
+      <Text style={styles.entryHeading}>{tr("有记录的月份")}</Text>
       {page.entries.map((entry) => (
         <Pressable
           key={entry.month}
           accessibilityRole="button"
-          accessibilityLabel={`${page.title}${entry.month}月，${entry.summary}`}
+          accessibilityLabel={tr("{0}{1}月，{2}", [page.title, entry.month, entry.summary])}
           testID={`lookback-month-entry-${page.year}-${pad2(entry.month)}`}
           onPress={() => onOpenMonth(entry.month)}
           style={styles.entryHit}
@@ -66,7 +67,7 @@ function YearMonthCell({
         style={styles.cell}
         accessible
         accessibilityRole="text"
-        accessibilityLabel={`${title}${cell.month}月，安静`}
+        accessibilityLabel={tr("{0}{1}月，安静", [title, cell.month])}
         testID={`lookback-month-quiet-${year}-${pad2(cell.month)}`}
       >
         <Text style={styles.quiet}>{cell.numeral}</Text>
@@ -76,7 +77,7 @@ function YearMonthCell({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}${cell.month}月，${cell.summary}`}
+      accessibilityLabel={tr("{0}{1}月，{2}", [title, cell.month, cell.summary])}
       testID={`lookback-month-${year}-${pad2(cell.month)}`}
       onPress={() => onOpenMonth(cell.month)}
       style={styles.cell}

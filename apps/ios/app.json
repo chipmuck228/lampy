@@ -19,7 +19,8 @@
         "NSMicrophoneUsageDescription": "Lampy 只在你录下当时的声音时使用麦克风。",
         "NSPhotoLibraryUsageDescription": "Lampy 只在你从相册选择已有照片留下时读取相册。",
         "NSPhotoLibraryAddUsageDescription": "Lampy 不会把生活写回系统相册；此说明仅用于系统要求。",
-        "NSFaceIDUsageDescription": "Lampy 只在你打开本机保护时，用 Face ID 或设备密码确认是这台设备的持有人。不会上传面部数据。"
+        "NSFaceIDUsageDescription": "本机保护开启后，Lampy 在进入或从后台返回时，由系统使用 Face ID 或设备密码认证。Lampy 不获取面部数据。",
+        "CFBundleDevelopmentRegion": "en"
       }
     },
     "android": {
@@ -52,7 +53,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Lampy 只在你打开本机保护时，用 Face ID 或设备密码确认是这台设备的持有人。不会上传面部数据。"
+          "faceIDPermission": "本机保护开启后，Lampy 在进入或从后台返回时，由系统使用 Face ID 或设备密码认证。Lampy 不获取面部数据。"
         }
       ],
       "expo-apple-authentication",
@@ -71,10 +72,25 @@
           "enableBackgroundPlayback": false,
           "enableBackgroundRecording": false
         }
+      ],
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": [
+              "zh-Hans",
+              "en"
+            ]
+          }
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "locales": {
+      "zh-Hans": "./locales/zh-Hans.json",
+      "en": "./locales/en.json"
     }
   }
 }

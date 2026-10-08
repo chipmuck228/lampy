@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import {
   createContext,
   useCallback,
@@ -199,7 +200,7 @@ export function DeviceLockProvider({
     setMessage(null);
     logLock('auth-start', { generation, cover: true });
     try {
-      const result = await resolvedAuthenticator.authenticate('验证是这台设备的持有人，才能打开 Lampy。');
+      const result = await resolvedAuthenticator.authenticate(tr("验证是这台设备的持有人，才能打开 Lampy。"));
       const decision = decideUnlockResult({
         appState: AppState.currentState,
         generation,
@@ -365,7 +366,7 @@ export function DeviceLockProvider({
     logLock('settings-start', { settingsGeneration: generation });
     try {
       const result = await resolvedAuthenticator.authenticate(
-        enabling ? '验证是这台设备的持有人，才能打开本机保护。' : '验证是这台设备的持有人，才能关闭本机保护。',
+        enabling ? tr("验证是这台设备的持有人，才能打开本机保护。") : tr("验证是这台设备的持有人，才能关闭本机保护。"),
       );
       const next = enabling ? session.confirmEnable(generation, result) : session.confirmDisable(generation, result);
       logLock('settings-end', { settingsGeneration: generation, result: next.kind, locked: next.locked });
@@ -417,7 +418,7 @@ export function DeviceLockProvider({
         {children}
       </View>
       {coverVisible ? (
-        <View style={styles.cover} testID="device-lock-cover" accessibilityLabel="Lampy 已锁定">
+        <View style={styles.cover} testID="device-lock-cover" accessibilityLabel={tr("Lampy 已锁定")}>
           <ScrollView
             contentContainerStyle={[
               styles.coverInner,
@@ -433,24 +434,24 @@ export function DeviceLockProvider({
             testID="device-lock-cover-scroll"
           >
             <Text style={styles.title} accessibilityRole="header">
-              {snapshot.setting === 'unknown' ? 'Lampy' : '这台设备已保护'}
+              {snapshot.setting === 'unknown' ? 'Lampy' : tr("这台设备已保护")}
             </Text>
             <Text style={styles.body}>
               {snapshot.setting === 'unknown' && !message
-                ? '正在确认本机设置。'
+                ? tr("正在确认本机设置。")
                 : snapshot.setting === 'unknown'
-                  ? '记录还在。'
-                  : '进入 Lampy 前，先确认是这台设备的持有人。记录还在。'}
+                  ? tr("记录还在。")
+                  : tr("进入 Lampy 前，先确认是这台设备的持有人。记录还在。")}
             </Text>
             {snapshot.setting === 'on' || message ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="再试一次"
+                accessibilityLabel={tr("再试一次")}
                 testID="device-lock-retry"
                 onPress={retryCoverAction}
                 style={styles.hit}
               >
-                <Text style={styles.action}>再试一次</Text>
+                <Text style={styles.action}>{tr("再试一次")}</Text>
               </Pressable>
             ) : null}
             {message ? (
@@ -474,10 +475,10 @@ export function DeviceLockSettings() {
     <View>
       <SettingsSwitchRow
         icon="lock"
-        title="本机保护"
-        detail={displayOn ? '已开启' : '未开启'}
+        title={tr("本机保护")}
+        detail={displayOn ? tr("已开启") : tr("未开启")}
         detailTestID="account-device-lock-state"
-        note="进入 Lampy 时使用 Face ID 或设备密码。"
+        note={tr("进入 Lampy 时使用 Face ID 或设备密码。")}
         noteTestID="account-device-lock-copy"
         testID="account-device-lock"
       >
@@ -488,7 +489,7 @@ export function DeviceLockSettings() {
             if (busy) return;
             void lock.toggle();
           }}
-          accessibilityLabel="本机保护"
+          accessibilityLabel={tr("本机保护")}
           accessibilityState={{ checked: displayOn, disabled: busy }}
           testID="account-device-lock-toggle"
         />

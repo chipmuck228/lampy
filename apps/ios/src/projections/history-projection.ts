@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import {
   calendarPartsAt,
   formatCalendarDate,
@@ -164,18 +165,18 @@ export function projectHistoryYearFromCounts(
     const filled = count > 0;
     return {
       month,
-      label: `${year}年${month}月`,
+      label: tr("{0}年{1}月", [year, month]),
       count,
       status: filled ? 'filled' : 'quiet',
-      summary: filled ? `有${count}条记录` : '安静',
+      summary: filled ? tr("有{0}条记录", [count]) : tr("安静"),
     };
   });
   return {
     year,
-    title: `${year}年`,
+    title: tr("{0}年", [year]),
     months,
     yearUnconfirmedCount,
-    yearUnconfirmedLabel: '这一年，月份未确认',
+    yearUnconfirmedLabel: tr("这一年，月份未确认"),
   };
 }
 
@@ -199,19 +200,19 @@ export function projectHistoryMonthFromCounts(
     const filled = count > 0;
     return {
       day,
-      label: `${month}月${day}日`,
+      label: tr("{0}月{1}日", [month, day]),
       count,
       status: filled ? 'filled' : 'quiet',
-      summary: filled ? `有${count}条记录` : '安静',
+      summary: filled ? tr("有{0}条记录", [count]) : tr("安静"),
     };
   });
   return {
     year,
     month,
-    title: `${year}年${month}月`,
+    title: tr("{0}年{1}月", [year, month]),
     days,
     dayUnconfirmedCount,
-    dayUnconfirmedLabel: '这个月，日子未确认',
+    dayUnconfirmedLabel: tr("这个月，日子未确认"),
     isEmpty: dayCounts.every((count) => count === 0) && dayUnconfirmedCount === 0,
   };
 }
@@ -256,7 +257,7 @@ export function projectHistoryDay(
     year,
     month,
     day,
-    title: `${year}年${month}月${day}日`,
+    title: tr("{0}年{1}月{2}日", [year, month, day]),
     items,
     isEmpty: items.length === 0,
   };
@@ -282,8 +283,8 @@ export function projectHistoryUnconfirmed(
   if (filter.kind === 'unknown') {
     return {
       kind: 'unknown',
-      title: '时间未确认',
-      explanation: '这些记录没有可以确定的发生时间。记录时间只用来说明它们是后来写下的，不会当成发生日期。',
+      title: tr("时间未确认"),
+      explanation: tr("这些记录没有可以确定的发生时间。记录时间只用来说明它们是后来写下的，不会当成发生日期。"),
       items,
       hasMore,
     };
@@ -291,16 +292,16 @@ export function projectHistoryUnconfirmed(
   if (filter.kind === 'year') {
     return {
       kind: 'year',
-      title: `${filter.year}年，月份未确认`,
-      explanation: '只知道发生在这一年，没有更具体的月份。不会放进某一个月的格子里。',
+      title: tr("{0}年，月份未确认", [filter.year]),
+      explanation: tr("只知道发生在这一年，没有更具体的月份。不会放进某一个月的格子里。"),
       items,
       hasMore,
     };
   }
   return {
     kind: 'month',
-    title: `${filter.year}年${filter.month}月，日子未确认`,
-    explanation: '只知道发生在这一个月，没有更具体的日期。不会放进某一天。',
+    title: tr("{0}年{1}月，日子未确认", [filter.year, filter.month]),
+    explanation: tr("只知道发生在这一个月，没有更具体的日期。不会放进某一天。"),
     items,
     hasMore,
   };
@@ -352,10 +353,10 @@ export function toListedMoment(moment: MomentRecord, clock: HistoryClock): Histo
     id: moment.id,
     note: moment.content.note,
     precision,
-    timeLabel: usedRecordedAtFallback ? '时间未确认' : timeLabel,
+    timeLabel: usedRecordedAtFallback ? tr("时间未确认") : timeLabel,
     usedRecordedAtFallback,
     recordedFallbackLabel: usedRecordedAtFallback
-      ? `记录于 ${formatCalendarDate(moment.time.recordedAt, 'day', recordedOffset)}`
+      ? tr("记录于 {0}", [formatCalendarDate(moment.time.recordedAt, 'day', recordedOffset)])
       : undefined,
   };
 }

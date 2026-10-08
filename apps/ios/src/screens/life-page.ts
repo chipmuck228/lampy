@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 export const paper = '#F3F0E9';
 export const paperDeep = '#E8E1D5';
 export const ink = '#25231F';
@@ -81,11 +82,11 @@ export function navBandItemsFor(
   hasFamily: boolean,
 ): { label: string; fontSize: number }[] {
   const items = [
-    { label: '最近', fontSize: NAV_BAND_LABEL_SIZE },
-    { label: '回看', fontSize: NAV_BAND_LABEL_SIZE },
-    { label: '生活册', fontSize: NAV_BAND_LABEL_SIZE },
+    { label: tr("最近"), fontSize: NAV_BAND_LABEL_SIZE },
+    { label: tr("回看"), fontSize: NAV_BAND_LABEL_SIZE },
+    { label: tr("生活册"), fontSize: NAV_BAND_LABEL_SIZE },
   ];
-  if (hasFamily) items.push({ label: '家庭', fontSize: NAV_BAND_LABEL_SIZE });
+  if (hasFamily) items.push({ label: tr("家庭"), fontSize: NAV_BAND_LABEL_SIZE });
   return items;
 }
 
@@ -154,8 +155,8 @@ const LEAVE_MEDIA_SIZE = 16;
 const LEAVE_SAVE_SIZE = 18;
 
 export function shouldStackLeaveActions(availableWidth: number): boolean {
-  const camera = navBandItemMinWidth('拍摄', LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
-  const photo = navBandItemMinWidth('照片', LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
-  const save = navBandItemMinWidth('留下', LEAVE_SAVE_SIZE);
+  const camera = navBandItemMinWidth(tr("拍摄"), LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
+  const photo = navBandItemMinWidth(tr("照片"), LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
+  const save = navBandItemMinWidth(tr("留下"), LEAVE_SAVE_SIZE);
   return camera + photo + save + LEAVE_ACTION_GAP * 2 > availableWidth;
 }

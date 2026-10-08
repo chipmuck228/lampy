@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { createAsset, type AssetRecord } from '../domain-adapters/asset-commands';
 import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
 import {
@@ -60,40 +61,40 @@ export type { OccurredChoiceView, OccurredDraftInput };
 
 export const MAX_DRAFT_IMAGES = 3;
 export const MAX_DRAFT_AUDIO = 1;
-export const IMAGE_MISSING_LABEL = '这张照片暂时找不到了，但这条记录还在。';
-export const IMAGE_UNDECODABLE_LABEL = '这张照片打不开了，但这条记录还在。';
+export const IMAGE_MISSING_LABEL = tr("这张照片暂时找不到了，但这条记录还在。");
+export const IMAGE_UNDECODABLE_LABEL = tr("这张照片打不开了，但这条记录还在。");
 export const IMAGE_UNAVAILABLE_LABEL = IMAGE_MISSING_LABEL;
-export const AUDIO_MISSING_LABEL = '这段声音暂时找不到了，其他内容仍然保留。';
-export const AUDIO_UNPLAYABLE_LABEL = '这段声音暂时无法播放，其他内容仍然保留。';
+export const AUDIO_MISSING_LABEL = tr("这段声音暂时找不到了，其他内容仍然保留。");
+export const AUDIO_UNPLAYABLE_LABEL = tr("这段声音暂时无法播放，其他内容仍然保留。");
 export const AUDIO_UNAVAILABLE_LABEL = AUDIO_UNPLAYABLE_LABEL;
-export const UNKNOWN_UNAVAILABLE_LABEL = '这份内容暂时无法打开。';
+export const UNKNOWN_UNAVAILABLE_LABEL = tr("这份内容暂时无法打开。");
 
 export const LIBRARY_DENIED_MESSAGE =
-  '没有打开相册。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许照片后，可以再试。';
+  tr("没有打开相册。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许照片后，可以再试。");
 export const CAMERA_DENIED_MESSAGE =
-  '没有打开相机。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许相机后，可以再试。';
+  tr("没有打开相机。还可以写字，也可以用其他已允许的方式留下。草稿还在。打开系统设置允许相机后，可以再试。");
 export const MIC_DENIED_MESSAGE =
-  '没有打开麦克风。还可以写字和留下照片，草稿还在。打开系统设置允许麦克风后，可以再试。';
+  tr("没有打开麦克风。还可以写字和留下照片，草稿还在。打开系统设置允许麦克风后，可以再试。");
 
 const IMAGE_DISK_FULL_MESSAGE =
-  '这台设备空间不够，这张照片没有留下。已经写的字和已留下的内容还在草稿里，可以清出空间后再试。';
+  tr("这台设备空间不够，这张照片没有留下。已经写的字和已留下的内容还在草稿里，可以清出空间后再试。");
 const IMAGE_COPY_FAILED_MESSAGE =
-  '这张照片没有复制进来。已经写的字和已留下的内容还在草稿里，可以再试。';
+  tr("这张照片没有复制进来。已经写的字和已留下的内容还在草稿里，可以再试。");
 const IMAGE_WRITE_FAILED_MESSAGE =
-  '这张照片还没写进草稿。已经写的字和已留下的内容还在，可以再试。';
+  tr("这张照片还没写进草稿。已经写的字和已留下的内容还在，可以再试。");
 const AUDIO_DISK_FULL_MESSAGE =
-  '这台设备空间不够，这段声音没有留下。已经写的字和已留下的内容还在草稿里，可以清出空间后再试。';
+  tr("这台设备空间不够，这段声音没有留下。已经写的字和已留下的内容还在草稿里，可以清出空间后再试。");
 const AUDIO_COPY_FAILED_MESSAGE =
-  '这段声音没有复制进来。已经写的字和已留下的内容还在草稿里，可以再试。';
+  tr("这段声音没有复制进来。已经写的字和已留下的内容还在草稿里，可以再试。");
 const AUDIO_WRITE_FAILED_MESSAGE =
-  '这段声音还没写进草稿。已经写的字和已留下的内容还在，可以再试。';
-const SAVE_DISK_FULL_MESSAGE = '这次没有留下正式记录。草稿还在，可以清出空间后再试。';
-const SAVE_WRITE_FAILED_MESSAGE = '这次没有留下正式记录。草稿还在，可以再试。';
-const DRAFT_CLEAR_FAILED_MESSAGE = '这份草稿还没拿掉。原来的内容还在，可以再试。';
+  tr("这段声音还没写进草稿。已经写的字和已留下的内容还在，可以再试。");
+const SAVE_DISK_FULL_MESSAGE = tr("这次没有留下正式记录。草稿还在，可以清出空间后再试。");
+const SAVE_WRITE_FAILED_MESSAGE = tr("这次没有留下正式记录。草稿还在，可以再试。");
+const DRAFT_CLEAR_FAILED_MESSAGE = tr("这份草稿还没拿掉。原来的内容还在，可以再试。");
 export const DRAFT_MEDIA_CLEANUP_FAILED_MESSAGE =
-  '草稿已经拿掉。有些本地副本还没删掉，没有从这台设备上清除。';
-export const DRAFT_IMAGE_REMOVE_FAILED_MESSAGE = '这张照片还没从草稿里拿掉。原来的内容还在，可以再试。';
-export const DRAFT_AUDIO_REMOVE_FAILED_MESSAGE = '这段声音还没从草稿里拿掉。原来的内容还在，可以再试。';
+  tr("草稿已经拿掉。有些本地副本还没删掉，没有从这台设备上清除。");
+export const DRAFT_IMAGE_REMOVE_FAILED_MESSAGE = tr("这张照片还没从草稿里拿掉。原来的内容还在，可以再试。");
+export const DRAFT_AUDIO_REMOVE_FAILED_MESSAGE = tr("这段声音还没从草稿里拿掉。原来的内容还在，可以再试。");
 
 export type Clock = { now: () => Date };
 
@@ -224,16 +225,16 @@ function recentOccurredLabel(
   if (precision === 'day' && sameViewerCalendarDay(moment.time.occurredAt, moment.time.recordedAt, clock)) {
     return null;
   }
-  return `发生于 ${formatCalendarDate(
+  return tr("发生于 {0}", [formatCalendarDate(
     moment.time.occurredAt,
     precision,
     viewerOffsetAt(moment.time.occurredAt, clock),
-  )}`;
+  )]);
 }
 
 
 function photoLabel(index: number, total: number): string {
-  return `照片 ${index}/${total}`;
+  return tr("照片 {0}/{1}", [index, total]);
 }
 
 function toProjectionAsset(asset: AssetRecord | null): object | null {
@@ -284,7 +285,7 @@ function mapRepositoryWrite(
     if (code === 'REPOSITORY_INVALID_RECORD') {
       return new ApplicationError(
         'REPOSITORY_INVALID_RECORD',
-        error instanceof Error ? error.message : '这条记录还在，但现在不能覆盖它',
+        error instanceof Error ? error.message : tr("这条记录还在，但现在不能覆盖它"),
       );
     }
   }
@@ -357,7 +358,7 @@ export function createUseCases(deps: {
     return unknownIds.map((assetId) => ({
       id: assetId,
       status: 'unavailable' as const,
-      label: '这份内容',
+      label: tr("这份内容"),
       unavailableLabel: UNKNOWN_UNAVAILABLE_LABEL,
     }));
   }
@@ -440,7 +441,7 @@ export function createUseCases(deps: {
         status: 'unavailable',
         durationMs,
         durationLabel,
-        label: '当时的声音',
+        label: tr("当时的声音"),
         unavailableLabel: AUDIO_MISSING_LABEL,
         reason: 'missing',
       };
@@ -453,7 +454,7 @@ export function createUseCases(deps: {
         status: 'unavailable',
         durationMs,
         durationLabel,
-        label: '当时的声音',
+        label: tr("当时的声音"),
         unavailableLabel: AUDIO_MISSING_LABEL,
         reason: 'missing',
       };
@@ -465,7 +466,7 @@ export function createUseCases(deps: {
         status: 'unavailable',
         durationMs,
         durationLabel,
-        label: '当时的声音',
+        label: tr("当时的声音"),
         unavailableLabel: AUDIO_UNPLAYABLE_LABEL,
         reason: 'unplayable',
       };
@@ -476,7 +477,7 @@ export function createUseCases(deps: {
       uri,
       durationMs,
       durationLabel,
-      label: '当时的声音',
+      label: tr("当时的声音"),
     };
   }
 
@@ -507,7 +508,7 @@ export function createUseCases(deps: {
   async function requireDraft(draftId: string): Promise<MomentRecord> {
     const draft = await deps.drafts.loadActive();
     if (!draft || draft.id !== draftId) {
-      throw new ApplicationError('DRAFT_NOT_FOUND', '没有可更新的草稿');
+      throw new ApplicationError('DRAFT_NOT_FOUND', tr("没有可更新的草稿"));
     }
     return draft;
   }
@@ -537,7 +538,7 @@ export function createUseCases(deps: {
 
   async function persistAndAttach(draft: MomentRecord, picks: PickedImage[]): Promise<MomentRecord> {
     if (!deps.assets || !deps.media) {
-      throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下照片。');
+      throw new ApplicationError('MEDIA_UNAVAILABLE', tr("现在不能留下照片。"));
     }
     let current = draft;
     for (const pick of picks) {
@@ -556,7 +557,7 @@ export function createUseCases(deps: {
         const existing = await deps.assets.findById(assetId);
         if (existing.kind === 'unreadable') {
           await rollbackUncommitted(assetId, persisted.localUri);
-          throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这张照片还在，但现在不能覆盖它');
+          throw new ApplicationError('REPOSITORY_INVALID_RECORD', tr("这张照片还在，但现在不能覆盖它"));
         }
         if (existing.kind === 'missing') {
           const instant = clock.now();
@@ -595,14 +596,14 @@ export function createUseCases(deps: {
     options?: { replace?: boolean },
   ): Promise<MomentRecord> {
     if (!deps.assets || !deps.media) {
-      throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下声音。');
+      throw new ApplicationError('MEDIA_UNAVAILABLE', tr("现在不能留下声音。"));
     }
     if (recorded.durationMs <= 0) {
-      throw new ApplicationError('AUDIO_EMPTY', '这一次没有录下声音。');
+      throw new ApplicationError('AUDIO_EMPTY', tr("这一次没有录下声音。"));
     }
     const { audioId: existingAudioId } = await classify(draft.assetIds);
     if (existingAudioId && !options?.replace) {
-      throw new ApplicationError('AUDIO_LIMIT', '每条最多一段声音');
+      throw new ApplicationError('AUDIO_LIMIT', tr("每条最多一段声音"));
     }
     const assetId = nextAssetId();
     let persisted: { localUri: string; sizeBytes?: number };
@@ -620,7 +621,7 @@ export function createUseCases(deps: {
       const existing = await deps.assets.findById(assetId);
       if (existing.kind === 'unreadable') {
         await rollbackUncommitted(assetId, persisted.localUri);
-        throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这段声音还在，但现在不能覆盖它');
+        throw new ApplicationError('REPOSITORY_INVALID_RECORD', tr("这段声音还在，但现在不能覆盖它"));
       }
       if (existing.kind === 'missing') {
         const instant = clock.now();
@@ -664,7 +665,7 @@ export function createUseCases(deps: {
     const draft = await requireDraft(draftId);
     const remaining = MAX_DRAFT_IMAGES - (await classify(draft.assetIds)).imageIds.length;
     if (remaining <= 0) {
-      throw new ApplicationError('IMAGE_LIMIT', '每条最多三张照片');
+      throw new ApplicationError('IMAGE_LIMIT', tr("每条最多三张照片"));
     }
     if (picks.length === 0) {
       return toComposer(draft, true);
@@ -672,7 +673,7 @@ export function createUseCases(deps: {
     const accepted = picks.slice(0, remaining);
     const next = await persistAndAttach(draft, accepted);
     if (picks.length > remaining) {
-      throw new ApplicationError('IMAGE_LIMIT', '每条最多三张照片');
+      throw new ApplicationError('IMAGE_LIMIT', tr("每条最多三张照片"));
     }
     return toComposer(next, true);
   }
@@ -686,10 +687,10 @@ export function createUseCases(deps: {
     const draft = await requireDraft(draftId);
     const remaining = MAX_DRAFT_IMAGES - (await classify(draft.assetIds)).imageIds.length;
     if (remaining <= 0) {
-      throw new ApplicationError('IMAGE_LIMIT', '每条最多三张照片');
+      throw new ApplicationError('IMAGE_LIMIT', tr("每条最多三张照片"));
     }
     if (!source) {
-      throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下照片。');
+      throw new ApplicationError('MEDIA_UNAVAILABLE', tr("现在不能留下照片。"));
     }
     const permission = await source.requestPermission();
     if (permission !== 'granted') {
@@ -701,7 +702,7 @@ export function createUseCases(deps: {
     }
     if (picks.length > remaining) {
       await persistAndAttach(draft, picks.slice(0, remaining));
-      throw new ApplicationError('IMAGE_LIMIT', '每条最多三张照片');
+      throw new ApplicationError('IMAGE_LIMIT', tr("每条最多三张照片"));
     }
     const next = await persistAndAttach(draft, picks);
     return toComposer(next, true);
@@ -878,27 +879,27 @@ export function createUseCases(deps: {
     if (!options?.replace) {
       const { audioId } = await classify(draft.assetIds);
       if (audioId) {
-        throw new ApplicationError('AUDIO_LIMIT', '每条最多一段声音');
+        throw new ApplicationError('AUDIO_LIMIT', tr("每条最多一段声音"));
       }
     }
     if (!deps.capture) {
-      throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下声音。');
+      throw new ApplicationError('MEDIA_UNAVAILABLE', tr("现在不能留下声音。"));
     }
     if (deps.capture.isRecording()) {
-      throw new ApplicationError('AUDIO_BUSY', '正在录一段声音。');
+      throw new ApplicationError('AUDIO_BUSY', tr("正在录一段声音。"));
     }
     if (options?.canStart && !options.canStart()) {
-      throw new ApplicationError('RECORDING_CANCELLED', '这次录音没有开始，可以再点录音。');
+      throw new ApplicationError('RECORDING_CANCELLED', tr("这次录音没有开始，可以再点录音。"));
     }
     const permission = await deps.capture.requestPermission();
     if (permission !== 'granted') {
       throw new ApplicationError('MIC_DENIED', MIC_DENIED_MESSAGE);
     }
     if (options?.waitUntilReady && !(await options.waitUntilReady())) {
-      throw new ApplicationError('RECORDING_CANCELLED', '这次录音没有开始，可以再点录音。');
+      throw new ApplicationError('RECORDING_CANCELLED', tr("这次录音没有开始，可以再点录音。"));
     }
     if (options?.canStart && !options.canStart()) {
-      throw new ApplicationError('RECORDING_CANCELLED', '这次录音没有开始，可以再点录音。');
+      throw new ApplicationError('RECORDING_CANCELLED', tr("这次录音没有开始，可以再点录音。"));
     }
     await deps.capture.start(options?.canStart);
   }
@@ -911,7 +912,7 @@ export function createUseCases(deps: {
 
   async function finishDraftRecording(draftId: string): Promise<ComposerViewModel> {
     if (!deps.capture) {
-      throw new ApplicationError('MEDIA_UNAVAILABLE', '现在不能留下声音。');
+      throw new ApplicationError('MEDIA_UNAVAILABLE', tr("现在不能留下声音。"));
     }
     const elapsedMs = deps.capture.getElapsedMs();
     const recorded = await deps.capture.stop();
@@ -985,7 +986,7 @@ export function createUseCases(deps: {
   async function saveTextMoment(draftId: string): Promise<{ id: string }> {
     const existing = await deps.moments.findById(draftId);
     if (existing.kind === 'unreadable') {
-      throw new ApplicationError('REPOSITORY_INVALID_RECORD', '这条记录还在，但现在不能覆盖它');
+      throw new ApplicationError('REPOSITORY_INVALID_RECORD', tr("这条记录还在，但现在不能覆盖它"));
     }
     if (existing.kind === 'ready' && existing.moment.lifecycle.status === 'active') {
       await deps.drafts.clear(draftId);
@@ -994,12 +995,12 @@ export function createUseCases(deps: {
 
     const draft = await deps.drafts.loadActive();
     if (!draft || draft.id !== draftId) {
-      throw new ApplicationError('DRAFT_NOT_FOUND', '没有可保存的草稿');
+      throw new ApplicationError('DRAFT_NOT_FOUND', tr("没有可保存的草稿"));
     }
 
     const note = draft.content.note.trim();
     if (!note && draft.assetIds.length === 0) {
-      throw new ApplicationError('MOMENT_EMPTY', '写一句、留下一张照片或一段声音。');
+      throw new ApplicationError('MOMENT_EMPTY', tr("写一句、留下一张照片或一段声音。"));
     }
 
     const instant = clock.now();

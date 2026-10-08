@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useState, type ReactNode, type Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type TextLayoutEventData, type ViewStyle } from 'react-native';
 import { Text } from './life-text';
@@ -32,10 +33,10 @@ const BAND_DESTINATIONS: {
   icon: LifeIconName;
   goTestID: string;
 }[] = [
-  { id: 'recent', label: '最近', icon: 'recent', goTestID: 'lookback-go-recent' },
-  { id: 'lookback', label: '回看', icon: 'lookback', goTestID: 'home-lookback' },
-  { id: 'albums', label: '生活册', icon: 'album', goTestID: 'home-albums' },
-  { id: 'family', label: '家庭', icon: 'family', goTestID: 'home-family' },
+  { id: 'recent', label: tr("最近"), icon: 'recent', goTestID: 'lookback-go-recent' },
+  { id: 'lookback', label: tr("回看"), icon: 'lookback', goTestID: 'home-lookback' },
+  { id: 'albums', label: tr("生活册"), icon: 'album', goTestID: 'home-albums' },
+  { id: 'family', label: tr("家庭"), icon: 'family', goTestID: 'home-family' },
 ];
 
 export function RootNavBand({

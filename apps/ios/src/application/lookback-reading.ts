@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { pad2 } from '../domain-adapters/calendar';
 import type { HistoryMonthView } from '../projections/history-projection';
 import { HISTORY_PAGE_SIZE } from './history-use-cases';
@@ -208,8 +209,8 @@ export function lookbackNeighborDateLabel(
   from: { year: number; month: number; day: number; count?: number },
   to: { year: number; month: number; day: number; count?: number },
 ): string {
-  if (from.year !== to.year) return `${to.year}年${to.month}月${to.day}日`;
-  return `${to.month}月${to.day}日`;
+  if (from.year !== to.year) return tr("{0}年{1}月{2}日", [to.year, to.month, to.day]);
+  return tr("{0}月{1}日", [to.month, to.day]);
 }
 
 export function lookbackNeighborCaption(
@@ -217,12 +218,12 @@ export function lookbackNeighborCaption(
   from: { year: number; month: number; day: number; count?: number },
   to: { year: number; month: number; day: number; count?: number },
 ): string {
-  const verb = direction === 'previous' ? '前一个有记录日' : '后一个有记录日';
+  const verb = direction === 'previous' ? tr("前一个有记录日") : tr("后一个有记录日");
   return `${verb} · ${lookbackNeighborDateLabel(from, to)}`;
 }
 
 export function lookbackReadingDayTitle(year: number, month: number, day: number): string {
-  return `${month}月${day}日`;
+  return tr("{0}月{1}日", [month, day]);
 }
 
 export function lookbackReadingYearLabel(year: number): string {
@@ -234,11 +235,11 @@ export function lookbackReadingDayWeekday(year: number, month: number, day: numb
 }
 
 export function lookbackReadingCountLabel(count: number): string {
-  return `${count}条`;
+  return tr("{0}条", [count]);
 }
 
 export function lookbackReadingCountPhrase(count: number): string {
-  return `${count}条记录`;
+  return tr("{0}条记录", [count]);
 }
 
 export function lookbackReadingDayMetaLine(
@@ -253,27 +254,27 @@ export function lookbackReadingDayMetaLine(
 }
 
 export function lookbackCatalogMonthTitle(year: number, month: number): string {
-  return `${year}年 · ${lookbackCatalogMonthHan(month)}`;
+  return tr("{0}年 · {1}", [year, lookbackCatalogMonthHan(month)]);
 }
 
 export function lookbackCatalogRangeCaption(scope: LookbackReadingScope | null): string | null {
   if (!scope) return null;
   if (scope.kind === 'day') return lookbackCatalogMonthTitle(scope.year, scope.month);
-  if (scope.kind === 'year-unconfirmed') return `${scope.year}年`;
+  if (scope.kind === 'year-unconfirmed') return tr("{0}年", [scope.year]);
   if (scope.kind === 'month-unconfirmed') return lookbackCatalogMonthTitle(scope.year, scope.month);
-  return '时间未确认';
+  return tr("时间未确认");
 }
 
 export function lookbackReadingEndNote(
   scopeKind: LookbackReadingScope['kind'] | null | undefined,
 ): string | null {
-  if (scopeKind === 'day') return '这一日，读到这里。';
+  if (scopeKind === 'day') return tr("这一日，读到这里。");
   if (
     scopeKind === 'unknown' ||
     scopeKind === 'year-unconfirmed' ||
     scopeKind === 'month-unconfirmed'
   ) {
-    return '这一段，读到这里。';
+    return tr("这一段，读到这里。");
   }
   return null;
 }

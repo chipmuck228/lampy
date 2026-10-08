@@ -1,3 +1,4 @@
+import { tr, feelingLabel } from '../i18n';
 import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
@@ -61,8 +62,8 @@ export function LookbackReadingHeader({
         testID="lookback-reading-title"
         accessibilityLabel={
           count == null
-            ? `${year}年${month}月${day}日，${weekday}`
-            : `${year}年${month}月${day}日，${weekday}，${lookbackReadingCountLabel(count)}`
+            ? tr("{0}年{1}月{2}日，{3}", [year, month, day, weekday])
+            : tr("{0}年{1}月{2}日，{3}，{4}", [year, month, day, weekday, lookbackReadingCountLabel(count)])
         }
       >
         {lookbackReadingDayTitle(year, month, day)}
@@ -131,12 +132,12 @@ export function LookbackReadingMoment({
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded }}
-              accessibilityLabel={expanded ? '收起正文' : '展开正文'}
+              accessibilityLabel={expanded ? tr("收起正文") : tr("展开正文")}
               testID={`lookback-reading-expand-${entry.id}`}
               onPress={onToggleExpand}
               style={styles.hit}
             >
-              <Text style={styles.expand}>{expanded ? '收起正文' : '展开正文'}</Text>
+              <Text style={styles.expand}>{expanded ? tr("收起正文") : tr("展开正文")}</Text>
             </Pressable>
           ) : null}
         </>
@@ -186,7 +187,7 @@ function LookbackRecordFoot({
       {feeling ? (
         <View
           testID={`lookback-reading-feeling-${id}`}
-          accessibilityLabel={`当时的感受，${feeling.label}`}
+          accessibilityLabel={tr("当时的感受，{0}", [feelingLabel(feeling.label)])}
           style={styles.feeling}
         >
           <View
@@ -195,14 +196,14 @@ function LookbackRecordFoot({
             importantForAccessibility="no"
             style={[styles.feelingDot, { backgroundColor: feelingAccentColor(feeling) }]}
           />
-          <Text style={styles.feelingWord}>{feeling.label}</Text>
+          <Text style={styles.feelingWord}>{feelingLabel(feeling.label)}</Text>
         </View>
       ) : (
         <View style={styles.feelingSlot} />
       )}
       <LookThisHit
-        caption="阅读完整记录"
-        accessibilityLabel={`阅读完整记录，${note || id}`}
+        caption={tr("阅读完整记录")}
+        accessibilityLabel={tr("阅读完整记录，{0}", [note || id])}
         testID={`lookback-book-open-${id}`}
         align="end"
         captionStyle={styles.open}
@@ -248,12 +249,12 @@ export function LookbackNeighborRetry({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="相邻有记录日，再试一次"
+      accessibilityLabel={tr("相邻有记录日，再试一次")}
       testID={testID}
       onPress={onRetry}
       style={styles.hit}
     >
-      <Text style={styles.expand}>相邻有记录日暂时读不出来。再试一次</Text>
+      <Text style={styles.expand}>{tr("相邻有记录日暂时读不出来。再试一次")}</Text>
     </Pressable>
   );
 }
@@ -269,7 +270,7 @@ function LookbackNeighborDayHit({
   day: LookbackPlacedDay;
   onOpen: (day: LookbackPlacedDay) => void;
 }) {
-  const verb = direction === 'previous' ? '前一个记录日' : '后一个记录日';
+  const verb = direction === 'previous' ? tr("前一个记录日") : tr("后一个记录日");
   const date = lookbackNeighborDateLabel(current, day);
   const trailing = direction === 'next';
   return (

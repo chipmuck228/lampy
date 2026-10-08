@@ -1,3 +1,4 @@
+import { tr } from '../../i18n';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, type } from '../../screens/life-text';
@@ -56,7 +57,7 @@ export default function MomentDetailScreen() {
   }, [momentId, loadKey]);
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="记录">
+    <SafeAreaView style={styles.safe} accessibilityLabel={tr("记录")}>
       <View
         style={[
           styles.chrome,
@@ -69,11 +70,11 @@ export default function MomentDetailScreen() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="返回原来的位置"
+          accessibilityLabel={tr("返回原来的位置")}
           onPress={() => router.back()}
           style={styles.backHit}
         >
-          <Text style={styles.back}>返回原来的位置</Text>
+          <Text style={styles.back}>{tr("返回原来的位置")}</Text>
         </Pressable>
         {view?.kind === 'ready' ? (
           <LifeIconButton
@@ -100,22 +101,22 @@ export default function MomentDetailScreen() {
       >
         {view?.kind === 'missing' ? (
           <View style={styles.block}>
-            <Text style={styles.title}>这条记录现在无法找到。</Text>
-            <Text style={styles.body}>没有改成显示其他记录。</Text>
+            <Text style={styles.title}>{tr("这条记录现在无法找到。")}</Text>
+            <Text style={styles.body}>{tr("没有改成显示其他记录。")}</Text>
           </View>
         ) : null}
 
         {view?.kind === 'error' ? (
           <View style={styles.block}>
-            <Text style={styles.title}>这条记录暂时读不出来。</Text>
-            <Text style={styles.body}>原来的内容还在，可以再试。没有把它当成已经丢失。</Text>
+            <Text style={styles.title}>{tr("这条记录暂时读不出来。")}</Text>
+            <Text style={styles.body}>{tr("原来的内容还在，可以再试。没有把它当成已经丢失。")}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="再试一次"
+              accessibilityLabel={tr("再试一次")}
               onPress={() => setLoadKey((value) => value + 1)}
               style={styles.retryHit}
             >
-              <Text style={styles.retry}>再试一次</Text>
+              <Text style={styles.retry}>{tr("再试一次")}</Text>
             </Pressable>
           </View>
         ) : null}

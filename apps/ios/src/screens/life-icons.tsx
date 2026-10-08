@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { Pressable, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 import { Text, type } from './life-text';
 import { SymbolView } from 'expo-symbols';
@@ -136,7 +137,7 @@ export function LookThisHit({
   onPress,
   testID,
   accessibilityLabel,
-  caption = '看这条',
+  caption = tr("看这条"),
   tight,
   align = 'center',
   captionStyle,
@@ -154,7 +155,7 @@ export function LookThisHit({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityHint="打开这条记录"
+      accessibilityHint={tr("打开这条记录")}
       testID={testID}
       onPress={onPress}
       style={[
