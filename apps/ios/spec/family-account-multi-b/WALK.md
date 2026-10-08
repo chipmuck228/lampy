@@ -11,7 +11,7 @@
 - 全量 Jest：TZ=Asia/Shanghai npx jest --ci --runInBand，196 suites：194 passed / 2 failed；1035 tests：1033 passed / 2 failed。未称全量 PASS。
 - 最后失焦清空视图修补后，页面与 application 资格测试 2 suites / 8 tests PASS；tsc 与改动文件 eslint 再核 PASS。此前全量与该修补分别记录。
 - 新增测试共 15 项；包括跨连接 SQLite、迁移回滚、目录状态和页面门控。
-- 实现 SHA 以独立 PR head 为准；设备运行 SHA 尚不存在。
+- 实现 SHA 以独立 PR head 为准；设备运行 SHA 见下方用户模拟器走查。
 
 ## 基线对照
 
@@ -26,5 +26,18 @@
 
 ## 验收边界
 
-模拟器/真机 UI、双设备、公网、VoiceOver、本机保护实页：NOT VERIFIED。
+此前模拟器/真机 UI、双设备、公网、VoiceOver、本机保护实页未验；新增模拟器用户报告仅覆盖下方明确路径。
 生产服务版本/迁移：NOT VERIFIED（未访问主机）。家庭入口关闭、identityLoopAccepted 未动；未开始 C–F、注册、账号删除或付费。不得据本轮测试开启家庭。
+
+## 2026-10-08 用户模拟器走查
+
+用户报告运行 checkout：`42781c235379febabb9012536109a35e0602c9d5`。`git status --short` 为 `M app.json`、`M metro.config.js`；因此不是干净 tree 的设备验收。此前按测试指导增加 wasm assetExts、将 web.output 改为 single；最终 diff 未取得，不声称已核对修改全文。Metro 测试入口/API/诊断通过启动环境变量开启，最后使用端口 8087。模拟器具体型号、iOS 版本和原生构建身份未提供。
+
+以下为模拟器 PASS（用户实测报告，非助手直接操作）：
+- 受控账号登录、创建 TestFamily；再创建一家，两家同时显示并能点选。
+- 杀进程重开：会话与两家仍在。
+- A 退出切 B、B 创建再切 A：家庭数据不串。
+- 隔离 API 停止后刷新显示失败/重试，不伪装为空；重启后恢复。
+- 本机保护开启后后台返回、认证期间家庭名称和列表遮挡。
+
+同账号双设备登录/单设备退出、10 家庭上限实页、真机、VoiceOver仍 NOT VERIFIED。公网与生产未验收，家庭发布入口仍关闭，PR 保持 OPEN。上述结果不改写此前自动化或生产验收边界。
