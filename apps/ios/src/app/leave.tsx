@@ -1,4 +1,4 @@
-import { tr } from '../i18n';
+import { appLanguage, tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput, type } from '../screens/life-text';
@@ -89,7 +89,7 @@ export default function LeaveScreen() {
   const gutter = pageGutter(width, height);
   const pageWidth = readingPageWidth(width, height);
   const compact = isCompactHeight(height);
-  const stackActions = compact || reading < 320 || shouldStackLeaveActions(reading);
+  const stackActions = (appLanguage !== 'en' && (compact || reading < 320)) || shouldStackLeaveActions(reading);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -1020,11 +1020,12 @@ export default function LeaveScreen() {
             accessibilityLabel={stackActions ? 'leave-actions-stack' : 'leave-actions-row'}
             style={[
               styles.actions,
+              appLanguage === 'en' && styles.actionsEnglish,
               { maxWidth: reading },
               stackActions && styles.actionsStacked,
             ]}
           >
-            <View style={styles.mediaRow}>
+            <View style={[styles.mediaRow, appLanguage === 'en' && styles.actionsEnglish]}>
               <LifeLabeledHit
                 icon="camera"
                 label={tr("拍摄")}
@@ -1126,6 +1127,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 20,
   },
+  actionsEnglish: { gap: 12 },
   actionsStacked: {
     flexDirection: 'column',
     alignItems: 'flex-start',

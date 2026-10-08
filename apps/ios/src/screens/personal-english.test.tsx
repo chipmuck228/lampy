@@ -1,3 +1,4 @@
+import { shouldStackLeaveActions } from './life-page';
 import { Animated } from 'react-native';
 import { RecentMoment } from './recent-moment';
 import type { RecentLifeItem } from '../application/use-cases';
@@ -57,4 +58,10 @@ it('keeps playback and opening separate, retaining the user text on rerender', a
   expect(onPause).toHaveBeenCalledTimes(1);
   expect(ui.getByTestId('recent-note-english_moment').props.children).toBe(item.note);
   expect(ui.getByText('Calm')).toBeTruthy();
+});
+
+// Composer labels use a Latin-width allowance without changing the Chinese nav estimates.
+it('keeps the English composer actions together when they fit, stacks on narrow columns', () => {
+  expect(shouldStackLeaveActions(300)).toBe(false);
+  expect(shouldStackLeaveActions(220)).toBe(true);
 });

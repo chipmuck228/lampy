@@ -1,4 +1,4 @@
-import { tr } from '../i18n';
+import { appLanguage, tr } from '../i18n';
 export const paper = '#F3F0E9';
 export const paperDeep = '#E8E1D5';
 export const ink = '#25231F';
@@ -155,8 +155,14 @@ const LEAVE_MEDIA_SIZE = 16;
 const LEAVE_SAVE_SIZE = 18;
 
 export function shouldStackLeaveActions(availableWidth: number): boolean {
-  const camera = navBandItemMinWidth(tr("拍摄"), LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
-  const photo = navBandItemMinWidth(tr("照片"), LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
-  const save = navBandItemMinWidth(tr("留下"), LEAVE_SAVE_SIZE);
-  return camera + photo + save + LEAVE_ACTION_GAP * 2 > availableWidth;
+  const english = appLanguage === 'en';
+  // English letters are narrower than the full-width CJK estimate used by the nav.
+  // Keep a conservative allowance and retain stacking on genuinely narrow columns.
+  const labelWidth = (label: string, size: number) => english
+    ? Math.max(48, Math.ceil(Array.from(label).length * size * 0.65))
+    : navBandItemMinWidth(label, size);
+  const camera = labelWidth(tr("拍摄"), LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
+  const photo = labelWidth(tr("照片"), LEAVE_MEDIA_SIZE) + LEAVE_MEDIA_ICON;
+  const save = labelWidth(tr("留下"), LEAVE_SAVE_SIZE);
+  return camera + photo + save + (english ? 12 : LEAVE_ACTION_GAP) * 2 > availableWidth;
 }

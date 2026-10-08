@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
@@ -16,9 +17,9 @@ export default function AccountAboutScreen() {
   });
   return (
     <SettingsPage
-      title="关于 Lampy"
-      backLabel="本机设置"
-      accessibilityLabel="关于 Lampy"
+      title={tr("关于 Lampy")}
+      backLabel={tr("本机设置")}
+      accessibilityLabel={tr("关于 Lampy")}
       testID="account-about-scroll"
       onBack={() => dismissToSettingsRoot(router)}
     >

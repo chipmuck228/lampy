@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Text } from './life-text';
@@ -440,7 +441,7 @@ export function FirstRunGuide({
   const markFace = fontsReady === 'ready' ? FIRST_RUN_MARK : undefined;
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="Lampy 引导">
+    <SafeAreaView style={styles.safe} accessibilityLabel={tr("Lampy 引导")}>
       <View style={[styles.header, { height: compact ? 53 : 61, paddingHorizontal: gutter }]} testID="first-run-mark-row">
         <Image source={mark} accessibilityLabel="Lampy" style={styles.markIcon} resizeMode="contain" />
         <Text style={[styles.markWord, markFace ? { fontFamily: markFace } : null]}>Lampy</Text>
@@ -458,7 +459,7 @@ export function FirstRunGuide({
           onScrollEndDrag={onScrollEnd}
           showsVerticalScrollIndicator={false}
           accessibilityRole="adjustable"
-          accessibilityLabel="引导页，上滑翻页"
+          accessibilityLabel={tr("引导页，上滑翻页")}
           style={styles.pager}
         >
           {FIRST_RUN_SCREENS.map((item) => {
@@ -571,12 +572,12 @@ export function FirstRunGuide({
           {index > 0 ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="上一屏"
+              accessibilityLabel={tr("上一屏")}
               testID="first-run-back"
               onPress={onBack}
               style={styles.backHit}
             >
-              <Text style={[styles.back, sans ? { fontFamily: sans } : null]}>上一屏</Text>
+              <Text style={[styles.back, sans ? { fontFamily: sans } : null]}>{tr("上一屏")}</Text>
             </Pressable>
           ) : null}
         </View>
