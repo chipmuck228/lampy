@@ -683,6 +683,7 @@ export function createUseCases(deps: {
     source: ImageSource | undefined,
     deniedCode: 'LIBRARY_DENIED' | 'CAMERA_DENIED',
     deniedMessage: string,
+    options?: { canStart: () => boolean; waitUntilReady: () => Promise<boolean> },
   ): Promise<ComposerViewModel> {
     const draft = await requireDraft(draftId);
     const remaining = MAX_DRAFT_IMAGES - (await classify(draft.assetIds)).imageIds.length;
@@ -692,9 +693,13 @@ export function createUseCases(deps: {
     if (!source) {
       throw new ApplicationError('MEDIA_UNAVAILABLE', tr("现在不能留下照片。"));
     }
+    if (options && !options.canStart()) throw new Error('camera shortcut cancelled');
     const permission = await source.requestPermission();
     if (permission !== 'granted') {
       throw new ApplicationError(deniedCode, deniedMessage);
+    }
+    if (options && (!(await options.waitUntilReady()) || !options.canStart())) {
+      throw new Error('camera shortcut cancelled');
     }
     const picks = await source.pick(remaining);
     if (picks.length === 0) {
@@ -862,12 +867,13 @@ export function createUseCases(deps: {
     );
   }
 
-  async function addCameraImage(draftId: string): Promise<ComposerViewModel> {
+  async function addCameraImage(draftId: string, options?: { canStart: () => boolean; waitUntilReady: () => Promise<boolean> }): Promise<ComposerViewModel> {
     return pickFromSource(
       draftId,
       deps.camera,
       'CAMERA_DENIED',
       CAMERA_DENIED_MESSAGE,
+      options,
     );
   }
 

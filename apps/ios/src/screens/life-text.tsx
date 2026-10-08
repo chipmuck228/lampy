@@ -6,6 +6,7 @@ import {
   type TextInputProps,
   type TextProps,
 } from 'react-native';
+import type { Ref } from 'react';
 
 /**
  * Fixed app type scale in iOS points.
@@ -27,7 +28,7 @@ export function Text(props: TextProps) {
   return <RNText {...props} allowFontScaling={false} maxFontSizeMultiplier={1} />;
 }
 
-export function TextInput({ style, ...props }: TextInputProps) {
+export function TextInput({ style, ...props }: TextInputProps & { ref?: Ref<RNTextInput> }) {
   const flat = StyleSheet.flatten(style);
   let next = style;
   if (flat && typeof flat === 'object' && 'lineHeight' in flat) {

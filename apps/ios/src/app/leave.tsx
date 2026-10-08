@@ -60,6 +60,8 @@ import { usePageMetrics } from '../screens/use-page-metrics';
 
 import { useDeviceLock } from '../screens/device-lock-context';
 import { forgetLeaveVoiceIntent, takeLeaveVoiceIntent } from '../screens/leave-voice-intent';
+import { forgetHomeScreenEntry, takeHomeScreenEntry } from '../application/home-screen-actions';
+import type { TextInput as NativeTextInput } from 'react-native';
 import { waitForRecordingForeground } from '../screens/recording-foreground';
 import { recordingStartedFeedback } from '../infrastructure/recording-feedback';
 
@@ -67,7 +69,8 @@ export const DRAFT_RESTORED_COPY = tr("上次没保存的内容已放回来。")
 
 export default function LeaveScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[]; voice?: string | string[] }>();
+  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[]; voice?: string | string[]; quick?: string | string[] }>();
+  const noteInputRef = useRef<NativeTextInput>(null);
   const lock = useDeviceLock();
   const lockRef = useRef(lock);
   lockRef.current = lock;
@@ -79,9 +82,10 @@ export default function LeaveScreen() {
       focusedRef.current = false;
       recordingGeneration.current += 1;
       forgetLeaveVoiceIntent(params.voice);
+      forgetHomeScreenEntry(params.quick);
       interruptRef.current();
     };
-  }, [params.voice]));
+  }, [params.voice, params.quick]));
   const fromLookback = leaveOpenedFromLookback(params.from);
   const { width, height } = usePageMetrics();
   const insets = useSafeAreaInsets();
@@ -367,14 +371,21 @@ export default function LeaveScreen() {
     });
   }
 
-  function applyImageAction(action: 'library' | 'camera') {
+  function applyImageAction(action: 'library' | 'camera', fromQuickAction = false) {
     const id = draftIdRef.current;
     if (!id || busyRef.current || abandoningRef.current) return;
+    const generation = recordingGeneration.current;
+    const stillHere = () => mountedRef.current && focusedRef.current &&
+      generation === recordingGeneration.current && draftIdRef.current === id && !abandoningRef.current;
+    const canStart = () => stillHere() && AppState.currentState === 'active' && !lockRef.current?.snapshot.locked;
     busyRef.current = true;
     setBusy('photo');
     void enqueue(async () => {
       const app = await getUseCases();
-      return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id);
+      return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id, fromQuickAction ? {
+        canStart,
+        waitUntilReady: () => waitForRecordingForeground(stillHere, canStart),
+      } : undefined);
     })
       .then((next) => {
         if (abandoningRef.current || draftIdRef.current !== id) return;
@@ -490,6 +501,31 @@ export default function LeaveScreen() {
     // The gesture is consumed once; rerenders cannot restart it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId, audio, params.voice, lock?.snapshot.locked]);
+
+  useEffect(() => {
+    const tryEntry = () => {
+      if (!focusedRef.current || !draftIdRef.current || AppState.currentState !== 'active' || lockRef.current?.snapshot.locked) return;
+      const kind = takeHomeScreenEntry(params.quick);
+      if (!kind || busyRef.current || abandoningRef.current || phaseRef.current === 'recording') return;
+      if (kind === 'write') noteInputRef.current?.focus();
+      if (kind === 'record') {
+        if (audio) setMessage(tr("草稿里已经有一段声音。"));
+        else startRecording(true);
+      }
+      if (kind === 'camera') {
+        if (images.length >= 3) setMessage(tr("每条最多三张照片"));
+        else applyImageAction('camera', true);
+      }
+    };
+    tryEntry();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background') forgetHomeScreenEntry(params.quick);
+      if (state === 'active') tryEntry();
+    });
+    return () => sub.remove();
+    // A native capability is consumed once after draft hydration, never from a URL alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftId, audio, images.length, params.quick, lock?.snapshot.locked]);
 
   function stopRecording() {
     const id = draftIdRef.current;
@@ -890,6 +926,7 @@ export default function LeaveScreen() {
             </View>
           ) : null}
           <TextInput
+            ref={noteInputRef}
             accessibilityLabel={tr("要留下的一句话")}
             testID="composer-note"
             value={note}

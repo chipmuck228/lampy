@@ -4,6 +4,10 @@
     "NSMicrophoneUsageDescription": "Lampy 只在你录下当时的声音时使用麦克风。",
     "NSPhotoLibraryUsageDescription": "Lampy 只在你从相册选择已有照片留下时读取相册。",
     "NSPhotoLibraryAddUsageDescription": "Lampy 不会把生活写回系统相册；此说明仅用于系统要求。",
-    "NSFaceIDUsageDescription": "本机保护开启后，Lampy 在进入或从后台返回时，由系统使用 Face ID 或设备密码认证。Lampy 不获取面部数据。"
+    "NSFaceIDUsageDescription": "本机保护开启后，Lampy 在进入或从后台返回时，由系统使用 Face ID 或设备密码认证。Lampy 不获取面部数据。",
+    "LAMPY_QUICK_WRITE": "写一句",
+    "LAMPY_QUICK_CAMERA": "拍一张",
+    "LAMPY_QUICK_RECORD": "录一段",
+    "LAMPY_QUICK_SHARE": "分享 Lampy"
   }
 }
