@@ -389,6 +389,12 @@ function createSqliteTx(db: FamilySql): FamilyTx {
         ],
       );
     },
+    async findInviteLinkByHash(hash) { return readInviteLink(await db.getFirst<InviteLinkRow>('SELECT * FROM family_invite_links WHERE token_hash = ?', [hash])); },
+    async findInviteLinkById(id) { return readInviteLink(await db.getFirst<InviteLinkRow>('SELECT * FROM family_invite_links WHERE invitation_id = ?', [id])); },
+    async listInviteLinks(familyId) { return (await db.getAll<InviteLinkRow>('SELECT * FROM family_invite_links WHERE family_id = ? ORDER BY created_at DESC', [familyId])).map(row => readInviteLink(row)!); },
+    async saveInviteLink(i) { await db.run(`INSERT INTO family_invite_links VALUES (?,?,?,?,?,?,?)
+      ON CONFLICT(invitation_id) DO UPDATE SET status=excluded.status, accepted_by_user_id=excluded.accepted_by_user_id`,
+      [i.invitationId,i.familyId,i.tokenHash,i.status,i.createdAt,i.expiresAt,i.acceptedByUserId ?? null]); },
     async findInvitationByCode(code) {
       const row = await db.getFirst<InvitationRow>(
         `SELECT invitation_id, family_id, code, status, created_at, expires_at, accepted_by_user_id
@@ -597,4 +603,9 @@ export function createSqliteFamilyRepository(db: FamilySql): FamilyRepository {
       return run;
     },
   };
+}
+
+type InviteLinkRow = { invitation_id: string; family_id: string; token_hash: string; status: import('./types').InvitationStatus; created_at: string; expires_at: string; accepted_by_user_id: string | null };
+function readInviteLink(r: InviteLinkRow | null): import('./types').InviteLink | null {
+  return r ? { invitationId:r.invitation_id, familyId:r.family_id, tokenHash:r.token_hash, status:r.status, createdAt:r.created_at, expiresAt:r.expires_at, acceptedByUserId:r.accepted_by_user_id ?? undefined } : null;
 }

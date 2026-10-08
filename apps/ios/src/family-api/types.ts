@@ -199,6 +199,14 @@ export type InvitationView = {
   expiresAt: string;
 };
 
+export type InviteLink = {
+  invitationId: string; familyId: string; tokenHash: string; status: InvitationStatus;
+  createdAt: string; expiresAt: string; acceptedByUserId?: string;
+};
+export type InviteLinkView = Omit<InviteLink, 'tokenHash' | 'acceptedByUserId' | 'createdAt'>;
+export type CreatedInviteLink = InviteLinkView & { token: string };
+export type InvitePreview = { name: string; expiresAt: string; status: InvitationStatus | 'dissolved'; };
+
 export type AppleIdentity = {
   appleSubject: string;
   email?: string;

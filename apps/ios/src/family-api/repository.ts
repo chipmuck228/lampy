@@ -23,6 +23,10 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  findInviteLinkByHash(hash: string): Promise<import('./types').InviteLink | null>;
+  findInviteLinkById(id: string): Promise<import('./types').InviteLink | null>;
+  listInviteLinks(familyId: string): Promise<import('./types').InviteLink[]>;
+  saveInviteLink(invite: import('./types').InviteLink): Promise<void>;
   findAccountByAppleSubject(appleSubject: string): Promise<Account | null>;
   findAccountByUserId(userId: string): Promise<Account | null>;
   saveAccount(account: Account): Promise<void>;
@@ -102,6 +106,10 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async findInviteLinkByHash(hash) { return store.inviteLinks.find(i => i.tokenHash === hash) ?? null; },
+    async findInviteLinkById(id) { return store.inviteLinks.find(i => i.invitationId === id) ?? null; },
+    async listInviteLinks(familyId) { return store.inviteLinks.filter(i => i.familyId === familyId); },
+    async saveInviteLink(invite) { replaceBy(store.inviteLinks, i => i.invitationId, invite); },
     async findAccountByAppleSubject(appleSubject) {
       return findAccountByAppleSubject(store, appleSubject);
     },

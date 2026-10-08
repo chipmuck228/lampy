@@ -157,6 +157,8 @@ export default function FamilyDirectoryScreen() {
         </View>
         {chosen ? <Text testID="family-selected" style={styles.meta}>{tr('当前家庭：{0}', [chosen.name || tr('未命名家庭')])}</Text> : null}
       </> : null}
+      {state.status==='ready' && chosen?.role==='creator' ? <Pressable style={styles.createHit} accessibilityRole="button" onPress={()=>router.push({pathname:'/family-invitations',params:{familyId:chosen.familyId}})}><Text style={styles.action}>{tr('邀请家人')}</Text></Pressable> : null}
+      <Pressable style={styles.hit} accessibilityRole="button" onPress={()=>router.push('/family-invite')}><Text style={styles.action}>{tr('打开邀请')}</Text></Pressable>
       {message ? <Text>{message}</Text> : null}
     </> : null}
   </SettingsPage>;
