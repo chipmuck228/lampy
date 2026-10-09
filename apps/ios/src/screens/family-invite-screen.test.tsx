@@ -31,7 +31,7 @@ it('late account/preview after background cannot reveal a confirm button or join
 });
 it('signed-out invitation offers login, not an automatic acceptance',async()=>{
   rememberFamilyInvite('a'.repeat(64));mockAccount.mockRejectedValue({code:'UNAUTHENTICATED'});const page=await render(<FamilyInviteScreen/>);
-  await waitFor(()=>expect(page.getByText('先登录家庭')).toBeTruthy());await fireEvent.press(page.getByText('先登录家庭'));expect(mockPush).toHaveBeenCalledWith('/account-diagnostics');expect(mockAccept).not.toHaveBeenCalled();
+  await waitFor(()=>expect(page.getByText('登录后加入')).toBeTruthy());await fireEvent.press(page.getByText('登录后加入'));expect(mockPush).toHaveBeenCalledWith({pathname:'/family-invite-login',params:{returnTo:'/family-invite',generation:expect.any(String)}});expect(mockAccept).not.toHaveBeenCalled();
 });
 
 it('previews inline, joins only on confirmation, and reports completion without navigation',async()=>{
@@ -60,4 +60,31 @@ it('clearing input invalidates a late preview and permits a fresh link',async()=
  await fireEvent.changeText(page.getByLabelText('邀请链接'),'lampy:///family-invite#'+'b'.repeat(64));
  await fireEvent.press(page.getByText('查看邀请'));
  await waitFor(()=>expect(page.getByTestId('invite-confirm')).toBeTruthy());
+});
+
+it('returning after login rechecks the invite and current account without auto joining',async()=>{
+ rememberFamilyInvite('a'.repeat(64));
+ mockAccount.mockRejectedValueOnce({code:'UNAUTHENTICATED'}).mockResolvedValue('new-account');
+ const page=await render(<FamilyInvitePanel/>);
+ await waitFor(()=>expect(page.getByText('登录后加入')).toBeTruthy());
+ await page.unmount();
+ const returned=await render(<FamilyInvitePanel/>);
+ await waitFor(()=>expect(returned.getByTestId('invite-confirm')).toBeTruthy());
+ expect(returned.queryByText('登录后加入')).toBeNull();
+ expect(mockPreview).toHaveBeenCalledTimes(2);
+ expect(mockAccept).not.toHaveBeenCalled();
+ await fireEvent.press(returned.getByTestId('invite-confirm'));
+ expect(mockAccept).toHaveBeenCalledWith('a'.repeat(64),'new-account',expect.any(Function));
+});
+it('an invitation that expires during login offers no confirmation on return',async()=>{
+ rememberFamilyInvite('a'.repeat(64));
+ mockAccount.mockRejectedValueOnce({code:'UNAUTHENTICATED'});
+ const page=await render(<FamilyInvitePanel/>);
+ await waitFor(()=>expect(page.getByText('登录后加入')).toBeTruthy());
+ await page.unmount();
+ mockPreview.mockResolvedValue({name:'Home',expiresAt:'2026-10-15T00:00:00Z',status:'expired'});
+ const returned=await render(<FamilyInvitePanel/>);
+ await waitFor(()=>expect(returned.getByText('这份邀请已结束。请向创建者要一份新的邀请。')).toBeTruthy());
+ expect(returned.queryByTestId('invite-confirm')).toBeNull();
+ expect(mockAccept).not.toHaveBeenCalled();
 });

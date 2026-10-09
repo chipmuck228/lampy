@@ -51,3 +51,11 @@ Removed visible Selected/current-family duplication; selected border and accessi
 Layout uses existing paper/cover wall/SettingsPage keyboard-aware scroll and 48pt actions, with section spacing and creator actions inside tile containers (no nested Pressables).
 
 Checks: tsc PASS; changed ESLint PASS; targeted Jest 4 suites / 19 tests PASS (creator/member actions, no redundant selection text, inline preview/confirm and directory refresh without navigation, input clear/late preview, existing lock/background/login and invitation share tests); diff check PASS. Actual simulator/device layout, keyboard, scrolling, focus, Chinese/English and inline join flow NOT VERIFIED. Attachment unavailable in this workspace; implementation follows the written requirements, not a claimed screenshot comparison. No production/TestFlight changes; PR remains OPEN.
+
+## User report and invitation authentication handoff — 2026-10-09
+
+User reports two-simulator PASS for replacement/share confirmation cancellation, old-link invalidation, new-link join, no duplicate copied link, used/revoked statuses, inline preview/explicit join/result/list refresh/Done, and member tile without invitation action. Runtime SHA not independently confirmed. Not public HTTPS/QR/Universal Link or real-device acceptance.
+
+Added invitation-scoped login handoff using existing Apple/controlled test account methods. Sign in to join routes to a gated reusable identity screen; success automatically returns to the existing stack page, cancel preserves pending invitation, failures remain on login. Only known /family or /family-invite fallback routes are accepted. Intent generation is passed (not bearer); changed intents invalidate old success navigation. Returning rechecks preview and current account before explicit confirmation; expiration during login blocks confirmation. No public registration, phone/SMS or automatic join introduced.
+
+Checks: targeted Jest 5 suites / 44 tests PASS; tsc PASS; changed ESLint PASS; diff check PASS. New identity success/cancel/retry/expired flow remains simulator/device NOT VERIFIED. Full Jest not repeated for this handoff; previous full-suite evidence remains as recorded. Family entry/default production gates unchanged; PR remains OPEN.

@@ -16,7 +16,7 @@ import { SettingsPage } from "./settings-chrome";
 import { Text, TextInput, type } from "./life-text";
 import { inkSoft, paperDeep } from "./life-page";
 import { familyInviteError } from "./family-invite-copy";
-export function FamilyInvitePanel({ onJoined, onClose }: { onJoined?: () => void; onClose?: () => void }) {
+export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invite" }: { onJoined?: () => void; onClose?: () => void; returnTo?: "/family" | "/family-invite" }) {
   const router = useRouter();
   const lock = useDeviceLock();
   const allowed = isFamilyProductEntryOpen() && !lock?.snapshot.locked;
@@ -213,9 +213,13 @@ export function FamilyInvitePanel({ onJoined, onClose }: { onJoined?: () => void
                     style={styles.hit}
                     accessibilityRole="button"
                     disabled={busy}
-                    onPress={() => router.push("/account-diagnostics")}
+                    onPress={() => {
+                      const intent = currentFamilyInvite();
+                      if (!intent || busy || AppState.currentState !== "active") return;
+                      router.push({ pathname: "/family-invite-login", params: { returnTo, generation: String(intent.generation) } });
+                    }}
                   >
-                    <Text>{tr("先登录家庭")}</Text>
+                    <Text>{tr("登录后加入")}</Text>
                   </Pressable>
                 )
               ) : (

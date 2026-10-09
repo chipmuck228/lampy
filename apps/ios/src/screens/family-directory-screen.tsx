@@ -169,7 +169,7 @@ export default function FamilyDirectoryScreen() {
           accessibilityState={{expanded:inviteOpen}} onPress={() => setInviteOpen(v => !v)}>
           <Text style={styles.action}>{tr('通过邀请加入')}</Text>
         </Pressable>
-        {inviteOpen ? <FamilyInvitePanel onJoined={joined} onClose={() => setInviteOpen(false)} /> : null}
+        {inviteOpen ? <FamilyInvitePanel returnTo="/family" onJoined={joined} onClose={() => setInviteOpen(false)} /> : null}
       </View>
       {message ? <Text>{message}</Text> : null}
     </> : null}

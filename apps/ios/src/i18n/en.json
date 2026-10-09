@@ -649,5 +649,8 @@
   "清除输入": "Clear input",
   "请粘贴一份完整的家庭邀请链接。": "Paste a complete family invitation link.",
   "邀请家人加入 {0}": "Invite someone to {{0}}",
-  "收起": "Close"
+  "收起": "Close",
+  "登录后加入": "Sign in to join",
+  "登录后回到邀请，再由你确认加入。": "After signing in, return to the invitation and confirm joining.",
+  "请返回邀请，重新确认后继续。": "Return to the invitation and confirm it again to continue."
 }
