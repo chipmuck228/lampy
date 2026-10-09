@@ -3,10 +3,11 @@ import { Alert, AppState, type AppStateStatus } from 'react-native';
 import { FamilyHistoryScreen } from './family-history-screen';
 const mockPolicy=jest.fn(),mockList=jest.fn(),mockRead=jest.fn(),mockAuthorize=jest.fn(),mockRevoke=jest.fn(),mockPush=jest.fn(),mockPlay=jest.fn();
 let mockOpen=true;
+let mockFocusCleanup:(()=>void)|undefined;
 const mockLock={snapshot:{locked:false}};
 const mockListeners:((s:AppStateStatus)=>void)[]=[];
 const mockSound={status:'idle',currentTimeMs:0,failed:false,play:mockPlay};
-jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useRouter:()=>({back:jest.fn(),push:mockPush}),useFocusEffect:(fn:()=>void)=>useEffect(fn,[fn])};});
+jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useRouter:()=>({back:jest.fn(),push:mockPush}),useFocusEffect:(fn:()=>void|(()=>void))=>useEffect(()=>{const cleanup=fn();mockFocusCleanup=typeof cleanup === 'function' ? cleanup : undefined;return cleanup;},[fn])};});
 jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({history:{getPolicy:mockPolicy,list:mockList,read:mockRead,authorize:mockAuthorize,revoke:mockRevoke}})}));
 jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>mockOpen}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
@@ -79,4 +80,24 @@ it('shows an inviting empty state with navigation instead of a record list', asy
   const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
   await waitFor(()=>expect(page.getByTestId('history-empty')).toBeTruthy());
   expect(page.getByText('去最近')).toBeTruthy();expect(page.getByText('去回看')).toBeTruthy();
+});
+
+it('never treats a detail with a temporarily missing route id as an empty family',async()=>{
+  const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId=""/>);
+  await waitFor(()=>expect(page.getByText('再试一次')).toBeTruthy());
+  expect(page.queryByTestId('history-empty')).toBeNull();expect(mockList).not.toHaveBeenCalled();
+});
+it('keeps pending detail reading out of the empty-family state',async()=>{
+  let resolve!:(v:typeof reading)=>void;mockRead.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));
+  const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);
+  await waitFor(()=>expect(mockRead).toHaveBeenCalledTimes(1));
+  expect(page.getByText('正在读取家庭记录。')).toBeTruthy();expect(page.queryByTestId('history-empty')).toBeNull();
+  await act(async()=>{resolve(reading);});expect(page.getByText('Morning')).toBeTruthy();expect(page.queryByTestId('history-empty')).toBeNull();
+});
+
+it('does not flash empty-family content when the populated list loses focus',async()=>{
+  const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
+  await waitFor(()=>expect(page.getByText('Morning')).toBeTruthy());
+  await act(async()=>{mockFocusCleanup?.();});
+  expect(page.queryByTestId('history-empty')).toBeNull();expect(page.queryByText('Morning')).toBeNull();
 });

@@ -28,6 +28,7 @@ function FamilyPhoto({ uri }: { uri: string }) {
 
 export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; shareId?: string }) {
   const router = useRouter();
+  const isDetail = shareId !== undefined;
   const { allowed, enter, leave, begin } = useFamilyPrivateRequest();
   const [view, setView] = useState<HistoryReading | null>(null);
   const [rows, setRows] = useState<ShareView[]>([]);
@@ -53,12 +54,13 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
     const current = begin(); currentRef.current = current;
     saveProgress(); setView(null); setRows([]); setViewer(null); setPolicy(null); setMessage(null); setStatus('loading');
     try {
+      if (isDetail && !shareId) throw { code: 'SHARE_NOT_FOUND' };
       const family = await getFamilyUseCases(); if (!current()) return;
       const p = await family.history.getPolicy(familyId,current); if (!current()) return;
       setName(p.family.name); setPolicy(p.policy);
       if (p.policy === 'family-history-v2') {
-        if (shareId) {
-          const result = await family.history.read(familyId,shareId,current); if (!current()) return;
+        if (isDetail) {
+          const result = await family.history.read(familyId,shareId!,current); if (!current()) return;
           setView(result); setViewer(result.userId);
         } else {
           const result = await family.history.list(familyId,current); if (!current()) return;
@@ -67,10 +69,10 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
       }
       if (current()) setStatus('ready');
     } catch (e) { if (current()) { setView(null); setRows([]); setStatus('failed'); setMessage(familyHistoryError(e)); } }
-  }, [begin, familyId, shareId, saveProgress]);
+  }, [begin, familyId, shareId, isDetail, saveProgress]);
   useFocusEffect(useCallback(() => {
     enter(); if (allowed) void load();
-    return () => { saveProgress(); leave(); currentRef.current = () => false; busyRef.current = false; busyOwner.current = null; setBusy(false); setView(null); setRows([]); setViewer(null); setName(''); };
+    return () => { saveProgress(); leave(); currentRef.current = () => false; busyRef.current = false; busyOwner.current = null; setBusy(false); setStatus('loading'); setPolicy(null); setView(null); setRows([]); setViewer(null); setName(''); };
   }, [allowed, enter, leave, load, saveProgress]));
   useEffect(() => {
     if (playingKey.current && sound.status !== 'preparing') progress.set(playingKey.current,sound.currentTimeMs);
@@ -104,13 +106,13 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
   }
   return <SettingsPage title={tr('家庭记录')} backLabel={tr('家庭')} accessibilityLabel={tr('家庭记录')} onBack={() => { saveProgress(); router.back(); }}>
     {!allowed ? <Text>{tr('家庭分享暂未开放。')}</Text> : <>
-      {name && !(status === 'ready' && policy === 'family-history-v2' && !shareId && rows.length === 0) ? <Text style={styles.name}>{name}</Text> : null}
+      {name && !(status === 'ready' && policy === 'family-history-v2' && !isDetail && rows.length === 0) ? <Text style={styles.name}>{name}</Text> : null}
       {status === 'loading' ? <Text style={styles.meta}>{tr('正在读取家庭记录。')}</Text> : null}
       {status === 'ready' && policy === 'legacy' ? <View style={styles.block}>
         <Text style={styles.meta}>{tr('请在家庭页开启家庭分享。')}</Text>
         <Pressable style={styles.hit} accessibilityRole="button" onPress={() => router.dismissTo('/family')}><Text style={styles.action}>{tr('返回家庭')}</Text></Pressable>
       </View> : null}
-      {status === 'ready' && policy === 'family-history-v2' && !shareId && rows.length === 0 ? <View style={styles.empty} testID="history-empty">
+      {status === 'ready' && policy === 'family-history-v2' && !isDetail && rows.length === 0 ? <View style={styles.empty} testID="history-empty">
         <Text style={styles.emptyName}>{name}</Text>
         <Text style={styles.emptyTitle}>{tr('家里的片段，会慢慢留在这里。')}</Text>
         <Text style={styles.emptyBody}>{tr('去最近或回看，打开一条记录，再选择「分享给家里」。')}</Text>
