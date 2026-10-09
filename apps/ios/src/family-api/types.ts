@@ -235,3 +235,5 @@ export type FamilyIds = {
   invitationCode: () => string;
   sessionToken: () => string;
 };
+
+export type FamilyRoster = { familyId: string; role: MembershipRole; membershipId: string; members: (FamilyMemberView & { membershipId: string })[] };

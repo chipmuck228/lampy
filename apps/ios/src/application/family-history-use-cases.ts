@@ -5,7 +5,7 @@ import type { FamilySessionStore } from './family-use-cases';
 import type { FamilyReceiveCache } from '../infrastructure/family-receive-cache';
 import type { PendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
-import type { FamilySummary, ShareView } from '../family-api/types';
+import type { FamilySummary, ShareView, FamilyRoster } from '../family-api/types';
 import { assertMediaPayload, sha256MediaBytes } from '../family-api/media-validate';
 
 export const HISTORY_AUDIENCE_CONFIRMATION = 'new-members-can-read-active-history';
@@ -38,6 +38,13 @@ export function createFamilyHistoryUseCases(deps: {
   mediaUri?: (storageKey: string) => string;
 }) {
   const frozen = new WeakMap<HistoryPreview, { account: Account; fingerprint: string; familyId: string; momentId: string; selectedAssetIds: string[] }>();
+  const memberViews = new WeakMap<FamilyRoster & { userId: string }, Account>();
+  const generations = new Map<string, number>();
+  function qualified(familyId: string, current: HistoryCurrent): HistoryCurrent {
+    const generation = generations.get(familyId) ?? 0;
+    generations.set(familyId, generation);
+    return () => current() && (generations.get(familyId) ?? 0) === generation;
+  }
   let cacheTail: Promise<unknown> = Promise.resolve();
   async function account(): Promise<Account> {
     const sessionToken = await deps.session.getSessionToken();
@@ -60,7 +67,7 @@ export function createFamilyHistoryUseCases(deps: {
     const list = await deps.client.listFamilies(a.sessionToken);
     await check(a, current);
     const found = list.families.find(f => f.familyId === familyId);
-    if (!found) throw error('NOT_IN_FAMILY');
+    if (!found) { await invalidateDenied(a, familyId, undefined, current, error('NOT_IN_FAMILY')); throw error('NOT_IN_FAMILY'); }
     return found;
   }
   async function source(momentId: string, a: Account, current: HistoryCurrent, selection?: string[]) {
@@ -117,24 +124,71 @@ export function createFamilyHistoryUseCases(deps: {
     const code = failure && typeof failure === 'object' && 'code' in failure ? failure.code : '';
     if (!['UNAUTHENTICATED','NOT_IN_FAMILY','FORBIDDEN','SHARE_NOT_FOUND','FAMILY_HISTORY_CLOSED'].includes(String(code))) return;
     // This cleanup touches only this account/family/share, never personal records.
-    await cacheWork(a, familyId, shareId, current, cache => shareId
+    await cacheWork(a, familyId, shareId, current, cache => shareId && !['NOT_IN_FAMILY', 'UNAUTHENTICATED', 'FORBIDDEN'].includes(String(code))
       ? cache.isolateShare(a.userId,familyId,shareId) : cache.isolateFamily(a.userId,familyId)).catch(() => undefined);
   }
   async function policy(a: Account, familyId: string, current: HistoryCurrent) {
     api();
     await check(a, current);
-    const result = await deps.client.getHistoryPolicy!(a.sessionToken, familyId);
+    let result;
+    try { result = await deps.client.getHistoryPolicy!(a.sessionToken, familyId); }
+    catch (e) { await invalidateDenied(a, familyId, undefined, current, e); throw e; }
     await check(a, current);
     return result.policy;
   }
 
   return {
+    async reconcileFamilies(userId: string, activeIds: string[], current: HistoryCurrent) {
+      const a = await account(); if (a.userId !== userId) throw error('STALE_FAMILY_REQUEST');
+      if (!deps.receiveCache?.listFamilyIds) return;
+      const job = cacheTail.catch(() => undefined).then(async () => {
+        await check(a, current);
+        const ids = await deps.receiveCache!.listFamilyIds!(userId); await check(a, current);
+        for (const familyId of new Set([...ids, ...generations.keys()].filter(id => !activeIds.includes(id)))) {
+          await check(a, current);
+          generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
+          await deps.receiveCache!.isolateFamily(userId, familyId);
+        }
+        await check(a, current);
+      });
+      cacheTail = job; await job;
+    },
+    async getMembers(familyId: string, current: HistoryCurrent) {
+      current = qualified(familyId, current);
+      const a = await account(); await check(a, current);
+      if (!deps.client.getFamilyRoster) throw error('FAMILY_UPGRADE_REQUIRED');
+      try {
+        const roster = await deps.client.getFamilyRoster(a.sessionToken, familyId);
+        await check(a, current); const view = { userId: a.userId, ...roster }; memberViews.set(view, a); return view;
+      } catch (e) { await invalidateDenied(a, familyId, undefined, current, e); throw e; }
+    },
+    async leaveFamily(view: FamilyRoster & { userId: string }, current: HistoryCurrent) {
+      const a = memberViews.get(view); if (!a || view.role !== 'member') throw error('FORBIDDEN');
+      const { familyId, membershipId } = view; await check(a, current);
+      if (!deps.client.leaveSelectedFamily) throw error('FAMILY_UPGRADE_REQUIRED');
+      await deps.client.leaveSelectedFamily(a.sessionToken, familyId, membershipId);
+      // Invalidate in-flight reads before queued cleanup, even if focus/account changed during the server write.
+      generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
+      const cleanup = cacheTail.catch(() => undefined).then(() => deps.receiveCache?.isolateFamily(a.userId, familyId));
+      cacheTail = cleanup; await cleanup;
+      await check(a, current); return { left: true as const };
+    },
+    async removeMember(view: FamilyRoster & { userId: string }, membershipId: string, current: HistoryCurrent) {
+      const a = memberViews.get(view); const target = view.members.find(m => m.membershipId === membershipId);
+      if (!a || view.role !== 'creator' || !target || target.role === 'creator' || target.userId === a.userId) throw error('FORBIDDEN');
+      const { familyId } = view; const userId = target.userId; await check(a, current);
+      if (!deps.client.removeSelectedMember) throw error('FAMILY_UPGRADE_REQUIRED');
+      const result = await deps.client.removeSelectedMember(a.sessionToken, familyId, userId, membershipId);
+      await check(a, current); return result;
+    },
     async getPolicy(familyId: string, current: HistoryCurrent) {
+      current = qualified(familyId, current);
       const a = await account();
       const target = await family(a, familyId, current);
       return { userId: a.userId, family: target, policy: await policy(a, familyId, current) };
     },
     async confirmPolicy(familyId: string, current: HistoryCurrent) {
+      current = qualified(familyId, current);
       const a = await account();
       const target = await family(a, familyId, current);
       if (target.role !== 'creator') throw error('FORBIDDEN');
@@ -145,6 +199,7 @@ export function createFamilyHistoryUseCases(deps: {
       return result;
     },
     async prepare(momentId: string, familyId: string, current: HistoryCurrent, selectedAssetIds?: string[]): Promise<HistoryPreview> {
+      current = qualified(familyId, current);
       const a = await account();
       const target = await family(a, familyId, current);
       if (await policy(a, familyId, current) !== 'family-history-v2') throw error('FAMILY_POLICY_UPGRADE_REQUIRED');
@@ -155,6 +210,7 @@ export function createFamilyHistoryUseCases(deps: {
       return preview;
     },
     async share(preview: HistoryPreview, confirmation: string, current: HistoryCurrent) {
+      current = qualified(preview.family.familyId, current);
       const original = frozen.get(preview);
       if (!original || confirmation !== HISTORY_AUDIENCE_CONFIRMATION || preview.family.familyId !== original.familyId || preview.sourceMomentId !== original.momentId) throw error('BAD_REQUEST');
       const a = original.account;
@@ -209,6 +265,7 @@ export function createFamilyHistoryUseCases(deps: {
       return result;
     },
     async list(familyId: string, current: HistoryCurrent) {
+      current = qualified(familyId, current);
       const a = await account();
       await family(a, familyId, current);
       let result;
@@ -219,6 +276,7 @@ export function createFamilyHistoryUseCases(deps: {
       return { userId: a.userId, shares: result.shares };
     },
     async read(familyId: string, shareId: string, current: HistoryCurrent): Promise<HistoryReading> {
+      current = qualified(familyId, current);
       const a = await account();
       const client = api();
       let share;
@@ -260,6 +318,7 @@ export function createFamilyHistoryUseCases(deps: {
       return { userId: a.userId, share, media: received };
     },
     async authorize(familyId: string, shareId: string, current: HistoryCurrent) {
+      current = qualified(familyId, current);
       const a = await account();
       let share;
       try { share = await api().getShare(a.sessionToken, familyId, shareId); }
@@ -268,6 +327,7 @@ export function createFamilyHistoryUseCases(deps: {
       return { userId: a.userId, share };
     },
     async revoke(familyId: string, shareId: string, current: HistoryCurrent) {
+      current = qualified(familyId, current);
       const a = await account();
       await check(a, current);
       const result = await api().revokeShare(a.sessionToken, familyId, shareId);

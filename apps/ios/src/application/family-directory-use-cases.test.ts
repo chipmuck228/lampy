@@ -1,3 +1,4 @@
+import { createMemoryFamilyReceiveCache } from '../infrastructure/family-receive-cache';
 import { createFamilyUseCases, createMemoryFamilySessionStore } from './family-use-cases';
 import { createFamilyApiClient, type FamilyTransportRequest } from '../infrastructure/family-http-client';
 import { createPendingFamilyOperationDisk, createPendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
@@ -58,4 +59,15 @@ it('does not send creation after screen qualification is cancelled', async () =>
   await session.setSession({userId:'a',sessionToken:'token-a'});
   await expect(family.createNamedFamily('Our home','cancelled',() => false)).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
   expect(request).not.toHaveBeenCalled();
+});
+
+it('E1 reconciles only missing family caches after a successful list, never after a network failure', async () => {
+ const cache=createMemoryFamilyReceiveCache();const isolate=jest.spyOn(cache,'isolateFamily');
+ cache.shares.push(...['gone','kept'].map(familyId=>({userId:'a',familyId,shareId:`s-${familyId}`,snapshotRevision:1,authorUserId:'a',snapshot:{note:'original',emotion:'',occurredAtPrecision:'unknown',media:[],origin:{type:'received' as const,transmissionId:'s',originalMomentId:'m',snapshotRevision:1}},sharedAt:'now',receiveStatus:'listed' as const,expectedMediaCount:0})));
+ const session=createMemoryFamilySessionStore();await session.setSession({userId:'a',sessionToken:'token-a'});
+ const request=jest.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({status:200,body:{families:[{...summary,familyId:'kept'}],limit:10}});
+ const family=createFamilyUseCases({session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),client:createFamilyApiClient({request}),receiveCache:cache});
+ await expect(family.getFamilies()).rejects.toMatchObject({code:'SERVER_UNREACHABLE'});expect(isolate).not.toHaveBeenCalled();
+ await family.getFamilies();expect(isolate).toHaveBeenCalledWith('a','gone');expect(isolate).toHaveBeenCalledTimes(1);
+ expect(await cache.listFamilyIds!('a')).toEqual(['kept']);
 });

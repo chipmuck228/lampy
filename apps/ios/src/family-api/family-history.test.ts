@@ -155,3 +155,52 @@ it('commits concurrent v2 confirmations once across two SQLite connections and p
  expect((await commands.historyShares.listVisibleShares(a.sessionToken,f.familyId)).shares).toHaveLength(1);
  await expect(commands.historyShares.shareMoment(a.sessionToken,f.familyId,input({sourceMomentId:'file:///private/x'}))).rejects.toMatchObject({code:'BAD_REQUEST'});
 });
+
+it('E1 targets one family, persists leave, preserves shares and requires a new invitation', async () => {
+ const a = await commands.signInWithApple('a'), b = await commands.signInWithApple('b');
+ const home = await commands.createNamedFamily(a.sessionToken, 'Home', 'e1-home');
+ const other = await commands.createNamedFamily(b.sessionToken, 'Other', 'e1-other');
+ const invite = await commands.createInviteLink(a.sessionToken, home.familyId);
+ await commands.acceptInviteLink(b.sessionToken, invite.token);
+ const photo = await commands.uploadMedia(a.sessionToken, { bytes: sampleJpegBytes(), mimeType: 'image/jpeg' });
+ const share = await commands.historyShares.shareMoment(a.sessionToken, home.familyId, input({mediaObjectIds:[photo.objectId],expectedMediaCount:1}));
+ const roster = await commands.getFamilyRoster(b.sessionToken, home.familyId);
+ const response = await dispatchFamilyApi(commands, {method:'POST', path:`/v2/families/${home.familyId}/leave`, headers:{Authorization:`Bearer ${b.sessionToken}`}, body:{membershipId:roster.membershipId}});
+ expect(response.status).toBe(200);
+ await commands.leaveSelectedFamily(b.sessionToken, home.familyId, roster.membershipId);
+ expect((await commands.listFamilies(b.sessionToken)).families.map(f=>f.familyId)).toEqual([other.familyId]);
+ for (const work of [
+  () => commands.getFamilyRoster(b.sessionToken, home.familyId),
+  () => commands.historyShares.listVisibleShares(b.sessionToken, home.familyId),
+  () => commands.historyShares.getShare(b.sessionToken, home.familyId, share.shareId),
+  () => commands.historyShares.getShareMedia(b.sessionToken, home.familyId, share.shareId, photo.objectId),
+  () => commands.historyShares.getShareMediaContent(b.sessionToken, home.familyId, share.shareId, photo.objectId),
+ ]) await expect(work()).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
+ expect((await commands.historyShares.getShare(a.sessionToken, home.familyId, share.shareId)).snapshot.note).toBe(input().note);
+ await db.close(); db=openFamilySqliteDatabase(path.join(dir,'family.sqlite')); commands=build();
+ expect((await commands.listFamilies(b.sessionToken)).families.map(f=>f.familyId)).toEqual([other.familyId]);
+ await expect(commands.acceptInviteLink(b.sessionToken, invite.token)).rejects.toBeDefined();
+ const fresh = await commands.createInviteLink(a.sessionToken, home.familyId);
+ await commands.acceptInviteLink(b.sessionToken, fresh.token);
+ expect((await commands.historyShares.getShare(b.sessionToken, home.familyId, share.shareId)).shareId).toBe(share.shareId);
+ await expect(commands.leaveSelectedFamily(b.sessionToken, home.familyId, roster.membershipId)).rejects.toMatchObject({code:'CONFLICT'});
+});
+
+it('E1 only allows creator removal and rejects stale removal of a rejoined member', async () => {
+ const a = await commands.signInWithApple('a'), b = await commands.signInWithApple('b'), c = await commands.signInWithApple('c');
+ const f = await commands.createNamedFamily(a.sessionToken, 'Home', 'e1');
+ const invite = await commands.createInviteLink(a.sessionToken, f.familyId); await commands.acceptInviteLink(b.sessionToken, invite.token);
+ const roster = await commands.getFamilyRoster(a.sessionToken, f.familyId);
+ const member = roster.members.find(m=>m.userId===b.userId)!;
+ await expect(commands.leaveSelectedFamily(a.sessionToken, f.familyId, roster.membershipId)).rejects.toMatchObject({code:'FORBIDDEN'});
+ await expect(commands.removeSelectedMember(a.sessionToken, f.familyId, a.userId, roster.membershipId)).rejects.toMatchObject({code:'FORBIDDEN'});
+ await expect(commands.removeSelectedMember(b.sessionToken, f.familyId, a.userId, roster.membershipId)).rejects.toMatchObject({code:'FORBIDDEN'});
+ await expect(commands.getFamilyRoster(c.sessionToken, f.familyId)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
+ await commands.removeSelectedMember(a.sessionToken, f.familyId, b.userId, member.membershipId);
+ await commands.removeSelectedMember(a.sessionToken, f.familyId, b.userId, member.membershipId);
+ await expect(commands.getFamilyHistoryPolicy(b.sessionToken, f.familyId)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
+ await expect(commands.acceptInviteLink(b.sessionToken, invite.token)).rejects.toBeDefined();
+ const fresh=await commands.createInviteLink(a.sessionToken, f.familyId);await commands.acceptInviteLink(b.sessionToken, fresh.token);
+ await expect(commands.removeSelectedMember(a.sessionToken, f.familyId, b.userId, member.membershipId)).rejects.toMatchObject({code:'CONFLICT'});
+ expect((await commands.getFamilyRoster(b.sessionToken, f.familyId)).role).toBe('member');
+});

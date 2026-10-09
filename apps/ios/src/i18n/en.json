@@ -712,5 +712,21 @@
   "照片 {0}": "Photo {{0}}",
   "声音 {0}": "Audio {{0}}",
   "个人原记录不变。": "Your personal moment stays unchanged.",
-  "这份分享的照片或声音暂时读不出来，请再试一次。": "The photos or audio in this share could not be loaded. Please try again."
+  "这份分享的照片或声音暂时读不出来，请再试一次。": "The photos or audio in this share could not be loaded. Please try again.",
+  "家庭成员": "Family members",
+  "成员状态已变化，请重新查看。": "Membership has changed. Please check again.",
+  "操作尚未确认，请重新查看后再试。": "This change is not yet confirmed. Please check again before retrying.",
+  "移除 {0}？": "Remove {{0}}?",
+  "离开这个家庭？": "Leave this family?",
+  "离开后将不能阅读这里的家庭记录。已经分享的片段会保留，个人记录不受影响。再次加入需要新的邀请。": "After leaving, you cannot read this family’s moments. Shared moments remain, and your personal records are unchanged. A new invitation is needed to rejoin.",
+  "确认移除": "Remove member",
+  "确认离开": "Leave family",
+  "成员暂未设置称呼，按加入顺序显示。": "Names are not available yet. Members are shown in joining order.",
+  "你": "You",
+  "成员 {0}": "Member {{0}}",
+  "加入于 {0}": "Joined {{0}}",
+  "移除 {0}": "Remove {{0}}",
+  "移除": "Remove",
+  "离开家庭": "Leave family",
+  "创建者暂不能离开，转交和解散将在后续提供。": "Creators cannot leave yet. Transfer and dissolution will be available later."
 }
