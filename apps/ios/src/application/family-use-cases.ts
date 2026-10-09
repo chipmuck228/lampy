@@ -1,3 +1,4 @@
+import { createFamilyHistoryUseCases } from './family-history-use-cases';
 import { ApplicationError } from './errors';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
 import {
@@ -203,8 +204,10 @@ export function createFamilyUseCases(deps: {
     moments: { findById(id: string): Promise<MomentRead> };
     assets: { findById(id: string): Promise<AssetRead> };
     readAssetBytes?: (localUri: string) => Promise<Uint8Array>;
+  convertImageForShare?: (bytes: Uint8Array, mimeType: string) => Promise<{ bytes: Uint8Array; mimeType: string }>;
   };
   receiveCache?: FamilyReceiveCache;
+  mediaUri?: (storageKey: string) => string;
 }) {
   const cache = deps.cache ?? createNoopFamilyCache();
   const pending = deps.pending;
@@ -416,6 +419,7 @@ export function createFamilyUseCases(deps: {
   }
 
   return {
+    history: createFamilyHistoryUseCases(deps),
     async previewInviteLink(token: string) {
       if(!deps.client.previewInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
       return deps.client.previewInviteLink(token);

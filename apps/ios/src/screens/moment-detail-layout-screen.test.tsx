@@ -93,7 +93,8 @@ describe('moment detail long layout', () => {
     expect(view.getByLabelText('照片 3/3')).toBeTruthy();
     expect(view.getByText('这段声音暂时找不到了，其他内容仍然保留。')).toBeTruthy();
     expect(view.getByText('当时的感受 · 平静')).toBeTruthy();
-    expect(view.getByText('你留下的记录')).toBeTruthy();
+    expect(view.queryByText('你留下的记录')).toBeNull();
+    expect(view.getByTestId('detail-end-line', {includeHiddenElements:true})).toBeTruthy();
     expect(view.getByTestId('detail-image-frame-asset_one').props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ aspectRatio: 0.75 })]),
     );

@@ -112,8 +112,9 @@ describe('moment detail hierarchy', () => {
     expect(view.getByTestId('detail-sound-scene-asset_voice').props.children).toBe('当时的声音');
     expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
     expect(view.getByText('当时的感受 · 平静')).toBeTruthy();
-    expect(view.getByText('你留下的记录')).toBeTruthy();
-    expect(view.getByLabelText('分享给家里')).toBeTruthy();
+    expect(view.queryByText('你留下的记录')).toBeNull();
+    expect(view.getByTestId('detail-end-line', {includeHiddenElements:true})).toBeTruthy();
+    expect(view.getAllByLabelText('分享')).toHaveLength(2);
   });
 
   it('keeps the reading column at 520 on a regular-width page', async () => {
