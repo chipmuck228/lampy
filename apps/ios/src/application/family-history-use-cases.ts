@@ -5,7 +5,7 @@ import type { FamilySessionStore } from './family-use-cases';
 import type { FamilyReceiveCache } from '../infrastructure/family-receive-cache';
 import type { PendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
-import type { FamilySummary, ShareView, FamilyRoster } from '../family-api/types';
+import type { FamilySummary, ShareView, FamilyRoster, FamilyTransfer } from '../family-api/types';
 import { assertMediaPayload, sha256MediaBytes } from '../family-api/media-validate';
 
 export const HISTORY_AUDIENCE_CONFIRMATION = 'new-members-can-read-active-history';
@@ -39,6 +39,7 @@ export function createFamilyHistoryUseCases(deps: {
 }) {
   const frozen = new WeakMap<HistoryPreview, { account: Account; fingerprint: string; familyId: string; momentId: string; selectedAssetIds: string[] }>();
   const memberViews = new WeakMap<FamilyRoster & { userId: string }, Account>();
+  const transferViews = new WeakMap<FamilyTransfer, Account>();
   const generations = new Map<string, number>();
   const shareGenerations = new Map<string, number>();
   const qualifierBase = new WeakMap<HistoryCurrent, HistoryCurrent>();
@@ -171,6 +172,27 @@ export function createFamilyHistoryUseCases(deps: {
         const roster = await deps.client.getFamilyRoster(a.sessionToken, familyId);
         await check(a, current); const view = { userId: a.userId, ...roster }; memberViews.set(view, a); return view;
       } catch (e) { await invalidateDenied(a, familyId, undefined, current, e); throw e; }
+    },
+    async getCreatorTransfer(view: FamilyRoster & { userId: string }, current: HistoryCurrent) {
+      const a = memberViews.get(view); if (!a) throw error('FORBIDDEN'); await check(a, current);
+      if (!deps.client.getCreatorTransfer) throw error('FAMILY_UPGRADE_REQUIRED');
+      const result = await deps.client.getCreatorTransfer(a.sessionToken, view.familyId); await check(a, current);
+      if (result.transfer) transferViews.set(result.transfer, a); return result.transfer;
+    },
+    async createCreatorTransfer(view: FamilyRoster & { userId: string }, membershipId: string, requestId: string, current: HistoryCurrent) {
+      const a = memberViews.get(view), target = view.members.find(m => m.membershipId === membershipId);
+      if (!a || view.role !== 'creator' || !target || target.role !== 'member' || target.userId === a.userId) throw error('FORBIDDEN');
+      await check(a, current); if (!deps.client.createCreatorTransfer) throw error('FAMILY_UPGRADE_REQUIRED');
+      const result = await deps.client.createCreatorTransfer(a.sessionToken, view.familyId, { requestId, fromMembershipId: view.membershipId, toMembershipId: membershipId });
+      await check(a, current); transferViews.set(result, a); return result;
+    },
+    async respondCreatorTransfer(view: FamilyRoster & { userId: string }, transfer: FamilyTransfer, action: 'accept' | 'cancel', current: HistoryCurrent) {
+      const a = memberViews.get(view), bound = transferViews.get(transfer);
+      if (!a || !bound || a.userId !== bound.userId || a.sessionToken !== bound.sessionToken || transfer.familyId !== view.familyId
+        || transfer.status !== 'pending' || (action === 'accept' ? transfer.toUserId !== a.userId || transfer.toMembershipId !== view.membershipId : transfer.fromUserId !== a.userId || transfer.fromMembershipId !== view.membershipId)) throw error('FORBIDDEN');
+      await check(a, current); if (!deps.client.respondCreatorTransfer) throw error('FAMILY_UPGRADE_REQUIRED');
+      const result = await deps.client.respondCreatorTransfer(a.sessionToken, view.familyId, transfer.transferId, transfer.revision, action);
+      await check(a, current); return result;
     },
     async leaveFamily(view: FamilyRoster & { userId: string }, current: HistoryCurrent) {
       const a = memberViews.get(view); if (!a || view.role !== 'member') throw error('FORBIDDEN');

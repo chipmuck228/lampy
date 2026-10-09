@@ -223,6 +223,16 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   return {
+    async listTransfers(familyId) {
+      const rows = await db.getAll<{ transfer_id: string; family_id: string; request_id: string; from_user_id: string; to_user_id: string; from_membership_id: string; to_membership_id: string; status: import('./types').FamilyTransfer['status']; revision: number; created_at: string; updated_at: string }>(
+        'SELECT * FROM family_creator_transfers WHERE family_id = ?', [familyId]);
+      return rows.map(r => ({ transferId:r.transfer_id, familyId:r.family_id, requestId:r.request_id, fromUserId:r.from_user_id, toUserId:r.to_user_id, fromMembershipId:r.from_membership_id, toMembershipId:r.to_membership_id, status:r.status, revision:r.revision, createdAt:r.created_at, updatedAt:r.updated_at }));
+    },
+    async saveTransfer(t) {
+      await db.run(`INSERT INTO family_creator_transfers (transfer_id,family_id,request_id,from_user_id,to_user_id,from_membership_id,to_membership_id,status,revision,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(transfer_id) DO UPDATE SET status=excluded.status,revision=excluded.revision,updated_at=excluded.updated_at`,
+        [t.transferId,t.familyId,t.requestId,t.fromUserId,t.toUserId,t.fromMembershipId,t.toMembershipId,t.status,t.revision,t.createdAt,t.updatedAt]);
+    },
     async findAccountByAppleSubject(appleSubject) {
       if (!appleSubject) return null;
       const row = await db.getFirst<AccountRow>(

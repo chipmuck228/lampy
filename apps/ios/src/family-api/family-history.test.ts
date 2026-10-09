@@ -38,7 +38,7 @@ it('migrates existing data as legacy without rewriting snapshots, audience or ol
  await applyFamilyApiSchema(db);await applyFamilyApiSchema(db);
  expect(await db.getAll('SELECT * FROM family_shares')).toEqual(before);
  expect(await db.getFirst("SELECT history_policy,history_confirmed_at FROM family_families WHERE family_id='old'")).toEqual({history_policy:'legacy',history_confirmed_at:null});
- expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:21});
+ expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:22});
  await db.close();db=openFamilySqliteDatabase(path.join(dir,'old.sqlite'));
  expect((await createSqliteFamilyRepository(db).withTransaction(tx=>tx.findFamily('old')))?.historyPolicy).toBe('legacy');
 });

@@ -1,3 +1,4 @@
+import { createFamilyTransferCommands } from './transfer-commands';
 import { createInviteLinkCommands, type InviteLinkCommands } from './invite-link-commands';
 import { FAMILY_ERROR, FamilyError } from './errors';
 import {
@@ -42,6 +43,7 @@ import { assertHistoryEnabled, HISTORY_CONFIRMATION } from './history-policy';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = InviteLinkCommands & {
+  transfers: ReturnType<typeof createFamilyTransferCommands>;
   historyShares: ShareCommands;
   getFamilyHistoryPolicy(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
   confirmFamilyHistory(session: string, familyId: string, confirmation: string): Promise<{ policy: 'family-history-v2' }>;
@@ -296,6 +298,7 @@ export function createFamilyCommands(deps: {
   }
 
   return {
+    transfers: createFamilyTransferCommands({authed:withAuthedUser,clock,id:()=>`transfer_${ids.invitationId()}`}),
     historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled,
       historyPolicy: 'family-history-v2', historyEnabled: deps.historySharingEnabled === true }),
     async getFamilyHistoryPolicy(session, familyId) {

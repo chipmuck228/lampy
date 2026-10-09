@@ -125,6 +125,13 @@ const MIGRATIONS = [
   `ALTER TABLE family_families ADD COLUMN history_policy TEXT NOT NULL DEFAULT 'legacy' CHECK(history_policy IN ('legacy','family-history-v2'));
    ALTER TABLE family_families ADD COLUMN history_confirmed_at TEXT;
    ALTER TABLE family_families ADD COLUMN history_confirmed_by TEXT;`,
+  `CREATE TABLE family_creator_transfers (
+    transfer_id TEXT PRIMARY KEY NOT NULL, family_id TEXT NOT NULL, request_id TEXT NOT NULL,
+    from_user_id TEXT NOT NULL, to_user_id TEXT NOT NULL, from_membership_id TEXT NOT NULL, to_membership_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','accepted','cancelled','invalid')),
+    revision INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+    UNIQUE(family_id, from_user_id, request_id)
+  ); CREATE UNIQUE INDEX family_creator_transfers_one_pending ON family_creator_transfers(family_id) WHERE status = 'pending';`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;

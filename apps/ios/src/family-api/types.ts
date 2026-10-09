@@ -237,3 +237,10 @@ export type FamilyIds = {
 };
 
 export type FamilyRoster = { familyId: string; role: MembershipRole; membershipId: string; members: (FamilyMemberView & { membershipId: string })[] };
+
+export type FamilyTransfer = {
+  transferId: string; familyId: string; requestId: string;
+  fromUserId: string; toUserId: string; fromMembershipId: string; toMembershipId: string;
+  status: 'pending' | 'accepted' | 'cancelled' | 'invalid'; revision: number;
+  createdAt: string; updatedAt: string;
+};

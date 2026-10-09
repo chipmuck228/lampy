@@ -78,6 +78,9 @@ export type FamilyApiClient = {
   acceptInvitation(sessionToken: string, code: string, idempotencyKey: string): Promise<FamilyView>;
   listMembership(sessionToken: string): Promise<MembershipListView>;
   listPendingInvitations(sessionToken: string, familyId: string): Promise<InvitationView[]>;
+  getCreatorTransfer?(session: string, familyId: string): Promise<{ transfer: import('../family-api/types').FamilyTransfer | null }>;
+  createCreatorTransfer?(session: string, familyId: string, input: { requestId: string; fromMembershipId: string; toMembershipId: string }): Promise<import('../family-api/types').FamilyTransfer>;
+  respondCreatorTransfer?(session: string, familyId: string, transferId: string, revision: number, action: 'accept' | 'cancel'): Promise<import('../family-api/types').FamilyTransfer>;
   getFamilyRoster?(sessionToken: string, familyId: string): Promise<import('../family-api/types').FamilyRoster>;
   leaveSelectedFamily?(sessionToken: string, familyId: string, membershipId: string): Promise<{ left: true }>;
   removeSelectedMember?(sessionToken: string, familyId: string, userId: string, membershipId: string): Promise<{ removed: true }>;
@@ -196,6 +199,15 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
     },
     listPendingInvitations(sessionToken, familyId) {
       return send({ method: 'GET', path: `/v1/families/${familyId}/invitations`, sessionToken });
+    },
+    getCreatorTransfer(sessionToken, familyId) {
+      return send({ method: 'GET', path: `/v2/families/${encodeURIComponent(familyId)}/creator-transfer`, sessionToken });
+    },
+    createCreatorTransfer(sessionToken, familyId, body) {
+      return send({ method: 'POST', path: `/v2/families/${encodeURIComponent(familyId)}/creator-transfer`, sessionToken, body });
+    },
+    respondCreatorTransfer(sessionToken, familyId, transferId, revision, action) {
+      return send({ method: 'POST', path: `/v2/families/${encodeURIComponent(familyId)}/creator-transfer/${encodeURIComponent(transferId)}/${action}`, sessionToken, body: { revision } });
     },
     getFamilyRoster(sessionToken, familyId) {
       return send({ method: 'GET', path: `/v2/families/${familyId}/members`, sessionToken });

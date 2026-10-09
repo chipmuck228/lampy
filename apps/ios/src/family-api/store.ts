@@ -17,6 +17,7 @@ export type IdempotentRecord = {
 };
 
 export type FamilyStore = {
+  transfers: import('./types').FamilyTransfer[];
   inviteLinks: import('./types').InviteLink[];
   accounts: Account[];
   sessions: Session[];
@@ -33,6 +34,7 @@ export type FamilyStore = {
 export function createFamilyStore(): FamilyStore {
   return {
     inviteLinks: [],
+    transfers: [],
     accounts: [],
     sessions: [],
     families: [],
