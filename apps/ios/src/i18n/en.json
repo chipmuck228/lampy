@@ -652,5 +652,10 @@
   "收起": "Close",
   "登录后加入": "Sign in to join",
   "登录后回到邀请，再由你确认加入。": "After signing in, return to the invitation and confirm joining.",
-  "请返回邀请，重新确认后继续。": "Return to the invitation and confirm it again to continue."
+  "请返回邀请，重新确认后继续。": "Return to the invitation and confirm it again to continue.",
+  "邀请": "Invitations",
+  "邀请已生成，但本机未能保存。请现在分享。": "Invitation created, but could not be saved on this device. Share it now.",
+  "本机没有保存这份邀请。可撤销后另建一份。": "This invitation is not saved on this device. You can revoke it and create another.",
+  "暂时无法分享，请再试一次。": "Unable to share right now. Try again.",
+  "分享": "Share"
 }

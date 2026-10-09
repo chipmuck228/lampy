@@ -62,3 +62,11 @@ Connect the simulator to **this** Metro, not another worktree. A creates/selects
 For two physical devices use a safe reachable HTTPS or private-LAN API/origin (127.0.0.1 points to each device). Universal Links require an enabled controlled native prebuild/reinstall: the config plugin adds associated domains only when family entry is enabled and the API is root HTTPS. The configured HTTPS host must serve AASA, with correct Team+Bundle ID and platform provisioning capability. This has **not** been deployed or device-verified; the plugin does not enable it in production by itself. Do not claim a custom-scheme simulation proves Universal Links.
 
 Keep public registration closed; account deletion remains its prerequisite. A web download button requires the confirmed `LAMPY_APP_STORE_URL=https://apps.apple.com/...`; do not invent one.
+
+## Invitation list interaction and creator-only local share cache
+
+The invitation list uses expiry date and status icon/color, keeping full status in VoiceOver. Tap an active row to show its QR, Share and Revoke; ended invitations have no share/revoke. No automatic replacement/regeneration. Refresh is an icon at the list heading; failures retain Reload.
+
+New creator-generated link/QR payloads are saved in existing SecureStore Keychain, account + family + invitation scoped, with WHEN_UNLOCKED_THIS_DEVICE_ONLY and small chunks published via manifest. Read only after an authorized server list; ended invitations remove their cached payload. No ordinary SQLite/AsyncStorage/log storage. Screen/background/lock clear rendered payloads; server still stores only token hashes. This supersedes the earlier one-time-only creator UI. Receiver pending intents remain memory-only.
+
+Historical invites created before this cache, other-device invites and secure-save failures cannot be reconstructed from hashes. Their active row shows a short honest missing-local-copy message and Revoke. Generating another invitation is explicit; tapping a row does not invalidate it or create a replacement.

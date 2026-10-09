@@ -59,3 +59,11 @@ User reports two-simulator PASS for replacement/share confirmation cancellation,
 Added invitation-scoped login handoff using existing Apple/controlled test account methods. Sign in to join routes to a gated reusable identity screen; success automatically returns to the existing stack page, cancel preserves pending invitation, failures remain on login. Only known /family or /family-invite fallback routes are accepted. Intent generation is passed (not bearer); changed intents invalidate old success navigation. Returning rechecks preview and current account before explicit confirmation; expiration during login blocks confirmation. No public registration, phone/SMS or automatic join introduced.
 
 Checks: targeted Jest 5 suites / 44 tests PASS; tsc PASS; changed ESLint PASS; diff check PASS. New identity success/cancel/retry/expired flow remains simulator/device NOT VERIFIED. Full Jest not repeated for this handoff; previous full-suite evidence remains as recorded. Family entry/default production gates unchanged; PR remains OPEN.
+
+## Compact invitation UI — 2026-10-09
+
+Join panel: empty/whitespace input disables View invitation visibly and accessibly. Clear icon is inside input row (48pt); separate Clear/Collapse controls removed. Outer Join with an invitation toggle remains available.
+
+Invitation page: date/status icon/color rows; actions hidden until a pending row opens; QR + Share + Revoke, no replacement button. Used/expired/revoked rows gray and never reveal destructive/share actions; full status retained for VoiceOver. Refresh icon at list top right. New invites are cached in account/family/invitation-scoped device-only Keychain; small chunks and last-published manifest, cache loss/partial data does not fabricate QR. Authorized server status governs display and ended-cache removal. Old or other-device invites remain unrecoverable and are explained.
+
+Checks: changed tsc/ESLint/diff PASS; targeted Jest 4 suites / 22 tests PASS (empty-input/icon clear, create/cache/single-message share, restore on expansion, used no actions, cache account/family isolation/cleanup/partial data, old missing cache, reload). Native Keychain persistence, actual QR sharing, row styling and VoiceOver on simulator/device remain NOT VERIFIED. No API/schema/dependency change or production/TestFlight write; PR OPEN.

@@ -102,7 +102,7 @@ it('places invite actions only in creator tiles and opens joining inline',async(
  await fireEvent.changeText(page.getByLabelText('邀请链接'),'bad link');
  await fireEvent.press(page.getByText('查看邀请'));
  expect(page.getByText('请粘贴一份完整的家庭邀请链接。')).toBeTruthy();
- await fireEvent.press(page.getByText('清除输入'));
+ await fireEvent.press(page.getByLabelText('清除输入'));
  expect(page.getByLabelText('邀请链接').props.value).toBe('');
 });
 

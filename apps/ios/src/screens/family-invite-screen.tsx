@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet } from "react-native";
+import { AppState, Pressable, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { getFamilyUseCases } from "../application/container";
 import { isFamilyProductEntryOpen } from "../infrastructure/family-config";
@@ -15,6 +15,7 @@ import { useDeviceLock } from "./device-lock-context";
 import { SettingsPage } from "./settings-chrome";
 import { Text, TextInput, type } from "./life-text";
 import { inkSoft, paperDeep } from "./life-page";
+import { LifeIcon } from "./life-icons";
 import { familyInviteError } from "./family-invite-copy";
 export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invite" }: { onJoined?: () => void; onClose?: () => void; returnTo?: "/family" | "/family-invite" }) {
   const router = useRouter();
@@ -158,6 +159,7 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
         <>
           {!joined ? (
             <>
+              <View style={{flexDirection:"row",alignItems:"center",gap:8}}>
               <TextInput
                 accessibilityLabel={tr("邀请链接")}
                 placeholder={tr("邀请链接")}
@@ -174,12 +176,19 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
                 }}
                 autoCapitalize="none"
                 autoCorrect={false}
-                style={styles.input}
+                style={[styles.input, {flex:1}]}
               />
+              <Pressable accessibilityRole="button" accessibilityLabel={tr("清除输入")} disabled={busy || (!link && !currentFamilyInvite())}
+                style={{minHeight:48,minWidth:48,alignItems:"center",justifyContent:"center"}}
+                onPress={() => { forgetFamilyInvite(); seq.current++; owner.current=null; setLink(""); setPreview(null); setUser(null); setMessage(null); }}>
+                <LifeIcon name="clear" />
+              </Pressable>
+              </View>
               <Pressable
-                style={styles.hit}
+                style={[styles.hit, (busy || !link.trim()) && {opacity:0.45}]}
                 accessibilityRole="button"
-                disabled={busy}
+                disabled={busy || !link.trim()}
+                accessibilityState={{disabled:busy || !link.trim()}}
                 onPress={open}
               >
                 <Text>{tr("查看邀请")}</Text>
@@ -252,13 +261,6 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
               <Text>{tr("再试一次")}</Text>
             </Pressable>
           ) : null}
-          {!joined ? <Pressable style={styles.hit} accessibilityRole="button" disabled={busy}
-            onPress={() => {
-              forgetFamilyInvite(); seq.current++; owner.current = null;
-              setLink(""); setPreview(null); setUser(null); setMessage(null); setBusy(false);
-            }}><Text>{tr("清除输入")}</Text></Pressable> : null}
-          {onClose && !joined ? <Pressable style={styles.hit} accessibilityRole="button" disabled={busy}
-            onPress={cancel}><Text>{tr("收起")}</Text></Pressable> : null}
         </>
       ) : (
         <Text>{tr("邀请暂未开放。")}</Text>

@@ -53,7 +53,7 @@ it('clearing input invalidates a late preview and permits a fresh link',async()=
  await fireEvent.changeText(page.getByLabelText('邀请链接'),'lampy:///family-invite#'+'a'.repeat(64));
  await fireEvent.press(page.getByText('查看邀请'));
  await waitFor(()=>expect(mockPreview).toHaveBeenCalledTimes(1));
- await fireEvent.press(page.getByText('清除输入'));
+ await fireEvent.press(page.getByLabelText('清除输入'));
  await act(async()=>{done({name:'Old home',status:'pending',expiresAt:'2026-10-15T00:00:00Z'});});
  expect(page.queryByText('Old home')).toBeNull();
  expect(page.getByLabelText('邀请链接').props.value).toBe('');
@@ -87,4 +87,15 @@ it('an invitation that expires during login offers no confirmation on return',as
  await waitFor(()=>expect(returned.getByText('这份邀请已结束。请向创建者要一份新的邀请。')).toBeTruthy());
  expect(returned.queryByTestId('invite-confirm')).toBeNull();
  expect(mockAccept).not.toHaveBeenCalled();
+});
+
+it('empty input disables preview and the clear icon resets input without a collapse button',async()=>{
+ const page=await render(<FamilyInvitePanel onClose={jest.fn()}/>);
+ expect(page.getByText('查看邀请')).toBeDisabled();
+ expect(page.queryByText('清除输入')).toBeNull();
+ expect(page.queryByText('收起')).toBeNull();
+ await fireEvent.changeText(page.getByLabelText('邀请链接'),'bad');
+ expect(page.getByText('查看邀请')).toBeEnabled();
+ await fireEvent.press(page.getByLabelText('清除输入'));
+ expect(page.getByText('查看邀请')).toBeDisabled();
 });
