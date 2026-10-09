@@ -165,6 +165,10 @@ export default function FamilyDirectoryScreen() {
             <Text style={styles.familyName}>{f.name || tr('未命名家庭')}</Text>
             <Text style={styles.familyMeta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
           </Pressable>
+          {f.familyId === state.selectedId ? <Pressable testID={`family-records-${f.familyId}`} style={styles.cardInvite}
+            accessibilityRole="button" disabled={busy} onPress={() => router.push({pathname:'/family-records',params:{familyId:f.familyId}})}>
+            <Text style={styles.action}>{tr('家庭记录')}</Text>
+          </Pressable> : null}
           {f.role === 'creator' && f.familyId === state.selectedId ? <Pressable testID={`family-invite-${f.familyId}`} style={styles.cardInvite}
             disabled={busy} accessibilityRole="button" accessibilityLabel={tr('邀请家人加入 {0}', [f.name || tr('未命名家庭')])}
             onPress={() => router.push({pathname:'/family-invitations', params:{familyId:f.familyId}})}>

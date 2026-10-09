@@ -160,12 +160,12 @@ export default function MomentDetailScreen() {
             {isFamilyProductEntryOpen() ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="分享给家里"
+                accessibilityLabel={tr('分享给家里')}
                 testID="moment-share-to-family"
                 onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)}
                 style={styles.shareHit}
               >
-                <Text style={styles.share}>分享给家里</Text>
+                <Text style={styles.share}>{tr('分享给家里')}</Text>
               </Pressable>
             ) : null}
           </View>

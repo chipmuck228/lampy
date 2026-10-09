@@ -60,6 +60,9 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 
 export type FamilyApiClient = {
   health(): Promise<FamilyHealth>;
+  getHistoryPolicy?(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
+  confirmHistoryPolicy?(session: string, familyId: string): Promise<{ policy: 'family-history-v2' }>;
+  history?: Pick<FamilyApiClient, 'shareMoment' | 'revokeShare' | 'listVisibleShares' | 'getShare' | 'getShareMedia' | 'getShareMediaContent'>;
   listFamilies?(sessionToken: string): Promise<FamilyListView>;
   createNamedFamily?(sessionToken: string, name: string, idempotencyKey: string): Promise<FamilySummary>;
   createInviteLink?(session: string, familyId: string): Promise<import('../family-api/types').CreatedInviteLink & {link: string; qr: string}>;
@@ -108,7 +111,8 @@ function throwIfFailed(status: number, body: unknown): void {
   throw new ApplicationError(code, message);
 }
 
-export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClient {
+export function createFamilyApiClient(transport: FamilyTransport, sharingVersion: 1 | 2 = 1): FamilyApiClient {
+  const shareBase = `/v${sharingVersion}/families`;
   async function send<T>(input: Parameters<FamilyTransport['request']>[0]): Promise<T> {
     const action = familyTestPathKind(input.method, input.path);
     let response: { status: number; body: unknown };
@@ -138,6 +142,9 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
   }
 
   return {
+    ...(sharingVersion === 1 ? { history: createFamilyApiClient(transport, 2) } : {}),
+    getHistoryPolicy(sessionToken, familyId) { return send({ method: 'GET', path: `/v2/families/${familyId}/history-policy`, sessionToken }); },
+    confirmHistoryPolicy(sessionToken, familyId) { return send({ method: 'POST', path: `/v2/families/${familyId}/history-policy`, sessionToken, body: { confirmation: 'new-members-can-read-active-history' } }); },
     health() {
       return send({ method: 'GET', path: '/health' });
     },
@@ -219,10 +226,11 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     shareMoment(sessionToken, familyId, input) {
       return send({
         method: 'POST',
-        path: `/v1/families/${familyId}/shares`,
+        path: `${shareBase}/${familyId}/shares`,
         sessionToken,
         idempotencyKey: input.idempotencyKey,
         body: {
+          ...(sharingVersion === 2 ? { audienceConfirmation: input.audienceConfirmation } : {}),
           sourceMomentId: input.sourceMomentId,
           sourceRevision: input.sourceRevision,
           note: input.note,
@@ -237,20 +245,20 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     revokeShare(sessionToken, familyId, shareId) {
       return send({
         method: 'POST',
-        path: `/v1/families/${familyId}/shares/${shareId}/revoke`,
+        path: `${shareBase}/${familyId}/shares/${shareId}/revoke`,
         sessionToken,
       });
     },
     listVisibleShares(sessionToken, familyId) {
-      return send({ method: 'GET', path: `/v1/families/${familyId}/shares`, sessionToken });
+      return send({ method: 'GET', path: `${shareBase}/${familyId}/shares`, sessionToken });
     },
     getShare(sessionToken, familyId, shareId) {
-      return send({ method: 'GET', path: `/v1/families/${familyId}/shares/${shareId}`, sessionToken });
+      return send({ method: 'GET', path: `${shareBase}/${familyId}/shares/${shareId}`, sessionToken });
     },
     getShareMedia(sessionToken, familyId, shareId, objectId) {
       return send({
         method: 'GET',
-        path: `/v1/families/${familyId}/shares/${shareId}/media/${objectId}`,
+        path: `${shareBase}/${familyId}/shares/${shareId}/media/${objectId}`,
         sessionToken,
       });
     },
@@ -259,7 +267,7 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
       try {
         response = await transport.request({
           method: 'GET',
-          path: `/v1/families/${familyId}/shares/${shareId}/media/${objectId}/content`,
+          path: `${shareBase}/${familyId}/shares/${shareId}/media/${objectId}/content`,
           sessionToken,
           expectBytes: true,
         });

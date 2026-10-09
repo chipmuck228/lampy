@@ -1,0 +1,117 @@
+import { createFamilyCommands } from '../family-api/commands';
+import { createFamilyStore } from '../family-api/store';
+import { createMapAppleVerifier } from '../family-api/apple';
+import { dispatchFamilyApi } from '../family-api/http';
+import { sampleJpegBytes } from '../family-api/media-validate';
+import { createFamilyApiClient, createDispatchTransport } from '../infrastructure/family-http-client';
+import { createMemoryFamilyReceiveCache } from '../infrastructure/family-receive-cache';
+import { createPendingFamilyOperationDisk, createPendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
+import { createMemoryFamilySessionStore } from './family-use-cases';
+import { createDraftMoment, activateMoment } from '../domain-adapters/moment-commands';
+import { createAsset } from '../domain-adapters/asset-commands';
+import { createFamilyHistoryUseCases, HISTORY_AUDIENCE_CONFIRMATION } from './family-history-use-cases';
+import type { FamilyTransportRequest } from '../infrastructure/family-http-client';
+import { ApplicationError } from './errors';
+
+function deferred<T>() { let resolve!: (value:T)=>void; const promise=new Promise<T>(r=>{resolve=r;});return {promise,resolve}; }
+async function fixture() {
+  const commands=createFamilyCommands({store:createFamilyStore(),apple:createMapAppleVerifier({a:{appleSubject:'a'},b:{appleSubject:'b'}}),historySharingEnabled:true,inviteLinksEnabled:true});
+  const a=await commands.signInWithApple('a'),b=await commands.signInWithApple('b');
+  const f=await commands.createNamedFamily(a.sessionToken,'Window','family-d2');
+  const session=createMemoryFamilySessionStore();await session.setSession(a);
+  const requests:FamilyTransportRequest[]=[];
+  const transport=createDispatchTransport(r=>dispatchFamilyApi(commands,r));
+  const client=createFamilyApiClient({request:r=>{requests.push(r);return transport.request(r);}});
+  const cache=createMemoryFamilyReceiveCache();
+  let moment=activateMoment(createDraftMoment({id:'moment_d2',ownerId:'local-user',content:{note:'A quiet morning',emotion:'平静'}}, {now:()=>new Date('2026-10-09T00:00:00Z')}),'local-user','2026-10-09T00:00:00Z');
+  const asset=createAsset({id:'asset_d2',ownerId:'local-user',type:'image',localUri:'file:///personal/photo.jpg',metadata:{mimeType:'image/jpeg'}},{now:()=>new Date('2026-10-09T00:00:00Z')});
+  const personal={moments:{findById:jest.fn(async()=>({kind:'ready' as const,moment}))},assets:{findById:jest.fn(async()=>({kind:'ready' as const,asset}))},readAssetBytes:jest.fn(async()=>sampleJpegBytes())};
+  const history=createFamilyHistoryUseCases({client,session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal,receiveCache:cache,mediaUri:key=>`file:///family-cache/${key}`});
+  return {commands,a,b,f,session,client,cache,personal,history,requests,attach:()=>{moment={...moment,assetIds:['asset_d2']};},change:()=>{moment={...moment,revision:moment.revision+1,content:{...moment.content,note:'changed'}};}};
+}
+const current=()=>true;
+it('requires explicit consent, binds a target, retries once and sends only the snapshot whitelist',async()=>{
+  const x=await fixture();x.attach();
+  const preview=await x.history.prepare('moment_d2',x.f.familyId,current);
+  await expect(x.history.share(preview,'',current)).rejects.toMatchObject({code:'BAD_REQUEST'});
+  const first=await x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,current);
+  const again=await x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,current);
+  expect(again.shareId).toBe(first.shareId);
+  const body=x.requests.find(r=>r.method==='POST'&&r.path.endsWith('/shares'))!.body;
+  expect(Object.keys(body as object).sort()).toEqual(['audienceConfirmation','emotion','expectedMediaCount','mediaObjectIds','note','occurredAt','occurredAtPrecision','sourceMomentId','sourceRevision'].sort());
+  expect(JSON.stringify(body)).not.toMatch(/localUri|personal\/|context|people|accessSummary/);
+  expect((await x.commands.historyShares.listVisibleShares(x.a.sessionToken,x.f.familyId)).shares).toHaveLength(1);
+});
+it('does not upload media explicitly left out, even when that file is unreadable',async()=>{
+  const x=await fixture();x.attach();x.personal.readAssetBytes.mockRejectedValue(new Error('missing'));
+  const all=await x.history.prepare('moment_d2',x.f.familyId,current);
+  expect(all.media[0].ready).toBe(false);
+  await expect(x.history.share(all,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'SHARE_MEDIA_INCOMPLETE'});
+  const text=await x.history.prepare('moment_d2',x.f.familyId,current,[]);
+  const saved=await x.history.share(text,HISTORY_AUDIENCE_CONFIRMATION,current);
+  expect(saved.snapshot.media).toHaveLength(0);expect(x.requests.filter(r=>r.path==='/v1/media')).toHaveLength(0);
+});
+it('rechecks revision after upload and never saves a mixed snapshot',async()=>{
+  const x=await fixture();x.attach();const preview=await x.history.prepare('moment_d2',x.f.familyId,current);
+  const upload=x.client.uploadMedia;x.client.uploadMedia=async(...args)=>{const result=await upload(...args);x.change();return result;};
+  await expect(x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'SOURCE_CHANGED'});
+  expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(0);
+});
+it('rechecks media bytes after upload even if revision is unchanged',async()=>{
+  const x=await fixture();x.attach();const preview=await x.history.prepare('moment_d2',x.f.familyId,current);
+  const upload=x.client.uploadMedia;x.client.uploadMedia=async(...args)=>{const result=await upload(...args);x.personal.readAssetBytes.mockResolvedValue(new Uint8Array([1,2,3]));return result;};
+  await expect(x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'SOURCE_CHANGED'});
+  expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(0);
+});
+it.each(['account','focus','lock'] as const)('does not send a share after %s changes during upload',async(kind)=>{
+  const x=await fixture();x.attach();let eligible=true;
+  const active=()=>eligible;const preview=await x.history.prepare('moment_d2',x.f.familyId,active);
+  const upload=x.client.uploadMedia;x.client.uploadMedia=async(...args)=>{const result=await upload(...args);if(kind==='account')await x.session.setSession(x.b);else eligible=false;return result;};
+  await expect(x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,active)).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+  expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(0);
+});
+it('rejects caller mutation of the confirmed family',async()=>{
+  const x=await fixture();const p=await x.history.prepare('moment_d2',x.f.familyId,current);
+  p.family={...p.family,familyId:'another'};
+  await expect(x.history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'BAD_REQUEST'});
+});
+it('lets a later member read historical bytes, isolates by account/family, then denies cached playback after revoke',async()=>{
+  const x=await fixture();x.attach();const p=await x.history.prepare('moment_d2',x.f.familyId,current);
+  const saved=await x.history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);
+  await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);
+  await x.session.setSession(x.b);
+  const list=await x.history.list(x.f.familyId,current);expect(list.shares[0].shareId).toBe(saved.shareId);
+  const read=await x.history.read(x.f.familyId,saved.shareId,current);
+  expect(read.media[0].uri).toContain(`${x.b.userId}/${x.f.familyId}/${saved.shareId}`);
+  expect(x.cache.shares.every(s=>s.userId===x.b.userId)).toBe(true);
+  await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,saved.shareId);
+  await expect(x.history.authorize(x.f.familyId,saved.shareId,current)).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
+  expect(await x.cache.find(x.b.userId,x.f.familyId,saved.shareId)).toBeNull();
+});
+it('does not publish a late list or write cache after switching account',async()=>{
+  const x=await fixture();const p=await x.history.prepare('moment_d2',x.f.familyId,current);
+  const saved=await x.history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  const gate=deferred<{shares:typeof saved[]}>();x.client.history!.listVisibleShares=()=>gate.promise;
+  const work=x.history.list(x.f.familyId,current);await new Promise(r=>setTimeout(r,0));await x.session.setSession(x.b);gate.resolve({shares:[saved]});
+  await expect(work).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});expect(x.cache.shares).toHaveLength(0);
+});
+it('cleans a cache write that finishes after account switch without touching another account',async()=>{
+  const x=await fixture();x.attach();const p=await x.history.prepare('moment_d2',x.f.familyId,current);
+  const saved=await x.history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  const original=x.cache.saveStoredMedia;const started=deferred<void>(),finish=deferred<void>();
+  x.cache.saveStoredMedia=async input=>{started.resolve();await finish.promise;return original(input);};
+  const read=x.history.read(x.f.familyId,saved.shareId,current);await started.promise;await x.session.setSession(x.b);finish.resolve();
+  await expect(read).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+  expect(x.cache.shares).toHaveLength(0);expect(x.cache.files.size).toBe(0);
+});
+it('never reads cached rows as an offline authorization and retries the same share after a lost response',async()=>{
+  const x=await fixture();const p=await x.history.prepare('moment_d2',x.f.familyId,current);
+  const send=x.client.history!.shareMoment;let first=true;
+  x.client.history!.shareMoment=async(...args)=>{const result=await send(...args);if(first){first=false;throw new ApplicationError('NETWORK','lost response');}return result;};
+  await expect(x.history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'NETWORK'});
+  const saved=await x.history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  expect((await x.history.list(x.f.familyId,current)).shares).toHaveLength(1);
+  x.client.history!.getShare=async()=>{throw new ApplicationError('NETWORK','offline');};
+  await expect(x.history.read(x.f.familyId,saved.shareId,current)).rejects.toMatchObject({code:'NETWORK'});
+});
