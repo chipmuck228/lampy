@@ -164,7 +164,7 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
 const styles=StyleSheet.create({
   footer:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:12},
   empty:{alignItems:'center',paddingVertical:48,gap:20},emptyName:{...type.title,color:ink,textAlign:'center'},emptyTitle:{...type.action,color:inkSoft,textAlign:'center'},emptyBody:{...type.meta,color:inkSoft,textAlign:'center',maxWidth:320},
-  name:{...type.action,fontSize:16,lineHeight:24,color:ink,marginTop:6,marginBottom:12},body:{...type.body,color:ink},meta:{...type.meta,color:inkSoft},
+  name:{...type.body,color:inkSoft,marginTop:16,marginBottom:24},body:{...type.body,color:ink},meta:{...type.meta,color:inkSoft},
   action:{...type.action,color:sage},block:{gap:16},record:{gap:16,paddingVertical:24,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline},
   hit:{minHeight:48,flexDirection:'row',alignItems:'center',gap:12,paddingVertical:12},audio:{gap:8},
 });
