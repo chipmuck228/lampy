@@ -26,3 +26,18 @@ Linux 环境未运行模拟器或真机，未动 Liuz17、生产或 TestFlight�
 新增 SDK 57 `expo-image-manipulator ~57.0.21`，必须重新编译 Dev Client，Metro Reload 不足。仅在家庭分享时把 HEIC/HEIF 源字节转成同尺寸 JPEG（质量 0.9，不裁切）；源文件、元数据、revision 和个人显示均不改。临时结果在 finally 删除，原生引用释放。原始字节仍参与变更检查，转码后实际字节/MIME 校验并用于上传幂等键。取消/后台期间完成的转码不上传。
 
 新增转换和取消测试通过，针对性 4 suites / 26 tests PASS；tsc PASS。Linux 未原生编译，HEIC 实机/模拟器转换、方向和上传阅读仍 NOT VERIFIED。前次全量结果不当成本修复后的全量 PASS。临时诊断日志不入库。
+
+## 用户报告：双模拟器核心闭环（2026-10-09）
+
+测试 checkout SHA：`2b0c36d18603eb9460a595aaec2c26b8dca69c77`。
+环境：两台模拟器、隔离本机 API、Debug Dev Client；原生包经用户重建，二进制摘要未核对。先前设备为 iPhone 17 Pro Max / iOS 26.3 与 Lampy-family-second / iOS 26.5；期间又报告 iPhone 17 Pro / iOS 26.6，最终第一台具体型号/运行时未重新确认，不臆写。
+工作区：`M app.json`、`M package-lock.json`。app.json 之前为本地 Web single 适配；最终两个文件的 diff 未收到，不能声称运行树与仓库完全一致。
+
+用户报告模拟器 PASS：
+1. A 分享文字、两张照片与声音，明确选择家庭/媒体并确认历史受众。
+2. B 后加入，可读加入前有效分享。
+3. 内容完整，声音播放/暂停/续播，离开返回不自动播。
+4. A 在家庭分享详情撤回；B 返回刷新后不可再读。
+5. 切账号不串内容，后台认证期间家庭内容遮挡，个人原记录完整。
+
+这是用户报告的模拟器结果，不是执行环境运行或真机 PASS。真机、双真机、公网、VoiceOver、短屏/横屏/iPad仍 NOT VERIFIED。PR 保持 OPEN，未部署/未上传 TestFlight。
