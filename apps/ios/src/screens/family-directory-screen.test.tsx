@@ -91,7 +91,8 @@ it('places invite actions only in creator tiles and opens joining inline',async(
  mockOpen.mockReturnValue(true);
  mockFamilies.mockResolvedValue({userId:'a',limit:10,families:[{familyId:'owned',name:'Owned',role:'creator',memberCount:1},{familyId:'joined',name:'Joined',role:'member',memberCount:2}]});
  const page=await render(<FamilyDirectoryScreen/>);
- await waitFor(()=>expect(page.getByTestId('family-invite-owned')).toBeTruthy());
+ await waitFor(()=>expect(page.getByTestId('family-select-owned')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('family-select-owned'));
  expect(page.queryByTestId('family-invite-joined')).toBeNull();
  await fireEvent.press(page.getByTestId('family-invite-owned'));
  expect(mockPush).toHaveBeenCalledWith({pathname:'/family-invitations',params:{familyId:'owned'}});
@@ -121,4 +122,21 @@ it('refreshes families after inline confirmation without pushing a join route',a
  await waitFor(()=>expect(page.getByTestId('family-select-new')).toBeTruthy());
  expect(page.getByText('已加入这个家。')).toBeTruthy();
  expect(mockPush).not.toHaveBeenCalled();
+});
+
+it('shows invite only on the selected creator family and never on a selected member',async()=>{
+ mockOpen.mockReturnValue(true);
+ mockFamilies.mockResolvedValue({userId:'a',limit:10,families:[{familyId:'one',name:'One',role:'creator',memberCount:1},{familyId:'two',name:'Two',role:'creator',memberCount:1},{familyId:'member',name:'Member',role:'member',memberCount:2}]});
+ const page=await render(<FamilyDirectoryScreen/>);
+ await waitFor(()=>expect(page.getByTestId('family-select-one')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('family-select-one'));
+ expect(page.getByTestId('family-invite-one')).toBeTruthy();
+ expect(page.queryByTestId('family-invite-two')).toBeNull();
+ await fireEvent.press(page.getByTestId('family-select-two'));
+ expect(page.queryByTestId('family-invite-one')).toBeNull();
+ expect(page.getByTestId('family-invite-two')).toBeTruthy();
+ await fireEvent.press(page.getByTestId('family-select-member'));
+ expect(page.queryByTestId('family-invite-member')).toBeNull();
+ expect(page.queryByTestId('family-invite-two')).toBeNull();
+ expect(page.getByTestId('family-open-invite')).toBeTruthy();
 });

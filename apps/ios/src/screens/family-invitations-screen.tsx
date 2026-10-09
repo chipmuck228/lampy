@@ -111,9 +111,11 @@ export default function FamilyInvitationsScreen() {
  <Text style={{...type.action,color:active?sage:inkSoft,opacity:active?1:0.6}}>{expiry(i.expiresAt)}</Text></View>
  <LifeIcon name={open?'collapse':'expand'} color={active?sage:inkSoft}/></Pressable>
  {open&&active?<View style={styles.detail}>
- {data?<><Image testID="created-invitation" source={{uri:data.qr}} style={{width:220,height:220,maxWidth:'100%'}} accessibilityLabel={tr('家庭邀请')}/>
- <Pressable style={styles.hit} accessibilityRole="button" disabled={busy||!ready} onPress={()=>void share(data)}><Text>{tr('分享')}</Text></Pressable></>:<Text style={styles.intro}>{tr('本机没有保存这份邀请。可撤销后另建一份。')}</Text>}
- <Pressable style={styles.hit} accessibilityRole="button" disabled={busy||!ready} onPress={()=>void act(i.invitationId)}><Text>{tr('撤销邀请')}</Text></Pressable>
+ {data?<Image testID="created-invitation" source={{uri:data.qr}} style={{width:220,height:220,maxWidth:'100%'}} accessibilityLabel={tr('家庭邀请')}/>:<Text style={styles.intro}>{tr('本机没有保存这份邀请。可撤销后另建一份。')}</Text>}
+ <View style={styles.actionRow}>
+ {data?<Pressable style={[styles.hit,styles.rowHit]} accessibilityRole="button" disabled={busy||!ready} onPress={()=>void share(data)}><Text>{tr('分享')}</Text></Pressable>:null}
+ <Pressable style={[styles.hit,styles.rowHit,styles.revokeHit]} accessibilityRole="button" disabled={busy||!ready} onPress={()=>void act(i.invitationId)}><Text style={{color:inkSoft}}>{tr('撤销邀请')}</Text></Pressable>
+ </View>
  </View>:null}
  </View>;
  })}
@@ -121,6 +123,9 @@ export default function FamilyInvitationsScreen() {
  </SettingsPage>;
 }
 const styles=StyleSheet.create({
+ actionRow:{flexDirection:'row',alignItems:'center',gap:12},
+ rowHit:{minWidth:48,flexShrink:1,marginVertical:0,paddingHorizontal:12},
+ revokeHit:{backgroundColor:'transparent',borderWidth:StyleSheet.hairlineWidth,borderColor:hairline},
  intro:{...type.meta,color:inkSoft,marginVertical:12},
  hit:{minHeight:48,justifyContent:'center',paddingHorizontal:16,backgroundColor:paperDeep,borderRadius:24,marginVertical:8,alignSelf:'flex-start'},
  iconHit:{minHeight:48,minWidth:48,alignItems:'center',justifyContent:'center'},

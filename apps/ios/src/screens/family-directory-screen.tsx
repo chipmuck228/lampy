@@ -113,19 +113,28 @@ export default function FamilyDirectoryScreen() {
         <Text style={styles.meta}>{tr('你的家庭没有因此消失。')}</Text>
         <Pressable style={styles.createHit} onPress={() => void refresh()} accessibilityRole="button"><Text style={styles.action}>{tr('再试一次')}</Text></Pressable>
       </View> : null}
+<View style={styles.rootActions}>
+        {state.status === 'ready' ? <Pressable style={[styles.createHit, styles.rootAction, (busy || (state.families.length >= 10 && !retrying)) && styles.disabled]}
+          testID="family-open-create" accessibilityRole="button" accessibilityLabel={tr('创建家庭')}
+          accessibilityState={{ disabled: busy || (state.families.length >= 10 && !retrying), expanded: formOpen }}
+          disabled={busy || (state.families.length >= 10 && !retrying)} onPress={() => setFormOpen(true)}>
+          <LifeIcon name="plus" color={sage} />
+          <Text style={[styles.action,{flexShrink:1,textAlign:'center'}]}>{tr('创建家庭')}</Text>
+        </Pressable> : null}
+
+        <Pressable style={[styles.createHit,styles.rootAction,styles.joinHit]} testID="family-open-invite" accessibilityRole="button"
+          accessibilityState={{expanded:inviteOpen}} onPress={() => setInviteOpen(v => !v)}>
+          <Text style={styles.joinAction}>{tr('通过邀请加入')}</Text>
+        </Pressable>
+        </View>
+        {inviteOpen ? <View style={styles.inlineJoin}><FamilyInvitePanel returnTo="/family" onJoined={joined} onClose={() => setInviteOpen(false)} /></View> : null}
+
       {state.status === 'ready' ? <>
         <View style={styles.capacity} testID="family-capacity">
           <View style={styles.capacityRow}><Text style={styles.capacityTitle}>{tr('我的家庭')}</Text>
             <Text style={styles.capacityCount} testID="family-count" accessibilityLabel={tr('已加入 {0} / 10 个家庭', [state.families.length])}>{tr('{0} / 10', [state.families.length])}</Text></View>
           {state.families.length >= 10 ? <Text style={styles.limit} testID="family-limit-hint">{tr('你已在10个家庭中，暂时不能再创建或加入。')}</Text> : <Text style={styles.meta}>{tr('最多可创建或加入10个家庭。')}</Text>}
         </View>
-        <Pressable style={[styles.createHit, (busy || (state.families.length >= 10 && !retrying)) && styles.disabled]}
-          testID="family-open-create" accessibilityRole="button" accessibilityLabel={tr('创建家庭')}
-          accessibilityState={{ disabled: busy || (state.families.length >= 10 && !retrying), expanded: formOpen }}
-          disabled={busy || (state.families.length >= 10 && !retrying)} onPress={() => setFormOpen(true)}>
-          <LifeIcon name="plus" color={sage} />
-          <Text style={styles.action}>{tr('创建家庭')}</Text>
-        </Pressable>
         {formOpen || retrying ? <View style={styles.form} testID="family-create-form">
           <Text style={styles.name}>{tr('给这个家起个名字')}</Text>
           <TextInput accessibilityLabel={tr('家庭名称')} placeholder={tr('家庭名称')} value={name} editable={!busy && !retrying}
@@ -152,10 +161,10 @@ export default function FamilyDirectoryScreen() {
               <AlbumCoverFace name="" coverUri={null} width={Math.max(1, wall.tileWidth - 2)} height={wall.tileHeight - 2} />
               <View style={styles.coverMark}><LifeIcon name="family" size={36} color={sage} /></View>
             </View>
-            <Text style={styles.name}>{f.name || tr('未命名家庭')}</Text>
-            <Text style={styles.meta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
+            <Text style={styles.familyName}>{f.name || tr('未命名家庭')}</Text>
+            <Text style={styles.familyMeta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
           </Pressable>
-          {f.role === 'creator' ? <Pressable testID={`family-invite-${f.familyId}`} style={styles.cardInvite}
+          {f.role === 'creator' && f.familyId === state.selectedId ? <Pressable testID={`family-invite-${f.familyId}`} style={styles.cardInvite}
             disabled={busy} accessibilityRole="button" accessibilityLabel={tr('邀请家人加入 {0}', [f.name || tr('未命名家庭')])}
             onPress={() => router.push({pathname:'/family-invitations', params:{familyId:f.familyId}})}>
             <Text style={styles.action}>{tr('邀请家人')}</Text>
@@ -164,18 +173,18 @@ export default function FamilyDirectoryScreen() {
         </View>
 
       </> : null}
-      <View style={styles.joinSection}>
-        <Pressable style={styles.createHit} testID="family-open-invite" accessibilityRole="button"
-          accessibilityState={{expanded:inviteOpen}} onPress={() => setInviteOpen(v => !v)}>
-          <Text style={styles.action}>{tr('通过邀请加入')}</Text>
-        </Pressable>
-        {inviteOpen ? <FamilyInvitePanel returnTo="/family" onJoined={joined} onClose={() => setInviteOpen(false)} /> : null}
-      </View>
       {message ? <Text>{message}</Text> : null}
     </> : null}
   </SettingsPage>;
 }
 const styles = StyleSheet.create({
+  rootActions: { flexDirection:'row', gap:12, alignItems:'stretch', marginBottom:16 },
+  rootAction: { flex:1, alignSelf:'stretch', paddingHorizontal:8, marginBottom:0 },
+  joinHit: { borderColor:inkSoft, backgroundColor:'transparent' },
+  joinAction: { ...type.action, color:inkSoft, flexShrink:1, textAlign:'center' },
+  inlineJoin: { paddingVertical:12, marginBottom:16 },
+  familyName: { ...type.action, fontSize:16, lineHeight:24, color:ink },
+  familyMeta: { ...type.meta, fontSize:13, lineHeight:20, color:inkSoft },
   joinSection: { gap: 12, paddingVertical: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline },
   selection: { gap: 6 },
   cardInvite: { minHeight: 48, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, borderRadius: 24, backgroundColor: paperDeep, marginTop: 8 },
