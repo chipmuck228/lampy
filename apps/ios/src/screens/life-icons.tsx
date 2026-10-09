@@ -30,6 +30,9 @@ export const LIFE_ICON_NAMES = {
   family: 'person.2',
   album: 'text.book.closed',
   more: 'ellipsis',
+  clear: 'xmark.circle.fill',
+  refresh: 'arrow.clockwise',
+  check: 'checkmark.circle',
 } as const;
 
 export type LifeIconName = keyof typeof LIFE_ICON_NAMES;

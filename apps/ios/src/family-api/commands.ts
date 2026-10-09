@@ -1,3 +1,4 @@
+import { createInviteLinkCommands, type InviteLinkCommands } from './invite-link-commands';
 import { FAMILY_ERROR, FamilyError } from './errors';
 import {
   fingerprintAcceptInvitation,
@@ -38,7 +39,7 @@ import { createMediaCommands } from './media-commands';
 import { createShareCommands } from './share-commands';
 import { assertMediaPayload } from './media-validate';
 
-export type FamilyCommands = {
+export type FamilyCommands = InviteLinkCommands & {
   health(): FamilyHealth;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
@@ -229,6 +230,7 @@ export function createFamilyCommands(deps: {
   mediaBlobs?: MediaBlobStore;
   passwordHasher?: PasswordHasher;
   testAccountLoginEnabled?: boolean;
+  inviteLinksEnabled?: boolean;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -278,6 +280,7 @@ export function createFamilyCommands(deps: {
   }
 
   return {
+    ...createInviteLinkCommands({ repository, clock, ids, enabled:deps.inviteLinksEnabled === true, withAuthedUser }),
     health() {
       const testHealth = testAccounts.health();
       return {

@@ -62,6 +62,11 @@ export type FamilyApiClient = {
   health(): Promise<FamilyHealth>;
   listFamilies?(sessionToken: string): Promise<FamilyListView>;
   createNamedFamily?(sessionToken: string, name: string, idempotencyKey: string): Promise<FamilySummary>;
+  createInviteLink?(session: string, familyId: string): Promise<import('../family-api/types').CreatedInviteLink & {link: string; qr: string}>;
+  listInviteLinks?(session: string, familyId: string): Promise<import('../family-api/types').InviteLinkView[]>;
+  revokeInviteLink?(session: string, id: string): Promise<import('../family-api/types').InviteLinkView>;
+  previewInviteLink?(token: string): Promise<import('../family-api/types').InvitePreview>;
+  acceptInviteLink?(session: string, token: string): Promise<FamilySummary>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createFamily(sessionToken: string, idempotencyKey: string): Promise<FamilyView>;
@@ -148,6 +153,11 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     createNamedFamily(sessionToken, name, idempotencyKey) {
       return send({ method: 'POST', path: '/v2/families', sessionToken, idempotencyKey, body: { name } });
     },
+    createInviteLink(sessionToken,familyId) { return send({method:'POST',path:`/v2/families/${familyId}/invitations`,sessionToken}); },
+    listInviteLinks(sessionToken,familyId) { return send({method:'GET',path:`/v2/families/${familyId}/invitations`,sessionToken}); },
+    revokeInviteLink(sessionToken,id) { return send({method:'POST',path:`/v2/invitations/${id}/revoke`,sessionToken}); },
+    previewInviteLink(token) { return send({method:'POST',path:'/v2/invitations/preview',body:{token}}); },
+    acceptInviteLink(sessionToken,token) { return send({method:'POST',path:'/v2/invitations/accept',sessionToken,body:{token}}); },
     createFamily(sessionToken, idempotencyKey) {
       return send({ method: 'POST', path: '/v1/families', sessionToken, idempotencyKey });
     },

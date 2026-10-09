@@ -117,6 +117,11 @@ const MIGRATIONS = [
      WHERE m.user_id = NEW.user_id AND m.membership_id != OLD.membership_id
        AND m.status = 'active' AND f.status = 'active') >= 10
    BEGIN SELECT RAISE(ABORT, 'family_limit_reached'); END;`,
+  `CREATE TABLE family_invite_links (
+    invitation_id TEXT PRIMARY KEY NOT NULL, family_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE, status TEXT NOT NULL CHECK(status IN ('pending','accepted','revoked','expired')),
+    created_at TEXT NOT NULL, expires_at TEXT NOT NULL, accepted_by_user_id TEXT
+  ); CREATE INDEX family_invite_links_family ON family_invite_links(family_id);`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;

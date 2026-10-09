@@ -416,6 +416,36 @@ export function createFamilyUseCases(deps: {
   }
 
   return {
+    async previewInviteLink(token: string) {
+      if(!deps.client.previewInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      return deps.client.previewInviteLink(token);
+    },
+    async inviteLinkAccount() { return (await requireAccount()).userId; },
+    async createInviteLink(familyId: string, isCurrent: () => boolean) {
+      const a=await requireAccount();await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');
+      if(!deps.client.createInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.createInviteLink(a.sessionToken,familyId);await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');
+      return result;
+    },
+    async listInviteLinks(familyId: string) {
+      const a=await requireAccount();if(!deps.client.listInviteLinks) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.listInviteLinks(a.sessionToken,familyId);await assertSameAccount(a);return result;
+    },
+    async revokeInviteLink(id: string, isCurrent: () => boolean) {
+      const a=await requireAccount();if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');
+      if(!deps.client.revokeInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.revokeInviteLink(a.sessionToken,id);await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');return result;
+    },
+    async acceptInviteLink(token: string, expectedUserId: string, isCurrent: () => boolean) {
+      const a=await requireAccount();await assertSameAccount(a);
+      if(a.userId!==expectedUserId || !isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Confirm with the current account.');
+      if(!deps.client.acceptInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.acceptInviteLink(a.sessionToken,token);await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');return result;
+    },
     async getFamilies(): Promise<FamilyListView & { userId: string }> {
       await flushPendingRevoke();
       const account = await requireAccount();

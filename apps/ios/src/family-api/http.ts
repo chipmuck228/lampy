@@ -7,6 +7,7 @@ export type FamilyHttpRequest = {
   headers: Record<string, string | undefined>;
   body?: unknown;
   bytes?: Uint8Array;
+  peer?: string;
 };
 
 export type FamilyHttpResponse = {
@@ -73,6 +74,7 @@ function statusFor(code: string) {
       return 409;
     case FAMILY_ERROR.RATE_LIMITED:
       return 429;
+    case 'INVITE_LINKS_CLOSED':
     case FAMILY_ERROR.TEST_ACCOUNT_LOGIN_CLOSED:
       return 503;
     case FAMILY_ERROR.TEST_ACCOUNT_NOT_FOUND:
@@ -136,6 +138,14 @@ export async function dispatchFamilyApi(
     if (method === 'POST' && path === '/v2/families') {
       return { status: 200, body: await commands.createNamedFamily(token || '', readString(body, 'name'), idempotencyKey || '') };
     }
+
+    const links = /^\/v2\/families\/([^/]+)\/invitations$/.exec(path);
+    if (links && method === 'POST') return { status:200, body:await commands.createInviteLink(token || '',links[1]) };
+    if (links && method === 'GET') return { status:200, body:await commands.listInviteLinks(token || '',links[1]) };
+    const revokeLink = /^\/v2\/invitations\/([^/]+)\/revoke$/.exec(path);
+    if (revokeLink && method === 'POST') return { status:200, body:await commands.revokeInviteLink(token || '',revokeLink[1]) };
+    if (path === '/v2/invitations/preview' && method === 'POST') return { status:200, body:await commands.previewInviteLink(readString(body,'token'),request.peer || 'dispatch') };
+    if (path === '/v2/invitations/accept' && method === 'POST') return { status:200, body:await commands.acceptInviteLink(token || '',readString(body,'token')) };
 
     if (method === 'POST' && path === '/v1/families') {
       return { status: 200, body: await commands.createFamily(token || '', idempotencyKey) };

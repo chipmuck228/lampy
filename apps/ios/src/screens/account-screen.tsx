@@ -93,7 +93,11 @@ export function AccountDiagnosticsClosed() {
   );
 }
 
-export default function AccountScreen({ variant = 'user' }: { variant?: 'user' | 'diagnostics' } = {}) {
+export default function AccountScreen({ variant = 'user', onAuthenticated, onCancel }: {
+  variant?: 'user' | 'diagnostics';
+  onAuthenticated?: () => void;
+  onCancel?: () => void;
+} = {}) {
   const router = useRouter();
   const diagnostics = variant === 'diagnostics';
   const diagnosticsAllowed = isPersonalSettingsDiagnosticsOpen();
@@ -260,6 +264,7 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
       await family.signInWithApple(token);
       if (!refreshGate.isCurrent(generation)) return;
       setSnapshot(snapshotAfterSignedIn(appleAvailable, testLoginFlags(snapshot)));
+      if (onAuthenticated) { onAuthenticated(); return; }
       setMessage(null);
     } catch (error) {
       if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
@@ -341,6 +346,7 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
       await family.signInWithTestAccount(submittedLogin, submittedPassword);
       if (!refreshGate.isCurrent(generation)) return;
       setSnapshot(snapshotAfterSignedIn(appleAvailable, testLoginFlags(snapshot)));
+      if (onAuthenticated) { onAuthenticated(); return; }
     } catch (error) {
       if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
       return;
@@ -445,20 +451,23 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
 
   return (
     <SettingsPage
-      title={tr("开发诊断")}
-      backLabel={tr("本机设置")}
-      accessibilityLabel={tr("开发诊断")}
-      onBack={() => dismissToSettingsRoot(router)}
+      title={tr(onAuthenticated ? "登录家庭" : "开发诊断")}
+      backLabel={tr(onAuthenticated ? "取消" : "本机设置")}
+      accessibilityLabel={tr(onAuthenticated ? "登录家庭" : "开发诊断")}
+      onBack={() => {
+        if (onCancel) { refreshGate.begin(); setPassword(''); onCancel(); }
+        else dismissToSettingsRoot(router);
+      }}
     >
       <View testID="account-diagnostics">
-        <View testID="account-family-preview">
+        {!onAuthenticated ? <View testID="account-family-preview">
           <Text style={styles.body} testID="account-family-copy">
             有些生活，只想交给重要的人。
           </Text>
           <Text style={styles.body} testID="account-family-soon">
             私密家庭空间正在准备中。敬请期待。
           </Text>
-        </View>
+        </View> : <Text style={styles.body}>{tr("登录后回到邀请，再由你确认加入。")}</Text>}
         {snapshot ? (
           <Text style={styles.body} testID={`account-kind-${snapshot.kind}`}>
             {kindCopy(snapshot)}
