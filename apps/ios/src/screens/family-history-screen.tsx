@@ -143,7 +143,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
               Alert.alert(tr('撤回这次分享？'), tr('家人将不能再阅读这次分享。你的个人记录仍然保留。'), [
                 {text:tr('取消'),style:'cancel'}, {text:tr('撤回分享'),style:'destructive',onPress:() => void revoke(expected,current)},
               ]);
-            }}><Text style={styles.meta}>{tr('撤回这次分享')}</Text></Pressable> : null}
+            }}><LifeIcon name="replay" color={inkSoft} size={16}/><Text style={styles.meta}>{tr('撤回这次分享')}</Text></Pressable> : null}
         </View>
         {!inline ? <Text style={styles.meta}>{familySnapshotDate(view.share.snapshot)}</Text> : null}
         {view.share.snapshot.note ? <Text style={styles.body}>{view.share.snapshot.note}</Text> : null}

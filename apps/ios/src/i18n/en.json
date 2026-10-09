@@ -705,5 +705,11 @@
   "撤回分享": "Withdraw share",
   "打开": "Open",
   "打开这条家庭记录": "Open this family moment",
-  "收起这条家庭记录": "Close this family moment"
+  "收起这条家庭记录": "Close this family moment",
+  "分享这一刻。": "Share this moment.",
+  "这次分享": "This moment",
+  "随这一刻分享": "Include with this moment",
+  "照片 {0}": "Photo {0}",
+  "声音 {0}": "Audio {0}",
+  "个人原记录不变。": "Your personal moment stays unchanged."
 }

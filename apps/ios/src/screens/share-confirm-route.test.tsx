@@ -49,3 +49,14 @@ it('does not accept a preview that arrives after backgrounding and requires a fr
   await act(async()=>{AppState.currentState='active';mockListeners.slice().forEach(fn=>fn('active'));});
   await waitFor(()=>expect(mockFamilies).toHaveBeenCalledTimes(2));expect(page.queryByTestId('history-share-preview')).toBeNull();
 });
+
+it('uses readable photo and audio choices without exposing technical media labels',async()=>{
+  mockPrepare.mockResolvedValue({...preview,availableMedia:[{assetId:'photo',mimeType:'image/jpeg'},{assetId:'sound',mimeType:'audio/mp4'}],media:[{assetId:'photo',mimeType:'image/jpeg',ready:true},{assetId:'sound',mimeType:'audio/mp4',ready:true}]});
+  const page=await render(<ShareConfirmRoute/>);await waitFor(()=>expect(page.getByText('Window')).toBeTruthy());
+  expect(page.getByText('分享这一刻。')).toBeTruthy();await fireEvent.press(page.getByTestId('share-family-fam_d2'));
+  await waitFor(()=>expect(page.getByText('照片 1')).toBeTruthy());expect(page.getByText('声音 1')).toBeTruthy();
+  expect(page.queryByText('分享这份媒介 1')).toBeNull();
+  await fireEvent.press(page.getByTestId('share-select-media-photo'));
+  await waitFor(()=>expect(mockPrepare).toHaveBeenLastCalledWith('moment_d2','fam_d2',expect.any(Function),['sound']));
+  expect(mockShare).not.toHaveBeenCalled();
+});

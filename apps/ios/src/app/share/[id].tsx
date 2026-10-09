@@ -75,13 +75,15 @@ export default function ShareConfirmRoute() {
   const disabled = status === 'busy' || status === 'stored';
   return <SettingsPage title={tr('分享给家里')} backLabel={tr('记录')} accessibilityLabel={tr('分享确认页')} onBack={() => router.back()}>
     {!allowed ? <Text>{tr('家庭分享暂未开放。')}</Text> : <>
-      <Text style={styles.hint}>{tr('选一个家，再确认这次要分享的片段。')}</Text>
+      <Text style={styles.intro}>{tr('分享这一刻。')}</Text>
       {status === 'loading' ? <Text>{tr('正在读取家庭。')}</Text> : null}
-      {families.map(f => <Pressable key={f.familyId} testID={`share-family-${f.familyId}`} disabled={disabled}
+      <View style={styles.families}>{families.map(f => <Pressable key={f.familyId} testID={`share-family-${f.familyId}`} disabled={disabled}
         accessibilityRole="button" accessibilityState={{ selected: target?.familyId === f.familyId, disabled }}
         onPress={() => void choose(f)} style={[styles.hit, styles.family, target?.familyId === f.familyId && styles.selected]}>
+        <View style={styles.familyTop}><LifeIcon name="family" size={24} color={target?.familyId === f.familyId ? sage : inkSoft} />{target?.familyId === f.familyId ? <LifeIcon name="check" /> : null}</View>
         <Text style={styles.name}>{f.name || tr('未命名家庭')}</Text>
-      </Pressable>)}
+        <Text style={styles.meta}>{tr(f.role === 'creator' ? '创建者' : '成员')}</Text>
+      </Pressable>)}</View>
       {families.length === 0 && status === 'ready' ? <Text>{tr('现在还没有家庭。')}</Text> : null}
       {policy === 'legacy' && target ? <View style={styles.block}>
         <Text style={styles.hint}>{tr('开启历史分享后，后来加入的家人也能阅读仍有效的分享。旧的未使用邀请会结束，需要重新邀请。')}</Text>
@@ -90,28 +92,30 @@ export default function ShareConfirmRoute() {
           : <Text style={styles.hint}>{tr('请家庭创建者先开启历史分享。')}</Text>}
       </View> : null}
       {preview ? <View style={styles.block} testID="history-share-preview">
-        <Text style={styles.hint}>{familySnapshotDate(preview)}</Text>
+        <View style={styles.sectionTitle}><Text style={styles.name}>{tr('这次分享')}</Text><Text style={styles.meta}>{familySnapshotDate(preview)}</Text></View>
         {preview.note ? <Text style={styles.body}>{preview.note}</Text> : null}
         {preview.emotion ? <Text style={styles.hint}>{feelingLabel(preview.emotion)}</Text> : null}
-        <Text style={styles.hint}>{tr('照片：{0} · 声音：{1}', [preview.media.filter(m => m.mimeType.startsWith('image/')).length, preview.media.filter(m => m.mimeType.startsWith('audio/')).length])}</Text>
-        <Text style={styles.hint}>{tr('这次分享的副本不会改变本机原记录。')}</Text>
+        {preview.availableMedia.length ? <Text style={styles.sectionLabel}>{tr('随这一刻分享')}</Text> : null}
+        <View style={styles.mediaChoices}>
         {preview.availableMedia.map((media,index) => <Pressable key={media.assetId} accessibilityRole="checkbox"
-          accessibilityState={{checked:preview.media.some(m=>m.assetId===media.assetId),disabled}} disabled={disabled} style={styles.hit}
+          accessibilityState={{checked:preview.media.some(m=>m.assetId===media.assetId),disabled}} disabled={disabled} style={[styles.mediaHit,preview.media.some(m=>m.assetId===media.assetId) && styles.selected]}
           testID={`share-select-media-${media.assetId}`} onPress={() => {
             const ids=preview.media.map(m=>m.assetId);
             void choose(preview.family,false,ids.includes(media.assetId) ? ids.filter(id=>id!==media.assetId) : [...ids,media.assetId]);
-          }}><Text style={styles.action}>{tr('分享这份媒介 {0}',[index+1])}</Text>
+          }}><LifeIcon name={media.mimeType.startsWith('image/') ? 'photo' : 'record'} color={inkSoft} /><Text style={styles.mediaLabel}>{tr(media.mimeType.startsWith('image/') ? '照片 {0}' : '声音 {0}',[preview.availableMedia.slice(0,index+1).filter(m=>m.mimeType.startsWith(media.mimeType.startsWith('image/') ? 'image/' : 'audio/')).length])}</Text>
           {preview.media.some(m=>m.assetId===media.assetId) ? <LifeIcon name="check"/> : null}
         </Pressable>)}
+        </View>
         {preview.media.some(m=>!m.ready) ? <Text style={styles.hint}>{tr('照片或声音暂时无法分享，原记录还在。')}</Text> : null}
         <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consent, disabled }} disabled={disabled}
-          testID="share-history-consent" style={styles.hit} onPress={() => setConsent(v => !v)}>
-          {consent ? <LifeIcon name="check"/> : null}<Text style={styles.action}>{tr('我知道，后来加入的家人也能看到这次分享。')}</Text>
+          testID="share-history-consent" style={styles.consent} onPress={() => setConsent(v => !v)}>
+          <View style={[styles.checkBox,consent && styles.selected]}>{consent ? <LifeIcon name="check" size={18}/> : null}</View><Text style={styles.consentText}>{tr('我知道，后来加入的家人也能看到这次分享。')}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" disabled={disabled || !consent || !preview.media.every(m=>m.ready)} accessibilityState={{ disabled: disabled || !consent || !preview.media.every(m=>m.ready) }}
-          testID="share-confirm" onPress={() => void confirm()} style={styles.hit}>
+          testID="share-confirm" onPress={() => void confirm()} style={[styles.confirm,(disabled || !consent || !preview.media.every(m=>m.ready)) && styles.disabled]}>
           <Text style={styles.action}>{tr(status === 'busy' ? '正在保存这次分享。' : '确认分享')}</Text>
         </Pressable>
+        <Text style={styles.footnote}>{tr('个人原记录不变。')}</Text>
       </View> : null}
       {status === 'stored' ? <Text style={styles.hint}>{tr('分享已保存，家人可以在家庭记录中查看。')}</Text> : null}
       {message ? <Text style={styles.hint}>{message}</Text> : null}
@@ -121,8 +125,21 @@ export default function ShareConfirmRoute() {
 }
 const styles = StyleSheet.create({
   hit: { minHeight:48, justifyContent:'center', paddingVertical:12 },
-  family: { paddingHorizontal:16, borderRadius:16, borderWidth:StyleSheet.hairlineWidth, borderColor:hairline, marginBottom:12 },
+  intro:{...type.body,color:inkSoft,marginTop:16,marginBottom:24},
+  families:{flexDirection:'row',flexWrap:'wrap',gap:12},
+  family: { flexGrow:1,flexBasis:'44%',padding:16,gap:8,borderRadius:16,borderWidth:StyleSheet.hairlineWidth,borderColor:hairline },
+  familyTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
+  meta:{...type.meta,color:inkSoft},
+  sectionTitle:{gap:6,paddingBottom:8},sectionLabel:{...type.meta,color:inkSoft,marginTop:8},
+  mediaChoices:{flexDirection:'row',flexWrap:'wrap',gap:12},
+  mediaHit:{minHeight:48,paddingHorizontal:12,paddingVertical:10,borderRadius:12,borderWidth:StyleSheet.hairlineWidth,borderColor:hairline,flexDirection:'row',alignItems:'center',gap:8},
+  mediaLabel:{...type.meta,color:ink},
+  consent:{minHeight:48,flexDirection:'row',alignItems:'center',gap:12,paddingVertical:16,marginTop:8,borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:hairline},
+  checkBox:{width:24,height:24,borderRadius:8,borderWidth:1,borderColor:inkSoft,alignItems:'center',justifyContent:'center'},
+  consentText:{...type.meta,color:inkSoft,flex:1},
+  confirm:{minHeight:48,borderRadius:24,backgroundColor:paperDeep,alignItems:'center',justifyContent:'center',padding:12},disabled:{opacity:0.45},
+  footnote:{...type.meta,color:inkSoft,textAlign:'center'},
   selected: { borderColor:sage, backgroundColor:paperDeep },
-  name: { ...type.action,color:ink }, body: { ...type.body,color:ink }, hint: { ...type.meta,color:inkSoft,marginBottom:12 },
+  name: { ...type.action,fontSize:16,lineHeight:24,color:ink }, body: { ...type.body,color:ink }, hint: { ...type.meta,color:inkSoft,marginBottom:12 },
   action: { ...type.action,color:sage }, block: { gap:12,marginTop:20 },
 });
