@@ -14,6 +14,7 @@ import { MomentFeeling } from '../../screens/moment-feeling';
 import { MomentImages } from '../../screens/moment-images';
 import {
   ink,
+  hairline,
   inkSoft,
   isCompactHeight,
   pageGutter,
@@ -124,9 +125,15 @@ export default function MomentDetailScreen() {
         {view?.kind === 'ready' ? (
           <View style={styles.page}>
             <View style={styles.entry}>
+              <View style={styles.dateRow} testID="detail-date-row">
               <Text accessibilityRole="header" style={styles.date}>
                 {view.dateLabel}
               </Text>
+              {isFamilyProductEntryOpen() ? <Pressable accessibilityRole="button" accessibilityLabel={tr('分享')}
+                testID="moment-share-top" onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)} style={styles.shareHit}>
+                <Text style={styles.share}>{tr('分享')}</Text>
+              </Pressable> : null}
+              </View>
               {detailPrecisionLine(view.precision) ? (
                 <Text testID="detail-precision" style={styles.precision}>
                   {detailPrecisionLine(view.precision)}
@@ -155,19 +162,19 @@ export default function MomentDetailScreen() {
             />
             <View style={styles.secondary}>
               <MomentFeeling feeling={view.feeling} testID="detail-feeling" />
-              <Text style={styles.meta}>{view.sourceLabel}</Text>
             </View>
             {isFamilyProductEntryOpen() ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={tr('分享给家里')}
+                accessibilityLabel={tr('分享')}
                 testID="moment-share-to-family"
                 onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)}
                 style={styles.shareHit}
               >
-                <Text style={styles.share}>{tr('分享给家里')}</Text>
+                <Text style={styles.share}>{tr('分享')}</Text>
               </Pressable>
             ) : null}
+            <View testID="detail-end-line" style={styles.endLine} accessible={false} accessibilityElementsHidden importantForAccessibility="no" />
           </View>
         ) : null}
       </ScrollView>
@@ -206,15 +213,17 @@ const styles = StyleSheet.create({
   block: { gap: 12, width: '100%', maxWidth: '100%', minWidth: 0 },
   page: { gap: 24, width: '100%', maxWidth: '100%', minWidth: 0 },
   entry: { gap: 4, width: '100%' },
+  dateRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:16},
+  endLine:{width:48,alignSelf:'center',height:StyleSheet.hairlineWidth,backgroundColor:hairline,marginTop:8,marginBottom:16},
   title: { ...type.title, color: ink, flexShrink: 0 },
   body: { ...type.action, color: inkSoft },
-  date: { ...type.title, color: sage, flexShrink: 0 },
+  date: { ...type.title, color: sage, flexShrink: 1 },
   precision: { ...type.meta, color: inkSoft },
   note: { ...type.body, color: ink },
   secondary: { gap: 8, width: '100%' },
   meta: { ...type.meta, color: inkSoft },
   retryHit: { minHeight: 44, justifyContent: 'center' },
   retry: { ...type.action, color: sage },
-  shareHit: { minHeight: 44, justifyContent: 'center' },
-  share: { ...type.action, color: sage },
+  shareHit: { minHeight: 48, minWidth:48, justifyContent: 'center',alignSelf:'flex-start' },
+  share: { ...type.meta, color: inkSoft, textDecorationLine:'underline',textDecorationColor:hairline },
 });
