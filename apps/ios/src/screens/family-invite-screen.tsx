@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { getFamilyUseCases } from "../application/container";
@@ -17,7 +17,7 @@ import { Text, TextInput, type } from "./life-text";
 import { inkSoft, paperDeep } from "./life-page";
 import { LifeIcon } from "./life-icons";
 import { familyInviteError } from "./family-invite-copy";
-export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invite" }: { onJoined?: () => void; onClose?: () => void; returnTo?: "/family" | "/family-invite" }) {
+export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invite", onBusyChange }: { onBusyChange?: (busy: boolean) => void; onJoined?: () => void; onClose?: () => void; returnTo?: "/family" | "/family-invite" }) {
   const router = useRouter();
   const lock = useDeviceLock();
   const allowed = isFamilyProductEntryOpen() && !lock?.snapshot.locked;
@@ -27,6 +27,9 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
+  const completed = useRef(false);
+  useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
+  useEffect(() => () => { onBusyChange?.(false); }, [onBusyChange]);
   const seq = useRef(0);
   const owner = useRef<number | null>(null);
   const focus = useRef(false);
@@ -35,6 +38,8 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
     const n = ++seq.current;
     setPreview(null);
     setUser(null);
+    if (!intent && completed.current) return;
+    completed.current = false;
     setJoined(false);
     setMessage(null);
     if (!intent) return;
@@ -91,6 +96,7 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
     setBusy(false);
     setPreview(null);
     setUser(null);
+    completed.current = false;
     setJoined(false);
     setMessage(null);
     onClose?.();
@@ -122,6 +128,7 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
       await u.acceptInviteLink(intent.token, user, current);
       if (!current()) return;
       forgetFamilyInvite(intent.generation);
+      completed.current = true;
       setJoined(true);
       setPreview(null);
       onJoined?.();

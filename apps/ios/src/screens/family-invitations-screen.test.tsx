@@ -53,3 +53,21 @@ it('old unsaved invitations do not fabricate QR and list failure has reload',asy
  await fireEvent.press(page.getByTestId('invite-refresh'));
  await waitFor(()=>expect(page.getByText('重新加载')).toBeTruthy());
 });
+
+it('failed refresh disables stale rows without claiming a cached invitation was not saved',async()=>{
+ mockList.mockResolvedValueOnce([item]);
+ const page=await render(<FamilyInvitationsScreen/>);
+ await waitFor(()=>expect(page.getByTestId('invite-create')).toBeEnabled());
+ await fireEvent.press(page.getByTestId('invite-row-i'));
+ expect(page.getByTestId('created-invitation')).toBeTruthy();
+ mockList.mockRejectedValueOnce(new Error('offline'));
+ await fireEvent.press(page.getByTestId('invite-refresh'));
+ await waitFor(()=>expect(page.getByText('重新加载')).toBeTruthy());
+ expect(page.getByTestId('invite-row-i')).toBeDisabled();
+ expect(page.queryByText('本机没有保存这份邀请。可撤销后另建一份。')).toBeNull();
+ mockList.mockResolvedValueOnce([item]);
+ await fireEvent.press(page.getByText('重新加载'));
+ await waitFor(()=>expect(page.getByTestId('invite-create')).toBeEnabled());
+ await fireEvent.press(page.getByTestId('invite-row-i'));
+ expect(page.getByTestId('created-invitation')).toBeTruthy();
+});

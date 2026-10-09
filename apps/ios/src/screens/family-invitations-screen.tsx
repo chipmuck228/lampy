@@ -105,12 +105,12 @@ export default function FamilyInvitationsScreen() {
  const status=tr(active?'可使用':i.status==='accepted'?'已使用':i.status==='expired'?'已过期':'已撤销');
  return <View key={i.invitationId} style={styles.row}>
  <Pressable testID={'invite-row-'+i.invitationId} style={styles.heading} accessibilityRole="button"
- accessibilityLabel={expiry(i.expiresAt)+'，'+status} accessibilityState={{expanded:open,disabled:busy}}
- disabled={busy} onPress={()=>setExpanded(open?null:i.invitationId)}>
+ accessibilityLabel={expiry(i.expiresAt)+'，'+status} accessibilityState={{expanded:open,disabled:busy||!ready}}
+ disabled={busy||!ready} onPress={()=>setExpanded(open?null:i.invitationId)}>
  <View style={styles.summary}><LifeIcon name={active?'family':i.status==='accepted'?'check':i.status==='revoked'?'clear':'replay'} color={active?sage:inkSoft}/>
  <Text style={{...type.action,color:active?sage:inkSoft,opacity:active?1:0.6}}>{expiry(i.expiresAt)}</Text></View>
  <LifeIcon name={open?'collapse':'expand'} color={active?sage:inkSoft}/></Pressable>
- {open&&active?<View style={styles.detail}>
+ {open&&active&&ready?<View style={styles.detail}>
  {data?<Image testID="created-invitation" source={{uri:data.qr}} style={{width:220,height:220,maxWidth:'100%'}} accessibilityLabel={tr('家庭邀请')}/>:<Text style={styles.intro}>{tr('本机没有保存这份邀请。可撤销后另建一份。')}</Text>}
  <View style={styles.actionRow}>
  {data?<Pressable style={[styles.hit,styles.rowHit]} accessibilityRole="button" disabled={busy||!ready} onPress={()=>void share(data)}><Text>{tr('分享')}</Text></Pressable>:null}

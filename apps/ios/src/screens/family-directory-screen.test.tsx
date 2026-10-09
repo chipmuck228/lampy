@@ -140,3 +140,24 @@ it('shows invite only on the selected creator family and never on a selected mem
  expect(page.queryByTestId('family-invite-two')).toBeNull();
  expect(page.getByTestId('family-open-invite')).toBeTruthy();
 });
+
+it('cannot collapse the inline panel during acceptance and refreshes families when it succeeds',async()=>{
+ mockOpen.mockReturnValue(true);
+ mockPreview.mockResolvedValue({name:'Invited',status:'pending',expiresAt:'2026-10-15T00:00:00Z'});
+ let done!:(v:unknown)=>void;
+ mockAccept.mockImplementationOnce(()=>new Promise(r=>{done=r;}));
+ const page=await render(<FamilyDirectoryScreen/>);
+ await waitFor(()=>expect(page.getByText('Our home')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('family-open-invite'));
+ await fireEvent.changeText(page.getByLabelText('邀请链接'),'lampy:///family-invite#'+'a'.repeat(64));
+ await fireEvent.press(page.getByText('查看邀请'));
+ await waitFor(()=>expect(page.getByTestId('invite-confirm')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('invite-confirm'));
+ expect(page.getByTestId('family-open-invite')).toBeDisabled();
+ await fireEvent.press(page.getByTestId('family-open-invite'));
+ expect(page.getByTestId('invite-confirm')).toBeTruthy();
+ await act(async()=>{done({familyId:'new'});});
+ await waitFor(()=>expect(mockFamilies).toHaveBeenCalledTimes(2));
+ expect(page.getByText('已加入这个家。')).toBeTruthy();
+ expect(page.getByTestId('family-open-invite')).toBeEnabled();
+});

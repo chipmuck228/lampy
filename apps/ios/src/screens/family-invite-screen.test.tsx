@@ -99,3 +99,15 @@ it('empty input disables preview and the clear icon resets input without a colla
  await fireEvent.press(page.getByLabelText('清除输入'));
  expect(page.getByText('查看邀请')).toBeDisabled();
 });
+
+it('keeps successful join feedback after background and foreground without replaying acceptance',async()=>{
+ rememberFamilyInvite('a'.repeat(64));
+ const page=await render(<FamilyInvitePanel/>);
+ await waitFor(()=>expect(page.getByTestId('invite-confirm')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('invite-confirm'));
+ await waitFor(()=>expect(page.getByText('已加入这个家。')).toBeTruthy());
+ await act(async()=>{(AppState as any).currentState='background';mockStateListener?.('background');});
+ await act(async()=>{(AppState as any).currentState='active';mockStateListener?.('active');});
+ expect(page.getByText('已加入这个家。')).toBeTruthy();
+ expect(mockAccept).toHaveBeenCalledTimes(1);
+});

@@ -25,6 +25,7 @@ export default function FamilyDirectoryScreen() {
   const [busy, setBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
   const [wallWidth, setWallWidth] = useState<number | null>(null);
   const wall = albumCoverWallLayout(wallWidth);
   const [message, setMessage] = useState<string | null>(null);
@@ -123,11 +124,11 @@ export default function FamilyDirectoryScreen() {
         </Pressable> : null}
 
         <Pressable style={[styles.createHit,styles.rootAction,styles.joinHit]} testID="family-open-invite" accessibilityRole="button"
-          accessibilityState={{expanded:inviteOpen}} onPress={() => setInviteOpen(v => !v)}>
+          disabled={inviteBusy} accessibilityState={{expanded:inviteOpen,disabled:inviteBusy}} onPress={() => { if (!inviteBusy) setInviteOpen(v => !v); }}>
           <Text style={styles.joinAction}>{tr('通过邀请加入')}</Text>
         </Pressable>
         </View>
-        {inviteOpen ? <View style={styles.inlineJoin}><FamilyInvitePanel returnTo="/family" onJoined={joined} onClose={() => setInviteOpen(false)} /></View> : null}
+        {inviteOpen ? <View style={styles.inlineJoin}><FamilyInvitePanel onBusyChange={setInviteBusy} returnTo="/family" onJoined={joined} onClose={() => setInviteOpen(false)} /></View> : null}
 
       {state.status === 'ready' ? <>
         <View style={styles.capacity} testID="family-capacity">
