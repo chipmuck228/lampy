@@ -12,6 +12,7 @@ import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
 import { AlbumCoverFace } from './album-cover-tile';
 import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
 import { LifeIcon } from './life-icons';
+import { FamilyCardMembers } from './family-card-members';
 import { FamilyCardHistory } from './family-card-history';
 import { FamilyInvitePanel } from './family-invite-screen';
 
@@ -37,7 +38,7 @@ export default function FamilyDirectoryScreen() {
   const refresh = useCallback(async () => {
     const request = sequence.current;
     const work = directory.load(async () => {
-      const result = await (await getFamilyUseCases()).getFamilies();
+      const result = await (await getFamilyUseCases()).getFamilies(() => request === sequence.current);
       if (request !== sequence.current) throw new Error('stale');
       if (accountId.current && accountId.current !== result.userId) {
         operation.current = null;
@@ -166,7 +167,7 @@ export default function FamilyDirectoryScreen() {
             <Text style={styles.familyName}>{f.name || tr('未命名家庭')}</Text>
             <Text style={styles.familyMeta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
           </Pressable>
-          {f.familyId === state.selectedId ? <FamilyCardHistory key={f.familyId} familyId={f.familyId} /> : null}
+          {f.familyId === state.selectedId ? <><FamilyCardHistory key={f.familyId} familyId={f.familyId} /><FamilyCardMembers key={`members-${f.familyId}`} familyId={f.familyId} onChanged={joined} /></> : null}
           {f.role === 'creator' && f.familyId === state.selectedId ? <Pressable testID={`family-invite-${f.familyId}`} style={styles.cardInvite}
             disabled={busy} accessibilityRole="button" accessibilityLabel={tr('邀请家人加入 {0}', [f.name || tr('未命名家庭')])}
             onPress={() => router.push({pathname:'/family-invitations', params:{familyId:f.familyId}})}>

@@ -418,8 +418,10 @@ export function createFamilyUseCases(deps: {
     }
   }
 
+  const history = createFamilyHistoryUseCases(deps);
+  let directoryRequest = 0;
   return {
-    history: createFamilyHistoryUseCases(deps),
+    history,
     async previewInviteLink(token: string) {
       if(!deps.client.previewInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
       return deps.client.previewInviteLink(token);
@@ -450,13 +452,18 @@ export function createFamilyUseCases(deps: {
       const result=await deps.client.acceptInviteLink(a.sessionToken,token);await assertSameAccount(a);
       if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');return result;
     },
-    async getFamilies(): Promise<FamilyListView & { userId: string }> {
+    async getFamilies(isCurrent: () => boolean = () => true): Promise<FamilyListView & { userId: string }> {
+      const request = ++directoryRequest;
+      const current = () => isCurrent() && request === directoryRequest;
       await flushPendingRevoke();
       const account = await requireAccount();
+      if (!current()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Directory request is inactive.');
       if (!deps.client.listFamilies) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED', 'Family service must be upgraded.');
       try {
         const result = await deps.client.listFamilies(account.sessionToken);
         await assertSameAccount(account);
+        if (!current()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Directory request is inactive.');
+        await history.reconcileFamilies(account.userId, result.families.map(f => f.familyId), current);
         return { ...result, userId: account.userId };
       } catch (error) {
         await assertSameAccount(account);

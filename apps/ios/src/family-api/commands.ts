@@ -16,6 +16,7 @@ import type {
   FamilyHealth,
   FamilyIds,
   FamilyView,
+  FamilyRoster,
   Invitation,
   InvitationView,
   MediaObjectView,
@@ -57,6 +58,9 @@ export type FamilyCommands = InviteLinkCommands & {
   acceptInvitation(sessionToken: string, code: string, idempotencyKey?: string): Promise<FamilyView>;
   listMembership(sessionToken: string): Promise<MembershipListView>;
   listPendingInvitations(sessionToken: string, familyId: string): Promise<InvitationView[]>;
+  getFamilyRoster(sessionToken: string, familyId: string): Promise<FamilyRoster>;
+  leaveSelectedFamily(sessionToken: string, familyId: string, membershipId: string): Promise<{ left: true }>;
+  removeSelectedMember(sessionToken: string, familyId: string, userId: string, membershipId: string): Promise<{ removed: true }>;
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
   dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
@@ -564,6 +568,50 @@ export function createFamilyCommands(deps: {
           if (invitation.status === 'pending') views.push(toInvitationView(invitation));
         }
         return views;
+      });
+    },
+
+    getFamilyRoster(sessionToken, familyId) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        await requireActiveFamily(tx, familyId);
+        const membership = await tx.findActiveMembership(familyId, userId);
+        if (!membership) throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.');
+        const rows = await tx.listActiveMembers(familyId);
+        return { familyId, role: membership.role, membershipId: membership.membershipId,
+          members: rows.sort((a, b) => a.joinedAt.localeCompare(b.joinedAt) || a.membershipId.localeCompare(b.membershipId))
+            .map(row => ({ membershipId: row.membershipId, userId: row.userId, role: row.role, joinedAt: row.joinedAt })) };
+      });
+    },
+    leaveSelectedFamily(sessionToken, familyId, membershipId) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        await requireActiveFamily(tx, familyId);
+        const active = await tx.findActiveMembership(familyId, userId);
+        if (active && active.membershipId !== membershipId) throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Membership changed.');
+        if (!active) {
+          const prior = (await tx.findMembershipsInFamily(familyId, userId)).find(row => row.membershipId === membershipId);
+          if (prior?.status === 'left' || prior?.status === 'removed') return { left: true as const };
+          throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.');
+        }
+        if (active.role === 'creator') throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'The creator cannot leave.');
+        active.status = 'left'; await tx.saveMembership(active);
+        return { left: true as const };
+      });
+    },
+    removeSelectedMember(sessionToken, familyId, targetUserId, membershipId) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        await requireActiveFamily(tx, familyId);
+        await requireActiveCreator(tx, familyId, userId, 'Only the creator can remove a member.');
+        if (targetUserId === userId) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Cannot remove yourself.');
+        const active = await tx.findActiveMembership(familyId, targetUserId);
+        if (active && active.membershipId !== membershipId) throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Membership changed.');
+        if (!active) {
+          const prior = (await tx.findMembershipsInFamily(familyId, targetUserId)).find(row => row.membershipId === membershipId);
+          if (prior?.status === 'removed' || prior?.status === 'left') return { removed: true as const };
+          throw new FamilyError(FAMILY_ERROR.MEMBER_NOT_FOUND, 'Member not found.');
+        }
+        if (active.role === 'creator') throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Cannot remove the creator.');
+        active.status = 'removed'; await tx.saveMembership(active);
+        return { removed: true as const };
       });
     },
 

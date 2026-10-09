@@ -179,6 +179,13 @@ export async function dispatchFamilyApi(
       return { status: 200, body: await commands.listMembership(token || '') };
     }
 
+    const roster = /^\/v2\/families\/([^/]+)\/members$/.exec(path);
+    if (method === 'GET' && roster) return { status: 200, body: await commands.getFamilyRoster(token || '', roster[1]) };
+    const selectedLeave = /^\/v2\/families\/([^/]+)\/leave$/.exec(path);
+    if (method === 'POST' && selectedLeave) return { status: 200, body: await commands.leaveSelectedFamily(token || '', selectedLeave[1], readString(body, 'membershipId')) };
+    const selectedRemove = /^\/v2\/families\/([^/]+)\/members\/([^/]+)\/remove$/.exec(path);
+    if (method === 'POST' && selectedRemove) return { status: 200, body: await commands.removeSelectedMember(token || '', selectedRemove[1], selectedRemove[2], readString(body, 'membershipId')) };
+
     if (method === 'POST' && path === '/v1/me/leave') {
       return { status: 200, body: await commands.leaveFamily(token || '') };
     }

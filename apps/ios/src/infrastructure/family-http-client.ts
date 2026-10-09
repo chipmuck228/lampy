@@ -78,6 +78,9 @@ export type FamilyApiClient = {
   acceptInvitation(sessionToken: string, code: string, idempotencyKey: string): Promise<FamilyView>;
   listMembership(sessionToken: string): Promise<MembershipListView>;
   listPendingInvitations(sessionToken: string, familyId: string): Promise<InvitationView[]>;
+  getFamilyRoster?(sessionToken: string, familyId: string): Promise<import('../family-api/types').FamilyRoster>;
+  leaveSelectedFamily?(sessionToken: string, familyId: string, membershipId: string): Promise<{ left: true }>;
+  removeSelectedMember?(sessionToken: string, familyId: string, userId: string, membershipId: string): Promise<{ removed: true }>;
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
   dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
@@ -193,6 +196,15 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
     },
     listPendingInvitations(sessionToken, familyId) {
       return send({ method: 'GET', path: `/v1/families/${familyId}/invitations`, sessionToken });
+    },
+    getFamilyRoster(sessionToken, familyId) {
+      return send({ method: 'GET', path: `/v2/families/${familyId}/members`, sessionToken });
+    },
+    leaveSelectedFamily(sessionToken, familyId, membershipId) {
+      return send({ method: 'POST', path: `/v2/families/${familyId}/leave`, sessionToken, body: { membershipId } });
+    },
+    removeSelectedMember(sessionToken, familyId, userId, membershipId) {
+      return send({ method: 'POST', path: `/v2/families/${familyId}/members/${userId}/remove`, sessionToken, body: { membershipId } });
     },
     leaveFamily(sessionToken) {
       return send({ method: 'POST', path: '/v1/me/leave', sessionToken });

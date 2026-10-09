@@ -147,3 +147,69 @@ it('drops a conversion completed after background cancellation',async()=>{
   await expect(sharing).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
   expect(x.requests.some(r=>r.path==='/v1/media')).toBe(false);
 });
+
+it('E1 leaves only the chosen family, clears its media and retains other-family and personal data', async () => {
+ const x=await fixture();x.attach();
+ const first=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);
+ const other=await x.commands.createNamedFamily(x.b.sessionToken,'Other','other');
+ await x.session.setSession(x.b);
+ const second=await x.history.share(await x.history.prepare('moment_d2',other.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ await x.history.read(x.f.familyId,first.shareId,current);await x.history.read(other.familyId,second.shareId,current);
+ const roster=await x.history.getMembers(x.f.familyId,current);
+ await x.history.leaveFamily(roster,current);
+ expect(await x.cache.find(x.b.userId,x.f.familyId,first.shareId)).toBeNull();
+ expect(await x.cache.find(x.b.userId,other.familyId,second.shareId)).not.toBeNull();
+ expect([...x.cache.files.keys()].every(key=>!key.includes(x.f.familyId))).toBe(true);
+ expect((await x.personal.moments.findById()).moment.content.note).toBe('A quiet morning');
+ expect((await x.personal.assets.findById()).asset.localUri).toBe('file:///personal/photo.jpg');
+});
+it('E1 cleans the entire denied family on a removed-member detail read, but not another family', async () => {
+ const x=await fixture();x.attach();
+ const share=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);
+ const other=await x.commands.createNamedFamily(x.b.sessionToken,'Other','other');
+ await x.session.setSession(x.b); await x.history.read(x.f.familyId,share.shareId,current);
+ await x.cache.upsertListed(x.b.userId,{...share,familyId:other.familyId,shareId:'other-share'});
+ const roster=await x.commands.getFamilyRoster(x.a.sessionToken,x.f.familyId),member=roster.members.find(m=>m.userId===x.b.userId)!;
+ await x.commands.removeSelectedMember(x.a.sessionToken,x.f.familyId,x.b.userId,member.membershipId);
+ await expect(x.history.read(x.f.familyId,share.shareId,current)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
+ expect(await x.cache.list(x.b.userId,x.f.familyId)).toEqual([]);expect(x.cache.files.size).toBe(0);
+ expect(await x.cache.find(x.b.userId,other.familyId,'other-share')).not.toBeNull();
+});
+it('E1 rejects old-account member confirmation and invalidates a late list after leaving', async () => {
+ const x=await fixture();const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);
+ await x.session.setSession(x.b);const roster=await x.history.getMembers(x.f.familyId,current);
+ await x.session.setSession(x.a);await expect(x.history.leaveFamily(roster,current)).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ await x.session.setSession(x.b);
+ const gate=deferred<{shares:[]}>();x.client.history!.listVisibleShares=()=>gate.promise;
+ const pending=x.history.list(x.f.familyId,current);await new Promise(r=>setTimeout(r,0));
+ await x.history.leaveFamily(await x.history.getMembers(x.f.familyId,current),current);
+ gate.resolve({shares:[]});await expect(pending).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ expect(await x.cache.list(x.b.userId,x.f.familyId)).toEqual([]);
+});
+it('E1 directory reconciliation also rejects a departed family list delayed before its first cache write', async () => {
+ const x=await fixture();const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);
+ await x.session.setSession(x.b);
+ const gate=deferred<{shares:[]}>();x.client.history!.listVisibleShares=()=>gate.promise;
+ const work=x.history.list(x.f.familyId,current);await new Promise(r=>setTimeout(r,0));
+ const roster=await x.commands.getFamilyRoster(x.b.sessionToken,x.f.familyId);
+ await x.commands.leaveSelectedFamily(x.b.sessionToken,x.f.familyId,roster.membershipId);
+ await x.history.reconcileFamilies(x.b.userId,[],current);
+ gate.resolve({shares:[]});await expect(work).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ expect(await x.cache.listFamilyIds!(x.b.userId)).toEqual([]);
+});
+it('denial invalidates a pending list before waiting for its cache write and keeps unrelated shares on FORBIDDEN', async () => {
+ const x=await fixture();const share=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ await x.cache.upsertListed(x.a.userId,{...share,shareId:'other-share'});
+ const start=deferred<void>(),end=deferred<void>();const original=x.cache.replaceVisible.bind(x.cache);
+ x.cache.replaceVisible=async (...args)=>{start.resolve();await end.promise;return original(...args);};
+ const list=x.history.list(x.f.familyId,current);await start.promise;
+ x.client.history!.getShare=async()=>{throw new ApplicationError('NOT_IN_FAMILY','removed');};
+ const denied=x.history.authorize(x.f.familyId,share.shareId,current).catch(e=>e);
+ await new Promise(r=>setTimeout(r,0));end.resolve();await expect(list).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});expect((await denied).code).toBe('NOT_IN_FAMILY');expect(await x.cache.list(x.a.userId,x.f.familyId)).toEqual([]);
+ await x.cache.upsertListed(x.a.userId,share);await x.cache.upsertListed(x.a.userId,{...share,shareId:'other-share'});
+ x.client.history!.getShare=async()=>{throw new ApplicationError('FORBIDDEN','one share');};
+ await expect(x.history.authorize(x.f.familyId,share.shareId,current)).rejects.toMatchObject({code:'FORBIDDEN'});
+ expect(await x.cache.find(x.a.userId,x.f.familyId,share.shareId)).toBeNull();expect(await x.cache.find(x.a.userId,x.f.familyId,'other-share')).not.toBeNull();
+});

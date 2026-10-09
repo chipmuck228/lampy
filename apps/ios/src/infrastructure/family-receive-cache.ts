@@ -51,6 +51,7 @@ export type FamilyCacheCleanup = {
 };
 
 export type FamilyReceiveCache = {
+  listFamilyIds?(userId: string): Promise<string[]>;
   list(userId: string, familyId: string): Promise<ReceivedShareRecord[]>;
   find(userId: string, familyId: string, shareId: string): Promise<ReceivedShareRecord | null>;
   upsertListed(userId: string, share: ShareView): Promise<ReceivedShareRecord>;
@@ -159,6 +160,7 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
     shares,
     media,
     files,
+    async listFamilyIds(userId) { return [...new Set([...shares, ...media].filter(row => row.userId === userId).map(row => row.familyId))]; },
     async list(userId, familyId) {
       return shares.filter((row) => row.userId === userId && row.familyId === familyId);
     },
@@ -593,6 +595,11 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
   }
 
   return {
+    async listFamilyIds(userId) {
+      const rows = await db.getAll<{ family_id: string }>(
+        'SELECT family_id FROM family_received_shares WHERE user_id = ? UNION SELECT family_id FROM family_received_media WHERE user_id = ?', [userId, userId]);
+      return rows.map(row => row.family_id);
+    },
     async list(userId, familyId) {
       await recoverDisk();
       const rows = await db.getAll<ShareRow>(
