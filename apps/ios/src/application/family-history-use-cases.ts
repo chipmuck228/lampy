@@ -40,10 +40,17 @@ export function createFamilyHistoryUseCases(deps: {
   const frozen = new WeakMap<HistoryPreview, { account: Account; fingerprint: string; familyId: string; momentId: string; selectedAssetIds: string[] }>();
   const memberViews = new WeakMap<FamilyRoster & { userId: string }, Account>();
   const generations = new Map<string, number>();
-  function qualified(familyId: string, current: HistoryCurrent): HistoryCurrent {
+  const shareGenerations = new Map<string, number>();
+  const qualifierBase = new WeakMap<HistoryCurrent, HistoryCurrent>();
+  function qualified(familyId: string, current: HistoryCurrent, shareId?: string): HistoryCurrent {
     const generation = generations.get(familyId) ?? 0;
     generations.set(familyId, generation);
-    return () => current() && (generations.get(familyId) ?? 0) === generation;
+    const shareKey = `${familyId}/${shareId ?? ''}`;
+    const shareGeneration = shareGenerations.get(shareKey) ?? 0;
+    const base = qualifierBase.get(current) ?? current;
+    const result = () => base() && (generations.get(familyId) ?? 0) === generation
+      && (!shareId || (shareGenerations.get(shareKey) ?? 0) === shareGeneration);
+    qualifierBase.set(result, base); return result;
   }
   let cacheTail: Promise<unknown> = Promise.resolve();
   async function account(): Promise<Account> {
@@ -121,11 +128,16 @@ export function createFamilyHistoryUseCases(deps: {
     return job;
   }
   async function invalidateDenied(a: Account, familyId: string, shareId: string | undefined, current: HistoryCurrent, failure: unknown) {
-    const code = failure && typeof failure === 'object' && 'code' in failure ? failure.code : '';
-    if (!['UNAUTHENTICATED','NOT_IN_FAMILY','FORBIDDEN','SHARE_NOT_FOUND','FAMILY_HISTORY_CLOSED'].includes(String(code))) return;
-    // This cleanup touches only this account/family/share, never personal records.
-    await cacheWork(a, familyId, shareId, current, cache => shareId && !['NOT_IN_FAMILY', 'UNAUTHENTICATED', 'FORBIDDEN'].includes(String(code))
-      ? cache.isolateShare(a.userId,familyId,shareId) : cache.isolateFamily(a.userId,familyId)).catch(() => undefined);
+    const code = String(failure && typeof failure === 'object' && 'code' in failure ? failure.code : '');
+    if (!['UNAUTHENTICATED','NOT_IN_FAMILY','FORBIDDEN','SHARE_NOT_FOUND','FAMILY_HISTORY_CLOSED'].includes(code)) return;
+    try { await check(a, qualifierBase.get(current) ?? current); } catch { return; }
+    const wholeFamily = !shareId || ['NOT_IN_FAMILY','UNAUTHENTICATED','FAMILY_HISTORY_CLOSED'].includes(code);
+    // Denial invalidates reads now, before waiting for cache writes already in flight.
+    if (wholeFamily) generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
+    else { const key = `${familyId}/${shareId}`; shareGenerations.set(key, (shareGenerations.get(key) ?? 0) + 1); }
+    const job = cacheTail.catch(() => undefined).then(() => wholeFamily
+      ? deps.receiveCache?.isolateFamily(a.userId, familyId) : deps.receiveCache?.isolateShare(a.userId, familyId, shareId!));
+    cacheTail = job; await job.catch(() => undefined);
   }
   async function policy(a: Account, familyId: string, current: HistoryCurrent) {
     api();
@@ -141,14 +153,12 @@ export function createFamilyHistoryUseCases(deps: {
     async reconcileFamilies(userId: string, activeIds: string[], current: HistoryCurrent) {
       const a = await account(); if (a.userId !== userId) throw error('STALE_FAMILY_REQUEST');
       if (!deps.receiveCache?.listFamilyIds) return;
+      await check(a, current);
+      const ids = await deps.receiveCache.listFamilyIds(userId); await check(a, current);
+      const removed = new Set([...ids, ...generations.keys()].filter(id => !activeIds.includes(id)));
+      for (const familyId of removed) generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
       const job = cacheTail.catch(() => undefined).then(async () => {
-        await check(a, current);
-        const ids = await deps.receiveCache!.listFamilyIds!(userId); await check(a, current);
-        for (const familyId of new Set([...ids, ...generations.keys()].filter(id => !activeIds.includes(id)))) {
-          await check(a, current);
-          generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
-          await deps.receiveCache!.isolateFamily(userId, familyId);
-        }
+        for (const familyId of removed) await deps.receiveCache!.isolateFamily(userId, familyId);
         await check(a, current);
       });
       cacheTail = job; await job;
@@ -276,7 +286,7 @@ export function createFamilyHistoryUseCases(deps: {
       return { userId: a.userId, shares: result.shares };
     },
     async read(familyId: string, shareId: string, current: HistoryCurrent): Promise<HistoryReading> {
-      current = qualified(familyId, current);
+      current = qualified(familyId, current, shareId);
       const a = await account();
       const client = api();
       let share;
@@ -318,7 +328,7 @@ export function createFamilyHistoryUseCases(deps: {
       return { userId: a.userId, share, media: received };
     },
     async authorize(familyId: string, shareId: string, current: HistoryCurrent) {
-      current = qualified(familyId, current);
+      current = qualified(familyId, current, shareId);
       const a = await account();
       let share;
       try { share = await api().getShare(a.sessionToken, familyId, shareId); }
@@ -327,7 +337,7 @@ export function createFamilyHistoryUseCases(deps: {
       return { userId: a.userId, share };
     },
     async revoke(familyId: string, shareId: string, current: HistoryCurrent) {
-      current = qualified(familyId, current);
+      current = qualified(familyId, current, shareId);
       const a = await account();
       await check(a, current);
       const result = await api().revokeShare(a.sessionToken, familyId, shareId);

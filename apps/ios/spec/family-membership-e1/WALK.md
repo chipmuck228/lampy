@@ -35,3 +35,9 @@ Simulator and real-device operation: NOT VERIFIED. No TestFlight upload or produ
 - `git diff --check`: PASS.
 - No new schema migration, dependencies or default feature flags.
 - Simulator / real device / VoiceOver: NOT VERIFIED. No production or TestFlight actions.
+
+## User simulator acceptance (2026-10-09)
+
+Reported PASS: member leave/cancel, other-family/personal preservation, old invite rejection/new invitation historical reading, creator remove/cancel and denied old content/audio, background authentication concealment, creator self-action absence, repeated taps, stopped 8787 failure/retry and recovery. Runtime SHA/device OS was not reconfirmed; these reports do not count as real-device acceptance. Final review additionally fixes immediate generation invalidation on denied reads/directory reconciliation and share-scoped FORBIDDEN cleanup; those interleavings are automated evidence, not a replay of device acceptance.
+
+Final pre-merge review fixes: targeted 13 suites / 114 tests PASS; tsc, changed-file ESLint and diff-check PASS. User simulator acceptance is recorded separately from these new interleaving tests.

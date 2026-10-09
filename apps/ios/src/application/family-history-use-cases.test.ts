@@ -199,3 +199,17 @@ it('E1 directory reconciliation also rejects a departed family list delayed befo
  gate.resolve({shares:[]});await expect(work).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
  expect(await x.cache.listFamilyIds!(x.b.userId)).toEqual([]);
 });
+it('denial invalidates a pending list before waiting for its cache write and keeps unrelated shares on FORBIDDEN', async () => {
+ const x=await fixture();const share=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ await x.cache.upsertListed(x.a.userId,{...share,shareId:'other-share'});
+ const start=deferred<void>(),end=deferred<void>();const original=x.cache.replaceVisible.bind(x.cache);
+ x.cache.replaceVisible=async (...args)=>{start.resolve();await end.promise;return original(...args);};
+ const list=x.history.list(x.f.familyId,current);await start.promise;
+ x.client.history!.getShare=async()=>{throw new ApplicationError('NOT_IN_FAMILY','removed');};
+ const denied=x.history.authorize(x.f.familyId,share.shareId,current).catch(e=>e);
+ await new Promise(r=>setTimeout(r,0));end.resolve();await expect(list).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});expect((await denied).code).toBe('NOT_IN_FAMILY');expect(await x.cache.list(x.a.userId,x.f.familyId)).toEqual([]);
+ await x.cache.upsertListed(x.a.userId,share);await x.cache.upsertListed(x.a.userId,{...share,shareId:'other-share'});
+ x.client.history!.getShare=async()=>{throw new ApplicationError('FORBIDDEN','one share');};
+ await expect(x.history.authorize(x.f.familyId,share.shareId,current)).rejects.toMatchObject({code:'FORBIDDEN'});
+ expect(await x.cache.find(x.a.userId,x.f.familyId,share.shareId)).toBeNull();expect(await x.cache.find(x.a.userId,x.f.familyId,'other-share')).not.toBeNull();
+});
