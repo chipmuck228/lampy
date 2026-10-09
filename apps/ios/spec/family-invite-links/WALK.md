@@ -43,3 +43,11 @@ Copy-fix checks: actual-page share and link-parser tests 2 suites / 4 tests PASS
 Pending invitations without the one-time link show that previously shared links remain valid. Replace and share asks confirmation, revokes the old invitation first, then creates and shares a single new link; revocation failure does not create/share. Creation uncertainty asks for a list refresh and does not silently retry. No bearer persistence added. Normal list control is Refresh; list failure is Reload. Chinese/English copy added.
 
 Checks: targeted page/parser Jest 2 suites / 7 tests PASS; tsc, changed ESLint and diff check PASS. Replacement/share and reload controls on simulator/device remain NOT VERIFIED. PR remains OPEN.
+
+## Family directory inline join — 2026-10-09
+
+Removed visible Selected/current-family duplication; selected border and accessibility selected state remain. Each creator tile has its own Invite family action bound to that tile ID; member tiles have none. Join with an invitation expands a reusable inline panel: paste, preview, explicit confirm, result and fresh directory read. Clear input invalidates old preview qualification. Invalid links receive a lightweight message; no automatic acceptance. External /family-invite route remains for web/deep links and uses the same panel. Login continues through the existing account diagnostics route; returning rechecks account before confirmation.
+
+Layout uses existing paper/cover wall/SettingsPage keyboard-aware scroll and 48pt actions, with section spacing and creator actions inside tile containers (no nested Pressables).
+
+Checks: tsc PASS; changed ESLint PASS; targeted Jest 4 suites / 19 tests PASS (creator/member actions, no redundant selection text, inline preview/confirm and directory refresh without navigation, input clear/late preview, existing lock/background/login and invitation share tests); diff check PASS. Actual simulator/device layout, keyboard, scrolling, focus, Chinese/English and inline join flow NOT VERIFIED. Attachment unavailable in this workspace; implementation follows the written requirements, not a claimed screenshot comparison. No production/TestFlight changes; PR remains OPEN.

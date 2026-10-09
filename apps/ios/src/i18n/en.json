@@ -643,5 +643,11 @@
   "邀请仍有效，已分享的链接仍可使用。": "This invitation is still valid. Links already shared still work.",
   "重新生成并分享": "Replace and share",
   "原邀请将失效。生成新的邀请后，再分享给家人。": "The original invitation will stop working. Create a new invitation to share with your family.",
-  "新邀请未确认生成。请刷新查看，原邀请可能已经失效。": "New invitation creation is unconfirmed. Refresh the list; the original invitation may already be inactive."
+  "新邀请未确认生成。请刷新查看，原邀请可能已经失效。": "New invitation creation is unconfirmed. Refresh the list; the original invitation may already be inactive.",
+  "通过邀请加入": "Join with an invitation",
+  "查看邀请": "View invitation",
+  "清除输入": "Clear input",
+  "请粘贴一份完整的家庭邀请链接。": "Paste a complete family invitation link.",
+  "邀请家人加入 {0}": "Invite someone to {{0}}",
+  "收起": "Close"
 }

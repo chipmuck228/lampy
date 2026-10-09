@@ -12,6 +12,7 @@ import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
 import { AlbumCoverFace } from './album-cover-tile';
 import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
 import { LifeIcon } from './life-icons';
+import { FamilyInvitePanel } from './family-invite-screen';
 
 export default function FamilyDirectoryScreen() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function FamilyDirectoryScreen() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [wallWidth, setWallWidth] = useState<number | null>(null);
   const wall = albumCoverWallLayout(wallWidth);
   const [message, setMessage] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export default function FamilyDirectoryScreen() {
       }
     }
   }
-  const chosen = state.status === 'ready' ? state.families.find(f => f.familyId === state.selectedId) : null;
+  const joined = useCallback(() => { void refresh(); }, [refresh]);
   return <SettingsPage title={tr('家庭')} backLabel={tr('最近')} accessibilityLabel={tr('家庭')} onBack={() => router.dismissTo('/')}>
     {!isFamilyProductEntryOpen() ? <Text>{tr('敬请期待。')}</Text> : allowed ? <>
       {state.status !== 'signed-out' ? <Text style={styles.intro}>{tr('给重要的人，留一个位置。')}</Text> : null}
@@ -140,8 +142,8 @@ export default function FamilyDirectoryScreen() {
           const next = Math.round(event.nativeEvent.layout.width);
           setWallWidth(previous => previous === next ? previous : next);
         }}>
-          {state.families.map(f => <Pressable key={f.familyId} testID={`family-select-${f.familyId}`}
-            style={[styles.tile, { width: wall.tileWidth }]} disabled={busy} accessibilityRole="button"
+          {state.families.map(f => <View key={f.familyId} style={[styles.tile, { width: wall.tileWidth }]}><Pressable testID={`family-select-${f.familyId}`}
+            style={styles.selection} disabled={busy} accessibilityRole="button"
             accessibilityLabel={`${f.name || tr('未命名家庭')}，${tr(f.role === 'creator' ? '创建者' : '成员')}，${tr('家庭成员：{0}人', [f.memberCount])}`}
             accessibilityState={{ selected: f.familyId === state.selectedId, disabled: busy }}
             onPress={() => { directory.select(f.familyId); setState(directory.snapshot()); }}>
@@ -152,18 +154,31 @@ export default function FamilyDirectoryScreen() {
             </View>
             <Text style={styles.name}>{f.name || tr('未命名家庭')}</Text>
             <Text style={styles.meta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
-            {f.familyId === state.selectedId ? <Text style={styles.selected}>{tr('已选择')}</Text> : null}
-          </Pressable>)}
+          </Pressable>
+          {f.role === 'creator' ? <Pressable testID={`family-invite-${f.familyId}`} style={styles.cardInvite}
+            disabled={busy} accessibilityRole="button" accessibilityLabel={tr('邀请家人加入 {0}', [f.name || tr('未命名家庭')])}
+            onPress={() => router.push({pathname:'/family-invitations', params:{familyId:f.familyId}})}>
+            <Text style={styles.action}>{tr('邀请家人')}</Text>
+          </Pressable> : null}
+          </View>)}
         </View>
-        {chosen ? <Text testID="family-selected" style={styles.meta}>{tr('当前家庭：{0}', [chosen.name || tr('未命名家庭')])}</Text> : null}
+
       </> : null}
-      {state.status==='ready' && chosen?.role==='creator' ? <Pressable style={styles.createHit} accessibilityRole="button" onPress={()=>router.push({pathname:'/family-invitations',params:{familyId:chosen.familyId}})}><Text style={styles.action}>{tr('邀请家人')}</Text></Pressable> : null}
-      <Pressable style={styles.hit} accessibilityRole="button" onPress={()=>router.push('/family-invite')}><Text style={styles.action}>{tr('打开邀请')}</Text></Pressable>
+      <View style={styles.joinSection}>
+        <Pressable style={styles.createHit} testID="family-open-invite" accessibilityRole="button"
+          accessibilityState={{expanded:inviteOpen}} onPress={() => setInviteOpen(v => !v)}>
+          <Text style={styles.action}>{tr('通过邀请加入')}</Text>
+        </Pressable>
+        {inviteOpen ? <FamilyInvitePanel onJoined={joined} onClose={() => setInviteOpen(false)} /> : null}
+      </View>
       {message ? <Text>{message}</Text> : null}
     </> : null}
   </SettingsPage>;
 }
 const styles = StyleSheet.create({
+  joinSection: { gap: 12, paddingVertical: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline },
+  selection: { gap: 6 },
+  cardInvite: { minHeight: 48, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, borderRadius: 24, backgroundColor: paperDeep, marginTop: 8 },
   intro: { ...type.body, color: inkSoft, marginTop: 12 },
   welcome: { gap: 20, paddingTop: 40, paddingBottom: 32, alignItems: 'flex-start' },
   welcomeMark: { width: 80, height: 80, borderRadius: 24, backgroundColor: paperDeep, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
@@ -193,5 +208,5 @@ const styles = StyleSheet.create({
   cover: { borderRadius: 10, borderWidth: 1, borderColor: 'transparent', overflow: 'hidden' },
   selectedCover: { borderColor: sage },
   coverMark: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
-  selected: { ...type.meta, color: sage },
+
 });

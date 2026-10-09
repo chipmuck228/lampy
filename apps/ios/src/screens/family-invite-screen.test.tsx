@@ -1,6 +1,6 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { AppState } from 'react-native';
-import FamilyInviteScreen from './family-invite-screen';
+import FamilyInviteScreen, { FamilyInvitePanel } from './family-invite-screen';
 import { forgetFamilyInvite, rememberFamilyInvite } from '../infrastructure/family-invite-link';
 const mockPreview=jest.fn(),mockAccount=jest.fn(),mockAccept=jest.fn(),mockPush=jest.fn();
 const mockOpen=jest.fn(()=>true);const mockLock={snapshot:{locked:false}};
@@ -32,4 +32,32 @@ it('late account/preview after background cannot reveal a confirm button or join
 it('signed-out invitation offers login, not an automatic acceptance',async()=>{
   rememberFamilyInvite('a'.repeat(64));mockAccount.mockRejectedValue({code:'UNAUTHENTICATED'});const page=await render(<FamilyInviteScreen/>);
   await waitFor(()=>expect(page.getByText('先登录家庭')).toBeTruthy());await fireEvent.press(page.getByText('先登录家庭'));expect(mockPush).toHaveBeenCalledWith('/account-diagnostics');expect(mockAccept).not.toHaveBeenCalled();
+});
+
+it('previews inline, joins only on confirmation, and reports completion without navigation',async()=>{
+ const joined=jest.fn();
+ const page=await render(<FamilyInvitePanel onJoined={joined}/>);
+ await fireEvent.changeText(page.getByLabelText('邀请链接'),'lampy:///family-invite#'+'a'.repeat(64));
+ await fireEvent.press(page.getByText('查看邀请'));
+ await waitFor(()=>expect(page.getByText('Home')).toBeTruthy());
+ expect(mockAccept).not.toHaveBeenCalled();
+ await fireEvent.press(page.getByTestId('invite-confirm'));
+ await waitFor(()=>expect(joined).toHaveBeenCalledTimes(1));
+ expect(page.getByText('已加入这个家。')).toBeTruthy();
+ expect(mockPush).not.toHaveBeenCalled();
+});
+it('clearing input invalidates a late preview and permits a fresh link',async()=>{
+ let done!:(value:unknown)=>void;
+ mockPreview.mockImplementationOnce(()=>new Promise(r=>{done=r;}));
+ const page=await render(<FamilyInvitePanel/>);
+ await fireEvent.changeText(page.getByLabelText('邀请链接'),'lampy:///family-invite#'+'a'.repeat(64));
+ await fireEvent.press(page.getByText('查看邀请'));
+ await waitFor(()=>expect(mockPreview).toHaveBeenCalledTimes(1));
+ await fireEvent.press(page.getByText('清除输入'));
+ await act(async()=>{done({name:'Old home',status:'pending',expiresAt:'2026-10-15T00:00:00Z'});});
+ expect(page.queryByText('Old home')).toBeNull();
+ expect(page.getByLabelText('邀请链接').props.value).toBe('');
+ await fireEvent.changeText(page.getByLabelText('邀请链接'),'lampy:///family-invite#'+'b'.repeat(64));
+ await fireEvent.press(page.getByText('查看邀请'));
+ await waitFor(()=>expect(page.getByTestId('invite-confirm')).toBeTruthy());
 });

@@ -16,7 +16,7 @@ import { SettingsPage } from "./settings-chrome";
 import { Text, TextInput, type } from "./life-text";
 import { inkSoft, paperDeep } from "./life-page";
 import { familyInviteError } from "./family-invite-copy";
-export default function FamilyInviteScreen() {
+export function FamilyInvitePanel({ onJoined, onClose }: { onJoined?: () => void; onClose?: () => void }) {
   const router = useRouter();
   const lock = useDeviceLock();
   const allowed = isFamilyProductEntryOpen() && !lock?.snapshot.locked;
@@ -86,7 +86,13 @@ export default function FamilyInviteScreen() {
     forgetFamilyInvite();
     setLink("");
     seq.current++;
-    router.dismissTo("/family");
+    owner.current = null;
+    setBusy(false);
+    setPreview(null);
+    setUser(null);
+    setJoined(false);
+    setMessage(null);
+    onClose?.();
   }
   async function accept() {
     const intent = currentFamilyInvite();
@@ -117,6 +123,7 @@ export default function FamilyInviteScreen() {
       forgetFamilyInvite(intent.generation);
       setJoined(true);
       setPreview(null);
+      onJoined?.();
     } catch (e) {
       if (current()) {
         setMessage(familyInviteError(e));
@@ -139,29 +146,32 @@ export default function FamilyInviteScreen() {
     if (!allowed || busy || AppState.currentState !== "active") return;
     const token = parseFamilyInviteLink(link.trim());
     if (!token) {
-      setMessage(tr("这份邀请已结束。请向创建者要一份新的邀请。"));
+      setMessage(tr("请粘贴一份完整的家庭邀请链接。"));
       return;
     }
     rememberFamilyInvite(token);
-    setLink("");
     void load();
   }
   return (
-    <SettingsPage
-      accessibilityLabel={tr("家庭邀请")}
-      title={tr("家庭邀请")}
-      backLabel={tr("取消")}
-      onBack={cancel}
-    >
+    <>
       {allowed ? (
         <>
-          {!currentFamilyInvite() && !joined ? (
+          {!joined ? (
             <>
               <TextInput
                 accessibilityLabel={tr("邀请链接")}
                 placeholder={tr("邀请链接")}
                 value={link}
-                onChangeText={setLink}
+                editable={!busy}
+                onChangeText={value => {
+                  forgetFamilyInvite();
+                  seq.current++;
+                  owner.current = null;
+                  setPreview(null);
+                  setUser(null);
+                  setMessage(null);
+                  setLink(value);
+                }}
                 autoCapitalize="none"
                 autoCorrect={false}
                 style={styles.input}
@@ -172,7 +182,7 @@ export default function FamilyInviteScreen() {
                 disabled={busy}
                 onPress={open}
               >
-                <Text>{tr("打开这份邀请")}</Text>
+                <Text>{tr("查看邀请")}</Text>
               </Pressable>
             </>
           ) : null}
@@ -219,16 +229,16 @@ export default function FamilyInviteScreen() {
               <Pressable
                 style={styles.hit}
                 accessibilityRole="button"
-                onPress={() => router.dismissTo("/family")}
+                onPress={cancel}
               >
-                <Text>{tr("家庭")}</Text>
+                <Text>{tr("完成")}</Text>
               </Pressable>
             </>
           ) : null}
           {message ? (
             <Text accessibilityLiveRegion="polite">{message}</Text>
           ) : null}
-          {!joined && currentFamilyInvite() ? (
+          {!joined && message && currentFamilyInvite() ? (
             <Pressable
               style={styles.hit}
               accessibilityRole="button"
@@ -238,13 +248,28 @@ export default function FamilyInviteScreen() {
               <Text>{tr("再试一次")}</Text>
             </Pressable>
           ) : null}
+          {!joined ? <Pressable style={styles.hit} accessibilityRole="button" disabled={busy}
+            onPress={() => {
+              forgetFamilyInvite(); seq.current++; owner.current = null;
+              setLink(""); setPreview(null); setUser(null); setMessage(null); setBusy(false);
+            }}><Text>{tr("清除输入")}</Text></Pressable> : null}
+          {onClose && !joined ? <Pressable style={styles.hit} accessibilityRole="button" disabled={busy}
+            onPress={cancel}><Text>{tr("收起")}</Text></Pressable> : null}
         </>
       ) : (
         <Text>{tr("邀请暂未开放。")}</Text>
       )}
-    </SettingsPage>
+    </>
   );
 }
+export default function FamilyInviteScreen() {
+  const router = useRouter();
+  return <SettingsPage accessibilityLabel={tr("家庭邀请")} title={tr("家庭邀请")}
+    backLabel={tr("取消")} onBack={() => { forgetFamilyInvite(); router.dismissTo("/family"); }}>
+    <FamilyInvitePanel onClose={() => router.dismissTo("/family")} />
+  </SettingsPage>;
+}
+
 function expiry(value: string) {
   const d = new Date(value);
   return dateLabel(d.getFullYear(), d.getMonth() + 1, d.getDate());
