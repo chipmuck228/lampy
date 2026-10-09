@@ -8,7 +8,7 @@ const mockPreview = jest.fn();
 const mockAccept = jest.fn();
 const mockOpen = jest.fn(() => false);
 const mockLock = { snapshot: { locked: false } };
-jest.mock('../application/container', () => ({ getFamilyUseCases: async () => ({ getFamilies: mockFamilies,createNamedFamily:mockCreate,previewInviteLink:mockPreview,inviteLinkAccount:async()=>'a',acceptInviteLink:mockAccept }) }));
+jest.mock('../application/container', () => ({ getFamilyUseCases: async () => ({ history:{getPolicy:async()=>({policy:'family-history-v2',family:{role:'creator'}})},getFamilies: mockFamilies,createNamedFamily:mockCreate,previewInviteLink:mockPreview,inviteLinkAccount:async()=>'a',acceptInviteLink:mockAccept }) }));
 jest.mock('../infrastructure/family-config', () => ({isFamilyProductEntryOpen: () => mockOpen()}));
 jest.mock('./device-lock-context', () => ({ useDeviceLock: () => mockLock }));
 jest.mock('./settings-chrome', () => { const { Text, View } = jest.requireActual('react-native'); return { SettingsPage: ({children,title}: {children: React.ReactNode;title:string}) => <View><Text>{title}</Text>{children}</View> }; });

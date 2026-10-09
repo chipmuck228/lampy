@@ -1,5 +1,5 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { AppState, type AppStateStatus } from 'react-native';
+import { Alert, AppState, type AppStateStatus } from 'react-native';
 import { FamilyHistoryScreen } from './family-history-screen';
 const mockPolicy=jest.fn(),mockList=jest.fn(),mockRead=jest.fn(),mockAuthorize=jest.fn(),mockRevoke=jest.fn(),mockPush=jest.fn(),mockPlay=jest.fn();
 let mockOpen=true;
@@ -52,4 +52,31 @@ it('does not let a late old-family reading replace a new family',async()=>{
   mockRead.mockResolvedValueOnce({...reading,share:{...share,familyId:'other',snapshot:{...share.snapshot,note:'Other'}}});
   await page.rerender(<FamilyHistoryScreen familyId="other" shareId="other_share"/>);await waitFor(()=>expect(page.getByText('Other')).toBeTruthy());
   await act(async()=>{resolve(reading);});expect(page.queryByText('Morning')).toBeNull();expect(page.getByText('Other')).toBeTruthy();
+});
+
+it('requires explicit confirmation to withdraw and discards confirmation after background', async()=>{
+  mockRead.mockResolvedValue({...reading,userId:'a'});
+  const alert=jest.spyOn(Alert,'alert');
+  const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);
+  await waitFor(()=>expect(page.getByTestId('history-revoke')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('history-revoke'));
+  expect(mockRevoke).not.toHaveBeenCalled();
+  const confirm=alert.mock.calls[0][2]![1].onPress!;
+  await act(async()=>{AppState.currentState='background';mockListeners.slice().forEach(fn=>fn('background'));});
+  await act(async()=>{confirm();});expect(mockRevoke).not.toHaveBeenCalled();
+});
+it('withdraws only after confirmation, keeps cancel harmless', async()=>{
+  mockRead.mockResolvedValue({...reading,userId:'a'});
+  const alert=jest.spyOn(Alert,'alert');
+  const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);
+  await waitFor(()=>expect(page.getByTestId('history-revoke')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('history-revoke'));expect(mockRevoke).not.toHaveBeenCalled();
+  await act(async()=>{alert.mock.calls[0][2]![1].onPress!();});
+  expect(mockRevoke).toHaveBeenCalledTimes(1);
+});
+it('shows an inviting empty state with navigation instead of a record list', async()=>{
+  mockList.mockResolvedValue({userId:'b',shares:[]});
+  const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
+  await waitFor(()=>expect(page.getByTestId('history-empty')).toBeTruthy());
+  expect(page.getByText('去最近')).toBeTruthy();expect(page.getByText('去回看')).toBeTruthy();
 });

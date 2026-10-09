@@ -685,5 +685,22 @@
   "分享这份媒介 {0}": "Include media {{0}}",
   "照片分享需要更新测试安装，原照片还在。": "Photo sharing requires an updated test installation. Your original photo is still here.",
   "这张照片暂时无法分享，可以取消勾选后再试。": "This photo cannot be shared right now. You can deselect it and try again.",
-  "这份照片或声音超过分享大小限制，可以取消勾选后再试。": "This photo or sound exceeds the sharing size limit. You can deselect it and try again."
+  "这份照片或声音超过分享大小限制，可以取消勾选后再试。": "This photo or sound exceeds the sharing size limit. You can deselect it and try again.",
+  "家人可以一起回看": "Your family can revisit together",
+  "开启家庭分享？": "Enable family sharing?",
+  "后来加入的家人也能阅读仍有效的分享。旧的未使用邀请会结束，需要重新邀请。": "New members can read active past shares. Unused old invitations will end; invite them again.",
+  "确认开启": "Enable sharing",
+  "正在开启。": "Enabling sharing…",
+  "开启家庭分享": "Enable family sharing",
+  "等创建者开启，一起留下家里的片段。": "The creator can enable sharing for this family.",
+  "请在家庭页开启家庭分享。": "Enable sharing from this family’s card.",
+  "返回家庭": "Back to family",
+  "去最近": "Go to Recent",
+  "去回看": "Go to Revisit",
+  "去最近或回看，打开一条记录，再选择「分享给家里」。": "Open a moment in Recent or Revisit, then choose “Share with family”.",
+  "你分享的": "Shared by you",
+  "家人分享的": "Shared by a family member",
+  "撤回这次分享？": "Withdraw this share?",
+  "家人将不能再阅读这次分享。你的个人记录仍然保留。": "Your family will no longer be able to read this share. Your personal moment stays on this device.",
+  "撤回分享": "Withdraw share"
 }

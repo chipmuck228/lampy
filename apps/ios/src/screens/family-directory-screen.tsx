@@ -12,6 +12,7 @@ import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
 import { AlbumCoverFace } from './album-cover-tile';
 import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
 import { LifeIcon } from './life-icons';
+import { FamilyCardHistory } from './family-card-history';
 import { FamilyInvitePanel } from './family-invite-screen';
 
 export default function FamilyDirectoryScreen() {
@@ -165,10 +166,7 @@ export default function FamilyDirectoryScreen() {
             <Text style={styles.familyName}>{f.name || tr('未命名家庭')}</Text>
             <Text style={styles.familyMeta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
           </Pressable>
-          {f.familyId === state.selectedId ? <Pressable testID={`family-records-${f.familyId}`} style={styles.cardInvite}
-            accessibilityRole="button" disabled={busy} onPress={() => router.push({pathname:'/family-records',params:{familyId:f.familyId}})}>
-            <Text style={styles.action}>{tr('家庭记录')}</Text>
-          </Pressable> : null}
+          {f.familyId === state.selectedId ? <FamilyCardHistory key={f.familyId} familyId={f.familyId} /> : null}
           {f.role === 'creator' && f.familyId === state.selectedId ? <Pressable testID={`family-invite-${f.familyId}`} style={styles.cardInvite}
             disabled={busy} accessibilityRole="button" accessibilityLabel={tr('邀请家人加入 {0}', [f.name || tr('未命名家庭')])}
             onPress={() => router.push({pathname:'/family-invitations', params:{familyId:f.familyId}})}>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
@@ -34,7 +34,6 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
   const [viewer, setViewer] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [policy, setPolicy] = useState<'legacy' | 'family-history-v2' | null>(null);
-  const [creator, setCreator] = useState(false);
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,7 +55,7 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
     try {
       const family = await getFamilyUseCases(); if (!current()) return;
       const p = await family.history.getPolicy(familyId,current); if (!current()) return;
-      setName(p.family.name); setPolicy(p.policy); setCreator(p.family.role === 'creator');
+      setName(p.family.name); setPolicy(p.policy);
       if (p.policy === 'family-history-v2') {
         if (shareId) {
           const result = await family.history.read(familyId,shareId,current); if (!current()) return;
@@ -76,16 +75,6 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
   useEffect(() => {
     if (playingKey.current && sound.status !== 'preparing') progress.set(playingKey.current,sound.currentTimeMs);
   }, [sound.status,sound.currentTimeMs]);
-  async function upgrade() {
-    if (busyRef.current || !creator || !allowed) return;
-    const current = currentRef.current; if (!current()) return;
-    busyRef.current = true; busyOwner.current = current; setBusy(true);
-    try {
-      const family = await getFamilyUseCases(); if (!current()) return;
-      await family.history.confirmPolicy(familyId,current); if (current()) await load();
-    } catch (e) { if (current()) setMessage(familyHistoryError(e)); }
-    finally { if (busyOwner.current === current) { busyOwner.current = null; busyRef.current = false; setBusy(false); } }
-  }
   async function play(read: HistoryReading, objectId: string, uri: string) {
     if (busyRef.current || !allowed) return;
     const current = currentRef.current; if (!current()) return;
@@ -102,36 +91,54 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
     } catch (e) { if (current()) { setView(null); setRows([]); setStatus('failed'); setMessage(familyHistoryError(e)); } }
     finally { if (busyOwner.current === current) { busyOwner.current=null;busyRef.current=false;setBusy(false); } }
   }
-  async function revoke() {
-    if (!view || busyRef.current || !allowed) return;
-    const current=currentRef.current; if (!current()) return;
+  async function revoke(expected = view, expectedCurrent = currentRef.current) {
+    if (!expected || expected !== view || viewer !== expected.share.authorUserId || busyRef.current || !allowed) return;
+    const current=expectedCurrent; if (!current()) return;
     busyRef.current=true;busyOwner.current=current;setBusy(true);saveProgress();
     try {
       const family=await getFamilyUseCases();if(!current())return;
-      await family.history.revoke(familyId,view.share.shareId,current);
+      await family.history.revoke(familyId,expected.share.shareId,current);
       if(current())router.back();
     } catch(e){if(current())setMessage(familyHistoryError(e));}
     finally{if(busyOwner.current===current){busyOwner.current=null;busyRef.current=false;setBusy(false);}}
   }
   return <SettingsPage title={tr('家庭记录')} backLabel={tr('家庭')} accessibilityLabel={tr('家庭记录')} onBack={() => { saveProgress(); router.back(); }}>
     {!allowed ? <Text>{tr('家庭分享暂未开放。')}</Text> : <>
-      {name ? <Text style={styles.name}>{name}</Text> : null}
+      {name && !(status === 'ready' && policy === 'family-history-v2' && !shareId && rows.length === 0) ? <Text style={styles.name}>{name}</Text> : null}
       {status === 'loading' ? <Text style={styles.meta}>{tr('正在读取家庭记录。')}</Text> : null}
       {status === 'ready' && policy === 'legacy' ? <View style={styles.block}>
-        <Text style={styles.meta}>{tr('开启历史分享后，后来加入的家人也能阅读仍有效的分享。旧的未使用邀请会结束，需要重新邀请。')}</Text>
-        {creator ? <Pressable accessibilityRole="button" testID="history-upgrade" style={styles.hit} disabled={busy} onPress={() => void upgrade()}><Text style={styles.action}>{tr('确认开启历史分享')}</Text></Pressable>
-          : <Text style={styles.meta}>{tr('请家庭创建者先开启历史分享。')}</Text>}
+        <Text style={styles.meta}>{tr('请在家庭页开启家庭分享。')}</Text>
+        <Pressable style={styles.hit} accessibilityRole="button" onPress={() => router.dismissTo('/family')}><Text style={styles.action}>{tr('返回家庭')}</Text></Pressable>
       </View> : null}
-      {status === 'ready' && policy === 'family-history-v2' && !shareId && rows.length === 0 ? <Text style={styles.meta}>{tr('家里的片段，会慢慢留在这里。')}</Text> : null}
+      {status === 'ready' && policy === 'family-history-v2' && !shareId && rows.length === 0 ? <View style={styles.empty} testID="history-empty">
+        <Text style={styles.emptyName}>{name}</Text>
+        <Text style={styles.emptyTitle}>{tr('家里的片段，会慢慢留在这里。')}</Text>
+        <Text style={styles.emptyBody}>{tr('去最近或回看，打开一条记录，再选择「分享给家里」。')}</Text>
+        <View style={styles.footer}>
+          <Pressable style={styles.hit} accessibilityRole="button" onPress={() => router.dismissTo('/')}><Text style={styles.action}>{tr('去最近')}</Text></Pressable>
+          <Pressable style={styles.hit} accessibilityRole="button" onPress={() => router.dismissTo('/lookback')}><Text style={styles.action}>{tr('去回看')}</Text></Pressable>
+        </View>
+      </View> : null}
       {rows.map(row => <View key={row.shareId} style={styles.record}>
         <Text style={styles.meta}>{familySnapshotDate(row.snapshot)}</Text>
         {row.snapshot.note ? <Text style={styles.body} numberOfLines={6}>{row.snapshot.note}</Text> : null}
         <Text style={styles.meta}>{tr('照片：{0} · 声音：{1}',[row.snapshot.media.filter(m=>m.mimeType.startsWith('image/')).length,row.snapshot.media.filter(m=>m.mimeType.startsWith('audio/')).length])}</Text>
         {row.snapshot.emotion ? <Text style={styles.meta}>{feelingLabel(row.snapshot.emotion)}</Text> : null}
+        <View style={styles.footer}><Text style={styles.meta}>{tr(viewer === row.authorUserId ? '你分享的' : '家人分享的')}</Text>
         <Pressable accessibilityRole="button" testID={`history-open-${row.shareId}`} style={styles.hit}
-          onPress={() => router.push({pathname:'/family-record/[id]',params:{id:row.shareId,familyId}})}><Text style={styles.action}>{tr('阅读完整记录')}</Text></Pressable>
+          onPress={() => router.push({pathname:'/family-record/[id]',params:{id:row.shareId,familyId}})}><Text style={styles.action}>{tr('阅读完整记录')}</Text></Pressable></View>
       </View>)}
       {view ? <View style={styles.record} testID="family-history-reading">
+        <View style={styles.footer}>
+          <Text style={styles.meta}>{tr(viewer === view.share.authorUserId ? '你分享的' : '家人分享的')}</Text>
+          {viewer === view.share.authorUserId ? <Pressable accessibilityRole="button" testID="history-revoke" disabled={busy} style={styles.hit}
+            onPress={() => {
+              const expected = view; const current = currentRef.current; if (!current()) return;
+              Alert.alert(tr('撤回这次分享？'), tr('家人将不能再阅读这次分享。你的个人记录仍然保留。'), [
+                {text:tr('取消'),style:'cancel'}, {text:tr('撤回分享'),style:'destructive',onPress:() => void revoke(expected,current)},
+              ]);
+            }}><Text style={styles.meta}>{tr('撤回这次分享')}</Text></Pressable> : null}
+        </View>
         <Text style={styles.meta}>{familySnapshotDate(view.share.snapshot)}</Text>
         {view.share.snapshot.note ? <Text style={styles.body}>{view.share.snapshot.note}</Text> : null}
         {view.media.map(media => media.mimeType.startsWith('image/') ? <FamilyPhoto key={media.objectId} uri={media.uri} /> :
@@ -147,7 +154,7 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
             {selectedAudio === media.objectId && sound.failed ? <Text style={styles.meta}>{tr('这段声音暂时无法播放，其他内容仍然保留。')}</Text> : null}
           </View> : <Text key={media.objectId} style={styles.meta}>{tr('这份内容暂时无法打开。')}</Text>)}
         {view.share.snapshot.emotion ? <Text style={styles.meta}>{feelingLabel(view.share.snapshot.emotion)}</Text> : null}
-        {viewer === view.share.authorUserId ? <Pressable accessibilityRole="button" testID="history-revoke" disabled={busy} style={styles.hit} onPress={() => void revoke()}><Text style={styles.meta}>{tr('撤回这次分享')}</Text></Pressable> : null}
+
       </View> : null}
       {message ? <Text style={styles.meta}>{message}</Text> : null}
       {status === 'failed' ? <Pressable accessibilityRole="button" style={styles.hit} onPress={() => void load()}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable> : null}
@@ -155,7 +162,9 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
   </SettingsPage>;
 }
 const styles=StyleSheet.create({
-  name:{...type.action,color:ink,marginBottom:20},body:{...type.body,color:ink},meta:{...type.meta,color:inkSoft},
+  footer:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:12},
+  empty:{alignItems:'center',paddingVertical:48,gap:20},emptyName:{...type.title,color:ink,textAlign:'center'},emptyTitle:{...type.action,color:inkSoft,textAlign:'center'},emptyBody:{...type.meta,color:inkSoft,textAlign:'center',maxWidth:320},
+  name:{...type.action,fontSize:16,lineHeight:24,color:ink,marginTop:6,marginBottom:12},body:{...type.body,color:ink},meta:{...type.meta,color:inkSoft},
   action:{...type.action,color:sage},block:{gap:16},record:{gap:16,paddingVertical:24,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline},
   hit:{minHeight:48,flexDirection:'row',alignItems:'center',gap:12,paddingVertical:12},audio:{gap:8},
 });
