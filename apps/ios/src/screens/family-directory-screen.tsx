@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   joinSection: { gap: 12, paddingVertical: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline },
   selection: { gap: 6 },
   cardInvite: { minHeight: 48, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, borderRadius: 24, backgroundColor: paperDeep, marginTop: 8 },
-  intro: { ...type.body, color: inkSoft, marginTop: 12 },
+  intro: { ...type.body, color: inkSoft, marginTop: 16, marginBottom: 24 },
   welcome: { gap: 20, paddingTop: 40, paddingBottom: 32, alignItems: 'flex-start' },
   welcomeMark: { width: 80, height: 80, borderRadius: 24, backgroundColor: paperDeep, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   welcomeTitle: { ...type.title, fontSize: 26, lineHeight: 38, color: ink, maxWidth: 300 },
