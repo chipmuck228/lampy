@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { assertHistoryEnabled, requireFamilyReadPolicy, HISTORY_CONFIRMATION } from './history-policy';
 import { FAMILY_ERROR, FamilyError } from './errors';
 import { canonicalizeShareSnapshot, fingerprintShareMoment } from './idempotency';
 import { sha256MediaBytes } from './media-validate';
@@ -7,6 +9,7 @@ import { FamilyStoreConstraintError } from './repository';
 import { assertTestAccountSessionAllowed, rejectDisallowedTestAccountSession } from './test-account-commands';
 import type {
   Membership,
+  FamilyHistoryPolicy,
   RevokeShareResult,
   ShareMediaView,
   ShareMomentInput,
@@ -57,7 +60,7 @@ function asShareView(body: unknown): ShareView | null {
 }
 
 function assertShareInput(input: ShareMomentInput) {
-  if (!input.sourceMomentId.trim()) {
+  if (typeof input.sourceMomentId !== 'string' || !input.sourceMomentId.trim()) {
     throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'A source moment is required.');
   }
   if (!Number.isInteger(input.sourceRevision) || input.sourceRevision < 1) {
@@ -110,11 +113,11 @@ function shareIsActive(row: ShareRecord) {
   return row.status === 'active';
 }
 
-function canSeeShare(membership: Membership, share: ShareRecord) {
+function canSeeShare(membership: Membership, share: ShareRecord, policy: FamilyHistoryPolicy = 'legacy') {
   return (
     shareIsActive(share) &&
-    share.audienceUserIds.includes(membership.userId) &&
-    membership.joinedAt <= share.sharedAt
+    (policy === 'family-history-v2' || (share.audienceUserIds.includes(membership.userId) &&
+    membership.joinedAt <= share.sharedAt))
   );
 }
 
@@ -158,11 +161,22 @@ export function createShareCommands(deps: {
   clock?: { now: () => Date };
   shareId?: () => string;
   testAccountLoginEnabled?: boolean;
+  historyPolicy?: FamilyHistoryPolicy;
+  historyEnabled?: boolean;
 }): ShareCommands {
   const clock = deps.clock ?? { now: () => new Date() };
   const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
 
+  const policy = deps.historyPolicy ?? 'legacy';
+  const shareCommand = policy === 'legacy' ? 'shareMoment' : 'shareMoment:family-history-v2';
+  async function member(tx: FamilyTx, familyId: string, userId: string) {
+    const membership = await requireActiveMember(tx, familyId, userId);
+    await requireFamilyReadPolicy(tx, familyId, policy);
+    return membership;
+  }
+
   function gateSession(sessionToken: string | undefined) {
+    if (policy === 'family-history-v2') assertHistoryEnabled(deps.historyEnabled === true);
     return rejectDisallowedTestAccountSession(
       deps.repository,
       sessionToken,
@@ -193,6 +207,14 @@ export function createShareCommands(deps: {
     async shareMoment(sessionToken, familyId, input) {
       await gateSession(sessionToken);
       assertShareInput(input);
+      if (policy === 'family-history-v2') {
+        const keys = ['sourceMomentId','sourceRevision','note','emotion','occurredAt','occurredAtPrecision','mediaObjectIds','expectedMediaCount','idempotencyKey','audienceConfirmation'];
+        if (!/^[a-zA-Z0-9_-]{1,200}$/.test(input.sourceMomentId) || input.mediaObjectIds.some(id => !/^[a-zA-Z0-9_-]{1,200}$/.test(id)) || input.audienceConfirmation !== HISTORY_CONFIRMATION || Object.keys(input).some(key => !keys.includes(key)) || input.mediaObjectIds.length > 4 ||
+            !['unknown','year','month','day','exact'].includes(input.occurredAtPrecision) ||
+            (input.occurredAtPrecision === 'unknown' ? Boolean(input.occurredAt) : !input.occurredAt)) {
+          throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Use only confirmed snapshot fields and time precision.');
+        }
+      }
       const snapshotCanonical = canonicalizeShareSnapshot({
         note: input.note,
         emotion: input.emotion,
@@ -200,19 +222,20 @@ export function createShareCommands(deps: {
         occurredAtPrecision: input.occurredAtPrecision,
         mediaObjectIds: input.mediaObjectIds,
       });
-      const fingerprint = fingerprintShareMoment({
+      const legacyFingerprint = fingerprintShareMoment({
         familyId,
         sourceMomentId: input.sourceMomentId,
         sourceRevision: input.sourceRevision,
         snapshotCanonical,
       });
 
+      const fingerprint = policy === 'legacy' ? legacyFingerprint : createHash('sha256').update(JSON.stringify({ familyId, sourceMomentId: input.sourceMomentId, sourceRevision: input.sourceRevision, snapshotCanonical })).digest('hex');
       return deps.repository.withTransaction(async (tx) => {
         const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
-        await requireActiveMember(tx, familyId, userId);
+        await member(tx, familyId, userId);
 
         if (input.idempotencyKey) {
-          const existing = await tx.findIdempotent(userId, 'shareMoment', input.idempotencyKey);
+          const existing = await tx.findIdempotent(userId, shareCommand, input.idempotencyKey);
           if (existing) {
             if (existing.requestFingerprint !== fingerprint) {
               throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.');
@@ -228,6 +251,10 @@ export function createShareCommands(deps: {
 
         const sameRevision = await tx.findShareBySource(familyId, userId, input.sourceMomentId, input.sourceRevision);
         const media = await ownedReadableMedia(tx, userId, input.mediaObjectIds);
+        if (policy === 'family-history-v2' && (media.filter(m => m.mimeType.startsWith('image/')).length > 3 ||
+          media.filter(m => m.mimeType.startsWith('audio/')).length > 1)) {
+          throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'A moment supports at most three photos and one sound.');
+        }
         const audienceUserIds = (await tx.listActiveMembers(familyId)).map((row) => row.userId).sort();
         const shareId = (deps.shareId ?? newShareId)();
         const snapshot: ShareSnapshot = {
@@ -251,7 +278,7 @@ export function createShareCommands(deps: {
             throw new FamilyError(FAMILY_ERROR.CONFLICT, 'This moment revision was already shared with different fields.');
           }
           if (input.idempotencyKey) {
-            await tx.saveIdempotent(userId, 'shareMoment', input.idempotencyKey, {
+            await tx.saveIdempotent(userId, shareCommand, input.idempotencyKey, {
               requestFingerprint: fingerprint,
               status: 200,
               body: toView(sameRevision),
@@ -287,7 +314,7 @@ export function createShareCommands(deps: {
                 );
               }
               if (input.idempotencyKey) {
-                await tx.saveIdempotent(userId, 'shareMoment', input.idempotencyKey, {
+                await tx.saveIdempotent(userId, shareCommand, input.idempotencyKey, {
                   requestFingerprint: fingerprint,
                   status: 200,
                   body: toView(raced),
@@ -299,7 +326,7 @@ export function createShareCommands(deps: {
           throw error;
         }
         if (input.idempotencyKey) {
-          await tx.saveIdempotent(userId, 'shareMoment', input.idempotencyKey, {
+          await tx.saveIdempotent(userId, shareCommand, input.idempotencyKey, {
             requestFingerprint: fingerprint,
             status: 200,
             body: toView(row),
@@ -313,7 +340,7 @@ export function createShareCommands(deps: {
       await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
         const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
-        await requireActiveMember(tx, familyId, userId);
+        await member(tx, familyId, userId);
         const row = await tx.findShare(shareId);
         if (!row || row.familyId !== familyId) {
           throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
@@ -334,10 +361,10 @@ export function createShareCommands(deps: {
       await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
         const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
-        const membership = await requireActiveMember(tx, familyId, userId);
+        const membership = await member(tx, familyId, userId);
         const rows = await tx.listSharesInFamily(familyId);
         return {
-          shares: rows.filter((row) => canSeeShare(membership, row)).map(toView),
+          shares: rows.filter((row) => canSeeShare(membership, row, policy)).map(toView),
         };
       });
     },
@@ -352,6 +379,7 @@ export function createShareCommands(deps: {
           shareId,
           clock.now(),
           testAccountLoginEnabled,
+          policy,
         );
         return toView(share);
       });
@@ -360,7 +388,7 @@ export function createShareCommands(deps: {
     async getShareMedia(sessionToken, familyId, shareId, objectId) {
       await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
-        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now(), testAccountLoginEnabled);
+        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now(), testAccountLoginEnabled, policy);
         return authorizedShareMedia(tx, deps.blobs, shareId, familyId, objectId);
       });
     },
@@ -368,7 +396,7 @@ export function createShareCommands(deps: {
     async getShareMediaContent(sessionToken, familyId, shareId, objectId) {
       await gateSession(sessionToken);
       return deps.repository.withTransaction(async (tx) => {
-        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now(), testAccountLoginEnabled);
+        await authorizeVisibleShare(tx, sessionToken, familyId, shareId, clock.now(), testAccountLoginEnabled, policy);
         const media = await authorizedShareMedia(tx, deps.blobs, shareId, familyId, objectId);
         const bytes = await deps.blobs.read(media.objectId);
         if (bytes.length !== media.byteLength || sha256MediaBytes(bytes) !== media.contentSha256) {
@@ -387,14 +415,16 @@ async function authorizeVisibleShare(
   shareId: string,
   now: Date,
   testAccountLoginEnabled: boolean,
+  policy: FamilyHistoryPolicy,
 ) {
   const userId = await requireUser(tx, sessionToken, now, testAccountLoginEnabled);
   const membership = await requireActiveMember(tx, familyId, userId);
+  await requireFamilyReadPolicy(tx, familyId, policy);
   const row = await tx.findShare(shareId);
   if (!row || row.familyId !== familyId || !shareIsActive(row)) {
     throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
   }
-  if (!canSeeShare(membership, row)) {
+  if (!canSeeShare(membership, row, policy)) {
     throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'This share is not available.');
   }
   return { userId, share: row };

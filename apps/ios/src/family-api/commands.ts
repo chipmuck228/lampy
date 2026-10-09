@@ -36,10 +36,14 @@ import {
 import type { MediaBlobStore } from './media-blobs';
 import { createMemoryMediaBlobStore } from './media-blobs';
 import { createMediaCommands } from './media-commands';
-import { createShareCommands } from './share-commands';
+import { createShareCommands, type ShareCommands } from './share-commands';
+import { assertHistoryEnabled, HISTORY_CONFIRMATION } from './history-policy';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = InviteLinkCommands & {
+  historyShares: ShareCommands;
+  getFamilyHistoryPolicy(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
+  confirmFamilyHistory(session: string, familyId: string, confirmation: string): Promise<{ policy: 'family-history-v2' }>;
   health(): FamilyHealth;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
@@ -110,6 +114,13 @@ async function requireActiveFamily(tx: FamilyTx, familyId: string) {
     throw new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.');
   }
   return family;
+}
+
+async function requireActiveMembership(tx: FamilyTx, familyId: string, userId: string) {
+  await requireActiveFamily(tx, familyId);
+  const membership = await tx.findActiveMembership(familyId, userId);
+  if (!membership) throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.');
+  return membership;
 }
 
 async function toFamilyView(tx: FamilyTx, familyId: string, userId: string): Promise<FamilyView> {
@@ -231,6 +242,7 @@ export function createFamilyCommands(deps: {
   passwordHasher?: PasswordHasher;
   testAccountLoginEnabled?: boolean;
   inviteLinksEnabled?: boolean;
+  historySharingEnabled?: boolean;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -280,6 +292,30 @@ export function createFamilyCommands(deps: {
   }
 
   return {
+    historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled,
+      historyPolicy: 'family-history-v2', historyEnabled: deps.historySharingEnabled === true }),
+    async getFamilyHistoryPolicy(session, familyId) {
+      assertHistoryEnabled(deps.historySharingEnabled === true);
+      return withAuthedUser(session, async (tx, userId) => {
+        await requireActiveMembership(tx, familyId, userId);
+        return { policy: (await tx.findFamily(familyId))?.historyPolicy ?? 'legacy' };
+      });
+    },
+    async confirmFamilyHistory(session, familyId, confirmation) {
+      assertHistoryEnabled(deps.historySharingEnabled === true);
+      if (confirmation !== HISTORY_CONFIRMATION) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Explicit history access confirmation is required.');
+      return withAuthedUser(session, async (tx, userId) => {
+        const membership = await requireActiveMembership(tx, familyId, userId);
+        if (membership.role !== 'creator') throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the creator can confirm history access.');
+        const family = (await tx.findFamily(familyId))!;
+        if (family.historyPolicy !== 'family-history-v2') {
+          await tx.saveFamily({ ...family, historyPolicy: 'family-history-v2', historyConfirmedAt: clock.now().toISOString(), historyConfirmedBy: userId });
+          for (const invitation of await tx.listPendingInvitations(familyId)) await tx.saveInvitation({ ...invitation, status: 'revoked' });
+          for (const invitation of await tx.listInviteLinks(familyId)) if (invitation.status === 'pending') await tx.saveInviteLink({ ...invitation, status: 'revoked' });
+        }
+        return { policy: 'family-history-v2' as const };
+      });
+    },
     ...createInviteLinkCommands({ repository, clock, ids, enabled:deps.inviteLinksEnabled === true, withAuthedUser }),
     health() {
       const testHealth = testAccounts.health();
@@ -291,6 +327,7 @@ export function createFamilyCommands(deps: {
         inbox: true as const,
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
+        familyHistoryV2: deps.historySharingEnabled === true,
         argon2id: ARGON2ID_PRODUCTION,
       };
     },
@@ -363,7 +400,7 @@ export function createFamilyCommands(deps: {
         if (count >= 10) throw new FamilyError(FAMILY_ERROR.FAMILY_LIMIT_REACHED, 'You can belong to at most 10 active families.');
         const now = iso(clock.now());
         const familyId = ids.familyId();
-        await tx.saveFamily({ familyId, name, createdAt: now, status: 'active' });
+        await tx.saveFamily({ familyId, name, createdAt: now, status: 'active', historyPolicy: deps.historySharingEnabled ? 'family-history-v2' : 'legacy' });
         await tx.saveMembership({ membershipId: ids.membershipId(), familyId, userId, role: 'creator', status: 'active', joinedAt: now });
         return writeIdempotent(tx, userId, 'createNamedFamily', idempotencyKey, fingerprint,
           { familyId, name, role: 'creator' as const, memberCount: 1 });
