@@ -682,5 +682,8 @@
   "正在保存这次分享。": "Saving this share…",
   "确认分享": "Confirm share",
   "分享给家里": "Share with family",
-  "分享这份媒介 {0}": "Include media {{0}}"
+  "分享这份媒介 {0}": "Include media {{0}}",
+  "照片分享需要更新测试安装，原照片还在。": "Photo sharing requires an updated test installation. Your original photo is still here.",
+  "这张照片暂时无法分享，可以取消勾选后再试。": "This photo cannot be shared right now. You can deselect it and try again.",
+  "这份照片或声音超过分享大小限制，可以取消勾选后再试。": "This photo or sound exceeds the sharing size limit. You can deselect it and try again."
 }

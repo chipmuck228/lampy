@@ -6,6 +6,9 @@ export function familyHistoryError(error: unknown) {
   if (code === 'FAMILY_HISTORY_CLOSED' || code === 'FAMILY_UPGRADE_REQUIRED') return tr('家庭分享暂未开放。');
   if (code === 'SOURCE_CHANGED' || code === 'MOMENT_NOT_FOUND') return tr('记录已变化，请重新查看并确认。');
   if (code === 'SHARE_MEDIA_INCOMPLETE' || code === 'SHARE_MEDIA_UNAVAILABLE') return tr('照片或声音暂时无法分享，原记录还在。');
+  if (code === 'SHARE_IMAGE_CONVERSION_UNAVAILABLE') return tr('照片分享需要更新测试安装，原照片还在。');
+  if (code === 'SHARE_IMAGE_CONVERSION_FAILED' || code === 'MEDIA_UNSUPPORTED' || code === 'MEDIA_CORRUPT') return tr('这张照片暂时无法分享，可以取消勾选后再试。');
+  if (code === 'MEDIA_TOO_LARGE') return tr('这份照片或声音超过分享大小限制，可以取消勾选后再试。');
   return tr('暂时读不出来，请再试一次。');
 }
 

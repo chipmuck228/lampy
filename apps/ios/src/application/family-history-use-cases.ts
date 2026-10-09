@@ -6,7 +6,7 @@ import type { FamilyReceiveCache } from '../infrastructure/family-receive-cache'
 import type { PendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
 import type { FamilySummary, ShareView } from '../family-api/types';
-import { sha256MediaBytes } from '../family-api/media-validate';
+import { assertMediaPayload, sha256MediaBytes } from '../family-api/media-validate';
 
 export const HISTORY_AUDIENCE_CONFIRMATION = 'new-members-can-read-active-history';
 export type HistoryCurrent = () => boolean;
@@ -26,6 +26,7 @@ type Personal = {
   moments: { findById(id: string): Promise<MomentRead> };
   assets: { findById(id: string): Promise<AssetRead> };
   readAssetBytes?: (uri: string) => Promise<Uint8Array>;
+  convertImageForShare?: (bytes: Uint8Array, mimeType: string) => Promise<{ bytes: Uint8Array; mimeType: string }>;
 };
 function error(code: string) { return new ApplicationError(code, code); }
 function digest(value: unknown) { return sha256MediaBytes(utf8ToBytes(JSON.stringify(value))); }
@@ -166,8 +167,23 @@ export function createFamilyHistoryUseCases(deps: {
       const mediaObjectIds: string[] = [];
       for (const item of read.media) {
         await check(a, current);
-        const uploaded = await deps.client.uploadMedia(a.sessionToken, { bytes: item.bytes, mimeType: item.mimeType,
-          idempotencyKey: `history-media:${digest({ assetId: item.assetId, hash: item.hash, mime: item.mimeType })}` });
+        let outgoing = { bytes: item.bytes, mimeType: item.mimeType };
+        const type = item.mimeType.split(';')[0].trim().toLowerCase();
+        if (['image/heic', 'image/heif'].includes(type)) {
+          if (!deps.personal?.convertImageForShare) throw error('SHARE_IMAGE_CONVERSION_UNAVAILABLE');
+          try { outgoing = await deps.personal.convertImageForShare(item.bytes, type); }
+          catch (e) {
+            if (e instanceof ApplicationError && e.code === 'SHARE_IMAGE_CONVERSION_UNAVAILABLE') throw e;
+            throw error('SHARE_IMAGE_CONVERSION_FAILED');
+          }
+          await check(a, current);
+          if (outgoing.mimeType !== 'image/jpeg') throw error('SHARE_IMAGE_CONVERSION_FAILED');
+        }
+        // Validate actual converted bytes, never relabel the original HEIC as JPEG.
+        outgoing.mimeType = assertMediaPayload(outgoing.bytes, outgoing.mimeType);
+        await check(a, current);
+        const uploaded = await deps.client.uploadMedia(a.sessionToken, { ...outgoing,
+          idempotencyKey: `history-media:${digest({ assetId: item.assetId, hash: sha256MediaBytes(outgoing.bytes), mime: outgoing.mimeType })}` });
         await check(a, current);
         mediaObjectIds.push(uploaded.objectId);
       }

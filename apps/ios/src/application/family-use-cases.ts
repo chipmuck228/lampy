@@ -204,6 +204,7 @@ export function createFamilyUseCases(deps: {
     moments: { findById(id: string): Promise<MomentRead> };
     assets: { findById(id: string): Promise<AssetRead> };
     readAssetBytes?: (localUri: string) => Promise<Uint8Array>;
+  convertImageForShare?: (bytes: Uint8Array, mimeType: string) => Promise<{ bytes: Uint8Array; mimeType: string }>;
   };
   receiveCache?: FamilyReceiveCache;
   mediaUri?: (storageKey: string) => string;

@@ -1,3 +1,4 @@
+import { convertExpoImageForFamilyShare } from '../infrastructure/family-share-image';
 import { deviceTimezoneOffsetMinutes } from '../domain-adapters/calendar';
 import { createUseCases } from './use-cases';
 import {
@@ -74,6 +75,7 @@ export type FamilyPersonalLibrary = {
   moments: { findById(id: string): Promise<MomentRead> };
   assets: { findById(id: string): Promise<AssetRead> };
   readAssetBytes?: (localUri: string) => Promise<Uint8Array>;
+  convertImageForShare?: (bytes: Uint8Array, mimeType: string) => Promise<{ bytes: Uint8Array; mimeType: string }>;
 };
 
 export function createIosFamilyUseCases(deps: {
@@ -106,6 +108,7 @@ const familyLoader = createUseCaseLoader(async () => {
       moments: repos.moments,
       assets: repos.assets,
       readAssetBytes: readExpoAssetBytes,
+      convertImageForShare: convertExpoImageForFamilyShare,
     },
   });
 });

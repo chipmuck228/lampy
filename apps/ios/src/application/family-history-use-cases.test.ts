@@ -115,3 +115,35 @@ it('never reads cached rows as an offline authorization and retries the same sha
   x.client.history!.getShare=async()=>{throw new ApplicationError('NETWORK','offline');};
   await expect(x.history.read(x.f.familyId,saved.shareId,current)).rejects.toMatchObject({code:'NETWORK'});
 });
+
+it('uploads converted HEIC as validated JPEG without changing the personal asset',async()=>{
+  const x=await fixture();x.attach();
+  const original=(await x.personal.assets.findById()).asset;
+  original.metadata.mimeType='image/heic';
+  const heic=new Uint8Array([0,0,0,24,102,116,121,112,104,101,105,99]);
+  x.personal.readAssetBytes.mockResolvedValue(heic);
+  const convert=jest.fn(async()=>({bytes:sampleJpegBytes(),mimeType:'image/jpeg'}));
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:convert},receiveCache:x.cache});
+  const p=await history.prepare('moment_d2',x.f.familyId,current);
+  const saved=await history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  expect(convert).toHaveBeenCalledWith(heic,'image/heic');
+  expect(saved.snapshot.media[0].mimeType).toBe('image/jpeg');
+  expect(original.metadata.mimeType).toBe('image/heic');
+  expect(x.requests.find(r=>r.path==='/v1/media')!.bytes).toEqual(sampleJpegBytes());
+});
+it('rejects fake JPEG relabelling and never posts a share',async()=>{
+  const x=await fixture();x.attach();(await x.personal.assets.findById()).asset.metadata.mimeType='image/heic';
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:async()=>({bytes:new Uint8Array([1,2,3]),mimeType:'image/jpeg'})}});
+  const p=await history.prepare('moment_d2',x.f.familyId,current);
+  await expect(history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'MEDIA_CORRUPT'});
+  expect(x.requests.some(r=>r.path==='/v1/media')).toBe(false);
+});
+it('drops a conversion completed after background cancellation',async()=>{
+  const x=await fixture();x.attach();(await x.personal.assets.findById()).asset.metadata.mimeType='image/heic';
+  const started=deferred<void>(),gate=deferred<{bytes:Uint8Array;mimeType:string}>();let active=true;
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:async()=>{started.resolve();return gate.promise;}}});
+  const p=await history.prepare('moment_d2',x.f.familyId,()=>active);
+  const sharing=history.share(p,HISTORY_AUDIENCE_CONFIRMATION,()=>active);await started.promise;active=false;gate.resolve({bytes:sampleJpegBytes(),mimeType:'image/jpeg'});
+  await expect(sharing).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+  expect(x.requests.some(r=>r.path==='/v1/media')).toBe(false);
+});
