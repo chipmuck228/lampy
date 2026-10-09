@@ -131,7 +131,7 @@ export default function MomentDetailScreen() {
               </Text>
               {isFamilyProductEntryOpen() ? <Pressable accessibilityRole="button" accessibilityLabel={tr('分享')}
                 testID="moment-share-top" onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)} style={styles.shareHit}>
-                <Text style={styles.share}>{tr('分享')}</Text>
+                <View style={styles.shareLabel}><Text style={styles.share}>{tr('分享')}</Text><View style={styles.shareUnderline} accessible={false} /></View>
               </Pressable> : null}
               </View>
               {detailPrecisionLine(view.precision) ? (
@@ -160,9 +160,8 @@ export default function MomentDetailScreen() {
               testIDPrefix="detail-sound"
               scene
             />
-            <View style={styles.secondary}>
-              <MomentFeeling feeling={view.feeling} testID="detail-feeling" />
-            </View>
+            <View style={styles.secondary} testID="detail-feeling-share-row">
+              <View style={styles.feelingColumn}><MomentFeeling feeling={view.feeling} testID="detail-feeling" /></View>
             {isFamilyProductEntryOpen() ? (
               <Pressable
                 accessibilityRole="button"
@@ -171,9 +170,10 @@ export default function MomentDetailScreen() {
                 onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)}
                 style={styles.shareHit}
               >
-                <Text style={styles.share}>{tr('分享')}</Text>
+                <View style={styles.shareLabel}><Text style={styles.share}>{tr('分享')}</Text><View style={styles.shareUnderline} accessible={false} /></View>
               </Pressable>
             ) : null}
+            </View>
             <View testID="detail-end-line" style={styles.endLine} accessible={false} accessibilityElementsHidden importantForAccessibility="no" />
           </View>
         ) : null}
@@ -220,10 +220,13 @@ const styles = StyleSheet.create({
   date: { ...type.title, color: sage, flexShrink: 1 },
   precision: { ...type.meta, color: inkSoft },
   note: { ...type.body, color: ink },
-  secondary: { gap: 8, width: '100%' },
+  secondary: { gap: 16, width: '100%',flexDirection:'row',justifyContent:'space-between',alignItems:'center' },
+  feelingColumn:{flex:1,minWidth:0},
   meta: { ...type.meta, color: inkSoft },
   retryHit: { minHeight: 44, justifyContent: 'center' },
   retry: { ...type.action, color: sage },
-  shareHit: { minHeight: 48, minWidth:48, justifyContent: 'center',alignSelf:'flex-start' },
-  share: { ...type.meta, color: inkSoft, textDecorationLine:'underline',textDecorationColor:hairline },
+  shareHit: { minHeight: 48, minWidth:48, justifyContent: 'center',alignItems:'center' },
+  share: { ...type.meta, color: sage },
+  shareLabel:{alignItems:'stretch',gap:5},
+  shareUnderline:{height:StyleSheet.hairlineWidth,backgroundColor:sage,opacity:0.55},
 });
