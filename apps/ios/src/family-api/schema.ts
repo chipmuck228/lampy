@@ -122,6 +122,9 @@ const MIGRATIONS = [
     token_hash TEXT NOT NULL UNIQUE, status TEXT NOT NULL CHECK(status IN ('pending','accepted','revoked','expired')),
     created_at TEXT NOT NULL, expires_at TEXT NOT NULL, accepted_by_user_id TEXT
   ); CREATE INDEX family_invite_links_family ON family_invite_links(family_id);`,
+  `ALTER TABLE family_families ADD COLUMN history_policy TEXT NOT NULL DEFAULT 'legacy' CHECK(history_policy IN ('legacy','family-history-v2'));
+   ALTER TABLE family_families ADD COLUMN history_confirmed_at TEXT;
+   ALTER TABLE family_families ADD COLUMN history_confirmed_by TEXT;`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;

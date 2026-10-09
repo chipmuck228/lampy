@@ -54,6 +54,10 @@ function statusFor(code: string) {
     case FAMILY_ERROR.FAMILY_LIMIT_REACHED:
     case FAMILY_ERROR.TEST_ACCOUNT_EXISTS:
       return 409;
+    case 'FAMILY_POLICY_UPGRADE_REQUIRED':
+      return 409;
+    case 'FAMILY_HISTORY_CLOSED':
+      return 503;
     case FAMILY_ERROR.BAD_REQUEST:
     case FAMILY_ERROR.MEDIA_CORRUPT:
       return 400;
@@ -211,9 +215,10 @@ export async function dispatchFamilyApi(
       return { status: 200, body: { objectId: mediaContent[1], mimeType: content.mimeType, byteLength: content.bytes.length }, bytes: content.bytes, contentType: content.mimeType };
     }
 
-    const shareMediaContent = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)\/content$/.exec(path);
+    const shareCommands = path.startsWith('/v2/') ? commands.historyShares : commands;
+    const shareMediaContent = /^\/v[12]\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)\/content$/.exec(path);
     if (method === 'GET' && shareMediaContent) {
-      const content = await commands.getShareMediaContent(
+      const content = await shareCommands.getShareMediaContent(
         token || '',
         shareMediaContent[1],
         shareMediaContent[2],
@@ -231,19 +236,33 @@ export async function dispatchFamilyApi(
       };
     }
 
-    const shareMedia = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)$/.exec(path);
+    const shareMedia = /^\/v[12]\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)$/.exec(path);
     if (method === 'GET' && shareMedia) {
       return {
         status: 200,
-        body: await commands.getShareMedia(token || '', shareMedia[1], shareMedia[2], shareMedia[3]),
+        body: await shareCommands.getShareMedia(token || '', shareMedia[1], shareMedia[2], shareMedia[3]),
       };
     }
 
-    const shareCreate = /^\/v1\/families\/([^/]+)\/shares$/.exec(path);
+    const policyRoute = /^\/v2\/families\/([^/]+)\/history-policy$/.exec(path);
+    if (policyRoute && method === 'GET') return { status: 200, body: await commands.getFamilyHistoryPolicy(token || '', policyRoute[1]) };
+    if (policyRoute && method === 'POST') {
+      if (Object.keys(body).some(key => key !== 'confirmation')) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Only history confirmation is accepted.');
+      return { status: 200, body: await commands.confirmFamilyHistory(token || '', policyRoute[1], readString(body, 'confirmation')) };
+    }
+
+    const shareCreate = /^\/v[12]\/families\/([^/]+)\/shares$/.exec(path);
     if (method === 'GET' && shareCreate) {
-      return { status: 200, body: await commands.listVisibleShares(token || '', shareCreate[1]) };
+      return { status: 200, body: await shareCommands.listVisibleShares(token || '', shareCreate[1]) };
     }
     if (method === 'POST' && shareCreate) {
+      if (path.startsWith('/v2/')) {
+        const keys = ['sourceMomentId','sourceRevision','note','emotion','occurredAt','occurredAtPrecision','mediaObjectIds','expectedMediaCount','audienceConfirmation'];
+        if (Object.keys(body).some(key => !keys.includes(key)) || !Array.isArray(body.mediaObjectIds) ||
+          body.mediaObjectIds.some(id => typeof id !== 'string') || (body.occurredAt !== undefined && typeof body.occurredAt !== 'string') || typeof body.note !== 'string' || typeof body.emotion !== 'string') {
+          throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Use only confirmed snapshot fields.');
+        }
+      }
       if (Object.prototype.hasOwnProperty.call(body, 'localUri') || Object.prototype.hasOwnProperty.call(body, 'people')) {
         throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Share snapshots cannot include local paths or people.');
       }
@@ -252,7 +271,8 @@ export async function dispatchFamilyApi(
         : [];
       return {
         status: 200,
-        body: await commands.shareMoment(token || '', shareCreate[1], {
+        body: await shareCommands.shareMoment(token || '', shareCreate[1], {
+          ...(path.startsWith('/v2/') ? { audienceConfirmation: readString(body, 'audienceConfirmation') } : {}),
           sourceMomentId: readString(body, 'sourceMomentId'),
           sourceRevision: typeof body.sourceRevision === 'number' ? body.sourceRevision : Number.NaN,
           note: readString(body, 'note'),
@@ -266,14 +286,14 @@ export async function dispatchFamilyApi(
       };
     }
 
-    const shareRevoke = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/revoke$/.exec(path);
+    const shareRevoke = /^\/v[12]\/families\/([^/]+)\/shares\/([^/]+)\/revoke$/.exec(path);
     if (method === 'POST' && shareRevoke) {
-      return { status: 200, body: await commands.revokeShare(token || '', shareRevoke[1], shareRevoke[2]) };
+      return { status: 200, body: await shareCommands.revokeShare(token || '', shareRevoke[1], shareRevoke[2]) };
     }
 
-    const shareGet = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)$/.exec(path);
+    const shareGet = /^\/v[12]\/families\/([^/]+)\/shares\/([^/]+)$/.exec(path);
     if (method === 'GET' && shareGet) {
-      return { status: 200, body: await commands.getShare(token || '', shareGet[1], shareGet[2]) };
+      return { status: 200, body: await shareCommands.getShare(token || '', shareGet[1], shareGet[2]) };
     }
 
     throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Unknown family API route.');

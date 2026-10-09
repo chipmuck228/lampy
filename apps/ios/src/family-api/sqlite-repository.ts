@@ -45,6 +45,9 @@ type SessionRow = {
 };
 
 type FamilyRow = {
+  history_policy: string;
+  history_confirmed_at: string | null;
+  history_confirmed_by: string | null;
   name: string;
   family_id: string;
   created_at: string;
@@ -160,7 +163,15 @@ function sessionFrom(row: SessionRow): Session {
 }
 
 function familyFrom(row: FamilyRow): Family {
-  return { familyId: row.family_id, name: row.name, createdAt: row.created_at, status: row.status as Family['status'] };
+  return {
+    historyPolicy: row.history_policy === 'family-history-v2' ? 'family-history-v2' : 'legacy',
+    historyConfirmedAt: row.history_confirmed_at || undefined,
+    historyConfirmedBy: row.history_confirmed_by || undefined,
+    familyId: row.family_id,
+    name: row.name,
+    createdAt: row.created_at,
+    status: row.status as Family['status'],
+  };
 }
 
 function membershipFrom(row: MembershipRow): Membership {
@@ -308,16 +319,16 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findFamily(familyId) {
       const row = await db.getFirst<FamilyRow>(
-        'SELECT family_id, name, created_at, status FROM family_families WHERE family_id = ?',
+        'SELECT family_id, name, created_at, status, history_policy, history_confirmed_at, history_confirmed_by FROM family_families WHERE family_id = ?',
         [familyId],
       );
       return row ? familyFrom(row) : null;
     },
     async saveFamily(family) {
       await db.run(
-        `INSERT INTO family_families (family_id, name, created_at, status) VALUES (?, ?, ?, ?)
-         ON CONFLICT(family_id) DO UPDATE SET status = excluded.status, name = excluded.name`,
-        [family.familyId, family.name ?? '', family.createdAt, family.status],
+        `INSERT INTO family_families (family_id, name, created_at, status, history_policy, history_confirmed_at, history_confirmed_by) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(family_id) DO UPDATE SET status = excluded.status, name = excluded.name, history_policy = excluded.history_policy, history_confirmed_at = excluded.history_confirmed_at, history_confirmed_by = excluded.history_confirmed_by`,
+        [family.familyId, family.name ?? '', family.createdAt, family.status, family.historyPolicy ?? 'legacy', family.historyConfirmedAt ?? null, family.historyConfirmedBy ?? null],
       );
     },
     async findActiveMembershipForUser(userId) {

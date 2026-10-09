@@ -65,6 +65,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
   const inviteEnabled=env.LAMPY_FAMILY_INVITES_ENABLED === '1' && Boolean(inviteOrigin);
   const authOpts = {
     inviteLinksEnabled:inviteEnabled,
+    historySharingEnabled:env.LAMPY_FAMILY_HISTORY_ENABLED === '1',
     testAccountLoginEnabled: plan.testAccount.testAccountLoginEnabled,
     passwordHasher: plan.mode === 'test' ? createArgon2idPasswordHasher(ARGON2ID_TEST) : undefined,
   };
@@ -115,7 +116,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
         if(route==='/.well-known/apple-app-site-association') { const aasa=inviteAssociation(inviteOrigin || undefined);res.writeHead(aasa ? 200 : 404,{'content-type':'application/json'});res.end(JSON.stringify(aasa || {}));return; }
       }
       const isMediaUpload = (req.method || '').toUpperCase() === 'POST' && route === '/v1/media';
-      const isShareCreate = (req.method || '').toUpperCase() === 'POST' && /^\/v1\/families\/[^/]+\/shares$/.test(route);
+      const isShareCreate = (req.method || '').toUpperCase() === 'POST' && /^\/v[12]\/families\/[^/]+\/shares$/.test(route);
       const maxBytes = isMediaUpload
         ? MEDIA_MAX_BYTES + 1024
         : isShareCreate

@@ -37,7 +37,12 @@ export type Session = {
   expiresAt: string;
 };
 
+export type FamilyHistoryPolicy = 'legacy' | 'family-history-v2';
+
 export type Family = {
+  historyPolicy?: FamilyHistoryPolicy;
+  historyConfirmedAt?: string;
+  historyConfirmedBy?: string;
   name?: string;
   familyId: string;
   createdAt: string;
@@ -96,6 +101,7 @@ export type FamilyHealth = {
   inbox: true;
   testAccountLogin: boolean;
   testAccountLoginReason: TestAccountHealth['testAccountLoginReason'];
+  familyHistoryV2?: boolean;
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 
@@ -180,6 +186,7 @@ export type ShareMediaView = {
 };
 
 export type ShareMomentInput = {
+  audienceConfirmation?: string;
   sourceMomentId: string;
   sourceRevision: number;
   note: string;
