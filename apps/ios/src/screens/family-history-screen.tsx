@@ -26,12 +26,13 @@ function FamilyPhoto({ uri }: { uri: string }) {
     }} />;
 }
 
-export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; shareId?: string }) {
+export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithdrawn }: { familyId: string; shareId?: string; inline?: boolean; onWithdrawn?: () => void }) {
   const router = useRouter();
   const isDetail = shareId !== undefined;
   const { allowed, enter, leave, begin } = useFamilyPrivateRequest();
   const [view, setView] = useState<HistoryReading | null>(null);
   const [rows, setRows] = useState<ShareView[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [policy, setPolicy] = useState<'legacy' | 'family-history-v2' | null>(null);
@@ -52,7 +53,7 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
   }, []);
   const load = useCallback(async () => {
     const current = begin(); currentRef.current = current;
-    saveProgress(); setView(null); setRows([]); setViewer(null); setPolicy(null); setMessage(null); setStatus('loading');
+    saveProgress(); setExpandedId(null); setView(null); setRows([]); setViewer(null); setPolicy(null); setMessage(null); setStatus('loading');
     try {
       if (isDetail && !shareId) throw { code: 'SHARE_NOT_FOUND' };
       const family = await getFamilyUseCases(); if (!current()) return;
@@ -72,7 +73,7 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
   }, [begin, familyId, shareId, isDetail, saveProgress]);
   useFocusEffect(useCallback(() => {
     enter(); if (allowed) void load();
-    return () => { saveProgress(); leave(); currentRef.current = () => false; busyRef.current = false; busyOwner.current = null; setBusy(false); setStatus('loading'); setPolicy(null); setView(null); setRows([]); setViewer(null); setName(''); };
+    return () => { saveProgress(); leave(); currentRef.current = () => false; busyRef.current = false; busyOwner.current = null; setBusy(false); setExpandedId(null); setStatus('loading'); setPolicy(null); setView(null); setRows([]); setViewer(null); setName(''); };
   }, [allowed, enter, leave, load, saveProgress]));
   useEffect(() => {
     if (playingKey.current && sound.status !== 'preparing') progress.set(playingKey.current,sound.currentTimeMs);
@@ -100,13 +101,14 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
     try {
       const family=await getFamilyUseCases();if(!current())return;
       await family.history.revoke(familyId,expected.share.shareId,current);
-      if(current())router.back();
+      if(current()) { if (inline) onWithdrawn?.(); else router.back(); }
     } catch(e){if(current())setMessage(familyHistoryError(e));}
     finally{if(busyOwner.current===current){busyOwner.current=null;busyRef.current=false;setBusy(false);}}
   }
-  return <SettingsPage title={tr('家庭记录')} backLabel={tr('家庭')} accessibilityLabel={tr('家庭记录')} onBack={() => { saveProgress(); router.back(); }}>
+  const withdrawn = useCallback(() => { setExpandedId(null); void load(); }, [load]);
+  const content = <>
     {!allowed ? <Text>{tr('家庭分享暂未开放。')}</Text> : <>
-      {name && !(status === 'ready' && policy === 'family-history-v2' && !isDetail && rows.length === 0) ? <Text style={styles.name}>{name}</Text> : null}
+      {!inline && name && !(status === 'ready' && policy === 'family-history-v2' && !isDetail && rows.length === 0) ? <Text style={styles.name}>{name}</Text> : null}
       {status === 'loading' ? <Text style={styles.meta}>{tr('正在读取家庭记录。')}</Text> : null}
       {status === 'ready' && policy === 'legacy' ? <View style={styles.block}>
         <Text style={styles.meta}>{tr('请在家庭页开启家庭分享。')}</Text>
@@ -123,16 +125,18 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
       </View> : null}
       {rows.map(row => <View key={row.shareId} style={styles.record}>
         <Text style={styles.meta}>{familySnapshotDate(row.snapshot)}</Text>
-        {row.snapshot.note ? <Text style={styles.body} numberOfLines={6}>{row.snapshot.note}</Text> : null}
-        <Text style={styles.meta}>{tr('照片：{0} · 声音：{1}',[row.snapshot.media.filter(m=>m.mimeType.startsWith('image/')).length,row.snapshot.media.filter(m=>m.mimeType.startsWith('audio/')).length])}</Text>
-        {row.snapshot.emotion ? <Text style={styles.meta}>{feelingLabel(row.snapshot.emotion)}</Text> : null}
+        {expandedId !== row.shareId && row.snapshot.note ? <Text style={styles.body} numberOfLines={6}>{row.snapshot.note}</Text> : null}
+        {expandedId !== row.shareId ? <Text style={styles.meta}>{tr('照片：{0} · 声音：{1}',[row.snapshot.media.filter(m=>m.mimeType.startsWith('image/')).length,row.snapshot.media.filter(m=>m.mimeType.startsWith('audio/')).length])}</Text> : null}
+        {expandedId !== row.shareId && row.snapshot.emotion ? <Text style={styles.meta}>{feelingLabel(row.snapshot.emotion)}</Text> : null}
         <View style={styles.footer}><Text style={styles.meta}>{tr(viewer === row.authorUserId ? '你分享的' : '家人分享的')}</Text>
         <Pressable accessibilityRole="button" testID={`history-open-${row.shareId}`} style={styles.hit}
-          onPress={() => router.push({pathname:'/family-record/[id]',params:{id:row.shareId,familyId}})}><Text style={styles.action}>{tr('阅读完整记录')}</Text></Pressable></View>
+          accessibilityState={{expanded:expandedId === row.shareId}} accessibilityLabel={tr(expandedId === row.shareId ? '收起这条家庭记录' : '打开这条家庭记录')}
+          onPress={() => { saveProgress(); setExpandedId(id => id === row.shareId ? null : row.shareId); }}><Text style={styles.action}>{tr(expandedId === row.shareId ? '收起' : '打开')}</Text><LifeIcon name={expandedId === row.shareId ? 'collapse' : 'expand'} /></Pressable></View>
+        {expandedId === row.shareId ? <FamilyHistoryScreen key={`${familyId}/${row.shareId}`} familyId={familyId} shareId={row.shareId} inline onWithdrawn={withdrawn} /> : null}
       </View>)}
-      {view ? <View style={styles.record} testID="family-history-reading">
+      {view ? <View style={inline ? styles.inlineReading : styles.record} testID="family-history-reading">
         <View style={styles.footer}>
-          <Text style={styles.meta}>{tr(viewer === view.share.authorUserId ? '你分享的' : '家人分享的')}</Text>
+          {!inline ? <Text style={styles.meta}>{tr(viewer === view.share.authorUserId ? '你分享的' : '家人分享的')}</Text> : null}
           {viewer === view.share.authorUserId ? <Pressable accessibilityRole="button" testID="history-revoke" disabled={busy} style={styles.hit}
             onPress={() => {
               const expected = view; const current = currentRef.current; if (!current()) return;
@@ -141,7 +145,7 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
               ]);
             }}><Text style={styles.meta}>{tr('撤回这次分享')}</Text></Pressable> : null}
         </View>
-        <Text style={styles.meta}>{familySnapshotDate(view.share.snapshot)}</Text>
+        {!inline ? <Text style={styles.meta}>{familySnapshotDate(view.share.snapshot)}</Text> : null}
         {view.share.snapshot.note ? <Text style={styles.body}>{view.share.snapshot.note}</Text> : null}
         {view.media.map(media => media.mimeType.startsWith('image/') ? <FamilyPhoto key={media.objectId} uri={media.uri} /> :
           media.mimeType.startsWith('audio/') ? <View key={media.objectId} style={styles.audio}>
@@ -161,9 +165,11 @@ export function FamilyHistoryScreen({ familyId, shareId }: { familyId: string; s
       {message ? <Text style={styles.meta}>{message}</Text> : null}
       {status === 'failed' ? <Pressable accessibilityRole="button" style={styles.hit} onPress={() => void load()}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable> : null}
     </>}
-  </SettingsPage>;
+  </>;
+  return inline ? content : <SettingsPage title={tr('家庭记录')} backLabel={tr('家庭')} accessibilityLabel={tr('家庭记录')} onBack={() => { saveProgress(); router.back(); }}>{content}</SettingsPage>;
 }
 const styles=StyleSheet.create({
+  inlineReading:{gap:16},
   footer:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:12},
   empty:{alignItems:'center',paddingVertical:48,gap:20},emptyName:{...type.title,color:ink,textAlign:'center'},emptyTitle:{...type.action,color:inkSoft,textAlign:'center'},emptyBody:{...type.meta,color:inkSoft,textAlign:'center',maxWidth:320},
   name:{...type.body,color:inkSoft,marginTop:16,marginBottom:24},body:{...type.body,color:ink},meta:{...type.meta,color:inkSoft},

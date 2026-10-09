@@ -27,9 +27,10 @@ it('keeps closed and locked entry private',async()=>{
   mockOpen=false;const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);expect(mockPolicy).not.toHaveBeenCalled();await page.unmount();
   mockOpen=true;mockLock.snapshot.locked=true;await render(<FamilyHistoryScreen familyId="family_d2"/>);expect(mockPolicy).not.toHaveBeenCalled();
 });
-it('opens the exact share with its family and does not offer member revoke',async()=>{
+it('opens the exact share inline with its family, collapses it, and does not offer member revoke',async()=>{
   const list=await render(<FamilyHistoryScreen familyId="family_d2"/>);await waitFor(()=>expect(list.getByText('Morning')).toBeTruthy());
-  await fireEvent.press(list.getByTestId('history-open-share_d2'));expect(mockPush).toHaveBeenCalledWith({pathname:'/family-record/[id]',params:{id:'share_d2',familyId:'family_d2'}});await list.unmount();
+  await fireEvent.press(list.getByTestId('history-open-share_d2'));await waitFor(()=>expect(mockRead).toHaveBeenCalledWith('family_d2','share_d2',expect.any(Function)));expect(mockPush).not.toHaveBeenCalled();expect(list.getByTestId('history-open-share_d2').props.accessibilityState.expanded).toBe(true);
+  await fireEvent.press(list.getByTestId('history-open-share_d2'));expect(list.queryByTestId('family-history-reading')).toBeNull();await list.unmount();
   const detail=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);await waitFor(()=>expect(detail.getByText('Morning')).toBeTruthy());
   expect(detail.queryByTestId('history-revoke')).toBeNull();expect(mockPlay).not.toHaveBeenCalled();
 });
@@ -100,4 +101,40 @@ it('does not flash empty-family content when the populated list loses focus',asy
   await waitFor(()=>expect(page.getByText('Morning')).toBeTruthy());
   await act(async()=>{mockFocusCleanup?.();});
   expect(page.queryByTestId('history-empty')).toBeNull();expect(page.queryByText('Morning')).toBeNull();
+});
+
+it('does not resurrect an inline reading that finishes after collapse',async()=>{
+  let resolve!:(v:typeof reading)=>void;mockRead.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));
+  const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
+  await waitFor(()=>expect(page.getByTestId('history-open-share_d2')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('history-open-share_d2'));
+  await waitFor(()=>expect(mockRead).toHaveBeenCalledTimes(1));
+  await fireEvent.press(page.getByTestId('history-open-share_d2'));
+  await act(async()=>{resolve(reading);});expect(page.queryByTestId('family-history-reading')).toBeNull();
+  expect(page.getByTestId('history-open-share_d2').props.accessibilityState.expanded).toBe(false);
+});
+
+it('keeps only one record expanded and reads the new exact share',async()=>{
+  mockList.mockResolvedValue({userId:'b',shares:[share,{...share,shareId:'second',snapshot:{...share.snapshot,note:'Second'}}]});
+  const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
+  await waitFor(()=>expect(page.getByTestId('history-open-second')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('history-open-share_d2'));
+  await waitFor(()=>expect(mockRead).toHaveBeenCalledTimes(1));
+  await fireEvent.press(page.getByTestId('history-open-second'));
+  await waitFor(()=>expect(mockRead).toHaveBeenCalledWith('family_d2','second',expect.any(Function)));
+  expect(page.getByTestId('history-open-share_d2').props.accessibilityState.expanded).toBe(false);
+  expect(page.getByTestId('history-open-second').props.accessibilityState.expanded).toBe(true);
+  expect(mockPush).not.toHaveBeenCalled();
+});
+it('withdraws inline and refreshes the list without navigating away',async()=>{
+  mockRead.mockResolvedValue({...reading,userId:'a'});const alert=jest.spyOn(Alert,'alert');
+  const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
+  await waitFor(()=>expect(page.getByTestId('history-open-share_d2')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('history-open-share_d2'));
+  await waitFor(()=>expect(page.getByTestId('history-revoke')).toBeTruthy());
+  mockList.mockResolvedValue({userId:'a',shares:[]});
+  await fireEvent.press(page.getByTestId('history-revoke'));
+  await act(async()=>{alert.mock.calls[0][2]![1].onPress!();});
+  await waitFor(()=>expect(page.getByTestId('history-empty')).toBeTruthy());
+  expect(mockRevoke).toHaveBeenCalledTimes(1);expect(mockPush).not.toHaveBeenCalled();
 });

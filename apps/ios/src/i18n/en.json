@@ -702,5 +702,8 @@
   "家人分享的": "Shared by a family member",
   "撤回这次分享？": "Withdraw this share?",
   "家人将不能再阅读这次分享。你的个人记录仍然保留。": "Your family will no longer be able to read this share. Your personal moment stays on this device.",
-  "撤回分享": "Withdraw share"
+  "撤回分享": "Withdraw share",
+  "打开": "Open",
+  "打开这条家庭记录": "Open this family moment",
+  "收起这条家庭记录": "Close this family moment"
 }
