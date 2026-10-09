@@ -709,7 +709,8 @@
   "分享这一刻。": "Share this moment.",
   "这次分享": "This moment",
   "随这一刻分享": "Include with this moment",
-  "照片 {0}": "Photo {0}",
-  "声音 {0}": "Audio {0}",
-  "个人原记录不变。": "Your personal moment stays unchanged."
+  "照片 {0}": "Photo {{0}}",
+  "声音 {0}": "Audio {{0}}",
+  "个人原记录不变。": "Your personal moment stays unchanged.",
+  "这份分享的照片或声音暂时读不出来，请再试一次。": "The photos or audio in this share could not be loaded. Please try again."
 }

@@ -52,3 +52,14 @@ Linux 环境未运行模拟器或真机，未动 Liuz17、生产或 TestFlight�
 - tsc / 改动 ESLint / diff check PASS；针对性 6 suites / 45 tests PASS。本轮未跑全量 Jest。
 - 新卡片开启、布局、空状态、撤回确认：模拟器/真机 NOT VERIFIED。先前五项用户报告模拟器 PASS 保留在原 SHA，不能扩为本轮界面验收。附件当前环境不能读取，按文字要求与现有 token 实现。
 - 本地测试差异已收到：app.json 仅 web.output static→single；lock 仅 fsevents dev:true，版本/完整性未变。不收入运行代码。
+
+
+## 合并前核对（2026-10-09）
+
+用户报告本轮所有界面与交互调整在模拟器全部通过。报告前最新运行候选 head 为 ac884ad；未另收到设备 JS 摘要，不臆写为已独立核实。包含卡片内开启、家庭名称与空态、原位打开/收起、撤回确认、分享页层次、详情分享位置与末尾线。本轮不扩大到真机、公网、VoiceOver 或短屏/横屏/iPad。
+
+合并审阅发现并修复两处：英文 Photo/Audio 数字插值使用双大括号；接收媒体读取失败使用读取提示，不再声称分享失败或个人原记录在接收设备。新增英文插值/接收失败测试。
+
+检查：tsc、改动 ESLint、git diff --check PASS；针对性 11 suites / 64 tests PASS。没有新跑全量，之前全量 2 个基线失败仍按原报告保留，不能写为全量 PASS。家庭默认入口、生产/身份验收标记未改。未部署、未上传 TestFlight。
+
+下一独立阶段按 IMPLEMENTATION.md 为 E：离开/移除/转交/前成员撤回/解散与清理；先拆 E1 离开与移除，不在 D2 中追加。

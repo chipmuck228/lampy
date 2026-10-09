@@ -71,3 +71,7 @@ it('interpolates family capacity in both app languages', () => {
   expect(localized('zh-CN').tr('{0} / 10',[2])).toBe('2 / 10');
   expect(localized('en-US').tr('已加入 {0} / 10 个家庭',[10])).toBe('Families: 10 / 10');
 });
+
+it('interpolates English family media choices',()=>{
+  const en=localized('en-US');expect(en.tr('照片 {0}',[1])).toBe('Photo 1');expect(en.tr('声音 {0}',[2])).toBe('Audio 2');
+});

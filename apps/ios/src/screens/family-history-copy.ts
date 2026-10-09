@@ -5,7 +5,8 @@ export function familyHistoryError(error: unknown) {
   if (code === 'NOT_IN_FAMILY' || code === 'FORBIDDEN' || code === 'SHARE_NOT_FOUND') return tr('这份家庭记录现在不可读。');
   if (code === 'FAMILY_HISTORY_CLOSED' || code === 'FAMILY_UPGRADE_REQUIRED') return tr('家庭分享暂未开放。');
   if (code === 'SOURCE_CHANGED' || code === 'MOMENT_NOT_FOUND') return tr('记录已变化，请重新查看并确认。');
-  if (code === 'SHARE_MEDIA_INCOMPLETE' || code === 'SHARE_MEDIA_UNAVAILABLE') return tr('照片或声音暂时无法分享，原记录还在。');
+  if (code === 'SHARE_MEDIA_UNAVAILABLE') return tr('这份分享的照片或声音暂时读不出来，请再试一次。');
+  if (code === 'SHARE_MEDIA_INCOMPLETE') return tr('照片或声音暂时无法分享，原记录还在。');
   if (code === 'SHARE_IMAGE_CONVERSION_UNAVAILABLE') return tr('照片分享需要更新测试安装，原照片还在。');
   if (code === 'SHARE_IMAGE_CONVERSION_FAILED' || code === 'MEDIA_UNSUPPORTED' || code === 'MEDIA_CORRUPT') return tr('这张照片暂时无法分享，可以取消勾选后再试。');
   if (code === 'MEDIA_TOO_LARGE') return tr('这份照片或声音超过分享大小限制，可以取消勾选后再试。');

@@ -138,3 +138,10 @@ it('withdraws inline and refreshes the list without navigating away',async()=>{
   await waitFor(()=>expect(page.getByTestId('history-empty')).toBeTruthy());
   expect(mockRevoke).toHaveBeenCalledTimes(1);expect(mockPush).not.toHaveBeenCalled();
 });
+
+it('uses a recipient read error when shared media cannot load',async()=>{
+  mockRead.mockRejectedValueOnce({code:'SHARE_MEDIA_UNAVAILABLE'});
+  const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);
+  await waitFor(()=>expect(page.getByText('这份分享的照片或声音暂时读不出来，请再试一次。')).toBeTruthy());
+  expect(page.queryByText('照片或声音暂时无法分享，原记录还在。')).toBeNull();
+});
