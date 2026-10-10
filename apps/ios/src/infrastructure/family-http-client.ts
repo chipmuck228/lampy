@@ -82,6 +82,7 @@ export type FamilyApiClient = {
   createCreatorTransfer?(session: string, familyId: string, input: { requestId: string; fromMembershipId: string; toMembershipId: string }): Promise<import('../family-api/types').FamilyTransfer>;
   respondCreatorTransfer?(session: string, familyId: string, transferId: string, revision: number, action: 'accept' | 'cancel'): Promise<import('../family-api/types').FamilyTransfer>;
   getFamilyRoster?(sessionToken: string, familyId: string): Promise<import('../family-api/types').FamilyRoster>;
+  dissolveSelectedFamily?(sessionToken: string, familyId: string, membershipId: string): Promise<{ dissolved: true }>;
   leaveSelectedFamily?(sessionToken: string, familyId: string, membershipId: string): Promise<{ left: true }>;
   removeSelectedMember?(sessionToken: string, familyId: string, userId: string, membershipId: string): Promise<{ removed: true }>;
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
@@ -211,6 +212,9 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
     },
     getFamilyRoster(sessionToken, familyId) {
       return send({ method: 'GET', path: `/v2/families/${familyId}/members`, sessionToken });
+    },
+    dissolveSelectedFamily(sessionToken, familyId, membershipId) {
+      return send({ method: 'POST', path: `/v2/families/${familyId}/dissolve`, sessionToken, body: { membershipId } });
     },
     leaveSelectedFamily(sessionToken, familyId, membershipId) {
       return send({ method: 'POST', path: `/v2/families/${familyId}/leave`, sessionToken, body: { membershipId } });

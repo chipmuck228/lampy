@@ -236,3 +236,32 @@ it('E2 rejects transfer reads completed after an account switch and sends no sta
  await x.session.setSession(x.b);gate.resolve({transfer:null});await expect(reading).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
  x.client.createCreatorTransfer=jest.fn();await expect(x.history.createCreatorTransfer(roster,'not-a-member','intent',current)).rejects.toMatchObject({code:'FORBIDDEN'});expect(x.client.createCreatorTransfer).not.toHaveBeenCalled();
 });
+
+it('E3 dissolve binds the creator roster, retires only that family cache, rejects late reads and leaves personal data untouched',async()=>{
+ const x=await fixture();x.attach();
+ const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ await x.history.read(x.f.familyId,shared.shareId,current);
+ const other=await x.commands.createNamedFamily(x.a.sessionToken,'Other','other');
+ await x.cache.upsertListed(x.a.userId,{...shared,familyId:other.familyId,shareId:'unrelated'});
+ const roster=await x.history.getMembers(x.f.familyId,current);
+ const gate=deferred<{shares:[]}>();x.client.history!.listVisibleShares=()=>gate.promise;
+ const reading=x.history.list(x.f.familyId,current);await new Promise(r=>setTimeout(r,0));
+ await x.history.dissolveFamily(roster,current);
+ gate.resolve({shares:[]});await expect(reading).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ expect(await x.cache.list(x.a.userId,x.f.familyId)).toEqual([]);
+ expect(await x.cache.find(x.a.userId,other.familyId,'unrelated')).not.toBeNull();
+ expect((await x.personal.moments.findById()).moment.content.note).toBe('A quiet morning');
+});
+it('E3 rejects a member or old-account dissolution confirmation',async()=>{
+ const x=await fixture();const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);
+ const creator=await x.history.getMembers(x.f.familyId,current);
+ await x.session.setSession(x.b);await expect(x.history.dissolveFamily(creator,current)).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ const member=await x.history.getMembers(x.f.familyId,current);await expect(x.history.dissolveFamily(member,current)).rejects.toMatchObject({code:'FORBIDDEN'});
+});
+it('E3 a remote dissolve denies cached reading and removes the family cache on refresh',async()=>{
+ const x=await fixture();const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ await x.history.list(x.f.familyId,current);expect(await x.cache.find(x.a.userId,x.f.familyId,shared.shareId)).not.toBeNull();
+ await x.commands.dissolveFamily(x.a.sessionToken,x.f.familyId);
+ await expect(x.history.read(x.f.familyId,shared.shareId,current)).rejects.toBeTruthy();
+ expect(await x.cache.list(x.a.userId,x.f.familyId)).toEqual([]);
+});

@@ -742,5 +742,10 @@
   "确认": "Confirm",
   "向 {0} 转交创建者？": "Transfer creator role to {{0}}?",
   "转交": "Transfer",
-  "移交": "Transfer"
+  "移交": "Transfer",
+  "这个家庭已解散，个人记录还在。": "This family has been dissolved. Your personal moments are still here.",
+  "解散这个家庭？": "Dissolve this family?",
+  "家人将不能再看这里的分享，邀请和待接受的移交也会结束。家庭分享副本将在30天后清理，个人记录和生活册不受影响。解散后无法恢复。": "Family members will lose access to shared moments. Invitations and pending transfers will end. Family copies will be cleaned up after 30 days; personal moments and life albums remain. This cannot be undone.",
+  "确认解散": "Confirm dissolution",
+  "解散家庭": "Dissolve family"
 }
