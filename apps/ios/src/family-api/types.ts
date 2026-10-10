@@ -40,6 +40,9 @@ export type Session = {
 export type FamilyHistoryPolicy = 'legacy' | 'family-history-v2';
 
 export type Family = {
+  dissolvedAt?: string;
+  cleanupDeadline?: string;
+  dissolvedBy?: string;
   historyPolicy?: FamilyHistoryPolicy;
   historyConfirmedAt?: string;
   historyConfirmedBy?: string;

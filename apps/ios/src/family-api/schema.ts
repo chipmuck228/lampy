@@ -132,6 +132,25 @@ const MIGRATIONS = [
     revision INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
     UNIQUE(family_id, from_user_id, request_id)
   ); CREATE UNIQUE INDEX family_creator_transfers_one_pending ON family_creator_transfers(family_id) WHERE status = 'pending';`,
+  `ALTER TABLE family_families ADD COLUMN dissolved_at TEXT;
+   ALTER TABLE family_families ADD COLUMN cleanup_deadline TEXT;
+   ALTER TABLE family_families ADD COLUMN dissolved_by TEXT;
+   ALTER TABLE family_families ADD COLUMN cleanup_time_estimated INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE family_families ADD COLUMN snapshots_purged_at TEXT;
+   ALTER TABLE family_families ADD COLUMN cleaned_at TEXT;
+   ALTER TABLE family_families ADD COLUMN cleanup_attempts INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE family_families ADD COLUMN cleanup_error TEXT;
+   CREATE TABLE family_media_cleanup (
+     storage_key TEXT PRIMARY KEY NOT NULL, object_id TEXT NOT NULL, family_id TEXT NOT NULL,
+     completed_at TEXT, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT
+   );
+   CREATE TABLE family_media_cleanup_families (
+     storage_key TEXT NOT NULL, family_id TEXT NOT NULL, PRIMARY KEY(storage_key,family_id)
+   );
+   UPDATE family_families SET cleanup_time_estimated=1, dissolved_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+     cleanup_deadline = strftime('%Y-%m-%dT%H:%M:%fZ','now','+30 days'),
+     dissolved_by = (SELECT user_id FROM family_memberships m WHERE m.family_id=family_families.family_id AND m.role='creator' ORDER BY joined_at DESC LIMIT 1)
+     WHERE status='dissolved';`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;

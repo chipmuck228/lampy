@@ -130,9 +130,9 @@ export function createFamilyHistoryUseCases(deps: {
   }
   async function invalidateDenied(a: Account, familyId: string, shareId: string | undefined, current: HistoryCurrent, failure: unknown) {
     const code = String(failure && typeof failure === 'object' && 'code' in failure ? failure.code : '');
-    if (!['UNAUTHENTICATED','NOT_IN_FAMILY','FORBIDDEN','SHARE_NOT_FOUND','FAMILY_HISTORY_CLOSED'].includes(code)) return;
+    if (!['UNAUTHENTICATED','NOT_IN_FAMILY','FORBIDDEN','SHARE_NOT_FOUND','FAMILY_HISTORY_CLOSED','FAMILY_DISSOLVED'].includes(code)) return;
     try { await check(a, qualifierBase.get(current) ?? current); } catch { return; }
-    const wholeFamily = !shareId || ['NOT_IN_FAMILY','UNAUTHENTICATED','FAMILY_HISTORY_CLOSED'].includes(code);
+    const wholeFamily = !shareId || ['NOT_IN_FAMILY','UNAUTHENTICATED','FAMILY_HISTORY_CLOSED','FAMILY_DISSOLVED'].includes(code);
     // Denial invalidates reads now, before waiting for cache writes already in flight.
     if (wholeFamily) generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
     else { const key = `${familyId}/${shareId}`; shareGenerations.set(key, (shareGenerations.get(key) ?? 0) + 1); }
@@ -192,6 +192,17 @@ export function createFamilyHistoryUseCases(deps: {
         || transfer.status !== 'pending' || (action === 'accept' ? transfer.toUserId !== a.userId || transfer.toMembershipId !== view.membershipId : transfer.fromUserId !== a.userId || transfer.fromMembershipId !== view.membershipId)) throw error('FORBIDDEN');
       await check(a, current); if (!deps.client.respondCreatorTransfer) throw error('FAMILY_UPGRADE_REQUIRED');
       const result = await deps.client.respondCreatorTransfer(a.sessionToken, view.familyId, transfer.transferId, transfer.revision, action);
+      await check(a, current); return result;
+    },
+    async dissolveFamily(view: FamilyRoster & { userId: string }, current: HistoryCurrent) {
+      const a = memberViews.get(view); if (!a || view.role !== 'creator') throw error('FORBIDDEN');
+      const { familyId, membershipId } = view; await check(a, current);
+      if (!deps.client.dissolveSelectedFamily) throw error('FAMILY_UPGRADE_REQUIRED');
+      const result = await deps.client.dissolveSelectedFamily(a.sessionToken, familyId, membershipId);
+      // The server may commit after focus changes: retire only the original account/family's cache.
+      generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
+      const cleanup = cacheTail.catch(() => undefined).then(() => deps.receiveCache?.isolateFamily(a.userId, familyId));
+      cacheTail = cleanup; await cleanup;
       await check(a, current); return result;
     },
     async leaveFamily(view: FamilyRoster & { userId: string }, current: HistoryCurrent) {

@@ -95,7 +95,7 @@ export default function FamilyDirectoryScreen() {
       }
     }
   }
-  const joined = useCallback(() => { void refresh(); }, [refresh]);
+  const joined = useCallback((feedback?: string) => { if (feedback) setMessage(feedback); void refresh(); }, [refresh]);
   return <SettingsPage title={tr('家庭')} backLabel={tr('最近')} accessibilityLabel={tr('家庭')} onBack={() => router.dismissTo('/')}>
     {!isFamilyProductEntryOpen() ? <Text>{tr('敬请期待。')}</Text> : allowed ? <>
       {state.status !== 'signed-out' ? <Text style={styles.intro}>{tr('给重要的人，留一个位置。')}</Text> : null}

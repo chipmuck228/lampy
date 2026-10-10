@@ -26,3 +26,4 @@
 | `lookback-expand/` | #35 当时的年页展开契约。产品效力见 `lookback-book/`；#36 是 B 的备选实现 |
 | `life-album/` | 生活册。阶段 A 设计 #63。阶段 B 本机册子 `WALK-B.md`。阶段 C 排版探测与预览 `WALK-C.md`。不开始 D–E |
 | `adr/` | `0001`–`0006`。`0006` 已接受：身份、成员、快照矛盾结论 |
+| `family-dissolve-cleanup-e3/` | E3解散、立即收权、30天清理与隔离验收；家庭正式入口仍关闭 |

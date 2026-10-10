@@ -65,7 +65,7 @@ export type FamilyCommands = InviteLinkCommands & {
   removeSelectedMember(sessionToken: string, familyId: string, userId: string, membershipId: string): Promise<{ removed: true }>;
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
-  dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
+  dissolveFamily(sessionToken: string, familyId: string, membershipId?: string): Promise<{ dissolved: true }>;
   signOut(sessionToken: string): Promise<{ signedOut: true }>;
   uploadMedia(
     sessionToken: string,
@@ -184,6 +184,9 @@ async function readIdempotent<T>(
   if (!idempotencyKey) return undefined;
   const hit = await tx.findIdempotent(userId, command, idempotencyKey);
   if (!hit) return undefined;
+  if (hit.body && typeof hit.body === 'object' && 'retired' in hit.body && hit.body.retired === 'family-dissolved') {
+    throw new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.');
+  }
   if (hit.requestFingerprint !== requestFingerprint) {
     throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.');
   }
@@ -657,22 +660,37 @@ export function createFamilyCommands(deps: {
       });
     },
 
-    dissolveFamily(sessionToken, familyId) {
+    dissolveFamily(sessionToken, familyId, membershipId) {
       return withAuthedUser(sessionToken, async (tx, userId) => {
         const family = await tx.findFamily(familyId);
         if (!family) {
           throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Family was not found.');
         }
         if (family.status === 'dissolved') {
-          const wasCreator = (await tx.findMembership(familyId, userId))?.role === 'creator';
+          const wasCreator = family.dissolvedBy === userId || (!family.dissolvedBy && (await tx.findMembership(familyId, userId))?.role === 'creator');
           if (!wasCreator) {
             throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.');
           }
           return { dissolved: true as const };
         }
         await requireActiveCreator(tx, familyId, userId, 'Only the family creator can dissolve the family.');
+        const creator = await tx.findActiveMembership(familyId, userId);
+        if (membershipId && creator?.membershipId !== membershipId) throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Membership changed.');
+        const dissolvedAt = clock.now().toISOString();
         family.status = 'dissolved';
+        family.dissolvedAt = dissolvedAt;
+        family.cleanupDeadline = new Date(Date.parse(dissolvedAt) + 30 * 24 * 60 * 60 * 1000).toISOString();
+        family.dissolvedBy = userId;
         await tx.saveFamily(family);
+        for (const invite of await tx.listInviteLinks(familyId)) {
+          if (invite.status === 'pending') await tx.saveInviteLink({ ...invite, status: 'revoked' });
+        }
+        for (const invite of await tx.listPendingInvitations(familyId)) {
+          await tx.saveInvitation({ ...invite, status: 'revoked' });
+        }
+        for (const transfer of await tx.listTransfers(familyId)) {
+          if (transfer.status === 'pending') await tx.saveTransfer({ ...transfer, status: 'invalid', revision: transfer.revision + 1, updatedAt: dissolvedAt });
+        }
         for (const row of await tx.listActiveMembers(familyId)) {
           row.status = 'removed';
           await tx.saveMembership(row);

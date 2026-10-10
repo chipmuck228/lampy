@@ -1,6 +1,7 @@
 import { appLanguage, dateLabel, tr } from '../i18n';
 export function familyHistoryError(error: unknown) {
   const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
+  if (code === 'FAMILY_DISSOLVED') return tr('这个家庭已解散，个人记录还在。');
   if (code === 'UNAUTHENTICATED') return tr('登录后，才能和家人一起看。');
   if (code === 'NOT_IN_FAMILY' || code === 'FORBIDDEN' || code === 'SHARE_NOT_FOUND') return tr('这份家庭记录现在不可读。');
   if (code === 'FAMILY_HISTORY_CLOSED' || code === 'FAMILY_UPGRADE_REQUIRED') return tr('家庭分享暂未开放。');

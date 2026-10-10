@@ -145,3 +145,12 @@ it('uses a recipient read error when shared media cannot load',async()=>{
   await waitFor(()=>expect(page.getByText('这份分享的照片或声音暂时读不出来，请再试一次。')).toBeTruthy());
   expect(page.queryByText('照片或声音暂时无法分享，原记录还在。')).toBeNull();
 });
+
+it('E3 refresh after dissolution drops the old family title and does not autoplay cached sound',async()=>{
+ const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);await waitFor(()=>expect(page.getByText('Morning')).toBeTruthy());
+ mockPolicy.mockRejectedValueOnce({code:'FAMILY_DISSOLVED'});
+ await act(async()=>{AppState.currentState='background';mockListeners.slice().forEach(fn=>fn('background'));});
+ await act(async()=>{AppState.currentState='active';mockListeners.slice().forEach(fn=>fn('active'));});
+ await waitFor(()=>expect(page.getByText('这个家庭已解散，个人记录还在。')).toBeTruthy());
+ expect(page.queryByText('Window')).toBeNull();expect(page.queryByText('Morning')).toBeNull();expect(mockPlay).not.toHaveBeenCalled();
+});

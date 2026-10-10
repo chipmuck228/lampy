@@ -188,6 +188,13 @@ export async function dispatchFamilyApi(
       return {status:200,body:await commands.transfers.respond(token || '',transferAction[1],transferAction[2],Number(body.revision),transferAction[3] as 'accept'|'cancel')};
     }
 
+    const selectedDissolve = /^\/v2\/families\/([^/]+)\/dissolve$/.exec(path);
+    if (method === 'POST' && selectedDissolve) {
+      const membershipId = readString(body, 'membershipId');
+      if (!membershipId) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Membership required.');
+      return { status: 200, body: await commands.dissolveFamily(token || '', selectedDissolve[1], membershipId) };
+    }
+
     const roster = /^\/v2\/families\/([^/]+)\/members$/.exec(path);
     if (method === 'GET' && roster) return { status: 200, body: await commands.getFamilyRoster(token || '', roster[1]) };
     const selectedLeave = /^\/v2\/families\/([^/]+)\/leave$/.exec(path);
