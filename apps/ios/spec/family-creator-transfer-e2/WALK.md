@@ -34,3 +34,10 @@ E1 的用户模拟器 PASS 不扩展到 E2。E2 不合并，等源码复审及�
 动画警告：用户报告 `Sending onAnimatedValueUpdate with no listeners registered`。本机依赖源码 `react-native/React/Modules/RCTEventEmitter.m` 在原生事件发送且无订阅时发出此日志；AnimatedValue 的监听注销在 RN 内部。本成员组件与 FamilyDirectoryScreen 不使用 Animated，没有足够动作／调用栈证据定位业务触发源。未添加空监听器、未屏蔽日志、未改 RN 源码／FAB 显隐或已有动画。警告触发路径与消失：NOT VERIFIED，需补发生动作及当前 Metro 工作树。
 
 附件 `image(20261010-005043).png` 的 scratch 副本不可读；本轮按用户文字规格实现，未声称看过画面。新成员区的真实尺寸、中文／英文、短屏／横屏、VoiceOver 仍待实页确认。
+
+
+## 家庭单列与卡片内操作（2026-10-10）
+
+家庭改为单列：小封面与名称、角色并排。仅选中家庭显示家庭记录、创建者专有的邀请家人、家庭成员；成员在该家庭内原位展开，不放在页面末尾。点选可管理成员后显示水平的「移交／移除」，原确认、接受、请求资格和权限不变。中文「移交」有英文 Transfer 翻译。
+
+本轮实页、短屏、横屏和 VoiceOver：NOT VERIFIED；此前设备报告不扩展到本轮布局。

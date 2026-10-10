@@ -117,7 +117,7 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
               {!transfer ? <Pressable style={styles.memberActionHit} disabled={busy} accessibilityRole="button"
                 accessibilityLabel={tr('向 {0} 转交创建者', [label])} accessibilityState={{ disabled: busy }}
                 testID={`family-transfer-${member.membershipId}`} onPress={() => confirmTransfer(member)}>
-                <Text style={styles.action}>{tr('转交')}</Text>
+                <Text style={styles.action}>{tr('移交')}</Text>
               </Pressable> : null}
               <Pressable style={styles.memberActionHit} disabled={busy} accessibilityRole="button"
                 accessibilityLabel={tr('移除 {0}', [label])} accessibilityState={{ disabled: busy }}

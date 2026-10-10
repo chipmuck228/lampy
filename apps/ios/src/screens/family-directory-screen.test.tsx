@@ -162,12 +162,14 @@ it('cannot collapse the inline panel during acceptance and refreshes families wh
  expect(page.getByTestId('family-open-invite')).toBeEnabled();
 });
 
-it('places the chosen family member panel outside the half-width cover wall and replaces it on family selection',async()=>{
+it('keeps actions and inline members inside the selected full-width family and replaces them on selection',async()=>{
  mockOpen.mockReturnValue(true);mockFamilies.mockResolvedValue({userId:'a',limit:10,families:[{familyId:'one',name:'One',role:'creator',memberCount:2},{familyId:'two',name:'Two',role:'member',memberCount:2}]});
  const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByTestId('family-select-one')).toBeTruthy());
  await fireEvent.press(page.getByTestId('family-select-one'));
- expect(within(page.getByTestId('family-cover-wall')).queryByTestId('family-members-one')).toBeNull();
- expect(within(page.getByTestId('family-selected-members')).getByTestId('family-members-one')).toBeTruthy();
+ expect(within(page.getByTestId('family-tile-two')).queryByTestId('family-members-one')).toBeNull();
+ expect(within(page.getByTestId('family-tile-one')).getByTestId('family-members-one')).toBeTruthy();
+ expect(within(page.getByTestId('family-tile-one')).getByTestId('family-invite-one')).toBeTruthy();
  await fireEvent.press(page.getByTestId('family-select-two'));
- expect(page.queryByTestId('family-members-one')).toBeNull();expect(page.getByTestId('family-members-two')).toBeTruthy();
+ expect(page.queryByTestId('family-members-one')).toBeNull();expect(within(page.getByTestId('family-tile-two')).getByTestId('family-members-two')).toBeTruthy();
+ expect(page.queryByTestId('family-invite-one')).toBeNull();expect(page.queryByTestId('family-invite-two')).toBeNull();
 });
