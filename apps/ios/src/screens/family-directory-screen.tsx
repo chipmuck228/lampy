@@ -167,7 +167,7 @@ export default function FamilyDirectoryScreen() {
             <Text style={styles.familyName}>{f.name || tr('未命名家庭')}</Text>
             <Text style={styles.familyMeta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
           </Pressable>
-          {f.familyId === state.selectedId ? <><FamilyCardHistory key={f.familyId} familyId={f.familyId} /><FamilyCardMembers key={`members-${f.familyId}`} familyId={f.familyId} onChanged={joined} /></> : null}
+          {f.familyId === state.selectedId ? <FamilyCardHistory key={f.familyId} familyId={f.familyId} /> : null}
           {f.role === 'creator' && f.familyId === state.selectedId ? <Pressable testID={`family-invite-${f.familyId}`} style={styles.cardInvite}
             disabled={busy} accessibilityRole="button" accessibilityLabel={tr('邀请家人加入 {0}', [f.name || tr('未命名家庭')])}
             onPress={() => router.push({pathname:'/family-invitations', params:{familyId:f.familyId}})}>
@@ -175,6 +175,9 @@ export default function FamilyDirectoryScreen() {
           </Pressable> : null}
           </View>)}
         </View>
+        {state.families.some(f => f.familyId === state.selectedId) ? <View testID="family-selected-members" style={{ alignSelf: 'stretch' }}>
+          <FamilyCardMembers key={`members-${state.selectedId}`} familyId={state.selectedId!} onChanged={joined} />
+        </View> : null}
 
       </> : null}
       {message ? <Text>{message}</Text> : null}

@@ -22,3 +22,15 @@
 7. 中文／英文、短屏、横屏／iPad、系统 VoiceOver 操作顺序和确认朗读。
 
 E1 的用户模拟器 PASS 不扩展到 E2。E2 不合并，等源码复审及上述正常路径验收。
+
+## 2026-10-10 用户报告与成员区优化
+
+用户报告上述 11 项 E2 模拟器走查全部通过，包括发起／取消／接受、重启持久、角色刷新、旧邀请失效、离开重新加入、重复提交／断网重试、本机保护。设备沿用两台模拟器，运行 SHA 未确认：用户提供 `2b0c36d18603eb9460a595aaec2c26b8dca69c77` 是旧 D2 实现，不包含 E2；不能据此把 #98 head 记为已确认运行。用户报告保留为 PASS（运行版本待核对），本次新 UI 没有设备验收。
+
+成员区从半宽家庭封面格子移出到全宽区域。去加入日期与两段说明；点成员才在下一行横排「转交／移除」，单成员展开、按成员身份绑定操作。切换家庭仍卸载旧成员区，收权／保护时隐藏；转交服务端、迁移22、动作确认和请求锁未改。头像／脱敏电话号码仅记为以后 profile 展示方向。
+
+检查：tsc PASS；改动源／测试 ESLint PASS；相关 Jest 5 suites / 61 tests PASS（包含成员点选／切换／收起、权限与遮挡、全宽成员区不在半宽格子、转交应用与 SQLite、i18n）；git diff --check PASS。本轮未重复全量 Jest，上一轮全量结果保留原提交语境。
+
+动画警告：用户报告 `Sending onAnimatedValueUpdate with no listeners registered`。本机依赖源码 `react-native/React/Modules/RCTEventEmitter.m` 在原生事件发送且无订阅时发出此日志；AnimatedValue 的监听注销在 RN 内部。本成员组件与 FamilyDirectoryScreen 不使用 Animated，没有足够动作／调用栈证据定位业务触发源。未添加空监听器、未屏蔽日志、未改 RN 源码／FAB 显隐或已有动画。警告触发路径与消失：NOT VERIFIED，需补发生动作及当前 Metro 工作树。
+
+附件 `image(20261010-005043).png` 的 scratch 副本不可读；本轮按用户文字规格实现，未声称看过画面。新成员区的真实尺寸、中文／英文、短屏／横屏、VoiceOver 仍待实页确认。

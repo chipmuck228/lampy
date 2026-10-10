@@ -22,7 +22,7 @@ it('keeps leave behind explicit confirmation and refreshes the directory only af
 it('does not show creator leave or self-removal; confirms the exact member membership',async()=>{
  const expected={...roster,userId:'a',role:'creator',membershipId:'ma'};mockMembers.mockResolvedValue(expected);
  const alert=jest.spyOn(Alert,'alert');const page=await open();expect(page.queryByTestId('family-leave')).toBeNull();expect(page.queryByTestId('family-remove-ma')).toBeNull();
- await fireEvent.press(page.getByTestId('family-remove-mb'));await act(async()=>{alert.mock.calls[0][2]![1].onPress!();});expect(mockRemove).toHaveBeenCalledWith(expected,'mb',expect.any(Function));
+ await fireEvent.press(page.getByTestId('family-member-mb'));await fireEvent.press(page.getByTestId('family-remove-mb'));await act(async()=>{alert.mock.calls[0][2]![1].onPress!();});expect(mockRemove).toHaveBeenCalledWith(expected,'mb',expect.any(Function));
 });
 it('discards an alert confirmed after unmount',async()=>{
  const alert=jest.spyOn(Alert,'alert');const page=await open();await fireEvent.press(page.getByTestId('family-leave'));const confirm=alert.mock.calls[0][2]![1].onPress!;
@@ -58,7 +58,7 @@ it('E2 shows a pending transfer without accepting it; only explicit confirmation
 it('E2 keeps creation behind confirmation and blocks duplicate creation while submitting',async()=>{
  const expected={...roster,userId:'a',role:'creator',membershipId:'ma'};mockMembers.mockResolvedValue(expected);
  let finish!:(t:typeof pendingTransfer)=>void;mockCreateTransfer.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
- const alert=jest.spyOn(Alert,'alert'),page=await open();await fireEvent.press(page.getByTestId('family-transfer-mb'));expect(mockCreateTransfer).not.toHaveBeenCalled();
+ const alert=jest.spyOn(Alert,'alert'),page=await open();await fireEvent.press(page.getByTestId('family-member-mb'));await fireEvent.press(page.getByTestId('family-transfer-mb'));expect(mockCreateTransfer).not.toHaveBeenCalled();
  const confirm=alert.mock.calls[0][2]![1].onPress!;await act(async()=>{confirm();});await waitFor(()=>expect(mockCreateTransfer).toHaveBeenCalledTimes(1));
  await act(async()=>{confirm();});expect(mockCreateTransfer).toHaveBeenCalledTimes(1);
  await act(async()=>{finish(pendingTransfer);});expect(page.getByTestId('family-transfer-cancel')).toBeTruthy();expect(mockChanged).not.toHaveBeenCalled();
@@ -69,8 +69,26 @@ it('E2 ignores a transfer alert confirmed after leaving the screen',async()=>{
 });
 it('E2 retains the creation intent after uncertain failure so a retry cannot create a second request',async()=>{
  const expected={...roster,userId:'a',role:'creator',membershipId:'ma'};mockMembers.mockResolvedValue(expected);mockCreateTransfer.mockRejectedValueOnce({code:'NETWORK'}).mockResolvedValueOnce(pendingTransfer);
- const alert=jest.spyOn(Alert,'alert'),page=await open();await fireEvent.press(page.getByTestId('family-transfer-mb'));await act(async()=>{alert.mock.calls[0][2]![1].onPress!();});
- await fireEvent.press(page.getByText('再试一次'));await waitFor(()=>expect(page.getByTestId('family-transfer-mb')).toBeTruthy());
- await fireEvent.press(page.getByTestId('family-transfer-mb'));await act(async()=>{alert.mock.calls[1][2]![1].onPress!();});
+ const alert=jest.spyOn(Alert,'alert'),page=await open();await fireEvent.press(page.getByTestId('family-member-mb'));await fireEvent.press(page.getByTestId('family-transfer-mb'));await act(async()=>{alert.mock.calls[0][2]![1].onPress!();});
+ await fireEvent.press(page.getByText('再试一次'));await waitFor(()=>expect(page.getByTestId('family-member-mb')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('family-member-mb'));await fireEvent.press(page.getByTestId('family-transfer-mb'));await act(async()=>{alert.mock.calls[1][2]![1].onPress!();});
  expect(mockCreateTransfer.mock.calls[0][2]).toBe(mockCreateTransfer.mock.calls[1][2]);expect(mockCreateTransfer).toHaveBeenCalledTimes(2);
+});
+it('shows actions only below the selected member and switches selection without sending a command',async()=>{
+ const third={...member,membershipId:'mc',userId:'c'};
+ mockMembers.mockResolvedValue({...roster,userId:'a',role:'creator',membershipId:'ma',members:[creator,member,third]});
+ const page=await open();
+ expect(page.queryByTestId('family-transfer-mb')).toBeNull();expect(page.queryByTestId('family-remove-mb')).toBeNull();
+ expect(page.queryByText(/加入于/)).toBeNull();expect(page.queryByText('创建者可以转交给现有成员；解散将在后续提供。')).toBeNull();
+ await fireEvent.press(page.getByTestId('family-member-mb'));
+ expect(page.getByTestId('family-member-mb').props.accessibilityState.expanded).toBe(true);
+ expect(page.getByTestId('family-transfer-mb')).toBeTruthy();expect(page.getByTestId('family-remove-mb')).toBeTruthy();
+ await fireEvent.press(page.getByTestId('family-member-mc'));
+ expect(page.queryByTestId('family-member-actions-mb')).toBeNull();expect(page.getByTestId('family-remove-mc')).toBeTruthy();
+ await fireEvent.press(page.getByTestId('family-member-mc'));expect(page.queryByTestId('family-member-actions-mc')).toBeNull();
+ expect(mockCreateTransfer).not.toHaveBeenCalled();expect(mockRemove).not.toHaveBeenCalled();
+});
+it('does not offer member management to a recipient or under protection',async()=>{
+ const page=await open();expect(page.queryByTestId('family-member-ma')).toBeNull();expect(page.queryByTestId('family-transfer-mb')).toBeNull();
+ mockLock.snapshot.locked=true;await page.rerender(<FamilyCardMembers familyId="home" onChanged={mockChanged}/>);expect(page.queryByText('你')).toBeNull();
 });

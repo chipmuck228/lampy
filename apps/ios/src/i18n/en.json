@@ -740,5 +740,6 @@
   "转交创建者": "Transfer creator role",
   "向 {0} 转交创建者": "Transfer creator role to {{0}}",
   "确认": "Confirm",
-  "向 {0} 转交创建者？": "Transfer creator role to {{0}}?"
+  "向 {0} 转交创建者？": "Transfer creator role to {{0}}?",
+  "转交": "Transfer"
 }
