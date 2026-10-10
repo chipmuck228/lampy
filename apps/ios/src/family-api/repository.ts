@@ -23,6 +23,8 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  listTransfers(familyId: string): Promise<import('./types').FamilyTransfer[]>;
+  saveTransfer(transfer: import('./types').FamilyTransfer): Promise<void>;
   findInviteLinkByHash(hash: string): Promise<import('./types').InviteLink | null>;
   findInviteLinkById(id: string): Promise<import('./types').InviteLink | null>;
   listInviteLinks(familyId: string): Promise<import('./types').InviteLink[]>;
@@ -106,6 +108,8 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async listTransfers(familyId) { return store.transfers.filter(row => row.familyId === familyId); },
+    async saveTransfer(transfer) { replaceBy(store.transfers, row => row.transferId, transfer); },
     async findInviteLinkByHash(hash) { return store.inviteLinks.find(i => i.tokenHash === hash) ?? null; },
     async findInviteLinkById(id) { return store.inviteLinks.find(i => i.invitationId === id) ?? null; },
     async listInviteLinks(familyId) { return store.inviteLinks.filter(i => i.familyId === familyId); },

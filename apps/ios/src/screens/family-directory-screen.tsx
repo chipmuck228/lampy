@@ -10,7 +10,6 @@ import { SettingsPage } from './settings-chrome';
 import { Text, TextInput, type } from './life-text';
 import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
 import { AlbumCoverFace } from './album-cover-tile';
-import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
 import { LifeIcon } from './life-icons';
 import { FamilyCardMembers } from './family-card-members';
 import { FamilyCardHistory } from './family-card-history';
@@ -28,8 +27,6 @@ export default function FamilyDirectoryScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
-  const [wallWidth, setWallWidth] = useState<number | null>(null);
-  const wall = albumCoverWallLayout(wallWidth);
   const [message, setMessage] = useState<string | null>(null);
   const sequence = useRef(0);
   const submitOwner = useRef<number | null>(null);
@@ -150,31 +147,30 @@ export default function FamilyDirectoryScreen() {
           </View>
         </View> : null}
         {state.families.length === 0 ? <Text style={styles.empty}>{tr('现在还没有家庭。')}</Text> : null}
-        <View style={styles.wall} testID="family-cover-wall" onLayout={event => {
-          const next = Math.round(event.nativeEvent.layout.width);
-          setWallWidth(previous => previous === next ? previous : next);
-        }}>
-          {state.families.map(f => <View key={f.familyId} style={[styles.tile, { width: wall.tileWidth }]}><Pressable testID={`family-select-${f.familyId}`}
+        <View style={styles.wall} testID="family-cover-wall">
+          {state.families.map(f => <View key={f.familyId} testID={`family-tile-${f.familyId}`} style={styles.tile}><Pressable testID={`family-select-${f.familyId}`}
             style={styles.selection} disabled={busy} accessibilityRole="button"
             accessibilityLabel={`${f.name || tr('未命名家庭')}，${tr(f.role === 'creator' ? '创建者' : '成员')}，${tr('家庭成员：{0}人', [f.memberCount])}`}
             accessibilityState={{ selected: f.familyId === state.selectedId, disabled: busy }}
             onPress={() => { directory.select(f.familyId); setState(directory.snapshot()); }}>
             <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
               style={[styles.cover, f.familyId === state.selectedId && styles.selectedCover]}>
-              <AlbumCoverFace name="" coverUri={null} width={Math.max(1, wall.tileWidth - 2)} height={wall.tileHeight - 2} />
+              <AlbumCoverFace name="" coverUri={null} width={70} height={88} />
               <View style={styles.coverMark}><LifeIcon name="family" size={36} color={sage} /></View>
             </View>
-            <Text style={styles.familyName}>{f.name || tr('未命名家庭')}</Text>
-            <Text style={styles.familyMeta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text>
+            <View style={styles.familySummary}><Text style={styles.familyName}>{f.name || tr('未命名家庭')}</Text>
+            <Text style={styles.familyMeta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text></View>
           </Pressable>
-          {f.familyId === state.selectedId ? <><FamilyCardHistory key={f.familyId} familyId={f.familyId} /><FamilyCardMembers key={`members-${f.familyId}`} familyId={f.familyId} onChanged={joined} /></> : null}
+          {f.familyId === state.selectedId ? <FamilyCardHistory key={f.familyId} familyId={f.familyId} /> : null}
           {f.role === 'creator' && f.familyId === state.selectedId ? <Pressable testID={`family-invite-${f.familyId}`} style={styles.cardInvite}
             disabled={busy} accessibilityRole="button" accessibilityLabel={tr('邀请家人加入 {0}', [f.name || tr('未命名家庭')])}
             onPress={() => router.push({pathname:'/family-invitations', params:{familyId:f.familyId}})}>
             <Text style={styles.action}>{tr('邀请家人')}</Text>
           </Pressable> : null}
+          {f.familyId === state.selectedId ? <FamilyCardMembers key={`members-${f.familyId}`} familyId={f.familyId} onChanged={joined} /> : null}
           </View>)}
         </View>
+
 
       </> : null}
       {message ? <Text>{message}</Text> : null}
@@ -190,7 +186,8 @@ const styles = StyleSheet.create({
   familyName: { ...type.action, fontSize:16, lineHeight:24, color:ink },
   familyMeta: { ...type.meta, fontSize:13, lineHeight:20, color:inkSoft },
   joinSection: { gap: 12, paddingVertical: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline },
-  selection: { gap: 6 },
+  selection: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  familySummary: { flex: 1, gap: 6 },
   cardInvite: { minHeight: 48, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, borderRadius: 24, backgroundColor: paperDeep, marginTop: 8 },
   intro: { ...type.body, color: inkSoft, marginTop: 16, marginBottom: 24 },
   welcome: { gap: 20, paddingTop: 40, paddingBottom: 32, alignItems: 'flex-start' },
@@ -216,8 +213,8 @@ const styles = StyleSheet.create({
   formActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
   input: { ...type.action, minHeight: 48, color: ink, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },
   empty: { ...type.body, color: inkSoft, marginVertical: 20 },
-  wall: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: ALBUM_COVER_WALL_GAP, marginTop: 12, marginBottom: 16 },
-  tile: { minHeight: 48, gap: 6, paddingBottom: 12 },
+  wall: { flexDirection: 'column', gap: 20, marginTop: 12, marginBottom: 16 },
+  tile: { alignSelf: 'stretch', minHeight: 48, gap: 6, paddingBottom: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },
   cover: { borderRadius: 10, borderWidth: 1, borderColor: 'transparent', overflow: 'hidden' },
   selectedCover: { borderColor: sage },
   coverMark: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },

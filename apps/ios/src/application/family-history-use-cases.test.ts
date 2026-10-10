@@ -213,3 +213,26 @@ it('denial invalidates a pending list before waiting for its cache write and kee
  await expect(x.history.authorize(x.f.familyId,share.shareId,current)).rejects.toMatchObject({code:'FORBIDDEN'});
  expect(await x.cache.find(x.a.userId,x.f.familyId,share.shareId)).toBeNull();expect(await x.cache.find(x.a.userId,x.f.familyId,'other-share')).not.toBeNull();
 });
+it('E2 preserves valid history and personal sources, binds transfer actions to the exact account and requires an explicit response', async () => {
+ const x=await fixture();x.attach();const share=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);
+ const ar=await x.history.getMembers(x.f.familyId,current),target=ar.members.find(m=>m.userId===x.b.userId)!;
+ const transfer=await x.history.createCreatorTransfer(ar,target.membershipId,'e2-intent',current);
+ expect((await x.commands.getFamilyRoster(x.a.sessionToken,x.f.familyId)).role).toBe('creator');
+ await x.session.setSession(x.b);
+ await expect(x.history.respondCreatorTransfer(ar,transfer,'cancel',current)).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ const br=await x.history.getMembers(x.f.familyId,current),pending=await x.history.getCreatorTransfer(br,current);
+ await expect(x.history.respondCreatorTransfer(br,{...pending!},'accept',current)).rejects.toMatchObject({code:'FORBIDDEN'});
+ expect((await x.history.read(x.f.familyId,share.shareId,current)).share.snapshot.note).toBe('A quiet morning');
+ await x.history.respondCreatorTransfer(br,pending!,'accept',current);
+ expect((await x.commands.getFamilyRoster(x.b.sessionToken,x.f.familyId)).role).toBe('creator');
+ expect((await x.history.read(x.f.familyId,share.shareId,current)).share.shareId).toBe(share.shareId);
+ expect((await x.personal.assets.findById()).asset.localUri).toBe('file:///personal/photo.jpg');
+});
+it('E2 rejects transfer reads completed after an account switch and sends no stale confirmation',async()=>{
+ const x=await fixture();const roster=await x.history.getMembers(x.f.familyId,current);
+ const gate=deferred<{transfer:null}>();x.client.getCreatorTransfer=()=>gate.promise;
+ const reading=x.history.getCreatorTransfer(roster,current);await new Promise(r=>setTimeout(r,0));
+ await x.session.setSession(x.b);gate.resolve({transfer:null});await expect(reading).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ x.client.createCreatorTransfer=jest.fn();await expect(x.history.createCreatorTransfer(roster,'not-a-member','intent',current)).rejects.toMatchObject({code:'FORBIDDEN'});expect(x.client.createCreatorTransfer).not.toHaveBeenCalled();
+});

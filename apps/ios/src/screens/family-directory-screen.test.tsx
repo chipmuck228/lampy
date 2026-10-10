@@ -1,4 +1,4 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { AppState } from 'react-native';
 import FamilyDirectoryScreen from './family-directory-screen';
 const mockPush = jest.fn();
@@ -160,4 +160,16 @@ it('cannot collapse the inline panel during acceptance and refreshes families wh
  await waitFor(()=>expect(mockFamilies).toHaveBeenCalledTimes(2));
  expect(page.getByText('已加入这个家。')).toBeTruthy();
  expect(page.getByTestId('family-open-invite')).toBeEnabled();
+});
+
+it('keeps actions and inline members inside the selected full-width family and replaces them on selection',async()=>{
+ mockOpen.mockReturnValue(true);mockFamilies.mockResolvedValue({userId:'a',limit:10,families:[{familyId:'one',name:'One',role:'creator',memberCount:2},{familyId:'two',name:'Two',role:'member',memberCount:2}]});
+ const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByTestId('family-select-one')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('family-select-one'));
+ expect(within(page.getByTestId('family-tile-two')).queryByTestId('family-members-one')).toBeNull();
+ expect(within(page.getByTestId('family-tile-one')).getByTestId('family-members-one')).toBeTruthy();
+ expect(within(page.getByTestId('family-tile-one')).getByTestId('family-invite-one')).toBeTruthy();
+ await fireEvent.press(page.getByTestId('family-select-two'));
+ expect(page.queryByTestId('family-members-one')).toBeNull();expect(within(page.getByTestId('family-tile-two')).getByTestId('family-members-two')).toBeTruthy();
+ expect(page.queryByTestId('family-invite-one')).toBeNull();expect(page.queryByTestId('family-invite-two')).toBeNull();
 });

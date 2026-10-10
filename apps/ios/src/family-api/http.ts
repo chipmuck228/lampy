@@ -179,6 +179,15 @@ export async function dispatchFamilyApi(
       return { status: 200, body: await commands.listMembership(token || '') };
     }
 
+    const transferRoot = /^\/v2\/families\/([^/]+)\/creator-transfer$/.exec(path);
+    if (method === 'GET' && transferRoot) return {status:200,body:await commands.transfers.get(token || '',transferRoot[1])};
+    if (method === 'POST' && transferRoot) return {status:200,body:await commands.transfers.create(token || '',transferRoot[1],{requestId:readString(body,'requestId'),fromMembershipId:readString(body,'fromMembershipId'),toMembershipId:readString(body,'toMembershipId')})};
+    const transferAction = /^\/v2\/families\/([^/]+)\/creator-transfer\/([^/]+)\/(accept|cancel)$/.exec(path);
+    if (method === 'POST' && transferAction) {
+      if (!Number.isInteger(body.revision) || Number(body.revision)<1) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Transfer revision required.');
+      return {status:200,body:await commands.transfers.respond(token || '',transferAction[1],transferAction[2],Number(body.revision),transferAction[3] as 'accept'|'cancel')};
+    }
+
     const roster = /^\/v2\/families\/([^/]+)\/members$/.exec(path);
     if (method === 'GET' && roster) return { status: 200, body: await commands.getFamilyRoster(token || '', roster[1]) };
     const selectedLeave = /^\/v2\/families\/([^/]+)\/leave$/.exec(path);

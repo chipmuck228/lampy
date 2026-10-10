@@ -728,5 +728,19 @@
   "移除 {0}": "Remove {{0}}",
   "移除": "Remove",
   "离开家庭": "Leave family",
-  "创建者暂不能离开，转交和解散将在后续提供。": "Creators cannot leave yet. Transfer and dissolution will be available later."
+  "创建者暂不能离开，转交和解散将在后续提供。": "Creators cannot leave yet. Transfer and dissolution will be available later.",
+  "创建者可以转交给现有成员；解散将在后续提供。": "Creators can transfer to a current member. Dissolution will be available later.",
+  "接任家庭创建者？": "Become the family creator?",
+  "撤销这次转交？": "Cancel this transfer?",
+  "对方主动接受后才会转交。原创建者将成为成员，家庭记录保留；订阅和收费责任不会随此操作转移。": "The recipient must explicitly accept. The previous creator becomes a member and family moments remain. Subscriptions and billing responsibility do not transfer with this action.",
+  "邀请你接任家庭创建者。": "You have been invited to become the family creator.",
+  "正在等待对方确认转交。": "Waiting for the recipient to accept.",
+  "接受转交": "Accept transfer",
+  "撤销转交": "Cancel transfer",
+  "转交创建者": "Transfer creator role",
+  "向 {0} 转交创建者": "Transfer creator role to {{0}}",
+  "确认": "Confirm",
+  "向 {0} 转交创建者？": "Transfer creator role to {{0}}?",
+  "转交": "Transfer",
+  "移交": "Transfer"
 }
