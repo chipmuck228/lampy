@@ -35,3 +35,18 @@ Inspector checks bundle/version/build/team, JS bundle, internal Info.plist marke
 ## Before internal distribution
 
 The isolated service was updated to #104 merge 708fb8c on 2026-10-11; startup/health and both account login/profile smoke passed by user report (see WALK). Earlier advanced acceptance belongs to 0883b4c; the new timeout/method corrections have automated regression evidence, not new public adversarial/concurrency acceptance. Check API runtime dependencies separately; the previous full npm inventory includes app/development dependencies and is not a runtime audit. Keep registration closed. Updated privacy information for test family uploads and the invitation webpage/download instructions must be reviewed before giving the build to testers. This PR alone is not a distribution approval.
+
+## Profile placement update (2026-10-11)
+
+Settings now embeds Profile (我的资料): default avatar, nickname input, explicit
+Save nickname, and confirmed Sign out. No profile-page navigation is required.
+Signed-out settings offers Login; completing/cancelling this login returns to
+Settings. The family directory no longer links to Profile. Old /family-profile
+links redirect to /account. Invitation login continues to use its existing
+return and explicit join confirmation. Personal release gates remain closed.
+Network failures stay failures with retry, not a signed-out state.
+
+The earlier eight-item physical-device Release acceptance was user-reported
+before this placement update, with runtime SHA/build not supplied; it does not
+verify this new UI. Recheck inline save, confirmed logout/login, keyboard scroll,
+protection, Chinese/English, and invitation return on the updated Release build.

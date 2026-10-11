@@ -1,4 +1,5 @@
-import { isControlledEmailAccountsOpen } from '../infrastructure/family-config';
+import FamilyEmailAccountScreen from './family-email-account-screen';
+import { isControlledEmailAccountsOpen, isFamilyInternalTestBuild, isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -381,6 +382,7 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
         onBack={() => dismissSettingsToRecent(router)}
       >
         <SettingsIntro />
+        {isControlledEmailAccountsOpen() && isFamilyProductEntryOpen() && (isFamilyInternalTestBuild() || diagnosticsAllowed) ? <SettingsGroup title={tr("我的资料")}><FamilyEmailAccountScreen profileMode embedded/></SettingsGroup> : null}
         <SettingsGroup title={tr("本机")}>
           <DeviceLockSettings />
           <SettingsLink

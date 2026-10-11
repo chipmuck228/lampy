@@ -19,3 +19,13 @@ Device checklist: internal Release shows family entry; ordinary personal Release
 User-run Ubuntu/Mac validation; deployed source 708fb8c7375e299b1df25adab789594a1420ca58 (#104 merge). Upload checksum comparison OK; previous deployed source 0883b4c. Backup: /srv/lampy-family-test/backups/before-708fb8c-20261011-171542. Volume guard passed, isolated service active, deployed SHA and local health verified. Public HTTPS health HTTP 200 with publicTestLogin=true, emailRegistration=false, testAccountLogin=false. Both operator test accounts logged in HTTP 200 and profile userId matched (user report). No passwords/tokens recorded.
 
 Deployment/startup/health and normal login/profile smoke: PASS (user report). No new dependency/schema change; no dependency reinstall. No new concurrency/slow-body/mixed-method/spoofing acceptance was run on this deployed revision: regression coverage remains automated; earlier end-to-end rate-limit tests belong to 0883b4c. This does not verify the internal App Release UI, invitations, media, real-device protection, VoiceOver or TestFlight. #87 and #105 remain OPEN.
+
+## Inline Settings Profile — 2026-10-11
+
+- Previous eight Release device checks: PASS by user report; device/build/runtime
+  SHA not provided. Performed before this UI update.
+- Inline profile/save/logout, signed-out login returning to Settings, failed
+  reads staying retryable: automated coverage added.
+- TypeScript and changed-file ESLint PASS; targeted Jest 5 suites / 64 tests PASS.
+- New Settings placement/keyboard/native protection device checks: NOT VERIFIED.
+- No native dependency or build-profile changes; PR remains OPEN, no upload.

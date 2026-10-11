@@ -1,2 +1,3 @@
-import FamilyEmailAccountScreen from '../screens/family-email-account-screen';
-export default function FamilyProfile() { return <FamilyEmailAccountScreen profileMode/>; }
+import { Redirect } from 'expo-router';
+/** Preserve old profile links; editing now belongs to Settings. */
+export default function FamilyProfile() { return <Redirect href="/account"/>; }
