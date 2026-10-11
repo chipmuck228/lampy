@@ -146,7 +146,7 @@ export default function FamilyDirectoryScreen() {
             {!retrying && !busy ? <Pressable style={styles.hit} accessibilityRole="button" onPress={() => setFormOpen(false)}><Text style={styles.meta}>{tr('取消')}</Text></Pressable> : null}
           </View>
         </View> : null}
-        {state.families.length === 0 ? <Text style={styles.empty}>{tr('现在还没有家庭。')}</Text> : null}
+        {state.families.length === 0 && state.pastFamilies.length === 0 ? <Text style={styles.empty}>{tr('现在还没有家庭。')}</Text> : null}
         <View style={styles.wall} testID="family-cover-wall">
           {state.families.map(f => <View key={f.familyId} testID={`family-tile-${f.familyId}`} style={styles.tile}><Pressable testID={`family-select-${f.familyId}`}
             style={styles.selection} disabled={busy} accessibilityRole="button"
@@ -168,6 +168,19 @@ export default function FamilyDirectoryScreen() {
             <Text style={styles.action}>{tr('邀请家人')}</Text>
           </Pressable> : null}
           {f.familyId === state.selectedId ? <FamilyCardMembers key={`members-${f.familyId}`} familyId={f.familyId} onChanged={joined} /> : null}
+          </View>)}
+          {state.pastFamilies.map(f => <View key={f.familyId} testID={`family-past-${f.familyId}`} style={styles.tile} accessible
+            accessibilityLabel={`${f.name || tr('未命名家庭')}，${tr(f.status === 'dissolved' ? '已解散' : f.status === 'left' ? '已离开' : '已被移除')}，${tr(f.status === 'dissolved' ? '家庭已解散，个人记录还在。' : '个人记录还在。')}`}>
+            <View style={styles.selection}>
+              <View style={[styles.cover,{backgroundColor:paperDeep,width:70,height:88,alignItems:'center',justifyContent:'center'}]} accessible={false}>
+                <LifeIcon name="family" size={36} color={inkSoft} />
+              </View>
+              <View style={styles.familySummary} accessible={false}>
+                <Text style={[styles.familyName,{color:inkSoft}]}>{f.name || tr('未命名家庭')}</Text>
+                <Text style={styles.familyMeta}>{tr(f.status === 'dissolved' ? '已解散' : f.status === 'left' ? '已离开' : '已被移除')}</Text>
+                <Text style={styles.familyMeta}>{tr(f.status === 'dissolved' ? '家庭已解散，个人记录还在。' : '个人记录还在。')}</Text>
+              </View>
+            </View>
           </View>)}
         </View>
 

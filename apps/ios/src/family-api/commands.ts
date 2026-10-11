@@ -385,7 +385,8 @@ export function createFamilyCommands(deps: {
             memberCount: (await tx.listActiveMembers(family.familyId)).length });
         }
         families.sort((a, b) => a.familyId.localeCompare(b.familyId));
-        return { families, limit: 10 as const };
+        const pastFamilies = (await tx.listPastFamilies(userId)).filter(row => !families.some(f => f.familyId === row.familyId));
+        return { families, ...(pastFamilies.length ? { pastFamilies } : {}), limit: 10 as const };
       });
     },
     createNamedFamily(sessionToken, rawName, idempotencyKey) {

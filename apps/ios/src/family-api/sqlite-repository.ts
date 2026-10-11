@@ -351,6 +351,11 @@ function createSqliteTx(db: FamilySql): FamilyTx {
          ON CONFLICT(family_id) DO UPDATE SET status = excluded.status, name = excluded.name, history_policy = excluded.history_policy, history_confirmed_at = excluded.history_confirmed_at, history_confirmed_by = excluded.history_confirmed_by, dissolved_at = excluded.dissolved_at, cleanup_deadline = excluded.cleanup_deadline, dissolved_by = excluded.dissolved_by`,
         [family.familyId, family.name ?? '', family.createdAt, family.status, family.historyPolicy ?? 'legacy', family.historyConfirmedAt ?? null, family.historyConfirmedBy ?? null, family.dissolvedAt ?? null, family.cleanupDeadline ?? null, family.dissolvedBy ?? null],
       );
+      if (family.status === 'dissolved') await db.run("UPDATE family_directory_history SET status='dissolved' WHERE family_id=?", [family.familyId]);
+    },
+    async listPastFamilies(userId) {
+      return db.getAll<import('./types').PastFamilySummary>(`SELECT family_id AS familyId,name,role,status
+        FROM family_directory_history WHERE user_id=? ORDER BY family_id`, [userId]);
     },
     async findActiveMembershipForUser(userId) {
       const rows = await db.getAll<MembershipRow>(
@@ -420,6 +425,15 @@ function createSqliteTx(db: FamilySql): FamilyTx {
           membership.joinedAt,
         ],
       );
+      const family = await this.findFamily(membership.familyId);
+      if (family && membership.status === 'active' && family.status === 'active') {
+        await db.run('DELETE FROM family_directory_history WHERE user_id=? AND family_id=?', [membership.userId,membership.familyId]);
+      } else if (family) {
+        await db.run(`INSERT INTO family_directory_history(user_id,family_id,name,role,status) VALUES(?,?,?,?,?)
+          ON CONFLICT(user_id,family_id) DO UPDATE SET name=excluded.name,role=excluded.role,status=excluded.status`,
+          [membership.userId,membership.familyId,family.name || '',membership.role,
+            family.status === 'dissolved' ? 'dissolved' : membership.status === 'left' ? 'left' : 'removed']);
+      }
     },
     async findInviteLinkByHash(hash) { return readInviteLink(await db.getFirst<InviteLinkRow>('SELECT * FROM family_invite_links WHERE token_hash = ?', [hash])); },
     async findInviteLinkById(id) { return readInviteLink(await db.getFirst<InviteLinkRow>('SELECT * FROM family_invite_links WHERE invitation_id = ?', [id])); },

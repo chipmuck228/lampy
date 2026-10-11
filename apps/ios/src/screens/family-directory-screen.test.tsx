@@ -173,3 +173,14 @@ it('keeps actions and inline members inside the selected full-width family and r
  expect(page.queryByTestId('family-members-one')).toBeNull();expect(within(page.getByTestId('family-tile-two')).getByTestId('family-members-two')).toBeTruthy();
  expect(page.queryByTestId('family-invite-one')).toBeNull();expect(page.queryByTestId('family-invite-two')).toBeNull();
 });
+
+it('shows ended families as read-only markers without counting or mounting privileged actions',async()=>{
+ mockOpen.mockReturnValue(true);mockFamilies.mockResolvedValue({userId:'a',families:[],limit:10,pastFamilies:[
+  {familyId:'dissolved',name:'Old home',role:'creator',status:'dissolved'},
+  {familyId:'left',name:'Other home',role:'member',status:'left'}]});
+ const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByTestId('family-past-dissolved')).toBeTruthy());
+ expect(page.getByText('家庭已解散，个人记录还在。')).toBeTruthy();expect(page.getByText('已离开')).toBeTruthy();
+ expect(page.getByTestId('family-count').props.children).toBe('0 / 10');expect(page.queryByTestId('family-select-dissolved')).toBeNull();
+ expect(page.queryByTestId('family-invite-dissolved')).toBeNull();expect(page.queryByText('现在还没有家庭。')).toBeNull();
+ expect(page.getByTestId('family-open-create').props.accessibilityState.disabled).toBe(false);
+});

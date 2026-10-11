@@ -1,3 +1,4 @@
+import { createFamilyStore } from './store';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -160,4 +161,67 @@ it('backfills old dissolved families from migration time with an explicit estima
  const old=await db.getFirst<{dissolved_at:string;cleanup_deadline:string;cleanup_time_estimated:number}>("SELECT dissolved_at,cleanup_deadline,cleanup_time_estimated FROM family_families WHERE family_id='old'");
  expect(old?.cleanup_time_estimated).toBe(1);expect(Date.parse(old!.cleanup_deadline)-Date.parse(old!.dissolved_at)).toBe(30*24*60*60*1000);
  expect(await db.getFirst("SELECT name,dissolved_at,cleanup_deadline,cleanup_time_estimated FROM family_families WHERE family_id='live'")).toEqual({name:'Live',dissolved_at:null,cleanup_deadline:null,cleanup_time_estimated:0});
+});
+
+it('keeps account-scoped dissolved directory markers after purge, without reviving a same-name new family',async()=>{
+ const x=await setup();await commands.dissolveFamily(x.a.sessionToken,x.f.familyId,x.ar.membershipId);
+ for (const account of [x.a,x.b]) {
+  const list=await commands.listFamilies(account.sessionToken);
+  expect(list.families).toEqual([]);expect(list.pastFamilies).toEqual([{familyId:x.f.familyId,name:'Private family',role:account===x.a?'creator':'member',status:'dissolved'}]);
+ }
+ now=new Date(deadline);await runFamilyCleanup(db,blobs,now);
+ await db.close();db=openFamilySqliteDatabase(path.join(dir,'f.sqlite'));commands=build();
+ x.a=await commands.signInWithApple('a');x.b=await commands.signInWithApple('b');
+ expect((await commands.listFamilies(x.b.sessionToken)).pastFamilies?.[0].name).toBe('Private family');
+ expect(await db.getAll('SELECT * FROM family_memberships WHERE family_id=?',[x.f.familyId])).toEqual([]);
+ expect(await db.getAll('SELECT * FROM family_shares WHERE family_id=?',[x.f.familyId])).toEqual([]);
+ await expect(commands.historyShares.getShare(x.b.sessionToken,x.f.familyId,x.shared.shareId)).rejects.toBeTruthy();
+ const fresh=await commands.createNamedFamily(x.a.sessionToken,'Private family','different-family');
+ expect(fresh.familyId).not.toBe(x.f.familyId);
+ const list=await commands.listFamilies(x.a.sessionToken);expect(list.families.map(f=>f.familyId)).toEqual([fresh.familyId]);
+ expect(list.pastFamilies?.[0].familyId).toBe(x.f.familyId);expect(list.pastFamilies?.[0].status).toBe('dissolved');
+});
+it('keeps left or removed markers private, does not count them, and rejoining the same id replaces the marker',async()=>{
+ const x=await setup();await commands.leaveSelectedFamily(x.b.sessionToken,x.f.familyId,x.br.membershipId);
+ expect((await commands.listFamilies(x.b.sessionToken)).pastFamilies?.[0]).toMatchObject({familyId:x.f.familyId,status:'left'});
+ expect((await commands.listFamilies(x.a.sessionToken)).pastFamilies).toBeUndefined();
+ await expect(commands.getFamilyRoster(x.b.sessionToken,x.f.familyId)).rejects.toBeTruthy();
+ const invite=await commands.createInviteLink(x.a.sessionToken,x.f.familyId);await commands.acceptInviteLink(x.b.sessionToken,invite.token);
+ expect((await commands.listFamilies(x.b.sessionToken)).pastFamilies).toBeUndefined();
+ const roster=await commands.getFamilyRoster(x.b.sessionToken,x.f.familyId);
+ await commands.removeSelectedMember(x.a.sessionToken,x.f.familyId,x.b.userId,roster.membershipId);
+ expect((await commands.listFamilies(x.b.sessionToken)).pastFamilies?.[0].status).toBe('removed');
+ for(let i=0;i<10;i++)await commands.createNamedFamily(x.b.sessionToken,`Another ${i}`,`another-${i}`);
+ const list=await commands.listFamilies(x.b.sessionToken);expect(list.families).toHaveLength(10);expect(list.pastFamilies).toHaveLength(1);
+ await expect(commands.createNamedFamily(x.b.sessionToken,'Eleventh','eleventh')).rejects.toMatchObject({code:'FAMILY_LIMIT_REACHED'});
+});
+it('backfills latest inactive membership at migration 24 and rolls back partial directory creation',async()=>{
+ await db.close();db=openFamilySqliteDatabase(path.join(dir,'legacy.sqlite'));await applyFamilyApiSchema(db,{upTo:23});
+ await db.run("INSERT INTO family_families(family_id,name,created_at,status) VALUES('old','Known name','now','active')");
+ await db.run("INSERT INTO family_memberships VALUES('first','old','u','member','left','now')");
+ await db.run("INSERT INTO family_memberships VALUES('latest','old','u','member','active','now')");
+ const broken:FamilySql={...db,exec:async sql=>{if(sql.includes('CREATE TABLE family_directory_history')){await db.exec(sql);throw new Error('interrupted');}return db.exec(sql);}};
+ await expect(applyFamilyApiSchema(broken)).rejects.toThrow('interrupted');
+ expect(await db.getFirst("SELECT name FROM sqlite_master WHERE name='family_directory_history'")).toBeNull();
+ await db.run("UPDATE family_memberships SET status='left' WHERE membership_id='latest'");await applyFamilyApiSchema(db);
+ expect(await db.getAll('SELECT * FROM family_directory_history')).toEqual([{user_id:'u',family_id:'old',name:'Known name',role:'member',status:'left'}]);
+});
+
+it('backfills dissolved families for every former member without admitting them to the active list',async()=>{
+ await db.close();db=openFamilySqliteDatabase(path.join(dir,'dissolved23.sqlite'));await applyFamilyApiSchema(db,{upTo:23});
+ await db.run("INSERT INTO family_families(family_id,name,created_at,status) VALUES('old','Old home','now','dissolved')");
+ await db.run("INSERT INTO family_memberships VALUES('ma','old','a','creator','removed','now')");
+ await db.run("INSERT INTO family_memberships VALUES('mb','old','b','member','left','now')");
+ await applyFamilyApiSchema(db);
+ expect(await db.getAll('SELECT user_id,status FROM family_directory_history ORDER BY user_id')).toEqual([{user_id:'a',status:'dissolved'},{user_id:'b',status:'dissolved'}]);
+});
+
+it('keeps memory repository behavior aligned for left, rejoin and dissolved history',async()=>{
+ const memory=createFamilyCommands({store:createFamilyStore(),apple:createMapAppleVerifier({a:{appleSubject:'a'},b:{appleSubject:'b'}}),inviteLinksEnabled:true});
+ const a=await memory.signInWithApple('a'),b=await memory.signInWithApple('b');const f=await memory.createNamedFamily(a.sessionToken,'Home','home');
+ const join=async()=>{const i=await memory.createInviteLink(a.sessionToken,f.familyId);await memory.acceptInviteLink(b.sessionToken,i.token);};await join();
+ const bRoster=await memory.getFamilyRoster(b.sessionToken,f.familyId);await memory.leaveSelectedFamily(b.sessionToken,f.familyId,bRoster.membershipId);
+ expect((await memory.listFamilies(b.sessionToken)).pastFamilies?.[0].status).toBe('left');await join();
+ expect((await memory.listFamilies(b.sessionToken)).pastFamilies).toBeUndefined();await memory.dissolveFamily(a.sessionToken,f.familyId);
+ expect((await memory.listFamilies(b.sessionToken)).pastFamilies?.[0]).toMatchObject({familyId:f.familyId,status:'dissolved'});
 });

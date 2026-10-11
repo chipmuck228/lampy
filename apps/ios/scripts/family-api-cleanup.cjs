@@ -40,7 +40,7 @@ const db = openFamilySqliteDatabase(databasePath);
 (async () => {
   try {
     const schema = await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations');
-    if (!schema || schema.version < 23) { process.stderr.write('Run family-api:migrate before cleanup (schema 23 required).\n'); process.exitCode = 1; return; }
+    if (!schema || schema.version < 24) { process.stderr.write('Run family-api:migrate before cleanup (schema 24 required).\n'); process.exitCode = 1; return; }
     const report = await runFamilyCleanup(db, createDirectoryMediaBlobStore(mediaPath));
     process.stdout.write(JSON.stringify(report) + '\n');
     if (report.failed) process.exitCode = 1;

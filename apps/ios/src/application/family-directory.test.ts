@@ -33,3 +33,19 @@ it('distinguishes an absent or expired account from connectivity failure', async
   await directory.load(async () => { throw {code:'NETWORK'}; });
   expect(directory.snapshot().status).toBe('failed');
 });
+
+it('retains past rows without granting selection, then replaces the exact family on rejoin',async()=>{
+ const directory=createFamilyDirectory();const past={familyId:'old',name:'Home',role:'member' as const,status:'left' as const};
+ await directory.load(async()=>({families:[],pastFamilies:[past],limit:10}));
+ expect(directory.snapshot().pastFamilies).toEqual([past]);expect(directory.select('old')).toBe(false);
+ await directory.load(async()=>({families:[{familyId:'old',name:'Home',role:'member',memberCount:2}],limit:10}));
+ expect(directory.snapshot().pastFamilies).toEqual([]);expect(directory.select('old')).toBe(true);
+ directory.invalidate();expect(directory.snapshot().pastFamilies).toEqual([]);
+});
+
+it('does not expose old account history when its delayed directory request finishes',async()=>{
+ const directory=createFamilyDirectory();let resolve!:(r:FamilyListView)=>void;
+ const pending=directory.load(()=>new Promise(r=>{resolve=r;}));directory.invalidate();
+ await directory.load(async()=>list('B'));resolve({families:[],pastFamilies:[{familyId:'A',name:'Private A',role:'creator',status:'dissolved'}],limit:10});await pending;
+ expect(directory.snapshot().pastFamilies).toEqual([]);expect(directory.snapshot().families[0].familyId).toBe('B');
+});
