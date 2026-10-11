@@ -33,3 +33,9 @@
 getPolicy先查家庭列表；已解散家庭不在列表中，真实结果通常是NOT_IN_FAMILY。不能把这一错误强改为FAMILY_DISSOLVED（也可能退出或被移除）。NOT_IN_FAMILY改为准确的「现在无法访问这个家庭，个人记录还在。」；明确FAMILY_DISSOLVED仍使用专用文案。真实应用路径测试验证缺席列表会隔离缓存；页面测试验证旧标题/正文清空、不自动播，不伪造解散原因。标题清空本身在原实现已成立。
 
 生产清理调度、告警、真机仍未配置/未验证；家庭正式入口和identityLoopAccepted保持原状。保持OPEN，未合并。
+
+## 2026-10-11 提示复测与收口
+
+用户在拉取 c500014 的步骤之后报告模拟器复测PASS：B在A解散后返回/刷新家庭记录，新不可访问提示正常。此轮没有另贴git输出，因此记为用户报告PASS、目标实现c500014，运行SHA未独立再次核对；不扩写为真机PASS。原14项完整走查仍对应81d748b。
+
+c500014：tsc PASS；本轮应用/页面/清理3 suites / 53 tests PASS；相关ESLint、node --check、git diff --check PASS。GitHub Bugbot已完成SUCCESS、没有新增问题。main仍为4164ad1；本轮只补走查不改运行代码。两个全量基线失败保留原记录，不声称全量PASS。生产调度/告警、真机及系统VO仍未完成。
