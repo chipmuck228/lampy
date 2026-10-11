@@ -62,6 +62,8 @@
     "lint": "expo lint",
     "check-env": "bash ./scripts/check-env.sh",
     "family-api": "node ./scripts/family-api.cjs",
+    "family-api:public-preflight": "node ./scripts/family-public-preflight.cjs",
+    "family-api:public-preflight:test": "node --test ./scripts/family-public-preflight.test.cjs",
     "family-api:cleanup": "node ./scripts/family-api-cleanup.cjs",
     "family-api:migrate": "node ./scripts/family-api-migrate.cjs",
     "family-api:test-account": "node ./scripts/family-api-test-account.cjs",
