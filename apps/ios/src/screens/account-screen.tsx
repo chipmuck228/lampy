@@ -1,3 +1,4 @@
+import { isControlledEmailAccountsOpen } from '../infrastructure/family-config';
 import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -93,10 +94,11 @@ export function AccountDiagnosticsClosed() {
   );
 }
 
-export default function AccountScreen({ variant = 'user', onAuthenticated, onCancel }: {
+export default function AccountScreen({ variant = 'user', onAuthenticated, onCancel, onEmailRequested }: {
   variant?: 'user' | 'diagnostics';
   onAuthenticated?: () => void;
   onCancel?: () => void;
+  onEmailRequested?: () => void;
 } = {}) {
   const router = useRouter();
   const diagnostics = variant === 'diagnostics';
@@ -488,6 +490,11 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
             正在登录。
           </Text>
         ) : null}
+        {isControlledEmailAccountsOpen() ? <Pressable accessibilityRole="button" style={styles.hit} testID="account-email-entry" disabled={busy !== 'idle'} accessibilityState={{disabled:busy !== 'idle'}} onPress={() => {
+          if (snapshot?.canSignOut) router.push('/family-profile');
+          else if (onEmailRequested) onEmailRequested();
+          else router.push('/family-email-account');
+        }}><Text style={styles.action}>{tr(snapshot?.canSignOut ? '我的资料' : '邮箱账号登录')}</Text></Pressable> : null}
         {showAppleButton ? (
           <View testID="account-apple-button">
             <AppleAuthentication.AppleAuthenticationButton

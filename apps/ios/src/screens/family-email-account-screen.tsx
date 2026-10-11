@@ -1,0 +1,98 @@
+import { useCallback, useRef, useState } from 'react';
+import { AppState, Pressable, StyleSheet, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { getFamilyUseCases } from '../application/container';
+import { isControlledEmailAccountsOpen, isFamilyProductEntryOpen } from '../infrastructure/family-config';
+import { isPersonalSettingsDiagnosticsOpen } from '../application/personal-settings-visibility';
+import { isPlausibleEmail, normalizeEmail, passwordPolicyError } from '../family-api/email-normalize';
+import type { UserProfile } from '../family-api/types';
+import { isApplicationError } from '../application/errors';
+import { tr } from '../i18n';
+import { useDeviceLock } from './device-lock-context';
+import { SettingsPage } from './settings-chrome';
+import { Text, TextInput, type } from './life-text';
+import { LifeIcon } from './life-icons';
+import { hairline, ink, inkSoft, sage, paperDeep } from './life-page';
+
+function errorCopy(error: unknown) {
+  if (isApplicationError(error)) {
+    if (error.code === 'EMAIL_ACCOUNT_EXISTS') return tr('这个账号已存在，请登录。');
+    if (error.code === 'AUTH_FAILED') return tr('邮箱或密码不对。');
+    if (error.code === 'RATE_LIMITED') return tr('请稍后再试。');
+    if (error.code === 'EMAIL_ACCOUNT_CLOSED') return tr('测试账号入口暂未开放。');
+    if (error.code === 'UNAUTHENTICATED') return tr('请先登录。');
+  }
+  return tr('现在没有完成，请再试一次。');
+}
+
+export default function FamilyEmailAccountScreen({ profileMode = false, onAuthenticated, onCancel, onOtherSignIn }: {
+  profileMode?: boolean; onAuthenticated?: () => void; onCancel?: () => void; onOtherSignIn?: () => void;
+} = {}) {
+  const router = useRouter();
+  const lock = useDeviceLock();
+  const allowed = isControlledEmailAccountsOpen() && isFamilyProductEntryOpen() && isPersonalSettingsDiagnosticsOpen() && !lock?.snapshot.locked;
+  const [register, setRegister] = useState(false);
+  const [email,setEmail] = useState(''); const [password,setPassword] = useState(''); const [nickname,setNickname] = useState('');
+  const [profile,setProfile] = useState<UserProfile | null>(null);
+  const [ready,setReady] = useState(false); const [loading,setLoading] = useState(true); const [busy,setBusy] = useState(false);
+  const [message,setMessage] = useState<string | null>(null);
+  const sequence = useRef(0); const owner = useRef<number | null>(null);
+  const current = useCallback((seq: number) => seq === sequence.current && allowed && AppState.currentState === 'active', [allowed]);
+  function cancel() { sequence.current++;owner.current=null;setPassword(''); if (onCancel) onCancel(); else if (router.canGoBack()) router.back(); else router.dismissTo('/family'); }
+  const load = useCallback(async(seq: number) => {
+    setLoading(true);setReady(false);setProfile(null);setMessage(null);
+    try {
+      const service = await getFamilyUseCases(); if (!current(seq)) return;
+      const health = await service.getControlledEmailAvailability(); if (!current(seq)) return;
+      if (!health.controlledEmailAccounts) { setMessage(tr('测试账号入口暂未开放。')); return; }
+      if (profileMode) { const value = await service.getMyProfile(() => current(seq)); if (!current(seq)) return;setProfile(value);setNickname(value.nickname); }
+      setReady(true);
+    } catch(error) { if(current(seq)) setMessage(errorCopy(error)); }
+    finally { if(current(seq)) setLoading(false); }
+  },[current,profileMode]);
+  useFocusEffect(useCallback(() => {
+    const seq = ++sequence.current;owner.current=null;setBusy(false);
+    if (allowed) void load(seq);
+    const sub = AppState.addEventListener('change',state => {
+      if (state !== 'active') { sequence.current++;owner.current=null;setPassword('');setBusy(false);setReady(false);setProfile(null); }
+      else if (allowed) { const next=++sequence.current;void load(next); }
+    });
+    return () => { sub.remove();sequence.current++;owner.current=null;setPassword('');setProfile(null); };
+  },[allowed,load]));
+  async function submit() {
+    if (!ready || owner.current !== null || !allowed || AppState.currentState !== 'active') return;
+    if ((profileMode || register) && (!nickname.trim() || Array.from(nickname.trim()).length > 24 || /[\u0000-\u001f\u007f\u2028\u2029]/.test(nickname))) {setMessage(tr('昵称请填写1至24个字。'));return;}
+    if (!profileMode && (!isPlausibleEmail(normalizeEmail(email)) || (register && passwordPolicyError(password)) || !password)) {setMessage(tr('请填写邮箱和密码，密码需10至128个字符。'));return;}
+    const seq=sequence.current;const submitted={email,password,nickname};owner.current=seq;setBusy(true);setMessage(null);
+    try {
+      const service=await getFamilyUseCases();if (!current(seq)) return;
+      if (profileMode) { const result=await service.updateMyProfile(submitted.nickname,()=>current(seq));if (!current(seq)) return;setProfile(result);setNickname(result.nickname);setMessage(tr('昵称已保存。')); }
+      else {
+        if(register) await service.registerControlledEmail(submitted,()=>current(seq));
+        else await service.signInWithControlledEmail(submitted,()=>current(seq));
+        if (!current(seq)) return;setPassword('');
+        if(onAuthenticated) onAuthenticated();else router.dismissTo('/family');
+      }
+    } catch(error) {if(current(seq)) setMessage(errorCopy(error));}
+    finally {if(owner.current===seq) {owner.current=null;if(current(seq)) setBusy(false);} }
+  }
+  const title=tr(profileMode ? '我的资料' : register ? '创建账号' : '登录家庭');
+  return <SettingsPage title={title} accessibilityLabel={title} backLabel={tr('返回')} onBack={cancel} pageTestID="family-email-page">
+    {!allowed ? <Text>{tr('测试账号入口暂未开放。')}</Text> : <>
+      {profileMode ? <View style={styles.avatar}><LifeIcon name="person" size={56} color={sage}/></View> : <Text style={styles.explanation}>{tr('邮箱仅用作测试账号，不会发送邮件。')}</Text>}
+      {loading ? <Text>{tr('正在读取。')}</Text> : null}
+      {ready ? <View style={styles.form}>
+        {!profileMode ? <>
+          <TextInput testID="email-account-email" accessibilityLabel={tr('邮箱')} placeholder={tr('邮箱')} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="username" maxLength={254} editable={!busy} style={styles.input}/>
+          <TextInput testID="email-account-password" accessibilityLabel={tr('密码')} placeholder={tr('密码')} value={password} onChangeText={setPassword} secureTextEntry textContentType={register ? 'newPassword' : 'password'} maxLength={128} editable={!busy} style={styles.input}/>
+        </> : null}
+        {profileMode || register ? <TextInput testID="email-account-nickname" accessibilityLabel={tr('昵称')} placeholder={tr('昵称')} value={nickname} onChangeText={setNickname} editable={!busy} style={styles.input}/> : null}
+        {profileMode && !profile ? <Text>{tr('请先登录。')}</Text> : <Pressable testID="email-account-submit" style={styles.primary} accessibilityRole="button" accessibilityState={{disabled:busy}} disabled={busy} onPress={()=>void submit()}><Text style={styles.action}>{tr(busy ? '正在处理。' : profileMode ? '保存昵称' : register ? '创建并登录' : '登录')}</Text></Pressable>}
+        {!profileMode ? <Pressable testID="email-account-toggle" style={styles.hit} accessibilityRole="button" disabled={busy} onPress={()=>{setRegister(!register);setMessage(null);setPassword('');}}><Text style={styles.action}>{tr(register ? '已有账号，去登录' : '没有账号，创建一个')}</Text></Pressable> : null}
+      </View> : !loading ? <Pressable style={styles.hit} accessibilityRole="button" onPress={()=>void load(++sequence.current)}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable> : null}
+      {!profileMode ? <Pressable style={styles.hit} accessibilityRole="button" disabled={busy} onPress={() => { if(onOtherSignIn) onOtherSignIn(); else router.push('/account-diagnostics'); }}><Text style={styles.action}>{tr('其他登录方式')}</Text></Pressable> : null}
+      {message ? <Text testID="email-account-message" style={styles.explanation}>{message}</Text> : null}
+    </>}
+  </SettingsPage>;
+}
+const styles=StyleSheet.create({form:{gap:16},input:{...type.action,color:ink,minHeight:48,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline,paddingVertical:12},primary:{minHeight:48,borderRadius:24,backgroundColor:paperDeep,alignItems:'center',justifyContent:'center',padding:12},hit:{minHeight:48,justifyContent:'center'},action:{...type.action,color:sage},explanation:{...type.meta,color:inkSoft,marginVertical:16},avatar:{alignItems:'center',marginVertical:24}});

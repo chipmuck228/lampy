@@ -33,6 +33,7 @@ import { ARGON2ID_PRODUCTION } from './password';
 import {
   assertTestAccountSessionAllowed,
   createTestAccountCommands,
+  requireProfileNickname,
   rejectDisallowedTestAccountSession,
 } from './test-account-commands';
 import type { MediaBlobStore } from './media-blobs';
@@ -47,6 +48,10 @@ export type FamilyCommands = InviteLinkCommands & {
   historyShares: ShareCommands;
   getFamilyHistoryPolicy(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
   confirmFamilyHistory(session: string, familyId: string, confirmation: string): Promise<{ policy: 'family-history-v2' }>;
+  registerControlledEmail(input: { email: string; password: string; nickname: string }, peer?: string): Promise<SignInResult>;
+  signInWithControlledEmail(input: { email: string; password: string }, peer?: string): Promise<SignInResult>;
+  getMyProfile(sessionToken: string): Promise<import('./types').UserProfile>;
+  updateMyProfile(sessionToken: string, nickname: string): Promise<import('./types').UserProfile>;
   health(): FamilyHealth;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
@@ -250,6 +255,7 @@ export function createFamilyCommands(deps: {
   mediaBlobs?: MediaBlobStore;
   passwordHasher?: PasswordHasher;
   testAccountLoginEnabled?: boolean;
+  controlledEmailAccountsEnabled?: boolean;
   inviteLinksEnabled?: boolean;
   historySharingEnabled?: boolean;
 }): FamilyCommands {
@@ -280,6 +286,7 @@ export function createFamilyCommands(deps: {
     ids,
     sessionTtlMs,
     passwordHasher: deps.passwordHasher,
+    controlledEmailAccountsEnabled: deps.controlledEmailAccountsEnabled,
     testAccountLoginEnabled,
   });
 
@@ -335,6 +342,7 @@ export function createFamilyCommands(deps: {
         media: true as const,
         shares: true as const,
         inbox: true as const,
+        controlledEmailAccounts: testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true,
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
         familyHistoryV2: deps.historySharingEnabled === true,
@@ -700,6 +708,18 @@ export function createFamilyCommands(deps: {
       });
     },
 
+    registerControlledEmail(input, peer) { return testAccounts.registerControlledEmail(input, peer); },
+    signInWithControlledEmail(input, peer) { return testAccounts.signInWithControlledEmail(input, peer); },
+    getMyProfile(sessionToken) {
+      return withAuthedUser(sessionToken, async(tx,userId) => (await tx.findProfile(userId)) ?? { userId, nickname:'', avatar:'system' as const, updatedAt:null });
+    },
+    async updateMyProfile(sessionToken, rawNickname) {
+      const nickname = requireProfileNickname(rawNickname);
+      return withAuthedUser(sessionToken, async(tx,userId) => {
+        const profile = { userId, nickname, avatar:'system' as const, updatedAt:iso(clock.now()) };
+        await tx.saveProfile(profile); return profile;
+      });
+    },
     signInWithTestAccount(input) {
       return testAccounts.signInWithTestAccount(input);
     },

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
 import { createFamilyDirectory } from '../application/family-directory';
-import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen, isControlledEmailAccountsOpen } from '../infrastructure/family-config';
 import { tr, appLanguage } from '../i18n';
 import { useDeviceLock } from './device-lock-context';
 import { SettingsPage } from './settings-chrome';
@@ -99,13 +99,14 @@ export default function FamilyDirectoryScreen() {
   return <SettingsPage title={tr('家庭')} backLabel={tr('最近')} accessibilityLabel={tr('家庭')} onBack={() => router.dismissTo('/')}>
     {!isFamilyProductEntryOpen() ? <Text>{tr('敬请期待。')}</Text> : allowed ? <>
       {state.status !== 'signed-out' ? <Text style={styles.intro}>{tr('给重要的人，留一个位置。')}</Text> : null}
+      {state.status === 'ready' && isControlledEmailAccountsOpen() ? <Pressable accessibilityRole="button" style={styles.hit} onPress={() => router.push('/family-profile')}><Text style={styles.action}>{tr('我的资料')}</Text></Pressable> : null}
       {state.status === 'loading' ? <Text>{tr('正在读取家庭。')}</Text> : null}
       {state.status === 'signed-out' ? <View style={styles.welcome} testID="family-signed-out">
         <View style={styles.welcomeMark}><LifeIcon name="family" size={44} color="#91AA98" /></View>
         <Text style={styles.welcomeTitle}>{tr('有些日子，想和家人一起留着。')}</Text>
         <Text style={styles.welcomeBody}>{tr('登录后，可以创建自己的家庭。')}</Text>
         <Pressable style={styles.createHit} testID="family-sign-in" accessibilityRole="button"
-          onPress={() => router.push('/account-diagnostics')}><Text style={styles.action}>{tr('登录家庭')}</Text></Pressable>
+          onPress={() => router.push(isControlledEmailAccountsOpen() ? '/family-email-account' : '/account-diagnostics')}><Text style={styles.action}>{tr('登录家庭')}</Text></Pressable>
         <Text style={styles.privacyHint}>{tr('自己的记录，仍在这台设备上。')}</Text>
       </View> : null}
       {state.status === 'failed' ? <View style={styles.connection} testID="family-connection-failed">

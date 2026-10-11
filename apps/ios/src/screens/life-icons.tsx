@@ -7,6 +7,7 @@ import { inkSoft, sage } from './life-page';
 
 export const LIFE_ICON_NAMES = {
   settings: 'gearshape',
+  person: 'person.crop.circle',
   back: 'chevron.left',
   open: 'chevron.right',
   lock: 'lock',

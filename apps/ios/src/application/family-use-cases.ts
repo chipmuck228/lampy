@@ -395,21 +395,43 @@ export function createFamilyUseCases(deps: {
     }
   }
 
-  async function commitSignedIn(result: { userId: string; sessionToken: string }) {
+  let identityCommit: Promise<unknown> = Promise.resolve();
+  function commitSignedIn(result: { userId: string; sessionToken: string }, isCurrent: () => boolean = () => true) {
+    const work = () => performSignedIn(result, isCurrent);
+    const next = identityCommit.then(work,work);
+    identityCommit = next.then(() => undefined, () => undefined);
+    return next;
+  }
+  async function performSignedIn(result: { userId: string; sessionToken: string }, isCurrent: () => boolean = () => true) {
+    const check = () => { if (!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Identity screen is inactive.'); };
+    check();
     const previousUserId = await deps.session.getUserId();
+    check();
     const pendingRow = await deps.session.getPendingRevoke();
+    check();
     if (pendingRow?.userId === result.userId) {
       await deps.session.clearPendingRevoke();
     } else {
       await flushPendingRevoke();
     }
+    check();
     if (previousUserId && previousUserId !== result.userId) {
       await cache.clear();
+      check();
       await safeIsolateAccount(previousUserId);
     }
-    await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
-    await safeIsolateAccount(result.userId);
-    return { userId: result.userId };
+    check();
+    try {
+      await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
+      check();
+      await safeIsolateAccount(result.userId);
+      check();
+      return { userId: result.userId };
+    } catch (error) {
+      // Still inside the identity commit queue: a newer sign-in cannot be cleared here.
+      if (!isCurrent() && await deps.session.getSessionToken() === result.sessionToken) await deps.session.clearSession();
+      throw error;
+    }
   }
 
   async function assertSameAccount(account: { userId: string; sessionToken: string }) {
@@ -420,6 +442,26 @@ export function createFamilyUseCases(deps: {
 
   const history = createFamilyHistoryUseCases(deps);
   let directoryRequest = 0;
+  let emailAuthRequest = 0;
+  async function controlledEmailAuth(input: { email: string; password: string; nickname?: string }, register: boolean, isCurrent: () => boolean) {
+    const request = ++emailAuthRequest;
+    const initialToken = await deps.session.getSessionToken();
+    const eligible = () => request === emailAuthRequest && isCurrent();
+    if (!eligible()) throw new ApplicationError('STALE_FAMILY_REQUEST','Identity screen is inactive.');
+    const method = register ? deps.client.registerControlledEmail : deps.client.signInWithControlledEmail;
+    if (!method) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+    const result = register
+      ? await deps.client.registerControlledEmail!({email:input.email,password:input.password,nickname:input.nickname || ''})
+      : await deps.client.signInWithControlledEmail!({email:input.email,password:input.password});
+    try {
+      if (!eligible() || await deps.session.getSessionToken() !== initialToken) throw new ApplicationError('STALE_FAMILY_REQUEST','Identity changed during sign-in.');
+      return await commitSignedIn(result, eligible);
+    } catch (error) {
+      // Revoke only the new, discarded session, never another device/account's session.
+      try { await deps.client.signOut(result.sessionToken); } catch { /* expires server-side if offline */ }
+      throw asApplicationError(error);
+    }
+  }
   return {
     history,
     async previewInviteLink(token: string) {
@@ -507,6 +549,7 @@ export function createFamilyUseCases(deps: {
         throw appError;
       }
     },
+    async getControlledEmailAvailability() { return deps.client.health(); },
     async getAuthHealth() {
       try {
         return await deps.client.health();
@@ -527,21 +570,51 @@ export function createFamilyUseCases(deps: {
         throw appError;
       }
     },
+    async registerControlledEmail(input: { email: string; password: string; nickname: string }, isCurrent: () => boolean) {
+      return controlledEmailAuth(input, true, isCurrent);
+    },
+    async signInWithControlledEmail(input: { email: string; password: string }, isCurrent: () => boolean) {
+      return controlledEmailAuth(input, false, isCurrent);
+    },
+    async getMyProfile(isCurrent: () => boolean) {
+      const account = await requireAccount();
+      if (!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile is inactive.');
+      if (!deps.client.getMyProfile) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const profile = await deps.client.getMyProfile(account.sessionToken);
+      await assertSameAccount(account);
+      if (!isCurrent() || profile.userId !== account.userId) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile account changed.');
+      return profile;
+    },
+    async updateMyProfile(nickname: string, isCurrent: () => boolean) {
+      const account = await requireAccount();
+      if (!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile is inactive.');
+      if (!deps.client.updateMyProfile) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const profile = await deps.client.updateMyProfile(account.sessionToken,nickname);
+      await assertSameAccount(account);
+      if (!isCurrent() || profile.userId !== account.userId) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile account changed.');
+      return profile;
+    },
     async signInWithApple(identityToken: string) {
+      const request = ++emailAuthRequest;
+      let result: { userId: string; sessionToken: string } | undefined;
       try {
-        const result = await deps.client.signInWithApple(identityToken);
-        return commitSignedIn(result);
+        result = await deps.client.signInWithApple(identityToken);
+        return await commitSignedIn(result, () => request === emailAuthRequest);
       } catch (error) {
-        await deps.session.clearSession();
+        if (result) { try { await deps.client.signOut(result.sessionToken); } catch { /* only discarded token */ } }
+        if (request === emailAuthRequest) await deps.session.clearSession();
         throw asApplicationError(error);
       }
     },
     async signInWithTestAccount(login: string, password: string) {
+      const request = ++emailAuthRequest;
+      let result: { userId: string; sessionToken: string } | undefined;
       try {
-        const result = await deps.client.signInWithTestAccount({ login, password });
-        return commitSignedIn(result);
+        result = await deps.client.signInWithTestAccount({ login, password });
+        return await commitSignedIn(result, () => request === emailAuthRequest);
       } catch (error) {
-        await deps.session.clearSession();
+        if (result) { try { await deps.client.signOut(result.sessionToken); } catch { /* only discarded token */ } }
+        if (request === emailAuthRequest) await deps.session.clearSession();
         throw asApplicationError(error);
       }
     },
@@ -686,6 +759,7 @@ export function createFamilyUseCases(deps: {
     },
 
     async signOut(): Promise<SignOutResult> {
+      emailAuthRequest++;
       const token = await deps.session.getSessionToken();
       const userId = await deps.session.getUserId();
       if (!token || !userId) {

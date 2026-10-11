@@ -53,6 +53,7 @@ function statusFor(code: string) {
     case FAMILY_ERROR.FAMILY_SELECTION_REQUIRED:
     case FAMILY_ERROR.FAMILY_LIMIT_REACHED:
     case FAMILY_ERROR.TEST_ACCOUNT_EXISTS:
+    case FAMILY_ERROR.EMAIL_ACCOUNT_EXISTS:
       return 409;
     case 'FAMILY_POLICY_UPGRADE_REQUIRED':
       return 409;
@@ -80,6 +81,7 @@ function statusFor(code: string) {
       return 429;
     case 'INVITE_LINKS_CLOSED':
     case FAMILY_ERROR.TEST_ACCOUNT_LOGIN_CLOSED:
+    case FAMILY_ERROR.EMAIL_ACCOUNT_CLOSED:
       return 503;
     case FAMILY_ERROR.TEST_ACCOUNT_NOT_FOUND:
       return 404;
@@ -121,6 +123,11 @@ export async function dispatchFamilyApi(
     if (method === 'POST' && path === '/v1/auth/apple') {
       return { status: 200, body: await commands.signInWithApple(readString(body, 'identityToken')) };
     }
+
+    if (method === 'POST' && path === '/v2/auth/email/register') return { status: 201, body: await commands.registerControlledEmail({email:readString(body,'email'),password:readString(body,'password'),nickname:readString(body,'nickname')},request.peer) };
+    if (method === 'POST' && path === '/v2/auth/email/login') return { status: 200, body: await commands.signInWithControlledEmail({email:readString(body,'email'),password:readString(body,'password')},request.peer) };
+    if (method === 'GET' && path === '/v2/me/profile') return {status:200,body:await commands.getMyProfile(token || '')};
+    if (method === 'PATCH' && path === '/v2/me/profile') return {status:200,body:await commands.updateMyProfile(token || '',readString(body,'nickname'))};
 
     if (method === 'POST' && path === '/v1/auth/test-account') {
       return {

@@ -4,6 +4,12 @@ import { ARGON2ID_PRODUCTION, createArgon2idPasswordHasher, type PasswordHasher 
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilyClock, FamilyIds, SignInResult, TestAccountHealth } from './types';
 
+export function requireProfileNickname(raw: string) {
+  const value = raw.normalize('NFC').trim();
+  if (!value || Array.from(value).length > 24 || /[\u0000-\u001f\u007f\u2028\u2029]/.test(value)) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Nickname must be 1 to 24 characters.');
+  return value;
+}
+
 export const TEST_ACCOUNT_AUTH_FAILED_COPY = 'Login name or password is wrong.';
 const RATE_LIMIT_COPY = 'Try again later.';
 const CLOSED_COPY = 'Controlled test-account login is disabled.';
@@ -109,10 +115,12 @@ export function createTestAccountCommands(deps: {
   ids: FamilyIds;
   sessionTtlMs: number;
   testAccountLoginEnabled?: boolean;
+  controlledEmailAccountsEnabled?: boolean;
   passwordHasher?: PasswordHasher;
   loginLimit?: { windowMs: number; max: number };
 }) {
   const enabled = deps.testAccountLoginEnabled === true;
+  const emailEnabled = enabled && deps.controlledEmailAccountsEnabled === true;
   const hasher = deps.passwordHasher ?? createArgon2idPasswordHasher();
   const loginLimit = deps.loginLimit ?? DEFAULT_TEST_ACCOUNT_LOGIN_LIMIT;
   const withHashLock = createHashGate();
@@ -130,6 +138,34 @@ export function createTestAccountCommands(deps: {
         testAccountLoginReason: enabled ? 'enabled' : 'disabled',
         argon2id: ARGON2ID_PRODUCTION,
       };
+    },
+
+    async registerControlledEmail(input: { email: string; password: string; nickname: string }, peer = 'unknown'): Promise<SignInResult> {
+      if (!emailEnabled) throw new FamilyError(FAMILY_ERROR.EMAIL_ACCOUNT_CLOSED, 'Controlled email accounts are disabled.');
+      const loginNormalized = requireLogin(input.email);
+      requirePassword(input.password);
+      const nickname = requireProfileNickname(input.nickname);
+      const now = deps.clock.now();
+      await incrementLoginRateLimit(deps.repository, `email-register-peer:${peer}`, now, { windowMs: 15 * 60 * 1000, max: 8 });
+      await incrementLoginRateLimit(deps.repository, `email-register:${loginNormalized}`, now, { windowMs: 15 * 60 * 1000, max: 4 });
+      const passwordHash = await withHashLock(() => hasher.hash(input.password));
+      return deps.repository.withTransaction(async tx => {
+        if (await tx.findTestCredentialByLogin(loginNormalized)) throw new FamilyError(FAMILY_ERROR.EMAIL_ACCOUNT_EXISTS, 'This account already exists. Sign in instead.');
+        const userId = deps.ids.userId();
+        const createdAt = iso(now);
+        await tx.saveAccount({ userId, createdAt });
+        await tx.saveTestCredential({ credentialId: randomId('tac'), loginNormalized, userId, passwordHash, enabled: true, createdAt });
+        await tx.saveProfile({ userId, nickname, avatar: 'system', updatedAt: createdAt });
+        const session = { token: deps.ids.sessionToken(), userId, expiresAt: iso(new Date(now.getTime() + deps.sessionTtlMs)) };
+        await tx.saveSession(session);
+        return { userId, sessionToken: session.token, expiresAt: session.expiresAt };
+      });
+    },
+
+    async signInWithControlledEmail(input: { email: string; password: string }, peer = 'unknown') {
+      if (!emailEnabled) throw new FamilyError(FAMILY_ERROR.EMAIL_ACCOUNT_CLOSED, 'Controlled email accounts are disabled.');
+      await incrementLoginRateLimit(deps.repository, `email-login-peer:${peer}`, deps.clock.now(), DEFAULT_TEST_ACCOUNT_LOGIN_LIMIT);
+      return this.signInWithTestAccount({ login: input.email, password: input.password });
     },
 
     async createTestAccount(login: string, password: string) {

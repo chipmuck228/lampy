@@ -43,3 +43,9 @@ describe('release public env', () => {
     expect(inspectReleasePublicEnv({}, false).diagnosticsOpen).toBe(false);
   });
 });
+
+it('closes controlled email registration even with leftover public flags', () => {
+ const env={EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS:'1'};
+ expect(inspectReleasePublicEnv(env).closed).toBe(false);
+ expect(inspectReleasePublicEnv(applyClosedReleasePublicEnv(env))).toMatchObject({controlledEmailAccountsOpen:false,closed:true});
+});
