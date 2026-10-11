@@ -60,3 +60,11 @@ it('uses readable photo and audio choices without exposing technical media label
   await waitFor(()=>expect(mockPrepare).toHaveBeenLastCalledWith('moment_d2','fam_d2',expect.any(Function),['sound']));
   expect(mockShare).not.toHaveBeenCalled();
 });
+
+it('shows current sharing identity and the exact target before consent',async()=>{
+ mockPrepare.mockResolvedValue({...preview,sharingNickname:'小禾'});
+ const page=await render(<ShareConfirmRoute/>);await waitFor(()=>expect(page.getByText('Window')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('share-family-fam_d2'));
+ await waitFor(()=>expect(page.getByText('以 小禾 的身份，分享给「Window」')).toBeTruthy());
+ expect(page.getByTestId('share-confirm')).toBeDisabled();expect(mockShare).not.toHaveBeenCalled();
+});

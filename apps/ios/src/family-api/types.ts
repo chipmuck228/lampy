@@ -177,6 +177,8 @@ export type ShareView = {
   shareId: string;
   familyId: string;
   authorUserId: string;
+  // Live display only; authorization and original snapshot remain ID-based.
+  authorNickname?: string;
   sourceMomentId: string;
   sourceRevision: number;
   snapshot: ShareSnapshot;

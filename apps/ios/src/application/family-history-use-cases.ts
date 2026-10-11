@@ -11,6 +11,7 @@ import { assertMediaPayload, sha256MediaBytes } from '../family-api/media-valida
 export const HISTORY_AUDIENCE_CONFIRMATION = 'new-members-can-read-active-history';
 export type HistoryCurrent = () => boolean;
 export type HistoryPreview = {
+  sharingNickname?: string;
   userId: string; family: FamilySummary; sourceMomentId: string; sourceRevision: number;
   note: string; emotion: string; occurredAt?: string; occurredAtPrecision: string;
   media: { assetId: string; mimeType: string; ready: boolean }[];
@@ -246,8 +247,11 @@ export function createFamilyHistoryUseCases(deps: {
       const a = await account();
       const target = await family(a, familyId, current);
       if (await policy(a, familyId, current) !== 'family-history-v2') throw error('FAMILY_POLICY_UPGRADE_REQUIRED');
+      const profile = deps.client.getMyProfile ? await deps.client.getMyProfile(a.sessionToken) : null;
+      await check(a, current);
+      if (profile && profile.userId !== a.userId) throw error('STALE_FAMILY_REQUEST');
       const read = await source(momentId, a, current, selectedAssetIds);
-      const preview: HistoryPreview = { userId: a.userId, family: target, ...read.snapshot,
+      const preview: HistoryPreview = { userId: a.userId, sharingNickname: profile?.nickname ?? '', family: target, ...read.snapshot,
         availableMedia: read.availableMedia, media: read.media.map(({ assetId, mimeType, hash }) => ({ assetId, mimeType, ready: Boolean(hash) })) };
       frozen.set(preview, { account: a, fingerprint: read.fingerprint, familyId, momentId, selectedAssetIds: read.media.map(m => m.assetId) });
       return preview;

@@ -92,6 +92,7 @@ export default function ShareConfirmRoute() {
           : <Text style={styles.hint}>{tr('请家庭创建者先开启历史分享。')}</Text>}
       </View> : null}
       {preview ? <View style={styles.block} testID="history-share-preview">
+        <Text testID="share-identity" style={styles.hint}>{tr('以 {0} 的身份，分享给「{1}」', [preview.sharingNickname?.trim() || tr('当前账号'), preview.family.name])}</Text>
         <View style={styles.sectionTitle}><Text style={styles.name}>{tr('这次分享')}</Text><Text style={styles.meta}>{familySnapshotDate(preview)}</Text></View>
         {preview.note ? <Text style={styles.body}>{preview.note}</Text> : null}
         {preview.emotion ? <Text style={styles.hint}>{feelingLabel(preview.emotion)}</Text> : null}

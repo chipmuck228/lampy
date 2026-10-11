@@ -75,3 +75,10 @@ it('interpolates family capacity in both app languages', () => {
 it('interpolates English family media choices',()=>{
   const en=localized('en-US');expect(en.tr('照片 {0}',[1])).toBe('Photo 1');expect(en.tr('声音 {0}',[2])).toBe('Audio 2');
 });
+
+it('interpolates sharing identity and target in English',()=>{
+ const en=localized('en-US');
+ expect(en.tr('你 · {0} 分享的',['River'])).toBe('Shared by you · River');
+ expect(en.tr('{0} 分享的',['River'])).toBe('Shared by River');
+ expect(en.tr('以 {0} 的身份，分享给「{1}」',['River','Home'])).toBe('Sharing as River with Home');
+});

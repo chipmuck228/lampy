@@ -164,3 +164,10 @@ it('E3 missing membership after remote dissolution clears private content withou
  expect(page.queryByText('这个家庭已解散，个人记录还在。')).toBeNull();
  expect(page.queryByText('Window')).toBeNull();expect(page.queryByText('Morning')).toBeNull();expect(mockPlay).not.toHaveBeenCalled();
 });
+
+it('shows a live author name and keeps withdrawal bound to author id rather than nickname',async()=>{
+ mockList.mockResolvedValue({userId:'b',shares:[{...share,authorNickname:'小禾'}]});
+ const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
+ await waitFor(()=>expect(page.getByText('小禾 分享的')).toBeTruthy());
+ expect(page.queryByTestId('history-revoke')).toBeNull();
+});

@@ -11,7 +11,7 @@ import { SettingsPage } from './settings-chrome';
 import { hairline, ink, inkSoft, sage } from './life-page';
 import { LifeIcon } from './life-icons';
 import { useFamilyPrivateRequest } from './use-family-private-request';
-import { familyHistoryError, familySnapshotDate } from './family-history-copy';
+import { familyHistoryError, familySnapshotDate, familyShareAuthorLabel } from './family-history-copy';
 import { useSoundPlayer } from './use-sound-player';
 import { feelingLabel, tr } from '../i18n';
 
@@ -128,7 +128,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
         {expandedId !== row.shareId && row.snapshot.note ? <Text style={styles.body} numberOfLines={6}>{row.snapshot.note}</Text> : null}
         {expandedId !== row.shareId ? <Text style={styles.meta}>{tr('照片：{0} · 声音：{1}',[row.snapshot.media.filter(m=>m.mimeType.startsWith('image/')).length,row.snapshot.media.filter(m=>m.mimeType.startsWith('audio/')).length])}</Text> : null}
         {expandedId !== row.shareId && row.snapshot.emotion ? <Text style={styles.meta}>{feelingLabel(row.snapshot.emotion)}</Text> : null}
-        <View style={styles.footer}><Text style={styles.meta}>{tr(viewer === row.authorUserId ? '你分享的' : '家人分享的')}</Text>
+        <View style={styles.footer}><Text style={[styles.meta, styles.author]}>{familyShareAuthorLabel(row, viewer)}</Text>
         <Pressable accessibilityRole="button" testID={`history-open-${row.shareId}`} style={styles.hit}
           accessibilityState={{expanded:expandedId === row.shareId}} accessibilityLabel={tr(expandedId === row.shareId ? '收起这条家庭记录' : '打开这条家庭记录')}
           onPress={() => { saveProgress(); setExpandedId(id => id === row.shareId ? null : row.shareId); }}><Text style={styles.action}>{tr(expandedId === row.shareId ? '收起' : '打开')}</Text><LifeIcon name={expandedId === row.shareId ? 'collapse' : 'expand'} /></Pressable></View>
@@ -136,7 +136,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
       </View>)}
       {view ? <View style={inline ? styles.inlineReading : styles.record} testID="family-history-reading">
         <View style={styles.footer}>
-          {!inline ? <Text style={styles.meta}>{tr(viewer === view.share.authorUserId ? '你分享的' : '家人分享的')}</Text> : null}
+          {!inline ? <Text style={[styles.meta, styles.author]}>{familyShareAuthorLabel(view.share, viewer)}</Text> : null}
           {viewer === view.share.authorUserId ? <Pressable accessibilityRole="button" testID="history-revoke" disabled={busy} style={styles.hit}
             onPress={() => {
               const expected = view; const current = currentRef.current; if (!current()) return;
@@ -170,6 +170,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
 }
 const styles=StyleSheet.create({
   inlineReading:{gap:16},
+  author:{maxWidth:'100%',flexShrink:1},
   footer:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:12},
   empty:{alignItems:'center',paddingVertical:48,gap:20},emptyName:{...type.title,color:ink,textAlign:'center'},emptyTitle:{...type.action,color:inkSoft,textAlign:'center'},emptyBody:{...type.meta,color:inkSoft,textAlign:'center',maxWidth:320},
   name:{...type.body,color:inkSoft,marginTop:16,marginBottom:24},body:{...type.body,color:ink},meta:{...type.meta,color:inkSoft},
