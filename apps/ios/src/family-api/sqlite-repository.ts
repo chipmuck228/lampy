@@ -229,6 +229,10 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   return {
+    async findProfile(userId) { return db.getFirst<import('./types').UserProfile>(
+      `SELECT user_id AS userId,nickname,'system' AS avatar,updated_at AS updatedAt FROM family_user_profiles WHERE user_id=?`,[userId]); },
+    async saveProfile(profile) { await db.run(`INSERT INTO family_user_profiles(user_id,nickname,updated_at) VALUES(?,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET nickname=excluded.nickname,updated_at=excluded.updated_at`,[profile.userId,profile.nickname,profile.updatedAt]); },
     async listSharesReferencingMedia(objectId) {
       const rows = await db.getAll<ShareRow>(`SELECT s.* FROM family_shares s WHERE EXISTS
         (SELECT 1 FROM json_each(s.snapshot_json, '$.media') j WHERE json_extract(j.value, '$.objectId') = ?)`, [objectId]);

@@ -59,6 +59,10 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 }
 
 export type FamilyApiClient = {
+  registerControlledEmail?(input: { email: string; password: string; nickname: string }): Promise<SignInResult>;
+  signInWithControlledEmail?(input: { email: string; password: string }): Promise<SignInResult>;
+  getMyProfile?(sessionToken: string): Promise<import('../family-api/types').UserProfile>;
+  updateMyProfile?(sessionToken: string, nickname: string): Promise<import('../family-api/types').UserProfile>;
   health(): Promise<FamilyHealth>;
   getHistoryPolicy?(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
   confirmHistoryPolicy?(session: string, familyId: string): Promise<{ policy: 'family-history-v2' }>;
@@ -152,6 +156,10 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
     ...(sharingVersion === 1 ? { history: createFamilyApiClient(transport, 2) } : {}),
     getHistoryPolicy(sessionToken, familyId) { return send({ method: 'GET', path: `/v2/families/${familyId}/history-policy`, sessionToken }); },
     confirmHistoryPolicy(sessionToken, familyId) { return send({ method: 'POST', path: `/v2/families/${familyId}/history-policy`, sessionToken, body: { confirmation: 'new-members-can-read-active-history' } }); },
+    registerControlledEmail(input) { return send({method:'POST',path:'/v2/auth/email/register',body:input}); },
+    signInWithControlledEmail(input) { return send({method:'POST',path:'/v2/auth/email/login',body:input}); },
+    getMyProfile(sessionToken) { return send({method:'GET',path:'/v2/me/profile',sessionToken}); },
+    updateMyProfile(sessionToken,nickname) { return send({method:'PATCH',path:'/v2/me/profile',sessionToken,body:{nickname}}); },
     health() {
       return send({ method: 'GET', path: '/health' });
     },

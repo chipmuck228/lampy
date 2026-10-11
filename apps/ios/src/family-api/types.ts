@@ -3,6 +3,8 @@ export type MembershipStatus = 'active' | 'left' | 'removed';
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
 export type FamilyStatus = 'active' | 'dissolved';
 
+export type UserProfile = { userId: string; nickname: string; avatar: 'system'; updatedAt: string | null };
+
 export type Account = {
   userId: string;
   appleSubject?: string;
@@ -106,6 +108,7 @@ export type FamilyHealth = {
   testAccountLogin: boolean;
   testAccountLoginReason: TestAccountHealth['testAccountLoginReason'];
   familyHistoryV2?: boolean;
+  controlledEmailAccounts?: boolean;
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 

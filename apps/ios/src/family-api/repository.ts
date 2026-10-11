@@ -23,6 +23,8 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  findProfile(userId: string): Promise<import('./types').UserProfile | null>;
+  saveProfile(profile: import('./types').UserProfile): Promise<void>;
   listPastFamilies(userId: string): Promise<import('./types').PastFamilySummary[]>;
   listSharesReferencingMedia(objectId: string): Promise<ShareRecord[]>;
   listTransfers(familyId: string): Promise<import('./types').FamilyTransfer[]>;
@@ -110,6 +112,8 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async findProfile(userId) { return store.profiles.find(p => p.userId === userId) ?? null; },
+    async saveProfile(profile) { replaceBy(store.profiles,p => p.userId,profile); },
     async listPastFamilies(userId) { return store.directoryHistory.filter(row => row.userId === userId).map(row => ({ familyId: row.familyId, name: row.name, createdAt: row.createdAt, role: row.role, status: row.status })); },
     async listSharesReferencingMedia(objectId) { return store.shares.filter(s => s.snapshot.media.some(m => m.objectId === objectId)); },
     async listTransfers(familyId) { return store.transfers.filter(row => row.familyId === familyId); },

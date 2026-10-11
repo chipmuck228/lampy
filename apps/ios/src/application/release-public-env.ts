@@ -1,6 +1,7 @@
 import { isPersonalSettingsDiagnosticsOpen } from './personal-settings-visibility';
 import {
   familyApiBaseUrl,
+  isControlledEmailAccountsOpen,
   isFamilyApiConfigured,
   isFamilyProductEntryOpen,
 } from '../infrastructure/family-config';
@@ -13,6 +14,7 @@ export type ReleasePublicEnvReport = {
   familyApiBaseUrl: string;
   diagnosticsOpen: boolean;
   testDriverEnabled: boolean;
+  controlledEmailAccountsOpen: boolean;
   closed: boolean;
 };
 
@@ -28,13 +30,15 @@ export function inspectReleasePublicEnv(
   const familyApiConfigured = isFamilyApiConfigured(env.EXPO_PUBLIC_FAMILY_API_BASE_URL);
   const diagnosticsOpen = isPersonalSettingsDiagnosticsOpen(env, isDev);
   const testDriverEnabled = Boolean(isDev) && isFamilyTestDriverEnabled(env.EXPO_PUBLIC_FAMILY_TEST_DRIVER);
+  const controlledEmailAccountsOpen = isControlledEmailAccountsOpen(env.EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS);
   return {
+    controlledEmailAccountsOpen,
     familyEntryOpen,
     familyApiConfigured,
     familyApiBaseUrl: familyApiBaseUrl(env.EXPO_PUBLIC_FAMILY_API_BASE_URL),
     diagnosticsOpen,
     testDriverEnabled,
-    closed: !familyEntryOpen && !familyApiConfigured && !diagnosticsOpen && !testDriverEnabled,
+    closed: !controlledEmailAccountsOpen && !familyEntryOpen && !familyApiConfigured && !diagnosticsOpen && !testDriverEnabled,
   };
 }
 
@@ -48,5 +52,6 @@ export function applyClosedReleasePublicEnv(
     EXPO_PUBLIC_FAMILY_TEST_DRIVER: '',
     EXPO_PUBLIC_FAMILY_TEST_INVITE_CODE: '',
     EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS: '0',
+    EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS: '0',
   };
 }

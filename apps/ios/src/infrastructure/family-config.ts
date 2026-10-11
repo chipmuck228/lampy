@@ -1,3 +1,7 @@
+export function isControlledEmailAccountsOpen(value = process.env.EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS) {
+  return value === '1';
+}
+
 export function familyApiBaseUrl(value = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL) {
   return (value || '').trim();
 }
