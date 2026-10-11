@@ -32,11 +32,12 @@ export type ShareCommands = {
   ): Promise<{ mimeType: string; bytes: Uint8Array }>;
 };
 
-function toView(row: ShareRecord): ShareView {
+async function toView(tx: FamilyTx, row: ShareRecord): Promise<ShareView> {
   return {
     shareId: row.shareId,
     familyId: row.familyId,
     authorUserId: row.authorUserId,
+    authorNickname: (await tx.findProfile(row.authorUserId))?.nickname ?? '',
     sourceMomentId: row.sourceMomentId,
     sourceRevision: row.sourceRevision,
     snapshot: row.snapshot,
@@ -245,7 +246,7 @@ export function createShareCommands(deps: {
             if (!row || row.authorUserId !== userId || !shareIsActive(row)) {
               throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
             }
-            return toView(row);
+            return await toView(tx, row);
           }
         }
 
@@ -281,10 +282,10 @@ export function createShareCommands(deps: {
             await tx.saveIdempotent(userId, shareCommand, input.idempotencyKey, {
               requestFingerprint: fingerprint,
               status: 200,
-              body: toView(sameRevision),
+              body: await toView(tx, sameRevision),
             });
           }
-          return toView(sameRevision);
+          return await toView(tx, sameRevision);
         }
 
         const row: ShareRecord = {
@@ -317,10 +318,10 @@ export function createShareCommands(deps: {
                 await tx.saveIdempotent(userId, shareCommand, input.idempotencyKey, {
                   requestFingerprint: fingerprint,
                   status: 200,
-                  body: toView(raced),
+                  body: await toView(tx, raced),
                 });
               }
-              return toView(raced);
+              return await toView(tx, raced);
             }
           }
           throw error;
@@ -329,10 +330,10 @@ export function createShareCommands(deps: {
           await tx.saveIdempotent(userId, shareCommand, input.idempotencyKey, {
             requestFingerprint: fingerprint,
             status: 200,
-            body: toView(row),
+            body: await toView(tx, row),
           });
         }
-        return toView(row);
+        return await toView(tx, row);
       });
     },
 
@@ -364,7 +365,7 @@ export function createShareCommands(deps: {
         const membership = await member(tx, familyId, userId);
         const rows = await tx.listSharesInFamily(familyId);
         return {
-          shares: rows.filter((row) => canSeeShare(membership, row, policy)).map(toView),
+          shares: await Promise.all(rows.filter((row) => canSeeShare(membership, row, policy)).map(row => toView(tx, row))),
         };
       });
     },
@@ -381,7 +382,7 @@ export function createShareCommands(deps: {
           testAccountLoginEnabled,
           policy,
         );
-        return toView(share);
+        return await toView(tx, share);
       });
     },
 

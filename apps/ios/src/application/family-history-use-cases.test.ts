@@ -274,3 +274,44 @@ it('E3 getPolicy after remote dissolution rejects the real absent-list path and 
  await expect(x.history.getPolicy(x.f.familyId,current)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
  expect(await x.cache.list(x.a.userId,x.f.familyId)).toEqual([]);
 });
+
+it('binds sharing nickname to the preparing account and rejects a delayed profile after account switch',async()=>{
+ const x=await fixture();await x.commands.updateMyProfile(x.a.sessionToken,'小禾');
+ const preview=await x.history.prepare('moment_d2',x.f.familyId,current);
+ expect(preview.sharingNickname).toBe('小禾');expect(preview.userId).toBe(x.a.userId);
+ const gate=deferred<Awaited<ReturnType<NonNullable<typeof x.client.getMyProfile>>>>();
+ x.client.getMyProfile=()=>gate.promise;
+ const pending=x.history.prepare('moment_d2',x.f.familyId,current);
+ await new Promise(r=>setTimeout(r,0));await x.session.setSession(x.b);
+ gate.resolve({userId:x.a.userId,nickname:'小禾',avatar:'system',updatedAt:null});
+ await expect(pending).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ await expect(x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+});
+it('projects live share author nickname without copying profile into a moment snapshot or relaxing reads',async()=>{
+ const x=await fixture();const preview=await x.history.prepare('moment_d2',x.f.familyId,current);
+ const share=await x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,current);
+ expect(share.authorNickname).toBe('');
+ await x.commands.updateMyProfile(x.a.sessionToken,'新昵称');
+ const visible=await x.commands.historyShares.getShare(x.a.sessionToken,x.f.familyId,share.shareId);
+ expect(visible.authorNickname).toBe('新昵称');expect(visible.authorUserId).toBe(x.a.userId);
+ expect(JSON.stringify(visible.snapshot)).not.toMatch(/nickname|email/);
+ await expect(x.commands.historyShares.getShare(x.b.sessionToken,x.f.familyId,share.shareId)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
+ await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,share.shareId);
+ await expect(x.commands.historyShares.getShare(x.a.sessionToken,x.f.familyId,share.shareId)).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
+});
+it('keeps same-nickname authors separate and retains a departed author on still-readable history',async()=>{
+ const x=await fixture();const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);
+ await x.commands.updateMyProfile(x.a.sessionToken,'同名');await x.commands.updateMyProfile(x.b.sessionToken,'同名');
+ const a=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ await x.session.setSession(x.b);
+ const b=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ expect(a.authorUserId).not.toBe(b.authorUserId);expect(a.shareId).not.toBe(b.shareId);
+ const rows=await x.commands.historyShares.listVisibleShares(x.a.sessionToken,x.f.familyId);
+ expect(rows.shares.map(s=>s.authorNickname)).toEqual(['同名','同名']);
+ expect(JSON.stringify(rows)).not.toMatch(/email|password|sessionToken/);
+ await expect(x.commands.historyShares.revokeShare(x.b.sessionToken,x.f.familyId,a.shareId)).rejects.toMatchObject({code:'FORBIDDEN'});
+ const roster=await x.commands.getFamilyRoster(x.b.sessionToken,x.f.familyId);const own=roster.members.find(m=>m.userId===x.b.userId)!;
+ await x.commands.leaveSelectedFamily(x.b.sessionToken,x.f.familyId,own.membershipId);
+ expect((await x.commands.historyShares.getShare(x.a.sessionToken,x.f.familyId,b.shareId)).authorNickname).toBe('同名');
+ await expect(x.commands.historyShares.getShare(x.b.sessionToken,x.f.familyId,b.shareId)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
+});

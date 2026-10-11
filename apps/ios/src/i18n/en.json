@@ -777,5 +777,9 @@
   "邮箱账号登录": "Sign in with email",
   "正在读取。": "Loading…",
   "密码": "Password",
-  "其他登录方式": "Other ways to sign in"
+  "其他登录方式": "Other ways to sign in",
+  "你 · {0} 分享的": "Shared by you · {{0}}",
+  "{0} 分享的": "Shared by {{0}}",
+  "以 {0} 的身份，分享给「{1}」": "Sharing as {{0}} with {{1}}",
+  "当前账号": "your current account"
 }

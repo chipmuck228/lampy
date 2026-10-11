@@ -25,3 +25,11 @@ export function familySnapshotDate(snapshot: { occurredAt?: string; occurredAtPr
   if (occurredAtPrecision === 'month') return dateLabel(y,m);
   return dateLabel(y,m,date.getDate());
 }
+
+// Nicknames describe authors; user IDs alone decide self and permissions.
+export function familyShareAuthorLabel(share: { authorUserId: string; authorNickname?: string }, viewer: string | null) {
+  const nickname = share.authorNickname?.trim();
+  return nickname
+    ? tr(viewer === share.authorUserId ? '你 · {0} 分享的' : '{0} 分享的', [nickname])
+    : tr(viewer === share.authorUserId ? '你分享的' : '家人分享的');
+}

@@ -30,3 +30,5 @@
 | `family-email-profile-stage1/` | 受控邮箱格式账号注册／登录与本人昵称；默认关闭，无邮件验证；成员头像墙留到下一阶段 |
 
 | `family-member-profiles-stage2/` | 家庭成员系统头像墙、昵称与点选操作；权限不按昵称，正式入口仍关闭 |
+
+- [家庭分享身份 · 阶段 3](family-share-author-stage3/README.md)
