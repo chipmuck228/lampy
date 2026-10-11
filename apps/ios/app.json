@@ -106,7 +106,8 @@
           }
         }
       ],
-      "./plugins/with-family-invite-links.cjs"
+      "./plugins/with-family-invite-links.cjs",
+      "./plugins/with-native-build-compat.cjs"
     ],
     "experiments": {
       "typedRoutes": true

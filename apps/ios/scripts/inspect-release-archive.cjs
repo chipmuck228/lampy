@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global __dirname */
+/* global __dirname, Buffer */
 /**
  * Inspect a Release .xcarchive. Prints reason codes only (no secrets, no bundle snippets).
  * Exit 0 only when Bundle ID / version / build / Team / main.jsbundle match.
@@ -78,6 +78,44 @@ function listPrivacyManifests(app) {
   return found.sort();
 }
 
+function inspectDynamicLibraries(app, readDependencies = file => execFileSync('otool', ['-L', file], { encoding: 'utf8' })) {
+  const problems = [];
+  const binaries = [];
+  const macho = new Set(['feedface', 'cefaedfe', 'feedfacf', 'cffaedfe', 'cafebabe', 'bebafeca', 'cafebabf', 'bfbafeca']);
+  function walk(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(file);
+      else if (entry.isFile()) {
+        const fd = fs.openSync(file, 'r');
+        const header = Buffer.alloc(4);
+        try { fs.readSync(fd, header, 0, 4, 0); } finally { fs.closeSync(fd); }
+        if (macho.has(header.toString('hex'))) binaries.push(file);
+      }
+    }
+  }
+  walk(app);
+  if (!binaries.length) problems.push('macho_missing');
+  for (const binary of binaries) {
+    let output;
+    try { output = readDependencies(binary); }
+    catch { problems.push(`otool_failed:${path.relative(app, binary)}`); continue; }
+    for (const line of output.split('\n')) {
+      const match = /^\s+(.+?) \(compatibility version/.exec(line);
+      if (!match) continue;
+      const dep = match[1];
+      if (dep.startsWith('/System/Library/') || dep.startsWith('/usr/lib/')) continue;
+      let candidate;
+      if (dep.startsWith('@rpath/')) candidate = path.join(app, 'Frameworks', dep.slice(7));
+      else if (dep.startsWith('@loader_path/')) candidate = path.resolve(path.dirname(binary), dep.slice(13));
+      else if (dep.startsWith('@executable_path/')) candidate = path.resolve(app, dep.slice(17));
+      else { problems.push(`unsupported_dependency:${dep}`); continue; }
+      if (!candidate.startsWith(app + path.sep) || !fs.existsSync(candidate)) problems.push(`missing_dependency:${path.relative(app, binary)}:${dep}`);
+    }
+  }
+  return { binaries: binaries.map(file => path.relative(app, file)), problems };
+}
+
 function inspectArchive(archivePath, expected = expectedFromAppJson()) {
   const problems = [];
   const archive = path.resolve(archivePath);
@@ -129,6 +167,8 @@ function inspectArchive(archivePath, expected = expectedFromAppJson()) {
     problems.push(...jsReport.problems);
   }
 
+  report.dynamicLibraries = inspectDynamicLibraries(app);
+  problems.push(...report.dynamicLibraries.problems);
   report.privacyManifests = listPrivacyManifests(app);
   if (!report.privacyManifests.includes('PrivacyInfo.xcprivacy')) {
     problems.push('app_privacyinfo_missing');
@@ -145,7 +185,7 @@ function printReport(report) {
     `build=${report.build || 'MISSING'}`,
     `team=${report.team || 'MISSING'}`,
     `jsbundle_present=${report.jsbundlePresent ? 'yes' : 'no'}`,
-    `inspect_scope=plist_codesign_jsbundle_few_strings`,
+    `inspect_scope=plist_codesign_jsbundle_few_strings_dynamic_dependencies`,
     `flags_release_pages=NOT_VERIFIED`,
     `runtime_metro_independent=${report.runtimeMetroIndependent}`,
     `privacy_manifest_count=${report.privacyManifests.length}`,
@@ -155,7 +195,7 @@ function printReport(report) {
   for (const line of lines) console.log(line);
 }
 
-module.exports = { expectedFromAppJson, inspectJsBundleText, inspectArchive };
+module.exports = { expectedFromAppJson, inspectJsBundleText, inspectArchive, inspectDynamicLibraries };
 
 if (require.main === module) {
   const archive = process.argv[2];
