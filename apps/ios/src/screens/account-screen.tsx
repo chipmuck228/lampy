@@ -1,3 +1,5 @@
+import { isControlledEmailAccountsOpen } from '../infrastructure/family-config';
+import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput, type } from './life-text';
@@ -81,18 +83,23 @@ export function AccountDiagnosticsClosed() {
   const router = useRouter();
   return (
     <SettingsPage
-      title="开发诊断"
-      backLabel="本机设置"
-      accessibilityLabel="开发诊断"
+      title={tr("开发诊断")}
+      backLabel={tr("本机设置")}
+      accessibilityLabel={tr("开发诊断")}
       pageTestID="account-diagnostics-closed"
       onBack={() => dismissToSettingsRoot(router)}
     >
-      <Text style={styles.body}>这里没有开发诊断。</Text>
+      <Text style={styles.body}>{tr("这里没有开发诊断。")}</Text>
     </SettingsPage>
   );
 }
 
-export default function AccountScreen({ variant = 'user' }: { variant?: 'user' | 'diagnostics' } = {}) {
+export default function AccountScreen({ variant = 'user', onAuthenticated, onCancel, onEmailRequested }: {
+  variant?: 'user' | 'diagnostics';
+  onAuthenticated?: () => void;
+  onCancel?: () => void;
+  onEmailRequested?: () => void;
+} = {}) {
   const router = useRouter();
   const diagnostics = variant === 'diagnostics';
   const diagnosticsAllowed = isPersonalSettingsDiagnosticsOpen();
@@ -259,6 +266,7 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
       await family.signInWithApple(token);
       if (!refreshGate.isCurrent(generation)) return;
       setSnapshot(snapshotAfterSignedIn(appleAvailable, testLoginFlags(snapshot)));
+      if (onAuthenticated) { onAuthenticated(); return; }
       setMessage(null);
     } catch (error) {
       if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
@@ -340,6 +348,7 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
       await family.signInWithTestAccount(submittedLogin, submittedPassword);
       if (!refreshGate.isCurrent(generation)) return;
       setSnapshot(snapshotAfterSignedIn(appleAvailable, testLoginFlags(snapshot)));
+      if (onAuthenticated) { onAuthenticated(); return; }
     } catch (error) {
       if (refreshGate.isCurrent(generation)) setMessage(accountMessage(error));
       return;
@@ -366,25 +375,25 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
   if (!diagnostics) {
     return (
       <SettingsPage
-        title="本机设置"
-        backLabel="最近"
-        accessibilityLabel="本机设置"
+        title={tr("本机设置")}
+        backLabel={tr("最近")}
+        accessibilityLabel={tr("本机设置")}
         onBack={() => dismissSettingsToRecent(router)}
       >
         <SettingsIntro />
-        <SettingsGroup title="本机">
+        <SettingsGroup title={tr("本机")}>
           <DeviceLockSettings />
           <SettingsLink
             icon="storage"
-            title="记录与存储"
-            detail="保存在这台设备"
+            title={tr("记录与存储")}
+            detail={tr("保存在这台设备")}
             testID="account-open-storage"
             onPress={() => router.push('/account/storage')}
           />
           <SettingsLink
             icon="album"
-            title="我的生活册"
-            detail="收在这台设备上"
+            title={tr("我的生活册")}
+            detail={tr("收在这台设备上")}
             testID="account-open-albums"
             onPress={() => router.push('/albums')}
           />
@@ -392,47 +401,47 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
         <SettingsGroup title="Lampy">
           <SettingsLink
             icon="subscribe"
-            title="订阅与付费"
-            detail="目前没有付费项目"
+            title={tr("订阅与付费")}
+            detail={tr("目前没有付费项目")}
             testID="account-open-subscribe"
             onPress={() => router.push('/account/subscribe')}
           />
           <SettingsLink
             icon="help"
-            title="使用帮助"
-            detail="留下、回看和本机保护"
+            title={tr("使用帮助")}
+            detail={tr("留下、回看和本机保护")}
             testID="account-open-help"
             onPress={() => router.push('/account/help')}
           />
         </SettingsGroup>
-        <SettingsGroup title="关于">
+        <SettingsGroup title={tr("关于")}>
           <SettingsLink
             icon="info"
-            title="关于 Lampy"
-            detail="版本与标识"
+            title={tr("关于 Lampy")}
+            detail={tr("版本与标识")}
             testID="account-open-about"
             onPress={() => router.push('/account/about')}
           />
           <SettingsLink
             icon="terms"
-            title="使用条款"
-            detail="使用 Lampy 时适用"
+            title={tr("使用条款")}
+            detail={tr("使用 Lampy 时适用")}
             testID="account-open-terms"
             onPress={() => router.push('/account/terms')}
           />
           <SettingsLink
             icon="privacy"
-            title="隐私政策"
-            detail="记录如何保存在这台设备"
+            title={tr("隐私政策")}
+            detail={tr("记录如何保存在这台设备")}
             testID="account-open-privacy"
             onPress={() => router.push('/account/privacy')}
           />
         </SettingsGroup>
         {showDiagnosticsEntry ? (
-          <SettingsGroup title="开发">
+          <SettingsGroup title={tr("开发")}>
             <SettingsLink
               icon="info"
-              title="开发诊断"
+              title={tr("开发诊断")}
               testID="account-open-diagnostics"
               onPress={() => router.push('/account-diagnostics')}
             />
@@ -444,20 +453,23 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
 
   return (
     <SettingsPage
-      title="开发诊断"
-      backLabel="本机设置"
-      accessibilityLabel="开发诊断"
-      onBack={() => dismissToSettingsRoot(router)}
+      title={tr(onAuthenticated ? "登录家庭" : "开发诊断")}
+      backLabel={tr(onAuthenticated ? "取消" : "本机设置")}
+      accessibilityLabel={tr(onAuthenticated ? "登录家庭" : "开发诊断")}
+      onBack={() => {
+        if (onCancel) { refreshGate.begin(); setPassword(''); onCancel(); }
+        else dismissToSettingsRoot(router);
+      }}
     >
       <View testID="account-diagnostics">
-        <View testID="account-family-preview">
+        {!onAuthenticated ? <View testID="account-family-preview">
           <Text style={styles.body} testID="account-family-copy">
             有些生活，只想交给重要的人。
           </Text>
           <Text style={styles.body} testID="account-family-soon">
             私密家庭空间正在准备中。敬请期待。
           </Text>
-        </View>
+        </View> : <Text style={styles.body}>{tr("登录后回到邀请，再由你确认加入。")}</Text>}
         {snapshot ? (
           <Text style={styles.body} testID={`account-kind-${snapshot.kind}`}>
             {kindCopy(snapshot)}
@@ -478,6 +490,11 @@ export default function AccountScreen({ variant = 'user' }: { variant?: 'user' |
             正在登录。
           </Text>
         ) : null}
+        {isControlledEmailAccountsOpen() ? <Pressable accessibilityRole="button" style={styles.hit} testID="account-email-entry" disabled={busy !== 'idle'} accessibilityState={{disabled:busy !== 'idle'}} onPress={() => {
+          if (snapshot?.canSignOut) router.push('/family-profile');
+          else if (onEmailRequested) onEmailRequested();
+          else router.push('/family-email-account');
+        }}><Text style={styles.action}>{tr(snapshot?.canSignOut ? '我的资料' : '邮箱账号登录')}</Text></Pressable> : null}
         {showAppleButton ? (
           <View testID="account-apple-button">
             <AppleAuthentication.AppleAuthenticationButton

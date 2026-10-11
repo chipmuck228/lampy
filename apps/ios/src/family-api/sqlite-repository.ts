@@ -1,3 +1,4 @@
+import { FamilyError, FAMILY_ERROR } from './errors';
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilySql } from './schema';
 import type { IdempotentRecord } from './store';
@@ -29,6 +30,7 @@ type TestCredentialRow = {
   enabled: number;
   created_at: string;
   disabled_at: string | null;
+  operator_provisioned: number;
 };
 
 type RateLimitRow = {
@@ -44,6 +46,13 @@ type SessionRow = {
 };
 
 type FamilyRow = {
+  dissolved_at: string | null;
+  cleanup_deadline: string | null;
+  dissolved_by: string | null;
+  history_policy: string;
+  history_confirmed_at: string | null;
+  history_confirmed_by: string | null;
+  name: string;
   family_id: string;
   created_at: string;
   status: string;
@@ -142,6 +151,7 @@ function testCredentialFrom(row: TestCredentialRow): TestCredential {
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     disabledAt: row.disabled_at || undefined,
+    operatorProvisioned: row.operator_provisioned === 1,
   };
 }
 
@@ -158,7 +168,18 @@ function sessionFrom(row: SessionRow): Session {
 }
 
 function familyFrom(row: FamilyRow): Family {
-  return { familyId: row.family_id, createdAt: row.created_at, status: row.status as Family['status'] };
+  return {
+    dissolvedAt: row.dissolved_at || undefined,
+    cleanupDeadline: row.cleanup_deadline || undefined,
+    dissolvedBy: row.dissolved_by || undefined,
+    historyPolicy: row.history_policy === 'family-history-v2' ? 'family-history-v2' : 'legacy',
+    historyConfirmedAt: row.history_confirmed_at || undefined,
+    historyConfirmedBy: row.history_confirmed_by || undefined,
+    familyId: row.family_id,
+    name: row.name,
+    createdAt: row.created_at,
+    status: row.status as Family['status'],
+  };
 }
 
 function membershipFrom(row: MembershipRow): Membership {
@@ -186,7 +207,8 @@ function invitationFrom(row: InvitationRow): Invitation {
 
 export function mapFamilySqlConstraint(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  if (/family_memberships_one_active_per_user|family_memberships\.user_id/i.test(message)) {
+  if (/family_limit_reached/.test(message)) return new FamilyError(FAMILY_ERROR.FAMILY_LIMIT_REACHED, 'You can belong to at most 10 active families.');
+  if (/family_memberships_one_active_creator|family_memberships_one_active_per_user|family_memberships\.user_id/i.test(message)) {
     return new FamilyStoreConstraintError('active_membership');
   }
   if (/family_invitations\.code/i.test(message)) {
@@ -209,6 +231,25 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   return {
+    async findProfile(userId) { return db.getFirst<import('./types').UserProfile>(
+      `SELECT user_id AS userId,nickname,'system' AS avatar,updated_at AS updatedAt FROM family_user_profiles WHERE user_id=?`,[userId]); },
+    async saveProfile(profile) { await db.run(`INSERT INTO family_user_profiles(user_id,nickname,updated_at) VALUES(?,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET nickname=excluded.nickname,updated_at=excluded.updated_at`,[profile.userId,profile.nickname,profile.updatedAt]); },
+    async listSharesReferencingMedia(objectId) {
+      const rows = await db.getAll<ShareRow>(`SELECT s.* FROM family_shares s WHERE EXISTS
+        (SELECT 1 FROM json_each(s.snapshot_json, '$.media') j WHERE json_extract(j.value, '$.objectId') = ?)`, [objectId]);
+      return rows.map(shareFrom);
+    },
+    async listTransfers(familyId) {
+      const rows = await db.getAll<{ transfer_id: string; family_id: string; request_id: string; from_user_id: string; to_user_id: string; from_membership_id: string; to_membership_id: string; status: import('./types').FamilyTransfer['status']; revision: number; created_at: string; updated_at: string }>(
+        'SELECT * FROM family_creator_transfers WHERE family_id = ?', [familyId]);
+      return rows.map(r => ({ transferId:r.transfer_id, familyId:r.family_id, requestId:r.request_id, fromUserId:r.from_user_id, toUserId:r.to_user_id, fromMembershipId:r.from_membership_id, toMembershipId:r.to_membership_id, status:r.status, revision:r.revision, createdAt:r.created_at, updatedAt:r.updated_at }));
+    },
+    async saveTransfer(t) {
+      await db.run(`INSERT INTO family_creator_transfers (transfer_id,family_id,request_id,from_user_id,to_user_id,from_membership_id,to_membership_id,status,revision,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(transfer_id) DO UPDATE SET status=excluded.status,revision=excluded.revision,updated_at=excluded.updated_at`,
+        [t.transferId,t.familyId,t.requestId,t.fromUserId,t.toUserId,t.fromMembershipId,t.toMembershipId,t.status,t.revision,t.createdAt,t.updatedAt]);
+    },
     async findAccountByAppleSubject(appleSubject) {
       if (!appleSubject) return null;
       const row = await db.getFirst<AccountRow>(
@@ -256,7 +297,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findTestCredentialByLogin(loginNormalized) {
       const row = await db.getFirst<TestCredentialRow>(
-        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at
+        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at, operator_provisioned
          FROM family_test_credentials WHERE login_normalized = ?`,
         [loginNormalized],
       );
@@ -264,7 +305,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findTestCredentialByUserId(userId) {
       const row = await db.getFirst<TestCredentialRow>(
-        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at
+        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at, operator_provisioned
          FROM family_test_credentials WHERE user_id = ?`,
         [userId],
       );
@@ -273,8 +314,8 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     async saveTestCredential(credential) {
       await db.run(
         `INSERT INTO family_test_credentials
-         (credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+         (credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at, operator_provisioned)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(credential_id) DO UPDATE SET
            enabled = excluded.enabled,
            disabled_at = excluded.disabled_at`,
@@ -286,6 +327,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
           credential.enabled ? 1 : 0,
           credential.createdAt,
           credential.disabledAt ?? null,
+          credential.operatorProvisioned ? 1 : 0,
         ],
       );
     },
@@ -305,27 +347,33 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findFamily(familyId) {
       const row = await db.getFirst<FamilyRow>(
-        'SELECT family_id, created_at, status FROM family_families WHERE family_id = ?',
+        'SELECT family_id, name, created_at, status, history_policy, history_confirmed_at, history_confirmed_by, dissolved_at, cleanup_deadline, dissolved_by FROM family_families WHERE family_id = ?',
         [familyId],
       );
       return row ? familyFrom(row) : null;
     },
     async saveFamily(family) {
       await db.run(
-        `INSERT INTO family_families (family_id, created_at, status) VALUES (?, ?, ?)
-         ON CONFLICT(family_id) DO UPDATE SET status = excluded.status`,
-        [family.familyId, family.createdAt, family.status],
+        `INSERT INTO family_families (family_id, name, created_at, status, history_policy, history_confirmed_at, history_confirmed_by, dissolved_at, cleanup_deadline, dissolved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(family_id) DO UPDATE SET status = excluded.status, name = excluded.name, history_policy = excluded.history_policy, history_confirmed_at = excluded.history_confirmed_at, history_confirmed_by = excluded.history_confirmed_by, dissolved_at = excluded.dissolved_at, cleanup_deadline = excluded.cleanup_deadline, dissolved_by = excluded.dissolved_by`,
+        [family.familyId, family.name ?? '', family.createdAt, family.status, family.historyPolicy ?? 'legacy', family.historyConfirmedAt ?? null, family.historyConfirmedBy ?? null, family.dissolvedAt ?? null, family.cleanupDeadline ?? null, family.dissolvedBy ?? null],
       );
+      if (family.status === 'dissolved') await db.run("UPDATE family_directory_history SET status='dissolved' WHERE family_id=?", [family.familyId]);
+    },
+    async listPastFamilies(userId) {
+      return db.getAll<import('./types').PastFamilySummary>(`SELECT family_id AS familyId,name,created_at AS createdAt,role,status
+        FROM family_directory_history WHERE user_id=? ORDER BY family_id`, [userId]);
     },
     async findActiveMembershipForUser(userId) {
-      const row = await db.getFirst<MembershipRow>(
+      const rows = await db.getAll<MembershipRow>(
         `SELECT m.membership_id, m.family_id, m.user_id, m.role, m.status, m.joined_at
          FROM family_memberships m
          JOIN family_families f ON f.family_id = m.family_id
          WHERE m.user_id = ? AND m.status = 'active' AND f.status = 'active'`,
         [userId],
       );
-      return row ? membershipFrom(row) : null;
+      if (rows.length > 1) throw new FamilyError(FAMILY_ERROR.FAMILY_SELECTION_REQUIRED, 'Choose a family with the updated app.');
+      return rows[0] ? membershipFrom(rows[0]) : null;
     },
     async findActiveMembership(familyId, userId) {
       const family = await this.findFamily(familyId);
@@ -384,7 +432,22 @@ function createSqliteTx(db: FamilySql): FamilyTx {
           membership.joinedAt,
         ],
       );
+      const family = await this.findFamily(membership.familyId);
+      if (family && membership.status === 'active' && family.status === 'active') {
+        await db.run('DELETE FROM family_directory_history WHERE user_id=? AND family_id=?', [membership.userId,membership.familyId]);
+      } else if (family) {
+        await db.run(`INSERT INTO family_directory_history(user_id,family_id,name,role,status,created_at) VALUES(?,?,?,?,?,?)
+          ON CONFLICT(user_id,family_id) DO UPDATE SET name=excluded.name,role=excluded.role,status=excluded.status,created_at=excluded.created_at`,
+          [membership.userId,membership.familyId,family.name || '',membership.role,
+            family.status === 'dissolved' ? 'dissolved' : membership.status === 'left' ? 'left' : 'removed',family.createdAt]);
+      }
     },
+    async findInviteLinkByHash(hash) { return readInviteLink(await db.getFirst<InviteLinkRow>('SELECT * FROM family_invite_links WHERE token_hash = ?', [hash])); },
+    async findInviteLinkById(id) { return readInviteLink(await db.getFirst<InviteLinkRow>('SELECT * FROM family_invite_links WHERE invitation_id = ?', [id])); },
+    async listInviteLinks(familyId) { return (await db.getAll<InviteLinkRow>('SELECT * FROM family_invite_links WHERE family_id = ? ORDER BY created_at DESC', [familyId])).map(row => readInviteLink(row)!); },
+    async saveInviteLink(i) { await db.run(`INSERT INTO family_invite_links VALUES (?,?,?,?,?,?,?)
+      ON CONFLICT(invitation_id) DO UPDATE SET status=excluded.status, accepted_by_user_id=excluded.accepted_by_user_id`,
+      [i.invitationId,i.familyId,i.tokenHash,i.status,i.createdAt,i.expiresAt,i.acceptedByUserId ?? null]); },
     async findInvitationByCode(code) {
       const row = await db.getFirst<InvitationRow>(
         `SELECT invitation_id, family_id, code, status, created_at, expires_at, accepted_by_user_id
@@ -593,4 +656,9 @@ export function createSqliteFamilyRepository(db: FamilySql): FamilyRepository {
       return run;
     },
   };
+}
+
+type InviteLinkRow = { invitation_id: string; family_id: string; token_hash: string; status: import('./types').InvitationStatus; created_at: string; expires_at: string; accepted_by_user_id: string | null };
+function readInviteLink(r: InviteLinkRow | null): import('./types').InviteLink | null {
+  return r ? { invitationId:r.invitation_id, familyId:r.family_id, tokenHash:r.token_hash, status:r.status, createdAt:r.created_at, expiresAt:r.expires_at, acceptedByUserId:r.accepted_by_user_id ?? undefined } : null;
 }

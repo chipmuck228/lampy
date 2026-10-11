@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 
@@ -56,12 +57,12 @@ export function LookbackMonthEntries({
   if (page.entries.length === 0) return null;
   return (
     <View testID="lookback-month-entries" style={styles.entries}>
-      <Text style={styles.entryHeading}>有记录的日子</Text>
+      <Text style={styles.entryHeading}>{tr("有记录的日子")}</Text>
       {page.entries.map((entry) => (
         <Pressable
           key={entry.day}
           accessibilityRole="button"
-          accessibilityLabel={`${page.title}${entry.day}日，${entry.summary}`}
+          accessibilityLabel={tr("{0}{1}日，{2}", [page.title, entry.day, entry.summary])}
           testID={`lookback-month-entry-${year}-${pad2(month)}-${pad2(entry.day)}`}
           onPress={() => onOpenDay(entry.day)}
           style={styles.entryHit}
@@ -97,7 +98,7 @@ function MonthDayCell({
         style={styles.cell}
         accessible
         accessibilityRole="text"
-        accessibilityLabel={`${title}${cell.day}日，安静`}
+        accessibilityLabel={tr("{0}{1}日，安静", [title, cell.day])}
         testID={`lookback-day-quiet-${year}-${pad2(month)}-${pad2(cell.day)}`}
       >
         <Text style={styles.quietNumeral}>{cell.numeral}</Text>
@@ -107,7 +108,7 @@ function MonthDayCell({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}${cell.day}日，${cell.summary}`}
+      accessibilityLabel={tr("{0}{1}日，{2}", [title, cell.day, cell.summary])}
       testID={`lookback-day-${year}-${pad2(month)}-${pad2(cell.day)}`}
       onPress={() => onOpenDay(cell.day)}
       style={styles.cell}

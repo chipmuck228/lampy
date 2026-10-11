@@ -1,3 +1,4 @@
+import { tr, feelingLabel } from '../i18n';
 import { StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 
@@ -16,7 +17,7 @@ export function RecentFeeling({
   return (
     <View
       testID={testID}
-      accessibilityLabel={`当时的感受，${feeling.label}`}
+      accessibilityLabel={tr("当时的感受，{0}", [feelingLabel(feeling.label)])}
       style={styles.row}
     >
       <View
@@ -25,7 +26,7 @@ export function RecentFeeling({
         importantForAccessibility="no"
         style={[styles.dot, { backgroundColor: feelingAccentColor(feeling) }]}
       />
-      <Text style={styles.text}>{feeling.label}</Text>
+      <Text style={styles.text}>{feelingLabel(feeling.label)}</Text>
     </View>
   );
 }

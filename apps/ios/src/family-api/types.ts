@@ -3,6 +3,8 @@ export type MembershipStatus = 'active' | 'left' | 'removed';
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
 export type FamilyStatus = 'active' | 'dissolved';
 
+export type UserProfile = { userId: string; nickname: string; avatar: 'system'; updatedAt: string | null };
+
 export type Account = {
   userId: string;
   appleSubject?: string;
@@ -18,6 +20,7 @@ export type TestCredential = {
   enabled: boolean;
   createdAt: string;
   disabledAt?: string;
+  operatorProvisioned?: boolean;
 };
 
 export type AuthRateLimit = {
@@ -37,7 +40,16 @@ export type Session = {
   expiresAt: string;
 };
 
+export type FamilyHistoryPolicy = 'legacy' | 'family-history-v2';
+
 export type Family = {
+  dissolvedAt?: string;
+  cleanupDeadline?: string;
+  dissolvedBy?: string;
+  historyPolicy?: FamilyHistoryPolicy;
+  historyConfirmedAt?: string;
+  historyConfirmedBy?: string;
+  name?: string;
   familyId: string;
   createdAt: string;
   status: FamilyStatus;
@@ -74,6 +86,10 @@ export type FamilyView = {
   members: FamilyMemberView[];
 };
 
+export type FamilySummary = { familyId: string; name: string; createdAt?: string; role: MembershipRole; memberCount: number };
+export type PastFamilySummary = { familyId: string; name: string; createdAt?: string; role: MembershipRole; status: 'left' | 'removed' | 'dissolved' };
+export type FamilyListView = { families: FamilySummary[]; pastFamilies?: PastFamilySummary[]; limit: 10 };
+
 export type MembershipListView = {
   family: FamilyView | null;
 };
@@ -92,6 +108,10 @@ export type FamilyHealth = {
   inbox: true;
   testAccountLogin: boolean;
   testAccountLoginReason: TestAccountHealth['testAccountLoginReason'];
+  familyHistoryV2?: boolean;
+  controlledEmailAccounts?: boolean;
+  emailRegistration?: boolean;
+  publicTestLogin?: boolean;
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 
@@ -160,6 +180,8 @@ export type ShareView = {
   shareId: string;
   familyId: string;
   authorUserId: string;
+  // Live display only; authorization and original snapshot remain ID-based.
+  authorNickname?: string;
   sourceMomentId: string;
   sourceRevision: number;
   snapshot: ShareSnapshot;
@@ -176,6 +198,7 @@ export type ShareMediaView = {
 };
 
 export type ShareMomentInput = {
+  audienceConfirmation?: string;
   sourceMomentId: string;
   sourceRevision: number;
   note: string;
@@ -194,6 +217,14 @@ export type InvitationView = {
   status: InvitationStatus;
   expiresAt: string;
 };
+
+export type InviteLink = {
+  invitationId: string; familyId: string; tokenHash: string; status: InvitationStatus;
+  createdAt: string; expiresAt: string; acceptedByUserId?: string;
+};
+export type InviteLinkView = Omit<InviteLink, 'tokenHash' | 'acceptedByUserId' | 'createdAt'>;
+export type CreatedInviteLink = InviteLinkView & { token: string };
+export type InvitePreview = { name: string; expiresAt: string; status: InvitationStatus | 'dissolved'; };
 
 export type AppleIdentity = {
   appleSubject: string;
@@ -215,4 +246,13 @@ export type FamilyIds = {
   invitationId: () => string;
   invitationCode: () => string;
   sessionToken: () => string;
+};
+
+export type FamilyRoster = { familyId: string; role: MembershipRole; membershipId: string; members: (FamilyMemberView & { membershipId: string; nickname?: string; avatar?: 'system' })[] };
+
+export type FamilyTransfer = {
+  transferId: string; familyId: string; requestId: string;
+  fromUserId: string; toUserId: string; fromMembershipId: string; toMembershipId: string;
+  status: 'pending' | 'accepted' | 'cancelled' | 'invalid'; revision: number;
+  createdAt: string; updatedAt: string;
 };

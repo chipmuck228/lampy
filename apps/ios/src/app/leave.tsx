@@ -1,3 +1,4 @@
+import { appLanguage, tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput, type } from '../screens/life-text';
@@ -59,14 +60,17 @@ import { usePageMetrics } from '../screens/use-page-metrics';
 
 import { useDeviceLock } from '../screens/device-lock-context';
 import { forgetLeaveVoiceIntent, takeLeaveVoiceIntent } from '../screens/leave-voice-intent';
+import { forgetHomeScreenEntry, takeHomeScreenEntry } from '../application/home-screen-actions';
+import type { TextInput as NativeTextInput } from 'react-native';
 import { waitForRecordingForeground } from '../screens/recording-foreground';
 import { recordingStartedFeedback } from '../infrastructure/recording-feedback';
 
-export const DRAFT_RESTORED_COPY = '上次没保存的内容已放回来。';
+export const DRAFT_RESTORED_COPY = tr("上次没保存的内容已放回来。");
 
 export default function LeaveScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[]; voice?: string | string[] }>();
+  const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[]; from?: string | string[]; voice?: string | string[]; quick?: string | string[] }>();
+  const noteInputRef = useRef<NativeTextInput>(null);
   const lock = useDeviceLock();
   const lockRef = useRef(lock);
   lockRef.current = lock;
@@ -78,9 +82,10 @@ export default function LeaveScreen() {
       focusedRef.current = false;
       recordingGeneration.current += 1;
       forgetLeaveVoiceIntent(params.voice);
+      forgetHomeScreenEntry(params.quick);
       interruptRef.current();
     };
-  }, [params.voice]));
+  }, [params.voice, params.quick]));
   const fromLookback = leaveOpenedFromLookback(params.from);
   const { width, height } = usePageMetrics();
   const insets = useSafeAreaInsets();
@@ -88,7 +93,7 @@ export default function LeaveScreen() {
   const gutter = pageGutter(width, height);
   const pageWidth = readingPageWidth(width, height);
   const compact = isCompactHeight(height);
-  const stackActions = compact || reading < 320 || shouldStackLeaveActions(reading);
+  const stackActions = (appLanguage !== 'en' && (compact || reading < 320)) || shouldStackLeaveActions(reading);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -100,7 +105,7 @@ export default function LeaveScreen() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [restored, setRestored] = useState(false);
   const [confirmingAbandon, setConfirmingAbandon] = useState(false);
-  const [occurred, setOccurred] = useState<OccurredChoiceView>({ kind: 'today', label: '今天' });
+  const [occurred, setOccurred] = useState<OccurredChoiceView>({ kind: 'today', label: tr("今天") });
   const [todayParts, setTodayParts] = useState<CalendarDayParts>(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
@@ -223,8 +228,8 @@ export default function LeaveScreen() {
         const nextOccurred =
           draft.occurred ??
           (draft.isRestored
-            ? { kind: 'unknown' as const, label: '时间不确定' }
-            : { kind: 'today' as const, label: '今天' });
+            ? { kind: 'unknown' as const, label: tr("时间不确定") }
+            : { kind: 'today' as const, label: tr("今天") });
         setOccurred(nextOccurred);
         setRecordPhase(draft.audio ? 'stopped' : 'ready');
         if (
@@ -237,7 +242,7 @@ export default function LeaveScreen() {
         }
       })
       .catch(() => {
-        if (!cancelled && mountedRef.current) setMessage('草稿暂时读不出来，原来的内容没有被改写。');
+        if (!cancelled && mountedRef.current) setMessage(tr("草稿暂时读不出来，原来的内容没有被改写。"));
       });
     return () => {
       cancelled = true;
@@ -295,7 +300,7 @@ export default function LeaveScreen() {
       ) {
         return;
       }
-      setMessage(shownError(error, '草稿暂时写不进去。已经写的字还在屏幕上。'));
+      setMessage(shownError(error, tr("草稿暂时写不进去。已经写的字还在屏幕上。")));
     });
   }
 
@@ -338,7 +343,7 @@ export default function LeaveScreen() {
       ) {
         return;
       }
-      setMessage(shownError(error, '发生日期暂时写不进去。已经选的日期还在屏幕上。'));
+      setMessage(shownError(error, tr("发生日期暂时写不进去。已经选的日期还在屏幕上。")));
     });
   }
 
@@ -362,18 +367,25 @@ export default function LeaveScreen() {
       ) {
         return;
       }
-      setMessage(shownError(error, '草稿暂时写不进去。已经选的感受还在屏幕上。'));
+      setMessage(shownError(error, tr("草稿暂时写不进去。已经选的感受还在屏幕上。")));
     });
   }
 
-  function applyImageAction(action: 'library' | 'camera') {
+  function applyImageAction(action: 'library' | 'camera', fromQuickAction = false) {
     const id = draftIdRef.current;
     if (!id || busyRef.current || abandoningRef.current) return;
+    const generation = recordingGeneration.current;
+    const stillHere = () => mountedRef.current && focusedRef.current &&
+      generation === recordingGeneration.current && draftIdRef.current === id && !abandoningRef.current;
+    const canStart = () => stillHere() && AppState.currentState === 'active' && !lockRef.current?.snapshot.locked;
     busyRef.current = true;
     setBusy('photo');
     void enqueue(async () => {
       const app = await getUseCases();
-      return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id);
+      return action === 'library' ? app.addLibraryImages(id) : app.addCameraImage(id, fromQuickAction ? {
+        canStart,
+        waitUntilReady: () => waitForRecordingForeground(stillHere, canStart),
+      } : undefined);
     })
       .then((next) => {
         if (abandoningRef.current || draftIdRef.current !== id) return;
@@ -388,7 +400,7 @@ export default function LeaveScreen() {
           const draft = await app.restoreOrCreateDraft();
           if (abandoningRef.current || draftIdRef.current !== id) return;
           applyComposer(draft);
-          setMessage('每条最多三张照片');
+          setMessage(tr("每条最多三张照片"));
           return;
         }
         if (
@@ -409,7 +421,7 @@ export default function LeaveScreen() {
           setMessage(error.message);
           return;
         }
-        setMessage(shownError(error, '这张照片没有留下。可以再试，也可以继续写字。'));
+        setMessage(shownError(error, tr("这张照片没有留下。可以再试，也可以继续写字。")));
       })
       .finally(() => {
         if (abandoningRef.current || removingRef.current || !mountedRef.current) return;
@@ -463,11 +475,11 @@ export default function LeaveScreen() {
         }
         if (isApplicationError(error) && error.code === 'AUDIO_LIMIT') {
           setRecordPhase(audio ? 'stopped' : 'ready');
-          setMessage('每条最多一段声音');
+          setMessage(tr("每条最多一段声音"));
           return;
         }
         setRecordPhase('failed');
-        setMessage(shownError(error, '这次没有录下声音。可以再试，也可以继续写字。'));
+        setMessage(shownError(error, tr("这次没有录下声音。可以再试，也可以继续写字。")));
       });
   }
 
@@ -477,7 +489,7 @@ export default function LeaveScreen() {
       if (!alive || !focusedRef.current || !draftIdRef.current || busyRef.current ||
           AppState.currentState !== 'active' || lockRef.current?.snapshot.locked) return;
       if (!takeLeaveVoiceIntent(params.voice)) return;
-      if (audio) { setMessage('草稿里已经有一段声音。'); return; }
+      if (audio) { setMessage(tr("草稿里已经有一段声音。")); return; }
       startRecording(true);
     };
     tryStart();
@@ -489,6 +501,31 @@ export default function LeaveScreen() {
     // The gesture is consumed once; rerenders cannot restart it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId, audio, params.voice, lock?.snapshot.locked]);
+
+  useEffect(() => {
+    const tryEntry = () => {
+      if (!focusedRef.current || !draftIdRef.current || AppState.currentState !== 'active' || lockRef.current?.snapshot.locked) return;
+      const kind = takeHomeScreenEntry(params.quick);
+      if (!kind || busyRef.current || abandoningRef.current || phaseRef.current === 'recording') return;
+      if (kind === 'write') noteInputRef.current?.focus();
+      if (kind === 'record') {
+        if (audio) setMessage(tr("草稿里已经有一段声音。"));
+        else startRecording(true);
+      }
+      if (kind === 'camera') {
+        if (images.length >= 3) setMessage(tr("每条最多三张照片"));
+        else applyImageAction('camera', true);
+      }
+    };
+    tryEntry();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background') forgetHomeScreenEntry(params.quick);
+      if (state === 'active') tryEntry();
+    });
+    return () => sub.remove();
+    // A native capability is consumed once after draft hydration, never from a URL alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftId, audio, images.length, params.quick, lock?.snapshot.locked]);
 
   function stopRecording() {
     const id = draftIdRef.current;
@@ -507,7 +544,7 @@ export default function LeaveScreen() {
       .catch((error) => {
         if (abandoningRef.current || draftIdRef.current !== id) return;
         setRecordPhase('failed');
-        setMessage(shownError(error, '这次没有录下声音。可以再试，也可以继续写字。'));
+        setMessage(shownError(error, tr("这次没有录下声音。可以再试，也可以继续写字。")));
       })
       .finally(() => {
         if (abandoningRef.current || removingRef.current) return;
@@ -532,14 +569,14 @@ export default function LeaveScreen() {
         if (!result.hadSession) return;
         setMessage(
           result.kept
-            ? '录音被打断。已经录下的声音还在草稿里。'
-            : '录音被打断。这一次没有留下声音，文字和照片还在。',
+            ? tr("录音被打断。已经录下的声音还在草稿里。")
+            : tr("录音被打断。这一次没有留下声音，文字和照片还在。"),
         );
       })
       .catch((error) => {
         if (!mountedRef.current || abandoningRef.current || draftIdRef.current !== id) return;
         setRecordPhase('failed');
-        setMessage(shownError(error, '录音被打断。可以再试，也可以继续写字。'));
+        setMessage(shownError(error, tr("录音被打断。可以再试，也可以继续写字。")));
       })
       .finally(() => {
         if (!mountedRef.current || abandoningRef.current || removingRef.current) return;
@@ -645,7 +682,7 @@ export default function LeaveScreen() {
           setDeniedMessage(error.code, error.message);
           return;
         }
-        setMessage(shownError(error, '这次没有重新录上。可以再试。'));
+        setMessage(shownError(error, tr("这次没有重新录上。可以再试。")));
       });
   }
 
@@ -672,8 +709,8 @@ export default function LeaveScreen() {
       if (abandoningRef.current || draftIdRef.current !== id) return;
       setMessage(
         isApplicationError(error) && error.code === 'MOMENT_EMPTY'
-          ? '写一句、留下一张照片或一段声音。已经写的草稿还在。'
-          : shownError(error, '这次没有留下正式记录。可以再试。'),
+          ? tr("写一句、留下一张照片或一段声音。已经写的草稿还在。")
+          : shownError(error, tr("这次没有留下正式记录。可以再试。")),
       );
     } finally {
       if (abandoningRef.current) return;
@@ -716,7 +753,7 @@ export default function LeaveScreen() {
         applyComposer(result.composer);
         occurredEpochRef.current += 1;
         setOccurred(
-          result.composer.occurred ?? { kind: 'today', label: '今天' },
+          result.composer.occurred ?? { kind: 'today', label: tr("今天") },
         );
         if (result.composer.today) setTodayParts(result.composer.today);
         if (!result.composer.occurred || result.composer.occurred.kind === 'unknown') {
@@ -729,7 +766,7 @@ export default function LeaveScreen() {
       })
       .catch((error) => {
         if (!mountedRef.current) return;
-        setMessage(shownError(error, '这份草稿还没拿掉。原来的内容还在，可以再试。'));
+        setMessage(shownError(error, tr("这份草稿还没拿掉。原来的内容还在，可以再试。")));
       })
       .finally(() => {
         abandoningRef.current = false;
@@ -760,7 +797,7 @@ export default function LeaveScreen() {
       const root = FileSystem.cacheDirectory;
       if (!root) {
         void Promise.resolve().then(() => {
-          setMessage('这次没有留下照片。可以再试，也可以继续写字。');
+          setMessage(tr("这次没有留下照片。可以再试，也可以继续写字。"));
         });
         return;
       }
@@ -778,7 +815,7 @@ export default function LeaveScreen() {
           applyImageAction('library');
         })
         .catch(() => {
-          setMessage('这次没有留下照片。可以再试，也可以继续写字。');
+          setMessage(tr("这次没有留下照片。可以再试，也可以继续写字。"));
         });
       return;
     }
@@ -794,20 +831,20 @@ export default function LeaveScreen() {
   const composerLocked = actionsLocked || confirmingAbandon;
   const saveLabel =
     busy === 'save'
-      ? '正在留下…'
+      ? tr("正在留下…")
       : busy === 'photo'
-        ? '正在加入照片…'
+        ? tr("正在加入照片…")
         : busy === 'audio' || busy === 'record'
-          ? '正在留下声音…'
+          ? tr("正在留下声音…")
           : busy === 'abandon'
-            ? '正在拿掉这份草稿…'
-            : '留下';
+            ? tr("正在拿掉这份草稿…")
+            : tr("留下");
 
   return (
     <SafeAreaView
       style={styles.safe}
       edges={['top', 'left', 'right']}
-      accessibilityLabel="留下"
+      accessibilityLabel={tr("留下")}
       testID="composer-layout"
       accessibilityHint={`leave-layout width:${Math.round(reading)} actions:${stackActions ? 'stack' : 'row'}`}
     >
@@ -840,12 +877,12 @@ export default function LeaveScreen() {
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={fromLookback ? '返回原来的位置' : '返回最近'}
+            accessibilityLabel={fromLookback ? tr("返回原来的位置") : tr("返回最近")}
             testID="leave-back"
             onPress={() => router.back()}
             style={styles.backHit}
           >
-            <Text style={styles.back}>{fromLookback ? '返回原来的位置' : '最近'}</Text>
+            <Text style={styles.back}>{fromLookback ? tr("返回原来的位置") : tr("最近")}</Text>
           </Pressable>
           {restored ? (
             <Text style={styles.restore}>{DRAFT_RESTORED_COPY}</Text>
@@ -853,44 +890,44 @@ export default function LeaveScreen() {
           {showAbandon && !confirmingAbandon ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="放弃这份草稿"
+              accessibilityLabel={tr("放弃这份草稿")}
               testID="composer-abandon"
               onPress={requestAbandon}
               disabled={busy === 'abandon'}
               style={styles.abandonHit}
             >
-              <Text style={styles.abandon}>放弃这份草稿</Text>
+              <Text style={styles.abandon}>{tr("放弃这份草稿")}</Text>
             </Pressable>
           ) : null}
           {confirmingAbandon ? (
             <View testID="composer-abandon-confirm">
               <Text style={styles.restore}>
-                这份草稿里的文字、感受、照片和录音会从这里拿掉。相册原片和已经留下的记录不会动。
-              </Text>
+                {tr("这份草稿里的文字、感受、照片和录音会从这里拿掉。相册原片和已经留下的记录不会动。")}</Text>
               <View style={styles.confirmRow}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="取消放弃草稿"
+                  accessibilityLabel={tr("取消放弃草稿")}
                   testID="composer-abandon-cancel"
                   onPress={cancelAbandon}
                   style={styles.abandonHit}
                 >
-                  <Text style={styles.back}>取消</Text>
+                  <Text style={styles.back}>{tr("取消")}</Text>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="确认放弃这份草稿"
+                  accessibilityLabel={tr("确认放弃这份草稿")}
                   testID="composer-abandon-confirm-button"
                   onPress={confirmAbandon}
                   style={styles.abandonHit}
                 >
-                  <Text style={styles.abandon}>确认放弃</Text>
+                  <Text style={styles.abandon}>{tr("确认放弃")}</Text>
                 </Pressable>
               </View>
             </View>
           ) : null}
           <TextInput
-            accessibilityLabel="要留下的一句话"
+            ref={noteInputRef}
+            accessibilityLabel={tr("要留下的一句话")}
             testID="composer-note"
             value={note}
             editable={!!draftId && busy !== 'abandon' && !confirmingAbandon}
@@ -901,7 +938,7 @@ export default function LeaveScreen() {
               const next = Math.max(88, Math.ceil(event.nativeEvent.contentSize.height));
               setNoteBoxHeight((current) => (current === next ? current : next));
             }}
-            placeholder="写一句就可以，也可以只留下照片或声音。"
+            placeholder={tr("写一句就可以，也可以只留下照片或声音。")}
             placeholderTextColor={placeholder}
             multiline
             textAlignVertical="top"
@@ -960,12 +997,12 @@ export default function LeaveScreen() {
             <View testID="composer-feedback-sheet" style={styles.sheet}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="关闭说明"
+                accessibilityLabel={tr("关闭说明")}
                 testID="composer-feedback-detail-close"
                 onPress={() => setDetailOpen(false)}
                 style={styles.sheetClose}
               >
-                <Text style={styles.back}>关闭</Text>
+                <Text style={styles.back}>{tr("关闭")}</Text>
               </Pressable>
               <ScrollView
                 testID="composer-feedback-detail-scroll"
@@ -1005,12 +1042,12 @@ export default function LeaveScreen() {
               {messageDetail ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="查看说明"
+                  accessibilityLabel={tr("查看说明")}
                   testID="composer-feedback-detail"
                   onPress={() => setDetailOpen(true)}
                   style={styles.detailHit}
                 >
-                  <Text style={styles.detailLink}>查看说明</Text>
+                  <Text style={styles.detailLink}>{tr("查看说明")}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -1020,14 +1057,15 @@ export default function LeaveScreen() {
             accessibilityLabel={stackActions ? 'leave-actions-stack' : 'leave-actions-row'}
             style={[
               styles.actions,
+              appLanguage === 'en' && styles.actionsEnglish,
               { maxWidth: reading },
               stackActions && styles.actionsStacked,
             ]}
           >
-            <View style={styles.mediaRow}>
+            <View style={[styles.mediaRow, appLanguage === 'en' && styles.actionsEnglish]}>
               <LifeLabeledHit
                 icon="camera"
-                label="拍摄"
+                label={tr("拍摄")}
                 testID="composer-camera"
                 disabled={composerLocked}
                 onPress={() => {
@@ -1036,7 +1074,7 @@ export default function LeaveScreen() {
               />
               <LifeLabeledHit
                 icon="photo"
-                label="照片"
+                label={tr("照片")}
                 testID="composer-library"
                 disabled={composerLocked}
                 onPress={() => {
@@ -1046,7 +1084,7 @@ export default function LeaveScreen() {
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="留下"
+              accessibilityLabel={tr("留下")}
               testID="composer-save"
               onPress={() => {
                 void onSave();
@@ -1126,6 +1164,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 20,
   },
+  actionsEnglish: { gap: 12 },
   actionsStacked: {
     flexDirection: 'column',
     alignItems: 'flex-start',

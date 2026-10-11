@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 
 import { decideFirstRunGuide, type FirstRunDecision } from '../application/first-run';
 import { getUseCases } from '../application/container';
+import { homeScreenActions } from '../application/home-screen-actions';
 import { leaveHref } from './lookback-origin';
 import { createSecureFirstRunStore, type FirstRunStore } from '../infrastructure/first-run-store';
 import { paper } from './life-page';
@@ -111,7 +112,8 @@ export function FirstRunGate({
           }
           setFinishError(null);
           setDecision('skip');
-          router.push(leaveHref('recent'));
+          // A shortcut waiting through onboarding owns the next navigation.
+          if (!homeScreenActions.snapshot()) router.push(leaveHref('recent'));
         });
       }}
     />

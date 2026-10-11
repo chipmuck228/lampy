@@ -68,12 +68,12 @@ export function createDirectoryMediaBlobStore(rootDir: string): MediaBlobStore {
       }
     },
     async remove(storageKey) {
-      if (!/^med_[a-f0-9]+$/.test(storageKey)) return;
+      assertStorageKey(storageKey);
       try {
         rmSync(path.join(rootDir, storageKey), { force: true });
         rmSync(path.join(rootDir, `${storageKey}.partial`), { force: true });
       } catch {
-        /* ignore */
+        throw new FamilyError(FAMILY_ERROR.MEDIA_WRITE_FAILED, 'Media could not be removed.');
       }
     },
   };

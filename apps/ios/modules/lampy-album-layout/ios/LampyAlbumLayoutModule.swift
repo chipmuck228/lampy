@@ -10,8 +10,8 @@ public final class LampyAlbumLayoutModule: Module {
       measureText(text: text, fontName: fontName, sizePt: sizePt, lineHeightPt: lineHeightPt, widthPt: widthPt)
     }
 
-    Function("diagnoseFonts") { () -> [String: Any] in
-      diagnoseAlbumFonts()
+    Function("diagnoseFonts") { (serif: String, ui: String) -> [String: Any] in
+      diagnoseAlbumFonts(serifName: serif, uiName: ui)
     }
 
     AsyncFunction("writeProbePdf") { (layoutJson: String, mediaJson: String, destPath: String) -> [String: Any] in
@@ -56,6 +56,7 @@ private struct ResolvedAlbumFont {
 private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedAlbumFont) {
   let requestedFamily = name
   let isPingFang = name.localizedCaseInsensitiveContains("PingFang")
+  let isSongti = name.localizedCaseInsensitiveContains("Songti") || name.localizedCaseInsensitiveContains("STSong")
   var candidates: [String] = [name]
   if isPingFang {
     candidates += [
@@ -65,7 +66,7 @@ private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedA
       "PingFangSC-Medium",
     ]
     candidates += UIFont.fontNames(forFamilyName: "PingFang SC")
-  } else {
+  } else if isSongti {
     candidates += [
       "STSongti-SC-Regular",
       "STSongti-SC-Light",
@@ -81,10 +82,12 @@ private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedA
   for candidate in candidates where seen.insert(candidate).inserted {
     if let font = UIFont(name: candidate, size: size) {
       let family = font.familyName
+      let normalizedFamily = family.replacingOccurrences(of: " ", with: "")
+      let normalizedRequested = requestedFamily.replacingOccurrences(of: " ", with: "")
       let matched =
-        family.localizedCaseInsensitiveContains(requestedFamily)
-        || requestedFamily.localizedCaseInsensitiveContains(family)
-        || (!isPingFang && (family.localizedCaseInsensitiveContains("Songti") || family.localizedCaseInsensitiveContains("STSong")))
+        normalizedFamily.localizedCaseInsensitiveContains(normalizedRequested)
+        || normalizedRequested.localizedCaseInsensitiveContains(normalizedFamily)
+        || (isSongti && (family.localizedCaseInsensitiveContains("Songti") || family.localizedCaseInsensitiveContains("STSong")))
         || (isPingFang && family.localizedCaseInsensitiveContains("PingFang"))
       return (
         font,
@@ -98,7 +101,7 @@ private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedA
       )
     }
   }
-  if !isPingFang {
+  if isSongti {
     let descriptor = UIFontDescriptor(fontAttributes: [
       .family: "Songti SC",
       .size: size,
@@ -137,10 +140,10 @@ private func resolveFont(name: String, size: CGFloat) -> UIFont {
 }
 
 /// Dev-only probe samples. Fixed strings only — never caller body text.
-private func diagnoseAlbumFonts() -> [String: Any] {
-  let serif = resolveAlbumFont(name: "Songti SC", size: 17)
-  let ui = resolveAlbumFont(name: "PingFang SC", size: 15)
-  let cover = resolveAlbumFont(name: "Songti SC", size: 28)
+private func diagnoseAlbumFonts(serifName: String, uiName: String) -> [String: Any] {
+  let serif = resolveAlbumFont(name: serifName, size: 17)
+  let ui = resolveAlbumFont(name: uiName, size: 15)
+  let cover = resolveAlbumFont(name: serifName, size: 28)
   let families = UIFont.familyNames
     .filter {
       $0.localizedCaseInsensitiveContains("Song")
@@ -270,8 +273,9 @@ private func writeProbePdf(layoutJson: String, mediaJson: String, destPath: Stri
   }
   let url = URL(fileURLWithPath: destPath)
   try data.write(to: url, options: .atomic)
-  let resolvedSerif = resolveAlbumFont(name: "Songti SC", size: 17).1
-  let resolvedUi = resolveAlbumFont(name: "PingFang SC", size: 15).1
+  let rendering = pages.first?["rendering"] as? [String: Any] ?? [:]
+  let resolvedSerif = resolveAlbumFont(name: rendering["serif"] as? String ?? "Songti SC", size: 17).1
+  let resolvedUi = resolveAlbumFont(name: rendering["ui"] as? String ?? "PingFang SC", size: 15).1
   let inspection = inspectPdfFontResources(data)
   return [
     "path": destPath,
@@ -410,16 +414,16 @@ private func drawAlbumTextAtBaseline(
   context.restoreGState()
 }
 
-private func albumFontForKind(_ kind: String) -> (name: String, size: CGFloat, color: UIColor) {
+private func albumFontForKind(_ kind: String, serif: String, ui: String) -> (name: String, size: CGFloat, color: UIColor) {
   switch kind {
   case "cover-name":
-    return ("Songti SC", 28, albumInkColor())
+    return (serif, 28, albumInkColor())
   case "note", "opening", "close":
-    return ("Songti SC", 17, albumInkColor())
+    return (serif, 17, albumInkColor())
   case "day-rule":
-    return ("PingFang SC", 15, albumSageColor())
+    return (ui, 15, albumSageColor())
   default:
-    return ("PingFang SC", 15, albumInkSoftColor())
+    return (ui, 15, albumInkSoftColor())
   }
 }
 
@@ -457,6 +461,10 @@ private func drawAlbumPage(
 ) {
   albumPaperColor().setFill()
   context.fill(bounds)
+  let rendering = page["rendering"] as? [String: Any] ?? [:]
+  let serifName = rendering["serif"] as? String ?? "Songti SC"
+  let uiName = rendering["ui"] as? String ?? "PingFang SC"
+  let copy = rendering["copy"] as? [String: String] ?? [:]
   let playingAssets = Set(playing)
   let blocks = page["blocks"] as? [[String: Any]] ?? []
   for block in blocks {
@@ -474,9 +482,9 @@ private func drawAlbumPage(
       } else {
         UIColor(white: 0.9, alpha: 1).setFill()
         context.fill(CGRect(x: x, y: y, width: width, height: height))
-        let missingFont = resolveFont(name: "PingFang SC", size: 15)
+        let missingFont = resolveFont(name: uiName, size: 15)
         drawAlbumTextAtBaseline(
-          text: "这张照片现在看不到。",
+          text: copy["imageMissing"] ?? "这张照片现在看不到。",
           font: missingFont,
           color: albumInkSoftColor(),
           x: x + 8,
@@ -490,7 +498,7 @@ private func drawAlbumPage(
       let value = block["value"] as? String ?? ""
       albumSageColor().setFill()
       context.fillEllipse(in: CGRect(x: x, y: y + 7, width: 8, height: 8))
-      let spec = albumFontForKind(kind)
+      let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
       let font = resolveFont(name: spec.name, size: spec.size)
       drawAlbumTextAtBaseline(
         text: value,
@@ -504,7 +512,7 @@ private func drawAlbumPage(
     }
     if kind == "audio" {
       let assetId = block["assetId"] as? String ?? ""
-      let spec = albumFontForKind(kind)
+      let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
       let font = resolveFont(name: spec.name, size: spec.size)
       let status = block["status"] as? String ?? ""
       if status == "available" {
@@ -521,7 +529,7 @@ private func drawAlbumPage(
       )
       continue
     }
-    let spec = albumFontForKind(kind)
+    let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
     let font = resolveFont(name: spec.name, size: spec.size)
     if let lines = block["lines"] as? [[String: Any]], let text = block["text"] as? String, !lines.isEmpty {
       for line in lines {
@@ -536,6 +544,9 @@ private func drawAlbumPage(
       let text = (block["text"] as? String)
         ?? (block["label"] as? String)
         ?? (block["value"] as? String)
+        ?? (kind == "source-gone" ? copy["sourceGone"] : nil)
+        ?? (kind == "source-unreadable" ? copy["sourceUnreadable"] : nil)
+        ?? (kind == "source-changed" ? copy["sourceChanged"] : nil)
         ?? ""
       drawAlbumTextAtBaseline(
         text: text,
@@ -593,5 +604,3 @@ final class AlbumPageView: ExpoView {
     drawAlbumPage(page: page, media: parseAlbumMedia(mediaJson), playing: playing, in: context, bounds: bounds)
   }
 }
-
-

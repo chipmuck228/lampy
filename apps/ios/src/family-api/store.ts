@@ -17,6 +17,10 @@ export type IdempotentRecord = {
 };
 
 export type FamilyStore = {
+  profiles: import('./types').UserProfile[];
+  directoryHistory: (import('./types').PastFamilySummary & { userId: string; status: 'left' | 'removed' | 'dissolved' })[];
+  transfers: import('./types').FamilyTransfer[];
+  inviteLinks: import('./types').InviteLink[];
   accounts: Account[];
   sessions: Session[];
   families: Family[];
@@ -31,6 +35,10 @@ export type FamilyStore = {
 
 export function createFamilyStore(): FamilyStore {
   return {
+    profiles: [],
+    directoryHistory: [],
+    inviteLinks: [],
+    transfers: [],
     accounts: [],
     sessions: [],
     families: [],

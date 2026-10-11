@@ -1,3 +1,4 @@
+import { tr } from '../../i18n';
 import { useCallback } from 'react';
 
 import { getUseCases } from '../../application/container';
@@ -12,7 +13,7 @@ export default function LookbackUnconfirmedScreen() {
     <LookbackUnconfirmedReading
       scope={{ kind: 'unknown' }}
       path="/lookback/unconfirmed"
-      fallbackTitle="时间未确认"
+      fallbackTitle={tr("时间未确认")}
       moreTestID="lookback-unconfirmed-more"
       loadPage={loadPage}
     />

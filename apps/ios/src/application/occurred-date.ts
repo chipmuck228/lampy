@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import {
   calendarDayBounds,
   calendarPartsAt,
@@ -7,8 +8,8 @@ import {
 } from '../domain-adapters/calendar';
 import { ApplicationError } from './errors';
 
-export const OCCURRED_IN_FUTURE_MESSAGE = '还不能选还没到的日子。';
-export const OCCURRED_INVALID_DATE_MESSAGE = '这一天不存在。';
+export const OCCURRED_IN_FUTURE_MESSAGE = tr("还不能选还没到的日子。");
+export const OCCURRED_INVALID_DATE_MESSAGE = tr("这一天不存在。");
 
 export type CalendarDayParts = {
   year: number;
@@ -42,9 +43,9 @@ export function isCalendarDayAfter(left: CalendarDayParts, right: CalendarDayPar
 }
 
 export function formatOccurredDayLabel(parts: CalendarDayParts, today: CalendarDayParts): string {
-  if (isSameCalendarDayParts(parts, today)) return '今天';
-  if (parts.year !== today.year) return `${parts.year}年${parts.month}月${parts.day}日`;
-  return `${parts.month}月${parts.day}日`;
+  if (isSameCalendarDayParts(parts, today)) return tr("今天");
+  if (parts.year !== today.year) return tr("{0}年{1}月{2}日", [parts.year, parts.month, parts.day]);
+  return tr("{0}月{1}日", [parts.month, parts.day]);
 }
 
 export function projectOccurredChoice(
@@ -55,7 +56,7 @@ export function projectOccurredChoice(
   const precision = time.occurredAtPrecision || 'unknown';
   const occurredMillis = parseMillis(time.occurredAt);
   if (precision === 'unknown' || !time.occurredAt || occurredMillis === null) {
-    return { kind: 'unknown', label: '时间不确定' };
+    return { kind: 'unknown', label: tr("时间不确定") };
   }
   const occurred = calendarPartsAt(occurredMillis, clock);
   const today = calendarPartsAt(now.getTime(), clock);
@@ -109,7 +110,7 @@ export function optimisticOccurredChoice(
   input: OccurredDraftInput,
   today: CalendarDayParts,
 ): OccurredChoiceView {
-  if (input.kind === 'unknown') return { kind: 'unknown', label: '时间不确定' };
+  if (input.kind === 'unknown') return { kind: 'unknown', label: tr("时间不确定") };
   const day = input.kind === 'today' ? today : input;
   return {
     kind: input.kind === 'today' || isSameCalendarDayParts(day, today) ? 'today' : 'day',

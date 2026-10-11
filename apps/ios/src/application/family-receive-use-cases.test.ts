@@ -264,6 +264,8 @@ describe('family receive cache use cases', () => {
 
       const secondDb = await openPreparedNodeSqliteDatabase(file);
       const restored = createSqliteFamilyReceiveCache(secondDb, createNodeFamilyReceiveFiles(cacheDir));
+      expect(await restored.listFamilyIds!(bobId as string)).toEqual([family.familyId]);
+      expect(await restored.listFamilyIds!('another-account')).toEqual([]);
       const kept = await restored.list(bobId as string, family.familyId);
       expect(kept[0]?.receiveStatus).toBe('received');
       const stored = (await restored.listMedia(bobId as string, family.familyId, shared.shareId))[0];

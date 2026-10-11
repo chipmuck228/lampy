@@ -51,7 +51,7 @@ describe('moment detail share entry', () => {
     await waitFor(() => {
       expect(view.getByText('门口的风')).toBeTruthy();
     });
-    expect(view.queryByLabelText('分享给家里')).toBeNull();
+    expect(view.queryAllByLabelText('分享')).toHaveLength(0);
   });
 
   it('opens the confirm route from personal detail when the family product entry is open', async () => {
@@ -67,9 +67,11 @@ describe('moment detail share entry', () => {
       </SafeAreaProvider>,
     );
     await waitFor(() => {
-      expect(view.getByLabelText('分享给家里')).toBeTruthy();
+      expect(view.getAllByLabelText('分享')).toHaveLength(2);
     });
-    fireEvent.press(view.getByLabelText('分享给家里'));
+    fireEvent.press(view.getByTestId('moment-share-top'));
+    expect(mockPush).toHaveBeenCalledWith('/share/moment_gate');
+    fireEvent.press(view.getByTestId('moment-share-to-family'));
     expect(mockPush).toHaveBeenCalledWith('/share/moment_gate');
   });
 });

@@ -7,6 +7,7 @@ export type FamilyHttpRequest = {
   headers: Record<string, string | undefined>;
   body?: unknown;
   bytes?: Uint8Array;
+  peer?: string;
 };
 
 export type FamilyHttpResponse = {
@@ -49,8 +50,15 @@ function statusFor(code: string) {
     case FAMILY_ERROR.INVITE_ALREADY_USED:
     case FAMILY_ERROR.FAMILY_DISSOLVED:
     case FAMILY_ERROR.CONFLICT:
+    case FAMILY_ERROR.FAMILY_SELECTION_REQUIRED:
+    case FAMILY_ERROR.FAMILY_LIMIT_REACHED:
     case FAMILY_ERROR.TEST_ACCOUNT_EXISTS:
+    case FAMILY_ERROR.EMAIL_ACCOUNT_EXISTS:
       return 409;
+    case 'FAMILY_POLICY_UPGRADE_REQUIRED':
+      return 409;
+    case 'FAMILY_HISTORY_CLOSED':
+      return 503;
     case FAMILY_ERROR.BAD_REQUEST:
     case FAMILY_ERROR.MEDIA_CORRUPT:
       return 400;
@@ -71,7 +79,9 @@ function statusFor(code: string) {
       return 409;
     case FAMILY_ERROR.RATE_LIMITED:
       return 429;
+    case 'INVITE_LINKS_CLOSED':
     case FAMILY_ERROR.TEST_ACCOUNT_LOGIN_CLOSED:
+    case FAMILY_ERROR.EMAIL_ACCOUNT_CLOSED:
       return 503;
     case FAMILY_ERROR.TEST_ACCOUNT_NOT_FOUND:
       return 404;
@@ -114,6 +124,11 @@ export async function dispatchFamilyApi(
       return { status: 200, body: await commands.signInWithApple(readString(body, 'identityToken')) };
     }
 
+    if (method === 'POST' && path === '/v2/auth/email/register') return { status: 201, body: await commands.registerControlledEmail({email:readString(body,'email'),password:readString(body,'password'),nickname:readString(body,'nickname')},request.peer) };
+    if (method === 'POST' && path === '/v2/auth/email/login') return { status: 200, body: await commands.signInWithControlledEmail({email:readString(body,'email'),password:readString(body,'password')},request.peer) };
+    if (method === 'GET' && path === '/v2/me/profile') return {status:200,body:await commands.getMyProfile(token || '')};
+    if (method === 'PATCH' && path === '/v2/me/profile') return {status:200,body:await commands.updateMyProfile(token || '',readString(body,'nickname'))};
+
     if (method === 'POST' && path === '/v1/auth/test-account') {
       return {
         status: 200,
@@ -127,6 +142,21 @@ export async function dispatchFamilyApi(
     if (method === 'POST' && path === '/v1/auth/sign-out') {
       return { status: 200, body: await commands.signOut(token || '') };
     }
+
+    if (method === 'GET' && path === '/v2/me/families') {
+      return { status: 200, body: await commands.listFamilies(token || '') };
+    }
+    if (method === 'POST' && path === '/v2/families') {
+      return { status: 200, body: await commands.createNamedFamily(token || '', readString(body, 'name'), idempotencyKey || '') };
+    }
+
+    const links = /^\/v2\/families\/([^/]+)\/invitations$/.exec(path);
+    if (links && method === 'POST') return { status:200, body:await commands.createInviteLink(token || '',links[1]) };
+    if (links && method === 'GET') return { status:200, body:await commands.listInviteLinks(token || '',links[1]) };
+    const revokeLink = /^\/v2\/invitations\/([^/]+)\/revoke$/.exec(path);
+    if (revokeLink && method === 'POST') return { status:200, body:await commands.revokeInviteLink(token || '',revokeLink[1]) };
+    if (path === '/v2/invitations/preview' && method === 'POST') return { status:200, body:await commands.previewInviteLink(readString(body,'token'),request.peer || 'dispatch') };
+    if (path === '/v2/invitations/accept' && method === 'POST') return { status:200, body:await commands.acceptInviteLink(token || '',readString(body,'token')) };
 
     if (method === 'POST' && path === '/v1/families') {
       return { status: 200, body: await commands.createFamily(token || '', idempotencyKey) };
@@ -155,6 +185,29 @@ export async function dispatchFamilyApi(
     if (method === 'GET' && path === '/v1/me/membership') {
       return { status: 200, body: await commands.listMembership(token || '') };
     }
+
+    const transferRoot = /^\/v2\/families\/([^/]+)\/creator-transfer$/.exec(path);
+    if (method === 'GET' && transferRoot) return {status:200,body:await commands.transfers.get(token || '',transferRoot[1])};
+    if (method === 'POST' && transferRoot) return {status:200,body:await commands.transfers.create(token || '',transferRoot[1],{requestId:readString(body,'requestId'),fromMembershipId:readString(body,'fromMembershipId'),toMembershipId:readString(body,'toMembershipId')})};
+    const transferAction = /^\/v2\/families\/([^/]+)\/creator-transfer\/([^/]+)\/(accept|cancel)$/.exec(path);
+    if (method === 'POST' && transferAction) {
+      if (!Number.isInteger(body.revision) || Number(body.revision)<1) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Transfer revision required.');
+      return {status:200,body:await commands.transfers.respond(token || '',transferAction[1],transferAction[2],Number(body.revision),transferAction[3] as 'accept'|'cancel')};
+    }
+
+    const selectedDissolve = /^\/v2\/families\/([^/]+)\/dissolve$/.exec(path);
+    if (method === 'POST' && selectedDissolve) {
+      const membershipId = readString(body, 'membershipId');
+      if (!membershipId) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Membership required.');
+      return { status: 200, body: await commands.dissolveFamily(token || '', selectedDissolve[1], membershipId) };
+    }
+
+    const roster = /^\/v2\/families\/([^/]+)\/members$/.exec(path);
+    if (method === 'GET' && roster) return { status: 200, body: await commands.getFamilyRoster(token || '', roster[1]) };
+    const selectedLeave = /^\/v2\/families\/([^/]+)\/leave$/.exec(path);
+    if (method === 'POST' && selectedLeave) return { status: 200, body: await commands.leaveSelectedFamily(token || '', selectedLeave[1], readString(body, 'membershipId')) };
+    const selectedRemove = /^\/v2\/families\/([^/]+)\/members\/([^/]+)\/remove$/.exec(path);
+    if (method === 'POST' && selectedRemove) return { status: 200, body: await commands.removeSelectedMember(token || '', selectedRemove[1], selectedRemove[2], readString(body, 'membershipId')) };
 
     if (method === 'POST' && path === '/v1/me/leave') {
       return { status: 200, body: await commands.leaveFamily(token || '') };
@@ -192,9 +245,10 @@ export async function dispatchFamilyApi(
       return { status: 200, body: { objectId: mediaContent[1], mimeType: content.mimeType, byteLength: content.bytes.length }, bytes: content.bytes, contentType: content.mimeType };
     }
 
-    const shareMediaContent = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)\/content$/.exec(path);
+    const shareCommands = path.startsWith('/v2/') ? commands.historyShares : commands;
+    const shareMediaContent = /^\/v[12]\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)\/content$/.exec(path);
     if (method === 'GET' && shareMediaContent) {
-      const content = await commands.getShareMediaContent(
+      const content = await shareCommands.getShareMediaContent(
         token || '',
         shareMediaContent[1],
         shareMediaContent[2],
@@ -212,19 +266,33 @@ export async function dispatchFamilyApi(
       };
     }
 
-    const shareMedia = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)$/.exec(path);
+    const shareMedia = /^\/v[12]\/families\/([^/]+)\/shares\/([^/]+)\/media\/([^/]+)$/.exec(path);
     if (method === 'GET' && shareMedia) {
       return {
         status: 200,
-        body: await commands.getShareMedia(token || '', shareMedia[1], shareMedia[2], shareMedia[3]),
+        body: await shareCommands.getShareMedia(token || '', shareMedia[1], shareMedia[2], shareMedia[3]),
       };
     }
 
-    const shareCreate = /^\/v1\/families\/([^/]+)\/shares$/.exec(path);
+    const policyRoute = /^\/v2\/families\/([^/]+)\/history-policy$/.exec(path);
+    if (policyRoute && method === 'GET') return { status: 200, body: await commands.getFamilyHistoryPolicy(token || '', policyRoute[1]) };
+    if (policyRoute && method === 'POST') {
+      if (Object.keys(body).some(key => key !== 'confirmation')) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Only history confirmation is accepted.');
+      return { status: 200, body: await commands.confirmFamilyHistory(token || '', policyRoute[1], readString(body, 'confirmation')) };
+    }
+
+    const shareCreate = /^\/v[12]\/families\/([^/]+)\/shares$/.exec(path);
     if (method === 'GET' && shareCreate) {
-      return { status: 200, body: await commands.listVisibleShares(token || '', shareCreate[1]) };
+      return { status: 200, body: await shareCommands.listVisibleShares(token || '', shareCreate[1]) };
     }
     if (method === 'POST' && shareCreate) {
+      if (path.startsWith('/v2/')) {
+        const keys = ['sourceMomentId','sourceRevision','note','emotion','occurredAt','occurredAtPrecision','mediaObjectIds','expectedMediaCount','audienceConfirmation'];
+        if (Object.keys(body).some(key => !keys.includes(key)) || !Array.isArray(body.mediaObjectIds) ||
+          body.mediaObjectIds.some(id => typeof id !== 'string') || (body.occurredAt !== undefined && typeof body.occurredAt !== 'string') || typeof body.note !== 'string' || typeof body.emotion !== 'string') {
+          throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Use only confirmed snapshot fields.');
+        }
+      }
       if (Object.prototype.hasOwnProperty.call(body, 'localUri') || Object.prototype.hasOwnProperty.call(body, 'people')) {
         throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Share snapshots cannot include local paths or people.');
       }
@@ -233,7 +301,8 @@ export async function dispatchFamilyApi(
         : [];
       return {
         status: 200,
-        body: await commands.shareMoment(token || '', shareCreate[1], {
+        body: await shareCommands.shareMoment(token || '', shareCreate[1], {
+          ...(path.startsWith('/v2/') ? { audienceConfirmation: readString(body, 'audienceConfirmation') } : {}),
           sourceMomentId: readString(body, 'sourceMomentId'),
           sourceRevision: typeof body.sourceRevision === 'number' ? body.sourceRevision : Number.NaN,
           note: readString(body, 'note'),
@@ -247,14 +316,14 @@ export async function dispatchFamilyApi(
       };
     }
 
-    const shareRevoke = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)\/revoke$/.exec(path);
+    const shareRevoke = /^\/v[12]\/families\/([^/]+)\/shares\/([^/]+)\/revoke$/.exec(path);
     if (method === 'POST' && shareRevoke) {
-      return { status: 200, body: await commands.revokeShare(token || '', shareRevoke[1], shareRevoke[2]) };
+      return { status: 200, body: await shareCommands.revokeShare(token || '', shareRevoke[1], shareRevoke[2]) };
     }
 
-    const shareGet = /^\/v1\/families\/([^/]+)\/shares\/([^/]+)$/.exec(path);
+    const shareGet = /^\/v[12]\/families\/([^/]+)\/shares\/([^/]+)$/.exec(path);
     if (method === 'GET' && shareGet) {
-      return { status: 200, body: await commands.getShare(token || '', shareGet[1], shareGet[2]) };
+      return { status: 200, body: await shareCommands.getShare(token || '', shareGet[1], shareGet[2]) };
     }
 
     throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Unknown family API route.');

@@ -1,15 +1,17 @@
+import { appLanguage } from '../i18n';
 import * as Font from 'expo-font';
 
-export const FIRST_RUN_SERIF = 'LampyNotoSerifSC';
-export const FIRST_RUN_SANS = 'LampyNotoSansSC';
-export const FIRST_RUN_MARK = 'LampyDMSans';
+export const FIRST_RUN_SERIF = appLanguage === 'en' ? 'Georgia' : 'LampyNotoSerifSC';
+export const FIRST_RUN_SANS = appLanguage === 'en' ? 'System' : 'LampyNotoSansSC';
+export const FIRST_RUN_MARK = appLanguage === 'en' ? 'System' : 'LampyDMSans';
 
 const SOURCES = {
-  [FIRST_RUN_SERIF]: require('../../assets/fonts/first-run/NotoSerifSC-Medium.ttf'),
-  [FIRST_RUN_SANS]: require('../../assets/fonts/first-run/NotoSansSC-Regular.ttf'),
-  [FIRST_RUN_MARK]: require('../../assets/fonts/first-run/DMSans-SemiBold.ttf'),
+  LampyNotoSerifSC: require('../../assets/fonts/first-run/NotoSerifSC-Medium.ttf'),
+  LampyNotoSansSC: require('../../assets/fonts/first-run/NotoSansSC-Regular.ttf'),
+  LampyDMSans: require('../../assets/fonts/first-run/DMSans-SemiBold.ttf'),
 };
 
 export async function loadFirstRunFonts() {
+  if (appLanguage === 'en') return;
   await Font.loadAsync(SOURCES);
 }

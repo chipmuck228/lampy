@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { LOOKBACK_MONTH_MIN_CELL, monthCalendarContentWidth } from './lookback-month';
 import type { HistoryYearView } from '../projections/history-projection';
 
@@ -42,11 +43,11 @@ export function lookbackYearPage(view: HistoryYearView): LookbackYearPage {
       ? {
           kind: 'filled',
           month: month.month,
-          numeral: `${month.month}月`,
+          numeral: tr("{0}月", [month.month]),
           count: month.count,
           summary: month.summary,
         }
-      : { kind: 'quiet', month: month.month, numeral: `${month.month}月` },
+      : { kind: 'quiet', month: month.month, numeral: tr("{0}月", [month.month]) },
   );
   return {
     year: view.year,
@@ -56,7 +57,7 @@ export function lookbackYearPage(view: HistoryYearView): LookbackYearPage {
       .filter((month) => month.status === 'filled')
       .map((month) => ({
         month: month.month,
-        label: `${month.month}月`,
+        label: tr("{0}月", [month.month]),
         count: month.count,
         summary: month.summary,
       })),

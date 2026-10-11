@@ -64,6 +64,14 @@ async function requireOwnedMedia(
   if (row.ownerUserId !== userId) {
     throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'This media object is not available.');
   }
+  const refs = await tx.listSharesReferencingMedia(objectId);
+  if (refs.length) {
+    let live = false;
+    for (const ref of refs) {
+      if ((await tx.findFamily(ref.familyId))?.status === 'active') { live = true; break; }
+    }
+    if (!live) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'This media object is not available.');
+  }
   return row;
 }
 
@@ -109,13 +117,14 @@ export function createMediaCommands(deps: {
   objectId?: () => string;
   assertPayload: (bytes: Uint8Array | undefined, mime: string | undefined) => string;
   testAccountLoginEnabled?: boolean;
+  operatorOnly?: boolean;
 }): MediaCommands {
   const clock = deps.clock ?? { now: () => new Date() };
   const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
 
   return {
     async uploadMedia(sessionToken, input) {
-      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled, deps.operatorOnly);
       const mime = deps.assertPayload(input.bytes, input.mimeType);
       const bytes = input.bytes;
       const sha256 = sha256MediaBytes(bytes);
@@ -153,8 +162,13 @@ export function createMediaCommands(deps: {
         return { kind: 'create' as const, userId };
       });
       if (prepared.kind === 'reuse') {
-        await requireReadableOrRestore(deps.blobs, prepared.row, bytes);
-        return toView(prepared.row);
+        return deps.repository.withTransaction(async tx => {
+          const current = await tx.findMediaObject(prepared.row.objectId);
+          const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
+          if (!current || current.ownerUserId !== userId) throw new FamilyError(FAMILY_ERROR.MEDIA_NOT_FOUND, 'Media object was not found.');
+          await requireReadableOrRestore(deps.blobs, current, bytes);
+          return toView(current);
+        });
       }
 
       const objectId = (deps.objectId ?? newObjectId)();
@@ -224,28 +238,32 @@ export function createMediaCommands(deps: {
       }
       if (row.storageKey !== objectId) {
         await deps.blobs.remove(objectId);
-        await requireReadableOrRestore(deps.blobs, row, bytes);
+        await deps.repository.withTransaction(async tx => {
+          const current = await tx.findMediaObject(row.objectId);
+          if (!current) throw new FamilyError(FAMILY_ERROR.MEDIA_NOT_FOUND, 'Media object was not found.');
+          await requireReadableOrRestore(deps.blobs, current, bytes);
+        });
       }
       return toView(row);
     },
 
     async getMediaObject(sessionToken, objectId) {
-      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled, deps.operatorOnly);
       return deps.repository.withTransaction(async (tx) => {
         return toView(await requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled));
       });
     },
 
     async getMediaContent(sessionToken, objectId) {
-      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
-      const row = await deps.repository.withTransaction(async (tx) => {
-        return requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled);
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled, deps.operatorOnly);
+      return deps.repository.withTransaction(async tx => {
+        const row = await requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled);
+        const bytes = await deps.blobs.read(row.storageKey);
+        if (bytes.length !== row.byteLength || sha256MediaBytes(bytes) !== row.contentSha256) {
+          throw new FamilyError(FAMILY_ERROR.MEDIA_NOT_FOUND, 'Media object was not found.');
+        }
+        return { mimeType: row.mimeType, bytes };
       });
-      const bytes = await deps.blobs.read(row.storageKey);
-      if (bytes.length !== row.byteLength || sha256MediaBytes(bytes) !== row.contentSha256) {
-        throw new FamilyError(FAMILY_ERROR.MEDIA_NOT_FOUND, 'Media object was not found.');
-      }
-      return { mimeType: row.mimeType, bytes };
     },
   };
 }

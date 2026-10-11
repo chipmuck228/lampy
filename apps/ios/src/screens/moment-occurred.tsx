@@ -1,3 +1,4 @@
+import { tr, appLanguage, weekdayLabel, dateLabel } from '../i18n';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
@@ -13,7 +14,7 @@ import {
 } from '../application/occurred-date';
 import { daysInMonth } from '../domain-adapters/calendar';
 
-const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
+const WEEKDAYS = appLanguage === 'en' ? Array.from({ length: 7 }, (_, index) => weekdayLabel(index, true)) : ['一', '二', '三', '四', '五', '六', '日'];
 
 function shiftMonth(parts: CalendarDayParts, delta: number): CalendarDayParts {
   const next = new Date(Date.UTC(parts.year, parts.month - 1 + delta, 1));
@@ -72,7 +73,7 @@ export function OccurredDatePicker({
     <View style={styles.block}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="这件事发生在哪一天"
+        accessibilityLabel={tr("这件事发生在哪一天")}
         accessibilityState={{ expanded: open, disabled: !!disabled }}
         testID="composer-occurred-toggle"
         disabled={disabled}
@@ -87,8 +88,7 @@ export function OccurredDatePicker({
         <View style={styles.toggleRow}>
           <View style={styles.toggleCopy}>
             <Text key={`occurred-heading-${layoutRevision ?? 1}`} style={styles.heading}>
-              发生日期
-            </Text>
+              {tr("发生日期")}</Text>
             <Text key={`occurred-chosen-${layoutRevision ?? 1}`} style={styles.chosen} accessible={false}>
               {value.label}
             </Text>
@@ -101,19 +101,19 @@ export function OccurredDatePicker({
       <View style={styles.chips}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={value.kind === 'today' ? '发生日期，今天，已选中' : '发生日期，今天'}
+          accessibilityLabel={value.kind === 'today' ? tr("发生日期，今天，已选中") : tr("发生日期，今天")}
           accessibilityState={{ selected: value.kind === 'today', disabled: !!disabled }}
           testID="composer-occurred-today"
           disabled={disabled}
           onPress={() => onChange({ kind: 'today' })}
           style={[styles.chip, value.kind === 'today' && styles.chipSelected]}
         >
-          <Text style={[styles.chipText, value.kind === 'today' && styles.chipTextSelected]}>今天</Text>
+          <Text style={[styles.chipText, value.kind === 'today' && styles.chipTextSelected]}>{tr("今天")}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            value.kind === 'unknown' ? '发生日期，时间不确定，已选中' : '发生日期，时间不确定'
+            value.kind === 'unknown' ? tr("发生日期，时间不确定，已选中") : tr("发生日期，时间不确定")
           }
           accessibilityState={{ selected: value.kind === 'unknown', disabled: !!disabled }}
           testID="composer-occurred-unknown"
@@ -122,13 +122,12 @@ export function OccurredDatePicker({
           style={[styles.chip, value.kind === 'unknown' && styles.chipSelected]}
         >
           <Text style={[styles.chipText, value.kind === 'unknown' && styles.chipTextSelected]}>
-            时间不确定
-          </Text>
+            {tr("时间不确定")}</Text>
         </Pressable>
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="选择过去的一天"
+        accessibilityLabel={tr("选择过去的一天")}
         accessibilityState={{ disabled: !!disabled, expanded: calendarOpen }}
         testID="composer-occurred-pick"
         disabled={disabled}
@@ -138,27 +137,26 @@ export function OccurredDatePicker({
         }}
         style={styles.pickHit}
       >
-        <Text style={styles.pick}>{calendarOpen ? '收起日期' : '选择过去的一天'}</Text>
+        <Text style={styles.pick}>{calendarOpen ? tr("收起日期") : tr("选择过去的一天")}</Text>
       </Pressable>
       {calendarOpen ? (
         <View testID="composer-occurred-calendar" style={styles.calendar}>
           <View style={styles.monthRow}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="上个月"
+              accessibilityLabel={tr("上个月")}
               testID="composer-occurred-prev-month"
               disabled={disabled}
               onPress={() => setVisibleMonth(prevMonth)}
               style={styles.monthHit}
             >
-              <Text style={styles.monthNav}>上个月</Text>
+              <Text style={styles.monthNav}>{tr("上个月")}</Text>
             </Pressable>
             <Text style={styles.monthTitle}>
-              {visibleMonth.year}年{visibleMonth.month}月
-            </Text>
+              {dateLabel(visibleMonth.year, visibleMonth.month)}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="下个月"
+              accessibilityLabel={tr("下个月")}
               testID="composer-occurred-next-month"
               disabled={disabled || !canGoNext}
               onPress={() => {
@@ -166,7 +164,7 @@ export function OccurredDatePicker({
               }}
               style={styles.monthHit}
             >
-              <Text style={[styles.monthNav, !canGoNext && styles.monthNavDisabled]}>下个月</Text>
+              <Text style={[styles.monthNav, !canGoNext && styles.monthNavDisabled]}>{tr("下个月")}</Text>
             </Pressable>
           </View>
           <View style={styles.weekRow}>
@@ -200,10 +198,10 @@ export function OccurredDatePicker({
                   accessibilityRole="button"
                   accessibilityLabel={
                     future
-                      ? `${parts.month}月${day}日，还没到`
+                      ? tr("{0}月{1}日，还没到", [parts.month, day])
                       : selected
-                        ? `${parts.month}月${day}日，已选中`
-                        : `${parts.month}月${day}日`
+                        ? tr("{0}月{1}日，已选中", [parts.month, day])
+                        : tr("{0}月{1}日", [parts.month, day])
                   }
                   accessibilityState={{ disabled: !!disabled || future, selected }}
                   testID={`composer-occurred-day-${parts.year}-${parts.month}-${day}`}

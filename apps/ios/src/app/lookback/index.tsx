@@ -1,3 +1,4 @@
+import { tr } from '../../i18n';
 import { leaveVoiceHref } from '../../screens/leave-voice-intent';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -853,7 +854,7 @@ export default function LookbackIndexScreen() {
       })
       .catch(() => {
         if (generation !== bookLoadGeneration.current || !mounted.current) return;
-        setError('回看暂时读不出来，原来的记录还在。');
+        setError(tr("回看暂时读不出来，原来的记录还在。"));
       });
   }, [applyIntent, loadScope]);
   useEffect(() => {
@@ -988,8 +989,8 @@ export default function LookbackIndexScreen() {
             {chapter.yearUnconfirmedCount > 0 ? (
               <LookbackCatalogSplitRow
                 left={chapter.yearUnconfirmedLabel}
-                right={`${chapter.yearUnconfirmedCount}条`}
-                accessibilityLabel={`${chapter.yearUnconfirmedLabel}，有${chapter.yearUnconfirmedCount}条记录`}
+                right={tr("{0}条", [chapter.yearUnconfirmedCount])}
+                accessibilityLabel={tr("{0}，有{1}条记录", [chapter.yearUnconfirmedLabel, chapter.yearUnconfirmedCount])}
                 testID={`lookback-book-year-unconfirmed-${chapter.year}`}
                 onPress={() =>
                   void loadScope(
@@ -1016,18 +1017,17 @@ export default function LookbackIndexScreen() {
                   />
                   {loading ? (
                     <Text testID="lookback-book-month-loading" style={lookbackStyles.action}>
-                      这个月正在读出来。
-                    </Text>
+                      {tr("这个月正在读出来。")}</Text>
                   ) : null}
                   {failed ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="重试打开这个月"
+                      accessibilityLabel={tr("重试打开这个月")}
                       testID="lookback-book-month-retry"
                       onPress={() => void loadMonth(chapter.year, month.month)}
                       style={lookbackStyles.hit}
                     >
-                      <Text style={lookbackStyles.action}>这个月暂时读不出来，原来的记录还在。再试一次</Text>
+                      <Text style={lookbackStyles.action}>{tr("这个月暂时读不出来，原来的记录还在。再试一次")}</Text>
                     </Pressable>
                   ) : null}
                   {open ? (
@@ -1035,8 +1035,8 @@ export default function LookbackIndexScreen() {
                       {readyExpand.page.dayUnconfirmedCount > 0 ? (
                         <LookbackCatalogSplitRow
                           left={readyExpand.page.dayUnconfirmedLabel}
-                          right={`${readyExpand.page.dayUnconfirmedCount}条`}
-                          accessibilityLabel={`${readyExpand.page.dayUnconfirmedLabel}，有${readyExpand.page.dayUnconfirmedCount}条记录`}
+                          right={tr("{0}条", [readyExpand.page.dayUnconfirmedCount])}
+                          accessibilityLabel={tr("{0}，有{1}条记录", [readyExpand.page.dayUnconfirmedLabel, readyExpand.page.dayUnconfirmedCount])}
                           testID={`lookback-book-day-unconfirmed-${chapter.year}-${pad2(month.month)}`}
                           onPress={() =>
                             void loadScope(
@@ -1085,11 +1085,11 @@ export default function LookbackIndexScreen() {
         ))}
         {view && view.unknownCount > 0 ? (
           <>
-            <LookbackCatalogNoteRow left="时间未确认" right="按已知范围保留" />
+            <LookbackCatalogNoteRow left={tr("时间未确认")} right={tr("按已知范围保留")} />
             <LookbackCatalogSplitRow
-              left="时间未确认"
-              right={`${view.unknownCount}条`}
-              accessibilityLabel={`时间未确认，有${view.unknownCount}条记录`}
+              left={tr("时间未确认")}
+              right={tr("{0}条", [view.unknownCount])}
+              accessibilityLabel={tr("时间未确认，有{0}条记录", [view.unknownCount])}
               testID="lookback-unconfirmed"
               onPress={() => void loadScope({ kind: 'unknown' }, { count: view.unknownCount })}
             />
@@ -1100,9 +1100,9 @@ export default function LookbackIndexScreen() {
 
   return (
     <LookbackScaffold
-      title="回看"
-      kicker="LAMPY · 时间里的记录"
-      subtitle="慢慢看"
+      title={tr("回看")}
+      kicker={tr("LAMPY · 时间里的记录")}
+      subtitle={tr("慢慢看")}
       path="/lookback"
       root
       locateKey={catalogOpen ? null : locateKey}
@@ -1178,20 +1178,20 @@ export default function LookbackIndexScreen() {
       {error ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="重试打开回看"
+          accessibilityLabel={tr("重试打开回看")}
           testID="lookback-book-retry"
           onPress={() => {
             void loadBook();
           }}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>回看暂时读不出来，原来的记录还在。再试一次</Text>
+          <Text style={lookbackStyles.action}>{tr("回看暂时读不出来，原来的记录还在。再试一次")}</Text>
         </Pressable>
       ) : null}
       {emptyLibrary ? (
         <View testID="lookback-empty">
-          <LookbackMessage>日子会慢慢留在这里。</LookbackMessage>
-          <LookbackMessage>先留下一点，以后再回来看看。</LookbackMessage>
+          <LookbackMessage>{tr("日子会慢慢留在这里。")}</LookbackMessage>
+          <LookbackMessage>{tr("先留下一点，以后再回来看看。")}</LookbackMessage>
         </View>
       ) : null}
       <Animated.View
@@ -1202,12 +1202,12 @@ export default function LookbackIndexScreen() {
         }}
       >
       {reading.status === 'loading' ? (
-        <LookbackMessage testID="lookback-reading-loading">这一天正在读出来。</LookbackMessage>
+        <LookbackMessage testID="lookback-reading-loading">{tr("这一天正在读出来。")}</LookbackMessage>
       ) : null}
       {reading.status === 'error' ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="重试打开回看"
+          accessibilityLabel={tr("重试打开回看")}
           testID="lookback-reading-retry"
           onPress={() => {
             if (reading.retry === 'search' && view) void runDefault(view);
@@ -1215,12 +1215,12 @@ export default function LookbackIndexScreen() {
           }}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>这一天暂时读不出来，原来的记录还在。再试一次</Text>
+          <Text style={lookbackStyles.action}>{tr("这一天暂时读不出来，原来的记录还在。再试一次")}</Text>
         </Pressable>
       ) : null}
-      {reading.status === 'invalid' ? <LookbackMessage>日历上没有这一天。</LookbackMessage> : null}
+      {reading.status === 'invalid' ? <LookbackMessage>{tr("日历上没有这一天。")}</LookbackMessage> : null}
       {reading.status === 'empty' ? (
-        <LookbackMessage testID="lookback-reading-empty">这一天还没有留下什么。</LookbackMessage>
+        <LookbackMessage testID="lookback-reading-empty">{tr("这一天还没有留下什么。")}</LookbackMessage>
       ) : null}
       <View ref={readingTitleRef} collapsable={false}>
         {selectedDay && (readyReading || reading.status === 'empty' || reading.status === 'error') ? (
@@ -1294,23 +1294,23 @@ export default function LookbackIndexScreen() {
       {readyReading?.moreError ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="继续往下看，再试一次"
+          accessibilityLabel={tr("继续往下看，再试一次")}
           testID="lookback-reading-more-retry"
           onPress={() => void loadMore()}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>后面的记录暂时读不出来。再试一次</Text>
+          <Text style={lookbackStyles.action}>{tr("后面的记录暂时读不出来。再试一次")}</Text>
         </Pressable>
       ) : null}
       {readyReading?.hasMore && !readyReading.moreError && !readyReading.moreLoading ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="继续往下看"
+          accessibilityLabel={tr("继续往下看")}
           testID="lookback-reading-more"
           onPress={() => void loadMore()}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>继续往下看</Text>
+          <Text style={lookbackStyles.action}>{tr("继续往下看")}</Text>
         </Pressable>
       ) : null}
       {selectedDay && readyReading && neighborError ? (

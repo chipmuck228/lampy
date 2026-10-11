@@ -1,3 +1,4 @@
+import { tr } from '../../../../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 import { Text } from '../../../../screens/life-text';
@@ -155,7 +156,7 @@ export default function LookbackDayScreen() {
           });
           setCount(resolved);
           if (!restored.ok && restored.items.length === 0) {
-            setError('这一天暂时读不出来，原来的记录还在。');
+            setError(tr("这一天暂时读不出来，原来的记录还在。"));
             return;
           }
           setError(null);
@@ -185,7 +186,7 @@ export default function LookbackDayScreen() {
             setError(null);
             return;
           }
-          setError('这一天暂时读不出来，原来的记录还在。');
+          setError(tr("这一天暂时读不出来，原来的记录还在。"));
         });
       void refreshNeighbors();
       return () => {
@@ -263,7 +264,7 @@ export default function LookbackDayScreen() {
 
   return (
     <LookbackScaffold
-      title="回看"
+      title={tr("回看")}
       path={path}
       onBack={leaveDay}
       pendingRestoreY={pendingRestoreY}
@@ -276,7 +277,7 @@ export default function LookbackDayScreen() {
       {error ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="重试打开这一天"
+          accessibilityLabel={tr("重试打开这一天")}
           testID="lookback-day-retry"
           onPress={() => {
             setError(null);
@@ -284,11 +285,11 @@ export default function LookbackDayScreen() {
           }}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>这一天暂时读不出来，原来的记录还在。再试一次</Text>
+          <Text style={lookbackStyles.action}>{tr("这一天暂时读不出来，原来的记录还在。再试一次")}</Text>
         </Pressable>
       ) : null}
-      {invalid ? <LookbackMessage>日历上没有这一天。</LookbackMessage> : null}
-      {empty ? <LookbackMessage>这一天还没有留下什么。</LookbackMessage> : null}
+      {invalid ? <LookbackMessage>{tr("日历上没有这一天。")}</LookbackMessage> : null}
+      {empty ? <LookbackMessage>{tr("这一天还没有留下什么。")}</LookbackMessage> : null}
       {!invalid && !empty && !error ? (
         <LookbackReadingHeader year={year} month={month} day={day} count={count} />
       ) : null}
@@ -321,23 +322,23 @@ export default function LookbackDayScreen() {
       {moreError ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="继续往下看，再试一次"
+          accessibilityLabel={tr("继续往下看，再试一次")}
           testID="lookback-day-more"
           onPress={() => void loadMore({ retry: true })}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>后面的记录暂时读不出来。再试一次</Text>
+          <Text style={lookbackStyles.action}>{tr("后面的记录暂时读不出来。再试一次")}</Text>
         </Pressable>
       ) : null}
       {hasMore && !moreError && !moreLoading ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="继续往下看"
+          accessibilityLabel={tr("继续往下看")}
           testID="lookback-day-more"
           onPress={() => void loadMore()}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>继续往下看</Text>
+          <Text style={lookbackStyles.action}>{tr("继续往下看")}</Text>
         </Pressable>
       ) : null}
       {neighborError ? (

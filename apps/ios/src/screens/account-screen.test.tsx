@@ -544,5 +544,59 @@ describe('account screen', () => {
     expect(view.queryByLabelText('开发诊断')).toBeNull();
     expect(view.queryByTestId('account-diagnostics')).toBeNull();
   });
+  it('returns to an invitation only after committed Apple login, not cancellation', async()=>{
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://family.example.com';
+    mockFamily.getMembership.mockResolvedValue({kind:'unauthenticated'});
+    mockFamily.signInWithApple.mockResolvedValue({sessionToken:'ses'});
+    const completed=jest.fn(),cancel=jest.fn();
+    const view=await render(wrap(<AccountScreen variant="diagnostics" onAuthenticated={completed} onCancel={cancel}/>));
+    await waitFor(()=>expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy());
+    expect(view.queryByTestId('account-family-preview')).toBeNull();
+    await fireEvent.press(view.getByLabelText('通过 Apple 登录'));
+    await waitFor(()=>expect(completed).toHaveBeenCalledTimes(1));
+    expect(cancel).not.toHaveBeenCalled();
+  });
+  it('failed invitation login stays on the identity screen', async()=>{
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://family.example.com';
+    mockFamily.getMembership.mockResolvedValue({kind:'unauthenticated'});
+    mockFamily.signInWithApple.mockRejectedValue(new Error('cancelled'));
+    const completed=jest.fn();
+    const view=await render(wrap(<AccountScreen variant="diagnostics" onAuthenticated={completed}/>));
+    await waitFor(()=>expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy());
+    await fireEvent.press(view.getByLabelText('通过 Apple 登录'));
+    await waitFor(()=>expect(view.getByTestId('account-message')).toBeTruthy());
+    expect(completed).not.toHaveBeenCalled();
+  });
+
+  it('committed controlled test login returns to the invitation', async()=>{
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://family.example.com';
+    mockFamily.getMembership.mockResolvedValue({kind:'unauthenticated'});
+    mockFamily.getAuthHealth.mockResolvedValue({ok:true,slice:'identity-membership',media:true,shares:true,inbox:true,testAccountLogin:true,testAccountLoginReason:'enabled',argon2id:{t:2,m:19456,p:1,dkLen:32}});
+    mockFamily.signInWithTestAccount.mockResolvedValue({sessionToken:'ses'});
+    const completed=jest.fn();
+    const view=await render(wrap(<AccountScreen variant="diagnostics" onAuthenticated={completed}/>));
+    await waitFor(()=>expect(view.getByTestId('account-test-login-submit')).toBeTruthy());
+    await fireEvent.changeText(view.getByTestId('account-test-login-input'),'tester');
+    await fireEvent.changeText(view.getByTestId('account-password-input'),'test-password');
+    await fireEvent.press(view.getByTestId('account-test-login-submit'));
+    await waitFor(()=>expect(completed).toHaveBeenCalledTimes(1));
+    expect(mockFamily.signInWithTestAccount).toHaveBeenCalledWith('tester','test-password');
+  });
+  it('cancel invalidates a login still in flight', async()=>{
+    process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://family.example.com';
+    mockFamily.getMembership.mockResolvedValue({kind:'unauthenticated'});
+    let done!:(value:unknown)=>void;
+    mockFamily.signInWithApple.mockImplementation(()=>new Promise(r=>{done=r;}));
+    const completed=jest.fn(),cancel=jest.fn();
+    const view=await render(wrap(<AccountScreen variant="diagnostics" onAuthenticated={completed} onCancel={cancel}/>));
+    await waitFor(()=>expect(view.getByLabelText('通过 Apple 登录')).toBeTruthy());
+    await fireEvent.press(view.getByLabelText('通过 Apple 登录'));
+    await waitFor(()=>expect(mockFamily.signInWithApple).toHaveBeenCalledTimes(1));
+    await fireEvent.press(view.getByTestId('account-back'));
+    await act(async()=>{done({sessionToken:'ses'});});
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(completed).not.toHaveBeenCalled();
+  });
+
 });
 

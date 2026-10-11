@@ -1,0 +1,73 @@
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { AppState, Share } from 'react-native';
+import FamilyInvitationsScreen from './family-invitations-screen';
+const mockCreate=jest.fn(),mockList=jest.fn(),mockRevoke=jest.fn(),mockRead=jest.fn(),mockSave=jest.fn();
+jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({inviteLinkAccount:async()=>'a',listInviteLinks:mockList,createInviteLink:mockCreate,revokeInviteLink:mockRevoke})}));
+jest.mock('../infrastructure/secure-invite-share',()=>({readInviteShare:(...args:any[])=>mockRead(...args),saveInviteShare:(...args:any[])=>mockSave(...args),removeInviteShare:jest.fn()}));
+jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>true}));
+jest.mock('./device-lock-context',()=>({useDeviceLock:()=>({snapshot:{locked:false}})}));
+jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
+jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useRouter:()=>({dismissTo:jest.fn()}),useLocalSearchParams:()=>({familyId:'f'}),useFocusEffect:(fn:()=>void)=>useEffect(fn,[fn])};});
+const item={invitationId:'i',familyId:'f',status:'pending',expiresAt:'2026-10-15T00:00:00Z'};
+const data={link:'http://127.0.0.1:8787/invite#'+'a'.repeat(64),qr:'data:image/png;base64,AA=='};
+beforeEach(()=>{jest.clearAllMocks();Object.defineProperty(AppState,'currentState',{configurable:true,value:'active',writable:true});mockList.mockResolvedValue([]);mockRead.mockResolvedValue(data);mockSave.mockResolvedValue(undefined);mockCreate.mockResolvedValue({...item,...data});mockRevoke.mockResolvedValue({});});
+it('saves new QR securely and shares only a single message',async()=>{
+ const share=jest.spyOn(Share,'share').mockResolvedValue({action:Share.sharedAction});
+ const page=await render(<FamilyInvitationsScreen/>);
+ await waitFor(()=>expect(page.getByTestId('invite-create')).toBeEnabled());
+ await fireEvent.press(page.getByTestId('invite-create'));
+ await waitFor(()=>expect(page.getByTestId('created-invitation')).toBeTruthy());
+ expect(mockSave).toHaveBeenCalledWith('a','f','i',data);
+ await fireEvent.press(page.getByText('分享'));
+ await waitFor(()=>expect(share).toHaveBeenCalledWith({message:data.link}));
+ await page.unmount();share.mockRestore();
+});
+it('restores a cached QR on row expansion without generating a new invite',async()=>{
+ mockList.mockResolvedValue([item]);
+ const page=await render(<FamilyInvitationsScreen/>);
+ await waitFor(()=>expect(page.getByTestId('invite-row-i')).toBeTruthy());
+ expect(page.queryByText('撤销邀请')).toBeNull();
+ await fireEvent.press(page.getByTestId('invite-row-i'));
+ expect(page.getByTestId('created-invitation')).toBeTruthy();
+ expect(page.getByText('撤销邀请')).toBeTruthy();
+ expect(page.queryByText('重新生成并分享')).toBeNull();
+ expect(mockCreate).not.toHaveBeenCalled();
+});
+it('used rows have no share or revoke even when expanded and retain accessible status',async()=>{
+ mockList.mockResolvedValue([{...item,status:'accepted'}]);
+ const page=await render(<FamilyInvitationsScreen/>);
+ await waitFor(()=>expect(page.getByTestId('invite-row-i')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('invite-row-i'));
+ expect(page.queryByText('撤销邀请')).toBeNull();expect(page.queryByText('分享')).toBeNull();
+ expect(page.queryByText('已使用')).toBeNull();
+ expect(page.getByTestId('invite-row-i').props.accessibilityLabel).toContain('已使用');
+});
+it('old unsaved invitations do not fabricate QR and list failure has reload',async()=>{
+ mockList.mockResolvedValueOnce([item]);mockRead.mockResolvedValue(null);
+ const page=await render(<FamilyInvitationsScreen/>);
+ await waitFor(()=>expect(page.getByTestId('invite-row-i')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('invite-row-i'));
+ expect(page.queryByTestId('created-invitation')).toBeNull();
+ expect(page.getByText('本机没有保存这份邀请。可撤销后另建一份。')).toBeTruthy();
+ mockList.mockRejectedValueOnce(new Error('offline'));
+ await fireEvent.press(page.getByTestId('invite-refresh'));
+ await waitFor(()=>expect(page.getByText('重新加载')).toBeTruthy());
+});
+
+it('failed refresh disables stale rows without claiming a cached invitation was not saved',async()=>{
+ mockList.mockResolvedValueOnce([item]);
+ const page=await render(<FamilyInvitationsScreen/>);
+ await waitFor(()=>expect(page.getByTestId('invite-create')).toBeEnabled());
+ await fireEvent.press(page.getByTestId('invite-row-i'));
+ expect(page.getByTestId('created-invitation')).toBeTruthy();
+ mockList.mockRejectedValueOnce(new Error('offline'));
+ await fireEvent.press(page.getByTestId('invite-refresh'));
+ await waitFor(()=>expect(page.getByText('重新加载')).toBeTruthy());
+ expect(page.getByTestId('invite-row-i')).toBeDisabled();
+ expect(page.queryByText('本机没有保存这份邀请。可撤销后另建一份。')).toBeNull();
+ mockList.mockResolvedValueOnce([item]);
+ await fireEvent.press(page.getByText('重新加载'));
+ await waitFor(()=>expect(page.getByTestId('invite-create')).toBeEnabled());
+ await fireEvent.press(page.getByTestId('invite-row-i'));
+ expect(page.getByTestId('created-invitation')).toBeTruthy();
+});

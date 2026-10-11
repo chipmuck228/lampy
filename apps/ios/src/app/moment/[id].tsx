@@ -1,3 +1,4 @@
+import { tr } from '../../i18n';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, type } from '../../screens/life-text';
@@ -13,6 +14,7 @@ import { MomentFeeling } from '../../screens/moment-feeling';
 import { MomentImages } from '../../screens/moment-images';
 import {
   ink,
+  hairline,
   inkSoft,
   isCompactHeight,
   pageGutter,
@@ -56,7 +58,7 @@ export default function MomentDetailScreen() {
   }, [momentId, loadKey]);
 
   return (
-    <SafeAreaView style={styles.safe} accessibilityLabel="记录">
+    <SafeAreaView style={styles.safe} accessibilityLabel={tr("记录")}>
       <View
         style={[
           styles.chrome,
@@ -69,11 +71,11 @@ export default function MomentDetailScreen() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="返回原来的位置"
+          accessibilityLabel={tr("返回原来的位置")}
           onPress={() => router.back()}
           style={styles.backHit}
         >
-          <Text style={styles.back}>返回原来的位置</Text>
+          <Text style={styles.back}>{tr("返回原来的位置")}</Text>
         </Pressable>
         {view?.kind === 'ready' ? (
           <LifeIconButton
@@ -100,22 +102,22 @@ export default function MomentDetailScreen() {
       >
         {view?.kind === 'missing' ? (
           <View style={styles.block}>
-            <Text style={styles.title}>这条记录现在无法找到。</Text>
-            <Text style={styles.body}>没有改成显示其他记录。</Text>
+            <Text style={styles.title}>{tr("这条记录现在无法找到。")}</Text>
+            <Text style={styles.body}>{tr("没有改成显示其他记录。")}</Text>
           </View>
         ) : null}
 
         {view?.kind === 'error' ? (
           <View style={styles.block}>
-            <Text style={styles.title}>这条记录暂时读不出来。</Text>
-            <Text style={styles.body}>原来的内容还在，可以再试。没有把它当成已经丢失。</Text>
+            <Text style={styles.title}>{tr("这条记录暂时读不出来。")}</Text>
+            <Text style={styles.body}>{tr("原来的内容还在，可以再试。没有把它当成已经丢失。")}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="再试一次"
+              accessibilityLabel={tr("再试一次")}
               onPress={() => setLoadKey((value) => value + 1)}
               style={styles.retryHit}
             >
-              <Text style={styles.retry}>再试一次</Text>
+              <Text style={styles.retry}>{tr("再试一次")}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -123,9 +125,15 @@ export default function MomentDetailScreen() {
         {view?.kind === 'ready' ? (
           <View style={styles.page}>
             <View style={styles.entry}>
+              <View style={styles.dateRow} testID="detail-date-row">
               <Text accessibilityRole="header" style={styles.date}>
                 {view.dateLabel}
               </Text>
+              {isFamilyProductEntryOpen() ? <Pressable accessibilityRole="button" accessibilityLabel={tr('分享')}
+                testID="moment-share-top" onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)} style={styles.shareHit}>
+                <View style={styles.shareLabel}><Text style={styles.share}>{tr('分享')}</Text><View style={styles.shareUnderline} accessible={false} /></View>
+              </Pressable> : null}
+              </View>
               {detailPrecisionLine(view.precision) ? (
                 <Text testID="detail-precision" style={styles.precision}>
                   {detailPrecisionLine(view.precision)}
@@ -152,21 +160,21 @@ export default function MomentDetailScreen() {
               testIDPrefix="detail-sound"
               scene
             />
-            <View style={styles.secondary}>
-              <MomentFeeling feeling={view.feeling} testID="detail-feeling" />
-              <Text style={styles.meta}>{view.sourceLabel}</Text>
-            </View>
+            <View style={styles.secondary} testID="detail-feeling-share-row">
+              <View style={styles.feelingColumn}><MomentFeeling feeling={view.feeling} testID="detail-feeling" /></View>
             {isFamilyProductEntryOpen() ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="分享给家里"
+                accessibilityLabel={tr('分享')}
                 testID="moment-share-to-family"
                 onPress={() => router.push(`/share/${encodeURIComponent(view.id)}`)}
                 style={styles.shareHit}
               >
-                <Text style={styles.share}>分享给家里</Text>
+                <View style={styles.shareLabel}><Text style={styles.share}>{tr('分享')}</Text><View style={styles.shareUnderline} accessible={false} /></View>
               </Pressable>
             ) : null}
+            </View>
+            <View testID="detail-end-line" style={styles.endLine} accessible={false} accessibilityElementsHidden importantForAccessibility="no" />
           </View>
         ) : null}
       </ScrollView>
@@ -205,15 +213,20 @@ const styles = StyleSheet.create({
   block: { gap: 12, width: '100%', maxWidth: '100%', minWidth: 0 },
   page: { gap: 24, width: '100%', maxWidth: '100%', minWidth: 0 },
   entry: { gap: 4, width: '100%' },
+  dateRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:16},
+  endLine:{width:48,alignSelf:'center',height:StyleSheet.hairlineWidth,backgroundColor:hairline,marginTop:8,marginBottom:16},
   title: { ...type.title, color: ink, flexShrink: 0 },
   body: { ...type.action, color: inkSoft },
-  date: { ...type.title, color: sage, flexShrink: 0 },
+  date: { ...type.title, color: sage, flexShrink: 1 },
   precision: { ...type.meta, color: inkSoft },
   note: { ...type.body, color: ink },
-  secondary: { gap: 8, width: '100%' },
+  secondary: { gap: 16, width: '100%',flexDirection:'row',justifyContent:'space-between',alignItems:'center' },
+  feelingColumn:{flex:1,minWidth:0},
   meta: { ...type.meta, color: inkSoft },
   retryHit: { minHeight: 44, justifyContent: 'center' },
   retry: { ...type.action, color: sage },
-  shareHit: { minHeight: 44, justifyContent: 'center' },
-  share: { ...type.action, color: sage },
+  shareHit: { minHeight: 48, minWidth:48, justifyContent: 'center',alignItems:'center' },
+  share: { ...type.meta, color: sage },
+  shareLabel:{alignItems:'stretch',gap:5},
+  shareUnderline:{height:StyleSheet.hairlineWidth,backgroundColor:sage,opacity:0.55},
 });

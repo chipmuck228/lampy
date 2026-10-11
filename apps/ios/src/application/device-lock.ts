@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 export type DeviceLockSetting = 'unknown' | 'off' | 'on';
 
 export type DeviceAuthResult =
@@ -101,22 +102,22 @@ export type DeviceLockSession = ReturnType<typeof createDeviceLockSession>;
 export function deviceLockCopy(result: DeviceAuthResult) {
   if (result.ok) return null;
   if (result.reason === 'no-passcode') {
-    return '这台设备还没有设置密码或 Face ID。记录还在。先在系统设置里加上设备密码，再回来重试。';
+    return tr("这台设备还没有设置密码或 Face ID。记录还在。先在系统设置里加上设备密码，再回来重试。");
   }
   if (result.reason === 'unavailable') {
-    return '现在不能用系统认证。记录还在，可以再试一次。';
+    return tr("现在不能用系统认证。记录还在，可以再试一次。");
   }
-  return '这次没有解锁。记录还在，可以再试一次。';
+  return tr("这次没有解锁。记录还在，可以再试一次。");
 }
 
 export function deviceLockPersistCopy() {
-  return '这次没有保存本机保护设置。记录还在，可以再试一次。';
+  return tr("这次没有保存本机保护设置。记录还在，可以再试一次。");
 }
 
 export function deviceLockReadCopy() {
-  return '暂时无法确认本机保护设置，可重试';
+  return tr("暂时无法确认本机保护设置，可重试");
 }
 
 export function deviceLockAuthErrorCopy() {
-  return '这次系统认证没有完成。记录还在，可以再试一次。';
+  return tr("这次系统认证没有完成。记录还在，可以再试一次。");
 }

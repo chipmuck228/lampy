@@ -1,3 +1,4 @@
+import { tr } from '../../../../i18n';
 import { useCallback } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -20,7 +21,7 @@ export default function LookbackMonthUnconfirmedScreen() {
     <LookbackUnconfirmedReading
       scope={{ kind: 'month-unconfirmed', year, month }}
       path={`/lookback/${year}/${pad2(month)}/unconfirmed`}
-      fallbackTitle={`${year}年${month}月，日子未确认`}
+      fallbackTitle={tr("{0}年{1}月，日子未确认", [year, month])}
       moreTestID="lookback-month-unconfirmed-more"
       loadPage={loadPage}
     />

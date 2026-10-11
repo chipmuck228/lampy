@@ -4,6 +4,12 @@ import { ARGON2ID_PRODUCTION, createArgon2idPasswordHasher, type PasswordHasher 
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilyClock, FamilyIds, SignInResult, TestAccountHealth } from './types';
 
+export function requireProfileNickname(raw: string) {
+  const value = raw.normalize('NFC').trim();
+  if (!value || Array.from(value).length > 24 || /[\u0000-\u001f\u007f\u2028\u2029]/.test(value)) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Nickname must be 1 to 24 characters.');
+  return value;
+}
+
 export const TEST_ACCOUNT_AUTH_FAILED_COPY = 'Login name or password is wrong.';
 const RATE_LIMIT_COPY = 'Try again later.';
 const CLOSED_COPY = 'Controlled test-account login is disabled.';
@@ -74,10 +80,14 @@ export async function assertTestAccountSessionAllowed(
   tx: FamilyTx,
   userId: string,
   enabled: boolean,
+  operatorOnly = false,
 ) {
   const credential = await tx.findTestCredentialByUserId(userId);
-  if (!credential) return;
-  if (!enabled || !credential.enabled) {
+  if (!credential) {
+    if (operatorOnly) throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
+    return;
+  }
+  if (!enabled || !credential.enabled || (operatorOnly && !credential.operatorProvisioned)) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
 }
@@ -87,14 +97,19 @@ export async function rejectDisallowedTestAccountSession(
   sessionToken: string | undefined,
   now: Date,
   enabled: boolean,
+  operatorOnly = false,
 ) {
   if (!sessionToken) return;
   const revoked = await repository.withTransaction(async (tx) => {
     const session = await tx.findSession(sessionToken);
     if (!session || new Date(session.expiresAt).getTime() <= now.getTime()) return false;
     const credential = await tx.findTestCredentialByUserId(session.userId);
-    if (!credential) return false;
-    if (enabled && credential.enabled) return false;
+    if (!credential) {
+      if (!operatorOnly) return false;
+      await tx.deleteSessionsForUser(session.userId);
+      return true;
+    }
+    if (enabled && credential.enabled && (!operatorOnly || credential.operatorProvisioned)) return false;
     await tx.deleteSessionsForUser(session.userId);
     return true;
   });
@@ -109,10 +124,14 @@ export function createTestAccountCommands(deps: {
   ids: FamilyIds;
   sessionTtlMs: number;
   testAccountLoginEnabled?: boolean;
+  controlledEmailAccountsEnabled?: boolean;
+  publicTestLoginEnabled?: boolean;
   passwordHasher?: PasswordHasher;
   loginLimit?: { windowMs: number; max: number };
 }) {
-  const enabled = deps.testAccountLoginEnabled === true;
+  const publicEnabled = deps.publicTestLoginEnabled === true;
+  const enabled = deps.testAccountLoginEnabled === true || publicEnabled;
+  const emailEnabled = publicEnabled || (enabled && deps.controlledEmailAccountsEnabled === true);
   const hasher = deps.passwordHasher ?? createArgon2idPasswordHasher();
   const loginLimit = deps.loginLimit ?? DEFAULT_TEST_ACCOUNT_LOGIN_LIMIT;
   const withHashLock = createHashGate();
@@ -123,13 +142,72 @@ export function createTestAccountCommands(deps: {
     await hasher.verify(password, dummyHash);
   }
 
+  async function authenticate(input: { login: string; password: string }): Promise<SignInResult> {
+    if (!enabled) {
+      throw new FamilyError(FAMILY_ERROR.TEST_ACCOUNT_LOGIN_CLOSED, CLOSED_COPY);
+    }
+    const loginNormalized = requireLogin(input.login);
+    const now = deps.clock.now();
+    await incrementLoginRateLimit(deps.repository, `test-login:${loginNormalized}`, now, loginLimit);
+    const passwordOversized = input.password.length > MAX_EMAIL_PASSWORD_LENGTH;
+    return deps.repository.withTransaction(async (tx) => {
+      const credential = await tx.findTestCredentialByLogin(loginNormalized);
+      const ok =
+        credential && !passwordOversized
+          ? await withHashLock(() => hasher.verify(input.password, credential.passwordHash))
+          : await withHashLock(() => burnDummy(passwordOversized ? input.password.slice(0, MAX_EMAIL_PASSWORD_LENGTH) : input.password));
+      if (!credential || !credential.enabled || (publicEnabled && !credential.operatorProvisioned) || !ok) {
+        throw new FamilyError(FAMILY_ERROR.AUTH_FAILED, TEST_ACCOUNT_AUTH_FAILED_COPY);
+      }
+      const session = {
+        token: deps.ids.sessionToken(),
+        userId: credential.userId,
+        expiresAt: iso(new Date(deps.clock.now().getTime() + deps.sessionTtlMs)),
+      };
+      await tx.saveSession(session);
+      return {
+        userId: credential.userId,
+        sessionToken: session.token,
+        expiresAt: session.expiresAt,
+      };
+    });
+  }
+
   return {
     health(): TestAccountHealth & { argon2id: typeof ARGON2ID_PRODUCTION } {
       return {
-        testAccountLogin: enabled,
-        testAccountLoginReason: enabled ? 'enabled' : 'disabled',
+        testAccountLogin: enabled && !publicEnabled,
+        testAccountLoginReason: enabled && !publicEnabled ? 'enabled' : 'disabled',
         argon2id: ARGON2ID_PRODUCTION,
       };
+    },
+
+    async registerControlledEmail(input: { email: string; password: string; nickname: string }, peer = 'unknown'): Promise<SignInResult> {
+      if (!emailEnabled || publicEnabled) throw new FamilyError(FAMILY_ERROR.EMAIL_ACCOUNT_CLOSED, 'Controlled email accounts are disabled.');
+      const loginNormalized = requireLogin(input.email);
+      requirePassword(input.password);
+      const nickname = requireProfileNickname(input.nickname);
+      const now = deps.clock.now();
+      await incrementLoginRateLimit(deps.repository, `email-register-peer:${peer}`, now, { windowMs: 15 * 60 * 1000, max: 8 });
+      await incrementLoginRateLimit(deps.repository, `email-register:${loginNormalized}`, now, { windowMs: 15 * 60 * 1000, max: 4 });
+      const passwordHash = await withHashLock(() => hasher.hash(input.password));
+      return deps.repository.withTransaction(async tx => {
+        if (await tx.findTestCredentialByLogin(loginNormalized)) throw new FamilyError(FAMILY_ERROR.EMAIL_ACCOUNT_EXISTS, 'This account already exists. Sign in instead.');
+        const userId = deps.ids.userId();
+        const createdAt = iso(now);
+        await tx.saveAccount({ userId, createdAt });
+        await tx.saveTestCredential({ credentialId: randomId('tac'), loginNormalized, userId, passwordHash, enabled: true, createdAt });
+        await tx.saveProfile({ userId, nickname, avatar: 'system', updatedAt: createdAt });
+        const session = { token: deps.ids.sessionToken(), userId, expiresAt: iso(new Date(now.getTime() + deps.sessionTtlMs)) };
+        await tx.saveSession(session);
+        return { userId, sessionToken: session.token, expiresAt: session.expiresAt };
+      });
+    },
+
+    async signInWithControlledEmail(input: { email: string; password: string }, peer = 'unknown') {
+      if (!emailEnabled) throw new FamilyError(FAMILY_ERROR.EMAIL_ACCOUNT_CLOSED, 'Controlled email accounts are disabled.');
+      await incrementLoginRateLimit(deps.repository, `email-login-peer:${peer}`, deps.clock.now(), DEFAULT_TEST_ACCOUNT_LOGIN_LIMIT);
+      return authenticate({ login: input.email, password: input.password });
     },
 
     async createTestAccount(login: string, password: string) {
@@ -151,6 +229,7 @@ export function createTestAccountCommands(deps: {
             userId: account.userId,
             passwordHash,
             enabled: true,
+            operatorProvisioned: true,
             createdAt: iso(now),
           });
         } catch (error) {
@@ -178,36 +257,18 @@ export function createTestAccountCommands(deps: {
       });
     },
 
-    async signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult> {
-      if (!enabled) {
-        throw new FamilyError(FAMILY_ERROR.TEST_ACCOUNT_LOGIN_CLOSED, CLOSED_COPY);
-      }
-      const loginNormalized = requireLogin(input.login);
-      const now = deps.clock.now();
-      await incrementLoginRateLimit(deps.repository, `test-login:${loginNormalized}`, now, loginLimit);
-      const passwordOversized = input.password.length > MAX_EMAIL_PASSWORD_LENGTH;
-      return deps.repository.withTransaction(async (tx) => {
+    async revokeTestAccountSessions(login: string) {
+      const loginNormalized = requireLogin(login);
+      return deps.repository.withTransaction(async tx => {
         const credential = await tx.findTestCredentialByLogin(loginNormalized);
-        const ok =
-          credential && !passwordOversized
-            ? await withHashLock(() => hasher.verify(input.password, credential.passwordHash))
-            : await withHashLock(() => burnDummy(passwordOversized ? input.password.slice(0, MAX_EMAIL_PASSWORD_LENGTH) : input.password));
-        if (!credential || !credential.enabled || !ok) {
-          throw new FamilyError(FAMILY_ERROR.AUTH_FAILED, TEST_ACCOUNT_AUTH_FAILED_COPY);
-        }
-        const session = {
-          token: deps.ids.sessionToken(),
-          userId: credential.userId,
-          expiresAt: iso(new Date(deps.clock.now().getTime() + deps.sessionTtlMs)),
-        };
-        await tx.saveSession(session);
-        await tx.deleteOtherSessions(credential.userId, session.token);
-        return {
-          userId: credential.userId,
-          sessionToken: session.token,
-          expiresAt: session.expiresAt,
-        };
+        if (!credential) throw new FamilyError(FAMILY_ERROR.TEST_ACCOUNT_NOT_FOUND, 'Account was not found.');
+        await tx.deleteSessionsForUser(credential.userId);
+        return { revoked: true as const, userId: credential.userId };
       });
+    },
+    async signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult> {
+      if (publicEnabled) throw new FamilyError(FAMILY_ERROR.TEST_ACCOUNT_LOGIN_CLOSED, CLOSED_COPY);
+      return authenticate(input);
     },
   };
 }

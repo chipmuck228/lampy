@@ -1,3 +1,4 @@
+import { appLanguage, dateLabel, tr, feelingLabel } from '../i18n';
 import {
   calendarPartsAt,
   parseMillis,
@@ -5,6 +6,10 @@ import {
 } from '../domain-adapters/calendar';
 import { isFeelingWord } from './feeling-accent';
 import {
+  ALBUM_IMAGE_MISSING,
+  ALBUM_SOURCE_GONE,
+  ALBUM_SOURCE_UNREADABLE,
+  ALBUM_SOURCE_CHANGED,
   ALBUM_AUDIO_LABEL,
   ALBUM_AUDIO_MISSING,
   ALBUM_CLOSE_TEXT,
@@ -37,7 +42,7 @@ import type { LifeAlbum } from './life-album';
 import { diagnoseAlbumFonts } from '../../modules/lampy-album-layout';
 
 function albumResolvedFontFaces(): Pick<AlbumLayout['fontFaces'], 'resolvedSerif' | 'resolvedUi'> {
-  const diagnosis = diagnoseAlbumFonts();
+  const diagnosis = diagnoseAlbumFonts(ALBUM_SERIF_FONT, ALBUM_UI_FONT);
   if (!diagnosis) return {};
   return {
     resolvedSerif: {
@@ -64,7 +69,7 @@ const CONTENT_BOTTOM = ALBUM_MARGIN_TOP_PT + ALBUM_CONTENT_HEIGHT_PT;
 function durationLabel(durationMs: number | null): string {
   if (durationMs == null || !Number.isFinite(durationMs) || durationMs < 0) return '';
   const total = Math.round(durationMs / 1000);
-  if (total < 60) return `${total}秒`;
+  if (total < 60) return tr('{0}秒', [total]);
   const minutes = Math.floor(total / 60);
   const seconds = total % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
@@ -76,11 +81,11 @@ function dateKeyAndLabel(record: AlbumLayoutRecordInput, clock: HistoryClock) {
   const millis = parseMillis(record.occurredAt);
   if (millis == null) return { key: null, label: null };
   const parts = calendarPartsAt(millis, clock);
-  if (precision === 'year') return { key: `y:${parts.year}`, label: `${parts.year}年` };
-  if (precision === 'month') return { key: `m:${parts.year}-${parts.month}`, label: `${parts.year}年${parts.month}月` };
+  if (precision === 'year') return { key: `y:${parts.year}`, label: tr('{0}年', [parts.year]) };
+  if (precision === 'month') return { key: `m:${parts.year}-${parts.month}`, label: dateLabel(parts.year, parts.month) };
   return {
     key: `d:${parts.year}-${parts.month}-${parts.day}`,
-    label: `${parts.year}年${parts.month}月${parts.day}日`,
+    label: dateLabel(parts.year, parts.month, parts.day),
   };
 }
 
@@ -88,7 +93,7 @@ function recordedLabel(record: AlbumLayoutRecordInput, clock: HistoryClock): str
   const millis = parseMillis(record.recordedAt);
   if (millis == null) return null;
   const parts = calendarPartsAt(millis, clock);
-  return `记录于 ${parts.year}年${parts.month}月${parts.day}日`;
+  return tr('记录于 {0}', [dateLabel(parts.year, parts.month, parts.day)]);
 }
 
 function imageSize(ratio: number | null, maxHeightPt = ALBUM_CONTENT_HEIGHT_PT) {
@@ -105,6 +110,8 @@ function imageSize(ratio: number | null, maxHeightPt = ALBUM_CONTENT_HEIGHT_PT) 
 
 export function fingerprintFromInput(album: LifeAlbum, input: AlbumLayoutInput): AlbumSourceFingerprint {
   return {
+    language: appLanguage,
+    fontPolicy: `${ALBUM_SERIF_FONT}|${ALBUM_UI_FONT}|${ALBUM_LAYOUT_VERSION}`,
     name: album.name,
     opening: album.opening,
     cover: album.cover,
@@ -352,7 +359,7 @@ export async function paginateAlbumLayout(
           kind: 'unknown-media',
           momentId: record.momentId,
           assetId: unknown.assetId,
-          label: '还有一种现在打不开的媒介。',
+          label: tr("还有一种现在打不开的媒介。"),
           box: { xPt: CONTENT_LEFT, yPt: y, widthPt: ALBUM_CONTENT_WIDTH_PT, heightPt: albumMetaRole.lineHeightPt },
         },
         albumMetaRole.lineHeightPt,
@@ -364,7 +371,7 @@ export async function paginateAlbumLayout(
         {
           kind: 'feeling',
           momentId: record.momentId,
-          value: record.feeling.trim(),
+          value: feelingLabel(record.feeling.trim()),
           known: isFeelingWord(record.feeling.trim()),
           box: { xPt: CONTENT_LEFT, yPt: y, widthPt: ALBUM_CONTENT_WIDTH_PT, heightPt: albumMetaRole.lineHeightPt },
         },
@@ -412,6 +419,7 @@ export async function paginateAlbumLayout(
 
   return {
     albumId: album.id,
+    language: appLanguage,
     layoutVersion: ALBUM_LAYOUT_VERSION,
     pageSize: { widthPt: ALBUM_PAGE_WIDTH_PT, heightPt: ALBUM_PAGE_HEIGHT_PT },
     margins: {
@@ -432,6 +440,10 @@ export async function paginateAlbumLayout(
     albumUpdatedAt: album.updatedAt,
     generatedAt: options.generatedAt,
     unicodeUnit: 'unicode-scalar',
-    pages,
+    pages: pages.map(page => ({ ...page, rendering: {
+      serif: ALBUM_SERIF_FONT, ui: ALBUM_UI_FONT,
+      copy: { imageMissing: ALBUM_IMAGE_MISSING, sourceGone: ALBUM_SOURCE_GONE,
+        sourceUnreadable: ALBUM_SOURCE_UNREADABLE, sourceChanged: ALBUM_SOURCE_CHANGED },
+    } })),
   };
 }

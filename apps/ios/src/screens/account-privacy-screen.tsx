@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useRouter } from 'expo-router';
 
 import { SETTINGS_PRIVACY_CHAPTERS, SETTINGS_PRIVACY_UPDATED } from './settings-privacy-copy';
@@ -9,13 +10,13 @@ export default function AccountPrivacyScreen() {
   const router = useRouter();
   return (
     <SettingsPage
-      title="隐私政策"
-      backLabel="本机设置"
-      accessibilityLabel="隐私政策"
+      title={tr("隐私政策")}
+      backLabel={tr("本机设置")}
+      accessibilityLabel={tr("隐私政策")}
       testID="account-privacy-scroll"
       onBack={() => dismissToSettingsRoot(router)}
     >
-      <SettingsDetailLead icon="privacy" title="隐私政策" />
+      <SettingsDetailLead icon="privacy" title={tr("隐私政策")} />
       <SettingsCopyArticle
         updated={SETTINGS_PRIVACY_UPDATED}
         updatedTestID="account-privacy-updated"

@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
@@ -99,12 +100,12 @@ export function RecentMoment({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ expanded }}
-                  accessibilityLabel={expanded ? '收起正文' : '展开正文'}
+                  accessibilityLabel={expanded ? tr("收起正文") : tr("展开正文")}
                   testID={`recent-expand-${item.id}`}
                   onPress={onToggleExpand}
                   style={styles.expandHit}
                 >
-                  <Text style={styles.expand}>{expanded ? '收起正文' : '展开正文'}</Text>
+                  <Text style={styles.expand}>{expanded ? tr("收起正文") : tr("展开正文")}</Text>
                 </Pressable>
               ) : null}
             </>
@@ -157,7 +158,7 @@ export function RecentMoment({
             caption={recentOpenCaption(truncated)}
             accessibilityLabel={
               recentOpenAccessLabel([item.dayLabel, clock, item.note], truncated) ||
-              `${item.dayLabel}，一条记录`
+              tr("{0}，一条记录", [item.dayLabel])
             }
             testID={`recent-open-${item.id}`}
             onPress={onOpen}

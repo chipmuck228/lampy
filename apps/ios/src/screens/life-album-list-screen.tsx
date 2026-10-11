@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -197,7 +198,7 @@ export default function LifeAlbumListScreen() {
       }}
       header={
         <View style={[styles.header, { paddingHorizontal: gutter }]} testID="life-album-list-header">
-          <Text style={styles.kicker}>LAMPY · 生活册</Text>
+          <Text style={styles.kicker}>{tr("LAMPY · 生活册")}</Text>
           <View style={styles.headerRow}>
             <Text style={styles.title} accessibilityRole="header">
               {ALBUM_MY_ALBUMS}

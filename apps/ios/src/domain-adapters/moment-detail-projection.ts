@@ -1,3 +1,5 @@
+import { formatCalendarDate } from './calendar';
+import { tr } from '../i18n';
 /* eslint-disable @typescript-eslint/no-require-imports */
 const projection = require('@lampy/projections/moment-detail-projection.js') as {
   projectMomentDetail: (
@@ -37,10 +39,11 @@ export type MomentDetailProjection = {
   };
 };
 
+
 const SOURCE_LABELS: Record<string, string> = {
-  created: '你留下的记录',
-  imported: '后来拾起的记录',
-  received: '收到的记录',
+  created: tr("你留下的记录"),
+  imported: tr("后来拾起的记录"),
+  received: tr("收到的记录"),
 };
 
 export function projectMomentDetailView(
@@ -52,6 +55,12 @@ export function projectMomentDetailView(
   const type = view.source.type;
   return {
     ...view,
+    displayDate: {
+      ...view.displayDate,
+      primary: view.displayDate.usedRecordedAtFallback
+        ? tr('记录于 {0}', [formatCalendarDate((moment as { time: { recordedAt: string } }).time.recordedAt, 'day', options?.timezoneOffsetMinutes)])
+        : formatCalendarDate((moment as { time: { occurredAt?: string } }).time.occurredAt ?? '', view.displayDate.precision, options?.timezoneOffsetMinutes),
+    },
     source: {
       ...view.source,
       label: SOURCE_LABELS[type] || view.source.label,
@@ -65,8 +74,8 @@ export function projectMomentDetailView(
               ...asset.display,
               unavailableLabel:
                 asset.type === 'audio'
-                  ? '这段声音暂时无法播放，其他内容仍然保留。'
-                  : '这张照片暂时找不到了，但这条记录还在。',
+                  ? tr("这段声音暂时无法播放，其他内容仍然保留。")
+                  : tr("这张照片暂时找不到了，但这条记录还在。"),
             },
           },
     ),

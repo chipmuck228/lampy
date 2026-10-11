@@ -99,9 +99,9 @@ export async function runTestAccountCli(input: {
 }) {
   const env = input.env ?? process.env;
   const [, , action, login] = input.argv;
-  if ((action !== 'create' && action !== 'disable') || !login) {
+  if ((action !== 'create' && action !== 'disable' && action !== 'revoke-sessions') || !login) {
     throw new Error(
-      'Usage: family-api-test-account create <login> | disable <login>\nPassword comes from a 0600 FAMILY_TEST_ACCOUNT_PASSWORD_FILE, FAMILY_TEST_ACCOUNT_PASSWORD_FD, or a hidden TTY prompt.',
+      'Usage: family-api-test-account create <login> | disable <login> | revoke-sessions <login>\nPassword comes from a 0600 FAMILY_TEST_ACCOUNT_PASSWORD_FILE, FAMILY_TEST_ACCOUNT_PASSWORD_FD, or a hidden TTY prompt.',
     );
   }
   const databasePath = (env.LAMPY_FAMILY_DATABASE_PATH || '').trim();
@@ -132,6 +132,10 @@ export async function runTestAccountCli(input: {
       const password = await (input.readPassword ?? (() => readOperatorPassword(env)))();
       const created = await commands.createTestAccount(login, password);
       return `Created test account userId=${created.userId}`;
+    }
+    if (action === 'revoke-sessions') {
+      const revoked = await commands.revokeTestAccountSessions(login);
+      return `Revoked account sessions userId=${revoked.userId}`;
     }
     const disabled = await commands.disableTestAccount(login);
     return `Disabled test account userId=${disabled.userId}`;

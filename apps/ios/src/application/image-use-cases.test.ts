@@ -334,3 +334,19 @@ describe('image personal moment use cases', () => {
     expect(media.removed).toEqual([]);
   });
 });
+
+
+it('does not open the camera after shortcut permission returns to an abandoned screen', async () => {
+  const { app, camera } = createImageApp();
+  const draft = await app.restoreOrCreateDraft();
+  let granted!: (value: 'granted') => void;
+  const permission = jest.spyOn(camera, 'requestPermission').mockReturnValue(new Promise(resolve => { granted = resolve; }));
+  const pick = jest.spyOn(camera, 'pick');
+  let valid = true;
+  const result = app.addCameraImage(draft.draftId, { canStart: () => valid, waitUntilReady: async () => valid });
+  await new Promise(resolve => setImmediate(resolve));
+  expect(permission).toHaveBeenCalled(); valid = false; granted('granted');
+  await expect(result).rejects.toThrow('camera shortcut cancelled');
+  expect(pick).not.toHaveBeenCalled();
+  expect((await app.restoreOrCreateDraft()).images).toHaveLength(0);
+});

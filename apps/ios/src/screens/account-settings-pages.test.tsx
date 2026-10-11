@@ -97,10 +97,7 @@ describe('account settings pages', () => {
   it('keeps terms readable offline with a dated chapter list', async () => {
     const view = await render(wrap(<AccountTermsScreen />));
     expect(view.getByLabelText('使用条款')).toBeTruthy();
-    expect(view.getByTestId('account-terms-updated').props.children).toEqual([
-      '更新日期：',
-      SETTINGS_TERMS_UPDATED,
-    ]);
+    expect(view.getByTestId('account-terms-updated').props.children).toBe(`更新日期：${SETTINGS_TERMS_UPDATED}`);
     expect(view.getByText(SETTINGS_TERMS_CHAPTERS[0].title)).toBeTruthy();
     expect(view.getByText(SETTINGS_TERMS_CHAPTERS[SETTINGS_TERMS_CHAPTERS.length - 1].title)).toBeTruthy();
     expect(view.getByText('目前没有付费项目。当前版本没有可购买的内容、订阅或试用。')).toBeTruthy();
@@ -114,10 +111,7 @@ describe('account settings pages', () => {
   it('keeps privacy readable offline without unverified upload promises', async () => {
     const view = await render(wrap(<AccountPrivacyScreen />));
     expect(view.getByLabelText('隐私政策')).toBeTruthy();
-    expect(view.getByTestId('account-privacy-updated').props.children).toEqual([
-      '更新日期：',
-      SETTINGS_PRIVACY_UPDATED,
-    ]);
+    expect(view.getByTestId('account-privacy-updated').props.children).toBe(`更新日期：${SETTINGS_PRIVACY_UPDATED}`);
     expect(view.getByText(SETTINGS_PRIVACY_CHAPTERS[0].title)).toBeTruthy();
     expect(
       view.getByText(

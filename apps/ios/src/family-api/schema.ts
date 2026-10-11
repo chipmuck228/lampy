@@ -100,9 +100,80 @@ const MIGRATIONS = [
     window_started_at TEXT NOT NULL,
     hit_count INTEGER NOT NULL
   );`,
+  `ALTER TABLE family_families ADD COLUMN name TEXT NOT NULL DEFAULT '';`,
+  `DROP INDEX family_memberships_one_active_per_user;
+   CREATE UNIQUE INDEX family_memberships_one_active_per_pair
+     ON family_memberships(user_id, family_id) WHERE status = 'active';
+   CREATE UNIQUE INDEX family_memberships_one_active_creator
+     ON family_memberships(family_id) WHERE status = 'active' AND role = 'creator';`,
+  `CREATE TRIGGER family_memberships_limit_insert BEFORE INSERT ON family_memberships
+   WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM family_memberships m
+     JOIN family_families f ON f.family_id = m.family_id
+     WHERE m.user_id = NEW.user_id AND m.status = 'active' AND f.status = 'active') >= 10
+   BEGIN SELECT RAISE(ABORT, 'family_limit_reached'); END;
+   CREATE TRIGGER family_memberships_limit_update BEFORE UPDATE OF status,user_id,family_id ON family_memberships
+   WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM family_memberships m
+     JOIN family_families f ON f.family_id = m.family_id
+     WHERE m.user_id = NEW.user_id AND m.membership_id != OLD.membership_id
+       AND m.status = 'active' AND f.status = 'active') >= 10
+   BEGIN SELECT RAISE(ABORT, 'family_limit_reached'); END;`,
+  `CREATE TABLE family_invite_links (
+    invitation_id TEXT PRIMARY KEY NOT NULL, family_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE, status TEXT NOT NULL CHECK(status IN ('pending','accepted','revoked','expired')),
+    created_at TEXT NOT NULL, expires_at TEXT NOT NULL, accepted_by_user_id TEXT
+  ); CREATE INDEX family_invite_links_family ON family_invite_links(family_id);`,
+  `ALTER TABLE family_families ADD COLUMN history_policy TEXT NOT NULL DEFAULT 'legacy' CHECK(history_policy IN ('legacy','family-history-v2'));
+   ALTER TABLE family_families ADD COLUMN history_confirmed_at TEXT;
+   ALTER TABLE family_families ADD COLUMN history_confirmed_by TEXT;`,
+  `CREATE TABLE family_creator_transfers (
+    transfer_id TEXT PRIMARY KEY NOT NULL, family_id TEXT NOT NULL, request_id TEXT NOT NULL,
+    from_user_id TEXT NOT NULL, to_user_id TEXT NOT NULL, from_membership_id TEXT NOT NULL, to_membership_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','accepted','cancelled','invalid')),
+    revision INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+    UNIQUE(family_id, from_user_id, request_id)
+  ); CREATE UNIQUE INDEX family_creator_transfers_one_pending ON family_creator_transfers(family_id) WHERE status = 'pending';`,
+  `ALTER TABLE family_families ADD COLUMN dissolved_at TEXT;
+   ALTER TABLE family_families ADD COLUMN cleanup_deadline TEXT;
+   ALTER TABLE family_families ADD COLUMN dissolved_by TEXT;
+   ALTER TABLE family_families ADD COLUMN cleanup_time_estimated INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE family_families ADD COLUMN snapshots_purged_at TEXT;
+   ALTER TABLE family_families ADD COLUMN cleaned_at TEXT;
+   ALTER TABLE family_families ADD COLUMN cleanup_attempts INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE family_families ADD COLUMN cleanup_error TEXT;
+   CREATE TABLE family_media_cleanup (
+     storage_key TEXT PRIMARY KEY NOT NULL, object_id TEXT NOT NULL, family_id TEXT NOT NULL,
+     completed_at TEXT, attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT
+   );
+   CREATE TABLE family_media_cleanup_families (
+     storage_key TEXT NOT NULL, family_id TEXT NOT NULL, PRIMARY KEY(storage_key,family_id)
+   );
+   UPDATE family_families SET cleanup_time_estimated=1, dissolved_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+     cleanup_deadline = strftime('%Y-%m-%dT%H:%M:%fZ','now','+30 days'),
+     dissolved_by = (SELECT user_id FROM family_memberships m WHERE m.family_id=family_families.family_id AND m.role='creator' ORDER BY joined_at DESC LIMIT 1)
+     WHERE status='dissolved';`,
+  `CREATE TABLE family_directory_history (
+    user_id TEXT NOT NULL, family_id TEXT NOT NULL, name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('creator','member')),
+    status TEXT NOT NULL CHECK(status IN ('left','removed','dissolved')),
+    PRIMARY KEY(user_id,family_id)
+   );
+   INSERT INTO family_directory_history(user_id,family_id,name,role,status)
+   SELECT m.user_id,m.family_id,f.name,m.role,
+     CASE WHEN f.status='dissolved' THEN 'dissolved' ELSE m.status END
+   FROM family_memberships m JOIN family_families f ON f.family_id=m.family_id
+   WHERE (f.status='dissolved' OR m.status IN ('left','removed'))
+     AND NOT EXISTS(SELECT 1 FROM family_memberships live WHERE live.family_id=m.family_id AND live.user_id=m.user_id
+       AND live.status='active' AND f.status='active')
+     AND m.rowid=(SELECT MAX(latest.rowid) FROM family_memberships latest WHERE latest.family_id=m.family_id AND latest.user_id=m.user_id);`,
+  `ALTER TABLE family_directory_history ADD COLUMN created_at TEXT;
+   UPDATE family_directory_history SET created_at=(SELECT created_at FROM family_families f WHERE f.family_id=family_directory_history.family_id);`,
+  `CREATE TABLE family_user_profiles (
+     user_id TEXT PRIMARY KEY NOT NULL, nickname TEXT NOT NULL, updated_at TEXT NOT NULL
+   );`,
+  `ALTER TABLE family_test_credentials ADD COLUMN operator_provisioned INTEGER NOT NULL DEFAULT 0 CHECK(operator_provisioned IN (0,1));`,
 ];
 
-export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;
+export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27] as const;
 
 export async function applyFamilyApiSchema(db: FamilySql, options?: { upTo?: number }): Promise<void> {
   const last = options?.upTo ?? MIGRATIONS.length;
@@ -118,11 +189,20 @@ export async function applyFamilyApiSchema(db: FamilySql, options?: { upTo?: num
       [version],
     );
     if (!applied) {
-      await db.exec(sql);
-      await db.run('INSERT INTO family_schema_migrations (version, applied_at) VALUES (?, ?)', [
-        version,
-        new Date().toISOString(),
-      ]);
+      // New multi-statement migrations must not leave half-replaced constraints.
+      const atomic = version >= 17;
+      if (atomic) await db.exec('BEGIN IMMEDIATE');
+      try {
+        await db.exec(sql);
+        await db.run('INSERT INTO family_schema_migrations (version, applied_at) VALUES (?, ?)', [
+          version,
+          new Date().toISOString(),
+        ]);
+        if (atomic) await db.exec('COMMIT');
+      } catch (error) {
+        if (atomic) await db.exec('ROLLBACK');
+        throw error;
+      }
     }
   }
 }
@@ -135,7 +215,7 @@ export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise
     throw missingTestAccountSchemaError();
   }
   const rows = await db.getAll<{ version: number }>(
-    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16)',
+    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16, 27)',
   );
   const have = new Set(rows.map((row) => row.version));
   if (TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS.some((version) => !have.has(version))) {
@@ -145,6 +225,6 @@ export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise
 
 function missingTestAccountSchemaError() {
   return new Error(
-    'This database is missing family-api migrations 14–16. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
+    'This database is missing family-api migrations 14–16 and 27. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
   );
 }

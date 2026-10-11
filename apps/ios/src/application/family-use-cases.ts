@@ -1,3 +1,4 @@
+import { createFamilyHistoryUseCases } from './family-history-use-cases';
 import { ApplicationError } from './errors';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
 import {
@@ -25,6 +26,8 @@ import type {
 import { DEFAULT_SESSION_TTL_MS } from '../family-api/ids';
 import type {
   FamilyMemberView,
+  FamilyListView,
+  FamilySummary,
   FamilyView,
   InvitationView,
   MediaObjectView,
@@ -115,6 +118,7 @@ export type FamilyMembershipView =
   | { kind: 'unauthenticated' }
   | { kind: 'unconfirmed'; reason: 'unreachable' | 'unauthenticated' }
   | { kind: 'none' }
+  | { kind: 'selection-required' }
   | { kind: 'ready'; familyId: string; role: 'creator' | 'member'; members: FamilyMemberView[] };
 
 export type InviteMemberOptions = {
@@ -200,8 +204,10 @@ export function createFamilyUseCases(deps: {
     moments: { findById(id: string): Promise<MomentRead> };
     assets: { findById(id: string): Promise<AssetRead> };
     readAssetBytes?: (localUri: string) => Promise<Uint8Array>;
+  convertImageForShare?: (bytes: Uint8Array, mimeType: string) => Promise<{ bytes: Uint8Array; mimeType: string }>;
   };
   receiveCache?: FamilyReceiveCache;
+  mediaUri?: (storageKey: string) => string;
 }) {
   const cache = deps.cache ?? createNoopFamilyCache();
   const pending = deps.pending;
@@ -389,24 +395,161 @@ export function createFamilyUseCases(deps: {
     }
   }
 
-  async function commitSignedIn(result: { userId: string; sessionToken: string }) {
+  let identityCommit: Promise<unknown> = Promise.resolve();
+  function commitSignedIn(result: { userId: string; sessionToken: string }, isCurrent: () => boolean = () => true) {
+    const work = () => performSignedIn(result, isCurrent);
+    const next = identityCommit.then(work,work);
+    identityCommit = next.then(() => undefined, () => undefined);
+    return next;
+  }
+  async function performSignedIn(result: { userId: string; sessionToken: string }, isCurrent: () => boolean = () => true) {
+    const check = () => { if (!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Identity screen is inactive.'); };
+    check();
     const previousUserId = await deps.session.getUserId();
+    check();
     const pendingRow = await deps.session.getPendingRevoke();
+    check();
     if (pendingRow?.userId === result.userId) {
       await deps.session.clearPendingRevoke();
     } else {
       await flushPendingRevoke();
     }
+    check();
     if (previousUserId && previousUserId !== result.userId) {
       await cache.clear();
+      check();
       await safeIsolateAccount(previousUserId);
     }
-    await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
-    await safeIsolateAccount(result.userId);
-    return { userId: result.userId };
+    check();
+    try {
+      await deps.session.setSession({ userId: result.userId, sessionToken: result.sessionToken });
+      check();
+      await safeIsolateAccount(result.userId);
+      check();
+      return { userId: result.userId };
+    } catch (error) {
+      // Still inside the identity commit queue: a newer sign-in cannot be cleared here.
+      if (!isCurrent() && await deps.session.getSessionToken() === result.sessionToken) await deps.session.clearSession();
+      throw error;
+    }
   }
 
+  async function assertSameAccount(account: { userId: string; sessionToken: string }) {
+    if (await deps.session.getSessionToken() !== account.sessionToken || await deps.session.getUserId() !== account.userId) {
+      throw new ApplicationError('STALE_FAMILY_REQUEST', 'The account changed during this request.');
+    }
+  }
+
+  const history = createFamilyHistoryUseCases(deps);
+  let directoryRequest = 0;
+  let emailAuthRequest = 0;
+  async function controlledEmailAuth(input: { email: string; password: string; nickname?: string }, register: boolean, isCurrent: () => boolean) {
+    const request = ++emailAuthRequest;
+    const initialToken = await deps.session.getSessionToken();
+    const eligible = () => request === emailAuthRequest && isCurrent();
+    if (!eligible()) throw new ApplicationError('STALE_FAMILY_REQUEST','Identity screen is inactive.');
+    const method = register ? deps.client.registerControlledEmail : deps.client.signInWithControlledEmail;
+    if (!method) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+    const result = register
+      ? await deps.client.registerControlledEmail!({email:input.email,password:input.password,nickname:input.nickname || ''})
+      : await deps.client.signInWithControlledEmail!({email:input.email,password:input.password});
+    try {
+      if (!eligible() || await deps.session.getSessionToken() !== initialToken) throw new ApplicationError('STALE_FAMILY_REQUEST','Identity changed during sign-in.');
+      return await commitSignedIn(result, eligible);
+    } catch (error) {
+      // Revoke only the new, discarded session, never another device/account's session.
+      try { await deps.client.signOut(result.sessionToken); } catch { /* expires server-side if offline */ }
+      throw asApplicationError(error);
+    }
+  }
   return {
+    history,
+    async previewInviteLink(token: string) {
+      if(!deps.client.previewInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      return deps.client.previewInviteLink(token);
+    },
+    async inviteLinkAccount() { return (await requireAccount()).userId; },
+    async createInviteLink(familyId: string, isCurrent: () => boolean) {
+      const a=await requireAccount();await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');
+      if(!deps.client.createInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.createInviteLink(a.sessionToken,familyId);await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');
+      return result;
+    },
+    async listInviteLinks(familyId: string) {
+      const a=await requireAccount();if(!deps.client.listInviteLinks) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.listInviteLinks(a.sessionToken,familyId);await assertSameAccount(a);return result;
+    },
+    async revokeInviteLink(id: string, isCurrent: () => boolean) {
+      const a=await requireAccount();if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');
+      if(!deps.client.revokeInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.revokeInviteLink(a.sessionToken,id);await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');return result;
+    },
+    async acceptInviteLink(token: string, expectedUserId: string, isCurrent: () => boolean) {
+      const a=await requireAccount();await assertSameAccount(a);
+      if(a.userId!==expectedUserId || !isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Confirm with the current account.');
+      if(!deps.client.acceptInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.acceptInviteLink(a.sessionToken,token);await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');return result;
+    },
+    async getFamilies(isCurrent: () => boolean = () => true): Promise<FamilyListView & { userId: string }> {
+      const request = ++directoryRequest;
+      const current = () => isCurrent() && request === directoryRequest;
+      await flushPendingRevoke();
+      const account = await requireAccount();
+      if (!current()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Directory request is inactive.');
+      if (!deps.client.listFamilies) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED', 'Family service must be upgraded.');
+      try {
+        const result = await deps.client.listFamilies(account.sessionToken);
+        await assertSameAccount(account);
+        if (!current()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Directory request is inactive.');
+        await history.reconcileFamilies(account.userId, result.families.map(f => f.familyId), current);
+        return { ...result, userId: account.userId };
+      } catch (error) {
+        await assertSameAccount(account);
+        const appError = asApplicationError(error);
+        if (appError.code === 'UNAUTHENTICATED') {
+          await deps.session.clearSession();
+          await cache.clear();
+          await safeIsolateAccount(account.userId);
+        }
+        throw appError;
+      }
+    },
+    async createNamedFamily(name: string, operationId: string, isCurrent: () => boolean = () => true): Promise<FamilySummary> {
+      if (!operationId || operationId.length > 100) throw new ApplicationError('BAD_REQUEST', 'A bounded operation id is required.');
+      const account = await requireAccount();
+      const assertCurrent = async () => {
+        await assertSameAccount(account);
+        if (!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'The creation screen is no longer active.');
+      };
+      await assertCurrent();
+      if (!deps.client.createNamedFamily) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED', 'Family service must be upgraded.');
+      const id = `named:${operationId}`;
+      const requestFingerprint = JSON.stringify({ version: 2, name: name.trim() });
+      const existing = await pending.find(account.userId, 'createFamily', id);
+      await assertCurrent();
+      if (existing && existing.requestFingerprint !== requestFingerprint) throw new ApplicationError('PENDING_CONFLICT', 'Retry the same family name.');
+      const key = existing?.idempotencyKey ?? `named:${operationId}`;
+      if (!existing) await pending.save({ userId: account.userId, command: 'createFamily', operationId: id,
+        requestFingerprint, idempotencyKey: key, createdAt: clock.now().toISOString() });
+      await assertCurrent();
+      try {
+        const result = await deps.client.createNamedFamily(account.sessionToken, name, key);
+        await assertCurrent();
+        await pending.remove(account.userId, 'createFamily', id);
+        await assertCurrent();
+        return result;
+      } catch (error) {
+        await assertCurrent();
+        const appError = asApplicationError(error);
+        if (!isUnconfirmedNetwork(appError)) await pending.remove(account.userId, 'createFamily', id);
+        throw appError;
+      }
+    },
+    async getControlledEmailAvailability() { return deps.client.health(); },
     async getAuthHealth() {
       try {
         return await deps.client.health();
@@ -427,21 +570,51 @@ export function createFamilyUseCases(deps: {
         throw appError;
       }
     },
+    async registerControlledEmail(input: { email: string; password: string; nickname: string }, isCurrent: () => boolean) {
+      return controlledEmailAuth(input, true, isCurrent);
+    },
+    async signInWithControlledEmail(input: { email: string; password: string }, isCurrent: () => boolean) {
+      return controlledEmailAuth(input, false, isCurrent);
+    },
+    async getMyProfile(isCurrent: () => boolean) {
+      const account = await requireAccount();
+      if (!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile is inactive.');
+      if (!deps.client.getMyProfile) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const profile = await deps.client.getMyProfile(account.sessionToken);
+      await assertSameAccount(account);
+      if (!isCurrent() || profile.userId !== account.userId) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile account changed.');
+      return profile;
+    },
+    async updateMyProfile(nickname: string, isCurrent: () => boolean) {
+      const account = await requireAccount();
+      if (!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile is inactive.');
+      if (!deps.client.updateMyProfile) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const profile = await deps.client.updateMyProfile(account.sessionToken,nickname);
+      await assertSameAccount(account);
+      if (!isCurrent() || profile.userId !== account.userId) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile account changed.');
+      return profile;
+    },
     async signInWithApple(identityToken: string) {
+      const request = ++emailAuthRequest;
+      let result: { userId: string; sessionToken: string } | undefined;
       try {
-        const result = await deps.client.signInWithApple(identityToken);
-        return commitSignedIn(result);
+        result = await deps.client.signInWithApple(identityToken);
+        return await commitSignedIn(result, () => request === emailAuthRequest);
       } catch (error) {
-        await deps.session.clearSession();
+        if (result) { try { await deps.client.signOut(result.sessionToken); } catch { /* only discarded token */ } }
+        if (request === emailAuthRequest) await deps.session.clearSession();
         throw asApplicationError(error);
       }
     },
     async signInWithTestAccount(login: string, password: string) {
+      const request = ++emailAuthRequest;
+      let result: { userId: string; sessionToken: string } | undefined;
       try {
-        const result = await deps.client.signInWithTestAccount({ login, password });
-        return commitSignedIn(result);
+        result = await deps.client.signInWithTestAccount({ login, password });
+        return await commitSignedIn(result, () => request === emailAuthRequest);
       } catch (error) {
-        await deps.session.clearSession();
+        if (result) { try { await deps.client.signOut(result.sessionToken); } catch { /* only discarded token */ } }
+        if (request === emailAuthRequest) await deps.session.clearSession();
         throw asApplicationError(error);
       }
     },
@@ -473,6 +646,7 @@ export function createFamilyUseCases(deps: {
           if (userId) await safeIsolateAccount(userId);
           return { kind: 'unconfirmed', reason: 'unauthenticated' };
         }
+        if (appError.code === 'FAMILY_SELECTION_REQUIRED') return { kind: 'selection-required' };
         if (appError.code === 'SERVER_UNREACHABLE' || appError.code === 'NETWORK') {
           return { kind: 'unconfirmed', reason: 'unreachable' };
         }
@@ -585,6 +759,7 @@ export function createFamilyUseCases(deps: {
     },
 
     async signOut(): Promise<SignOutResult> {
+      emailAuthRequest++;
       const token = await deps.session.getSessionToken();
       const userId = await deps.session.getUserId();
       if (!token || !userId) {

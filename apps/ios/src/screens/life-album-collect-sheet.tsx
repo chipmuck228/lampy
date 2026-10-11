@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -248,7 +249,7 @@ export function LifeAlbumCollectSheet({
           ) : null}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="关闭"
+            accessibilityLabel={tr("关闭")}
             testID="life-album-sheet-mask"
             onPress={dismiss}
             style={[StyleSheet.absoluteFill, { backgroundColor: maskColor }]}
@@ -336,7 +337,7 @@ export function LifeAlbumCollectSheet({
                           style={[styles.capsule, busy && styles.capsuleDisabled]}
                         >
                           <Text style={styles.capsuleLabel}>
-                            {joining ? '正在加入' : ALBUM_JOIN_ACTION}
+                            {joining ? tr("正在加入") : ALBUM_JOIN_ACTION}
                           </Text>
                         </Pressable>
                       )}
@@ -347,11 +348,11 @@ export function LifeAlbumCollectSheet({
               {error ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="再试一次"
+                  accessibilityLabel={tr("再试一次")}
                   onPress={() => setLoadKey((value) => value + 1)}
                   style={styles.hit}
                 >
-                  <Text style={styles.action}>再试一次</Text>
+                  <Text style={styles.action}>{tr("再试一次")}</Text>
                 </Pressable>
               ) : null}
             </ScrollView>
@@ -383,7 +384,7 @@ export function LifeAlbumCollectSheet({
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="取消"
+                accessibilityLabel={tr("取消")}
                 testID="life-album-sheet-cancel"
                 onPress={dismiss}
                 style={[
@@ -391,9 +392,7 @@ export function LifeAlbumCollectSheet({
                   footerStacked ? styles.cancelHitStacked : styles.cancelHitRow,
                 ]}
               >
-                <Text style={styles.cancelLabel} numberOfLines={1}>
-                  取消
-                </Text>
+                <Text style={styles.cancelLabel} numberOfLines={1}>{tr("取消")}</Text>
               </Pressable>
             </View>
           </View>

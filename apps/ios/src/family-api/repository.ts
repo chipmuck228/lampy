@@ -1,3 +1,4 @@
+import { FamilyError, FAMILY_ERROR } from './errors';
 import type {
   Account,
   AuthRateLimit,
@@ -22,6 +23,16 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  findProfile(userId: string): Promise<import('./types').UserProfile | null>;
+  saveProfile(profile: import('./types').UserProfile): Promise<void>;
+  listPastFamilies(userId: string): Promise<import('./types').PastFamilySummary[]>;
+  listSharesReferencingMedia(objectId: string): Promise<ShareRecord[]>;
+  listTransfers(familyId: string): Promise<import('./types').FamilyTransfer[]>;
+  saveTransfer(transfer: import('./types').FamilyTransfer): Promise<void>;
+  findInviteLinkByHash(hash: string): Promise<import('./types').InviteLink | null>;
+  findInviteLinkById(id: string): Promise<import('./types').InviteLink | null>;
+  listInviteLinks(familyId: string): Promise<import('./types').InviteLink[]>;
+  saveInviteLink(invite: import('./types').InviteLink): Promise<void>;
   findAccountByAppleSubject(appleSubject: string): Promise<Account | null>;
   findAccountByUserId(userId: string): Promise<Account | null>;
   saveAccount(account: Account): Promise<void>;
@@ -101,6 +112,16 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async findProfile(userId) { return store.profiles.find(p => p.userId === userId) ?? null; },
+    async saveProfile(profile) { replaceBy(store.profiles,p => p.userId,profile); },
+    async listPastFamilies(userId) { return store.directoryHistory.filter(row => row.userId === userId).map(row => ({ familyId: row.familyId, name: row.name, createdAt: row.createdAt, role: row.role, status: row.status })); },
+    async listSharesReferencingMedia(objectId) { return store.shares.filter(s => s.snapshot.media.some(m => m.objectId === objectId)); },
+    async listTransfers(familyId) { return store.transfers.filter(row => row.familyId === familyId); },
+    async saveTransfer(transfer) { replaceBy(store.transfers, row => row.transferId, transfer); },
+    async findInviteLinkByHash(hash) { return store.inviteLinks.find(i => i.tokenHash === hash) ?? null; },
+    async findInviteLinkById(id) { return store.inviteLinks.find(i => i.invitationId === id) ?? null; },
+    async listInviteLinks(familyId) { return store.inviteLinks.filter(i => i.familyId === familyId); },
+    async saveInviteLink(invite) { replaceBy(store.inviteLinks, i => i.invitationId, invite); },
     async findAccountByAppleSubject(appleSubject) {
       return findAccountByAppleSubject(store, appleSubject);
     },
@@ -165,8 +186,13 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     },
     async saveFamily(family) {
       replaceBy(store.families, (row) => row.familyId, family);
+      if (family.status === 'dissolved') for (const row of store.directoryHistory) {
+        if (row.familyId === family.familyId) row.status = 'dissolved';
+      }
     },
     async findActiveMembershipForUser(userId) {
+      const rows = store.memberships.filter(row => row.userId === userId && row.status === 'active' && store.families.some(f => f.familyId === row.familyId && f.status === 'active'));
+      if (rows.length > 1) throw new FamilyError(FAMILY_ERROR.FAMILY_SELECTION_REQUIRED, 'Choose a family with the updated app.');
       return findActiveMembershipForUser(store, userId);
     },
     async findActiveMembership(familyId, userId) {
@@ -189,12 +215,23 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       const conflict = store.memberships.find(
         (row) =>
           row.userId === membership.userId &&
+          row.familyId === membership.familyId &&
           row.status === 'active' &&
           membership.status === 'active' &&
           row.membershipId !== membership.membershipId,
       );
       if (conflict) throw new FamilyStoreConstraintError('active_membership');
+      if (membership.status === 'active' && membership.role === 'creator' && store.memberships.some(row =>
+        row.familyId === membership.familyId && row.role === 'creator' && row.status === 'active' && row.membershipId !== membership.membershipId)) {
+        throw new FamilyStoreConstraintError('active_membership');
+      }
       replaceBy(store.memberships, (row) => row.membershipId, membership);
+      const family = findFamily(store, membership.familyId);
+      store.directoryHistory = store.directoryHistory.filter(row => row.userId !== membership.userId || row.familyId !== membership.familyId);
+      if (family && (membership.status !== 'active' || family.status === 'dissolved')) {
+        store.directoryHistory.push({ userId: membership.userId, familyId: membership.familyId, name: family.name || '', createdAt: family.createdAt, role: membership.role,
+          status: family.status === 'dissolved' ? 'dissolved' : membership.status === 'left' ? 'left' : 'removed' });
+      }
     },
     async findInvitationByCode(code) {
       return findInvitationByCode(store, code);

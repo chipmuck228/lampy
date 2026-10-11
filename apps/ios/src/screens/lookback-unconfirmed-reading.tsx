@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
 import { Text } from './life-text';
@@ -99,7 +100,7 @@ export function LookbackUnconfirmedReading({
             if (resolved != null) setCount(resolved);
           }
           if (!restored.ok && restored.items.length === 0) {
-            setError('这些记录暂时读不出来，原来的内容还在。');
+            setError(tr("这些记录暂时读不出来，原来的内容还在。"));
             return;
           }
           setError(null);
@@ -123,7 +124,7 @@ export function LookbackUnconfirmedReading({
             setInvalid(true);
             return;
           }
-          setError('这些记录暂时读不出来，原来的内容还在。');
+          setError(tr("这些记录暂时读不出来，原来的内容还在。"));
         });
       return () => {
         cancelled = true;
@@ -186,7 +187,7 @@ export function LookbackUnconfirmedReading({
       {error ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="重试打开这些记录"
+          accessibilityLabel={tr("重试打开这些记录")}
           testID="lookback-unconfirmed-retry"
           onPress={() => {
             setError(null);
@@ -194,10 +195,10 @@ export function LookbackUnconfirmedReading({
           }}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>这些记录暂时读不出来，原来的内容还在。再试一次</Text>
+          <Text style={lookbackStyles.action}>{tr("这些记录暂时读不出来，原来的内容还在。再试一次")}</Text>
         </Pressable>
       ) : null}
-      {invalid ? <LookbackMessage>没有这一段。</LookbackMessage> : null}
+      {invalid ? <LookbackMessage>{tr("没有这一段。")}</LookbackMessage> : null}
       {explanation ? (
         <LookbackUnconfirmedHeader title={title} explanation={explanation} count={count} />
       ) : null}
@@ -230,23 +231,23 @@ export function LookbackUnconfirmedReading({
       {hasMore && !moreError && !moreLoading ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="继续往下看"
+          accessibilityLabel={tr("继续往下看")}
           testID={moreTestID}
           onPress={() => void loadMore()}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>继续往下看</Text>
+          <Text style={lookbackStyles.action}>{tr("继续往下看")}</Text>
         </Pressable>
       ) : null}
       {moreError ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="继续往下看，再试一次"
+          accessibilityLabel={tr("继续往下看，再试一次")}
           testID={moreTestID}
           onPress={() => void loadMore({ retry: true })}
           style={lookbackStyles.hit}
         >
-          <Text style={lookbackStyles.action}>后面的记录暂时读不出来。再试一次</Text>
+          <Text style={lookbackStyles.action}>{tr("后面的记录暂时读不出来。再试一次")}</Text>
         </Pressable>
       ) : null}
     </LookbackScaffold>

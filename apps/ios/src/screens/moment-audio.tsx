@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text, type } from './life-text';
 
@@ -21,21 +22,21 @@ export function draftPreviewStatus(
 
 function playbackLabel(status: PlaybackStatus, durationLabel: string, currentMs: number): string {
   if (status === 'preparing') {
-    return `正在准备这段声音，共${durationLabel}`;
+    return tr("正在准备这段声音，共{0}", [durationLabel]);
   }
   if (status === 'playing') {
-    return `正在播放，${formatSoundDuration(currentMs)}，共${durationLabel}`;
+    return tr("正在播放，{0}，共{1}", [formatSoundDuration(currentMs), durationLabel]);
   }
   if (status === 'paused') {
-    return `已暂停，${formatSoundDuration(currentMs)}，共${durationLabel}`;
+    return tr("已暂停，{0}，共{1}", [formatSoundDuration(currentMs), durationLabel]);
   }
   if (status === 'finished') {
-    return `已播完，共${durationLabel}`;
+    return tr("已播完，共{0}", [durationLabel]);
   }
   if (status === 'unavailable') {
-    return `这段声音这次没有播出，共${durationLabel}`;
+    return tr("这段声音这次没有播出，共{0}", [durationLabel]);
   }
-  return `一段声音，${durationLabel}，未播放`;
+  return tr("一段声音，{0}，未播放", [durationLabel]);
 }
 
 export function shouldShowHeardProgress(status: PlaybackStatus, currentTimeMs: number): boolean {
@@ -44,11 +45,11 @@ export function shouldShowHeardProgress(status: PlaybackStatus, currentTimeMs: n
 }
 
 function playbackMeta(status: PlaybackStatus, durationLabel: string, currentMs: number): string {
-  if (status === 'preparing') return `正在准备 · ${durationLabel}`;
-  if (status === 'playing') return `正在播放 · ${formatSoundDuration(currentMs)} / ${durationLabel}`;
-  if (status === 'paused') return `已暂停 · ${formatSoundDuration(currentMs)} / ${durationLabel}`;
-  if (status === 'finished') return `已播完 · ${durationLabel}`;
-  return `一段声音 · ${durationLabel}`;
+  if (status === 'preparing') return tr("正在准备 · {0}", [durationLabel]);
+  if (status === 'playing') return tr("正在播放 · {0} / {1}", [formatSoundDuration(currentMs), durationLabel]);
+  if (status === 'paused') return tr("已暂停 · {0} / {1}", [formatSoundDuration(currentMs), durationLabel]);
+  if (status === 'finished') return tr("已播完 · {0}", [durationLabel]);
+  return tr("一段声音 · {0}", [durationLabel]);
 }
 
 function formatClock(ms: number): string {
@@ -96,7 +97,7 @@ export function MomentAudio({
         style={styles.block}
       >
         <Text style={styles.missing}>
-          {audio.unavailableLabel || '这段声音暂时无法播放，其他内容仍然保留。'}
+          {audio.unavailableLabel || tr("这段声音暂时无法播放，其他内容仍然保留。")}
         </Text>
       </View>
     );
@@ -118,17 +119,16 @@ export function MomentAudio({
           testID={`${testIDPrefix}-failed-${audio.id}`}
           style={styles.missing}
         >
-          这段声音这次没有播出。可以再试一次。
-        </Text>
+          {tr("这段声音这次没有播出。可以再试一次。")}</Text>
         {onPlay ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`再试一次，${durationLabel}`}
+            accessibilityLabel={tr("再试一次，{0}", [durationLabel])}
             testID={`${testIDPrefix}-retry-${audio.id}`}
             onPress={onPlay}
             style={styles.hit}
           >
-            <Text style={styles.action}>再试一次</Text>
+            <Text style={styles.action}>{tr("再试一次")}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -137,7 +137,7 @@ export function MomentAudio({
 
   const playing = playbackStatus === 'playing';
   const preparing = playbackStatus === 'preparing';
-  const actionLabel = playing ? '暂停' : playbackStatus === 'finished' ? '再听一次' : preparing ? '正在准备' : '播放';
+  const actionLabel = playing ? tr("暂停") : playbackStatus === 'finished' ? tr("再听一次") : preparing ? tr("正在准备") : tr("播放");
   const progress =
     audio.durationMs > 0 ? Math.min(1, Math.max(0, currentTimeMs / audio.durationMs)) : 0;
   const showProgress = progressWhenHeard
@@ -318,19 +318,19 @@ export function DraftSoundBar({
       <View style={styles.block}>
         <Text
           accessibilityLiveRegion="polite"
-          accessibilityLabel={`正在录，${elapsedLabel}`}
+          accessibilityLabel={tr("正在录，{0}", [elapsedLabel])}
           style={styles.recording}
         >
-          正在录 · {elapsedLabel}
+          {tr("正在录 ·")}{' '}{elapsedLabel}
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`停止录音，已经录了${elapsedLabel}`}
+          accessibilityLabel={tr("停止录音，已经录了{0}", [elapsedLabel])}
           testID="composer-stop-sound"
           onPress={onStop}
           style={styles.hit}
         >
-          <Text style={styles.action}>停止</Text>
+          <Text style={styles.action}>{tr("停止")}</Text>
         </Pressable>
       </View>
     );
@@ -338,9 +338,8 @@ export function DraftSoundBar({
 
   if (phase === 'processing') {
     return (
-      <Text accessibilityLabel="正在留下这段声音" style={styles.meta}>
-        正在留下这段声音…
-      </Text>
+      <Text accessibilityLabel={tr("正在留下这段声音")} style={styles.meta}>
+        {tr("正在留下这段声音…")}</Text>
     );
   }
 
@@ -348,7 +347,7 @@ export function DraftSoundBar({
     return (
       <View style={styles.block}>
         {phase === 'failed' ? (
-          <Text style={styles.missing}>这次没有录下声音。已经写的字和照片还在。</Text>
+          <Text style={styles.missing}>{tr("这次没有录下声音。已经写的字和照片还在。")}</Text>
         ) : null}
         <MomentAudio
           audio={audio}
@@ -361,23 +360,23 @@ export function DraftSoundBar({
         <View style={styles.row}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="重录"
+            accessibilityLabel={tr("重录")}
             testID="composer-rerecord"
             onPress={onRerecord}
             disabled={disabled}
             style={styles.hit}
           >
-            <Text style={styles.action}>重录</Text>
+            <Text style={styles.action}>{tr("重录")}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="移除这段声音"
+            accessibilityLabel={tr("移除这段声音")}
             testID="composer-remove-sound"
             onPress={onRemove}
             disabled={removeDisabled ?? disabled}
             style={styles.hit}
           >
-            <Text style={styles.action}>移除这段声音</Text>
+            <Text style={styles.action}>{tr("移除这段声音")}</Text>
           </Pressable>
         </View>
       </View>
@@ -387,11 +386,11 @@ export function DraftSoundBar({
   if (phase === 'failed') {
     return (
       <View style={styles.block}>
-        <Text style={styles.missing}>这次没有录下声音。已经写的字和照片还在。</Text>
+        <Text style={styles.missing}>{tr("这次没有录下声音。已经写的字和照片还在。")}</Text>
         <LifeLabeledHit
           layoutRevision={layoutRevision}
           icon="record"
-          label="录音"
+          label={tr("录音")}
           testID="composer-sound"
           onPress={onStart}
           disabled={disabled}
@@ -404,7 +403,7 @@ export function DraftSoundBar({
     <LifeLabeledHit
       layoutRevision={layoutRevision}
       icon="record"
-      label="录音"
+      label={tr("录音")}
       testID="composer-sound"
       onPress={onStart}
       disabled={disabled}

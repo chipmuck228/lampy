@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useRouter } from 'expo-router';
 
 import { SETTINGS_HELP_CHAPTERS } from './settings-help-copy';
@@ -9,13 +10,13 @@ export default function AccountHelpScreen() {
   const router = useRouter();
   return (
     <SettingsPage
-      title="使用帮助"
-      backLabel="本机设置"
-      accessibilityLabel="使用帮助"
+      title={tr("使用帮助")}
+      backLabel={tr("本机设置")}
+      accessibilityLabel={tr("使用帮助")}
       testID="account-help-scroll"
       onBack={() => dismissToSettingsRoot(router)}
     >
-      <SettingsDetailLead icon="help" title="使用帮助" />
+      <SettingsDetailLead icon="help" title={tr("使用帮助")} />
       <SettingsCopyArticle chapters={SETTINGS_HELP_CHAPTERS} testIDPrefix="account-help" />
     </SettingsPage>
   );

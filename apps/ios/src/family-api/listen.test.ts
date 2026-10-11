@@ -47,9 +47,10 @@ function getHealth(port: number) {
 }
 
 describe('family API listen startup', () => {
-  it('accepts a long F3 note with three uploaded media references while bounding share JSON', async () => {
+  it.each(['v1','v2'])('accepts a long F3 note with three media references in %s while bounding share JSON', async (version) => {
     const listening = await startFamilyApiServer({ port: 0, host: '127.0.0.1', env: {
       LAMPY_FAMILY_API_MODE: 'test', LAMPY_FAMILY_API_TEST_TOKENS: 'review-token:apple.review.sub',
+      LAMPY_FAMILY_HISTORY_ENABLED: version === 'v2' ? '1' : '',
     } });
     try {
       const login = await postJson(listening.port, '/v1/auth/apple', { identityToken: 'review-token' });
@@ -57,6 +58,8 @@ describe('family API listen startup', () => {
       const token = login.body.sessionToken;
       const family = await postJson(listening.port, '/v1/families', {}, token);
       expect(family.status).toBe(200);
+      if (version === 'v2') expect((await postJson(listening.port, `/v2/families/${family.body.familyId}/history-policy`,
+        {confirmation:'new-members-can-read-active-history'},token)).status).toBe(200);
       const ids: string[] = [];
       for (let i = 0; i < 3; i += 1) {
         const bytes = Buffer.concat([Buffer.from(sampleJpegBytes()), Buffer.from([i])]);
@@ -75,16 +78,17 @@ describe('family API listen startup', () => {
         ids.push(media.body.objectId);
       }
       const shareInput = {
+        ...(version === 'v2' ? {audienceConfirmation:'new-members-can-read-active-history'} : {}),
         sourceMomentId: 'moment_long_note', sourceRevision: 1, note: '今天的片段。'.repeat(1000),
         emotion: '平静', occurredAt: '2026-09-29T08:00:00.000Z', occurredAtPrecision: 'exact',
         mediaObjectIds: ids, expectedMediaCount: 3,
       };
       expect(Buffer.byteLength(JSON.stringify(shareInput))).toBeGreaterThan(4096);
-      const shared = await postJson(listening.port, `/v1/families/${family.body.familyId}/shares`, shareInput, token);
+      const shared = await postJson(listening.port, `/${version}/families/${family.body.familyId}/shares`, shareInput, token);
       expect(shared.status).toBe(200);
       expect(shared.body.snapshot.note).toBe(shareInput.note);
       expect(shared.body.snapshot.media).toHaveLength(3);
-      const oversized = await postJson(listening.port, `/v1/families/${family.body.familyId}/shares`,
+      const oversized = await postJson(listening.port, `/${version}/families/${family.body.familyId}/shares`,
         { ...shareInput, sourceRevision: 2, note: '长'.repeat(23000) }, token);
       expect(oversized.status).toBe(413);
       expect(oversized.body.error.code).toBe('PAYLOAD_TOO_LARGE');

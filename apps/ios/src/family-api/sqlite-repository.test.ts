@@ -244,7 +244,7 @@ describe('durable SQLite family repository', () => {
     });
   });
 
-  it('keeps the previous session when replacing sessions fails inside the login transaction', async () => {
+  it('keeps the previous session when saving a new session fails inside the login transaction', async () => {
     await withSqliteFile(async (file) => {
       const seq = { n: 0 };
       const real = openFamilySqliteDatabase(file);
@@ -253,7 +253,7 @@ describe('durable SQLite family repository', () => {
       const db: FamilySql = {
         exec: (sql) => real.exec(sql),
         run: async (sql, params) => {
-          if (failReplace && typeof sql === 'string' && /DELETE FROM family_sessions WHERE user_id/.test(sql)) {
+          if (failReplace && typeof sql === 'string' && /INSERT INTO family_sessions/.test(sql)) {
             throw new Error('disk full');
           }
           return real.run(sql, params);

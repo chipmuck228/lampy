@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AppState,
@@ -209,8 +210,8 @@ export default function LifeAlbumPreviewScreen() {
   return (
     <SettingsPage
       title={ALBUM_PREVIEW_ACTION}
-      backLabel="这一册"
-      accessibilityLabel="看看这一册"
+      backLabel={tr("这一册")}
+      accessibilityLabel={tr("看看这一册")}
       pageTestID="life-album-preview"
       scrollEnabled={!zoomed}
       onBack={() => router.back()}
@@ -253,7 +254,7 @@ export default function LifeAlbumPreviewScreen() {
           <Text
             style={styles.meta}
             accessibilityRole="text"
-          >{`第${page + 1}页，共${layout.pages.length}页`}</Text>
+          >{tr('第{0}页，共{1}页', [page + 1, layout.pages.length])}</Text>
           <View
             testID="life-album-preview-stage"
             style={[styles.stageFrame, zoomed && styles.stageFrameZoomed]}
@@ -352,7 +353,7 @@ export default function LifeAlbumPreviewScreen() {
                     <Pressable
                       key={`audio-hit-${block.assetId}-${index}`}
                       accessibilityRole="button"
-                      accessibilityLabel={playing ? '暂停' : block.text}
+                      accessibilityLabel={playing ? tr("暂停") : block.text}
                       accessibilityState={{ disabled: !canPlay }}
                       testID={`life-album-preview-audio-${block.assetId}`}
                       disabled={!canPlay}

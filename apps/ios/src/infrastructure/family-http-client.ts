@@ -1,6 +1,8 @@
 import { ApplicationError } from '../application/errors';
 import type {
   FamilyView,
+  FamilyListView,
+  FamilySummary,
   InvitationView,
   MediaObjectView,
   MembershipListView,
@@ -57,7 +59,21 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 }
 
 export type FamilyApiClient = {
+  registerControlledEmail?(input: { email: string; password: string; nickname: string }): Promise<SignInResult>;
+  signInWithControlledEmail?(input: { email: string; password: string }): Promise<SignInResult>;
+  getMyProfile?(sessionToken: string): Promise<import('../family-api/types').UserProfile>;
+  updateMyProfile?(sessionToken: string, nickname: string): Promise<import('../family-api/types').UserProfile>;
   health(): Promise<FamilyHealth>;
+  getHistoryPolicy?(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
+  confirmHistoryPolicy?(session: string, familyId: string): Promise<{ policy: 'family-history-v2' }>;
+  history?: Pick<FamilyApiClient, 'shareMoment' | 'revokeShare' | 'listVisibleShares' | 'getShare' | 'getShareMedia' | 'getShareMediaContent'>;
+  listFamilies?(sessionToken: string): Promise<FamilyListView>;
+  createNamedFamily?(sessionToken: string, name: string, idempotencyKey: string): Promise<FamilySummary>;
+  createInviteLink?(session: string, familyId: string): Promise<import('../family-api/types').CreatedInviteLink & {link: string; qr: string}>;
+  listInviteLinks?(session: string, familyId: string): Promise<import('../family-api/types').InviteLinkView[]>;
+  revokeInviteLink?(session: string, id: string): Promise<import('../family-api/types').InviteLinkView>;
+  previewInviteLink?(token: string): Promise<import('../family-api/types').InvitePreview>;
+  acceptInviteLink?(session: string, token: string): Promise<FamilySummary>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createFamily(sessionToken: string, idempotencyKey: string): Promise<FamilyView>;
@@ -66,6 +82,13 @@ export type FamilyApiClient = {
   acceptInvitation(sessionToken: string, code: string, idempotencyKey: string): Promise<FamilyView>;
   listMembership(sessionToken: string): Promise<MembershipListView>;
   listPendingInvitations(sessionToken: string, familyId: string): Promise<InvitationView[]>;
+  getCreatorTransfer?(session: string, familyId: string): Promise<{ transfer: import('../family-api/types').FamilyTransfer | null }>;
+  createCreatorTransfer?(session: string, familyId: string, input: { requestId: string; fromMembershipId: string; toMembershipId: string }): Promise<import('../family-api/types').FamilyTransfer>;
+  respondCreatorTransfer?(session: string, familyId: string, transferId: string, revision: number, action: 'accept' | 'cancel'): Promise<import('../family-api/types').FamilyTransfer>;
+  getFamilyRoster?(sessionToken: string, familyId: string): Promise<import('../family-api/types').FamilyRoster>;
+  dissolveSelectedFamily?(sessionToken: string, familyId: string, membershipId: string): Promise<{ dissolved: true }>;
+  leaveSelectedFamily?(sessionToken: string, familyId: string, membershipId: string): Promise<{ left: true }>;
+  removeSelectedMember?(sessionToken: string, familyId: string, userId: string, membershipId: string): Promise<{ removed: true }>;
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
   dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
@@ -99,7 +122,8 @@ function throwIfFailed(status: number, body: unknown): void {
   throw new ApplicationError(code, message);
 }
 
-export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClient {
+export function createFamilyApiClient(transport: FamilyTransport, sharingVersion: 1 | 2 = 1): FamilyApiClient {
+  const shareBase = `/v${sharingVersion}/families`;
   async function send<T>(input: Parameters<FamilyTransport['request']>[0]): Promise<T> {
     const action = familyTestPathKind(input.method, input.path);
     let response: { status: number; body: unknown };
@@ -129,6 +153,13 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
   }
 
   return {
+    ...(sharingVersion === 1 ? { history: createFamilyApiClient(transport, 2) } : {}),
+    getHistoryPolicy(sessionToken, familyId) { return send({ method: 'GET', path: `/v2/families/${familyId}/history-policy`, sessionToken }); },
+    confirmHistoryPolicy(sessionToken, familyId) { return send({ method: 'POST', path: `/v2/families/${familyId}/history-policy`, sessionToken, body: { confirmation: 'new-members-can-read-active-history' } }); },
+    registerControlledEmail(input) { return send({method:'POST',path:'/v2/auth/email/register',body:input}); },
+    signInWithControlledEmail(input) { return send({method:'POST',path:'/v2/auth/email/login',body:input}); },
+    getMyProfile(sessionToken) { return send({method:'GET',path:'/v2/me/profile',sessionToken}); },
+    updateMyProfile(sessionToken,nickname) { return send({method:'PATCH',path:'/v2/me/profile',sessionToken,body:{nickname}}); },
     health() {
       return send({ method: 'GET', path: '/health' });
     },
@@ -138,6 +169,17 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     signInWithTestAccount(input) {
       return send({ method: 'POST', path: '/v1/auth/test-account', body: input });
     },
+    listFamilies(sessionToken) {
+      return send({ method: 'GET', path: '/v2/me/families', sessionToken });
+    },
+    createNamedFamily(sessionToken, name, idempotencyKey) {
+      return send({ method: 'POST', path: '/v2/families', sessionToken, idempotencyKey, body: { name } });
+    },
+    createInviteLink(sessionToken,familyId) { return send({method:'POST',path:`/v2/families/${familyId}/invitations`,sessionToken}); },
+    listInviteLinks(sessionToken,familyId) { return send({method:'GET',path:`/v2/families/${familyId}/invitations`,sessionToken}); },
+    revokeInviteLink(sessionToken,id) { return send({method:'POST',path:`/v2/invitations/${id}/revoke`,sessionToken}); },
+    previewInviteLink(token) { return send({method:'POST',path:'/v2/invitations/preview',body:{token}}); },
+    acceptInviteLink(sessionToken,token) { return send({method:'POST',path:'/v2/invitations/accept',sessionToken,body:{token}}); },
     createFamily(sessionToken, idempotencyKey) {
       return send({ method: 'POST', path: '/v1/families', sessionToken, idempotencyKey });
     },
@@ -166,6 +208,27 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     },
     listPendingInvitations(sessionToken, familyId) {
       return send({ method: 'GET', path: `/v1/families/${familyId}/invitations`, sessionToken });
+    },
+    getCreatorTransfer(sessionToken, familyId) {
+      return send({ method: 'GET', path: `/v2/families/${encodeURIComponent(familyId)}/creator-transfer`, sessionToken });
+    },
+    createCreatorTransfer(sessionToken, familyId, body) {
+      return send({ method: 'POST', path: `/v2/families/${encodeURIComponent(familyId)}/creator-transfer`, sessionToken, body });
+    },
+    respondCreatorTransfer(sessionToken, familyId, transferId, revision, action) {
+      return send({ method: 'POST', path: `/v2/families/${encodeURIComponent(familyId)}/creator-transfer/${encodeURIComponent(transferId)}/${action}`, sessionToken, body: { revision } });
+    },
+    getFamilyRoster(sessionToken, familyId) {
+      return send({ method: 'GET', path: `/v2/families/${familyId}/members`, sessionToken });
+    },
+    dissolveSelectedFamily(sessionToken, familyId, membershipId) {
+      return send({ method: 'POST', path: `/v2/families/${familyId}/dissolve`, sessionToken, body: { membershipId } });
+    },
+    leaveSelectedFamily(sessionToken, familyId, membershipId) {
+      return send({ method: 'POST', path: `/v2/families/${familyId}/leave`, sessionToken, body: { membershipId } });
+    },
+    removeSelectedMember(sessionToken, familyId, userId, membershipId) {
+      return send({ method: 'POST', path: `/v2/families/${familyId}/members/${userId}/remove`, sessionToken, body: { membershipId } });
     },
     leaveFamily(sessionToken) {
       return send({ method: 'POST', path: '/v1/me/leave', sessionToken });
@@ -199,10 +262,11 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     shareMoment(sessionToken, familyId, input) {
       return send({
         method: 'POST',
-        path: `/v1/families/${familyId}/shares`,
+        path: `${shareBase}/${familyId}/shares`,
         sessionToken,
         idempotencyKey: input.idempotencyKey,
         body: {
+          ...(sharingVersion === 2 ? { audienceConfirmation: input.audienceConfirmation } : {}),
           sourceMomentId: input.sourceMomentId,
           sourceRevision: input.sourceRevision,
           note: input.note,
@@ -217,20 +281,20 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
     revokeShare(sessionToken, familyId, shareId) {
       return send({
         method: 'POST',
-        path: `/v1/families/${familyId}/shares/${shareId}/revoke`,
+        path: `${shareBase}/${familyId}/shares/${shareId}/revoke`,
         sessionToken,
       });
     },
     listVisibleShares(sessionToken, familyId) {
-      return send({ method: 'GET', path: `/v1/families/${familyId}/shares`, sessionToken });
+      return send({ method: 'GET', path: `${shareBase}/${familyId}/shares`, sessionToken });
     },
     getShare(sessionToken, familyId, shareId) {
-      return send({ method: 'GET', path: `/v1/families/${familyId}/shares/${shareId}`, sessionToken });
+      return send({ method: 'GET', path: `${shareBase}/${familyId}/shares/${shareId}`, sessionToken });
     },
     getShareMedia(sessionToken, familyId, shareId, objectId) {
       return send({
         method: 'GET',
-        path: `/v1/families/${familyId}/shares/${shareId}/media/${objectId}`,
+        path: `${shareBase}/${familyId}/shares/${shareId}/media/${objectId}`,
         sessionToken,
       });
     },
@@ -239,7 +303,7 @@ export function createFamilyApiClient(transport: FamilyTransport): FamilyApiClie
       try {
         response = await transport.request({
           method: 'GET',
-          path: `/v1/families/${familyId}/shares/${shareId}/media/${objectId}/content`,
+          path: `${shareBase}/${familyId}/shares/${shareId}/media/${objectId}/content`,
           sessionToken,
           expectBytes: true,
         });

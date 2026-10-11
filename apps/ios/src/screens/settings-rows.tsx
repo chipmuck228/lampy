@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
@@ -14,7 +15,7 @@ export function SettingsIntro() {
       <Text style={styles.introName} accessibilityRole="header">
         Lampy
       </Text>
-      <Text style={styles.introLine}>把生活，留给自己。</Text>
+      <Text style={styles.introLine}>{tr("把生活，留给自己。")}</Text>
     </View>
   );
 }
@@ -187,7 +188,7 @@ export function SettingsAboutMark() {
       <Text style={styles.bodyName} accessibilityRole="header">
         Lampy
       </Text>
-      <Text style={styles.bodyLine}>把生活，留给自己。</Text>
+      <Text style={styles.bodyLine}>{tr("把生活，留给自己。")}</Text>
     </View>
   );
 }
@@ -247,7 +248,7 @@ export function SettingsCopyArticle({
   return (
     <View>
       {updated ? (
-        <SettingsUpdated testID={updatedTestID}>更新日期：{updated}</SettingsUpdated>
+        <SettingsUpdated testID={updatedTestID}>{tr('更新日期：{0}', [updated])}</SettingsUpdated>
       ) : null}
       {chapters.map((chapter, index) => (
         <SettingsChapter

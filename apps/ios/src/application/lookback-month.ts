@@ -1,3 +1,4 @@
+import { appLanguage, weekdayLabel } from '../i18n';
 import type { HistoryMonthView } from '../projections/history-projection';
 
 export const LOOKBACK_WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
@@ -87,7 +88,7 @@ export function lookbackMonthPage(view: HistoryMonthView): LookbackMonthPage {
     year: view.year,
     month: view.month,
     title: view.title,
-    weekdayLabels: LOOKBACK_WEEKDAY_LABELS,
+    weekdayLabels: appLanguage === 'en' ? Array.from({ length: 7 }, (_, index) => weekdayLabel(index, true)) : LOOKBACK_WEEKDAY_LABELS,
     weeks,
     entries: view.days
       .filter((day) => day.status === 'filled')

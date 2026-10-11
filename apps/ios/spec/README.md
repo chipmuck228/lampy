@@ -8,6 +8,8 @@
 | `PHASE_0_IMPLEMENTATION_PLAN.md` | 按独立 PR 拆分；PR-1 必须是纯文字个人闭环 |
 | `PHASE_0_UNIMPLEMENTED.md` | 尚未真实存在的能力 |
 | `PHASE_0_VERIFICATION.md` | 本轮命令与结果 |
+| `family-account-multi-b/` | 阶段 B 账号与多家庭基础；门控保持关闭，运行边界见 WALK |
+| `family-invite-share-design/` | 家庭邀请与分享新版阶段 A：多家庭、7 天单名额、历史分享、离开/转交/30 天清理；纯设计，入口关闭，公开注册须先实现账号删除 |
 | `FAMILY_CAPABILITY_AUDIT.md` | 家庭能力：产品已决定 vs 仓库已实现 |
 | `FAMILY_DOMAIN_MODEL.md` | Family / Membership / 接收快照是家庭缓存 |
 | `FAMILY_ACCESS_AND_SNAPSHOT.md` | 读取矩阵；退出后 App 内不可读接收快照 |
@@ -24,3 +26,9 @@
 | `lookback-expand/` | #35 当时的年页展开契约。产品效力见 `lookback-book/`；#36 是 B 的备选实现 |
 | `life-album/` | 生活册。阶段 A 设计 #63。阶段 B 本机册子 `WALK-B.md`。阶段 C 排版探测与预览 `WALK-C.md`。不开始 D–E |
 | `adr/` | `0001`–`0006`。`0006` 已接受：身份、成员、快照矛盾结论 |
+| `family-dissolve-cleanup-e3/` | E3解散、立即收权、30天清理与隔离验收；家庭正式入口仍关闭 |
+| `family-email-profile-stage1/` | 受控邮箱格式账号注册／登录与本人昵称；默认关闭，无邮件验证；成员头像墙留到下一阶段 |
+
+| `family-member-profiles-stage2/` | 家庭成员系统头像墙、昵称与点选操作；权限不按昵称，正式入口仍关闭 |
+
+- [家庭分享身份 · 阶段 3](family-share-author-stage3/README.md)

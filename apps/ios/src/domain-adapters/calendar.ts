@@ -1,3 +1,4 @@
+import { appLanguage, dateLabel, tr } from '../i18n';
 /* eslint-disable @typescript-eslint/no-require-imports */
 const calendar = require('@lampy/domain/shared/calendar.js') as {
   getCalendarParts: (
@@ -26,7 +27,17 @@ export const {
   deviceTimezoneOffsetMinutes,
 } = calendar;
 
-export const { formatCalendarDate } = dateFormat;
+export function formatCalendarDate(timestamp: string | number, precision: string, timezoneOffsetMinutes?: number): string {
+  if (appLanguage === 'zh-Hans') return dateFormat.formatCalendarDate(timestamp, precision, timezoneOffsetMinutes);
+  const millis = time.parseMillis(timestamp);
+  if (millis == null || !['exact', 'day', 'month', 'year'].includes(precision)) return tr('时间未确认');
+  const parts = calendar.getCalendarParts(millis, timezoneOffsetMinutes);
+  if (precision === 'year') return String(parts.year);
+  const label = dateLabel(parts.year, parts.month, precision === 'month' ? undefined : parts.day);
+  if (precision !== 'exact') return label;
+  const shifted = new Date(millis + (timezoneOffsetMinutes ?? 0) * 60000);
+  return `${label} ${pad2(shifted.getUTCHours())}:${pad2(shifted.getUTCMinutes())}`;
+}
 export const { parseMillis } = time;
 
 export type HistoryClock = number | { timeZone: string };

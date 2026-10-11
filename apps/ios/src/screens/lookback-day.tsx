@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { Pressable, StyleSheet } from 'react-native';
 import { Text, type } from './life-text';
 
@@ -20,10 +21,10 @@ export function LookbackDayMoment({
       ...entry.images.map((image) => image.label),
       entry.audio?.label || '',
       ...entry.unknownMedia.map((item) => item.label),
-      entry.feeling ? `当时的感受，${entry.feeling.label}` : '',
+      entry.feeling ? tr("当时的感受，{0}", [entry.feeling.label]) : '',
     ]
       .filter(Boolean)
-      .join('，') || '一条记录';
+      .join('，') || tr("一条记录");
   return (
     <Pressable
       accessibilityRole="button"

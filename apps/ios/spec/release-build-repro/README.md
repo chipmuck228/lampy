@@ -1,6 +1,6 @@
 # Reproducible native release builds (Xcode 26.3)
 
-Base: main d76edf1 after #86. No personal functionality changes, no upload.
+Original base: main d76edf1 after #86. Updated by merging main 708fb8c on 2026-10-11. No personal functionality changes, no upload.
 
 ## Recorded incident
 User's TestFlight 0.1.0 (4) terminated before JS: DYLD could not load
@@ -58,3 +58,18 @@ Final Linux reproduction: clean npm ci applied BOTH patches; repeated native:pat
 reported already patched. NODE_ENV=production expo prebuild --platform ios
 --no-install completed and generated Podfile with the disable setting before
 require/autolinking. This validates config generation only, not CocoaPods or Xcode.
+
+## Current-main conflict resolution (2026-10-11)
+
+Merged main 708fb8c7375e299b1df25adab789594a1420ca58 into the original
+release compatibility branch. The app.json plugin list retains expo-localization
+and with-family-invite-links from main, and adds with-native-build-compat.
+No dependency upgrades, version/build changes, or internal TestFlight login
+implementation are included in this merge. PR remains OPEN.
+
+Checks on this merged tree: TypeScript, changed CJS ESLint, bash syntax,
+native-build-fix Node tests (3 top-level tests, including real copied-package
+patch replay/idempotence and dependency inspection), and git diff --check.
+Native CocoaPods/Xcode Archive and device startup on this tree remain
+NOT VERIFIED. Earlier local combined #105 integration was config-generation
+verification only; #105 remains a separate PR.

@@ -1,3 +1,5 @@
+import { createFamilyTransferCommands } from './transfer-commands';
+import { createInviteLinkCommands, type InviteLinkCommands } from './invite-link-commands';
 import { FAMILY_ERROR, FamilyError } from './errors';
 import {
   fingerprintAcceptInvitation,
@@ -10,9 +12,12 @@ import { createFamilyStore, type FamilyStore, type IdempotentRecord } from './st
 import type {
   AppleVerifier,
   FamilyClock,
+  FamilyListView,
+  FamilySummary,
   FamilyHealth,
   FamilyIds,
   FamilyView,
+  FamilyRoster,
   Invitation,
   InvitationView,
   MediaObjectView,
@@ -28,29 +33,45 @@ import { ARGON2ID_PRODUCTION } from './password';
 import {
   assertTestAccountSessionAllowed,
   createTestAccountCommands,
+  requireProfileNickname,
   rejectDisallowedTestAccountSession,
 } from './test-account-commands';
 import type { MediaBlobStore } from './media-blobs';
 import { createMemoryMediaBlobStore } from './media-blobs';
 import { createMediaCommands } from './media-commands';
-import { createShareCommands } from './share-commands';
+import { createShareCommands, type ShareCommands } from './share-commands';
+import { assertHistoryEnabled, HISTORY_CONFIRMATION } from './history-policy';
 import { assertMediaPayload } from './media-validate';
 
-export type FamilyCommands = {
+export type FamilyCommands = InviteLinkCommands & {
+  transfers: ReturnType<typeof createFamilyTransferCommands>;
+  historyShares: ShareCommands;
+  getFamilyHistoryPolicy(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
+  confirmFamilyHistory(session: string, familyId: string, confirmation: string): Promise<{ policy: 'family-history-v2' }>;
+  registerControlledEmail(input: { email: string; password: string; nickname: string }, peer?: string): Promise<SignInResult>;
+  signInWithControlledEmail(input: { email: string; password: string }, peer?: string): Promise<SignInResult>;
+  getMyProfile(sessionToken: string): Promise<import('./types').UserProfile>;
+  updateMyProfile(sessionToken: string, nickname: string): Promise<import('./types').UserProfile>;
   health(): FamilyHealth;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createTestAccount(login: string, password: string): Promise<{ userId: string; created: true }>;
+  revokeTestAccountSessions(login: string): Promise<{ revoked: true; userId: string }>;
   disableTestAccount(login: string): Promise<{ disabled: true; userId: string }>;
+  listFamilies(sessionToken: string): Promise<FamilyListView>;
+  createNamedFamily(sessionToken: string, name: string, idempotencyKey: string): Promise<FamilySummary>;
   createFamily(sessionToken: string, idempotencyKey?: string): Promise<FamilyView>;
   inviteMember(sessionToken: string, familyId: string, idempotencyKey?: string): Promise<InvitationView>;
   revokeInvitation(sessionToken: string, invitationId: string): Promise<InvitationView>;
   acceptInvitation(sessionToken: string, code: string, idempotencyKey?: string): Promise<FamilyView>;
   listMembership(sessionToken: string): Promise<MembershipListView>;
   listPendingInvitations(sessionToken: string, familyId: string): Promise<InvitationView[]>;
+  getFamilyRoster(sessionToken: string, familyId: string): Promise<FamilyRoster>;
+  leaveSelectedFamily(sessionToken: string, familyId: string, membershipId: string): Promise<{ left: true }>;
+  removeSelectedMember(sessionToken: string, familyId: string, userId: string, membershipId: string): Promise<{ removed: true }>;
   leaveFamily(sessionToken: string): Promise<{ left: true }>;
   removeMember(sessionToken: string, familyId: string, userId: string): Promise<{ removed: true }>;
-  dissolveFamily(sessionToken: string, familyId: string): Promise<{ dissolved: true }>;
+  dissolveFamily(sessionToken: string, familyId: string, membershipId?: string): Promise<{ dissolved: true }>;
   signOut(sessionToken: string): Promise<{ signedOut: true }>;
   uploadMedia(
     sessionToken: string,
@@ -84,6 +105,7 @@ async function requireUser(
   sessionToken: string | undefined,
   clock: FamilyClock,
   testAccountLoginEnabled: boolean,
+  operatorOnly = false,
 ) {
   if (!sessionToken) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
@@ -92,7 +114,7 @@ async function requireUser(
   if (!session || new Date(session.expiresAt).getTime() <= clock.now().getTime()) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
-  await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled);
+  await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled, operatorOnly);
   return session.userId;
 }
 
@@ -105,6 +127,13 @@ async function requireActiveFamily(tx: FamilyTx, familyId: string) {
     throw new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.');
   }
   return family;
+}
+
+async function requireActiveMembership(tx: FamilyTx, familyId: string, userId: string) {
+  await requireActiveFamily(tx, familyId);
+  const membership = await tx.findActiveMembership(familyId, userId);
+  if (!membership) throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.');
+  return membership;
 }
 
 async function toFamilyView(tx: FamilyTx, familyId: string, userId: string): Promise<FamilyView> {
@@ -162,6 +191,9 @@ async function readIdempotent<T>(
   if (!idempotencyKey) return undefined;
   const hit = await tx.findIdempotent(userId, command, idempotencyKey);
   if (!hit) return undefined;
+  if (hit.body && typeof hit.body === 'object' && 'retired' in hit.body && hit.body.retired === 'family-dissolved') {
+    throw new FamilyError(FAMILY_ERROR.FAMILY_DISSOLVED, 'This family has been dissolved.');
+  }
   if (hit.requestFingerprint !== requestFingerprint) {
     throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Idempotency key was reused with a different request.');
   }
@@ -225,6 +257,10 @@ export function createFamilyCommands(deps: {
   mediaBlobs?: MediaBlobStore;
   passwordHasher?: PasswordHasher;
   testAccountLoginEnabled?: boolean;
+  controlledEmailAccountsEnabled?: boolean;
+  publicTestLoginEnabled?: boolean;
+  inviteLinksEnabled?: boolean;
+  historySharingEnabled?: boolean;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -233,19 +269,21 @@ export function createFamilyCommands(deps: {
   const store = deps.store ?? createFamilyStore();
   const repository = deps.repository ?? createMemoryFamilyRepository(store);
   const blobs = deps.mediaBlobs ?? createMemoryMediaBlobStore();
-  const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
+  const testAccountLoginEnabled = deps.testAccountLoginEnabled === true || deps.publicTestLoginEnabled === true;
   const media = createMediaCommands({
     repository,
     blobs,
     clock,
     assertPayload: assertMediaPayload,
     testAccountLoginEnabled,
+    operatorOnly: deps.publicTestLoginEnabled === true,
   });
   const shares = createShareCommands({
     repository,
     blobs,
     clock,
     testAccountLoginEnabled,
+    operatorOnly: deps.publicTestLoginEnabled === true,
   });
   const testAccounts = createTestAccountCommands({
     repository,
@@ -253,6 +291,8 @@ export function createFamilyCommands(deps: {
     ids,
     sessionTtlMs,
     passwordHasher: deps.passwordHasher,
+    controlledEmailAccountsEnabled: deps.controlledEmailAccountsEnabled,
+    publicTestLoginEnabled: deps.publicTestLoginEnabled,
     testAccountLoginEnabled,
   });
 
@@ -265,15 +305,42 @@ export function createFamilyCommands(deps: {
       sessionToken,
       clock.now(),
       testAccountLoginEnabled,
+      deps.publicTestLoginEnabled === true,
     ).then(() =>
       repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled, deps.publicTestLoginEnabled === true);
         return work(tx, userId);
       }),
     );
   }
 
   return {
+    transfers: createFamilyTransferCommands({authed:withAuthedUser,clock,id:()=>`transfer_${ids.invitationId()}`}),
+    historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled, operatorOnly: deps.publicTestLoginEnabled === true,
+      historyPolicy: 'family-history-v2', historyEnabled: deps.historySharingEnabled === true }),
+    async getFamilyHistoryPolicy(session, familyId) {
+      assertHistoryEnabled(deps.historySharingEnabled === true);
+      return withAuthedUser(session, async (tx, userId) => {
+        await requireActiveMembership(tx, familyId, userId);
+        return { policy: (await tx.findFamily(familyId))?.historyPolicy ?? 'legacy' };
+      });
+    },
+    async confirmFamilyHistory(session, familyId, confirmation) {
+      assertHistoryEnabled(deps.historySharingEnabled === true);
+      if (confirmation !== HISTORY_CONFIRMATION) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Explicit history access confirmation is required.');
+      return withAuthedUser(session, async (tx, userId) => {
+        const membership = await requireActiveMembership(tx, familyId, userId);
+        if (membership.role !== 'creator') throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the creator can confirm history access.');
+        const family = (await tx.findFamily(familyId))!;
+        if (family.historyPolicy !== 'family-history-v2') {
+          await tx.saveFamily({ ...family, historyPolicy: 'family-history-v2', historyConfirmedAt: clock.now().toISOString(), historyConfirmedBy: userId });
+          for (const invitation of await tx.listPendingInvitations(familyId)) await tx.saveInvitation({ ...invitation, status: 'revoked' });
+          for (const invitation of await tx.listInviteLinks(familyId)) if (invitation.status === 'pending') await tx.saveInviteLink({ ...invitation, status: 'revoked' });
+        }
+        return { policy: 'family-history-v2' as const };
+      });
+    },
+    ...createInviteLinkCommands({ repository, clock, ids, enabled:deps.inviteLinksEnabled === true, withAuthedUser }),
     health() {
       const testHealth = testAccounts.health();
       return {
@@ -282,12 +349,17 @@ export function createFamilyCommands(deps: {
         media: true as const,
         shares: true as const,
         inbox: true as const,
+        controlledEmailAccounts: deps.publicTestLoginEnabled === true || (testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true),
+        emailRegistration: deps.publicTestLoginEnabled !== true && testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true,
+        publicTestLogin: deps.publicTestLoginEnabled === true,
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
+        familyHistoryV2: deps.historySharingEnabled === true,
         argon2id: ARGON2ID_PRODUCTION,
       };
     },
     async signInWithApple(identityToken: string) {
+      if (deps.publicTestLoginEnabled) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Apple sign-in is not enabled for this controlled test.');
       if (!identityToken.trim()) {
         throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, 'Apple identity token is invalid.');
       }
@@ -312,12 +384,55 @@ export function createFamilyCommands(deps: {
           expiresAt: iso(new Date(clock.now().getTime() + sessionTtlMs)),
         };
         await tx.saveSession(session);
-        await tx.deleteOtherSessions(account.userId, session.token);
         return {
           userId: account.userId,
           sessionToken: session.token,
           expiresAt: session.expiresAt,
         };
+      });
+    },
+
+    listFamilies(sessionToken) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        const families: FamilySummary[] = [];
+        for (const membership of await tx.findMembershipsForUser(userId)) {
+          if (membership.status !== 'active') continue;
+          const family = await tx.findFamily(membership.familyId);
+          if (!family || family.status !== 'active') continue;
+          families.push({ familyId: family.familyId, name: family.name || '', createdAt: family.createdAt, role: membership.role,
+            memberCount: (await tx.listActiveMembers(family.familyId)).length });
+        }
+        families.sort((a, b) => a.familyId.localeCompare(b.familyId));
+        const pastFamilies = (await tx.listPastFamilies(userId)).filter(row => !families.some(f => f.familyId === row.familyId));
+        return { families, ...(pastFamilies.length ? { pastFamilies } : {}), limit: 10 as const };
+      });
+    },
+    createNamedFamily(sessionToken, rawName, idempotencyKey) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        const name = rawName.trim();
+        if (!name || Array.from(name).length > 40 || /[\u0000-\u001f\u007f]/.test(name) || !idempotencyKey || idempotencyKey.length > 128) {
+          throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'A family name (1–40 characters) and operation key are required.');
+        }
+        const fingerprint = JSON.stringify({ version: 2, name });
+        const cached = await readIdempotent<FamilySummary>(tx, userId, 'createNamedFamily', idempotencyKey, fingerprint);
+        if (cached) {
+          const family = await requireActiveFamily(tx, cached.familyId);
+          const member = await tx.findActiveMembership(family.familyId, userId);
+          if (!member) throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Membership has ended.');
+          return { familyId: family.familyId, name: family.name || '', createdAt: family.createdAt, role: member.role,
+            memberCount: (await tx.listActiveMembers(family.familyId)).length };
+        }
+        let count = 0;
+        for (const membership of await tx.findMembershipsForUser(userId)) {
+          if (membership.status === 'active' && (await tx.findFamily(membership.familyId))?.status === 'active') count++;
+        }
+        if (count >= 10) throw new FamilyError(FAMILY_ERROR.FAMILY_LIMIT_REACHED, 'You can belong to at most 10 active families.');
+        const now = iso(clock.now());
+        const familyId = ids.familyId();
+        await tx.saveFamily({ familyId, name, createdAt: now, status: 'active', historyPolicy: deps.historySharingEnabled ? 'family-history-v2' : 'legacy' });
+        await tx.saveMembership({ membershipId: ids.membershipId(), familyId, userId, role: 'creator', status: 'active', joinedAt: now });
+        return writeIdempotent(tx, userId, 'createNamedFamily', idempotencyKey, fingerprint,
+          { familyId, name, createdAt: now, role: 'creator' as const, memberCount: 1 });
       });
     },
 
@@ -481,6 +596,51 @@ export function createFamilyCommands(deps: {
       });
     },
 
+    getFamilyRoster(sessionToken, familyId) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        await requireActiveFamily(tx, familyId);
+        const membership = await tx.findActiveMembership(familyId, userId);
+        if (!membership) throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.');
+        const rows = await tx.listActiveMembers(familyId);
+        return { familyId, role: membership.role, membershipId: membership.membershipId,
+          members: await Promise.all(rows.sort((a, b) => a.joinedAt.localeCompare(b.joinedAt) || a.membershipId.localeCompare(b.membershipId))
+            .map(async row => ({ membershipId: row.membershipId, userId: row.userId, role: row.role, joinedAt: row.joinedAt,
+              nickname: (await tx.findProfile(row.userId))?.nickname ?? '', avatar: 'system' as const }))) };
+      });
+    },
+    leaveSelectedFamily(sessionToken, familyId, membershipId) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        await requireActiveFamily(tx, familyId);
+        const active = await tx.findActiveMembership(familyId, userId);
+        if (active && active.membershipId !== membershipId) throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Membership changed.');
+        if (!active) {
+          const prior = (await tx.findMembershipsInFamily(familyId, userId)).find(row => row.membershipId === membershipId);
+          if (prior?.status === 'left' || prior?.status === 'removed') return { left: true as const };
+          throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.');
+        }
+        if (active.role === 'creator') throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'The creator cannot leave.');
+        active.status = 'left'; await tx.saveMembership(active);
+        return { left: true as const };
+      });
+    },
+    removeSelectedMember(sessionToken, familyId, targetUserId, membershipId) {
+      return withAuthedUser(sessionToken, async (tx, userId) => {
+        await requireActiveFamily(tx, familyId);
+        await requireActiveCreator(tx, familyId, userId, 'Only the creator can remove a member.');
+        if (targetUserId === userId) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Cannot remove yourself.');
+        const active = await tx.findActiveMembership(familyId, targetUserId);
+        if (active && active.membershipId !== membershipId) throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Membership changed.');
+        if (!active) {
+          const prior = (await tx.findMembershipsInFamily(familyId, targetUserId)).find(row => row.membershipId === membershipId);
+          if (prior?.status === 'removed' || prior?.status === 'left') return { removed: true as const };
+          throw new FamilyError(FAMILY_ERROR.MEMBER_NOT_FOUND, 'Member not found.');
+        }
+        if (active.role === 'creator') throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Cannot remove the creator.');
+        active.status = 'removed'; await tx.saveMembership(active);
+        return { removed: true as const };
+      });
+    },
+
     leaveFamily(sessionToken) {
       return withAuthedUser(sessionToken, async (tx, userId) => {
         const membership = await tx.findActiveMembershipForUser(userId);
@@ -520,22 +680,37 @@ export function createFamilyCommands(deps: {
       });
     },
 
-    dissolveFamily(sessionToken, familyId) {
+    dissolveFamily(sessionToken, familyId, membershipId) {
       return withAuthedUser(sessionToken, async (tx, userId) => {
         const family = await tx.findFamily(familyId);
         if (!family) {
           throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Family was not found.');
         }
         if (family.status === 'dissolved') {
-          const wasCreator = (await tx.findMembership(familyId, userId))?.role === 'creator';
+          const wasCreator = family.dissolvedBy === userId || (!family.dissolvedBy && (await tx.findMembership(familyId, userId))?.role === 'creator');
           if (!wasCreator) {
             throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Only the family creator can dissolve the family.');
           }
           return { dissolved: true as const };
         }
         await requireActiveCreator(tx, familyId, userId, 'Only the family creator can dissolve the family.');
+        const creator = await tx.findActiveMembership(familyId, userId);
+        if (membershipId && creator?.membershipId !== membershipId) throw new FamilyError(FAMILY_ERROR.CONFLICT, 'Membership changed.');
+        const dissolvedAt = clock.now().toISOString();
         family.status = 'dissolved';
+        family.dissolvedAt = dissolvedAt;
+        family.cleanupDeadline = new Date(Date.parse(dissolvedAt) + 30 * 24 * 60 * 60 * 1000).toISOString();
+        family.dissolvedBy = userId;
         await tx.saveFamily(family);
+        for (const invite of await tx.listInviteLinks(familyId)) {
+          if (invite.status === 'pending') await tx.saveInviteLink({ ...invite, status: 'revoked' });
+        }
+        for (const invite of await tx.listPendingInvitations(familyId)) {
+          await tx.saveInvitation({ ...invite, status: 'revoked' });
+        }
+        for (const transfer of await tx.listTransfers(familyId)) {
+          if (transfer.status === 'pending') await tx.saveTransfer({ ...transfer, status: 'invalid', revision: transfer.revision + 1, updatedAt: dissolvedAt });
+        }
         for (const row of await tx.listActiveMembers(familyId)) {
           row.status = 'removed';
           await tx.saveMembership(row);
@@ -544,12 +719,25 @@ export function createFamilyCommands(deps: {
       });
     },
 
+    registerControlledEmail(input, peer) { return testAccounts.registerControlledEmail(input, peer); },
+    signInWithControlledEmail(input, peer) { return testAccounts.signInWithControlledEmail(input, peer); },
+    getMyProfile(sessionToken) {
+      return withAuthedUser(sessionToken, async(tx,userId) => (await tx.findProfile(userId)) ?? { userId, nickname:'', avatar:'system' as const, updatedAt:null });
+    },
+    async updateMyProfile(sessionToken, rawNickname) {
+      const nickname = requireProfileNickname(rawNickname);
+      return withAuthedUser(sessionToken, async(tx,userId) => {
+        const profile = { userId, nickname, avatar:'system' as const, updatedAt:iso(clock.now()) };
+        await tx.saveProfile(profile); return profile;
+      });
+    },
     signInWithTestAccount(input) {
       return testAccounts.signInWithTestAccount(input);
     },
     createTestAccount(login, password) {
       return testAccounts.createTestAccount(login, password);
     },
+    revokeTestAccountSessions(login) { return testAccounts.revokeTestAccountSessions(login); },
     disableTestAccount(login) {
       return testAccounts.disableTestAccount(login);
     },

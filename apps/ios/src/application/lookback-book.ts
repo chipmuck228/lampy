@@ -1,7 +1,8 @@
+import { tr, appLanguage, monthLabel, weekdayLabel } from '../i18n';
 import { isValidCalendarDay, pad2 } from '../domain-adapters/calendar';
 import { lookbackDayEntries, type LookbackDayEntry } from './lookback-day';
 import type { HistoryMomentItem } from './history-use-cases';
-import { weekdayMondayIndex, LOOKBACK_WEEKDAY_LABELS } from './lookback-month';
+import { weekdayMondayIndex } from './lookback-month';
 import type { LookbackYearEntry } from './lookback-year';
 
 export const LOOKBACK_BOOK_EXCERPT_LIMIT = 2;
@@ -52,22 +53,23 @@ export function lookbackBookIntentFromParts(input: {
 }
 
 export function lookbackBookWeekdayName(year: number, month: number, day: number): string {
-  return `星期${LOOKBACK_WEEKDAY_LABELS[weekdayMondayIndex(year, month, day)]}`;
+  return weekdayLabel(weekdayMondayIndex(year, month, day));
 }
 
 export function lookbackBookDateLabel(year: number, month: number, day: number): string {
-  return `${month}月${day}日 · ${lookbackBookWeekdayName(year, month, day)}`;
+  return tr("{0}月{1}日 · {2}", [month, day, lookbackBookWeekdayName(year, month, day)]);
 }
 
 const LOOKBACK_MONTH_HAN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'] as const;
 
 export function lookbackCatalogMonthHan(month: number): string {
+  if (appLanguage === 'en') return monthLabel(month);
   const stem = LOOKBACK_MONTH_HAN[month - 1];
-  return stem ? `${stem}月` : `${month}月`;
+  return stem ? tr("{0}月", [stem]) : tr("{0}月", [month]);
 }
 
 export function lookbackBookDayPrimaryLabel(day: number): string {
-  return `${day}日`;
+  return tr("{0}日", [day]);
 }
 
 export function lookbackBookDayDateLabel(month: number, day: number): string {
@@ -75,7 +77,7 @@ export function lookbackBookDayDateLabel(month: number, day: number): string {
 }
 
 export function lookbackBookDaySecondaryLabel(year: number, month: number, day: number): string {
-  return `周${LOOKBACK_WEEKDAY_LABELS[weekdayMondayIndex(year, month, day)]}`;
+  return weekdayLabel(weekdayMondayIndex(year, month, day), true);
 }
 
 export function lookbackBookDayMetaLabel(
@@ -84,7 +86,7 @@ export function lookbackBookDayMetaLabel(
   day: number,
   count: number,
 ): string {
-  return `${lookbackBookDaySecondaryLabel(year, month, day)} · ${count}条`;
+  return tr("{0} · {1}条", [lookbackBookDaySecondaryLabel(year, month, day), count]);
 }
 
 export function lookbackBookDayAccessLabel(
@@ -94,9 +96,7 @@ export function lookbackBookDayAccessLabel(
   summary: string,
   selected: boolean,
 ): string {
-  return `${year}年${month}月${day}日，${lookbackBookWeekdayName(year, month, day)}，${summary}，${
-    selected ? '已选中' : '未选中'
-  }`;
+  return tr("{0}年{1}月{2}日，{3}，{4}，{5}", [year, month, day, lookbackBookWeekdayName(year, month, day), summary, selected ? tr("已选中") : tr("未选中")]);
 }
 
 export function lookbackBookMonthAccessLabel(
@@ -105,7 +105,7 @@ export function lookbackBookMonthAccessLabel(
   summary: string,
   expanded: boolean,
 ): string {
-  return `${year}年${month}月，${summary}，${expanded ? '已展开' : '已收起'}`;
+  return tr("{0}年{1}月，{2}，{3}", [year, month, summary, expanded ? tr("已展开") : tr("已收起")]);
 }
 
 export function lookbackBookMonthOpenable(input: {

@@ -1,3 +1,4 @@
+import { dateLabel, tr } from '../i18n';
 import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
 import type { AssetRepository, MomentRepository } from '../infrastructure/repositories';
 import type { LifeAlbumRepository } from '../infrastructure/life-album-repository';
@@ -76,7 +77,7 @@ function formatCollectedAt(iso: string | null, clock: HistoryClock): string | nu
   const millis = parseMillis(iso);
   if (millis === null) return null;
   const parts = calendarPartsAt(millis, clock);
-  return `${parts.year}年${parts.month}月${parts.day}日`;
+  return dateLabel(parts.year, parts.month, parts.day);
 }
 
 export function createLifeAlbumUseCases(deps: {
@@ -135,18 +136,18 @@ export function createLifeAlbumUseCases(deps: {
     if (cover.kind === 'words') return;
     const present = entries ?? (await albums.listEntries(albumId));
     if (!present.some((entry) => entry.momentId === cover.momentId)) {
-      throw new ApplicationError(ALBUM_COVER_INVALID, '封面只能选自已经收进这一册的照片。');
+      throw new ApplicationError(ALBUM_COVER_INVALID, tr("封面只能选自已经收进这一册的照片。"));
     }
     const found = await deps.moments.findById(cover.momentId);
     if (found.kind !== 'ready' || !found.moment.assetIds.includes(cover.assetId)) {
-      throw new ApplicationError(ALBUM_COVER_INVALID, '封面只能选自已经收进这一册的照片。');
+      throw new ApplicationError(ALBUM_COVER_INVALID, tr("封面只能选自已经收进这一册的照片。"));
     }
     if (!deps.assets) {
-      throw new ApplicationError(ALBUM_COVER_INVALID, '封面只能选自已经收进这一册的照片。');
+      throw new ApplicationError(ALBUM_COVER_INVALID, tr("封面只能选自已经收进这一册的照片。"));
     }
     const asset = await deps.assets.findById(cover.assetId);
     if (asset.kind !== 'ready' || asset.asset.type !== 'image') {
-      throw new ApplicationError(ALBUM_COVER_INVALID, '封面只能选自已经收进这一册的照片。');
+      throw new ApplicationError(ALBUM_COVER_INVALID, tr("封面只能选自已经收进这一册的照片。"));
     }
   }
 
@@ -260,7 +261,7 @@ export function createLifeAlbumUseCases(deps: {
     return {
       source: 'ready',
       noteExcerpt: albumNoteExcerpt(found.moment.content.note),
-      dateLabel: occurred ? dated : dated ? `记录于 ${dated}` : null,
+      dateLabel: occurred ? dated : dated ? tr('记录于 {0}', [dated]) : null,
       mediaHint: albumMediaHint({ photoCount, hasAudio, unknownCount }),
       photoCount,
       hasAudio,
@@ -311,7 +312,7 @@ export function createLifeAlbumUseCases(deps: {
       return { status: 'ready', albums: items };
     } catch (error) {
       if (error instanceof ApplicationError) return { status: 'error', message: error.message };
-      return { status: 'error', message: '生活册暂时读不出来，原来的记录还在。' };
+      return { status: 'error', message: tr("生活册暂时读不出来，原来的记录还在。") };
     }
   }
 
@@ -401,7 +402,7 @@ export function createLifeAlbumUseCases(deps: {
         if (existing) return;
         const found = await deps.moments.findById(input.momentId);
         if (found.kind !== 'ready') {
-          throw new ApplicationError(ALBUM_SOURCE_UNAVAILABLE, '这条记录现在无法找到。');
+          throw new ApplicationError(ALBUM_SOURCE_UNAVAILABLE, tr("这条记录现在无法找到。"));
         }
         const current = await albums.listEntries(input.albumId);
         const result = await albums.insertEntry({
@@ -464,11 +465,11 @@ export function createLifeAlbumUseCases(deps: {
         const current = await albums.listEntries(input.albumId);
         const currentIds = current.map((entry) => entry.momentId);
         if (currentIds.length !== input.momentIds.length) {
-          throw new ApplicationError(ALBUM_REORDER_INVALID, '这一册的顺序没有改成。可以再试。');
+          throw new ApplicationError(ALBUM_REORDER_INVALID, tr("这一册的顺序没有改成。可以再试。"));
         }
         const same = [...currentIds].sort().join('\0') === [...input.momentIds].sort().join('\0');
         if (!same) {
-          throw new ApplicationError(ALBUM_REORDER_INVALID, '这一册的顺序没有改成。可以再试。');
+          throw new ApplicationError(ALBUM_REORDER_INVALID, tr("这一册的顺序没有改成。可以再试。"));
         }
         await albums.replaceEntryOrder(input.albumId, input.momentIds);
         await albums.update({
@@ -491,7 +492,7 @@ export function createLifeAlbumUseCases(deps: {
     const current = await albums.listEntries(input.albumId);
     const ids = current.map((entry) => entry.momentId);
     const index = ids.indexOf(input.momentId);
-    if (index < 0) throw new ApplicationError(ALBUM_REORDER_INVALID, '这一册的顺序没有改成。可以再试。');
+    if (index < 0) throw new ApplicationError(ALBUM_REORDER_INVALID, tr("这一册的顺序没有改成。可以再试。"));
     const swap = input.direction === 'up' ? index - 1 : index + 1;
     if (swap < 0 || swap >= ids.length) return toManageView(input.albumId);
     const next = ids.slice();

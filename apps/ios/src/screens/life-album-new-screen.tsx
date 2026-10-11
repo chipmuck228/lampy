@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -202,9 +203,9 @@ export default function LifeAlbumNewScreen() {
         finishedRef.current = true;
         consumeAlbumCollectCreateIntent(sessionToken);
         const successName = albumName;
-        Alert.alert(ALBUM_CREATE_COLLECT_SUCCESS, `已收进「${successName}」`, [
+        Alert.alert(ALBUM_CREATE_COLLECT_SUCCESS, tr('已收进「{0}」', [successName]), [
           {
-            text: '好',
+            text: tr('好'),
             onPress: () => {
               if (!isEligible(requestId)) return;
               finishCollectCreateToMoment(router, {
@@ -244,20 +245,20 @@ export default function LifeAlbumNewScreen() {
     : ALBUM_CREATE_ONLY_ACTION;
   const submitBusyLabel = collectMode
     ? nameLocked
-      ? '正在加入'
-      : '正在创建'
-    : '正在记下';
+      ? tr("正在加入")
+      : tr("正在创建")
+    : tr("正在记下");
 
   return (
     <SettingsPage
-      title="新建一册"
-      backLabel={collectMode ? '返回' : '我的生活册'}
-      accessibilityLabel="新建一册"
+      title={tr("新建一册")}
+      backLabel={collectMode ? tr("返回") : tr("我的生活册")}
+      accessibilityLabel={tr("新建一册")}
       pageTestID="life-album-new"
       scrollEnabled={false}
       onBack={leaveWithoutWrite}
     >
-      <Text style={styles.label}>册名</Text>
+      <Text style={styles.label}>{tr("册名")}</Text>
       <TextInput
         testID="life-album-new-name"
         value={displayName}
