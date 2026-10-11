@@ -83,8 +83,8 @@ export type FamilyView = {
   members: FamilyMemberView[];
 };
 
-export type FamilySummary = { familyId: string; name: string; role: MembershipRole; memberCount: number };
-export type PastFamilySummary = { familyId: string; name: string; role: MembershipRole; status: 'left' | 'removed' | 'dissolved' };
+export type FamilySummary = { familyId: string; name: string; createdAt?: string; role: MembershipRole; memberCount: number };
+export type PastFamilySummary = { familyId: string; name: string; createdAt?: string; role: MembershipRole; status: 'left' | 'removed' | 'dissolved' };
 export type FamilyListView = { families: FamilySummary[]; pastFamilies?: PastFamilySummary[]; limit: 10 };
 
 export type MembershipListView = {

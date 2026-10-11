@@ -47,3 +47,11 @@ c500014：tsc PASS；本轮应用/页面/清理3 suites / 53 tests PASS；相关
 30天清理现在明确保留每个原成员的最小目录信息；SQL文件测试验证成员/分享被清理但目录仍在。已被旧清理删除的历史不可自动找回。
 
 最新自动化：tsc、相关Jest 15 suites / 182 tests、改动源ESLint、node --check、git diff --check PASS。全量为210 suites PASS / 2 FAIL、1184 tests PASS / 2 FAIL；life-page.test.ts与life-album-detail-sheet.test.tsx为此前已同依赖对照main复现的基线失败，不记全量PASS。新增目录状态仍未做实页走查。
+
+## 目录状态用户走查（9c37c8c）与新视觉边界
+
+用户报告双模拟器九项全部PASS：离开保留、同ID再加入、解散保留、旧邀请/分享/声音拒绝、同名新ID独立、重启持久、账号隔离、其他家庭/个人/生活册完整、本机保护。对应用户已核对运行9c37c8c，不记真机PASS。
+
+之后状态胶囊/图标颜色/创建日期/删除重复说明为新视觉，模拟器/真机仍NOT VERIFIED。需迁移25；24原契约和其历史走查仍保留。
+
+本轮tsc、相关Jest 7 suites / 68 tests、改动源ESLint、node --check、git diff --check PASS。全量210 suites / 1184 tests通过，2套件/2测试为此前基线失败，未记全量PASS。创建日期回填、清理后保留日期和页面去重复说明有测试；颜色与排版仍须实页复测。

@@ -165,6 +165,8 @@ const MIGRATIONS = [
      AND NOT EXISTS(SELECT 1 FROM family_memberships live WHERE live.family_id=m.family_id AND live.user_id=m.user_id
        AND live.status='active' AND f.status='active')
      AND m.rowid=(SELECT MAX(latest.rowid) FROM family_memberships latest WHERE latest.family_id=m.family_id AND latest.user_id=m.user_id);`,
+  `ALTER TABLE family_directory_history ADD COLUMN created_at TEXT;
+   UPDATE family_directory_history SET created_at=(SELECT created_at FROM family_families f WHERE f.family_id=family_directory_history.family_id);`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16] as const;

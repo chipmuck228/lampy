@@ -167,12 +167,12 @@ it('keeps account-scoped dissolved directory markers after purge, without revivi
  const x=await setup();await commands.dissolveFamily(x.a.sessionToken,x.f.familyId,x.ar.membershipId);
  for (const account of [x.a,x.b]) {
   const list=await commands.listFamilies(account.sessionToken);
-  expect(list.families).toEqual([]);expect(list.pastFamilies).toEqual([{familyId:x.f.familyId,name:'Private family',role:account===x.a?'creator':'member',status:'dissolved'}]);
+  expect(list.families).toEqual([]);expect(list.pastFamilies).toEqual([{familyId:x.f.familyId,name:'Private family',createdAt:start,role:account===x.a?'creator':'member',status:'dissolved'}]);
  }
  now=new Date(deadline);await runFamilyCleanup(db,blobs,now);
  await db.close();db=openFamilySqliteDatabase(path.join(dir,'f.sqlite'));commands=build();
  x.a=await commands.signInWithApple('a');x.b=await commands.signInWithApple('b');
- expect((await commands.listFamilies(x.b.sessionToken)).pastFamilies?.[0].name).toBe('Private family');
+ expect((await commands.listFamilies(x.b.sessionToken)).pastFamilies?.[0]).toMatchObject({name:'Private family',createdAt:start});
  expect(await db.getAll('SELECT * FROM family_memberships WHERE family_id=?',[x.f.familyId])).toEqual([]);
  expect(await db.getAll('SELECT * FROM family_shares WHERE family_id=?',[x.f.familyId])).toEqual([]);
  await expect(commands.historyShares.getShare(x.b.sessionToken,x.f.familyId,x.shared.shareId)).rejects.toBeTruthy();
@@ -204,7 +204,7 @@ it('backfills latest inactive membership at migration 24 and rolls back partial 
  await expect(applyFamilyApiSchema(broken)).rejects.toThrow('interrupted');
  expect(await db.getFirst("SELECT name FROM sqlite_master WHERE name='family_directory_history'")).toBeNull();
  await db.run("UPDATE family_memberships SET status='left' WHERE membership_id='latest'");await applyFamilyApiSchema(db);
- expect(await db.getAll('SELECT * FROM family_directory_history')).toEqual([{user_id:'u',family_id:'old',name:'Known name',role:'member',status:'left'}]);
+ expect(await db.getAll('SELECT * FROM family_directory_history')).toEqual([{user_id:'u',family_id:'old',name:'Known name',role:'member',status:'left',created_at:'now'}]);
 });
 
 it('backfills dissolved families for every former member without admitting them to the active list',async()=>{

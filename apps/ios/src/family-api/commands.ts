@@ -381,7 +381,7 @@ export function createFamilyCommands(deps: {
           if (membership.status !== 'active') continue;
           const family = await tx.findFamily(membership.familyId);
           if (!family || family.status !== 'active') continue;
-          families.push({ familyId: family.familyId, name: family.name || '', role: membership.role,
+          families.push({ familyId: family.familyId, name: family.name || '', createdAt: family.createdAt, role: membership.role,
             memberCount: (await tx.listActiveMembers(family.familyId)).length });
         }
         families.sort((a, b) => a.familyId.localeCompare(b.familyId));
@@ -401,7 +401,7 @@ export function createFamilyCommands(deps: {
           const family = await requireActiveFamily(tx, cached.familyId);
           const member = await tx.findActiveMembership(family.familyId, userId);
           if (!member) throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Membership has ended.');
-          return { familyId: family.familyId, name: family.name || '', role: member.role,
+          return { familyId: family.familyId, name: family.name || '', createdAt: family.createdAt, role: member.role,
             memberCount: (await tx.listActiveMembers(family.familyId)).length };
         }
         let count = 0;
@@ -414,7 +414,7 @@ export function createFamilyCommands(deps: {
         await tx.saveFamily({ familyId, name, createdAt: now, status: 'active', historyPolicy: deps.historySharingEnabled ? 'family-history-v2' : 'legacy' });
         await tx.saveMembership({ membershipId: ids.membershipId(), familyId, userId, role: 'creator', status: 'active', joinedAt: now });
         return writeIdempotent(tx, userId, 'createNamedFamily', idempotencyKey, fingerprint,
-          { familyId, name, role: 'creator' as const, memberCount: 1 });
+          { familyId, name, createdAt: now, role: 'creator' as const, memberCount: 1 });
       });
     },
 

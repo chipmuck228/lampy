@@ -110,7 +110,7 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
-    async listPastFamilies(userId) { return store.directoryHistory.filter(row => row.userId === userId).map(row => ({ familyId: row.familyId, name: row.name, role: row.role, status: row.status })); },
+    async listPastFamilies(userId) { return store.directoryHistory.filter(row => row.userId === userId).map(row => ({ familyId: row.familyId, name: row.name, createdAt: row.createdAt, role: row.role, status: row.status })); },
     async listSharesReferencingMedia(objectId) { return store.shares.filter(s => s.snapshot.media.some(m => m.objectId === objectId)); },
     async listTransfers(familyId) { return store.transfers.filter(row => row.familyId === familyId); },
     async saveTransfer(transfer) { replaceBy(store.transfers, row => row.transferId, transfer); },
@@ -225,7 +225,7 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       const family = findFamily(store, membership.familyId);
       store.directoryHistory = store.directoryHistory.filter(row => row.userId !== membership.userId || row.familyId !== membership.familyId);
       if (family && (membership.status !== 'active' || family.status === 'dissolved')) {
-        store.directoryHistory.push({ userId: membership.userId, familyId: membership.familyId, name: family.name || '', role: membership.role,
+        store.directoryHistory.push({ userId: membership.userId, familyId: membership.familyId, name: family.name || '', createdAt: family.createdAt, role: membership.role,
           status: family.status === 'dissolved' ? 'dissolved' : membership.status === 'left' ? 'left' : 'removed' });
       }
     },

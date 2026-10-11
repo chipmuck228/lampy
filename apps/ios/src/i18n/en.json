@@ -753,5 +753,6 @@
   "已离开": "Left",
   "已被移除": "Removed",
   "家庭已解散，个人记录还在。": "This family has been dissolved. Your personal moments are still here.",
-  "个人记录还在。": "Your personal moments are still here."
+  "个人记录还在。": "Your personal moments are still here.",
+  "创建于 {0}": "Created {{0}}"
 }
