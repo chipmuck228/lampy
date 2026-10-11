@@ -39,13 +39,12 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
   const transferIntent = useRef<{ target: string; requestId: string } | null>(null);
   const currentRef = useRef<() => boolean>(() => false), owner = useRef<(() => boolean) | null>(null);
   useFocusEffect(useCallback(() => {
-    if (!familyId) { leave(); return; }
-    enter();
-    if (!allowed) { setOpen(false); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null); }
+    if (familyId) enter(); else leave();
+    if (!allowed || !familyId) { setOpen(false); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null); }
     return () => { leave(); currentRef.current = () => false; owner.current = null; setBusy(false); setOpen(false); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null); };
   }, [allowed, enter, leave, familyId]));
   async function load() {
-    if (!allowed || owner.current) return;
+    if (!allowed || !familyId || owner.current) return;
     pauseForegroundAudio(); setOpen(true); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null);
     const current = begin(); currentRef.current = current; owner.current = current; setBusy(true);
     try {
@@ -130,7 +129,7 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
       tr('离开后将不能阅读这里的家庭记录。已经分享的片段会保留，个人记录不受影响。再次加入需要新的邀请。'),
       [{ text: tr('取消'), style: 'cancel' }, { text: tr(target ? '确认移除' : '确认离开'), style: 'destructive', onPress: () => void change(expected, target, current) }]);
   }
-  if (!allowed) return null;
+  if (!allowed || !familyId) return null;
   return <View>
     <Pressable style={styles.hit} accessibilityRole="button" accessibilityState={{ expanded: open, disabled: busy }} disabled={busy}
       testID={`family-members-${familyId}`} onPress={() => { if (open) { begin(); currentRef.current = () => false; setOpen(false); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null); } else void load(); }}><Text style={styles.action}>{tr('家庭成员')}</Text></Pressable>
@@ -191,8 +190,8 @@ const styles = StyleSheet.create({
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: paperDeep, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' },
   avatarSelected: { borderColor: sage },
   selectedPanel: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline, paddingTop: 12, gap: 4 },
-  name: { ...type.meta, color: inkSoft, textAlign: 'center', flexShrink: 1 },
-  role: { fontSize: 13, lineHeight: 20, color: inkSoft },
+  name: { ...type.meta, color: inkSoft, textAlign: 'center', alignSelf: 'stretch', width: '100%' },
+  role: { fontSize: 13, lineHeight: 20, color: inkSoft, textAlign: 'center', alignSelf: 'stretch', width: '100%' },
   memberHit: { minHeight: 100, paddingHorizontal: 4, paddingVertical: 8, gap: 4, justifyContent: 'flex-start', alignItems: 'center' },
   memberActions: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 8, paddingBottom: 8 },
   memberActionHit: { minHeight: 48, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center', flexShrink: 1 },

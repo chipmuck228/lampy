@@ -144,3 +144,12 @@ it('reopening refreshes the nickname, and a different family cannot retain the o
  expect(page.queryByText('新的昵称')).toBeNull();
  await act(async () => { confirm(); }); expect(mockRemove).not.toHaveBeenCalled();
 });
+
+it('does not open an unqualified empty family and loads normally once a real family arrives', async () => {
+ const page = await render(<FamilyCardMembers familyId="" onChanged={mockChanged}/>);
+ expect(page.queryByText('家庭成员')).toBeNull(); expect(mockMembers).not.toHaveBeenCalled();
+ await page.rerender(<FamilyCardMembers familyId="home" onChanged={mockChanged}/>);
+ await fireEvent.press(page.getByTestId('family-members-home'));
+ await waitFor(() => expect(page.getByTestId('family-member-wall')).toBeTruthy());
+ expect(mockMembers).toHaveBeenCalledWith('home', expect.any(Function));
+});
