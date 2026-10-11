@@ -1,4 +1,4 @@
-import { publicTestAuthPlan, publicTestPeer, createPublicAuthAdmission } from './public-test-auth';
+import { publicTestAuthPlan, publicTestPeer, createPublicAuthAdmission, isPublicAuthRequest, publicAuthBodyDeadline } from './public-test-auth';
 import { INVITE_WEB_HTML, INVITE_WEB_CSS, inviteWebJs, inviteAssociation } from './invite-web';
 import { invitationOrigin, makeFamilyInviteLink } from '../infrastructure/family-invite-link';
 import { mkdirSync } from 'node:fs';
@@ -105,6 +105,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
 
   const admitAuth = createPublicAuthAdmission();
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    let cancelBodyDeadline: (() => void) | undefined;
     let releaseAuth: (() => void) | undefined;
     try {
       const url = new URL(req.url || '/', `http://${host}:${port}`);
@@ -122,7 +123,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
         if(asset) {res.setHeader('content-security-policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'");res.writeHead(200,{'content-type':asset[1]});res.end(asset[0]);return;}
         if(route==='/.well-known/apple-app-site-association') { const aasa=inviteAssociation(inviteOrigin || undefined);res.writeHead(aasa ? 200 : 404,{'content-type':'application/json'});res.end(JSON.stringify(aasa || {}));return; }
       }
-      const authRequest = req.method === 'POST' && /^\/v[12]\/auth\//.test(route);
+      const authRequest = isPublicAuthRequest(req.method, route);
       let peer = req.socket.remoteAddress || 'unknown';
       if (publicAuth.enabled && authRequest) {
         const trusted = publicTestPeer(req.socket.remoteAddress, req.headers['x-lampy-client-ip']);
@@ -138,7 +139,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
           res.end(JSON.stringify({ error: { code: 'RATE_LIMITED', message: 'Try again later.' } }));
           return;
         }
-        req.setTimeout(10_000, () => req.destroy());
+        cancelBodyDeadline = publicAuthBodyDeadline(() => req.destroy());
       }
       const isMediaUpload = (req.method || '').toUpperCase() === 'POST' && route === '/v1/media';
       const isShareCreate = (req.method || '').toUpperCase() === 'POST' && /^\/v[12]\/families\/[^/]+\/shares$/.test(route);
@@ -148,6 +149,8 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
           ? FAMILY_SHARE_JSON_MAX_BYTES
           : FAMILY_JSON_MAX_BYTES;
       const raw = await readRawBody(req, maxBytes);
+      cancelBodyDeadline?.();
+      cancelBodyDeadline = undefined;
       if (raw === 'too-large') {
         res.writeHead(413, { 'content-type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: isMediaUpload
@@ -192,6 +195,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
       res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: { code: 'INTERNAL', message: 'Family API failed.' } }));
     } finally {
+      cancelBodyDeadline?.();
       releaseAuth?.();
     }
   });

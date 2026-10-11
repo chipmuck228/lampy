@@ -30,3 +30,13 @@ export function createPublicAuthAdmission(max = 4) {
     return () => { if (!released) { released = true; active -= 1; } };
   };
 }
+
+export function isPublicAuthRequest(method: string | undefined, route: string) {
+  return (method || '').toUpperCase() === 'POST' && /^\/v[12]\/auth\//.test(route);
+}
+
+// Request-body deadline only. Cancel as soon as the body is read, before queued Argon2.
+export function publicAuthBodyDeadline(destroy: () => void, delayMs = 10_000) {
+  const timer = setTimeout(destroy, delayMs);
+  return () => clearTimeout(timer);
+}

@@ -6,7 +6,7 @@ import { createFamilyCommands } from './commands';
 import { createMapAppleVerifier } from './apple';
 import { createFamilyStore } from './store';
 import { ARGON2ID_TEST, createArgon2idPasswordHasher } from './password';
-import { createPublicAuthAdmission, publicTestAuthPlan, publicTestPeer } from './public-test-auth';
+import { createPublicAuthAdmission, publicTestAuthPlan, publicTestPeer, isPublicAuthRequest, publicAuthBodyDeadline } from './public-test-auth';
 import { startFamilyApiServer } from './listen';
 import { openFamilySqliteDatabase } from './node-db';
 import { applyFamilyApiSchema } from './schema';
@@ -130,4 +130,19 @@ it('migration 27 preserves old credentials and marks them unprovisioned, and is 
     await applyFamilyApiSchema(db); await applyFamilyApiSchema(db);
     expect(await db.getFirst('SELECT user_id,password_hash,enabled,operator_provisioned FROM family_test_credentials')).toEqual({ user_id: 'old-user', password_hash: 'old-hash', enabled: 1, operator_provisioned: 0 });
   } finally { await db.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
+it('uses the same normalized method for every auth gate', () => {
+  for (const method of ['POST', 'post', 'Post', 'pOsT']) expect(isPublicAuthRequest(method, '/v2/auth/email/login')).toBe(true);
+  expect(isPublicAuthRequest('GET', '/v2/auth/email/login')).toBe(false);
+});
+it('body timeout can abort a slow body but cannot abort queued authentication after body completion', () => {
+  jest.useFakeTimers();
+  try {
+    const destroy = jest.fn();
+    const finishBody = publicAuthBodyDeadline(destroy);
+    jest.advanceTimersByTime(9999); expect(destroy).not.toHaveBeenCalled();
+    finishBody(); jest.advanceTimersByTime(60_000); expect(destroy).not.toHaveBeenCalled();
+    publicAuthBodyDeadline(destroy); jest.advanceTimersByTime(10_000); expect(destroy).toHaveBeenCalledTimes(1);
+  } finally { jest.useRealTimers(); }
 });
