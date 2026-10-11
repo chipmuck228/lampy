@@ -265,3 +265,12 @@ it('E3 a remote dissolve denies cached reading and removes the family cache on r
  await expect(x.history.read(x.f.familyId,shared.shareId,current)).rejects.toBeTruthy();
  expect(await x.cache.list(x.a.userId,x.f.familyId)).toEqual([]);
 });
+
+it('E3 getPolicy after remote dissolution rejects the real absent-list path and isolates cache',async()=>{
+ const x=await fixture();await x.history.confirmPolicy(x.f.familyId,current);
+ const preview=await x.history.prepare('moment_d2',x.f.familyId,current);const shared=await x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,current);
+ await x.history.read(x.f.familyId,shared.shareId,current);
+ await x.commands.dissolveFamily(x.a.sessionToken,x.f.familyId);
+ await expect(x.history.getPolicy(x.f.familyId,current)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
+ expect(await x.cache.list(x.a.userId,x.f.familyId)).toEqual([]);
+});

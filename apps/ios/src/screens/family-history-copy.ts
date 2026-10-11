@@ -3,7 +3,8 @@ export function familyHistoryError(error: unknown) {
   const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
   if (code === 'FAMILY_DISSOLVED') return tr('这个家庭已解散，个人记录还在。');
   if (code === 'UNAUTHENTICATED') return tr('登录后，才能和家人一起看。');
-  if (code === 'NOT_IN_FAMILY' || code === 'FORBIDDEN' || code === 'SHARE_NOT_FOUND') return tr('这份家庭记录现在不可读。');
+  if (code === 'NOT_IN_FAMILY') return tr('现在无法访问这个家庭，个人记录还在。');
+  if (code === 'FORBIDDEN' || code === 'SHARE_NOT_FOUND') return tr('这份家庭记录现在不可读。');
   if (code === 'FAMILY_HISTORY_CLOSED' || code === 'FAMILY_UPGRADE_REQUIRED') return tr('家庭分享暂未开放。');
   if (code === 'SOURCE_CHANGED' || code === 'MOMENT_NOT_FOUND') return tr('记录已变化，请重新查看并确认。');
   if (code === 'SHARE_MEDIA_UNAVAILABLE') return tr('这份分享的照片或声音暂时读不出来，请再试一次。');

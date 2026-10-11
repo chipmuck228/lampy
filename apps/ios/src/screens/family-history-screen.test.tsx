@@ -154,3 +154,13 @@ it('E3 refresh after dissolution drops the old family title and does not autopla
  await waitFor(()=>expect(page.getByText('这个家庭已解散，个人记录还在。')).toBeTruthy());
  expect(page.queryByText('Window')).toBeNull();expect(page.queryByText('Morning')).toBeNull();expect(mockPlay).not.toHaveBeenCalled();
 });
+
+it('E3 missing membership after remote dissolution clears private content without claiming a cause',async()=>{
+ const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);await waitFor(()=>expect(page.getByText('Morning')).toBeTruthy());
+ mockPolicy.mockRejectedValueOnce({code:'NOT_IN_FAMILY'});
+ await act(async()=>{AppState.currentState='background';mockListeners.slice().forEach(fn=>fn('background'));});
+ await act(async()=>{AppState.currentState='active';mockListeners.slice().forEach(fn=>fn('active'));});
+ await waitFor(()=>expect(page.getByText('现在无法访问这个家庭，个人记录还在。')).toBeTruthy());
+ expect(page.queryByText('这个家庭已解散，个人记录还在。')).toBeNull();
+ expect(page.queryByText('Window')).toBeNull();expect(page.queryByText('Morning')).toBeNull();expect(mockPlay).not.toHaveBeenCalled();
+});
