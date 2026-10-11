@@ -55,3 +55,9 @@ c500014：tsc PASS；本轮应用/页面/清理3 suites / 53 tests PASS；相关
 之后状态胶囊/图标颜色/创建日期/删除重复说明为新视觉，模拟器/真机仍NOT VERIFIED。需迁移25；24原契约和其历史走查仍保留。
 
 本轮tsc、相关Jest 7 suites / 68 tests、改动源ESLint、node --check、git diff --check PASS。全量210 suites / 1184 tests通过，2套件/2测试为此前基线失败，未记全量PASS。创建日期回填、清理后保留日期和页面去重复说明有测试；颜色与排版仍须实页复测。
+
+## 最新视觉模拟器验收与合并核对
+
+用户按269cbe9拉取/迁移25步骤后报告六项模拟器PASS：正常浅绿图标与创建日期、历史灰色图标与三种胶囊、去重复说明、同名独立、历史只读、重启持久。目标运行269cbe9；本次未再次贴rev-parse，不扩写真机/系统VO/横屏/iPad。
+
+最终源码269cbe9已跑tsc、相关7套件68项、ESLint、node检查、diff检查通过；全量210套件1184项通过，2项main对照基线失败保留。GitHub该head Bugbot SUCCESS，旧review已解决。main仍4164ad1；仅apps/ios，无node_modules/截图/生产配置写入。
