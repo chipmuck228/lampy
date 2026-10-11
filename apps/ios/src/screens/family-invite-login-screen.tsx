@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { currentFamilyInvite } from '../infrastructure/family-invite-link';
-import { isFamilyProductEntryOpen, isControlledEmailAccountsOpen } from '../infrastructure/family-config';
+import { isFamilyProductEntryOpen, isControlledEmailAccountsOpen, isFamilyInternalTestBuild } from '../infrastructure/family-config';
 import { isPersonalSettingsDiagnosticsOpen } from '../application/personal-settings-visibility';
 import { tr } from '../i18n';
 import { useState } from 'react';
@@ -16,7 +16,8 @@ export default function FamilyInviteLoginScreen() {
   const params = useLocalSearchParams<{returnTo?: string; generation?: string}>();
   const lock = useDeviceLock();
   const target = params.returnTo === '/family' ? '/family' : '/family-invite';
-  const valid = isFamilyProductEntryOpen() && isPersonalSettingsDiagnosticsOpen() &&
+  const internal = isFamilyInternalTestBuild();
+  const valid = isFamilyProductEntryOpen() && (internal || isPersonalSettingsDiagnosticsOpen()) &&
     !lock?.snapshot.locked && currentFamilyInvite()?.generation === Number(params.generation);
   function back() {
     if (router.canGoBack()) router.back();
@@ -30,6 +31,6 @@ export default function FamilyInviteLoginScreen() {
     accessibilityLabel={tr('家庭邀请')} onBack={back}>
     <Text>{tr('请返回邀请，重新确认后继续。')}</Text>
   </SettingsPage>;
-  if (emailMode) return <FamilyEmailAccountScreen onAuthenticated={authenticated} onCancel={back} onOtherSignIn={() => setEmailMode(false)}/>;
+  if (emailMode) return <FamilyEmailAccountScreen onAuthenticated={authenticated} onCancel={back} onOtherSignIn={internal ? undefined : () => setEmailMode(false)}/>;
   return <AccountScreen onEmailRequested={() => setEmailMode(true)} variant="diagnostics" onAuthenticated={authenticated} onCancel={back} />;
 }

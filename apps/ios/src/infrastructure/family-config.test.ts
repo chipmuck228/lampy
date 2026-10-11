@@ -1,4 +1,4 @@
-import { isFamilyApiConfigured, isFamilyProductEntryOpen, isSafeFamilyApiBaseUrl } from './family-config';
+import { isFamilyInternalTestBuild, isFamilyApiConfigured, isFamilyProductEntryOpen, isSafeFamilyApiBaseUrl } from './family-config';
 import { createFamilyHttpTransport } from './family-http-client';
 import { armFamilyTestNextRequestFailure } from './family-test-driver';
 
@@ -98,4 +98,10 @@ describe('family API URL safety', () => {
     if (previous === undefined) delete process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER;
     else process.env.EXPO_PUBLIC_FAMILY_TEST_DRIVER = previous;
   });
+});
+
+it('requires explicit internal profile and approved HTTPS origin',()=>{
+ expect(isFamilyInternalTestBuild('1','https://family-test.yunpura.com','1','1')).toBe(true);
+ for(const url of ['http://family-test.yunpura.com','https://family-test.yunpura.com.evil.test','http://127.0.0.1:8787','https://family-test.yunpura.com/path']) expect(isFamilyInternalTestBuild('1',url,'1','1')).toBe(false);
+ expect(isFamilyInternalTestBuild('0','https://family-test.yunpura.com','1','1')).toBe(false);
 });

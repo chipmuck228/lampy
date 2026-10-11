@@ -99,7 +99,6 @@ export default function FamilyDirectoryScreen() {
   return <SettingsPage title={tr('家庭')} backLabel={tr('最近')} accessibilityLabel={tr('家庭')} onBack={() => router.dismissTo('/')}>
     {!isFamilyProductEntryOpen() ? <Text>{tr('敬请期待。')}</Text> : allowed ? <>
       {state.status !== 'signed-out' ? <Text style={styles.intro}>{tr('给重要的人，留一个位置。')}</Text> : null}
-      {state.status === 'ready' && isControlledEmailAccountsOpen() ? <Pressable accessibilityRole="button" style={styles.hit} onPress={() => router.push('/family-profile')}><Text style={styles.action}>{tr('我的资料')}</Text></Pressable> : null}
       {state.status === 'loading' ? <Text>{tr('正在读取家庭。')}</Text> : null}
       {state.status === 'signed-out' ? <View style={styles.welcome} testID="family-signed-out">
         <View style={styles.welcomeMark}><LifeIcon name="family" size={44} color="#91AA98" /></View>

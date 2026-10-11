@@ -40,3 +40,13 @@ export function isSafeFamilyApiBaseUrl(value = process.env.EXPO_PUBLIC_FAMILY_AP
     return false;
   }
 }
+
+/** Explicit internal build only; never infer this from merely having an API URL. */
+export function isFamilyInternalTestBuild(
+  marker = process.env.EXPO_PUBLIC_FAMILY_INTERNAL_TEST,
+  base = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL,
+  entry = process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN,
+  email = process.env.EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS,
+) {
+  return marker === '1' && base === 'https://family-test.yunpura.com' && entry === '1' && email === '1';
+}
