@@ -114,3 +114,33 @@ it('E3 drops stale dissolve confirmation and permits one explicit retry after fa
  await fireEvent.press(page.getByTestId('family-dissolve-selected'));const confirm=alert.mock.calls[1][2]![1].onPress!;
  await page.unmount();await act(async()=>{confirm();});expect(mockDissolve).toHaveBeenCalledTimes(1);
 });
+
+it('shows a default-avatar wall with live nicknames; equal names still remove the exact selected membership', async () => {
+ const third = { ...member, membershipId: 'mc', userId: 'c', nickname: '小禾' };
+ const expected = { ...roster, userId: 'a', role: 'creator', membershipId: 'ma', members: [creator, { ...member, nickname: '小禾' }, third] };
+ mockMembers.mockResolvedValue(expected);
+ const alert = jest.spyOn(Alert, 'alert'), page = await open();
+ expect(page.getByTestId('family-member-wall')).toBeTruthy();
+ expect(page.getAllByText('小禾')).toHaveLength(2);
+ expect(page.queryByText(/example.com/)).toBeNull();
+ await fireEvent.press(page.getByTestId('family-member-mc'));
+ expect(page.queryByTestId('family-member-actions-mb')).toBeNull();
+ await fireEvent.press(page.getByTestId('family-remove-mc'));
+ await act(async () => { alert.mock.calls[0][2]![1].onPress!(); });
+ expect(mockRemove).toHaveBeenCalledWith(expected, 'mc', expect.any(Function));
+});
+it('reopening refreshes the nickname, and a different family cannot retain the old roster or confirmation', async () => {
+ const expected = { ...roster, userId: 'a', role: 'creator', membershipId: 'ma', members: [creator, { ...member, nickname: '小禾' }] };
+ mockMembers.mockResolvedValue(expected);
+ const page = await open(), alert = jest.spyOn(Alert, 'alert');
+ await fireEvent.press(page.getByTestId('family-members-home'));
+ mockMembers.mockResolvedValue({ ...expected, members: [creator, { ...member, nickname: '新的昵称' }] });
+ await fireEvent.press(page.getByTestId('family-members-home'));
+ await waitFor(() => expect(page.getByText('新的昵称')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('family-member-mb'));
+ await fireEvent.press(page.getByTestId('family-remove-mb'));
+ const confirm = alert.mock.calls[0][2]![1].onPress!;
+ await page.rerender(<FamilyCardMembers familyId="other" onChanged={mockChanged}/>);
+ expect(page.queryByText('新的昵称')).toBeNull();
+ await act(async () => { confirm(); }); expect(mockRemove).not.toHaveBeenCalled();
+});

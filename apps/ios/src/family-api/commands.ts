@@ -593,8 +593,9 @@ export function createFamilyCommands(deps: {
         if (!membership) throw new FamilyError(FAMILY_ERROR.NOT_IN_FAMILY, 'Not a member of this family.');
         const rows = await tx.listActiveMembers(familyId);
         return { familyId, role: membership.role, membershipId: membership.membershipId,
-          members: rows.sort((a, b) => a.joinedAt.localeCompare(b.joinedAt) || a.membershipId.localeCompare(b.membershipId))
-            .map(row => ({ membershipId: row.membershipId, userId: row.userId, role: row.role, joinedAt: row.joinedAt })) };
+          members: await Promise.all(rows.sort((a, b) => a.joinedAt.localeCompare(b.joinedAt) || a.membershipId.localeCompare(b.membershipId))
+            .map(async row => ({ membershipId: row.membershipId, userId: row.userId, role: row.role, joinedAt: row.joinedAt,
+              nickname: (await tx.findProfile(row.userId))?.nickname ?? '', avatar: 'system' as const }))) };
       });
     },
     leaveSelectedFamily(sessionToken, familyId, membershipId) {
