@@ -26,6 +26,7 @@ function expectedFromAppJson(appJsonPath = DEFAULT_APP_JSON) {
     team: 'B283NY984J',
     version: String(version),
     build: String(build),
+    profile: 'personal',
   };
 }
 
@@ -110,6 +111,13 @@ function inspectArchive(archivePath, expected = expectedFromAppJson()) {
   report.version = plistPrint(info, 'CFBundleShortVersionString');
   report.build = plistPrint(info, 'CFBundleVersion');
   report.team = codesignTeam(app);
+  const profile = plistPrint(info, 'LampyBuildProfile');
+  const api = plistPrint(info, 'LampyFamilyAPI');
+  if (expected.profile === 'family-internal') {
+    if (profile !== 'family-internal' || api !== 'https://family-test.yunpura.com') problems.push('family_profile_mismatch');
+    const entitlements = spawnSync('codesign', ['-d', '--entitlements', ':-', app], {encoding:'utf8'});
+    if (!`${entitlements.stdout || ''} ${entitlements.stderr || ''}`.includes('applinks:family-test.yunpura.com')) problems.push('family_associated_domain_missing');
+  } else if (profile || api) problems.push('unexpected_family_profile');
 
   if (report.bundleId !== expected.bundleId) problems.push('bundle_id_mismatch');
   if (report.version !== expected.version) problems.push('version_mismatch');
@@ -163,7 +171,12 @@ if (require.main === module) {
     console.error('usage: inspect-release-archive.cjs /path/to/Lampy.xcarchive');
     process.exit(2);
   }
-  const report = inspectArchive(archive);
+  const expected = expectedFromAppJson();
+  if (process.env.LAMPY_BUILD_PROFILE === 'family-internal') {
+    const internal = require('./family-internal-profile.cjs').internalProfile(process.env);
+    expected.build = internal.build; expected.profile = 'family-internal';
+  }
+  const report = inspectArchive(archive, expected);
   printReport(report);
   process.exit(report.problems.length === 0 ? 0 : 1);
 }

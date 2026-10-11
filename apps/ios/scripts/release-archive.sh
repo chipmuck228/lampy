@@ -12,8 +12,32 @@ if [[ "${1:-}" == "--inspect" ]]; then
   exit $?
 fi
 
+if [[ -n "${1:-}" && "${1:-}" != "--family-internal" ]]; then
+  echo "usage: release-archive.sh [--family-internal [--prepare|--inspect ARCHIVE]]" >&2
+  exit 2
+fi
+if [[ "${1:-}" == "--family-internal" && -n "${2:-}" && "${2:-}" != "--prepare" && "${2:-}" != "--inspect" ]]; then
+  echo "unknown internal archive option" >&2
+  exit 2
+fi
+
+FAMILY_INTERNAL=0
+PREPARE_ONLY=0
+if [[ "${1:-}" == "--family-internal" ]]; then
+  FAMILY_INTERNAL=1
+  [[ "${2:-}" != "--prepare" ]] || PREPARE_ONLY=1
+fi
+
 # shellcheck source=./release-public-env.sh
 source "$ROOT/scripts/release-public-env.sh"
+if [[ "$FAMILY_INTERNAL" == 1 ]]; then
+  source "$ROOT/scripts/family-internal-env.sh"
+  node -e 'require("./scripts/family-internal-profile.cjs").internalProfile(process.env)'
+  if [[ "${2:-}" == "--inspect" ]]; then
+    node "$ROOT/scripts/inspect-release-archive.cjs" "${3:?archive path required}"
+    exit $?
+  fi
+fi
 
 STASH="$(mktemp -d /tmp/lampy-dotenv-stash.XXXXXX)"
 RESTORE_DONE=0
@@ -65,7 +89,8 @@ REPORT="$OUT/archive-report.txt"
   echo "bundle=app.lampy.ios"
   echo "team=B283NY984J"
   echo "version=$(node -p "require('./app.json').expo.version")"
-  echo "build=$(node -p "require('./app.json').expo.ios.buildNumber")"
+  echo "build=$(node -p 'require("./scripts/family-internal-profile.cjs").configure(require("./app.json").expo,process.env).ios.buildNumber')"
+  echo "profile=${LAMPY_BUILD_PROFILE:-personal}"
   echo "EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS=${EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS-}"
   echo "EXPO_PUBLIC_FAMILY_ENTRY_OPEN=${EXPO_PUBLIC_FAMILY_ENTRY_OPEN-}"
   echo "EXPO_PUBLIC_FAMILY_API_BASE_URL=${EXPO_PUBLIC_FAMILY_API_BASE_URL-}"
@@ -103,6 +128,16 @@ fi
 
 pod install --project-directory=ios
 
+if [[ "$FAMILY_INTERNAL" == 1 ]]; then
+  # Persist non-secret bundle flags for later manual Xcode Run/Archive. Expo dotenv is disabled.
+  {
+    printf 'export NODE_BINARY=%q\n' "$(command -v node)"
+    for key in LAMPY_BUILD_PROFILE LAMPY_BUILD_NUMBER EXPO_NO_DOTENV EXPO_PUBLIC_FAMILY_INTERNAL_TEST EXPO_PUBLIC_FAMILY_ENTRY_OPEN EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS EXPO_PUBLIC_FAMILY_API_BASE_URL EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS EXPO_PUBLIC_FAMILY_TEST_DRIVER EXPO_PUBLIC_FAMILY_TEST_INVITE_CODE; do
+      printf 'export %s=%q\n' "$key" "${!key}"
+    done
+  } > "$ROOT/ios/.xcode.env.local"
+fi
+
 PLIST="$ROOT/ios/Lampy/Info.plist"
 ENT="$ROOT/ios/Lampy/Lampy.entitlements"
 PRIV="$ROOT/ios/Lampy/PrivacyInfo.xcprivacy"
@@ -133,6 +168,11 @@ PBX="$ROOT/ios/Lampy.xcodeproj/project.pbxproj"
     echo "PrivacyInfo.xcprivacy=(missing after prebuild)"
   fi
 } | tee -a "$REPORT"
+
+if [[ "$PREPARE_ONLY" == 1 ]]; then
+  echo "prepared=$ROOT/ios/Lampy.xcworkspace (no archive, no upload)"
+  exit 0
+fi
 
 echo "archiving Release (no upload)"
 set +e

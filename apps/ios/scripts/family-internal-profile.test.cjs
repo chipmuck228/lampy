@@ -1,0 +1,7 @@
+'use strict';
+const {test}=require('node:test');const assert=require('node:assert/strict');
+const {configure,internalProfile}=require('./family-internal-profile.cjs');
+const env={LAMPY_BUILD_PROFILE:'family-internal',LAMPY_BUILD_NUMBER:'8',EXPO_PUBLIC_FAMILY_INTERNAL_TEST:'1',EXPO_PUBLIC_FAMILY_ENTRY_OPEN:'1',EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS:'1',EXPO_PUBLIC_FAMILY_API_BASE_URL:'https://family-test.yunpura.com',EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS:'0',EXPO_PUBLIC_FAMILY_TEST_DRIVER:'',EXPO_PUBLIC_FAMILY_TEST_INVITE_CODE:''};
+test('personal config unchanged',()=>{const base={ios:{buildNumber:'1'}};assert.equal(configure(base,{...env,LAMPY_BUILD_PROFILE:undefined}),base);});
+test('internal build preserves permissions and base config',()=>{const base={ios:{buildNumber:'1',infoPlist:{NSMicrophoneUsageDescription:'Keep'}}};const c=configure(base,env);assert.equal(c.ios.buildNumber,'8');assert.equal(c.ios.infoPlist.LampyFamilyAPI,env.EXPO_PUBLIC_FAMILY_API_BASE_URL);assert.equal(c.ios.infoPlist.NSMicrophoneUsageDescription,'Keep');assert.equal(base.ios.buildNumber,'1');});
+test('bad origin, diagnostics, driver, missing build or unknown profile fails',()=>{for(const patch of [{EXPO_PUBLIC_FAMILY_API_BASE_URL:'http://localhost:8787'},{EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS:'1'},{EXPO_PUBLIC_FAMILY_TEST_DRIVER:'1'},{LAMPY_BUILD_NUMBER:''},{LAMPY_BUILD_PROFILE:'typo'}])assert.throws(()=>internalProfile({...env,...patch}));});

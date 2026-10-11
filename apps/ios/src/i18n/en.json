@@ -781,5 +781,11 @@
   "你 · {0} 分享的": "Shared by you · {{0}}",
   "{0} 分享的": "Shared by {{0}}",
   "以 {0} 的身份，分享给「{1}」": "Sharing as {{0}} with {{1}}",
-  "当前账号": "your current account"
+  "当前账号": "your current account",
+  "请使用受邀测试账号登录。": "Please sign in with your invited test account.",
+  "退出登录": "Sign out",
+  "仅退出这台设备，个人记录不变。": "Sign out on this device only. Your personal moments stay here.",
+  "退出还未完成，请再试一次。": "Sign-out is not complete. Please try again.",
+  "已退出这台设备，联网后会继续撤销会话。": "Signed out on this device. Session revocation will continue when connected.",
+  "已退出这台设备。": "Signed out on this device."
 }
