@@ -1,17 +1,18 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Alert, AppState } from 'react-native';
 import { FamilyCardMembers } from './family-card-members';
+const mockDissolve=jest.fn();
 const mockTransfer=jest.fn(),mockCreateTransfer=jest.fn(),mockRespondTransfer=jest.fn();
 const mockMembers=jest.fn(),mockLeave=jest.fn(),mockRemove=jest.fn(),mockChanged=jest.fn();
 const mockLock={snapshot:{locked:false}};
 jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useFocusEffect:(fn:()=>void)=>useEffect(fn,[fn])};});
-jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({history:{getCreatorTransfer:mockTransfer,createCreatorTransfer:mockCreateTransfer,respondCreatorTransfer:mockRespondTransfer,getMembers:mockMembers,leaveFamily:mockLeave,removeMember:mockRemove}})}));
+jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({history:{dissolveFamily:mockDissolve,getCreatorTransfer:mockTransfer,createCreatorTransfer:mockCreateTransfer,respondCreatorTransfer:mockRespondTransfer,getMembers:mockMembers,leaveFamily:mockLeave,removeMember:mockRemove}})}));
 jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>true}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
 const member={membershipId:'mb',userId:'b',role:'member',joinedAt:'2026-10-09T00:00:00Z'};
 const creator={membershipId:'ma',userId:'a',role:'creator',joinedAt:'2026-10-08T00:00:00Z'};
 const roster={familyId:'home',userId:'b',role:'member',membershipId:'mb',members:[creator,member]};
-beforeEach(()=>{jest.clearAllMocks();mockTransfer.mockResolvedValue(null);mockLock.snapshot.locked=false;Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});mockMembers.mockResolvedValue(roster);mockLeave.mockResolvedValue({left:true});mockRemove.mockResolvedValue({removed:true});});
+beforeEach(()=>{jest.clearAllMocks();mockTransfer.mockResolvedValue(null);mockDissolve.mockResolvedValue({dissolved:true});mockLock.snapshot.locked=false;Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});mockMembers.mockResolvedValue(roster);mockLeave.mockResolvedValue({left:true});mockRemove.mockResolvedValue({removed:true});});
 afterEach(()=>jest.restoreAllMocks());
 async function open(){const page=await render(<FamilyCardMembers familyId="home" onChanged={mockChanged}/>);await fireEvent.press(page.getByTestId('family-members-home'));await waitFor(()=>expect(mockMembers).toHaveBeenCalled());await waitFor(()=>expect(page.getByText('你')).toBeTruthy());return page;}
 it('keeps leave behind explicit confirmation and refreshes the directory only after success',async()=>{
@@ -91,4 +92,25 @@ it('shows actions only below the selected member and switches selection without 
 it('does not offer member management to a recipient or under protection',async()=>{
  const page=await open();expect(page.queryByTestId('family-member-ma')).toBeNull();expect(page.queryByTestId('family-transfer-mb')).toBeNull();
  mockLock.snapshot.locked=true;await page.rerender(<FamilyCardMembers familyId="home" onChanged={mockChanged}/>);expect(page.queryByText('你')).toBeNull();
+});
+
+it('E3 shows dissolve only for a creator; cancel does not dissolve and double confirmation is locked',async()=>{
+ const memberPage=await open();expect(memberPage.queryByTestId('family-dissolve-selected')).toBeNull();await memberPage.unmount();
+ mockMembers.mockResolvedValue({...roster,userId:'a',role:'creator',membershipId:'ma'});
+ let finish!:()=>void;mockDissolve.mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));
+ const alert=jest.spyOn(Alert,'alert'),page=await open();await fireEvent.press(page.getByTestId('family-dissolve-selected'));
+ expect(alert.mock.calls[0][1]).toContain('个人记录和生活册不受影响');expect(mockDissolve).not.toHaveBeenCalled();
+ const confirm=alert.mock.calls[0][2]![1].onPress!;
+ await act(async()=>{confirm();});await waitFor(()=>expect(mockDissolve).toHaveBeenCalledTimes(1));
+ await act(async()=>{confirm();});expect(mockDissolve).toHaveBeenCalledTimes(1);
+ await act(async()=>{finish();});expect(mockChanged).toHaveBeenCalledWith('这个家庭已解散，个人记录还在。');
+});
+it('E3 drops stale dissolve confirmation and permits one explicit retry after failure',async()=>{
+ mockMembers.mockResolvedValue({...roster,userId:'a',role:'creator',membershipId:'ma'});
+ mockDissolve.mockRejectedValueOnce({code:'NETWORK'}).mockResolvedValueOnce({dissolved:true});
+ const alert=jest.spyOn(Alert,'alert'),page=await open();await fireEvent.press(page.getByTestId('family-dissolve-selected'));
+ await act(async()=>{alert.mock.calls[0][2]![1].onPress!();});expect(mockChanged).not.toHaveBeenCalled();
+ await fireEvent.press(page.getByText('再试一次'));await waitFor(()=>expect(page.getByTestId('family-dissolve-selected')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('family-dissolve-selected'));const confirm=alert.mock.calls[1][2]![1].onPress!;
+ await page.unmount();await act(async()=>{confirm();});expect(mockDissolve).toHaveBeenCalledTimes(1);
 });

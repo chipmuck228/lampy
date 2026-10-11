@@ -40,6 +40,9 @@ export type Session = {
 export type FamilyHistoryPolicy = 'legacy' | 'family-history-v2';
 
 export type Family = {
+  dissolvedAt?: string;
+  cleanupDeadline?: string;
+  dissolvedBy?: string;
   historyPolicy?: FamilyHistoryPolicy;
   historyConfirmedAt?: string;
   historyConfirmedBy?: string;
@@ -80,8 +83,9 @@ export type FamilyView = {
   members: FamilyMemberView[];
 };
 
-export type FamilySummary = { familyId: string; name: string; role: MembershipRole; memberCount: number };
-export type FamilyListView = { families: FamilySummary[]; limit: 10 };
+export type FamilySummary = { familyId: string; name: string; createdAt?: string; role: MembershipRole; memberCount: number };
+export type PastFamilySummary = { familyId: string; name: string; createdAt?: string; role: MembershipRole; status: 'left' | 'removed' | 'dissolved' };
+export type FamilyListView = { families: FamilySummary[]; pastFamilies?: PastFamilySummary[]; limit: 10 };
 
 export type MembershipListView = {
   family: FamilyView | null;

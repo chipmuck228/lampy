@@ -45,6 +45,9 @@ type SessionRow = {
 };
 
 type FamilyRow = {
+  dissolved_at: string | null;
+  cleanup_deadline: string | null;
+  dissolved_by: string | null;
   history_policy: string;
   history_confirmed_at: string | null;
   history_confirmed_by: string | null;
@@ -164,6 +167,9 @@ function sessionFrom(row: SessionRow): Session {
 
 function familyFrom(row: FamilyRow): Family {
   return {
+    dissolvedAt: row.dissolved_at || undefined,
+    cleanupDeadline: row.cleanup_deadline || undefined,
+    dissolvedBy: row.dissolved_by || undefined,
     historyPolicy: row.history_policy === 'family-history-v2' ? 'family-history-v2' : 'legacy',
     historyConfirmedAt: row.history_confirmed_at || undefined,
     historyConfirmedBy: row.history_confirmed_by || undefined,
@@ -223,6 +229,11 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   return {
+    async listSharesReferencingMedia(objectId) {
+      const rows = await db.getAll<ShareRow>(`SELECT s.* FROM family_shares s WHERE EXISTS
+        (SELECT 1 FROM json_each(s.snapshot_json, '$.media') j WHERE json_extract(j.value, '$.objectId') = ?)`, [objectId]);
+      return rows.map(shareFrom);
+    },
     async listTransfers(familyId) {
       const rows = await db.getAll<{ transfer_id: string; family_id: string; request_id: string; from_user_id: string; to_user_id: string; from_membership_id: string; to_membership_id: string; status: import('./types').FamilyTransfer['status']; revision: number; created_at: string; updated_at: string }>(
         'SELECT * FROM family_creator_transfers WHERE family_id = ?', [familyId]);
@@ -329,17 +340,22 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findFamily(familyId) {
       const row = await db.getFirst<FamilyRow>(
-        'SELECT family_id, name, created_at, status, history_policy, history_confirmed_at, history_confirmed_by FROM family_families WHERE family_id = ?',
+        'SELECT family_id, name, created_at, status, history_policy, history_confirmed_at, history_confirmed_by, dissolved_at, cleanup_deadline, dissolved_by FROM family_families WHERE family_id = ?',
         [familyId],
       );
       return row ? familyFrom(row) : null;
     },
     async saveFamily(family) {
       await db.run(
-        `INSERT INTO family_families (family_id, name, created_at, status, history_policy, history_confirmed_at, history_confirmed_by) VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(family_id) DO UPDATE SET status = excluded.status, name = excluded.name, history_policy = excluded.history_policy, history_confirmed_at = excluded.history_confirmed_at, history_confirmed_by = excluded.history_confirmed_by`,
-        [family.familyId, family.name ?? '', family.createdAt, family.status, family.historyPolicy ?? 'legacy', family.historyConfirmedAt ?? null, family.historyConfirmedBy ?? null],
+        `INSERT INTO family_families (family_id, name, created_at, status, history_policy, history_confirmed_at, history_confirmed_by, dissolved_at, cleanup_deadline, dissolved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(family_id) DO UPDATE SET status = excluded.status, name = excluded.name, history_policy = excluded.history_policy, history_confirmed_at = excluded.history_confirmed_at, history_confirmed_by = excluded.history_confirmed_by, dissolved_at = excluded.dissolved_at, cleanup_deadline = excluded.cleanup_deadline, dissolved_by = excluded.dissolved_by`,
+        [family.familyId, family.name ?? '', family.createdAt, family.status, family.historyPolicy ?? 'legacy', family.historyConfirmedAt ?? null, family.historyConfirmedBy ?? null, family.dissolvedAt ?? null, family.cleanupDeadline ?? null, family.dissolvedBy ?? null],
       );
+      if (family.status === 'dissolved') await db.run("UPDATE family_directory_history SET status='dissolved' WHERE family_id=?", [family.familyId]);
+    },
+    async listPastFamilies(userId) {
+      return db.getAll<import('./types').PastFamilySummary>(`SELECT family_id AS familyId,name,created_at AS createdAt,role,status
+        FROM family_directory_history WHERE user_id=? ORDER BY family_id`, [userId]);
     },
     async findActiveMembershipForUser(userId) {
       const rows = await db.getAll<MembershipRow>(
@@ -409,6 +425,15 @@ function createSqliteTx(db: FamilySql): FamilyTx {
           membership.joinedAt,
         ],
       );
+      const family = await this.findFamily(membership.familyId);
+      if (family && membership.status === 'active' && family.status === 'active') {
+        await db.run('DELETE FROM family_directory_history WHERE user_id=? AND family_id=?', [membership.userId,membership.familyId]);
+      } else if (family) {
+        await db.run(`INSERT INTO family_directory_history(user_id,family_id,name,role,status,created_at) VALUES(?,?,?,?,?,?)
+          ON CONFLICT(user_id,family_id) DO UPDATE SET name=excluded.name,role=excluded.role,status=excluded.status,created_at=excluded.created_at`,
+          [membership.userId,membership.familyId,family.name || '',membership.role,
+            family.status === 'dissolved' ? 'dissolved' : membership.status === 'left' ? 'left' : 'removed',family.createdAt]);
+      }
     },
     async findInviteLinkByHash(hash) { return readInviteLink(await db.getFirst<InviteLinkRow>('SELECT * FROM family_invite_links WHERE token_hash = ?', [hash])); },
     async findInviteLinkById(id) { return readInviteLink(await db.getFirst<InviteLinkRow>('SELECT * FROM family_invite_links WHERE invitation_id = ?', [id])); },

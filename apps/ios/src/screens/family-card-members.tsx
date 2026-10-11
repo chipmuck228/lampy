@@ -17,7 +17,7 @@ function memberLabel(roster: Roster, member: Roster['members'][number]) {
 }
 // Called only after the user confirms; this is an idempotency key, not a credential.
 function newTransferRequestId() { return `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; onChanged: () => void }) {
+export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; onChanged: (message?: string) => void }) {
   const { allowed, begin, enter, leave } = useFamilyPrivateRequest();
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
   const [roster, setRoster] = useState<Roster | null>(null), [message, setMessage] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
       if (current()) { setRoster(result); setTransfer(pending); }
     } catch (error) {
       if (current()) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'NOT_IN_FAMILY') { setOpen(false); onChanged(); }
+        if (error && typeof error === 'object' && 'code' in error && ['NOT_IN_FAMILY', 'FAMILY_DISSOLVED'].includes(String(error.code))) { setOpen(false); onChanged(); }
         else setMessage(familyHistoryError(error));
       }
     }
@@ -78,6 +78,26 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
     } catch {
       if (current()) { setMessage(tr('操作尚未确认，请重新查看后再试。')); setRoster(null); setSelectedMemberId(null); setTransfer(null); }
     } finally { if (owner.current === current) { owner.current = null; setBusy(false); } }
+  }
+  async function dissolve(expected: Roster, current: () => boolean) {
+    if (!allowed || !current() || owner.current || expected !== roster || expected.role !== 'creator') return;
+    owner.current = current; setBusy(true); setMessage(null); pauseForegroundAudio();
+    try {
+      const family = await getFamilyUseCases(); if (!current()) return;
+      await family.history.dissolveFamily(expected, current);
+      if (current()) {
+        setOpen(false); setRoster(null); setTransfer(null); setSelectedMemberId(null);
+        onChanged(tr('这个家庭已解散，个人记录还在。'));
+      }
+    } catch {
+      if (current()) { setMessage(tr('操作尚未确认，请重新查看后再试。')); setRoster(null); setTransfer(null); setSelectedMemberId(null); }
+    } finally { if (owner.current === current) { owner.current = null; setBusy(false); } }
+  }
+  function confirmDissolve() {
+    const expected = roster, current = currentRef.current;
+    if (!expected || expected.role !== 'creator' || !current() || owner.current) return;
+    Alert.alert(tr('解散这个家庭？'), tr('家人将不能再看这里的分享，邀请和待接受的移交也会结束。家庭分享副本将在30天后清理，个人记录和生活册不受影响。解散后无法恢复。'),
+      [{ text: tr('取消'), style: 'cancel' }, { text: tr('确认解散'), style: 'destructive', onPress: () => void dissolve(expected, current) }]);
   }
   function confirmTransfer(target?: Roster['members'][number], action?: 'accept' | 'cancel') {
     const expected = roster, current = currentRef.current, pending = transfer;
@@ -132,6 +152,10 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
           {transfer.toUserId === roster.userId ? <Pressable style={styles.hit} disabled={busy} accessibilityRole="button" accessibilityState={{ disabled: busy }} testID="family-transfer-accept" onPress={() => confirmTransfer(undefined, 'accept')}><Text style={styles.action}>{tr('接受转交')}</Text></Pressable> : null}
           {transfer.fromUserId === roster.userId ? <Pressable style={styles.hit} disabled={busy} accessibilityRole="button" accessibilityState={{ disabled: busy }} testID="family-transfer-cancel" onPress={() => confirmTransfer(undefined, 'cancel')}><Text style={styles.meta}>{tr('撤销转交')}</Text></Pressable> : null}
         </View> : null}
+        {roster.role === 'creator' ? <Pressable style={styles.dissolveHit} disabled={busy} accessibilityRole="button"
+          accessibilityState={{ disabled: busy }} testID="family-dissolve-selected" onPress={confirmDissolve}>
+          <Text style={styles.meta}>{tr('解散家庭')}</Text>
+        </Pressable> : null}
         {roster.role === 'member' ? <Pressable style={styles.hit} disabled={busy} accessibilityRole="button" accessibilityState={{ disabled: busy }} testID="family-leave" onPress={() => confirm(null, '')}><Text style={styles.meta}>{tr('离开家庭')}</Text></Pressable> : null}
       </> : null}
       {message ? <><Text style={styles.meta}>{message}</Text><Pressable style={styles.hit} disabled={busy} accessibilityRole="button" onPress={() => void load()}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable></> : null}
@@ -139,6 +163,7 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
   </View>;
 }
 const styles = StyleSheet.create({
+  dissolveHit: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline, marginTop: 16 },
   hit: { minHeight: 48, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center' },
   panel: { gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline, paddingTop: 8 },
   member: { alignSelf: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },

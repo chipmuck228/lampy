@@ -1,8 +1,9 @@
-import type { FamilyListView, FamilySummary } from '../family-api/types';
+import type { FamilyListView, FamilySummary, PastFamilySummary } from '../family-api/types';
 
 export type FamilyDirectoryState = {
   status: 'idle' | 'loading' | 'ready' | 'failed' | 'signed-out';
   families: FamilySummary[];
+  pastFamilies: PastFamilySummary[];
   selectedId: string | null;
   error: unknown;
 };
@@ -11,12 +12,12 @@ export type FamilyDirectoryState = {
 export function createFamilyDirectory() {
   let generation = 0;
   let preferredId: string | null = null;
-  let state: FamilyDirectoryState = { status: 'idle', families: [], selectedId: null, error: null };
+  let state: FamilyDirectoryState = { status: 'idle', families: [], pastFamilies: [], selectedId: null, error: null };
   return {
     snapshot: () => state,
     invalidate() {
       generation++;
-      state = { status: 'idle', families: [], selectedId: null, error: null };
+      state = { status: 'idle', families: [], pastFamilies: [], selectedId: null, error: null };
     },
     select(id: string) {
       if (state.status !== 'ready' || !state.families.some(f => f.familyId === id)) return false;
@@ -26,16 +27,16 @@ export function createFamilyDirectory() {
     },
     async load(read: () => Promise<FamilyListView>) {
       const request = ++generation;
-      state = { status: 'loading', families: [], selectedId: null, error: null };
+      state = { status: 'loading', families: [], pastFamilies: [], selectedId: null, error: null };
       try {
         const result = await read();
         if (request !== generation) return;
         const selectedId = result.families.some(f => f.familyId === preferredId) ? preferredId : null;
-        state = { status: 'ready', families: result.families, selectedId, error: null };
+        state = { status: 'ready', families: result.families, pastFamilies: result.pastFamilies ?? [], selectedId, error: null };
       } catch (error) {
         if (request === generation) {
           const signedOut = error && typeof error === 'object' && 'code' in error && error.code === 'UNAUTHENTICATED';
-          state = { status: signedOut ? 'signed-out' : 'failed', families: [], selectedId: null, error };
+          state = { status: signedOut ? 'signed-out' : 'failed', families: [], pastFamilies: [], selectedId: null, error };
         }
       }
     },

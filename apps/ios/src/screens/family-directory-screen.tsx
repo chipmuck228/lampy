@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
 import { createFamilyDirectory } from '../application/family-directory';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
-import { tr } from '../i18n';
+import { tr, appLanguage } from '../i18n';
 import { useDeviceLock } from './device-lock-context';
 import { SettingsPage } from './settings-chrome';
 import { Text, TextInput, type } from './life-text';
@@ -95,13 +95,13 @@ export default function FamilyDirectoryScreen() {
       }
     }
   }
-  const joined = useCallback(() => { void refresh(); }, [refresh]);
+  const joined = useCallback((feedback?: string) => { if (feedback) setMessage(feedback); void refresh(); }, [refresh]);
   return <SettingsPage title={tr('家庭')} backLabel={tr('最近')} accessibilityLabel={tr('家庭')} onBack={() => router.dismissTo('/')}>
     {!isFamilyProductEntryOpen() ? <Text>{tr('敬请期待。')}</Text> : allowed ? <>
       {state.status !== 'signed-out' ? <Text style={styles.intro}>{tr('给重要的人，留一个位置。')}</Text> : null}
       {state.status === 'loading' ? <Text>{tr('正在读取家庭。')}</Text> : null}
       {state.status === 'signed-out' ? <View style={styles.welcome} testID="family-signed-out">
-        <View style={styles.welcomeMark}><LifeIcon name="family" size={44} color={sage} /></View>
+        <View style={styles.welcomeMark}><LifeIcon name="family" size={44} color="#91AA98" /></View>
         <Text style={styles.welcomeTitle}>{tr('有些日子，想和家人一起留着。')}</Text>
         <Text style={styles.welcomeBody}>{tr('登录后，可以创建自己的家庭。')}</Text>
         <Pressable style={styles.createHit} testID="family-sign-in" accessibilityRole="button"
@@ -146,19 +146,20 @@ export default function FamilyDirectoryScreen() {
             {!retrying && !busy ? <Pressable style={styles.hit} accessibilityRole="button" onPress={() => setFormOpen(false)}><Text style={styles.meta}>{tr('取消')}</Text></Pressable> : null}
           </View>
         </View> : null}
-        {state.families.length === 0 ? <Text style={styles.empty}>{tr('现在还没有家庭。')}</Text> : null}
+        {state.families.length === 0 && state.pastFamilies.length === 0 ? <Text style={styles.empty}>{tr('现在还没有家庭。')}</Text> : null}
         <View style={styles.wall} testID="family-cover-wall">
           {state.families.map(f => <View key={f.familyId} testID={`family-tile-${f.familyId}`} style={styles.tile}><Pressable testID={`family-select-${f.familyId}`}
             style={styles.selection} disabled={busy} accessibilityRole="button"
-            accessibilityLabel={`${f.name || tr('未命名家庭')}，${tr(f.role === 'creator' ? '创建者' : '成员')}，${tr('家庭成员：{0}人', [f.memberCount])}`}
+            accessibilityLabel={`${f.name || tr('未命名家庭')}，${tr(f.role === 'creator' ? '创建者' : '成员')}，${tr('家庭成员：{0}人', [f.memberCount])}${familyCreatedLabel(f.createdAt) ? `，${familyCreatedLabel(f.createdAt)}` : ''}`}
             accessibilityState={{ selected: f.familyId === state.selectedId, disabled: busy }}
             onPress={() => { directory.select(f.familyId); setState(directory.snapshot()); }}>
             <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
               style={[styles.cover, f.familyId === state.selectedId && styles.selectedCover]}>
               <AlbumCoverFace name="" coverUri={null} width={70} height={88} />
-              <View style={styles.coverMark}><LifeIcon name="family" size={36} color={sage} /></View>
+              <View style={styles.coverMark}><LifeIcon name="family" size={36} color="#91AA98" /></View>
             </View>
             <View style={styles.familySummary}><Text style={styles.familyName}>{f.name || tr('未命名家庭')}</Text>
+            {familyCreatedLabel(f.createdAt) ? <Text style={styles.familyMeta}>{familyCreatedLabel(f.createdAt)}</Text> : null}
             <Text style={styles.familyMeta}>{tr(f.role === 'creator' ? '创建者' : '成员')} · {tr('家庭成员：{0}人', [f.memberCount])}</Text></View>
           </Pressable>
           {f.familyId === state.selectedId ? <FamilyCardHistory key={f.familyId} familyId={f.familyId} /> : null}
@@ -169,6 +170,19 @@ export default function FamilyDirectoryScreen() {
           </Pressable> : null}
           {f.familyId === state.selectedId ? <FamilyCardMembers key={`members-${f.familyId}`} familyId={f.familyId} onChanged={joined} /> : null}
           </View>)}
+          {state.pastFamilies.map(f => <View key={f.familyId} testID={`family-past-${f.familyId}`} style={styles.tile} accessible
+            accessibilityLabel={`${f.name || tr('未命名家庭')}，${tr(f.status === 'dissolved' ? '已解散' : f.status === 'left' ? '已离开' : '已被移除')}${familyCreatedLabel(f.createdAt) ? `，${familyCreatedLabel(f.createdAt)}` : ''}`}>
+            <View style={styles.selection}>
+              <View style={[styles.cover,{backgroundColor:paperDeep,width:70,height:88,alignItems:'center',justifyContent:'center'}]} accessible={false}>
+                <LifeIcon name="family" size={36} color={inkSoft} />
+              </View>
+              <View style={styles.familySummary} accessible={false}>
+                <Text style={[styles.familyName,{color:inkSoft}]}>{f.name || tr('未命名家庭')}</Text>
+                {familyCreatedLabel(f.createdAt) ? <Text style={styles.familyMeta}>{familyCreatedLabel(f.createdAt)}</Text> : null}
+                <View testID={`family-status-${f.familyId}`} style={[styles.statusPill, familyStatusColors[f.status]]}><Text style={[styles.familyMeta,{color:familyStatusColors[f.status].color}]}>{tr(f.status === 'dissolved' ? '已解散' : f.status === 'left' ? '已离开' : '已被移除')}</Text></View>
+              </View>
+            </View>
+          </View>)}
         </View>
 
 
@@ -177,7 +191,15 @@ export default function FamilyDirectoryScreen() {
     </> : null}
   </SettingsPage>;
 }
+const familyStatusColors = { left: { backgroundColor:'#E7EBE5', color:'#637569' }, removed: { backgroundColor:'#EEE3DA', color:'#886D5C' }, dissolved: { backgroundColor:'#E5E6EB', color:'#6D7283' } };
+function familyCreatedLabel(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return tr('创建于 {0}', [new Intl.DateTimeFormat(appLanguage === 'en' ? 'en' : 'zh-Hans', {year:'numeric',month:'short',day:'numeric'}).format(date)]);
+}
 const styles = StyleSheet.create({
+  statusPill: { alignSelf:'flex-start', borderRadius:12, paddingHorizontal:10, paddingVertical:3 },
   rootActions: { flexDirection:'row', gap:12, alignItems:'stretch', marginBottom:16 },
   rootAction: { flex:1, alignSelf:'stretch', paddingHorizontal:8, marginBottom:0 },
   joinHit: { borderColor:inkSoft, backgroundColor:'transparent' },

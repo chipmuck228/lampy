@@ -53,7 +53,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
   }, []);
   const load = useCallback(async () => {
     const current = begin(); currentRef.current = current;
-    saveProgress(); setExpandedId(null); setView(null); setRows([]); setViewer(null); setPolicy(null); setMessage(null); setStatus('loading');
+    saveProgress(); setExpandedId(null); setView(null); setRows([]); setViewer(null); setName(''); setPolicy(null); setMessage(null); setStatus('loading');
     try {
       if (isDetail && !shareId) throw { code: 'SHARE_NOT_FOUND' };
       const family = await getFamilyUseCases(); if (!current()) return;
