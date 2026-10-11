@@ -23,6 +23,11 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  findAppleChallenge(id: string): Promise<import('./types').AppleChallenge | null>;
+  saveAppleChallenge(challenge: import('./types').AppleChallenge): Promise<void>;
+  deleteAppleChallenge(id: string): Promise<void>;
+  pruneAppleChallenges(now: string): Promise<void>;
+
   findLoginIdentity(provider: import('./types').LoginProvider, subject: string): Promise<import('./types').LoginIdentity | null>;
   listLoginIdentities(userId: string): Promise<import('./types').LoginIdentity[]>;
   // Internal persistence only: callers must verify credentials before attaching an identity.
@@ -117,6 +122,10 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async findAppleChallenge(id) { return store.appleChallenges.find(c => c.id === id) ?? null; },
+    async saveAppleChallenge(c) { store.appleChallenges.push({...c}); },
+    async deleteAppleChallenge(id) { store.appleChallenges = store.appleChallenges.filter(c => c.id !== id); },
+    async pruneAppleChallenges(now) { store.appleChallenges = store.appleChallenges.filter(c => c.expiresAt > now); },
     async findLoginIdentity(provider, subject) {
       return store.loginIdentities.find(i => i.provider === provider && i.subject === subject) ?? null;
     },

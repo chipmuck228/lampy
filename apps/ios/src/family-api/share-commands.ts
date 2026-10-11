@@ -162,7 +162,7 @@ export function createShareCommands(deps: {
   clock?: { now: () => Date };
   shareId?: () => string;
   testAccountLoginEnabled?: boolean;
-  operatorOnly?: boolean;
+  operatorOnly?: boolean | "apple-enabled";
   historyPolicy?: FamilyHistoryPolicy;
   historyEnabled?: boolean;
 }): ShareCommands {

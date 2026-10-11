@@ -594,6 +594,27 @@ export function createFamilyUseCases(deps: {
       if (!isCurrent() || profile.userId !== account.userId) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile account changed.');
       return profile;
     },
+    async getAppleLink(isCurrent:()=>boolean) {
+      const a=await requireAccount();if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile is inactive.');
+      if(!deps.client.getAppleLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.getAppleLink(a.sessionToken);await assertSameAccount(a);
+      if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile is inactive.');return result;
+    },
+    async authenticateApple(intent:'login'|'link',authorize:(nonce:string)=>Promise<string>,isCurrent:()=>boolean) {
+      const request=++emailAuthRequest;const initialToken=await deps.session.getSessionToken();
+      const eligible=()=>request===emailAuthRequest && isCurrent();
+      const check=async()=>{if(!eligible() || await deps.session.getSessionToken()!==initialToken) throw new ApplicationError('STALE_FAMILY_REQUEST','Apple request is inactive.');};
+      await check();
+      if(intent==='link' && !initialToken) throw new ApplicationError('UNAUTHENTICATED','Sign in first.');
+      if(!deps.client.beginAppleAuth || !deps.client.completeAppleAuth) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const c=await deps.client.beginAppleAuth(intent,intent==='link'?initialToken || undefined:undefined);
+      await check();
+      const identityToken=await authorize(c.nonce);await check();
+      const result=await deps.client.completeAppleAuth({challengeId:c.challengeId,identityToken},intent==='link'?initialToken || undefined:undefined);
+      if('linked' in result) {await check();return result;}
+      try {await check();return await commitSignedIn(result,eligible);}
+      catch(error) {try {await deps.client.signOut(result.sessionToken);} catch { /* discarded session expires */ }throw asApplicationError(error);}
+    },
     async signInWithApple(identityToken: string) {
       const request = ++emailAuthRequest;
       let result: { userId: string; sessionToken: string } | undefined;

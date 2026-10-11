@@ -121,6 +121,7 @@ export type FamilyHealth = {
   controlledEmailAccounts?: boolean;
   emailRegistration?: boolean;
   publicTestLogin?: boolean;
+  appleLogin?: boolean;
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 
@@ -235,13 +236,17 @@ export type InviteLinkView = Omit<InviteLink, 'tokenHash' | 'acceptedByUserId' |
 export type CreatedInviteLink = InviteLinkView & { token: string };
 export type InvitePreview = { name: string; expiresAt: string; status: InvitationStatus | 'dissolved'; };
 
+export type AppleChallenge = { id: string; nonce: string; intent: "login" | "link"; userId: string | null; sessionToken: string | null; expiresAt: string };
+export type AppleAuthInput = { challengeId: string; identityToken: string };
+
 export type AppleIdentity = {
+  nonce?: string;
   appleSubject: string;
   email?: string;
 };
 
 export interface AppleVerifier {
-  verifyIdentityToken(identityToken: string): Promise<AppleIdentity>;
+  verifyIdentityToken(identityToken: string, expectedNonce?: string): Promise<AppleIdentity>;
 }
 
 export type FamilyClock = {

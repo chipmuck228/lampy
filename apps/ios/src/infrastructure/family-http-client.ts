@@ -74,6 +74,9 @@ export type FamilyApiClient = {
   revokeInviteLink?(session: string, id: string): Promise<import('../family-api/types').InviteLinkView>;
   previewInviteLink?(token: string): Promise<import('../family-api/types').InvitePreview>;
   acceptInviteLink?(session: string, token: string): Promise<FamilySummary>;
+  beginAppleAuth?(intent:'login'|'link',sessionToken?:string):Promise<{challengeId:string;nonce:string;expiresAt:string}>;
+  completeAppleAuth?(input:import('../family-api/types').AppleAuthInput,sessionToken?:string):Promise<SignInResult | {linked:true;userId:string}>;
+  getAppleLink?(sessionToken:string):Promise<{linked:boolean}>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createFamily(sessionToken: string, idempotencyKey: string): Promise<FamilyView>;
@@ -163,6 +166,9 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
     health() {
       return send({ method: 'GET', path: '/health' });
     },
+    beginAppleAuth(intent,sessionToken) { return send({method:'POST',path:'/v2/auth/apple/challenge',sessionToken,body:{intent}}); },
+    completeAppleAuth(input,sessionToken) { return send({method:'POST',path:'/v2/auth/apple/complete',sessionToken,body:input}); },
+    getAppleLink(sessionToken) { return send({method:'GET',path:'/v2/me/apple',sessionToken}); },
     signInWithApple(identityToken) {
       return send({ method: 'POST', path: '/v1/auth/apple', body: { identityToken } });
     },
