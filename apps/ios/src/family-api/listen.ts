@@ -1,3 +1,4 @@
+import { publicTestAuthPlan, publicTestPeer, createPublicAuthAdmission } from './public-test-auth';
 import { INVITE_WEB_HTML, INVITE_WEB_CSS, inviteWebJs, inviteAssociation } from './invite-web';
 import { invitationOrigin, makeFamilyInviteLink } from '../infrastructure/family-invite-link';
 import { mkdirSync } from 'node:fs';
@@ -36,6 +37,7 @@ function readRawBody(req: IncomingMessage, maxBytes: number): Promise<Buffer | '
       }
       chunks.push(buffer);
     });
+    req.on('aborted', () => reject(new Error('Request aborted.')));
     req.on('end', () => resolve(tooLarge ? 'too-large' : Buffer.concat(chunks)));
     req.on('error', (error) => {
       if (tooLarge) resolve('too-large');
@@ -63,7 +65,9 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
   });
   const inviteOrigin=invitationOrigin(env.LAMPY_FAMILY_INVITE_ORIGIN);
   const inviteEnabled=env.LAMPY_FAMILY_INVITES_ENABLED === '1' && Boolean(inviteOrigin);
+  const publicAuth = publicTestAuthPlan({ ...env, LAMPY_FAMILY_API_HOST: options?.host ?? env.LAMPY_FAMILY_API_HOST });
   const authOpts = {
+    publicTestLoginEnabled: publicAuth.enabled,
     inviteLinksEnabled:inviteEnabled,
     historySharingEnabled:env.LAMPY_FAMILY_HISTORY_ENABLED === '1',
     testAccountLoginEnabled: plan.testAccount.testAccountLoginEnabled,
@@ -99,7 +103,9 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
   const port = options?.port ?? Number(env.LAMPY_FAMILY_API_PORT || 8787);
   const host = options?.host ?? env.LAMPY_FAMILY_API_HOST ?? '127.0.0.1';
 
+  const admitAuth = createPublicAuthAdmission();
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    let releaseAuth: (() => void) | undefined;
     try {
       const url = new URL(req.url || '/', `http://${host}:${port}`);
       const route = url.pathname.replace(/\/+$/, '');
@@ -115,6 +121,24 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
         const asset=assets[route];
         if(asset) {res.setHeader('content-security-policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'");res.writeHead(200,{'content-type':asset[1]});res.end(asset[0]);return;}
         if(route==='/.well-known/apple-app-site-association') { const aasa=inviteAssociation(inviteOrigin || undefined);res.writeHead(aasa ? 200 : 404,{'content-type':'application/json'});res.end(JSON.stringify(aasa || {}));return; }
+      }
+      const authRequest = req.method === 'POST' && /^\/v[12]\/auth\//.test(route);
+      let peer = req.socket.remoteAddress || 'unknown';
+      if (publicAuth.enabled && authRequest) {
+        const trusted = publicTestPeer(req.socket.remoteAddress, req.headers['x-lampy-client-ip']);
+        if (!trusted) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: { code: 'FORBIDDEN', message: 'Trusted proxy is required.' } }));
+          return;
+        }
+        peer = trusted;
+        releaseAuth = admitAuth();
+        if (!releaseAuth) {
+          res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '5' });
+          res.end(JSON.stringify({ error: { code: 'RATE_LIMITED', message: 'Try again later.' } }));
+          return;
+        }
+        req.setTimeout(10_000, () => req.destroy());
       }
       const isMediaUpload = (req.method || '').toUpperCase() === 'POST' && route === '/v1/media';
       const isShareCreate = (req.method || '').toUpperCase() === 'POST' && /^\/v[12]\/families\/[^/]+\/shares$/.test(route);
@@ -145,7 +169,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
         headers: headersOf(req),
         body,
         bytes: isMediaUpload ? new Uint8Array(raw) : undefined,
-        peer:req.socket.remoteAddress || 'unknown',
+        peer,
       });
       if (response.status===200 && req.method==='POST' && /^\/v2\/families\/[^/]+\/invitations$/.test(route) && inviteOrigin) {
         const body=response.body as import('./types').CreatedInviteLink;
@@ -167,8 +191,14 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
     } catch {
       res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: { code: 'INTERNAL', message: 'Family API failed.' } }));
+    } finally {
+      releaseAuth?.();
     }
   });
+  if (publicAuth.enabled) {
+    server.requestTimeout = 15_000;
+    server.headersTimeout = 10_000;
+  }
 
   return new Promise<{ close: () => Promise<void>; port: number; host: string; banner: string }>((resolve, reject) => {
     const onError = (error: Error) => {

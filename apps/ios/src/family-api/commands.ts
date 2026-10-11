@@ -56,6 +56,7 @@ export type FamilyCommands = InviteLinkCommands & {
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createTestAccount(login: string, password: string): Promise<{ userId: string; created: true }>;
+  revokeTestAccountSessions(login: string): Promise<{ revoked: true; userId: string }>;
   disableTestAccount(login: string): Promise<{ disabled: true; userId: string }>;
   listFamilies(sessionToken: string): Promise<FamilyListView>;
   createNamedFamily(sessionToken: string, name: string, idempotencyKey: string): Promise<FamilySummary>;
@@ -104,6 +105,7 @@ async function requireUser(
   sessionToken: string | undefined,
   clock: FamilyClock,
   testAccountLoginEnabled: boolean,
+  operatorOnly = false,
 ) {
   if (!sessionToken) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
@@ -112,7 +114,7 @@ async function requireUser(
   if (!session || new Date(session.expiresAt).getTime() <= clock.now().getTime()) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
-  await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled);
+  await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled, operatorOnly);
   return session.userId;
 }
 
@@ -256,6 +258,7 @@ export function createFamilyCommands(deps: {
   passwordHasher?: PasswordHasher;
   testAccountLoginEnabled?: boolean;
   controlledEmailAccountsEnabled?: boolean;
+  publicTestLoginEnabled?: boolean;
   inviteLinksEnabled?: boolean;
   historySharingEnabled?: boolean;
 }): FamilyCommands {
@@ -266,19 +269,21 @@ export function createFamilyCommands(deps: {
   const store = deps.store ?? createFamilyStore();
   const repository = deps.repository ?? createMemoryFamilyRepository(store);
   const blobs = deps.mediaBlobs ?? createMemoryMediaBlobStore();
-  const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
+  const testAccountLoginEnabled = deps.testAccountLoginEnabled === true || deps.publicTestLoginEnabled === true;
   const media = createMediaCommands({
     repository,
     blobs,
     clock,
     assertPayload: assertMediaPayload,
     testAccountLoginEnabled,
+    operatorOnly: deps.publicTestLoginEnabled === true,
   });
   const shares = createShareCommands({
     repository,
     blobs,
     clock,
     testAccountLoginEnabled,
+    operatorOnly: deps.publicTestLoginEnabled === true,
   });
   const testAccounts = createTestAccountCommands({
     repository,
@@ -287,6 +292,7 @@ export function createFamilyCommands(deps: {
     sessionTtlMs,
     passwordHasher: deps.passwordHasher,
     controlledEmailAccountsEnabled: deps.controlledEmailAccountsEnabled,
+    publicTestLoginEnabled: deps.publicTestLoginEnabled,
     testAccountLoginEnabled,
   });
 
@@ -299,9 +305,10 @@ export function createFamilyCommands(deps: {
       sessionToken,
       clock.now(),
       testAccountLoginEnabled,
+      deps.publicTestLoginEnabled === true,
     ).then(() =>
       repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled, deps.publicTestLoginEnabled === true);
         return work(tx, userId);
       }),
     );
@@ -309,7 +316,7 @@ export function createFamilyCommands(deps: {
 
   return {
     transfers: createFamilyTransferCommands({authed:withAuthedUser,clock,id:()=>`transfer_${ids.invitationId()}`}),
-    historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled,
+    historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled, operatorOnly: deps.publicTestLoginEnabled === true,
       historyPolicy: 'family-history-v2', historyEnabled: deps.historySharingEnabled === true }),
     async getFamilyHistoryPolicy(session, familyId) {
       assertHistoryEnabled(deps.historySharingEnabled === true);
@@ -342,7 +349,9 @@ export function createFamilyCommands(deps: {
         media: true as const,
         shares: true as const,
         inbox: true as const,
-        controlledEmailAccounts: testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true,
+        controlledEmailAccounts: deps.publicTestLoginEnabled === true || (testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true),
+        emailRegistration: deps.publicTestLoginEnabled !== true && testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true,
+        publicTestLogin: deps.publicTestLoginEnabled === true,
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
         familyHistoryV2: deps.historySharingEnabled === true,
@@ -350,6 +359,7 @@ export function createFamilyCommands(deps: {
       };
     },
     async signInWithApple(identityToken: string) {
+      if (deps.publicTestLoginEnabled) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Apple sign-in is not enabled for this controlled test.');
       if (!identityToken.trim()) {
         throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, 'Apple identity token is invalid.');
       }
@@ -727,6 +737,7 @@ export function createFamilyCommands(deps: {
     createTestAccount(login, password) {
       return testAccounts.createTestAccount(login, password);
     },
+    revokeTestAccountSessions(login) { return testAccounts.revokeTestAccountSessions(login); },
     disableTestAccount(login) {
       return testAccounts.disableTestAccount(login);
     },

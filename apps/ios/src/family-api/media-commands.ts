@@ -117,13 +117,14 @@ export function createMediaCommands(deps: {
   objectId?: () => string;
   assertPayload: (bytes: Uint8Array | undefined, mime: string | undefined) => string;
   testAccountLoginEnabled?: boolean;
+  operatorOnly?: boolean;
 }): MediaCommands {
   const clock = deps.clock ?? { now: () => new Date() };
   const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;
 
   return {
     async uploadMedia(sessionToken, input) {
-      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled, deps.operatorOnly);
       const mime = deps.assertPayload(input.bytes, input.mimeType);
       const bytes = input.bytes;
       const sha256 = sha256MediaBytes(bytes);
@@ -247,14 +248,14 @@ export function createMediaCommands(deps: {
     },
 
     async getMediaObject(sessionToken, objectId) {
-      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled, deps.operatorOnly);
       return deps.repository.withTransaction(async (tx) => {
         return toView(await requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled));
       });
     },
 
     async getMediaContent(sessionToken, objectId) {
-      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled);
+      await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled, deps.operatorOnly);
       return deps.repository.withTransaction(async tx => {
         const row = await requireOwnedMedia(tx, sessionToken, objectId, clock.now(), testAccountLoginEnabled);
         const bytes = await deps.blobs.read(row.storageKey);

@@ -30,6 +30,7 @@ type TestCredentialRow = {
   enabled: number;
   created_at: string;
   disabled_at: string | null;
+  operator_provisioned: number;
 };
 
 type RateLimitRow = {
@@ -150,6 +151,7 @@ function testCredentialFrom(row: TestCredentialRow): TestCredential {
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     disabledAt: row.disabled_at || undefined,
+    operatorProvisioned: row.operator_provisioned === 1,
   };
 }
 
@@ -295,7 +297,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findTestCredentialByLogin(loginNormalized) {
       const row = await db.getFirst<TestCredentialRow>(
-        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at
+        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at, operator_provisioned
          FROM family_test_credentials WHERE login_normalized = ?`,
         [loginNormalized],
       );
@@ -303,7 +305,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findTestCredentialByUserId(userId) {
       const row = await db.getFirst<TestCredentialRow>(
-        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at
+        `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at, operator_provisioned
          FROM family_test_credentials WHERE user_id = ?`,
         [userId],
       );
@@ -312,8 +314,8 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     async saveTestCredential(credential) {
       await db.run(
         `INSERT INTO family_test_credentials
-         (credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+         (credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at, operator_provisioned)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(credential_id) DO UPDATE SET
            enabled = excluded.enabled,
            disabled_at = excluded.disabled_at`,
@@ -325,6 +327,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
           credential.enabled ? 1 : 0,
           credential.createdAt,
           credential.disabledAt ?? null,
+          credential.operatorProvisioned ? 1 : 0,
         ],
       );
     },

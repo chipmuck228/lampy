@@ -20,6 +20,7 @@ export type TestCredential = {
   enabled: boolean;
   createdAt: string;
   disabledAt?: string;
+  operatorProvisioned?: boolean;
 };
 
 export type AuthRateLimit = {
@@ -109,6 +110,8 @@ export type FamilyHealth = {
   testAccountLoginReason: TestAccountHealth['testAccountLoginReason'];
   familyHistoryV2?: boolean;
   controlledEmailAccounts?: boolean;
+  emailRegistration?: boolean;
+  publicTestLogin?: boolean;
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 

@@ -162,6 +162,7 @@ export function createShareCommands(deps: {
   clock?: { now: () => Date };
   shareId?: () => string;
   testAccountLoginEnabled?: boolean;
+  operatorOnly?: boolean;
   historyPolicy?: FamilyHistoryPolicy;
   historyEnabled?: boolean;
 }): ShareCommands {
@@ -183,6 +184,7 @@ export function createShareCommands(deps: {
       sessionToken,
       clock.now(),
       testAccountLoginEnabled,
+      deps.operatorOnly,
     );
   }
 
