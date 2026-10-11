@@ -22,6 +22,7 @@ export type FamilyStore = {
   transfers: import('./types').FamilyTransfer[];
   inviteLinks: import('./types').InviteLink[];
   accounts: Account[];
+  loginIdentities: import('./types').LoginIdentity[];
   sessions: Session[];
   families: Family[];
   memberships: Membership[];
@@ -40,6 +41,7 @@ export function createFamilyStore(): FamilyStore {
     inviteLinks: [],
     transfers: [],
     accounts: [],
+    loginIdentities: [],
     sessions: [],
     families: [],
     memberships: [],
