@@ -2,6 +2,7 @@
 
 | 文件 | 内容 |
 | --- | --- |
+| [release-readiness/](release-readiness/README.md) | 持续更新的发布范围、实际能力、缺口台账与分层验收；历史规格不代替当前发布状态 |
 | `LAMPY_APP_PRODUCT_DESIGN_GUIDE.md` | 产品与体验基准 |
 | `ios-navigation-account/` | 导航与未来账户入口方案（设计稿，未改运行代码） |
 | `PHASE_0_DOMAIN_AUDIT.md` | 领域 / Service / Projection / Repository 复用表 |
