@@ -171,9 +171,22 @@ const MIGRATIONS = [
      user_id TEXT PRIMARY KEY NOT NULL, nickname TEXT NOT NULL, updated_at TEXT NOT NULL
    );`,
   `ALTER TABLE family_test_credentials ADD COLUMN operator_provisioned INTEGER NOT NULL DEFAULT 0 CHECK(operator_provisioned IN (0,1));`,
+  `CREATE TABLE family_login_identities (
+     provider TEXT NOT NULL CHECK(provider IN ('apple','controlled-password')),
+     subject TEXT NOT NULL CHECK(length(trim(subject)) > 0),
+     user_id TEXT NOT NULL REFERENCES family_accounts(user_id),
+     created_at TEXT NOT NULL,
+     PRIMARY KEY(provider,subject),
+     UNIQUE(user_id,provider)
+   );
+   CREATE INDEX family_login_identities_user ON family_login_identities(user_id);
+   INSERT INTO family_login_identities(provider,subject,user_id,created_at)
+     SELECT 'apple',apple_subject,user_id,created_at FROM family_accounts WHERE apple_subject IS NOT NULL;
+   INSERT INTO family_login_identities(provider,subject,user_id,created_at)
+     SELECT 'controlled-password',login_normalized,user_id,created_at FROM family_test_credentials;`,
 ];
 
-export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27] as const;
+export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28] as const;
 
 export async function applyFamilyApiSchema(db: FamilySql, options?: { upTo?: number }): Promise<void> {
   const last = options?.upTo ?? MIGRATIONS.length;
@@ -215,7 +228,7 @@ export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise
     throw missingTestAccountSchemaError();
   }
   const rows = await db.getAll<{ version: number }>(
-    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16, 27)',
+    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16, 27, 28)',
   );
   const have = new Set(rows.map((row) => row.version));
   if (TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS.some((version) => !have.has(version))) {
@@ -225,6 +238,6 @@ export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise
 
 function missingTestAccountSchemaError() {
   return new Error(
-    'This database is missing family-api migrations 14–16 and 27. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
+    'This database is missing family-api migrations 14–16, 27 and 28. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
   );
 }

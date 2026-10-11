@@ -2,6 +2,7 @@
 
 | 文件 | 内容 |
 | --- | --- |
+| [account-identity-model/](account-identity-model/README.md) | 统一账号登录身份、迁移 28 与旧凭据兼容；不开放 Apple 入口 |
 | [release-readiness/](release-readiness/README.md) | 持续更新的发布范围、实际能力、缺口台账与分层验收；历史规格不代替当前发布状态 |
 | `LAMPY_APP_PRODUCT_DESIGN_GUIDE.md` | 产品与体验基准 |
 | `ios-navigation-account/` | 导航与未来账户入口方案（设计稿，未改运行代码） |

@@ -23,6 +23,10 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  findLoginIdentity(provider: import('./types').LoginProvider, subject: string): Promise<import('./types').LoginIdentity | null>;
+  listLoginIdentities(userId: string): Promise<import('./types').LoginIdentity[]>;
+  // Internal persistence only: callers must verify credentials before attaching an identity.
+  attachLoginIdentity(identity: import('./types').LoginIdentity): Promise<void>;
   findProfile(userId: string): Promise<import('./types').UserProfile | null>;
   saveProfile(profile: import('./types').UserProfile): Promise<void>;
   listPastFamilies(userId: string): Promise<import('./types').PastFamilySummary[]>;
@@ -91,6 +95,7 @@ export class FamilyStoreConstraintError extends Error {
       | 'active_membership'
       | 'invitation_code'
       | 'apple_subject'
+      | 'login_identity'
       | 'test_login'
       | 'test_user'
       | 'idempotency'
@@ -112,6 +117,18 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async findLoginIdentity(provider, subject) {
+      return store.loginIdentities.find(i => i.provider === provider && i.subject === subject) ?? null;
+    },
+    async listLoginIdentities(userId) { return store.loginIdentities.filter(i => i.userId === userId); },
+    async attachLoginIdentity(identity) {
+      if (!['apple', 'controlled-password'].includes(identity.provider) || !identity.subject.trim() || !store.accounts.some(a => a.userId === identity.userId)) throw new FamilyStoreConstraintError('login_identity');
+      if (store.loginIdentities.some(i => i.provider === identity.provider &&
+        ((i.subject === identity.subject && i.userId !== identity.userId) || (i.userId === identity.userId && i.subject !== identity.subject)))) {
+        throw new FamilyStoreConstraintError('login_identity');
+      }
+      if (!store.loginIdentities.some(i => i.provider === identity.provider && i.subject === identity.subject)) store.loginIdentities.push({ ...identity });
+    },
     async findProfile(userId) { return store.profiles.find(p => p.userId === userId) ?? null; },
     async saveProfile(profile) { replaceBy(store.profiles,p => p.userId,profile); },
     async listPastFamilies(userId) { return store.directoryHistory.filter(row => row.userId === userId).map(row => ({ familyId: row.familyId, name: row.name, createdAt: row.createdAt, role: row.role, status: row.status })); },
@@ -123,7 +140,8 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     async listInviteLinks(familyId) { return store.inviteLinks.filter(i => i.familyId === familyId); },
     async saveInviteLink(invite) { replaceBy(store.inviteLinks, i => i.invitationId, invite); },
     async findAccountByAppleSubject(appleSubject) {
-      return findAccountByAppleSubject(store, appleSubject);
+      const identity = await tx.findLoginIdentity('apple', appleSubject);
+      return identity ? await tx.findAccountByUserId(identity.userId) : findAccountByAppleSubject(store, appleSubject);
     },
     async findAccountByUserId(userId) {
       return store.accounts.find((row) => row.userId === userId) ?? null;
@@ -135,7 +153,16 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       ) {
         throw new FamilyStoreConstraintError('apple_subject');
       }
+      if (account.appleSubject !== undefined && !account.appleSubject.trim()) throw new FamilyStoreConstraintError('login_identity');
+      const previous = store.accounts.find(a => a.userId === account.userId);
+      if (previous?.appleSubject && account.appleSubject !== previous.appleSubject) throw new FamilyStoreConstraintError('login_identity');
+      if (account.appleSubject) {
+        // Check conflicts before mutating the account (memory repository has no rollback).
+        if (store.loginIdentities.some(i => i.provider === 'apple' &&
+          ((i.subject === account.appleSubject && i.userId !== account.userId) || (i.userId === account.userId && i.subject !== account.appleSubject)))) throw new FamilyStoreConstraintError('login_identity');
+      }
       replaceBy(store.accounts, (row) => row.userId, account);
+      if (account.appleSubject) await tx.attachLoginIdentity({ provider: 'apple', subject: account.appleSubject, userId: account.userId, createdAt: account.createdAt });
     },
     async findSession(token) {
       return findSession(store, token);
@@ -173,6 +200,9 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       ) {
         throw new FamilyStoreConstraintError('test_user');
       }
+      const previous = store.testCredentials.find(c => c.credentialId === credential.credentialId);
+      if (previous && (previous.userId !== credential.userId || previous.loginNormalized !== credential.loginNormalized)) throw new FamilyStoreConstraintError('login_identity');
+      await tx.attachLoginIdentity({ provider: 'controlled-password', subject: credential.loginNormalized, userId: credential.userId, createdAt: credential.createdAt });
       replaceBy(store.testCredentials, (row) => row.credentialId, credential);
     },
     async findRateLimit(bucket) {

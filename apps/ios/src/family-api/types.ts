@@ -5,6 +5,15 @@ export type FamilyStatus = 'active' | 'dissolved';
 
 export type UserProfile = { userId: string; nickname: string; avatar: 'system'; updatedAt: string | null };
 
+// A provider subject identifies a login, never a family or a local Moment owner.
+export type LoginProvider = 'apple' | 'controlled-password';
+export type LoginIdentity = {
+  provider: LoginProvider;
+  subject: string;
+  userId: string;
+  createdAt: string;
+};
+
 export type Account = {
   userId: string;
   appleSubject?: string;
