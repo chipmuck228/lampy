@@ -6,14 +6,27 @@ import type { FamilyRoster, FamilyTransfer } from '../family-api/types';
 import { pauseForegroundAudio } from '../application/foreground-audio';
 import { tr } from '../i18n';
 import { Text, type } from './life-text';
-import { hairline, inkSoft, sage } from './life-page';
+import { LifeIcon } from './life-icons';
+import { hairline, inkSoft, sage, paperDeep } from './life-page';
 import { useFamilyPrivateRequest } from './use-family-private-request';
 import { familyHistoryError } from './family-history-copy';
 type Roster = FamilyRoster & { userId: string };
 function memberLabel(roster: Roster, member: Roster['members'][number]) {
+  if (member.nickname?.trim()) return member.nickname.trim();
   if (member.userId === roster.userId) return tr('你');
   if (member.role === 'creator') return tr('创建者');
   return tr('成员 {0}', [roster.members.filter(m => m.role === 'member').findIndex(m => m.membershipId === member.membershipId) + 1]);
+}
+function memberRoleLabel(roster: Roster, member: Roster['members'][number]) {
+  const duplicate = member.nickname?.trim() && roster.members.filter(m => m.nickname?.trim() === member.nickname?.trim()).length > 1;
+  const role = member.role === 'creator' ? tr('创建者') : duplicate
+    ? tr('成员 {0}', [roster.members.filter(m => m.role === 'member').findIndex(m => m.membershipId === member.membershipId) + 1]) : tr('成员');
+  return member.nickname?.trim() && member.userId === roster.userId ? `${role} · ${tr('你')}` : role;
+}
+function memberTargetLabel(roster: Roster, member: Roster['members'][number]) {
+  const label = memberLabel(roster, member);
+  return member.nickname?.trim() && roster.members.filter(m => m.nickname?.trim() === member.nickname?.trim()).length > 1
+    ? `${label} · ${memberRoleLabel(roster, member)}` : label;
 }
 // Called only after the user confirms; this is an idempotency key, not a credential.
 function newTransferRequestId() { return `transfer-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -26,12 +39,12 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
   const transferIntent = useRef<{ target: string; requestId: string } | null>(null);
   const currentRef = useRef<() => boolean>(() => false), owner = useRef<(() => boolean) | null>(null);
   useFocusEffect(useCallback(() => {
-    enter();
-    if (!allowed) { setOpen(false); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null); }
+    if (familyId) enter(); else leave();
+    if (!allowed || !familyId) { setOpen(false); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null); }
     return () => { leave(); currentRef.current = () => false; owner.current = null; setBusy(false); setOpen(false); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null); };
-  }, [allowed, enter, leave]));
+  }, [allowed, enter, leave, familyId]));
   async function load() {
-    if (!allowed || owner.current) return;
+    if (!allowed || !familyId || owner.current) return;
     pauseForegroundAudio(); setOpen(true); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null);
     const current = begin(); currentRef.current = current; owner.current = current; setBusy(true);
     try {
@@ -104,7 +117,7 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
     if (!expected || !current() || owner.current) return;
     if (target ? expected.role !== 'creator' || !!pending || target.role !== 'member' || target.userId === expected.userId
       : !pending || (action === 'accept' ? pending.toUserId !== expected.userId : pending.fromUserId !== expected.userId)) return;
-    const title = target ? tr('向 {0} 转交创建者？', [memberLabel(expected, target)]) : action === 'accept' ? tr('接任家庭创建者？') : tr('撤销这次转交？');
+    const title = target ? tr('向 {0} 转交创建者？', [memberTargetLabel(expected, target)]) : action === 'accept' ? tr('接任家庭创建者？') : tr('撤销这次转交？');
     Alert.alert(title, tr('对方主动接受后才会转交。原创建者将成为成员，家庭记录保留；订阅和收费责任不会随此操作转移。'),
       [{ text: tr('取消'), style: 'cancel' }, { text: tr('确认'), onPress: () => void transferChange(expected, current, target?.membershipId, action, pending ?? undefined) }]);
   }
@@ -116,35 +129,41 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
       tr('离开后将不能阅读这里的家庭记录。已经分享的片段会保留，个人记录不受影响。再次加入需要新的邀请。'),
       [{ text: tr('取消'), style: 'cancel' }, { text: tr(target ? '确认移除' : '确认离开'), style: 'destructive', onPress: () => void change(expected, target, current) }]);
   }
-  if (!allowed) return null;
+  if (!allowed || !familyId) return null;
   return <View>
     <Pressable style={styles.hit} accessibilityRole="button" accessibilityState={{ expanded: open, disabled: busy }} disabled={busy}
       testID={`family-members-${familyId}`} onPress={() => { if (open) { begin(); currentRef.current = () => false; setOpen(false); setRoster(null); setSelectedMemberId(null); setTransfer(null); setMessage(null); } else void load(); }}><Text style={styles.action}>{tr('家庭成员')}</Text></Pressable>
     {open ? <View style={styles.panel}>
       {busy ? <Text style={styles.meta}>{tr('正在读取家庭。')}</Text> : null}
       {roster ? <>
-        {roster.members.map(member => {
+        <View style={styles.wall} testID="family-member-wall">{roster.members.map(member => {
           const label = memberLabel(roster, member);
           const canManage = roster.role === 'creator' && member.role === 'member' && member.userId !== roster.userId;
           const selected = canManage && selectedMemberId === member.membershipId;
           return <View key={member.membershipId} style={styles.member}>
             {canManage ? <Pressable style={styles.memberHit} disabled={busy} accessibilityRole="button"
-              accessibilityLabel={label} accessibilityState={{ expanded: selected, selected, disabled: busy }}
+              accessibilityLabel={`${label}，${memberRoleLabel(roster, member)}`} accessibilityState={{ expanded: selected, selected, disabled: busy }}
               testID={`family-member-${member.membershipId}`} onPress={() => setSelectedMemberId(selected ? null : member.membershipId)}>
-              <Text style={styles.action}>{label}</Text>
-            </Pressable> : <View style={styles.memberHit}><Text style={styles.meta}>{label}</Text></View>}
-            {selected ? <View style={styles.memberActions} testID={`family-member-actions-${member.membershipId}`}>
+              <View style={[styles.avatar, selected && styles.avatarSelected]}><LifeIcon name="person" size={40} color={sage}/></View>
+              <Text style={styles.name}>{label}</Text><Text style={styles.role}>{memberRoleLabel(roster, member)}</Text>
+            </Pressable> : <View style={styles.memberHit} accessible accessibilityLabel={`${label}，${memberRoleLabel(roster, member)}`}><View style={styles.avatar}><LifeIcon name="person" size={40} color={inkSoft}/></View><Text style={styles.name}>{label}</Text><Text style={styles.role}>{memberRoleLabel(roster, member)}</Text></View>}
+
+          </View>;
+        })}</View>
+        {roster.members.filter(member => member.membershipId === selectedMemberId && roster.role === 'creator' && member.role === 'member' && member.userId !== roster.userId).map(member => {
+          return <View key={member.membershipId} style={styles.selectedPanel}><Text style={styles.name}>{memberTargetLabel(roster, member)}</Text>
+            <View style={styles.memberActions} testID={`family-member-actions-${member.membershipId}`}>
               {!transfer ? <Pressable style={styles.memberActionHit} disabled={busy} accessibilityRole="button"
-                accessibilityLabel={tr('向 {0} 转交创建者', [label])} accessibilityState={{ disabled: busy }}
+                accessibilityLabel={tr('向 {0} 转交创建者', [memberTargetLabel(roster, member)])} accessibilityState={{ disabled: busy }}
                 testID={`family-transfer-${member.membershipId}`} onPress={() => confirmTransfer(member)}>
                 <Text style={styles.action}>{tr('移交')}</Text>
               </Pressable> : null}
               <Pressable style={styles.memberActionHit} disabled={busy} accessibilityRole="button"
-                accessibilityLabel={tr('移除 {0}', [label])} accessibilityState={{ disabled: busy }}
-                testID={`family-remove-${member.membershipId}`} onPress={() => confirm(member, label)}>
+                accessibilityLabel={tr('移除 {0}', [memberTargetLabel(roster, member)])} accessibilityState={{ disabled: busy }}
+                testID={`family-remove-${member.membershipId}`} onPress={() => confirm(member, memberTargetLabel(roster, member))}>
                 <Text style={styles.meta}>{tr('移除')}</Text>
               </Pressable>
-            </View> : null}
+            </View>
           </View>;
         })}
         {transfer ? <View style={styles.panel}>
@@ -166,10 +185,16 @@ const styles = StyleSheet.create({
   dissolveHit: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline, marginTop: 16 },
   hit: { minHeight: 48, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center' },
   panel: { gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline, paddingTop: 8 },
-  member: { alignSelf: 'stretch', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },
-  memberHit: { minHeight: 48, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'flex-start' },
+  wall: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
+  member: { width: '33.333333%', minWidth: 72, padding: 4 },
+  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: paperDeep, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' },
+  avatarSelected: { borderColor: sage },
+  selectedPanel: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hairline, paddingTop: 12, gap: 4 },
+  name: { ...type.meta, color: inkSoft, textAlign: 'center', alignSelf: 'stretch', width: '100%' },
+  role: { fontSize: 13, lineHeight: 20, color: inkSoft, textAlign: 'center', alignSelf: 'stretch', width: '100%' },
+  memberHit: { minHeight: 100, paddingHorizontal: 4, paddingVertical: 8, gap: 4, justifyContent: 'flex-start', alignItems: 'center' },
   memberActions: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 8, paddingBottom: 8 },
-  memberActionHit: { minHeight: 48, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  memberActionHit: { minHeight: 48, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center', flexShrink: 1 },
   action: { ...type.action, color: sage },
   meta: { ...type.meta, color: inkSoft },
 });

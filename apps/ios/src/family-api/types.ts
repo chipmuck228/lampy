@@ -243,7 +243,7 @@ export type FamilyIds = {
   sessionToken: () => string;
 };
 
-export type FamilyRoster = { familyId: string; role: MembershipRole; membershipId: string; members: (FamilyMemberView & { membershipId: string })[] };
+export type FamilyRoster = { familyId: string; role: MembershipRole; membershipId: string; members: (FamilyMemberView & { membershipId: string; nickname?: string; avatar?: 'system' })[] };
 
 export type FamilyTransfer = {
   transferId: string; familyId: string; requestId: string;
