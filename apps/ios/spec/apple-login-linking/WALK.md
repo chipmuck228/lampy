@@ -99,3 +99,26 @@ Linux Node 24，自动化测量与测试不是原生授权成功证据。
 注意：30 秒等待从 Apple 原生授权返回 token 后开始，停留在 Apple 系统授权面板上 35 秒不等于此路径。切到后台会直接作废请求，也不等于此超时。若设备无法复现等待，保留专项实页 NOT VERIFIED。
 
 合并状态：源码修复与针对性自动化通过；保持 OPEN，待 Release 专项结果与新 head 审阅。未自动合并、未上传新 TestFlight。
+
+## 2026-10-12：Xcode Release Build 9 专项验收（用户报告）
+
+- 真机：iPhone 17 Pro / iOS 26.2。
+- 版本／Build：0.1.0 (9)，Xcode Release 安装；本机测试，不等于已上传 TestFlight。
+- 当前代码 SHA 与工程准备报告 git_sha 均为 af9e1ba6d23e012cc916a2131e022822f143aafb；报告 git_dirty=no。构建来源已核对，不声称已在设备提取运行时 JS 哈希。
+- 用户确认：开启本机保护，退出账号后使用 Apple 登录；完成 Apple 系统授权后，在 Lampy 保护认证等待至少 35 秒；手动解锁后显示等待结束提示、按钮可操作、不自动登录；再次明确授权回原 A2，昵称与家庭保留。邮箱登录、Apple 取消和后台保护遮挡抽查通过。
+- 上述超时恢复专项记为真机 PASS（用户报告）。Build 8 十项原验收继续对应 afdf817；服务器仍为 afdf817，数据库 29；本次未再次部署服务。
+- 首次未关联 Apple 创建新账号、系统 VoiceOver 等仍 NOT VERIFIED，不能扩记为全路径设备 PASS。
+
+### 合并前核对
+
+- 审阅实现 head：af9e1ba6d23e012cc916a2131e022822f143aafb。base/main：9c1887eb5e7aee5e0278f62577761414afce961f。
+- GitHub：OPEN / MERGEABLE / CLEAN。修复 head 的 Cursor Bugbot COMPLETED / SUCCESS，无新问题；原超时线程已由 cursor[bot] resolve。无 CHANGES_REQUESTED review。
+- 重新读取修复代码与三项页面测试，确认提交锁按 owner／世代释放、旧 token 超时不返回、不绕过本机保护、旧 A 不解 B 锁。
+- 修复实现时实际运行的 tsc、相关 Jest 29 / 246、lint 与 diff 检查 PASS 仍对应 af9e1ba；本次仅补文档，不重复运行源码测试，两个既有全量失败继续保留。
+- 本次验收记录提交不是设备构建 SHA。核对记录提交仅改 WALK 后，建议普通 merge，不 squash／rebase。
+
+### 后续内部测试
+
+先从合并后的 main 准备新 family-internal Archive，使用未上传的 Build 号（Build 9 若未上传可使用），通过 TestFlight 让测试人员获得超时修复。仅 Xcode 本机安装不会更新其他测试人员的 Build 8。本片没有服务端改动需要再次部署。
+
+邀请一位未关联过 Lampy 的 Apple 身份测试：首次 Apple 登录 → 设置昵称 → 创建／接受家庭邀请（仍需确认加入）→ 退出再 Apple 登录 → 同账号、昵称、家庭保留。首次 Apple 创建账号通过后，再扩大邀请。若缺少新 Apple 身份则继续保留 NOT VERIFIED；公开邮箱注册、账号删除与 Apple 授权撤销闭环仍未开放／完成。
