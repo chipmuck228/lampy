@@ -232,6 +232,13 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   const tx: FamilyTx = {
+    async findAppleChallenge(id) {
+      const r = await db.getFirst<{ id: string; nonce: string; intent: "login" | "link"; user_id: string | null; session_token: string | null; expires_at: string }>('SELECT * FROM family_apple_challenges WHERE id=?', [id]);
+      return r ? {id:r.id,nonce:r.nonce,intent:r.intent,userId:r.user_id,sessionToken:r.session_token,expiresAt:r.expires_at} : null;
+    },
+    async saveAppleChallenge(c) { await db.run('INSERT INTO family_apple_challenges VALUES(?,?,?,?,?,?)',[c.id,c.nonce,c.intent,c.userId,c.sessionToken,c.expiresAt]); },
+    async deleteAppleChallenge(id) { await db.run('DELETE FROM family_apple_challenges WHERE id=?',[id]); },
+    async pruneAppleChallenges(now) { await db.run('DELETE FROM family_apple_challenges WHERE expires_at<=?',[now]); },
     async findLoginIdentity(provider, subject) {
       const row = await db.getFirst<{ provider: import('./types').LoginProvider; subject: string; user_id: string; created_at: string }>('SELECT * FROM family_login_identities WHERE provider=? AND subject=?', [provider, subject]);
       return row ? { provider: row.provider, subject: row.subject, userId: row.user_id, createdAt: row.created_at } : null;

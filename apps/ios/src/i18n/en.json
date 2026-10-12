@@ -787,5 +787,16 @@
   "仅退出这台设备，个人记录不变。": "Sign out on this device only. Your personal moments stay here.",
   "退出还未完成，请再试一次。": "Sign-out is not complete. Please try again.",
   "已退出这台设备，联网后会继续撤销会话。": "Signed out on this device. Session revocation will continue when connected.",
-  "已退出这台设备。": "Signed out on this device."
+  "已退出这台设备。": "Signed out on this device.",
+  "使用Apple继续": "Continue with Apple",
+  "已取消Apple登录。": "Apple sign-in cancelled.",
+  "Apple授权没有完成，请重新试一次。": "Apple authorization could not be completed. Please start again.",
+  "这台设备暂不能使用Apple登录。": "Sign in with Apple is unavailable on this device.",
+  "这个Apple账号已关联其他账号，不能合并。": "This Apple account is already linked. Accounts cannot be merged.",
+  "Apple账号已关联。": "Apple account linked.",
+  "关联Apple账号": "Link Apple account",
+  "已关联Apple账号": "Apple account linked",
+  "关联": "Link",
+  "关联后可用Apple登录当前账号，家庭和昵称保留。不会合并其他账号。": "Use Apple to sign in to this account, keeping your families and nickname. Other accounts will not be merged.",
+  "Apple授权等待已结束，请重新试一次。": "Apple authorization timed out. Please start again."
 }

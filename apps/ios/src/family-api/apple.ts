@@ -3,11 +3,12 @@ import type { AppleIdentity, AppleVerifier, FamilyClock } from './types';
 
 export function createMapAppleVerifier(tokens: Record<string, AppleIdentity>): AppleVerifier {
   return {
-    async verifyIdentityToken(identityToken: string) {
+    async verifyIdentityToken(identityToken: string, expectedNonce?: string) {
       const identity = tokens[identityToken];
       if (!identity) {
         throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, 'Apple identity token is invalid.');
       }
+      if (expectedNonce !== undefined && identity.nonce !== expectedNonce) throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, "Apple nonce is invalid.");
       return identity;
     },
   };
@@ -18,6 +19,7 @@ export type AppleJwtClaims = {
   aud?: string | string[];
   exp?: number;
   iat?: number;
+  nonce?: string;
   sub?: string;
   email?: string;
 };
@@ -94,12 +96,15 @@ export function createAppleJwksVerifier(options: {
   }
 
   return {
-    async verifyIdentityToken(identityToken: string) {
-      const parsed = parseJwtParts(identityToken);
+    async verifyIdentityToken(identityToken: string, expectedNonce?: string) {
+      let parsed: ReturnType<typeof parseJwtParts>;
+      try { parsed=parseJwtParts(identityToken); } catch { throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID,'Apple identity token is malformed.'); }
+      if(!parsed.header.kid) throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID,'Apple key identifier is missing.');
       if (parsed.header.alg !== 'RS256') {
         throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, 'Apple identity token algorithm is invalid.');
       }
       assertAppleClaims(parsed.payload, audience, (options.clock ?? { now: () => new Date() }).now());
+      if (expectedNonce !== undefined && parsed.payload.nonce !== expectedNonce) throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, "Apple nonce is invalid.");
       const keys = await options.fetchJwks();
       const jwk = keys.find((key) => key.kid === parsed.header.kid && key.kty === 'RSA');
       if (!jwk) {

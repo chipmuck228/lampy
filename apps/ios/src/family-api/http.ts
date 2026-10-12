@@ -120,6 +120,13 @@ export async function dispatchFamilyApi(
       return { status: 200, body: commands.health() };
     }
 
+    if (method === 'POST' && path === '/v2/auth/apple/challenge') {
+      const intent = readString(body,'intent');
+      if (intent !== 'login' && intent !== 'link') throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Invalid Apple intent.');
+      return {status:200,body:await commands.beginAppleAuth(intent,token,request.peer)};
+    }
+    if (method === 'POST' && path === '/v2/auth/apple/complete') return {status:200,body:await commands.completeAppleAuth({challengeId:readString(body,'challengeId'),identityToken:readString(body,'identityToken')},token)};
+    if (method === 'GET' && path === '/v2/me/apple') return {status:200,body:await commands.getAppleLink(token || '')};
     if (method === 'POST' && path === '/v1/auth/apple') {
       return { status: 200, body: await commands.signInWithApple(readString(body, 'identityToken')) };
     }

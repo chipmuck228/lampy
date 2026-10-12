@@ -184,6 +184,8 @@ const MIGRATIONS = [
      SELECT 'apple',apple_subject,user_id,created_at FROM family_accounts WHERE apple_subject IS NOT NULL;
    INSERT INTO family_login_identities(provider,subject,user_id,created_at)
      SELECT 'controlled-password',login_normalized,user_id,created_at FROM family_test_credentials;`,
+  `CREATE TABLE family_apple_challenges (id TEXT PRIMARY KEY, nonce TEXT NOT NULL UNIQUE, intent TEXT NOT NULL CHECK(intent IN ('login','link')), user_id TEXT REFERENCES family_accounts(user_id), session_token TEXT, expires_at TEXT NOT NULL);
+   CREATE INDEX family_apple_challenges_expiry ON family_apple_challenges(expires_at);`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28] as const;

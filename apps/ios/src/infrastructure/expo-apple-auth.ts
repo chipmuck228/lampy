@@ -4,7 +4,7 @@ import { ApplicationError } from '../application/errors';
 
 export type AppleIdentityTokenSource = {
   isAvailable(): Promise<boolean>;
-  requestIdentityToken(): Promise<string>;
+  requestIdentityToken(nonce?: string): Promise<string>;
 };
 
 export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
@@ -12,7 +12,7 @@ export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
     async isAvailable() {
       return AppleAuthentication.isAvailableAsync();
     },
-    async requestIdentityToken() {
+    async requestIdentityToken(nonce?: string) {
       const available = await AppleAuthentication.isAvailableAsync();
       if (!available) {
         throw new ApplicationError('APPLE_UNAVAILABLE', 'Sign in with Apple is not available on this device.');
@@ -20,6 +20,7 @@ export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
       try {
         const credential = await AppleAuthentication.signInAsync({
           requestedScopes: [],
+          nonce,
         });
         if (!credential.identityToken) {
           throw new ApplicationError('APPLE_TOKEN_INVALID', 'Apple did not return an identity token.');

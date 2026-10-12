@@ -1,3 +1,4 @@
+import { createAppleAuthCommands } from './apple-auth-commands';
 import { createFamilyTransferCommands } from './transfer-commands';
 import { createInviteLinkCommands, type InviteLinkCommands } from './invite-link-commands';
 import { FAMILY_ERROR, FamilyError } from './errors';
@@ -53,6 +54,9 @@ export type FamilyCommands = InviteLinkCommands & {
   getMyProfile(sessionToken: string): Promise<import('./types').UserProfile>;
   updateMyProfile(sessionToken: string, nickname: string): Promise<import('./types').UserProfile>;
   health(): FamilyHealth;
+  beginAppleAuth(intent: 'login' | 'link', sessionToken?: string, peer?: string): Promise<{challengeId:string;nonce:string;expiresAt:string}>;
+  completeAppleAuth(input: import('./types').AppleAuthInput, sessionToken?: string): Promise<SignInResult | {linked:true;userId:string}>;
+  getAppleLink(sessionToken: string): Promise<{linked:boolean}>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
   createTestAccount(login: string, password: string): Promise<{ userId: string; created: true }>;
@@ -105,7 +109,7 @@ async function requireUser(
   sessionToken: string | undefined,
   clock: FamilyClock,
   testAccountLoginEnabled: boolean,
-  operatorOnly = false,
+  operatorOnly: boolean | "apple-enabled" = false,
 ) {
   if (!sessionToken) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
@@ -259,6 +263,8 @@ export function createFamilyCommands(deps: {
   testAccountLoginEnabled?: boolean;
   controlledEmailAccountsEnabled?: boolean;
   publicTestLoginEnabled?: boolean;
+  appleLoginEnabled?: boolean;
+  legacyAppleLoginEnabled?: boolean;
   inviteLinksEnabled?: boolean;
   historySharingEnabled?: boolean;
 }): FamilyCommands {
@@ -269,6 +275,7 @@ export function createFamilyCommands(deps: {
   const store = deps.store ?? createFamilyStore();
   const repository = deps.repository ?? createMemoryFamilyRepository(store);
   const blobs = deps.mediaBlobs ?? createMemoryMediaBlobStore();
+  const operatorOnly = deps.publicTestLoginEnabled === true ? (deps.appleLoginEnabled === true ? 'apple-enabled' as const : true) : false;
   const testAccountLoginEnabled = deps.testAccountLoginEnabled === true || deps.publicTestLoginEnabled === true;
   const media = createMediaCommands({
     repository,
@@ -276,14 +283,14 @@ export function createFamilyCommands(deps: {
     clock,
     assertPayload: assertMediaPayload,
     testAccountLoginEnabled,
-    operatorOnly: deps.publicTestLoginEnabled === true,
+    operatorOnly,
   });
   const shares = createShareCommands({
     repository,
     blobs,
     clock,
     testAccountLoginEnabled,
-    operatorOnly: deps.publicTestLoginEnabled === true,
+    operatorOnly,
   });
   const testAccounts = createTestAccountCommands({
     repository,
@@ -305,10 +312,10 @@ export function createFamilyCommands(deps: {
       sessionToken,
       clock.now(),
       testAccountLoginEnabled,
-      deps.publicTestLoginEnabled === true,
+      operatorOnly,
     ).then(() =>
       repository.withTransaction(async (tx) => {
-        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled, deps.publicTestLoginEnabled === true);
+        const userId = await requireUser(tx, sessionToken, clock, testAccountLoginEnabled, operatorOnly);
         return work(tx, userId);
       }),
     );
@@ -316,7 +323,7 @@ export function createFamilyCommands(deps: {
 
   return {
     transfers: createFamilyTransferCommands({authed:withAuthedUser,clock,id:()=>`transfer_${ids.invitationId()}`}),
-    historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled, operatorOnly: deps.publicTestLoginEnabled === true,
+    historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled, operatorOnly,
       historyPolicy: 'family-history-v2', historyEnabled: deps.historySharingEnabled === true }),
     async getFamilyHistoryPolicy(session, familyId) {
       assertHistoryEnabled(deps.historySharingEnabled === true);
@@ -352,14 +359,17 @@ export function createFamilyCommands(deps: {
         controlledEmailAccounts: deps.publicTestLoginEnabled === true || (testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true),
         emailRegistration: deps.publicTestLoginEnabled !== true && testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true,
         publicTestLogin: deps.publicTestLoginEnabled === true,
+        appleLogin: deps.appleLoginEnabled === true,
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
         familyHistoryV2: deps.historySharingEnabled === true,
         argon2id: ARGON2ID_PRODUCTION,
       };
     },
+    ...createAppleAuthCommands({repository, apple:deps.apple, clock, ids, sessionTtlMs, enabled:deps.appleLoginEnabled === true,
+      requireUser: (tx, token) => requireUser(tx,token,clock,testAccountLoginEnabled,operatorOnly)}),
     async signInWithApple(identityToken: string) {
-      if (deps.publicTestLoginEnabled) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Apple sign-in is not enabled for this controlled test.');
+      if (deps.publicTestLoginEnabled || deps.legacyAppleLoginEnabled === false) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Apple sign-in is not enabled for this controlled test.');
       if (!identityToken.trim()) {
         throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, 'Apple identity token is invalid.');
       }

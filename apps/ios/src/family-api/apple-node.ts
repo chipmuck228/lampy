@@ -4,7 +4,7 @@ import { FAMILY_ERROR, FamilyError } from './errors';
 import type { AppleJwk } from './apple';
 
 export async function fetchAppleJwks(): Promise<AppleJwk[]> {
-  const response = await fetch('https://appleid.apple.com/auth/keys');
+  const response = await fetch('https://appleid.apple.com/auth/keys', {signal:AbortSignal.timeout(10_000)});
   if (!response.ok) {
     throw new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID, 'Apple JWKS could not be loaded.');
   }

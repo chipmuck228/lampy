@@ -80,10 +80,11 @@ export async function assertTestAccountSessionAllowed(
   tx: FamilyTx,
   userId: string,
   enabled: boolean,
-  operatorOnly = false,
+  operatorOnly: boolean | "apple-enabled" = false,
 ) {
   const credential = await tx.findTestCredentialByUserId(userId);
   if (!credential) {
+    if (operatorOnly === 'apple-enabled' && (await tx.listLoginIdentities(userId)).some(i => i.provider === 'apple')) return;
     if (operatorOnly) throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
     return;
   }
@@ -97,7 +98,7 @@ export async function rejectDisallowedTestAccountSession(
   sessionToken: string | undefined,
   now: Date,
   enabled: boolean,
-  operatorOnly = false,
+  operatorOnly: boolean | "apple-enabled" = false,
 ) {
   if (!sessionToken) return;
   const revoked = await repository.withTransaction(async (tx) => {
@@ -105,7 +106,7 @@ export async function rejectDisallowedTestAccountSession(
     if (!session || new Date(session.expiresAt).getTime() <= now.getTime()) return false;
     const credential = await tx.findTestCredentialByUserId(session.userId);
     if (!credential) {
-      if (!operatorOnly) return false;
+      if (!operatorOnly || (operatorOnly === 'apple-enabled' && (await tx.listLoginIdentities(session.userId)).some(i => i.provider === 'apple'))) return false;
       await tx.deleteSessionsForUser(session.userId);
       return true;
     }
