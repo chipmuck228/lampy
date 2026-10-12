@@ -38,3 +38,5 @@
 | 2026-10-11 | 首次按 main 建立能力、范围与缺口台账；补记 Build 7 TestFlight 用户报告；家庭公开仍待决定 | [EVIDENCE](EVIDENCE.md) |
 
 2026-10-11：首片收窄为账号模型＋兼容迁移；Apple 入口另片，邮件链接／Google／微信延后。见 [账号模型规格](../account-identity-model/README.md)。
+
+2026-10-12：生活册新一轮阶段A见[life-album-v2](../life-album-v2/README.md)。已确认连续／打印同风格、自包含成品、创建者保存／接收者按次只读、我的／家里的分区、自动封面及家庭共同分享约定（无逐条许可）。样本不等于正式导出；ALBUM-01、PAY-01仍未完成。#109继续搁置，AUTH-02仍是正式公开账号门槛。
