@@ -2,8 +2,8 @@ import { Alert, AppState } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { ApplicationError } from '../application/errors';
 import FamilyEmailAccountScreen from './family-email-account-screen';
-const mockAppleAvailable=jest.fn();const mockAppleToken=jest.fn();const mockAppleStatus=jest.fn();const mockAuthenticateApple=jest.fn();
-jest.mock('../infrastructure/expo-apple-auth',()=>({createExpoAppleIdentityTokenSource:()=>({isAvailable:mockAppleAvailable,requestIdentityToken:mockAppleToken})}));
+const mockAppleCredential=jest.fn();const mockAppleAvailable=jest.fn();const mockAppleToken=jest.fn();const mockAppleStatus=jest.fn();const mockAuthenticateApple=jest.fn();
+jest.mock('../infrastructure/expo-apple-auth',()=>({createExpoAppleIdentityTokenSource:()=>({isAvailable:mockAppleAvailable,requestIdentityToken:mockAppleToken,requestAuthorization:mockAppleCredential})}));
 jest.mock('./apple-auth-button',()=>{const {Pressable,Text}=jest.requireActual('react-native');return {AppleAuthButton:({disabled,onPress}:any)=><Pressable testID="apple-auth-button" disabled={disabled} onPress={onPress}><Text>Apple</Text></Pressable>};});
 let mockInternal=false;let mockDiagnostics=true;
 const mockPush=jest.fn(),mockDismiss=jest.fn(),mockBack=jest.fn();
@@ -182,5 +182,17 @@ it('late Apple A completion cannot clear the newer B submission lock',async()=>{
   await act(async()=>finishA({userId:'a'}));expect(page.getByTestId('apple-auth-button')).toBeDisabled();expect(done).not.toHaveBeenCalled();
   await fireEvent.press(page.getByTestId('apple-auth-button'));expect(mockAuthenticateApple).toHaveBeenCalledTimes(2);
   await act(async()=>finishB({userId:'b'}));expect(done).toHaveBeenCalledTimes(1);
+ } finally {await page.unmount();subscription.mockRestore();}
+});
+
+
+it('server-required grant capture uses one native credential request and preserves explicit completion',async()=>{
+ mockHealth.mockResolvedValue({controlledEmailAccounts:true,appleLogin:true,appleGrantCapture:true});mockAppleAvailable.mockResolvedValue(true);
+ mockAppleCredential.mockResolvedValue({identityToken:'id',authorizationCode:'code'});
+ mockAuthenticateApple.mockImplementation(async(_intent,authorize)=>{expect(await authorize('nonce',true)).toEqual({identityToken:'id',authorizationCode:'code'});});
+ const subscription=jest.spyOn(AppState,'addEventListener').mockImplementation(()=>({remove:jest.fn()}));const done=jest.fn();
+ const page=await render(<FamilyEmailAccountScreen onAuthenticated={done}/>);try {
+  await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeTruthy());await fireEvent.press(page.getByTestId('apple-auth-button'));
+  expect(mockAppleCredential).toHaveBeenCalledWith('nonce');expect(mockAppleCredential).toHaveBeenCalledTimes(1);expect(mockAppleToken).not.toHaveBeenCalled();expect(done).toHaveBeenCalledTimes(1);
  } finally {await page.unmount();subscription.mockRestore();}
 });

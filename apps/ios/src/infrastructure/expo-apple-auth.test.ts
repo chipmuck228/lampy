@@ -13,3 +13,10 @@ it('native cancellation and unsupported devices fail without a token',async()=>{
  (Apple.isAvailableAsync as jest.Mock).mockResolvedValue(false);await expect(createExpoAppleIdentityTokenSource().requestIdentityToken('nonce')).rejects.toMatchObject({code:'APPLE_UNAVAILABLE'});
  expect(Apple.signInAsync).toHaveBeenCalledTimes(1);
 });
+it('returns the single-use code only for credential capture and does not make a second native request',async()=>{
+ (Apple.signInAsync as jest.Mock).mockResolvedValue({identityToken:'token',authorizationCode:'one-use-code'});
+ expect(await createExpoAppleIdentityTokenSource().requestAuthorization('nonce')).toEqual({identityToken:'token',authorizationCode:'one-use-code'});
+ expect(Apple.signInAsync).toHaveBeenCalledTimes(1);
+ (Apple.signInAsync as jest.Mock).mockResolvedValue({identityToken:'token'});
+ await expect(createExpoAppleIdentityTokenSource().requestAuthorization('nonce')).rejects.toMatchObject({code:'APPLE_GRANT_REQUIRED'});
+});

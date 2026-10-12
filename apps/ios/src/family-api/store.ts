@@ -17,6 +17,7 @@ export type IdempotentRecord = {
 };
 
 export type FamilyStore = {
+  appleGrants: import('./types').AppleGrant[];
   appleChallenges: import('./types').AppleChallenge[];
   profiles: import('./types').UserProfile[];
   directoryHistory: (import('./types').PastFamilySummary & { userId: string; status: 'left' | 'removed' | 'dissolved' })[];
@@ -37,6 +38,7 @@ export type FamilyStore = {
 
 export function createFamilyStore(): FamilyStore {
   return {
+    appleGrants: [],
     appleChallenges: [],
     profiles: [],
     directoryHistory: [],

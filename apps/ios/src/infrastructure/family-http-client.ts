@@ -74,7 +74,7 @@ export type FamilyApiClient = {
   revokeInviteLink?(session: string, id: string): Promise<import('../family-api/types').InviteLinkView>;
   previewInviteLink?(token: string): Promise<import('../family-api/types').InvitePreview>;
   acceptInviteLink?(session: string, token: string): Promise<FamilySummary>;
-  beginAppleAuth?(intent:'login'|'link',sessionToken?:string):Promise<{challengeId:string;nonce:string;expiresAt:string}>;
+  beginAppleAuth?(intent:'login'|'link',sessionToken?:string):Promise<{challengeId:string;nonce:string;expiresAt:string;authorizationCodeRequired?:boolean}>;
   completeAppleAuth?(input:import('../family-api/types').AppleAuthInput,sessionToken?:string):Promise<SignInResult | {linked:true;userId:string}>;
   getAppleLink?(sessionToken:string):Promise<{linked:boolean}>;
   signInWithApple(identityToken: string): Promise<SignInResult>;

@@ -22,6 +22,8 @@ function errorCopy(error: unknown) {
     if (error.code === 'AUTH_FAILED') return tr('邮箱或密码不对。');
     if (error.code === 'RATE_LIMITED') return tr('请稍后再试。');
     if (error.code === 'EMAIL_ACCOUNT_CLOSED') return tr('测试账号入口暂未开放。');
+    if (error.code === 'APPLE_GRANT_REQUIRED') return tr('请更新Lampy后再试一次。');
+    if (error.code === 'APPLE_GRANT_UNAVAILABLE') return tr('Apple授权没有完成，请重新试一次。');
     if (error.code === 'APPLE_AUTH_WAIT_TIMEOUT') return tr('Apple授权等待已结束，请重新试一次。');
     if (error.code === 'APPLE_SIGN_IN_CANCELLED') return tr('已取消Apple登录。');
     if (error.code === 'APPLE_TOKEN_INVALID') return tr('Apple授权没有完成，请重新试一次。');
@@ -117,11 +119,12 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
     owner.current=seq;appleRecoveryMessage.current=null;setBusy(true);setMessage(null);setPassword('');
     try {
       const service=await getFamilyUseCases();if(!current(seq)) return;
-      await service.authenticateApple(profileMode?'link':'login',async nonce=>{
+      await service.authenticateApple(profileMode?'link':'login',async (nonce,authorizationCodeRequired)=>{
         if(!current(seq)) throw new Error('Inactive');
         nativeApple.current=seq;
         try {
-          const token=await createExpoAppleIdentityTokenSource().requestIdentityToken(nonce);
+          const source=createExpoAppleIdentityTokenSource();
+          const token=authorizationCodeRequired ? await source.requestAuthorization(nonce) : await source.requestIdentityToken(nonce);
           // Authorization sheets can set inactive; protection is never bypassed. Wait for active/unlocked.
           const end=Date.now()+30_000;
           while(!current(seq) && sequence.current===seq && AppState.currentState!=='background' && Date.now()<end) await new Promise<void>(resolve=>setTimeout(resolve,50));

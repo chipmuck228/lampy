@@ -798,5 +798,6 @@
   "已关联Apple账号": "Apple account linked",
   "关联": "Link",
   "关联后可用Apple登录当前账号，家庭和昵称保留。不会合并其他账号。": "Use Apple to sign in to this account, keeping your families and nickname. Other accounts will not be merged.",
-  "Apple授权等待已结束，请重新试一次。": "Apple authorization timed out. Please start again."
+  "Apple授权等待已结束，请重新试一次。": "Apple authorization timed out. Please start again.",
+  "请更新Lampy后再试一次。": "Please update Lampy and try again."
 }

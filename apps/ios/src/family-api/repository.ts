@@ -23,6 +23,9 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  findAppleGrant(userId: string): Promise<import('./types').AppleGrant | null>;
+  listAppleGrants(userId: string): Promise<import('./types').AppleGrant[]>;
+  saveAppleGrant(grant: import('./types').AppleGrant): Promise<void>;
   findAppleChallenge(id: string): Promise<import('./types').AppleChallenge | null>;
   saveAppleChallenge(challenge: import('./types').AppleChallenge): Promise<void>;
   deleteAppleChallenge(id: string): Promise<void>;
@@ -122,6 +125,13 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async findAppleGrant(userId) { return store.appleGrants.find(g => g.userId === userId) ?? null; },
+    async listAppleGrants(userId) { return store.appleGrants.filter(g => g.userId === userId); },
+    async saveAppleGrant(grant) {
+      const identity = await tx.findLoginIdentity('apple',grant.appleSubject);
+      if(!identity || identity.userId!==grant.userId) throw new FamilyStoreConstraintError('login_identity');
+      replaceBy(store.appleGrants,g=>JSON.stringify([g.userId,g.fingerprint]),{...grant});
+    },
     async findAppleChallenge(id) { return store.appleChallenges.find(c => c.id === id) ?? null; },
     async saveAppleChallenge(c) { store.appleChallenges.push({...c}); },
     async deleteAppleChallenge(id) { store.appleChallenges = store.appleChallenges.filter(c => c.id !== id); },

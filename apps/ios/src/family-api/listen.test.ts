@@ -286,3 +286,13 @@ describe('family API listen startup', () => {
     }
   });
 });
+
+it('bounds the credential-complete body separately, without enlarging legacy auth JSON',async()=>{
+ const listening=await startFamilyApiServer({port:0,host:'127.0.0.1',env:{LAMPY_FAMILY_API_MODE:'test',LAMPY_FAMILY_API_TEST_TOKENS:'token:subject',LAMPY_APPLE_LOGIN_ENABLED:'1'}});
+ try {
+  const medium={challengeId:'0'.repeat(64),identityToken:'i'.repeat(7000),authorizationCode:'c'.repeat(2000)};
+  expect((await postJson(listening.port,'/v2/auth/apple/complete',medium)).status).toBe(401);
+  expect((await postJson(listening.port,'/v1/auth/apple',medium)).status).toBe(413);
+  expect((await postJson(listening.port,'/v2/auth/apple/complete',{...medium,authorizationCode:'c'.repeat(17000)})).status).toBe(413);
+ } finally {await listening.close();}
+});

@@ -1,3 +1,4 @@
+import { appleGrantServiceFromEnv } from './apple-grants';
 import { publicTestAuthPlan, publicTestPeer, createPublicAuthAdmission, isPublicAuthRequest, publicAuthBodyDeadline } from './public-test-auth';
 import { INVITE_WEB_HTML, INVITE_WEB_CSS, inviteWebJs, inviteAssociation } from './invite-web';
 import { invitationOrigin, makeFamilyInviteLink } from '../infrastructure/family-invite-link';
@@ -20,6 +21,7 @@ import { ARGON2ID_TEST, createArgon2idPasswordHasher } from './password';
 
 export const FAMILY_JSON_MAX_BYTES = 4096;
 export const FAMILY_SHARE_JSON_MAX_BYTES = 64 * 1024;
+export const FAMILY_APPLE_JSON_MAX_BYTES = 16 * 1024;
 
 function readRawBody(req: IncomingMessage, maxBytes: number): Promise<Buffer | 'too-large'> {
   return new Promise((resolve, reject) => {
@@ -66,8 +68,12 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
   const inviteOrigin=invitationOrigin(env.LAMPY_FAMILY_INVITE_ORIGIN);
   const inviteEnabled=env.LAMPY_FAMILY_INVITES_ENABLED === '1' && Boolean(inviteOrigin);
   const publicAuth = publicTestAuthPlan({ ...env, LAMPY_FAMILY_API_HOST: options?.host ?? env.LAMPY_FAMILY_API_HOST });
+  const productionApple=plan.mode==='production' ? createAppleJwksVerifier({audience:plan.appleClientId,fetchJwks:fetchAppleJwks,verifySignature:verifyAppleJwtSignature}) : undefined;
+  if(env.LAMPY_APPLE_GRANT_CAPTURE==='1' && !productionApple) throw new Error('Apple grant capture is production-only.');
+  const appleGrants=productionApple ? appleGrantServiceFromEnv(env,productionApple) : undefined;
   const authOpts = {
     publicTestLoginEnabled: publicAuth.enabled,
+    appleGrants,
     appleLoginEnabled: env.LAMPY_APPLE_LOGIN_ENABLED === '1',
     legacyAppleLoginEnabled: plan.mode === 'test',
     inviteLinksEnabled:inviteEnabled,
@@ -88,15 +94,16 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
           mkdirSync(path.dirname(path.resolve(plan.databasePath)), { recursive: true });
           const db = openFamilySqliteDatabase(plan.databasePath);
           await applyFamilyApiSchema(db);
+          if(appleGrants) {
+            const grants=await db.getAll<import('./types').AppleGrant>('SELECT user_id AS userId,apple_subject AS appleSubject,fingerprint,ciphertext,key_version AS keyVersion,updated_at AS updatedAt FROM family_apple_grants');
+            try { for(const grant of grants) appleGrants.assertReadable(grant); }
+            catch { await db.close();throw new Error('Existing Apple grants cannot be read with the configured key.'); }
+          }
           const mediaRoot = (env.LAMPY_FAMILY_MEDIA_PATH || path.join(path.dirname(path.resolve(plan.databasePath)), 'media')).trim();
           mkdirSync(mediaRoot, { recursive: true });
           return createFamilyCommands({
             repository: createSqliteFamilyRepository(db),
-            apple: createAppleJwksVerifier({
-              audience: plan.appleClientId,
-              fetchJwks: fetchAppleJwks,
-              verifySignature: verifyAppleJwtSignature,
-            }),
+            apple: productionApple!,
             mediaBlobs: createDirectoryMediaBlobStore(mediaRoot),
             ...authOpts,
           });
@@ -149,7 +156,9 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
         ? MEDIA_MAX_BYTES + 1024
         : isShareCreate
           ? FAMILY_SHARE_JSON_MAX_BYTES
-          : FAMILY_JSON_MAX_BYTES;
+          : route==='/v2/auth/apple/complete' && req.method==='POST'
+            ? FAMILY_APPLE_JSON_MAX_BYTES
+            : FAMILY_JSON_MAX_BYTES;
       const raw = await readRawBody(req, maxBytes);
       cancelBodyDeadline?.();
       cancelBodyDeadline = undefined;

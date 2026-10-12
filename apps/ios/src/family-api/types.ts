@@ -122,6 +122,7 @@ export type FamilyHealth = {
   emailRegistration?: boolean;
   publicTestLogin?: boolean;
   appleLogin?: boolean;
+  appleGrantCapture?: boolean;
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 
@@ -236,8 +237,16 @@ export type InviteLinkView = Omit<InviteLink, 'tokenHash' | 'acceptedByUserId' |
 export type CreatedInviteLink = InviteLinkView & { token: string };
 export type InvitePreview = { name: string; expiresAt: string; status: InvitationStatus | 'dissolved'; };
 
-export type AppleChallenge = { id: string; nonce: string; intent: "login" | "link"; userId: string | null; sessionToken: string | null; expiresAt: string };
-export type AppleAuthInput = { challengeId: string; identityToken: string };
+export type AppleChallenge = { id: string; nonce: string; intent: "login" | "link"; userId: string | null; sessionToken: string | null; expiresAt: string; grantRequired?: boolean };
+export type AppleAuthInput = { challengeId: string; identityToken: string; authorizationCode?: string };
+export type AppleAuthorization = { identityToken: string; authorizationCode?: string };
+export type AppleGrant = { userId: string; appleSubject: string; fingerprint: string; ciphertext: string; keyVersion: string; updatedAt: string };
+export interface AppleGrantService {
+  exchange(input: { authorizationCode: string; appleSubject: string; nonce: string }): Promise<string>;
+  seal(userId: string, appleSubject: string, refreshToken: string): AppleGrant;
+  assertReadable(grant: AppleGrant): void;
+  revoke(grant: AppleGrant): Promise<void>;
+}
 
 export type AppleIdentity = {
   nonce?: string;

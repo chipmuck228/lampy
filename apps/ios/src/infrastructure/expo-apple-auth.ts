@@ -5,14 +5,11 @@ import { ApplicationError } from '../application/errors';
 export type AppleIdentityTokenSource = {
   isAvailable(): Promise<boolean>;
   requestIdentityToken(nonce?: string): Promise<string>;
+  requestAuthorization(nonce: string): Promise<import('../family-api/types').AppleAuthorization>;
 };
 
 export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
-  return {
-    async isAvailable() {
-      return AppleAuthentication.isAvailableAsync();
-    },
-    async requestIdentityToken(nonce?: string) {
+  async function request(nonce?: string) {
       const available = await AppleAuthentication.isAvailableAsync();
       if (!available) {
         throw new ApplicationError('APPLE_UNAVAILABLE', 'Sign in with Apple is not available on this device.');
@@ -25,7 +22,7 @@ export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
         if (!credential.identityToken) {
           throw new ApplicationError('APPLE_TOKEN_INVALID', 'Apple did not return an identity token.');
         }
-        return credential.identityToken;
+        return {identityToken:credential.identityToken,authorizationCode:credential.authorizationCode || undefined};
       } catch (error) {
         if (error instanceof ApplicationError) throw error;
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_REQUEST_CANCELED') {
@@ -36,6 +33,14 @@ export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
           error instanceof Error ? error.message : 'Sign in with Apple failed.',
         );
       }
+  }
+  return {
+    isAvailable:()=>AppleAuthentication.isAvailableAsync(),
+    requestIdentityToken:async(nonce?:string)=>(await request(nonce)).identityToken,
+    requestAuthorization:async(nonce:string)=>{
+      const credential=await request(nonce);
+      if(!credential.authorizationCode) throw new ApplicationError('APPLE_GRANT_REQUIRED','Apple authorization code is missing.');
+      return credential;
     },
   };
 }
