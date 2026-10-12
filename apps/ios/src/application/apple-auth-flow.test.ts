@@ -35,3 +35,9 @@ it('successful login saves session once and newer auth prevents older completion
  const d=deferred<string>();const authorize=jest.fn(()=>d.promise);const old=h.family.authenticateApple('login',authorize,()=>true);while(!authorize.mock.calls.length)await Promise.resolve();
  await h.family.authenticateApple('login',async()=> 'second',()=>true);d.resolve('old');await expect(old).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
 });
+it('new capture capability forwards the code once while an old client result fails before completing',async()=>{
+ const h=setup();const challenge={challengeId:'id',nonce:'nonce',expiresAt:'future',authorizationCodeRequired:true};h.begin.mockResolvedValue(challenge);
+ await h.family.authenticateApple('login',async(nonce,required)=>{expect(required).toBe(true);return {identityToken:'identity',authorizationCode:'one-use-code'};},()=>true);
+ expect(h.complete).toHaveBeenCalledWith({challengeId:'id',identityToken:'identity',authorizationCode:'one-use-code'},undefined);
+ h.complete.mockClear();await expect(h.family.authenticateApple('login',async()=> 'old-token',()=>true)).rejects.toMatchObject({code:'APPLE_GRANT_REQUIRED'});expect(h.complete).not.toHaveBeenCalled();
+});

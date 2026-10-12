@@ -232,11 +232,22 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   const tx: FamilyTx = {
-    async findAppleChallenge(id) {
-      const r = await db.getFirst<{ id: string; nonce: string; intent: "login" | "link"; user_id: string | null; session_token: string | null; expires_at: string }>('SELECT * FROM family_apple_challenges WHERE id=?', [id]);
-      return r ? {id:r.id,nonce:r.nonce,intent:r.intent,userId:r.user_id,sessionToken:r.session_token,expiresAt:r.expires_at} : null;
+    async findAppleGrant(userId) {
+      return db.getFirst<import('./types').AppleGrant>('SELECT user_id AS userId,apple_subject AS appleSubject,fingerprint,ciphertext,key_version AS keyVersion,updated_at AS updatedAt FROM family_apple_grants WHERE user_id=? ORDER BY updated_at DESC LIMIT 1',[userId]);
     },
-    async saveAppleChallenge(c) { await db.run('INSERT INTO family_apple_challenges VALUES(?,?,?,?,?,?)',[c.id,c.nonce,c.intent,c.userId,c.sessionToken,c.expiresAt]); },
+    async listAppleGrants(userId) {
+      return db.getAll<import('./types').AppleGrant>('SELECT user_id AS userId,apple_subject AS appleSubject,fingerprint,ciphertext,key_version AS keyVersion,updated_at AS updatedAt FROM family_apple_grants WHERE user_id=?',[userId]);
+    },
+    async saveAppleGrant(grant) {
+      const identity=await tx.findLoginIdentity('apple',grant.appleSubject);
+      if(!identity || identity.userId!==grant.userId) throw new FamilyStoreConstraintError('login_identity');
+      await db.run('INSERT INTO family_apple_grants VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,fingerprint) DO UPDATE SET apple_subject=excluded.apple_subject,ciphertext=excluded.ciphertext,key_version=excluded.key_version,updated_at=excluded.updated_at',[grant.userId,grant.appleSubject,grant.fingerprint,grant.ciphertext,grant.keyVersion,grant.updatedAt]);
+    },
+    async findAppleChallenge(id) {
+      const r = await db.getFirst<{ id: string; nonce: string; intent: "login" | "link"; user_id: string | null; session_token: string | null; expires_at: string; grant_required: number }>('SELECT * FROM family_apple_challenges WHERE id=?', [id]);
+      return r ? {id:r.id,nonce:r.nonce,intent:r.intent,userId:r.user_id,sessionToken:r.session_token,expiresAt:r.expires_at,grantRequired:r.grant_required===1} : null;
+    },
+    async saveAppleChallenge(c) { await db.run('INSERT INTO family_apple_challenges(id,nonce,intent,user_id,session_token,expires_at,grant_required) VALUES(?,?,?,?,?,?,?)',[c.id,c.nonce,c.intent,c.userId,c.sessionToken,c.expiresAt,c.grantRequired?1:0]); },
     async deleteAppleChallenge(id) { await db.run('DELETE FROM family_apple_challenges WHERE id=?',[id]); },
     async pruneAppleChallenges(now) { await db.run('DELETE FROM family_apple_challenges WHERE expires_at<=?',[now]); },
     async findLoginIdentity(provider, subject) {

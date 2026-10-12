@@ -54,7 +54,7 @@ export type FamilyCommands = InviteLinkCommands & {
   getMyProfile(sessionToken: string): Promise<import('./types').UserProfile>;
   updateMyProfile(sessionToken: string, nickname: string): Promise<import('./types').UserProfile>;
   health(): FamilyHealth;
-  beginAppleAuth(intent: 'login' | 'link', sessionToken?: string, peer?: string): Promise<{challengeId:string;nonce:string;expiresAt:string}>;
+  beginAppleAuth(intent: 'login' | 'link', sessionToken?: string, peer?: string): Promise<{challengeId:string;nonce:string;expiresAt:string;authorizationCodeRequired?:boolean}>;
   completeAppleAuth(input: import('./types').AppleAuthInput, sessionToken?: string): Promise<SignInResult | {linked:true;userId:string}>;
   getAppleLink(sessionToken: string): Promise<{linked:boolean}>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
@@ -264,6 +264,7 @@ export function createFamilyCommands(deps: {
   controlledEmailAccountsEnabled?: boolean;
   publicTestLoginEnabled?: boolean;
   appleLoginEnabled?: boolean;
+  appleGrants?: import('./types').AppleGrantService;
   legacyAppleLoginEnabled?: boolean;
   inviteLinksEnabled?: boolean;
   historySharingEnabled?: boolean;
@@ -360,13 +361,14 @@ export function createFamilyCommands(deps: {
         emailRegistration: deps.publicTestLoginEnabled !== true && testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true,
         publicTestLogin: deps.publicTestLoginEnabled === true,
         appleLogin: deps.appleLoginEnabled === true,
+        appleGrantCapture: Boolean(deps.appleGrants),
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
         familyHistoryV2: deps.historySharingEnabled === true,
         argon2id: ARGON2ID_PRODUCTION,
       };
     },
-    ...createAppleAuthCommands({repository, apple:deps.apple, clock, ids, sessionTtlMs, enabled:deps.appleLoginEnabled === true,
+    ...createAppleAuthCommands({repository, apple:deps.apple, clock, ids, sessionTtlMs, enabled:deps.appleLoginEnabled === true, appleGrants:deps.appleGrants,
       requireUser: (tx, token) => requireUser(tx,token,clock,testAccountLoginEnabled,operatorOnly)}),
     async signInWithApple(identityToken: string) {
       if (deps.publicTestLoginEnabled || deps.legacyAppleLoginEnabled === false) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Apple sign-in is not enabled for this controlled test.');

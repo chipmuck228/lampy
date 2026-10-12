@@ -3,7 +3,7 @@ import { FamilyError, FAMILY_ERROR } from './errors';
 import type { FamilyRepository, FamilyTx } from './repository';
 import type { AppleVerifier, AppleAuthInput, FamilyClock, FamilyIds, SignInResult } from './types';
 
-export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple:AppleVerifier;clock:FamilyClock;ids:FamilyIds;sessionTtlMs:number;enabled:boolean;requireUser:(tx:FamilyTx,token?:string)=>Promise<string>}) {
+export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple:AppleVerifier;clock:FamilyClock;ids:FamilyIds;sessionTtlMs:number;enabled:boolean;requireUser:(tx:FamilyTx,token?:string)=>Promise<string>;appleGrants?:import('./types').AppleGrantService}) {
   function open() { if(!deps.enabled) throw new FamilyError(FAMILY_ERROR.FORBIDDEN,'Apple sign-in is not enabled.'); }
   function invalid() { return new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID,'Apple request expired or was already used. Please start again.'); }
   return {
@@ -17,9 +17,9 @@ export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple
         if(active && row.hitCount>=10) throw new FamilyError(FAMILY_ERROR.RATE_LIMITED,'Try again later.');
         await tx.saveRateLimit({bucket,windowStartedAt:active?row.windowStartedAt:now.toISOString(),hitCount:active?row.hitCount+1:1});
         await tx.pruneAppleChallenges(now.toISOString());
-        const c={id:randomBytes(32).toString('hex'),nonce:randomBytes(32).toString('hex'),intent,userId,sessionToken:intent==='link'?sessionToken! : null,expiresAt:new Date(now.getTime()+5*60_000).toISOString()};
+        const c={id:randomBytes(32).toString('hex'),nonce:randomBytes(32).toString('hex'),intent,userId,sessionToken:intent==='link'?sessionToken! : null,expiresAt:new Date(now.getTime()+5*60_000).toISOString(),grantRequired:Boolean(deps.appleGrants)};
         await tx.saveAppleChallenge(c);
-        return {challengeId:c.id,nonce:c.nonce,expiresAt:c.expiresAt};
+        return {challengeId:c.id,nonce:c.nonce,expiresAt:c.expiresAt,authorizationCodeRequired:c.grantRequired};
       });
     },
     async getAppleLink(token:string) {
@@ -33,10 +33,25 @@ export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple
         const c=await tx.findAppleChallenge(input.challengeId);
         if(!c || Date.parse(c.expiresAt)<=deps.clock.now().getTime()) throw invalid();
         if(c.intent==='link' && (c.sessionToken!==token || await deps.requireUser(tx,token)!==c.userId)) throw invalid();
+        if(c.grantRequired && (!deps.appleGrants || !input.authorizationCode || input.authorizationCode.length>4096)) throw new FamilyError('APPLE_GRANT_REQUIRED','Update Lampy and authorize again.');
         await tx.deleteAppleChallenge(c.id);return c;
       });
       const identity=await deps.apple.verifyIdentityToken(input.identityToken,c.nonce);
       if(!identity.appleSubject?.trim()) throw invalid();
+      // Refuse conflicts before sending a code to Apple. Never revoke someone else's grant on conflict.
+      await deps.repository.withTransaction(async tx=>{
+        const existing=await tx.findLoginIdentity('apple',identity.appleSubject);
+        if(c.intent==='link') {
+          const userId=await deps.requireUser(tx,token);
+          const own=(await tx.listLoginIdentities(userId)).find(i=>i.provider==='apple');
+          if(userId!==c.userId || token!==c.sessionToken) throw invalid();
+          if((existing && existing.userId!==userId) || (own && own.subject!==identity.appleSubject)) throw new FamilyError(FAMILY_ERROR.CONFLICT,'Apple identity conflict.');
+        } else if(existing) {
+          const credential=await tx.findTestCredentialByUserId(existing.userId);
+          if(credential && !credential.enabled) throw new FamilyError(FAMILY_ERROR.AUTH_FAILED,'Account is unavailable.');
+        }
+      });
+      const refreshToken=c.grantRequired ? await deps.appleGrants!.exchange({authorizationCode:input.authorizationCode!,appleSubject:identity.appleSubject,nonce:c.nonce}) : undefined;
       return deps.repository.withTransaction(async tx=>{
         if(Date.parse(c.expiresAt)<=deps.clock.now().getTime()) throw invalid();
         const existing=await tx.findLoginIdentity('apple',identity.appleSubject);
@@ -45,12 +60,14 @@ export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple
           if(userId!==c.userId || token!==c.sessionToken) throw invalid();
           const own=(await tx.listLoginIdentities(userId)).find(i=>i.provider==='apple');
           if((existing && existing.userId!==userId) || (own && own.subject!==identity.appleSubject)) throw new FamilyError(FAMILY_ERROR.CONFLICT,'This Apple identity is already linked. Accounts will not be merged.');
+          const grant=refreshToken ? deps.appleGrants!.seal(userId,identity.appleSubject,refreshToken) : undefined;
           await tx.attachLoginIdentity({provider:'apple',subject:identity.appleSubject,userId,createdAt:deps.clock.now().toISOString()});
+          if(grant) await tx.saveAppleGrant(grant);
           return {linked:true as const,userId};
         }
-        let userId=existing?.userId;
-        if(!userId) {
-          userId=deps.ids.userId();
+        const userId=existing?.userId ?? deps.ids.userId();
+        const grant=refreshToken ? deps.appleGrants!.seal(userId,identity.appleSubject,refreshToken) : undefined;
+        if(!existing) {
           // Email is not an identity key. Do not overwrite a profile or merge accounts by email.
           await tx.saveAccount({userId,appleSubject:identity.appleSubject,createdAt:deps.clock.now().toISOString()});
         } else {
@@ -58,6 +75,7 @@ export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple
           const credential=await tx.findTestCredentialByUserId(userId);
           if(credential && !credential.enabled) throw new FamilyError(FAMILY_ERROR.AUTH_FAILED,'Account is unavailable.');
         }
+        if(grant) await tx.saveAppleGrant(grant);
         const session={token:deps.ids.sessionToken(),userId,expiresAt:new Date(deps.clock.now().getTime()+deps.sessionTtlMs).toISOString()};
         await tx.saveSession(session);return {userId,sessionToken:session.token,expiresAt:session.expiresAt};
       });

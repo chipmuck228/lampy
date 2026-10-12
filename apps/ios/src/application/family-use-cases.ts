@@ -600,7 +600,7 @@ export function createFamilyUseCases(deps: {
       const result=await deps.client.getAppleLink(a.sessionToken);await assertSameAccount(a);
       if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Profile is inactive.');return result;
     },
-    async authenticateApple(intent:'login'|'link',authorize:(nonce:string)=>Promise<string>,isCurrent:()=>boolean) {
+    async authenticateApple(intent:'login'|'link',authorize:(nonce:string,authorizationCodeRequired?:boolean)=>Promise<string | import('../family-api/types').AppleAuthorization>,isCurrent:()=>boolean) {
       const request=++emailAuthRequest;const initialToken=await deps.session.getSessionToken();
       const eligible=()=>request===emailAuthRequest && isCurrent();
       const check=async()=>{if(!eligible() || await deps.session.getSessionToken()!==initialToken) throw new ApplicationError('STALE_FAMILY_REQUEST','Apple request is inactive.');};
@@ -609,8 +609,10 @@ export function createFamilyUseCases(deps: {
       if(!deps.client.beginAppleAuth || !deps.client.completeAppleAuth) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
       const c=await deps.client.beginAppleAuth(intent,intent==='link'?initialToken || undefined:undefined);
       await check();
-      const identityToken=await authorize(c.nonce);await check();
-      const result=await deps.client.completeAppleAuth({challengeId:c.challengeId,identityToken},intent==='link'?initialToken || undefined:undefined);
+      const authorization=await authorize(c.nonce,c.authorizationCodeRequired===true);await check();
+      const credentials=typeof authorization==='string'?{identityToken:authorization}:authorization;
+      if(c.authorizationCodeRequired && !credentials.authorizationCode) throw new ApplicationError('APPLE_GRANT_REQUIRED','Update Lampy and authorize again.');
+      const result=await deps.client.completeAppleAuth({challengeId:c.challengeId,...credentials},intent==='link'?initialToken || undefined:undefined);
       if('linked' in result) {await check();return result;}
       try {await check();return await commitSignedIn(result,eligible);}
       catch(error) {try {await deps.client.signOut(result.sessionToken);} catch { /* discarded session expires */ }throw asApplicationError(error);}
