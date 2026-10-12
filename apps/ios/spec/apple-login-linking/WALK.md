@@ -11,7 +11,7 @@ Linux Node 24，自动化测量与测试不是原生授权成功证据。
 - 改动 TypeScript lint、`git diff --check` 在提交前运行，结果记录 PR 描述。
 - 未运行 Xcode、原生模拟器、真机或 TestFlight；未修改服务器。
 
-## 设备（全部 NOT VERIFIED）
+## 原始设备清单（以下方 Build 8 验收记录为准）
 
 在 Mac 从本 PR 构建 family-internal Release，配合迁移 29 且显式开启 Apple 的隔离公网 API；记录设备、iOS、包版本／Build、实现 SHA、服务端 SHA。不要用 Build 7 或 Metro Refresh 代替新版本验收。
 
@@ -29,3 +29,42 @@ Linux Node 24，自动化测量与测试不是原生授权成功证据。
 ## 已知基线测试
 
 全量首次运行 220 suites：5 失败。两项为 migration 最新版本断言（28→29），已同步修改。另三项涉及本机日期时区及既有导航／生活册标签断言；在干净 main `9c1887e` 同样复核后再记录，不能记全量 PASS。
+
+## 2026-10-12：TestFlight Build 8 真机验收（用户报告）
+
+- 设备：iPhone 17 Pro；iOS 26.2。
+- 安装：TestFlight 下载，Version 0.1.0 / Build 8；family-internal。
+- Archive 报告：git_sha=afdf8175b28d842d26d32d19fdb4b5d2faebc48c，git_dirty=no。
+- 隔离服务器 DEPLOYED_GIT_SHA：同为 afdf8175b28d842d26d32d19fdb4b5d2faebc48c。
+- 数据库：version 29。
+- 公网 health（用户实测 HTTP 成功）：appleLogin=true、controlledEmailAccounts=true、publicTestLogin=true、emailRegistration=false、testAccountLogin=false、familyHistoryV2=true。
+- 后续只改本文记录的提交不是设备运行 SHA；本轮无新原生包、无服务器更新。
+
+| 项目 | 结论 |
+| --- | --- |
+| 停止 Metro，从桌面冷启动新包 | PASS |
+| 邮箱登录 A2，资料、原昵称和家庭保留 | PASS |
+| 关联 Apple 先取消，不改变状态 | PASS |
+| 明确确认关联，账号、昵称和家庭保留 | PASS |
+| 退出后用 Apple 登录回原 A2，不新建账号 | PASS |
+| B 尝试关联同一 Apple，冲突且不合并 | PASS |
+| 邀请进入 Apple 登录，返回后仍需确认加入 | PASS |
+| 授权期间后台或离开，无迟到登录／跳转 | PASS |
+| 本机保护开启，授权及后台返回遮挡，解锁后继续 | PASS |
+| 分享、声音、个人记录和生活册完整，声音不自动恢复 | PASS |
+
+上述全部为用户报告的真机 PASS，已定位构建与部署 SHA，不是本助手重新操作设备的结论。首次未关联 Apple 身份创建新账号、系统 VoiceOver、短屏／横屏、30 秒等待超时恢复等未包含在这份验收中，仍 NOT VERIFIED。
+
+## 2026-10-12：合并前源码复审
+
+审阅实现 head：afdf8175b28d842d26d32d19fdb4b5d2faebc48c。base main：9c1887eb5e7aee5e0278f62577761414afce961f。GitHub 查询为 OPEN、MERGEABLE / CLEAN；这不等于可以忽略源码问题。
+
+复核一次性 nonce、关联会话前后资格、身份冲突不合并、迟到登录会话撤销与本机保护前台条件；未发现这些所读路径的新阻塞。但发现以下合并阻塞：
+
+- Bugbot 评论 https://github.com/chipmuck228/lampy/pull/108#discussion_r4242104199 已报告 Apple 等待超时保留 busy。
+- family-email-account-screen.tsx 中，原生授权后的 30 秒 active／解锁等待超时会清 nativeApple 并丢弃 token；由于 current(seq) 为 false，catch 不显示反馈、finally 不 setBusy(false)。随后 load() 也不清 busy，解锁／重新读取后入口仍可能禁用。
+- Build 8 十项正常路径 PASS 不覆盖这项超时路径。须修复请求自身的 busy 收尾，避免 A 迟到清掉 B 的提交锁，并补超时后恢复重试／不提交旧 token 的测试，才建议合并。
+
+检查边界：上方 tsc、Jest、lint 与 diff 的 PASS／既有失败是 afdf817 实现时实际运行的记录。此轮执行环境 shell 不可用，未重新运行命令；不能把历史记录称为本轮新检查通过。本次仅 GitHub 源码与审阅／head 核对，文档修改未运行代码。
+
+当前结论：保持 OPEN，不合并；上述超时问题修复并检查后再次核对。
