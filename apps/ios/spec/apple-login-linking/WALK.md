@@ -68,3 +68,34 @@ Linux Node 24，自动化测量与测试不是原生授权成功证据。
 检查边界：上方 tsc、Jest、lint 与 diff 的 PASS／既有失败是 afdf817 实现时实际运行的记录。此轮执行环境 shell 不可用，未重新运行命令；不能把历史记录称为本轮新检查通过。本次仅 GitHub 源码与审阅／head 核对，文档修改未运行代码。
 
 当前结论：保持 OPEN，不合并；上述超时问题修复并检查后再次核对。
+
+## 2026-10-12：Apple 等待超时修复（待 Release 真机复测）
+
+在 #108 原分支修复上述 busy 阻塞，仅改登录／资料页面、英文提示和页面测试，未改服务器、迁移、门控或本机保护规则。
+
+- 30 秒等待超时不返回原 native token，不发起完成登录／关联请求。
+- Apple finally 只在 owner 属于本请求时释放锁；释放不再要求 App 已解锁。离开页面不更新 UI，A 迟到不能解除 B 的提交锁。
+- 解锁后的合格读取在无新提交时复位 busy，并保留一次「Apple授权等待已结束，请重新试一次。」提示。取消、后台、失焦和新的主动操作清掉旧提示。
+- 用户必须重新点 Apple 并重新授权，不能自动复用旧 token。
+
+实际运行（Linux Node 24.19）：
+- 新增普通超时、保护开启时超时两则页面测试，在修复前源码上均 FAIL（预期）；修复后 PASS。
+- 页面 Jest：18 / 18 PASS，包含 A 迟到不能清 B 锁。
+- 相关 Jest：29 suites / 246 tests PASS。
+- npx tsc --noEmit：PASS。
+- 改动页面／测试 eslint：PASS；git diff --check：PASS。
+- 未重跑全量；此前两个已复现的基线失败继续保留，不宣称全量 PASS。
+- 修复实页：Xcode Release / 真机 NOT VERIFIED；Build 8 的十项 PASS 仍只对应 afdf817。服务器仍按用户报告为 afdf817、DB 29，无须为页面修复重新部署。
+
+### Xcode Release 专项走查
+
+从修复 head 拉取新代码，使用仓库 release-archive.sh --family-internal --prepare 配置原生工程；Xcode Scheme Lampy 的 Run 改为 Release，再安装到 iPhone 17 Pro。记录构建 SHA 与版本／Build，不卸载或清除原记录。
+
+1. 开启本机保护，在 Apple 登录时先完成 Apple 系统授权；回到 Lampy 后取消或暂不完成 Lampy 的保护认证，停留至少 35 秒，再手动解锁。应出现等待结束提示，按钮可点，不能自动登录。
+2. 再次点 Apple 并授权，正常登录回已关联的 A2，原家庭／昵称保留；邮箱登录也可正常操作。
+3. 若能安排未关联账号，资料页关联同样检查等待超时→解锁→明确重试。当前同一 Apple 已属于 A2 时，B 重试应显示身份冲突，不应一直忙碌，也不应合并。
+4. 抽查正常 Apple 登录、取消、后台返回和本机保护遮挡，无回归。
+
+注意：30 秒等待从 Apple 原生授权返回 token 后开始，停留在 Apple 系统授权面板上 35 秒不等于此路径。切到后台会直接作废请求，也不等于此超时。若设备无法复现等待，保留专项实页 NOT VERIFIED。
+
+合并状态：源码修复与针对性自动化通过；保持 OPEN，待 Release 专项结果与新 head 审阅。未自动合并、未上传新 TestFlight。
