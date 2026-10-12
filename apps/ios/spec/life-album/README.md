@@ -1,5 +1,7 @@
 # 生活册 · 阶段 A
 
+> **历史规格提示（2026-10-12）**：本文件保留#63–#65当时契约／样本；当前V2设计审阅见[life-album-v2](../life-album-v2/README.md)与[新旧规则映射](../life-album-v2/SUPERSEDES.md)。旧的入口、家庭排除、默认分页、手选封面、导出阶段定义不能覆盖V2；当前运行代码未在阶段A变更。
+
 > 只改 `apps/ios/spec/life-album/` 与 spec 索引。**不写运行代码。不开始阶段 B–E。不合并。**
 > 基线：本地 `origin/main` `e1afff0af15740e6162565a1a10fbac0d7456021`（#61 merge）。独立分支 `ios/life-album-design`，不叠首次引导、TestFlight、回看旧 PR。
 > 家庭入口与 AI 仍关。不改 Moment / Asset / revision / 发生时间精度语义。不读、不清、不写 Liuz17 个人库。

@@ -1,0 +1,14 @@
+[
+  {
+    "role": "Serif",
+    "source_sha256": "2a2eae2628df83556c54018c41e20fa532c1b862c5256ae8b3f23feb918d12ca",
+    "subset_sha256": "88c3b86bada1f7e6aac6c92781a973e24df41e524b9df729961d86f7bb396803",
+    "subset_bytes": 540380
+  },
+  {
+    "role": "Sans",
+    "source_sha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+    "subset_sha256": "db48aaf0d9631370b926b4e4076304755a4c0504aebb84d1eda66843df2cf946",
+    "subset_bytes": 375844
+  }
+]

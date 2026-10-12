@@ -26,7 +26,8 @@
 | `personal-visual-details/` | 感受色点、回看日期行、首次三屏。运行中实现 |
 | `testflight-beta-1/` | 第一份 TestFlight 预发布准备。不上传、不邀请 |
 | `lookback-expand/` | #35 当时的年页展开契约。产品效力见 `lookback-book/`；#36 是 B 的备选实现 |
-| `life-album/` | 生活册。阶段 A 设计 #63。阶段 B 本机册子 `WALK-B.md`。阶段 C 排版探测与预览 `WALK-C.md`。不开始 D–E |
+| `life-album/` | 生活册#63–#65历史规格与WALK；新契约见life-album-v2，历史记录不覆盖新版设计 |
+| `life-album-v2/` | 新一轮阶段A：V1.2讨论契约，连续／打印、素纸／手作中英文完整样本；R2/R3、首页和自动封面已确认，导出与付费未实现 |
 | `adr/` | `0001`–`0006`。`0006` 已接受：身份、成员、快照矛盾结论 |
 | `family-dissolve-cleanup-e3/` | E3解散、立即收权、30天清理与隔离验收；家庭正式入口仍关闭 |
 | `family-email-profile-stage1/` | 受控邮箱格式账号注册／登录与本人昵称；默认关闭，无邮件验证；成员头像墙留到下一阶段 |
