@@ -2,7 +2,7 @@ import { appLanguage, tr, type AppLanguage } from '../i18n';
 import type { AlbumCover } from './life-album';
 
 /** Bumped when font resolve / measure / draw rules change so in-process cache and old probes invalidate. */
-export const ALBUM_LAYOUT_VERSION = 'album-a5-v3' as const;
+export const ALBUM_LAYOUT_VERSION = 'album-a5-v4' as const;
 export const ALBUM_PAGE_WIDTH_PT = 420;
 export const ALBUM_PAGE_HEIGHT_PT = 595;
 export const ALBUM_MARGIN_TOP_PT = 40;
@@ -152,7 +152,7 @@ export type AlbumPlacedBlock = AlbumBlockBase &
         text: string;
       }
     | { kind: 'unknown-media'; momentId: string; assetId: string; label: string }
-    | { kind: 'feeling'; momentId: string; value: string; known: boolean }
+    | { kind: 'feeling'; momentId: string; value: string; known: boolean; accent?: string }
     | { kind: 'recorded-at'; momentId: string; label: string }
     | { kind: 'source-changed'; momentId: string }
     | { kind: 'source-gone'; momentId: string }
@@ -163,7 +163,7 @@ export type AlbumPlacedBlock = AlbumBlockBase &
 export type AlbumPage = {
   index: number;
   blocks: AlbumPlacedBlock[];
-  rendering?: { serif: string; ui: string; copy: Record<string, string> };
+  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number };
 };
 
 export type AlbumLayout = {

@@ -4,7 +4,7 @@ import {
   parseMillis,
   type HistoryClock,
 } from '../domain-adapters/calendar';
-import { isFeelingWord } from './feeling-accent';
+import { feelingAccentColor, isFeelingWord } from './feeling-accent';
 import {
   ALBUM_IMAGE_MISSING,
   ALBUM_SOURCE_GONE,
@@ -75,7 +75,7 @@ function durationLabel(durationMs: number | null): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-function dateKeyAndLabel(record: AlbumLayoutRecordInput, clock: HistoryClock) {
+export function dateKeyAndLabel(record: AlbumLayoutRecordInput, clock: HistoryClock) {
   const precision = record.occurredAtPrecision || 'unknown';
   if (precision === 'unknown' || !record.occurredAt) return { key: null as string | null, label: null as string | null };
   const millis = parseMillis(record.occurredAt);
@@ -89,7 +89,7 @@ function dateKeyAndLabel(record: AlbumLayoutRecordInput, clock: HistoryClock) {
   };
 }
 
-function recordedLabel(record: AlbumLayoutRecordInput, clock: HistoryClock): string | null {
+export function recordedLabel(record: AlbumLayoutRecordInput, clock: HistoryClock): string | null {
   const millis = parseMillis(record.recordedAt);
   if (millis == null) return null;
   const parts = calendarPartsAt(millis, clock);
@@ -372,6 +372,7 @@ export async function paginateAlbumLayout(
           kind: 'feeling',
           momentId: record.momentId,
           value: feelingLabel(record.feeling.trim()),
+          accent: feelingAccentColor({ value: record.feeling.trim(), label: record.feeling.trim(), known: isFeelingWord(record.feeling.trim()) }),
           known: isFeelingWord(record.feeling.trim()),
           box: { xPt: CONTENT_LEFT, yPt: y, widthPt: ALBUM_CONTENT_WIDTH_PT, heightPt: albumMetaRole.lineHeightPt },
         },

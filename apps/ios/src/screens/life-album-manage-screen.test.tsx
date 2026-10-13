@@ -135,7 +135,7 @@ describe('life album manage screen', () => {
       expect(view.getByTestId('life-album-edit')).toBeTruthy();
     });
     fireEvent.press(view.getByTestId('life-album-preview-open'));
-    expect(mockPush).toHaveBeenCalledWith('/albums/album_1/preview');
+    expect(mockPush).toHaveBeenCalledWith('/albums/album_1/read');
     fireEvent.press(view.getByTestId('life-album-entry-open-m1'));
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm1' } });
     fireEvent.press(view.getByTestId('life-album-edit'));

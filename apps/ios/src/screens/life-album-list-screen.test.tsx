@@ -113,6 +113,18 @@ describe('life album list root', () => {
     cleanup();
   });
 
+  it('family partition does not show personal covers or a fake family creation action', async () => {
+    mockList.mockResolvedValue({ status: 'ready', albums: sampleAlbums });
+    const view = await render(wrap());
+    await waitFor(() => expect(view.getByTestId('life-album-cover-wall')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('life-album-source-family'));
+    expect(view.getByText('家里的生活册将在之后开放。')).toBeTruthy();
+    expect(view.queryByTestId('life-album-cover-wall')).toBeNull();
+    expect(view.queryByTestId('life-album-new')).toBeNull();
+    await fireEvent.press(view.getByTestId('life-album-source-personal'));
+    expect(view.getByTestId('life-album-cover-wall')).toBeTruthy();
+  });
+
   it('renders a cover wall with image, words, and missing-uri fallback tiles', async () => {
     mockList.mockResolvedValue({ status: 'ready', albums: sampleAlbums });
     const view = await render(wrap());

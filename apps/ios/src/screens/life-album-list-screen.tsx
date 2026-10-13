@@ -46,6 +46,7 @@ export default function LifeAlbumListScreen() {
   const [wallWidth, setWallWidth] = useState<number | null>(null);
   const wallLayout = albumCoverWallLayout(wallWidth);
 
+  const [source, setSource] = useState<'personal' | 'family'>('personal');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [albums, setAlbums] = useState<AlbumListItem[]>([]);
   const [loadKey, setLoadKey] = useState(0);
@@ -60,6 +61,7 @@ export default function LifeAlbumListScreen() {
   const viewportHeightRef = useRef(0);
 
   const tryRestoreScroll = useCallback(() => {
+    if (source !== 'personal') return;
     const decision = albumListRestoreScrollY({
       restorePending: restorePendingRef.current,
       savedY: peekAlbumListScroll(),
@@ -74,7 +76,7 @@ export default function LifeAlbumListScreen() {
     if (decision.action === 'restore') {
       scrollRef.current?.scrollTo({ y: decision.y, animated: false });
     }
-  }, [status, guideReady]);
+  }, [status, guideReady, source]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +169,7 @@ export default function LifeAlbumListScreen() {
         },
       ]}
       onScroll={(event) => {
+        if (source !== 'personal') return;
         const offsetY = event.nativeEvent.contentOffset.y;
         if (
           !albumListShouldRecordScrollOffset({
@@ -241,6 +244,17 @@ export default function LifeAlbumListScreen() {
       }
     >
       <View testID="life-album-list" style={styles.body}>
+        <View style={{ flexDirection: 'row', gap: 16 }}>
+          {(['personal', 'family'] as const).map(part => <Pressable key={part}
+            accessibilityRole="button" accessibilityState={{ selected: source === part }}
+            testID={`life-album-source-${part}`} style={styles.hit} onPress={() => {
+              if (part === source) return;
+              setSource(part);
+              if (part === 'personal') { restorePendingRef.current = true; contentSizedRef.current = false; }
+              scrollRef.current?.scrollTo({ y: 0, animated: false });
+            }}><Text style={[styles.action, source === part && { textDecorationLine: 'underline' }]}>{tr(part === 'personal' ? '我的' : '家里的')}</Text></Pressable>)}
+        </View>
+        {source === 'family' ? <Text style={styles.meta}>{tr('家里的生活册将在之后开放。')}</Text> : <>
         {showGuideBody ? (
           <View
             testID="life-album-guide"
@@ -338,6 +352,7 @@ export default function LifeAlbumListScreen() {
             <Text style={styles.createLabel}>{ALBUM_NEW_ACTION}</Text>
           </Pressable>
         ) : null}
+        </>}
       </View>
     </RootReadingLayout>
   );

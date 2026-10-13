@@ -59,6 +59,9 @@ import { SettingsPage } from './settings-chrome';
 import { useRecentClipPlayback } from './use-recent-clip-playback';
 import { requireAlbumNativePageView } from '../../modules/lampy-album-layout';
 
+import { ALBUM_READING_STYLES, type AlbumReadingStyle } from '../application/album-reading';
+import { readAlbumReadingState } from '../infrastructure/album-reading-store';
+
 const MIN_HIT = 48;
 const NativeAlbumPageView = requireAlbumNativePageView() as
   | import('react').ComponentType<{ pageJson: string; mediaJson: string; playingJson: string; style?: object }>
@@ -80,6 +83,7 @@ export default function LifeAlbumPreviewScreen() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(1);
+  const [readingStyle, setReadingStyle] = useState<AlbumReadingStyle>('plain');
   const pageSeq = useRef(0);
   const attempt = useRef<AlbumPreviewPageAttempt | null>(null);
   const probeAlive = useRef(false);
@@ -124,6 +128,9 @@ export default function LifeAlbumPreviewScreen() {
       if (!shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current })) {
         return;
       }
+      const preference = await readAlbumReadingState(albumId).catch(() => ({ style: 'plain' as const }));
+      if (!shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current })) return;
+      setReadingStyle(preference.style);
       const began = app.beginAlbumLayout(albumId);
       if (!shouldContinueAlbumPreviewLoad({ seq, albumId, current: attempt.current })) {
         app.cancelAlbumLayout(began.requestId);
@@ -147,7 +154,10 @@ export default function LifeAlbumPreviewScreen() {
         ) {
           return;
         }
-        setLayout(result.layout);
+        setLayout({ ...result.layout, pages: result.layout.pages.map(page => ({ ...page, rendering: {
+          ...page.rendering!, style: preference.style, paper: ALBUM_READING_STYLES[preference.style].paper,
+          photoBorderWidth: ALBUM_READING_STYLES[preference.style].photoBorderWidth,
+        }, blocks: page.blocks.map(block => block.kind === 'feeling' ? { ...block, accent: block.accent ?? feelingAccentColor({ value: block.value, label: block.value, known: block.known }) } : block) })) });
         setMedia(result.media);
         setPage(0);
         setLoading(false);
@@ -290,7 +300,7 @@ export default function LifeAlbumPreviewScreen() {
               <View
                 testID="life-album-preview-page"
                 accessible={false}
-                style={{ width: paperWidth, height: paperHeight, backgroundColor: paper }}
+                style={{ width: paperWidth, height: paperHeight, backgroundColor: ALBUM_READING_STYLES[readingStyle].paper }}
               >
                 <View
                   pointerEvents="none"
@@ -316,6 +326,7 @@ export default function LifeAlbumPreviewScreen() {
                       <AlbumBlockView
                         key={`${block.kind}-${index}`}
                         block={block}
+                        readingStyle={readingStyle}
                         media={media}
                         playing={block.kind === 'audio' ? clips.card(block.assetId).status === 'playing' : false}
                       />
@@ -478,10 +489,12 @@ export default function LifeAlbumPreviewScreen() {
 }
 
 function AlbumBlockView({
+  readingStyle,
   block,
   media,
   playing,
 }: {
+  readingStyle: AlbumReadingStyle;
   block: AlbumPlacedBlock;
   media: AlbumLayoutMediaMap;
   playing: boolean;
@@ -496,7 +509,7 @@ function AlbumBlockView({
   if (block.kind === 'cover-image' || block.kind === 'image') {
     const uri = media[block.assetId];
     if (block.status === 'available' && uri) {
-      return <Image accessibilityIgnoresInvertColors source={{ uri }} style={box} resizeMode="contain" />;
+      return <Image accessibilityIgnoresInvertColors source={{ uri }} style={[box, { borderWidth: ALBUM_READING_STYLES[readingStyle].photoBorderWidth, borderColor: ALBUM_READING_STYLES[readingStyle].photoBorder }]} resizeMode="contain" />;
     }
     return (
       <View style={[box, styles.missing]}>
@@ -538,7 +551,7 @@ function AlbumBlockView({
     <View style={box}>
       {block.kind === 'feeling' ? (
         <View style={styles.row}>
-          <View style={[styles.dot, { backgroundColor: feelingAccentColor({ value: block.value, label: block.value, known: block.known }) }]} />
+          <View style={[styles.dot, { backgroundColor: block.accent ?? feelingAccentColor({ value: block.value, label: block.value, known: block.known }) }]} />
           <Text style={spec}>{block.value}</Text>
         </View>
       ) : 'lines' in block && block.lines.length ? (

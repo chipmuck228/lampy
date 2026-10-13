@@ -35,7 +35,7 @@ export interface LifeAlbumRepository {
 
 function cloneCover(cover: AlbumCover): AlbumCover {
   return cover.kind === 'words'
-    ? { kind: 'words' }
+    ? { ...cover }
     : { kind: 'image', momentId: cover.momentId, assetId: cover.assetId };
 }
 
@@ -137,7 +137,7 @@ function decodeCover(kind: string, momentId: string | null, assetId: string | nu
   if (kind === 'image' && momentId && assetId) {
     return { kind: 'image', momentId, assetId };
   }
-  return { kind: 'words' };
+  return kind === 'auto' ? { kind: 'words', automatic: true } : { kind: 'words' };
 }
 
 export function createSqliteLifeAlbumRepository(db: SqlDatabase): LifeAlbumRepository {
@@ -216,7 +216,7 @@ export function createSqliteLifeAlbumRepository(db: SqlDatabase): LifeAlbumRepos
           album.schemaVersion,
           album.name,
           album.opening,
-          album.cover.kind,
+          album.cover.kind === 'words' && album.cover.automatic ? 'auto' : album.cover.kind,
           album.cover.kind === 'image' ? album.cover.momentId : null,
           album.cover.kind === 'image' ? album.cover.assetId : null,
           album.createdAt,
@@ -232,7 +232,7 @@ export function createSqliteLifeAlbumRepository(db: SqlDatabase): LifeAlbumRepos
         [
           album.name,
           album.opening,
-          album.cover.kind,
+          album.cover.kind === 'words' && album.cover.automatic ? 'auto' : album.cover.kind,
           album.cover.kind === 'image' ? album.cover.momentId : null,
           album.cover.kind === 'image' ? album.cover.assetId : null,
           album.updatedAt,

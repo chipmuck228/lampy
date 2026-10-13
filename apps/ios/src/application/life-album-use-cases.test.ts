@@ -292,3 +292,31 @@ describe('life album use cases', () => {
     ).rejects.toBeInstanceOf(ApplicationError);
   });
 });
+
+it('new automatic covers follow the first available collected photo; legacy manual choices remain', async () => {
+  const repos = createMemoryRepositories();
+  const albums = createMemoryLifeAlbumRepository();
+  const at = '2026-10-01T00:00:00.000Z';
+  await seedImage(repos, 'photo_a', at);
+  await seedImage(repos, 'photo_b', at);
+  await seedMoment(repos, 'm_auto_a', 'first', at, ['photo_a']);
+  await seedMoment(repos, 'm_auto_b', 'second', at, ['photo_b']);
+  let missingA = false;
+  const app = createLifeAlbumUseCases({ ...repos, albums, id: () => 'auto', media: { exists: async uri => !missingA || !uri.includes('photo_a') } });
+  await app.createAlbum();
+  await app.collectAlbumEntry({ albumId: 'auto', momentId: 'm_auto_a' });
+  await app.collectAlbumEntry({ albumId: 'auto', momentId: 'm_auto_b' });
+  const cover = async () => {
+    const list = await app.listAlbums();
+    if (list.status !== 'ready') throw new Error('not ready');
+    return list.albums[0].cover;
+  };
+  expect(await cover()).toEqual({ kind: 'image', momentId: 'm_auto_a', assetId: 'photo_a' });
+  missingA = true;
+  expect(await cover()).toEqual({ kind: 'image', momentId: 'm_auto_b', assetId: 'photo_b' });
+  await app.setAlbumCover({ albumId: 'auto', cover: { kind: 'words' } });
+  expect(await cover()).toEqual({ kind: 'words' });
+  await app.setAlbumCover({ albumId: 'auto', cover: { kind: 'image', momentId: 'm_auto_b', assetId: 'photo_b' } });
+  missingA = false;
+  expect(await cover()).toEqual({ kind: 'image', momentId: 'm_auto_b', assetId: 'photo_b' });
+});

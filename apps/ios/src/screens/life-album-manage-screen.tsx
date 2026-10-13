@@ -132,7 +132,9 @@ export default function LifeAlbumManageScreen() {
     setError(null);
   }
 
-  const cover = view?.album.cover;
+  const automaticCover = view?.album.cover.kind === 'words' && view.album.cover.automatic
+    ? view.coverCandidates.find(candidate => candidate.available) : null;
+  const cover = automaticCover ? { kind: 'image' as const, ...automaticCover } : view?.album.cover;
   const selectedCoverUri =
     cover?.kind === 'image'
       ? view?.coverCandidates.find(
@@ -194,7 +196,7 @@ export default function LifeAlbumManageScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={ALBUM_PREVIEW_ACTION}
                   testID="life-album-preview-open"
-                  onPress={() => router.push(`/albums/${albumId}/preview`)}
+                  onPress={() => router.push(`/albums/${albumId}/read`)}
                   style={styles.previewHit}
                 >
                   <Text style={styles.previewLabel}>{ALBUM_PREVIEW_ACTION}</Text>
@@ -523,9 +525,15 @@ function CoverChoice({
 }) {
   return (
     <View style={styles.covers}>
+      <Pressable accessibilityRole="button" accessibilityLabel={tr('自动封面')}
+        accessibilityState={{ selected: selected.kind === 'words' && !!selected.automatic, disabled }}
+        testID="life-album-cover-auto" disabled={disabled}
+        onPress={() => onSelect({ kind: 'words', automatic: true })} style={styles.coverChip}>
+        <Text style={styles.coverChipLabel}>{tr('自动封面')}</Text>
+      </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ selected: selected.kind === 'words', disabled }}
+        accessibilityState={{ selected: selected.kind === 'words' && !selected.automatic, disabled }}
         accessibilityLabel={ALBUM_WORDS_COVER}
         testID="life-album-cover-words"
         disabled={disabled}
@@ -533,10 +541,10 @@ function CoverChoice({
           if (disabled) return;
           onSelect({ kind: 'words' });
         }}
-        style={[styles.coverChip, selected.kind === 'words' && styles.coverChipOn]}
+        style={[styles.coverChip, selected.kind === 'words' && !selected.automatic && styles.coverChipOn]}
       >
         <Text style={[styles.coverChipLabel, disabled && styles.disabled]}>{ALBUM_WORDS_COVER}</Text>
-        {selected.kind === 'words' ? <Text style={styles.selectedMark}>{tr("已选")}</Text> : null}
+        {selected.kind === 'words' && !selected.automatic ? <Text style={styles.selectedMark}>{tr("已选")}</Text> : null}
       </Pressable>
       {candidates.map((candidate) => {
         const active =
