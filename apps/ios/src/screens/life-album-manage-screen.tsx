@@ -580,7 +580,7 @@ function CoverChoice({
 }
 
 const styles = StyleSheet.create({
-  block: { gap: 10 },
+  block: { gap: 10, paddingTop: 24 },
   hero: { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 },
   heroCover: {
     width: 72,
