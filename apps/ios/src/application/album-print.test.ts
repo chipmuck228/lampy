@@ -276,3 +276,24 @@ it('preserves only numeric native text diagnostics', () => {
   expect(printFailureDiagnostic({code: 'INVALID_PDF', reason: 'PDF_TEXT_V3_P2_B3_L1_E20_A100'}, 'PDF_CHECK').reason).toBe('PDF_TEXT_V3_P2_B3_L1_E20_A100');
   expect(printFailureDiagnostic({code: 'INVALID_PDF', reason: 'PDF_TEXT_V3_private正文'}, 'PDF_CHECK').reason).toBeUndefined();
 });
+
+it('accepts visual color glyphs only with the new explicit ordinary text check', async () => {
+  const {service, store} = setup();
+  const original = store.writePdf;
+  store.writePdf = async (...args) => ({...(await original(...args)), textSelectable: false,
+    textCheckRevision: 4, nonColorTextSelectable: true, emojiVisualCheckRequired: true,
+    colorGlyphRanges: [{page: 0, block: 0, line: 0, startUTF16: 1, endUTF16: 3}]});
+  const edition = await service.save('plain');
+  expect(edition.manifest.pdf.textSelectable).toBe(false);
+  expect(edition.manifest.pdf.emojiVisualCheckRequired).toBe(true);
+});
+it('color glyphs do not bypass failed ordinary text checks', async () => {
+  const {service, store} = setup();
+  const original = store.writePdf;
+  store.writePdf = async (...args) => ({...(await original(...args)), textSelectable: false,
+    textCheckRevision: 4, nonColorTextSelectable: false, emojiVisualCheckRequired: true,
+    textCheckFailure: 'PDF_TEXT_V4_P1_B1_L1_E19_A35',
+    colorGlyphRanges: [{page: 0, block: 0, line: 0, startUTF16: 1, endUTF16: 3}]});
+  await expect(service.save('plain')).rejects.toMatchObject({code: 'INVALID_PDF'});
+  expect(store.discard).toHaveBeenCalled();
+});

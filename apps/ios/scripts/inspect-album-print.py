@@ -20,7 +20,7 @@ def compact(text):
     return ''.join(unicodedata.normalize('NFC', text).split())
 
 
-def check_block_text(block, extracted):
+def check_block_text(block, extracted, exclusions=None):
     source = block['text']
     lines = block.get('lines', [])
     expected = []
@@ -29,8 +29,26 @@ def check_block_text(block, extracted):
         if not 0 <= start <= end <= len(source):
             raise ValueError('invalid text line range')
         expected.append(source[start:end])
-    if any(compact(part) not in compact(extracted) for part in (expected or [source])):
-        raise ValueError('PDF selectable text mismatch')
+    for index, part in enumerate(expected or [source]):
+        encoded = part.encode('utf-16-le')
+        cursor = 0
+        pieces = []
+        for item in sorted((exclusions or {}).get(index, []), key=lambda item: item['startUTF16']):
+            start, end = item['startUTF16'], item['endUTF16']
+            if not cursor <= start < end <= len(encoded) // 2:
+                raise ValueError('invalid color glyph range')
+            pieces.append(encoded[cursor * 2:start * 2].decode('utf-16-le'))
+            cursor = end
+        pieces.append(encoded[cursor * 2:].decode('utf-16-le'))
+        remaining = compact(extracted)
+        for piece in pieces:
+            required = compact(piece)
+            if not required:
+                continue
+            position = remaining.find(required)
+            if position < 0:
+                raise ValueError('PDF selectable text mismatch')
+            remaining = remaining[position + len(required):]
 
 
 def font_embedding(font):
@@ -85,16 +103,20 @@ def main():
     if len(reader.pages) != len(manifest['layout']['pages']):
         raise ValueError('page count mismatch')
     fonts = []
-    for actual, planned in zip(reader.pages, manifest['layout']['pages']):
+    for page_index, (actual, planned) in enumerate(zip(reader.pages, manifest['layout']['pages'])):
         if abs(float(actual.mediabox.width) - 148 * 72 / 25.4) > 0.1 or abs(float(actual.mediabox.height) - 210 * 72 / 25.4) > 0.1:
             raise ValueError('not physical A5')
         text = compact(actual.extract_text() or '')
-        for block in planned['blocks']:
+        for block_index, block in enumerate(planned['blocks']):
             if block['kind'] in ('note', 'opening', 'cover-name'):
-                check_block_text(block, text)
+                exclusions = {}
+                for item in manifest['pdf'].get('colorGlyphRanges', []):
+                    if item['page'] == page_index and item['block'] == block_index:
+                        exclusions.setdefault(item['line'], []).append(item)
+                check_block_text(block, text, exclusions)
         fonts.extend(resource_fonts(actual['/Resources']))
     embedded = None if not fonts or any(font['embedded'] is None for font in fonts) else all(font['embedded'] for font in fonts)
-    result = {'pages': len(reader.pages), 'A5': True, 'textChecked': True, 'pdfAndMediaHashesChecked': True,
+    result = {'pages': len(reader.pages), 'A5': True, 'nonColorTextChecked': True, 'emojiVisualReview': 'NOT_VERIFIED' if manifest['pdf'].get('emojiVisualCheckRequired') else 'NOT_APPLICABLE', 'pdfAndMediaHashesChecked': True,
               'fontResources': fonts, 'fontsEmbedded': embedded, 'nativeFontRuns': manifest['pdf']['fontRunNames'], 'visualReview': 'NOT_VERIFIED'}
     if args.render:
         destination = folder / 'rendered'

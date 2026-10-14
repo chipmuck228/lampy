@@ -204,7 +204,9 @@ export default function AlbumPrintScreen() {
                 {(edition.pdf.bytes / 1024).toFixed(0)} KB
               </Text>
               <Text style={styles.meta}>{tr('测试成品已保存在本机。')}</Text>
-              <Text style={styles.meta}>{tr('页面与文字选择已核对')}</Text>
+              <Text style={styles.meta}>{tr(edition.pdf.emojiVisualCheckRequired
+                ? '普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。'
+                : '页面与文字选择已核对')}</Text>
               <Text style={styles.meta}>
                 {tr(
                   edition.pdf.fontsEmbedded === true

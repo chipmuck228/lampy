@@ -69,6 +69,8 @@ it('generation is explicit, uses the saved style, and does not auto-share', asyn
       style: 'handmade',
       imageDpi: [],
       pdf: {
+        emojiVisualCheckRequired: true,
+        textSelectable: false,
         pageCount: 3,
         bytes: 1024,
         fontsEmbedded: null,
@@ -83,6 +85,8 @@ it('generation is explicit, uses the saved style, and does not auto-share', asyn
   expect(mockSave).toHaveBeenCalledWith('handmade');
   expect(mockShare).not.toHaveBeenCalled();
   expect(view.getByText('字体嵌入尚未确认')).toBeTruthy();
+  expect(view.getByText('普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。')).toBeTruthy();
+  expect(view.queryByText('页面与文字选择已核对')).toBeNull();
 });
 it('cancelled generation cannot surface a late saved result', async () => {
   let finish!: (value: unknown) => void;

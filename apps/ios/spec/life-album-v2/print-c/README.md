@@ -93,3 +93,7 @@ python3 scripts/inspect-album-print.py /实际路径/print_xxx --render
 本次只有TS/TSX与文档，不需要重编Swift；拉取新提交后重启带EXPO_PUBLIC_ALBUM_PRINT_EVAL=1的Metro或重载JS即可。再次生成失败仍保留为阻塞验收项，PR #112保持草稿。
 
 本轮新运行TypeScript、6个变更TS/TSX ESLint、git diff --check PASS；相关Jest 4 suites / 29 tests PASS。包含同册追加再生成、新册生成、诊断脱敏、PDF文本失败分类和纸页导航回归；未用新的native真实文件验证失败根因。
+
+### Color emoji text validation
+
+User's simulator comparison isolated emoji-bearing records as the PDF_TEXT trigger. The checker now excludes only UTF-16 ranges actually shaped as AppleColorEmoji by CoreText; ordinary segments on each line must match in order. Original content and drawing are unchanged. The manifest records exact color ranges, nonColorTextSelectable, and emojiVisualCheckRequired; textSelectable remains false when color glyphs need visual review. The saved-edition UI and independent inspection script report emoji as NOT_VERIFIED, not full text-selection success. Native rebuild and exported PDF visual validation, including lobster/poop, ZWJ, modifiers, flags and emoji-only text, are still required.

@@ -65,7 +65,7 @@ export function printFailureDiagnostic(
     (typeof record.code === 'string' && /^ERR_[A-Z0-9_]{1,64}$/.test(record.code) ? record.code : 'PRINT_OPERATION_FAILED');
   const reason =
     typeof record.reason === 'string' &&
-    /^(PDF_(PAGE_COUNT|BYTES|TEXT|TEXT_NATIVE_OLD|TEXT_V3_P[0-9]{1,6}_B[0-9]{1,6}_L[0-9]{1,6}_E[0-9]{1,6}_A[0-9]{1,6}|SIZE|FONT_RUNS)|LAYOUT_[A-Z_]+)$/.test(
+    /^(PDF_(PAGE_COUNT|BYTES|TEXT|TEXT_NATIVE_OLD|TEXT_V[34]_P[0-9]{1,6}_B[0-9]{1,6}_L[0-9]{1,6}_E[0-9]{1,6}_A[0-9]{1,6}|SIZE|FONT_RUNS)|LAYOUT_[A-Z_]+)$/.test(
       record.reason,
     )
       ? record.reason
@@ -95,6 +95,9 @@ export type PrintInspection = {
   fontsEmbedded: boolean | null;
   fontResources: unknown[];
   textSelectable: boolean;
+  nonColorTextSelectable?: boolean;
+  emojiVisualCheckRequired?: boolean;
+  colorGlyphRanges?: { page: number; block: number; line: number; startUTF16: number; endUTF16: number }[];
   textCheckRevision?: number;
   textCheckFailure?: string;
   fontRunNames: string[];
@@ -279,9 +282,11 @@ export function createAlbumPrintService(deps: {
           throw new AlbumPrintError('INVALID_PDF', 'PDF_PAGE_COUNT');
         if (pdf.bytes <= 0)
           throw new AlbumPrintError('INVALID_PDF', 'PDF_BYTES');
-        if (!pdf.textSelectable)
+        if (!pdf.textSelectable && !(pdf.textCheckRevision === 4 &&
+          pdf.nonColorTextSelectable === true && pdf.emojiVisualCheckRequired === true &&
+          (pdf.colorGlyphRanges?.length ?? 0) > 0))
           throw new AlbumPrintError('INVALID_PDF',
-            pdf.textCheckRevision !== 3 ? 'PDF_TEXT_NATIVE_OLD' :
+            pdf.textCheckRevision !== 4 ? 'PDF_TEXT_NATIVE_OLD' :
               pdf.textCheckFailure || 'PDF_TEXT');
         if (
           Math.abs(pdf.widthPt - layout.pageSize.widthPt) > 0.1 ||

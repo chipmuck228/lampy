@@ -821,6 +821,7 @@
   "字体嵌入已核对": "Font embedding checked",
   "字体嵌入尚未确认": "Font embedding not confirmed",
   "字体未完整嵌入": "Fonts are not fully embedded",
+  "普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。": "Ordinary text selection checked. Open the PDF to check emoji appearance; emoji may not be copyable.",
   "页面与文字选择已核对": "Pages and selectable text checked",
   "开发验收入口，正式导出尚未开放。": "Development evaluation. Production export is not available.",
   "部分照片低于300DPI，打印前请检查清晰度。": "Some photos are below 300 DPI. Check clarity before printing."

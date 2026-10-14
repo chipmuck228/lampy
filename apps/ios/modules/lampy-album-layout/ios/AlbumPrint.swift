@@ -108,6 +108,46 @@ private func collectPageFonts(_ pdf: CGPDFDocument) -> FontCollector {
 private func compactPdfText(_ value: String) -> String {
   value.precomposedStringWithCanonicalMapping.unicodeScalars.filter { !CharacterSet.whitespacesAndNewlines.contains($0) }.map { String($0) }.joined()
 }
+// Only ranges actually shaped with Apple's color emoji face are visual-only.
+// String ranges from CoreText are UTF-16, unlike layout's Unicode-scalar ranges.
+private func printColorGlyphRanges(_ text: String, font: UIFont) throws -> [NSRange] {
+  let attributed = NSAttributedString(string: text, attributes: [.font: font])
+  let line = CTLineCreateWithAttributedString(attributed)
+  let runs = CTLineGetGlyphRuns(line) as? [CTRun] ?? []
+  var ranges: [NSRange] = []
+  for run in runs {
+    let attributes = CTRunGetAttributes(run) as NSDictionary
+    guard let value = attributes[kCTFontAttributeName] else { throw printFailure("INVALID_LAYOUT") }
+    let name = CTFontCopyPostScriptName(value as! CTFont) as String
+    if name == "AppleColorEmoji" {
+      let range = CTRunGetStringRange(run)
+      guard range.location >= 0, range.length > 0,
+            range.location + range.length <= (text as NSString).length,
+            CTRunGetGlyphCount(run) > 0 else { throw printFailure("INVALID_LAYOUT") }
+      ranges.append(NSRange(location: range.location, length: range.length))
+    }
+  }
+  return ranges.sorted { $0.location < $1.location }
+}
+private func printRequiredSegments(_ text: String, excluding ranges: [NSRange]) -> [String] {
+  let source = text as NSString
+  var cursor = 0
+  var parts: [String] = []
+  for range in ranges {
+    if range.location > cursor { parts.append(source.substring(with: NSRange(location: cursor, length: range.location - cursor))) }
+    cursor = max(cursor, NSMaxRange(range))
+  }
+  if cursor < source.length { parts.append(source.substring(from: cursor)) }
+  return parts.map { compactPdfText($0) }.filter { !$0.isEmpty }
+}
+private func printSegmentsMatch(_ parts: [String], in text: String) -> Bool {
+  var remainder = text[...]
+  for part in parts {
+    guard let range = remainder.range(of: part) else { return false }
+    remainder = remainder[range.upperBound...]
+  }
+  return true
+}
 func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: String) throws -> [String: Any] {
   guard let data = layoutJson.data(using: .utf8), let layout = try JSONSerialization.jsonObject(with: data) as? [String: Any],
         let pages = layout["pages"] as? [[String: Any]], !pages.isEmpty,
@@ -139,6 +179,7 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
   guard let pdf = CGPDFDocument(target as CFURL), let searchable = PDFDocument(url: target), searchable.pageCount == pages.count else { throw printFailure("PDF_REOPEN_FAILED") }
   var selectable = true
   var textCheckFailure: String?
+  var colorGlyphRanges: [[String: Int]] = []
   var runs = Set<String>()
   for (index, page) in pages.enumerated() {
     let text = compactPdfText(searchable.page(at: index)?.string ?? "")
@@ -146,34 +187,30 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
     for (blockIndex, block) in (page["blocks"] as? [[String: Any]] ?? []).enumerated() {
       let kind = block["kind"] as? String ?? ""
       let source = block["text"] as? String ?? block["label"] as? String ?? block["value"] as? String ?? ""
-      if ["cover-name", "note", "opening"].contains(kind) {
-        // CoreText draws separate lines. PDFKit may interleave nearby blocks when
-        // reconstructing reading order, so a whole paragraph need not be contiguous.
-        // Require every drawn line, preserving character order within that line.
-        let scalars = Array(source.unicodeScalars)
-        let lines = block["lines"] as? [[String: Any]] ?? []
-        if lines.isEmpty {
-          let expected = compactPdfText(source)
-          if !expected.isEmpty && !text.contains(expected) {
-            selectable = false
-            if textCheckFailure == nil { textCheckFailure = "PDF_TEXT_V3_P\(index + 1)_B\(blockIndex + 1)_L0_E\(expected.unicodeScalars.count)_A\(text.unicodeScalars.count)" }
-          }
-        } else {
-          for (lineIndex, line) in lines.enumerated() {
-            let start = Int(line["start"] as? Double ?? -1)
-            let end = Int(line["end"] as? Double ?? -1)
-            guard start >= 0, end >= start, end <= scalars.count else { selectable = false; continue }
-            let expected = compactPdfText(scalars[start..<end].map { String($0) }.joined())
-            if !expected.isEmpty && !text.contains(expected) {
-              selectable = false
-              if textCheckFailure == nil { textCheckFailure = "PDF_TEXT_V3_P\(index + 1)_B\(blockIndex + 1)_L\(lineIndex + 1)_E\(expected.unicodeScalars.count)_A\(text.unicodeScalars.count)" }
-            }
-          }
-        }
-      }
       let serif = ["cover-name", "note", "opening", "close"].contains(kind)
       let name = rendering[serif ? "serif" : "ui"] as? String ?? (serif ? "Songti SC" : "PingFang SC")
       let font = resolveFont(name: name, size: kind == "cover-name" ? 28 : serif ? 17 : 15)
+      if ["cover-name", "note", "opening"].contains(kind) {
+        let scalars = Array(source.unicodeScalars)
+        let lines = block["lines"] as? [[String: Any]] ?? []
+        let checks: [[String: Any]] = lines.isEmpty ? [["start": 0.0, "end": Double(scalars.count)]] : lines
+        for (lineIndex, line) in checks.enumerated() {
+          let start = Int(line["start"] as? Double ?? -1)
+          let end = Int(line["end"] as? Double ?? -1)
+          guard start >= 0, end >= start, end <= scalars.count else { throw printFailure("INVALID_LAYOUT") }
+          let slice = scalars[start..<end].map { String($0) }.joined()
+          let exclusions = try printColorGlyphRanges(slice, font: font)
+          for range in exclusions {
+            colorGlyphRanges.append(["page": index, "block": blockIndex, "line": lineIndex,
+                                     "startUTF16": range.location, "endUTF16": NSMaxRange(range)])
+          }
+          let required = printRequiredSegments(slice, excluding: exclusions)
+          if !printSegmentsMatch(required, in: text) {
+            selectable = false
+            if textCheckFailure == nil { textCheckFailure = "PDF_TEXT_V4_P\(index + 1)_B\(blockIndex + 1)_L\(lineIndex + 1)_E\(compactPdfText(slice).unicodeScalars.count)_A\(text.unicodeScalars.count)" }
+          }
+        }
+      }
       for run in coreTextRunFontNames(text: source + (block["printHint"] as? String ?? ""), font: font) { if let post = run["postScriptName"] { runs.insert(post) } }
     }
   }
@@ -183,5 +220,6 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
   let digest = try printFileDigest(destination)
   return ["pageCount": pdf.numberOfPages, "bytes": digest["bytes"] ?? 0, "sha256": digest["sha256"] ?? "",
           "widthPt": pdf.page(at: 1)?.getBoxRect(.mediaBox).width ?? 0, "heightPt": pdf.page(at: 1)?.getBoxRect(.mediaBox).height ?? 0,
-          "fontsEmbedded": embedded, "fontResources": fonts.fonts, "textSelectable": selectable, "textCheckRevision": 3, "textCheckFailure": textCheckFailure ?? "", "fontRunNames": runs.sorted()]
+          "fontsEmbedded": embedded, "fontResources": fonts.fonts, "textSelectable": selectable && colorGlyphRanges.isEmpty, "nonColorTextSelectable": selectable,
+          "colorGlyphRanges": colorGlyphRanges, "emojiVisualCheckRequired": !colorGlyphRanges.isEmpty, "textCheckRevision": 4, "textCheckFailure": textCheckFailure ?? "", "fontRunNames": runs.sorted()]
 }
