@@ -255,7 +255,7 @@ it('PDF text check failure includes its stage and a safe fixed reason', async ()
     expect(printFailureDiagnostic(caught)).toEqual({
       stage: 'PDF_CHECK',
       code: 'INVALID_PDF',
-      reason: 'PDF_TEXT',
+      reason: 'PDF_TEXT_NATIVE_OLD',
     });
   }
 });
@@ -270,4 +270,9 @@ it('diagnostics never copy a private native error message or path', () => {
 
 it('retains a fixed native error code behind an exception prefix without copying the message', () => {
   expect(printFailureDiagnostic(new Error('Native exception: PDF_REOPEN_FAILED'), 'WRITE_PDF')).toEqual({ stage: 'WRITE_PDF', code: 'PDF_REOPEN_FAILED' });
+});
+
+it('preserves only numeric native text diagnostics', () => {
+  expect(printFailureDiagnostic({code: 'INVALID_PDF', reason: 'PDF_TEXT_V3_P2_B3_L1_E20_A100'}, 'PDF_CHECK').reason).toBe('PDF_TEXT_V3_P2_B3_L1_E20_A100');
+  expect(printFailureDiagnostic({code: 'INVALID_PDF', reason: 'PDF_TEXT_V3_private正文'}, 'PDF_CHECK').reason).toBeUndefined();
 });

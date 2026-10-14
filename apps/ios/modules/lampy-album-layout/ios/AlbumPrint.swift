@@ -138,11 +138,12 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
   context.closePDF()
   guard let pdf = CGPDFDocument(target as CFURL), let searchable = PDFDocument(url: target), searchable.pageCount == pages.count else { throw printFailure("PDF_REOPEN_FAILED") }
   var selectable = true
+  var textCheckFailure: String?
   var runs = Set<String>()
   for (index, page) in pages.enumerated() {
     let text = compactPdfText(searchable.page(at: index)?.string ?? "")
     let rendering = page["rendering"] as? [String: Any] ?? [:]
-    for block in page["blocks"] as? [[String: Any]] ?? [] {
+    for (blockIndex, block) in (page["blocks"] as? [[String: Any]] ?? []).enumerated() {
       let kind = block["kind"] as? String ?? ""
       let source = block["text"] as? String ?? block["label"] as? String ?? block["value"] as? String ?? ""
       if ["cover-name", "note", "opening"].contains(kind) {
@@ -153,14 +154,20 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
         let lines = block["lines"] as? [[String: Any]] ?? []
         if lines.isEmpty {
           let expected = compactPdfText(source)
-          if !expected.isEmpty && !text.contains(expected) { selectable = false }
+          if !expected.isEmpty && !text.contains(expected) {
+            selectable = false
+            if textCheckFailure == nil { textCheckFailure = "PDF_TEXT_V3_P\(index + 1)_B\(blockIndex + 1)_L0_E\(expected.unicodeScalars.count)_A\(text.unicodeScalars.count)" }
+          }
         } else {
-          for line in lines {
+          for (lineIndex, line) in lines.enumerated() {
             let start = Int(line["start"] as? Double ?? -1)
             let end = Int(line["end"] as? Double ?? -1)
             guard start >= 0, end >= start, end <= scalars.count else { selectable = false; continue }
             let expected = compactPdfText(scalars[start..<end].map { String($0) }.joined())
-            if !expected.isEmpty && !text.contains(expected) { selectable = false }
+            if !expected.isEmpty && !text.contains(expected) {
+              selectable = false
+              if textCheckFailure == nil { textCheckFailure = "PDF_TEXT_V3_P\(index + 1)_B\(blockIndex + 1)_L\(lineIndex + 1)_E\(expected.unicodeScalars.count)_A\(text.unicodeScalars.count)" }
+            }
           }
         }
       }
@@ -176,5 +183,5 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
   let digest = try printFileDigest(destination)
   return ["pageCount": pdf.numberOfPages, "bytes": digest["bytes"] ?? 0, "sha256": digest["sha256"] ?? "",
           "widthPt": pdf.page(at: 1)?.getBoxRect(.mediaBox).width ?? 0, "heightPt": pdf.page(at: 1)?.getBoxRect(.mediaBox).height ?? 0,
-          "fontsEmbedded": embedded, "fontResources": fonts.fonts, "textSelectable": selectable, "fontRunNames": runs.sorted()]
+          "fontsEmbedded": embedded, "fontResources": fonts.fonts, "textSelectable": selectable, "textCheckRevision": 3, "textCheckFailure": textCheckFailure ?? "", "fontRunNames": runs.sorted()]
 }

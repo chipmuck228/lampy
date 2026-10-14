@@ -137,6 +137,7 @@ export async function writeAlbumProbePdf(
 export type AlbumPrintNativeResult = {
   pageCount: number; bytes: number; widthPt: number; heightPt: number;
   fontsEmbedded: boolean | null; fontResources: AlbumPdfFontResource[];
+  textCheckRevision?: number; textCheckFailure?: string;
   textSelectable: boolean; fontRunNames: string[]; sha256: string;
 };
 type PrintNativeModule = {
