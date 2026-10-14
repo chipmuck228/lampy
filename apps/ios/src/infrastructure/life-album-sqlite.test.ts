@@ -58,6 +58,7 @@ describe('life album sqlite preservation', () => {
         expect(listed.albums[0].entryCount).toBe(1);
       }
       const view = await second.getAlbum('album_persist');
+      expect(view.album.cover).toEqual({ kind: 'words', automatic: true });
       expect(view.album.entries.map((entry) => entry.momentId)).toEqual(['moment_wind']);
       expect(view.entries[0].source).toBe('ready');
       const storedMoment = await createSqliteRepositories(secondDb).moments.findById('moment_wind');

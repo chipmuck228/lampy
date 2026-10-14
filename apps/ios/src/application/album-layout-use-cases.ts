@@ -1,3 +1,4 @@
+import { albumReadingFingerprint } from './album-reading';
 import { tr } from '../i18n';
 import type { HistoryClock } from '../domain-adapters/calendar';
 import type { AssetRepository, MomentRepository } from '../infrastructure/repositories';
@@ -134,6 +135,24 @@ export function createAlbumLayoutUseCases(deps: {
     return { layout, media: first.media, fingerprint, requestId };
   }
 
+  async function readAlbumForContinuousReading(
+    albumId: string,
+    options?: { signal?: { cancelled: boolean }; requestId?: number; privateUnlocked?: boolean },
+  ) {
+    assertUnlocked(options?.privateUnlocked);
+    const requestId = options?.requestId ?? beginAlbumLayout(albumId).requestId;
+    const first = await snapshot(albumId);
+    assertCurrent(requestId, options?.signal);
+    assertUnlocked(options?.privateUnlocked);
+    const second = await snapshot(albumId);
+    assertCurrent(requestId, options?.signal);
+    assertUnlocked(options?.privateUnlocked);
+    if (albumReadingFingerprint(first.input) !== albumReadingFingerprint(second.input)) {
+      throw new ApplicationError(ALBUM_LAYOUT_STALE, ALBUM_PREVIEW_FAILED);
+    }
+    return { ...second, requestId };
+  }
+
   function invalidateAlbumLayout(albumId: string) {
     cache.delete(albumId);
   }
@@ -147,6 +166,7 @@ export function createAlbumLayoutUseCases(deps: {
   }
 
   return {
+    readAlbumForContinuousReading,
     beginAlbumLayout,
     generateAlbumLayout,
     invalidateAlbumLayout,

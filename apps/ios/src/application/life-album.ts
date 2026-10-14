@@ -39,7 +39,7 @@ export const ALBUM_WORDS_COVER = tr("文字封面");
 export const ALBUM_OPENING_HINT = tr("可以写一段开篇，也可以留空。");
 
 export type AlbumCover =
-  | { kind: 'words' }
+  | { kind: 'words'; automatic?: true }
   | { kind: 'image'; momentId: string; assetId: string };
 
 export type AlbumEntry = {

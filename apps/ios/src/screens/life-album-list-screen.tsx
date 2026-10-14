@@ -36,6 +36,7 @@ import { LifeIcon } from './life-icons';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 import { dismissToRootNav } from './root-nav-switch';
 import { usePageMetrics } from './use-page-metrics';
+import { recentType, recentInk, recentKicker } from './recent-visual';
 
 const guideStore = createSecureAlbumListGuideStore();
 
@@ -46,6 +47,7 @@ export default function LifeAlbumListScreen() {
   const [wallWidth, setWallWidth] = useState<number | null>(null);
   const wallLayout = albumCoverWallLayout(wallWidth);
 
+  const [source, setSource] = useState<'personal' | 'family'>('personal');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [albums, setAlbums] = useState<AlbumListItem[]>([]);
   const [loadKey, setLoadKey] = useState(0);
@@ -60,6 +62,7 @@ export default function LifeAlbumListScreen() {
   const viewportHeightRef = useRef(0);
 
   const tryRestoreScroll = useCallback(() => {
+    if (source !== 'personal') return;
     const decision = albumListRestoreScrollY({
       restorePending: restorePendingRef.current,
       savedY: peekAlbumListScroll(),
@@ -74,7 +77,7 @@ export default function LifeAlbumListScreen() {
     if (decision.action === 'restore') {
       scrollRef.current?.scrollTo({ y: decision.y, animated: false });
     }
-  }, [status, guideReady]);
+  }, [status, guideReady, source]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +170,7 @@ export default function LifeAlbumListScreen() {
         },
       ]}
       onScroll={(event) => {
+        if (source !== 'personal') return;
         const offsetY = event.nativeEvent.contentOffset.y;
         if (
           !albumListShouldRecordScrollOffset({
@@ -197,27 +201,20 @@ export default function LifeAlbumListScreen() {
         tryRestoreScroll();
       }}
       header={
-        <View style={[styles.header, { paddingHorizontal: gutter }]} testID="life-album-list-header">
-          <Text style={styles.kicker}>{tr("LAMPY · 生活册")}</Text>
-          <View style={styles.headerRow}>
-            <Text style={styles.title} accessibilityRole="header">
-              {ALBUM_MY_ALBUMS}
-            </Text>
-            {guideReady && !guideOpen ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={ALBUM_GUIDE_REOPEN}
-                testID="life-album-guide-reopen"
-                onPress={() => {
-                  setGuidePersistHint(null);
-                  setGuideOpen(true);
-                }}
-                style={styles.reopenHit}
-              >
-                <Text style={styles.reopenLabel}>{ALBUM_GUIDE_REOPEN}</Text>
-              </Pressable>
-            ) : null}
+        <View style={[styles.header, { paddingHorizontal: gutter, paddingTop: height < 500 ? 12 : 20 }]} testID="life-album-list-header">
+          <View style={styles.headerCopy}>
+            <Text style={styles.kicker}>{tr("LAMPY · 生活册")}</Text>
+            <Text style={styles.title} accessibilityRole="header">{ALBUM_MY_ALBUMS}</Text>
           </View>
+          {guideReady && !guideOpen ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={ALBUM_GUIDE_REOPEN}
+              testID="life-album-guide-reopen" onPress={() => {
+                setGuidePersistHint(null);
+                setGuideOpen(true);
+              }} style={styles.reopenHit}>
+              <Text style={styles.reopenLabel}>{ALBUM_GUIDE_REOPEN}</Text>
+            </Pressable>
+          ) : null}
         </View>
       }
       band={
@@ -241,6 +238,17 @@ export default function LifeAlbumListScreen() {
       }
     >
       <View testID="life-album-list" style={styles.body}>
+        <View style={{ flexDirection: 'row', gap: 16 }}>
+          {(['personal', 'family'] as const).map(part => <Pressable key={part}
+            accessibilityRole="button" accessibilityState={{ selected: source === part }}
+            testID={`life-album-source-${part}`} style={styles.hit} onPress={() => {
+              if (part === source) return;
+              setSource(part);
+              if (part === 'personal') { restorePendingRef.current = true; contentSizedRef.current = false; }
+              scrollRef.current?.scrollTo({ y: 0, animated: false });
+            }}><Text style={[styles.action, source === part && { textDecorationLine: 'underline' }]}>{tr(part === 'personal' ? '我的' : '家里的')}</Text></Pressable>)}
+        </View>
+        {source === 'family' ? <Text style={styles.meta}>{tr('家里的生活册将在之后开放。')}</Text> : <>
         {showGuideBody ? (
           <View
             testID="life-album-guide"
@@ -338,6 +346,7 @@ export default function LifeAlbumListScreen() {
             <Text style={styles.createLabel}>{ALBUM_NEW_ACTION}</Text>
           </Pressable>
         ) : null}
+        </>}
       </View>
     </RootReadingLayout>
   );
@@ -346,16 +355,13 @@ export default function LifeAlbumListScreen() {
 const styles = StyleSheet.create({
   column: { alignSelf: 'stretch', width: '100%' },
   body: { gap: 16 },
-  header: { paddingTop: 8, paddingBottom: 8, gap: 4, backgroundColor: paper },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    minHeight: 48,
+  header: {
+    flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
+    paddingBottom: 17, gap: 12, backgroundColor: paper,
   },
-  kicker: { ...type.meta, color: inkSoft, letterSpacing: 0.6 },
-  title: { ...type.title, color: ink, fontSize: 28, lineHeight: 34, flexShrink: 1 },
+  headerCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
+  kicker: { ...recentType.kicker, color: recentKicker },
+  title: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
   reopenHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', paddingHorizontal: 4 },
   reopenLabel: { ...type.meta, color: sage },
   guide: {

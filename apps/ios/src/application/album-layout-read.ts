@@ -136,5 +136,17 @@ export async function readAlbumLayoutInput(deps: {
     createdAt: album.createdAt,
     updatedAt: album.updatedAt,
   };
+  if (lifeAlbum.cover.kind === 'words' && lifeAlbum.cover.automatic) {
+    const first = records.flatMap(record => record.presence === 'ready'
+      ? record.media.filter(item => item.role === 'image' && item.availability === 'available')
+        .map(item => ({ momentId: record.momentId, assetId: item.assetId })) : [])[0];
+    if (first) lifeAlbum.cover = { kind: 'image', ...first };
+  }
+  if (lifeAlbum.cover.kind === 'image') {
+    const selected = lifeAlbum.cover;
+    const candidate = records.find(record => record.momentId === selected.momentId && record.presence === 'ready')
+      ?.media.find(item => item.assetId === selected.assetId && item.role === 'image' && item.availability === 'available');
+    if (!candidate) lifeAlbum.cover = { kind: 'words' };
+  }
   return { input: { album: lifeAlbum, entries: records }, media: mediaMap };
 }

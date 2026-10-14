@@ -452,6 +452,14 @@ private func drawAudioGlyph(playing: Bool, at origin: CGPoint) {
   path.fill()
 }
 
+private func albumHexColor(_ value: String?, fallback: UIColor) -> UIColor {
+  guard let value = value, value.hasPrefix("#"), value.count == 7,
+        let rgb = UInt32(value.dropFirst(), radix: 16) else { return fallback }
+  return UIColor(red: CGFloat((rgb >> 16) & 255) / 255,
+                 green: CGFloat((rgb >> 8) & 255) / 255,
+                 blue: CGFloat(rgb & 255) / 255, alpha: 1)
+}
+
 private func drawAlbumPage(
   page: [String: Any],
   media: [String: String],
@@ -459,9 +467,9 @@ private func drawAlbumPage(
   in context: CGContext,
   bounds: CGRect
 ) {
-  albumPaperColor().setFill()
-  context.fill(bounds)
   let rendering = page["rendering"] as? [String: Any] ?? [:]
+  albumHexColor(rendering["paper"] as? String, fallback: albumPaperColor()).setFill()
+  context.fill(bounds)
   let serifName = rendering["serif"] as? String ?? "Songti SC"
   let uiName = rendering["ui"] as? String ?? "PingFang SC"
   let copy = rendering["copy"] as? [String: String] ?? [:]
@@ -478,7 +486,18 @@ private func drawAlbumPage(
       let assetId = block["assetId"] as? String ?? ""
       let path = (media[assetId] ?? "").replacingOccurrences(of: "file://", with: "")
       if let image = UIImage(contentsOfFile: path) {
-        image.draw(in: CGRect(x: x, y: y, width: width, height: height))
+        let photoRect = CGRect(x: x, y: y, width: width, height: height)
+        let border = min(CGFloat(rendering["photoBorderWidth"] as? Double ?? 0), min(width, height) / 4)
+        if border > 0 {
+          context.setFillColor(UIColor.white.cgColor)
+          context.fill(photoRect)
+        }
+        let inner = photoRect.insetBy(dx: border, dy: border)
+        let scale = min(inner.width / image.size.width, inner.height / image.size.height)
+        let imageWidth = image.size.width * scale
+        let imageHeight = image.size.height * scale
+        image.draw(in: CGRect(x: inner.midX - imageWidth / 2, y: inner.midY - imageHeight / 2,
+                              width: imageWidth, height: imageHeight))
       } else {
         UIColor(white: 0.9, alpha: 1).setFill()
         context.fill(CGRect(x: x, y: y, width: width, height: height))
@@ -496,7 +515,7 @@ private func drawAlbumPage(
     }
     if kind == "feeling" {
       let value = block["value"] as? String ?? ""
-      albumSageColor().setFill()
+      albumHexColor(block["accent"] as? String, fallback: albumSageColor()).setFill()
       context.fillEllipse(in: CGRect(x: x, y: y + 7, width: 8, height: 8))
       let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
       let font = resolveFont(name: spec.name, size: spec.size)

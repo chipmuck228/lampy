@@ -798,5 +798,15 @@
   "已关联Apple账号": "Apple account linked",
   "关联": "Link",
   "关联后可用Apple登录当前账号，家庭和昵称保留。不会合并其他账号。": "Use Apple to sign in to this account, keeping your families and nickname. Other accounts will not be merged.",
-  "Apple授权等待已结束，请重新试一次。": "Apple authorization timed out. Please start again."
+  "Apple授权等待已结束，请重新试一次。": "Apple authorization timed out. Please start again.",
+  "连续阅读": "Read",
+  "看纸页": "View paper pages",
+  "素纸": "Plain paper",
+  "手作": "Handmade",
+  "我的": "Mine",
+  "家里的": "Family",
+  "家里的生活册将在之后开放。": "Family albums will be available later.",
+  "阅读位置暂时没有记下。": "Your reading position could not be saved.",
+  "自动封面": "Automatic cover",
+  "播放声音": "Play audio"
 }

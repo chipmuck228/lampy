@@ -39,7 +39,7 @@ function defaultAlbumId(): string {
 }
 
 function coverEquals(left: AlbumCover, right: AlbumCover): boolean {
-  if (left.kind === 'words' && right.kind === 'words') return true;
+  if (left.kind === 'words' && right.kind === 'words') return left.automatic === right.automatic;
   return (
     left.kind === 'image' &&
     right.kind === 'image' &&
@@ -157,12 +157,13 @@ export function createLifeAlbumUseCases(deps: {
       if (!latest || entry.collectedAt > latest) return entry.collectedAt;
       return latest;
     }, null);
-    let coverUri: string | null = null;
-    if (album.cover.kind === 'image' && deps.assets) {
-      const asset = await deps.assets.findById(album.cover.assetId);
-      if (asset.kind === 'ready' && asset.asset.type === 'image') {
-        coverUri = await locateDisplayUri(asset.asset.localUri);
-      }
+    const candidates = await coverCandidates(album.id);
+    const displayCover = album.cover.kind === 'words' && album.cover.automatic
+      ? candidates.find(candidate => candidate.available) : null;
+    let coverUri: string | null = displayCover?.uri ?? null;
+    if (album.cover.kind === 'image') {
+      coverUri = candidates.find(candidate => candidate.available && album.cover.kind === 'image' &&
+        candidate.momentId === album.cover.momentId && candidate.assetId === album.cover.assetId)?.uri ?? null;
     }
     return {
       id: album.id,
@@ -170,7 +171,7 @@ export function createLifeAlbumUseCases(deps: {
       entryCount: entries.length,
       lastCollectedAt,
       lastCollectedLabel: formatCollectedAt(lastCollectedAt, viewerClock),
-      cover: album.cover,
+      cover: displayCover ? { kind: 'image', momentId: displayCover.momentId, assetId: displayCover.assetId } : album.cover,
       coverUri,
     };
   }
@@ -332,7 +333,7 @@ export function createLifeAlbumUseCases(deps: {
       schemaVersion: LIFE_ALBUM_SCHEMA_VERSION,
       name: normalizeAlbumName(input?.name),
       opening: null,
-      cover: { kind: 'words' as const },
+      cover: { kind: 'words' as const, automatic: true as const },
       createdAt: now,
       updatedAt: now,
     };
