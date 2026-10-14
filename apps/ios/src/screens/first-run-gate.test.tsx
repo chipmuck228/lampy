@@ -10,8 +10,10 @@ import { FIRST_RUN_SECURE_KEY } from '../infrastructure/first-run-store';
 import { FIRST_RUN_FINISH_ERROR, FirstRunGate, finishFirstRunGuide } from './first-run-gate';
 
 const mockPush = jest.fn();
+let mockPathname = '/';
 
 jest.mock('expo-router', () => ({
+  usePathname: () => mockPathname,
   useRouter: () => ({ push: mockPush }),
 }));
 
@@ -34,8 +36,8 @@ describe('first-run gate errors', () => {
     await SecureStore.deleteItemAsync(FIRST_RUN_SECURE_KEY);
   });
 
-  afterEach(() => {
-    cleanup();
+  afterEach(async () => {
+    await cleanup();
   });
 
   it('skips the blank pending page when the store or library cannot be read', async () => {
@@ -94,7 +96,7 @@ describe('first-run gate errors', () => {
     });
     expect(view.getByTestId('first-run-skip-has-records')).toBeTruthy();
     await act(async () => {
-      fireEvent.press(view.getByLabelText('rerender'));
+      await fireEvent.press(view.getByLabelText('rerender'));
     });
     expect(view.getByText('app')).toBeTruthy();
     expect(view.queryByTestId('first-run-pending')).toBeNull();
@@ -115,13 +117,23 @@ describe('first-run gate errors', () => {
     await waitFor(() => {
       expect(view.getByTestId('first-run-continue')).toBeTruthy();
     });
-    fireEvent.press(view.getByTestId('first-run-continue'));
+    await fireEvent.press(view.getByTestId('first-run-continue'));
     expect(markCompleted).not.toHaveBeenCalled();
-    fireEvent.press(view.getByTestId('first-run-continue'));
+    await fireEvent.press(view.getByTestId('first-run-continue'));
     await waitFor(() => {
       expect(view.getByLabelText('留下瞬间')).toBeTruthy();
     });
     expect(markCompleted).not.toHaveBeenCalled();
     expect(view.queryByText('app')).toBeNull();
   });
+});
+
+it('external album reading bypasses onboarding and does not query the personal library', async () => {
+  mockPathname = '/album-file';
+  const readLibrary = jest.fn(async()=>({hasPersonalRecords:false,recordsUnknown:false}));
+  try {
+    const view = await render(wrap(<FirstRunGate readLibrary={readLibrary}><Text>External reader</Text></FirstRunGate>));
+    expect(view.getByText('External reader')).toBeTruthy();expect(readLibrary).not.toHaveBeenCalled();
+    await view.unmount();
+  } finally {mockPathname = '/';}
 });

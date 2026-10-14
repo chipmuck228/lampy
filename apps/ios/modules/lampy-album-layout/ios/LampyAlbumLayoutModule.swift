@@ -18,6 +18,21 @@ public final class LampyAlbumLayoutModule: Module {
       try writeProbePdf(layoutJson: layoutJson, mediaJson: mediaJson, destPath: destPath)
     }
 
+    AsyncFunction("beginAlbumArchive") { (id: String) -> String in try beginAlbumArchive(id) }
+    AsyncFunction("cleanAlbumArchiveSessions") { try cleanAlbumArchiveSessions() }
+    AsyncFunction("closeAlbumArchive") { (id: String) in try closeAlbumArchive(id) }
+    AsyncFunction("prepareAlbumArchiveMedia") { (id: String, source: String, name: String, role: String) async throws -> [String: Any] in
+      try await prepareAlbumArchiveMedia(id, source, name, role)
+    }
+    AsyncFunction("saveAlbumArchive") { (source: String, promise: Promise) in
+      saveAlbumArchive(source) { result in
+        switch result { case .success(let saved): promise.resolve(saved)
+        case .failure: promise.reject("FILE_SAVE_FAILED", "FILE_SAVE_FAILED") }
+      }
+    }
+    AsyncFunction("packAlbumArchive") { (id: String) -> [String: Any] in try packAlbumArchive(id) }
+    AsyncFunction("openAlbumArchive") { (source: String, id: String) -> [String: Any] in try openAlbumArchive(source, id) }
+
     AsyncFunction("copyPrintMedia") { (source: String, destination: String) -> [String: Any] in
       try copyPrintMedia(source, destination)
     }

@@ -12,6 +12,7 @@ import {
   printFailureDiagnostic,
   type PrintFailureDiagnostic,
 } from '../application/album-print';
+import { albumFileEvaluationOpen } from '../application/album-file';
 import type { AlbumReadingStyle } from '../application/album-reading';
 import {
   createExpoAlbumPrint,
@@ -238,6 +239,8 @@ export default function AlbumPrintScreen() {
               >
                 <Text style={styles.action}>{tr('保存或打印PDF')}</Text>
               </Pressable>
+              {albumFileEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <Pressable accessibilityRole="button" disabled={busy} style={styles.hit}
+                onPress={() => router.push({pathname:'/album-file-create',params:{edition:edition.id}})}><Text style={styles.action}>{tr('制作生活册文件')}</Text></Pressable> : null}
             </View>
           ))}
         </View>

@@ -31,6 +31,7 @@ jest.mock('./device-lock-context', () => ({
 }));
 jest.mock('./use-recent-clip-playback', () => ({
   useRecentClipPlayback: () => ({
+    release: mockPause,
     pause: mockPause,
     play: mockPlay,
     card: () => ({ status: 'idle' }),
@@ -181,4 +182,17 @@ it('a removed record is explicit and cannot expose old text or audio', async () 
   await waitFor(() => expect(view.getByText('这条已经不在。')).toBeTruthy());
   expect(view.queryByText(fixture.entries[0].note)).toBeNull();
   expect(view.queryByTestId('album-reading-audio-a1')).toBeNull();
+});
+
+it('external frozen reading never reads personal sources or writes reading history', async () => {
+  const onClose = jest.fn();
+  const view = await render(<SafeAreaProvider initialMetrics={{frame:{x:0,y:0,width:390,height:844},insets:{top:0,bottom:0,left:0,right:0}}}>
+    <LifeAlbumReadingScreen external={{input: fixture as import('../application/album-layout-input').AlbumLayoutInput,style:'handmade',onClose}} />
+  </SafeAreaProvider>);
+  await waitFor(() => expect(view.getByText('Our days')).toBeTruthy());
+  expect(mockRead).not.toHaveBeenCalled();
+  expect(view.queryByText('看纸页')).toBeNull();expect(view.queryByText('素纸')).toBeNull();
+  await fireEvent.press(view.getByText('关闭这一册'));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());await view.unmount();
+  expect(mockSave).not.toHaveBeenCalled();
 });

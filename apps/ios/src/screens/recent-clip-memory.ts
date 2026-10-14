@@ -5,21 +5,22 @@ export type ClipListen = {
   currentTimeMs: number;
 };
 
+export function createClipMemory() {
 const session = new Map<string, ClipListen>();
 
-export function resetRecentClipMemoryForTests() {
+function resetRecentClipMemoryForTests() {
   session.clear();
 }
 
-export function rememberClip(id: string, next: ClipListen) {
+function rememberClip(id: string, next: ClipListen) {
   session.set(id, { status: next.status, currentTimeMs: next.currentTimeMs });
 }
 
-export function rememberedClip(id: string): ClipListen | undefined {
+function rememberedClip(id: string): ClipListen | undefined {
   return session.get(id);
 }
 
-export function stashOutgoing(id: string, live: ClipListen) {
+function stashOutgoing(id: string, live: ClipListen) {
   if (live.status === 'unavailable') {
     rememberClip(id, { status: 'unavailable', currentTimeMs: live.currentTimeMs });
     return;
@@ -35,13 +36,13 @@ export function stashOutgoing(id: string, live: ClipListen) {
   rememberClip(id, { status: 'idle', currentTimeMs: 0 });
 }
 
-export function resumeAtMs(id: string): number {
+function resumeAtMs(id: string): number {
   const remembered = session.get(id);
   if (!remembered || remembered.status === 'finished') return 0;
   return remembered.currentTimeMs;
 }
 
-export function cardListen(clipId: string, activeId: string | null, live: ClipListen): ClipListen {
+function cardListen(clipId: string, activeId: string | null, live: ClipListen): ClipListen {
   const remembered = session.get(clipId);
   if (clipId === activeId) {
     if (preferRemembered(live, remembered)) return remembered!;
@@ -50,6 +51,10 @@ export function cardListen(clipId: string, activeId: string | null, live: ClipLi
   return remembered ?? { status: 'idle', currentTimeMs: 0 };
 }
 
+return {clear: resetRecentClipMemoryForTests, resetRecentClipMemoryForTests, rememberClip, rememberedClip, stashOutgoing, resumeAtMs, cardListen};
+}
+const shared = createClipMemory();
+export const {resetRecentClipMemoryForTests, rememberClip, rememberedClip, stashOutgoing, resumeAtMs, cardListen} = shared;
 function preferRemembered(live: ClipListen, remembered: ClipListen | undefined): boolean {
   if (!remembered) return false;
   if (live.status === 'unavailable' || live.status === 'playing' || live.status === 'preparing') {

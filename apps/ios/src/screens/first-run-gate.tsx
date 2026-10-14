@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 
 import { decideFirstRunGuide, type FirstRunDecision } from '../application/first-run';
 import { getUseCases } from '../application/container';
@@ -43,6 +43,7 @@ export function FirstRunGate({
   readLibrary?: () => Promise<{ hasPersonalRecords: boolean; recordsUnknown: boolean }>;
 }) {
   const router = useRouter();
+  const externalFile = usePathname() === '/album-file';
   const defaults = useRef({
     store: store ?? createSecureFirstRunStore(),
     readLibrary: readLibrary ?? readFirstRunLibrary,
@@ -52,6 +53,7 @@ export function FirstRunGate({
   const [finishError, setFinishError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (externalFile) return;
     let alive = true;
     const resolvedStore = store ?? defaults.current.store;
     const resolvedRead = readLibrary ?? defaults.current.readLibrary;
@@ -87,8 +89,9 @@ export function FirstRunGate({
     return () => {
       alive = false;
     };
-  }, [readLibrary, store]);
+  }, [readLibrary, store, externalFile]);
 
+  if (externalFile) return <>{children}</>;
   if (decision === 'pending') {
     return <View testID="first-run-pending" style={{ flex: 1, backgroundColor: paper }} />;
   }

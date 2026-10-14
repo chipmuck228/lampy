@@ -57,17 +57,22 @@ import { useDeviceLock } from './device-lock-context';
 import { useRecentClipPlayback } from './use-recent-clip-playback';
 import { Text } from './life-text';
 
-const fonts = albumReadingFonts();
+const baseFonts = albumReadingFonts();
 const timezone = {
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
 };
-export default function LifeAlbumReadingScreen() {
+export type ExternalAlbumReading = { input: AlbumLayoutInput; style: AlbumReadingStyle; fonts?: {serif:string;ui:string}; onClose(): void; onPaper?(): void };
+export default function LifeAlbumReadingScreen({ external }: { external?: ExternalAlbumReading } = {}) {
+  const fonts = useMemo(() => external?.fonts ? Object.fromEntries(Object.entries(baseFonts).map(([key,value]) => [key,{
+    ...value,fontFamily: ['body','coverName','close'].includes(key) ? external.fonts!.serif : external.fonts!.ui,
+  }])) as typeof baseFonts : baseFonts,[external]);
   const router = useRouter();
-  const albumId =
+  const routeAlbumId =
     firstSearchParam(useLocalSearchParams<{ id?: string | string[] }>().id) ??
     '';
+  const albumId = external?.input.album.id ?? routeAlbumId;
   const lock = useDeviceLock();
-  const clips = useRecentClipPlayback();
+  const clips = useRecentClipPlayback(undefined, !!external);
   const pause = useRef(clips.pause);
   useEffect(() => {
     pause.current = clips.pause;
@@ -99,13 +104,14 @@ export default function LifeAlbumReadingScreen() {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     const state = latest.current;
+    if (external) { saved.current = state?.position ?? saved.current; return; }
     if (state)
       void saveAlbumReadingState(state.id, state.style, state.position).catch(
         () => {
           if (alive.current && latest.current?.id === state.id) setSaveError(true);
         },
       );
-  }, []);
+  }, [external]);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       setForeground(state === 'active');
@@ -132,6 +138,9 @@ export default function LifeAlbumReadingScreen() {
       if (!blocked && albumId)
         void (async () => {
           try {
+            if (external) {
+              setStyle(external.style); setInput(external.input); return;
+            }
             const app = await getUseCases();
             if (cancelled) return;
             requestId = app.beginAlbumLayout(albumId).requestId;
@@ -161,7 +170,7 @@ export default function LifeAlbumReadingScreen() {
         if (requestId != null)
           void getUseCases().then((app) => app.cancelAlbumLayout(requestId));
       };
-    }, [albumId, blocked, retry, persist]),
+    }, [albumId, blocked, retry, persist, external]),
   );
   const shown = !blocked && input?.album.id === albumId ? input : null;
   const fingerprint = useMemo(
@@ -250,21 +259,21 @@ export default function LifeAlbumReadingScreen() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={tr('返回')}
-          onPress={() => router.back()}
+          accessibilityLabel={tr(external ? '关闭这一册' : '返回')}
+          onPress={() => { if (external) { void clips.release().then(external.onClose); } else router.back(); }}
           style={styles.hit}
         >
-          <Text style={fonts.date}>{tr('返回')}</Text>
+          <Text style={fonts.date}>{tr(external ? '关闭这一册' : '返回')}</Text>
         </Pressable>
         <Text style={fonts.meta}>{tr('连续阅读')}</Text>
-        {shown ? (
+        {shown && (!external || external.onPaper) ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr('看纸页')}
             onPress={() => {
               persist();
               void pause.current();
-              router.push(`/albums/${albumId}/preview`);
+              if (external) external.onPaper?.(); else router.push(`/albums/${albumId}/preview`);
             }}
             style={styles.hit}
           >
@@ -297,7 +306,7 @@ export default function LifeAlbumReadingScreen() {
           }}
         >
           <View style={{ width: contentWidth }}>
-            <View style={styles.styleRow}>
+            {!external ? <View style={styles.styleRow}>
               {(['plain', 'handmade'] as const).map((choice) => (
                 <Pressable
                   key={choice}
@@ -324,6 +333,7 @@ export default function LifeAlbumReadingScreen() {
                 </Pressable>
               ))}
             </View>
+            : null}
             <View style={styles.cover}>
               {coverMedia?.availability === 'available' && coverMedia.uri ? (
                 <Image

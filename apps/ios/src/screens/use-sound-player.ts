@@ -164,6 +164,7 @@ export function useSoundPlayer(createPlayback: () => AudioPlayback = createExpoA
   }, [status]);
 
   return {
+    release: () => teardown(true),
     status,
     currentTimeMs,
     failed,
