@@ -20,6 +20,19 @@ def compact(text):
     return ''.join(unicodedata.normalize('NFC', text).split())
 
 
+def check_block_text(block, extracted):
+    source = block['text']
+    lines = block.get('lines', [])
+    expected = []
+    for line in lines:
+        start, end = line['start'], line['end']
+        if not 0 <= start <= end <= len(source):
+            raise ValueError('invalid text line range')
+        expected.append(source[start:end])
+    if any(compact(part) not in compact(extracted) for part in (expected or [source])):
+        raise ValueError('PDF selectable text mismatch')
+
+
 def font_embedding(font):
     font = font.get_object()
     descendants = font.get('/DescendantFonts')
@@ -77,8 +90,8 @@ def main():
             raise ValueError('not physical A5')
         text = compact(actual.extract_text() or '')
         for block in planned['blocks']:
-            if block['kind'] in ('note', 'opening', 'cover-name') and compact(block['text']) not in text:
-                raise ValueError('PDF selectable text mismatch')
+            if block['kind'] in ('note', 'opening', 'cover-name'):
+                check_block_text(block, text)
         fonts.extend(resource_fonts(actual['/Resources']))
     embedded = None if not fonts or any(font['embedded'] is None for font in fonts) else all(font['embedded'] for font in fonts)
     result = {'pages': len(reader.pages), 'A5': True, 'textChecked': True, 'pdfAndMediaHashesChecked': True,

@@ -145,8 +145,25 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
     for block in page["blocks"] as? [[String: Any]] ?? [] {
       let kind = block["kind"] as? String ?? ""
       let source = block["text"] as? String ?? block["label"] as? String ?? block["value"] as? String ?? ""
-      if ["cover-name", "note", "opening"].contains(kind), !compactPdfText(source).isEmpty,
-         !text.contains(compactPdfText(source)) { selectable = false }
+      if ["cover-name", "note", "opening"].contains(kind) {
+        // CoreText draws separate lines. PDFKit may interleave nearby blocks when
+        // reconstructing reading order, so a whole paragraph need not be contiguous.
+        // Require every drawn line, preserving character order within that line.
+        let scalars = Array(source.unicodeScalars)
+        let lines = block["lines"] as? [[String: Any]] ?? []
+        if lines.isEmpty {
+          let expected = compactPdfText(source)
+          if !expected.isEmpty && !text.contains(expected) { selectable = false }
+        } else {
+          for line in lines {
+            let start = Int(line["start"] as? Double ?? -1)
+            let end = Int(line["end"] as? Double ?? -1)
+            guard start >= 0, end >= start, end <= scalars.count else { selectable = false; continue }
+            let expected = compactPdfText(scalars[start..<end].map { String($0) }.joined())
+            if !expected.isEmpty && !text.contains(expected) { selectable = false }
+          }
+        }
+      }
       let serif = ["cover-name", "note", "opening", "close"].contains(kind)
       let name = rendering[serif ? "serif" : "ui"] as? String ?? (serif ? "Songti SC" : "PingFang SC")
       let font = resolveFont(name: name, size: kind == "cover-name" ? 28 : serif ? 17 : 15)
