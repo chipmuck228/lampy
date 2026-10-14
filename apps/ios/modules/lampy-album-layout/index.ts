@@ -133,3 +133,20 @@ export async function writeAlbumProbePdf(
   }
   return native.writeProbePdf(layoutJson, mediaJson, destPath);
 }
+
+export type AlbumPrintNativeResult = {
+  pageCount: number; bytes: number; widthPt: number; heightPt: number;
+  fontsEmbedded: boolean | null; fontResources: AlbumPdfFontResource[];
+  textSelectable: boolean; fontRunNames: string[]; sha256: string;
+};
+type PrintNativeModule = {
+  copyPrintMedia(source: string, destination: string): Promise<{ sha256: string; bytes: number }>;
+  printFileDigest(path: string): Promise<{ sha256: string; bytes: number }>;
+  writePrintPdf(layout: string, media: string, destination: string): Promise<AlbumPrintNativeResult>;
+  sharePrintPdf(path: string): Promise<boolean>;
+};
+export function albumPrintNative(): PrintNativeModule {
+  const module = loadNative() as unknown as PrintNativeModule | null;
+  if (!module || typeof module.writePrintPdf !== 'function' || typeof module.copyPrintMedia !== 'function' || typeof module.printFileDigest !== 'function' || typeof module.sharePrintPdf !== 'function') throw new Error('PRINT_NATIVE_REBUILD_REQUIRED');
+  return module;
+}

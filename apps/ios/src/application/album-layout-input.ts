@@ -6,6 +6,8 @@ export type AlbumLayoutMediaInput = {
   role: 'image' | 'audio' | 'unknown';
   availability: AlbumSourceMediaState;
   intrinsicRatio: number | null;
+  widthPx?: number;
+  heightPx?: number;
   durationMs: number | null;
   uri?: string;
 };

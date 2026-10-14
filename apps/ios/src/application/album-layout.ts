@@ -2,14 +2,14 @@ import { appLanguage, tr, type AppLanguage } from '../i18n';
 import type { AlbumCover } from './life-album';
 
 /** Bumped when font resolve / measure / draw rules change so in-process cache and old probes invalidate. */
-export const ALBUM_LAYOUT_VERSION = 'album-a5-v4' as const;
-export const ALBUM_PAGE_WIDTH_PT = 420;
-export const ALBUM_PAGE_HEIGHT_PT = 595;
+export const ALBUM_LAYOUT_VERSION = 'album-a5-v5' as const;
+export const ALBUM_PAGE_WIDTH_PT = (148 * 72) / 25.4;
+export const ALBUM_PAGE_HEIGHT_PT = (210 * 72) / 25.4;
 export const ALBUM_MARGIN_TOP_PT = 40;
 export const ALBUM_MARGIN_BOTTOM_PT = 44;
 export const ALBUM_MARGIN_X_PT = 36;
-export const ALBUM_CONTENT_WIDTH_PT = 348;
-export const ALBUM_CONTENT_HEIGHT_PT = 511;
+export const ALBUM_CONTENT_WIDTH_PT = ALBUM_PAGE_WIDTH_PT - 2 * ALBUM_MARGIN_X_PT;
+export const ALBUM_CONTENT_HEIGHT_PT = ALBUM_PAGE_HEIGHT_PT - ALBUM_MARGIN_TOP_PT - ALBUM_MARGIN_BOTTOM_PT;
 export const ALBUM_RECORD_GAP_PT = 16;
 export const ALBUM_FILL_RATIO = 0.35;
 
@@ -149,6 +149,7 @@ export type AlbumPlacedBlock = AlbumBlockBase &
         assetId: string;
         status: 'available' | 'missing' | 'unreadable';
         durationMs: number | null;
+        printHint?: string;
         text: string;
       }
     | { kind: 'unknown-media'; momentId: string; assetId: string; label: string }
@@ -163,7 +164,7 @@ export type AlbumPlacedBlock = AlbumBlockBase &
 export type AlbumPage = {
   index: number;
   blocks: AlbumPlacedBlock[];
-  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number };
+  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number; pageCount?: number; pageNumbers?: boolean };
 };
 
 export type AlbumLayout = {
