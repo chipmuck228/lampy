@@ -60,3 +60,12 @@
 用户实机截图显示单册整理页封面紧贴导航分隔线；另报告生活册首页与 Recent／Revisit 的字体、字号、间距出现跳跃。首页现复用 recentType.kicker/title 与对应颜色：11/16pt 引题，29/36pt 主标题，标题上距10pt，字距1.2；页头顶部常规20pt／短屏12pt，底部17pt，与现有两个首页一致。使用说明按钮放在旁边，不再让48pt按钮行抬高标题间距。单册整理页内容顶部增加24pt留白，不修改全局 SettingsPage。
 
 本次为两处 UI 样式收尾；之前设备功能报告保留。本次新增视觉效果需用户拉取后在同一设备复验，未声称已取得新设备视觉 PASS。
+
+
+## 2026-10-14 模拟器视觉验收与合并前复审
+
+- 用户明确报告实现 `796a3e1` 模拟器测试通过：页面切换无视觉跳跃，整体视觉、字体、字号统一；先前报告的视觉问题已由用户确认收尾。模拟器型号／iOS未提供。本项不是新真机验收、真实字体诊断或系统 VoiceOver 证据。
+- 复审实现 head：`796a3e1522bf27e5fcd4c4295929fbd5177480cd`；main／base仍为 `cb3ecf025787a383f2bbdd79a7e1dd134b570567`。本轮新运行 TypeScript、变更 TS/TSX ESLint、base-to-head diff check PASS；相关 Jest 11 suites / 59 tests PASS。未跑全量，不改变既有全量失败的状态。
+- 检查个人来源读取与失效封面、旧选择与 SQLite 编码、异步取消／解锁复查、位置摘要与串行保存、声音离页暂停、首页分区壳层及原生绘制改动，未发现新的合并阻塞问题。PR mergeable=true，无 review threads／submitted reviews；查询返回的 commit statuses 与 PR workflow runs 为空，不记为 CI／Bugbot PASS。
+- 设备报告的限制继续保留：真机功能为用户报告，实际运行 SHA／构建号未独立核对；系统 VoiceOver、iPad、真实字体诊断、正式PDF与打印等不扩大为 PASS。这些后续验收项不被本轮阶段 B 功能／模拟器视觉结果自动覆盖。
+- 建议阶段 B 先合并，再从合并后的 main 开阶段 C（打印PDF、真实字体、分页、冻结与保存）的独立PR。此次仅完成复审与证据回填，未执行合并／部署／上传，也未开始阶段C。
