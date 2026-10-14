@@ -32,3 +32,5 @@
 ## 阶段 C 实施候选
 
 #111已合并固定B基线；隔离打印PDF、冻结与保存的实现和Mac验收见 [print-c/README.md](print-c/README.md)。原生和实际文件验收未通过前不称C完成或正式导出开放。
+
+阶段 C 的开发验收实现已合并 #112，基线 `6a4ad76`。用户报告 emoji 真机通过；真实字体及实纸等验收限制仍保留。下一阶段的实现、格式边界与 Mac 步骤见 [offline-d/README.md](offline-d/README.md)。

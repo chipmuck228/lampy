@@ -154,3 +154,18 @@ export function albumPrintNative(): PrintNativeModule {
   if (!module || typeof module.writePrintPdf !== 'function' || typeof module.copyPrintMedia !== 'function' || typeof module.printFileDigest !== 'function' || typeof module.sharePrintPdf !== 'function') throw new Error('PRINT_NATIVE_REBUILD_REQUIRED');
   return module;
 }
+
+export type AlbumArchiveNative = {
+  beginAlbumArchive(id: string): Promise<string>;
+  cleanAlbumArchiveSessions(): Promise<void>;
+  closeAlbumArchive(id: string): Promise<void>;
+  prepareAlbumArchiveMedia(id: string, source: string, name: string, role: string): Promise<{bytes: number; sha256: string; widthPx?: number; heightPx?: number}>;
+  saveAlbumArchive(source: string): Promise<boolean>;
+  packAlbumArchive(id: string): Promise<{uri: string; bytes: number; sha256: string}>;
+  openAlbumArchive(source: string, id: string): Promise<{directory: string; manifest: string; hashes: Record<string, string>}>;
+};
+export function albumArchiveNative(): AlbumArchiveNative {
+  const module = loadNative() as unknown as AlbumArchiveNative | null;
+  if (!module || ['openAlbumArchive','closeAlbumArchive','beginAlbumArchive','packAlbumArchive','prepareAlbumArchiveMedia','cleanAlbumArchiveSessions','saveAlbumArchive'].some(name => typeof (module as unknown as Record<string,unknown>)[name] !== 'function')) throw new Error('FILE_NATIVE_REBUILD_REQUIRED');
+  return module;
+}

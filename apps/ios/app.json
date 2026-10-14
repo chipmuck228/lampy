@@ -107,6 +107,7 @@
         }
       ],
       "./plugins/with-family-invite-links.cjs",
+      "./plugins/with-album-files.cjs",
       "./plugins/with-native-build-compat.cjs"
     ],
     "experiments": {

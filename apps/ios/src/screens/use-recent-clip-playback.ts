@@ -5,6 +5,7 @@ import { createExpoAudioPlayback } from '../infrastructure/expo-audio';
 import type { AudioPlayback } from '../infrastructure/media';
 import { useSoundPlayer } from './use-sound-player';
 import {
+  createClipMemory,
   cardListen,
   rememberClip,
   resumeAtMs,
@@ -12,7 +13,10 @@ import {
   type ClipListen,
 } from './recent-clip-memory';
 
-export function useRecentClipPlayback(createPlayback: () => AudioPlayback = createExpoAudioPlayback) {
+const sharedMemory = {cardListen, rememberClip, resumeAtMs, stashOutgoing};
+export function useRecentClipPlayback(createPlayback: () => AudioPlayback = createExpoAudioPlayback, ephemeral = false) {
+  const [privateMemory] = useState(createClipMemory);
+  const memory = ephemeral ? privateMemory : sharedMemory;
   const sound = useSoundPlayer(createPlayback);
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeIdRef = useRef<string | null>(null);
@@ -36,19 +40,19 @@ export function useRecentClipPlayback(createPlayback: () => AudioPlayback = crea
     heardRef.current = { id: activeId, ...next };
     if (!activeId) return;
     if (next.status === 'unavailable') {
-      rememberClip(activeId, {
+      memory.rememberClip(activeId, {
         status: 'unavailable',
-        currentTimeMs: Math.max(next.currentTimeMs, resumeAtMs(activeId)),
+        currentTimeMs: Math.max(next.currentTimeMs, memory.resumeAtMs(activeId)),
       });
       return;
     }
-    rememberClip(activeId, next);
-  }, [activeId, sound.failed, sound.status, sound.currentTimeMs]);
+    memory.rememberClip(activeId, next);
+  }, [activeId, sound.failed, sound.status, sound.currentTimeMs, memory]);
 
   useEffect(() => {
     function stashHeard() {
       const heard = heardRef.current;
-      if (heard.id) stashOutgoing(heard.id, { status: heard.status, currentTimeMs: heard.currentTimeMs });
+      if (heard.id) memory.stashOutgoing(heard.id, { status: heard.status, currentTimeMs: heard.currentTimeMs });
     }
     const app = AppState.addEventListener('change', (state) => {
       if (state !== 'active') stashHeard();
@@ -57,17 +61,17 @@ export function useRecentClipPlayback(createPlayback: () => AudioPlayback = crea
       stashHeard();
       app?.remove?.();
     };
-  }, []);
+  }, [memory]);
 
   return {
     card(clipId: string): ClipListen {
-      return cardListen(clipId, activeId, live);
+      return memory.cardListen(clipId, activeId, live);
     },
     async play(id: string, uri: string) {
       const outgoing = activeIdRef.current;
       if (outgoing && outgoing !== id) {
         const heard = heardRef.current.id === outgoing ? heardRef.current : live;
-        stashOutgoing(outgoing, { status: heard.status, currentTimeMs: heard.currentTimeMs });
+        memory.stashOutgoing(outgoing, { status: heard.status, currentTimeMs: heard.currentTimeMs });
         try {
           await sound.pause();
         } catch {
@@ -76,12 +80,13 @@ export function useRecentClipPlayback(createPlayback: () => AudioPlayback = crea
       }
       activeIdRef.current = id;
       setActiveId(id);
-      await sound.play(uri, resumeAtMs(id));
+      await sound.play(uri, memory.resumeAtMs(id));
     },
+    async release() { await sound.release(); privateMemory.clear(); },
     async pause() {
       await sound.pause();
       const id = activeIdRef.current;
-      if (id) stashOutgoing(id, { status: 'paused', currentTimeMs: sound.currentTimeMs });
+      if (id) memory.stashOutgoing(id, { status: 'paused', currentTimeMs: sound.currentTimeMs });
     },
   };
 }

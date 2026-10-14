@@ -1,4 +1,5 @@
 import {
+  createClipMemory,
   cardListen,
   rememberClip,
   resetRecentClipMemoryForTests,
@@ -54,4 +55,11 @@ describe('recent clip memory keeps each asset’s listen state', () => {
       'unavailable',
     );
   });
+});
+
+it('external audio memory is isolated from shared recent playback memory', () => {
+  const privateMemory = createClipMemory();
+  privateMemory.rememberClip('external',{status:'paused',currentTimeMs:800});
+  expect(privateMemory.resumeAtMs('external')).toBe(800);
+  expect(resumeAtMs('external')).toBe(0);
 });

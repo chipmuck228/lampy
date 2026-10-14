@@ -1,3 +1,4 @@
+import { receiveAlbumFile } from '../application/album-file-open';
 import { isFamilyProductEntryOpen } from "../infrastructure/family-config";
 import {
   parseFamilyInviteLink,
@@ -9,6 +10,10 @@ export function redirectSystemPath({
   path: string;
   initial: boolean;
 }) {
+  if (path.startsWith('file:')) {
+    try { return `/album-file?token=${receiveAlbumFile(path)}`; }
+    catch { return '/album-file'; }
+  }
   const token = parseFamilyInviteLink(path);
   if (token && isFamilyProductEntryOpen()) {
     rememberFamilyInvite(token);
