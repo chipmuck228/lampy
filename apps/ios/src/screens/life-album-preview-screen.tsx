@@ -263,10 +263,6 @@ export default function LifeAlbumPreviewScreen() {
       ) : null}
       {showPage && current ? (
         <>
-          <Text
-            style={styles.meta}
-            accessibilityRole="text"
-          >{tr('第{0}页，共{1}页', [page + 1, layout.pages.length])}</Text>
           <View
             testID="life-album-preview-stage"
             style={[styles.stageFrame, zoomed && styles.stageFrameZoomed]}
@@ -594,7 +590,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' },
-  stageFrame: { backgroundColor: paper, overflow: 'hidden' },
+  stageFrame: { marginTop: 24, backgroundColor: paper, overflow: 'hidden' },
   stageFrameZoomed: { flexGrow: 1, minHeight: 280 },
   stage: { backgroundColor: paper, flexGrow: 1 },
   restoreHit: {

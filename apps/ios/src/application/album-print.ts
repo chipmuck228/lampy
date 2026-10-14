@@ -21,8 +21,64 @@ export class AlbumPrintError extends Error {
       | 'MISSING_CONTENT'
       | 'INVALID_PDF'
       | 'UNAVAILABLE',
+    public readonly reason?: string,
   ) {
     super(code);
+  }
+}
+export type PrintFailureDiagnostic = {
+  stage: string;
+  code: string;
+  reason?: string;
+};
+const PRINT_ERROR_CODES = [
+  'CANCELLED',
+  'SOURCE_CHANGED',
+  'MISSING_CONTENT',
+  'INVALID_PDF',
+  'UNAVAILABLE',
+  'PRINT_NATIVE_REBUILD_REQUIRED',
+  'PRINT_ID_EXISTS',
+  'PRINT_INVALID_ID',
+  'PRINT_CLEANUP_FAILED',
+  'PRINT_FILE_CHANGED',
+  'PRINT_STORAGE_UNAVAILABLE',
+  'LOCAL_FILE_REQUIRED',
+  'INVALID_LAYOUT',
+  'PDF_CREATE_FAILED',
+  'IMAGE_UNREADABLE',
+  'PDF_REOPEN_FAILED',
+  'SHARE_UNAVAILABLE',
+  'SHARE_FAILED',
+];
+export function printFailureDiagnostic(
+  error: unknown,
+  stage = 'UNKNOWN',
+): PrintFailureDiagnostic {
+  if (error instanceof AlbumPrintFailure) return error.diagnostic;
+  const record =
+    error && typeof error === 'object'
+      ? (error as { code?: unknown; message?: unknown; reason?: unknown })
+      : {};
+  const code = PRINT_ERROR_CODES.find(code => record.code === code ||
+    (typeof record.message === 'string' && record.message.split(/[^A-Z0-9_]+/).includes(code))) ??
+    (typeof record.code === 'string' && /^ERR_[A-Z0-9_]{1,64}$/.test(record.code) ? record.code : 'PRINT_OPERATION_FAILED');
+  const reason =
+    typeof record.reason === 'string' &&
+    /^(PDF_(PAGE_COUNT|BYTES|TEXT|SIZE|FONT_RUNS)|LAYOUT_[A-Z_]+)$/.test(
+      record.reason,
+    )
+      ? record.reason
+      : undefined;
+  return { stage, code, ...(reason ? { reason } : {}) };
+}
+export class AlbumPrintFailure extends Error {
+  readonly code: string;
+  constructor(readonly diagnostic: PrintFailureDiagnostic) {
+    super(
+      `${diagnostic.stage}: ${diagnostic.code}${diagnostic.reason ? ` (${diagnostic.reason})` : ''}`,
+    );
+    this.code = diagnostic.code;
   }
 }
 export type PrintMedia = {
@@ -137,6 +193,7 @@ export function createAlbumPrintService(deps: {
       if (busy) throw new AlbumPrintError('UNAVAILABLE');
       busy = true;
       let id: string | null = null;
+      let stage = 'READ_SOURCE';
       const assertCurrent = () => {
         if (!deps.current()) throw new AlbumPrintError('CANCELLED');
       };
@@ -144,13 +201,16 @@ export function createAlbumPrintService(deps: {
         assertCurrent();
         const first = await deps.read();
         assertCurrent();
+        stage = 'CHECK_INPUT';
         assertPrintContent(first);
         const fingerprint = albumReadingFingerprint(first);
+        stage = 'FONT_DIAGNOSIS';
         const fonts = deps.fonts();
         if (!fonts) throw new AlbumPrintError('UNAVAILABLE');
         id = deps.id();
         if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id))
           throw new AlbumPrintError('UNAVAILABLE');
+        stage = 'BEGIN_STORAGE';
         await deps.store.begin(id);
         assertCurrent();
         const frozen: AlbumLayoutInput = JSON.parse(JSON.stringify(first));
@@ -163,6 +223,7 @@ export function createAlbumPrintService(deps: {
             const source = item.uri!;
             let copy = copied.get(item.assetId);
             if (!copy) {
+              stage = 'COPY_MEDIA';
               const result = await deps.store.copy(
                 id,
                 item.assetId,
@@ -184,11 +245,18 @@ export function createAlbumPrintService(deps: {
             // Serialized snapshot uses relative copies only, never the author's original path.
             item.uri = copy.file;
           }
+        stage = 'LAYOUT';
         const layout = await deps.layout(frozen, style, fonts);
         assertCurrent();
+        stage = 'LAYOUT_CHECK';
         validatePrintLayout(layout);
+        const integrity = albumLayoutIntegrity(layout, frozen);
+        if (!integrity.ok)
+          throw new AlbumPrintError(
+            'INVALID_PDF',
+            `LAYOUT_${integrity.reason.replace(/-/g, '_').toUpperCase()}`,
+          );
         if (
-          !albumLayoutIntegrity(layout, frozen).ok ||
           layout.pages
             .flatMap((page) => page.blocks)
             .filter((block) => block.kind === 'cover-name')
@@ -201,21 +269,29 @@ export function createAlbumPrintService(deps: {
             .join('') !== (frozen.album.opening ?? '')
         )
           throw new AlbumPrintError('INVALID_PDF');
+        stage = 'WRITE_PDF';
         const pdf = await deps.store.writePdf(id, layout, map);
         assertCurrent();
+        stage = 'PDF_CHECK';
+        if (pdf.pageCount !== layout.pages.length)
+          throw new AlbumPrintError('INVALID_PDF', 'PDF_PAGE_COUNT');
+        if (pdf.bytes <= 0)
+          throw new AlbumPrintError('INVALID_PDF', 'PDF_BYTES');
+        if (!pdf.textSelectable)
+          throw new AlbumPrintError('INVALID_PDF', 'PDF_TEXT');
         if (
-          pdf.pageCount !== layout.pages.length ||
-          pdf.bytes <= 0 ||
-          !pdf.textSelectable ||
           Math.abs(pdf.widthPt - layout.pageSize.widthPt) > 0.1 ||
-          Math.abs(pdf.heightPt - layout.pageSize.heightPt) > 0.1 ||
-          !pdf.fontRunNames.length
+          Math.abs(pdf.heightPt - layout.pageSize.heightPt) > 0.1
         )
-          throw new AlbumPrintError('INVALID_PDF');
+          throw new AlbumPrintError('INVALID_PDF', 'PDF_SIZE');
+        if (!pdf.fontRunNames.length)
+          throw new AlbumPrintError('INVALID_PDF', 'PDF_FONT_RUNS');
+        stage = 'VERIFY_MEDIA';
         for (const source of sources) {
           await deps.store.verifySource(source.uri, source.hash);
           assertCurrent();
         }
+        stage = 'RECHECK_SOURCE';
         const after = await deps.read();
         assertCurrent();
         if (albumReadingFingerprint(after) !== fingerprint)
@@ -255,8 +331,10 @@ export function createAlbumPrintService(deps: {
             }),
           pdf: { ...pdf, file: 'album.pdf' },
         };
+        stage = 'WRITE_MANIFEST';
         await deps.store.writeManifest(id, manifest);
         assertCurrent();
+        stage = 'COMMIT';
         const saved = await deps.store.commit(id);
         assertCurrent();
         return { ...saved, manifest };
@@ -265,10 +343,13 @@ export function createAlbumPrintService(deps: {
           try {
             await deps.store.discard(id);
           } catch {
-            throw new Error('PRINT_CLEANUP_FAILED');
+            throw new AlbumPrintFailure({
+              stage: 'CLEANUP',
+              code: 'PRINT_CLEANUP_FAILED',
+            });
           }
         }
-        throw error;
+        throw new AlbumPrintFailure(printFailureDiagnostic(error, stage));
       } finally {
         busy = false;
       }

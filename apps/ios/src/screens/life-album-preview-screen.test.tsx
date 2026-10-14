@@ -174,7 +174,7 @@ describe('life album preview screen', () => {
       expect(view.getByTestId('life-album-preview-page')).toBeTruthy();
     });
     expect(view.getByLabelText('一些日子')).toBeTruthy();
-    expect(view.getByText('第1页，共2页')).toBeTruthy();
+    expect(view.queryByText('第1页，共2页')).toBeNull();
     expect(mockPlay).not.toHaveBeenCalled();
     await act(async () => {
       fireEvent.press(view.getByTestId('life-album-preview-next'));
@@ -302,18 +302,18 @@ describe('life album preview screen', () => {
       fireEvent.press(view.getByTestId('life-album-preview-next'));
     });
     await waitFor(() => {
-      expect(view.getByText('第2页，共2页')).toBeTruthy();
+      expect(view.queryByText('第2页，共2页')).toBeNull();
     });
     await act(async () => {
       fireEvent.press(view.getByTestId('life-album-preview-zoom'));
     });
     expect(view.getByTestId('life-album-preview-zoom-restore')).toBeTruthy();
     expect(view.queryByTestId('life-album-preview-next')).toBeNull();
-    expect(view.getByText('第2页，共2页')).toBeTruthy();
+    expect(view.queryByText('第2页，共2页')).toBeNull();
     await act(async () => {
       fireEvent.press(view.getByTestId('life-album-preview-zoom-restore'));
     });
-    expect(view.getByText('第2页，共2页')).toBeTruthy();
+    expect(view.queryByText('第2页，共2页')).toBeNull();
     expect(view.getByTestId('life-album-preview-zoom')).toBeTruthy();
     expect(mockPlay).not.toHaveBeenCalled();
   });

@@ -80,3 +80,16 @@ python3 scripts/inspect-album-print.py /实际路径/print_xxx --render
 ## 首次Mac构建反馈修正
 
 2026-10-14用户报告三处Swift编译错误：CGPDFPage.dictionary和CGPDFStreamGetDictionary的结果为可选值，新增显式解包；已安装ExpoModulesCore的Promise.reject仅有Error／Exception单参数或code+description双参数重载，原三参数调用改为双参数，保留脱敏错误。异常catch同样修正。构建脚本依赖分析警告与这三项编译错误无关，本次不修改该脚本。当前环境没有Xcode，不称重新编译通过；需Mac再次构建。
+
+
+## 模拟器首次文件与再次生成反馈
+
+2026-10-14用户报告：首次PDF可以生成并保存到系统Files；同册新增记录后再生成、新册加入记录后生成均显示通用失败提示，其他模拟器测试正常。运行版本目标ce81e8e，实际JS SHA未独立核实；不据此称独立字体／打印／真机验收通过。
+
+此次移除纸页顶端重复“第N页，共M页”，保留纸内页码，并补24pt顶部留白。对再次生成失败，尚无原生具体异常，未宣称根因已修复；新增固定阶段／错误码／原因诊断，不输出正文、册名、媒体路径或任意native错误原文。PDF页数、文本、尺寸、字体运行与排版完整性校验继续保留，失败清理不放宽。
+
+应用层新增“追加记录后第二次生成”与“前一册生成后新册生成”回归，能成功并保留旧成品；这些测试使用测量／PDF端口double，不替代真实native复现。诊断将区分READ_SOURCE、CHECK_INPUT、BEGIN_STORAGE、COPY_MEDIA、LAYOUT_CHECK、WRITE_PDF、PDF_CHECK、VERIFY_MEDIA、RECHECK_SOURCE、WRITE_MANIFEST、COMMIT／CLEANUP；若失败请提供页面底部固定诊断行，例如PDF_CHECK / INVALID_PDF / PDF_TEXT，再定位真实原生问题。
+
+本次只有TS/TSX与文档，不需要重编Swift；拉取新提交后重启带EXPO_PUBLIC_ALBUM_PRINT_EVAL=1的Metro或重载JS即可。再次生成失败仍保留为阻塞验收项，PR #112保持草稿。
+
+本轮新运行TypeScript、6个变更TS/TSX ESLint、git diff --check PASS；相关Jest 4 suites / 29 tests PASS。包含同册追加再生成、新册生成、诊断脱敏、PDF文本失败分类和纸页导航回归；未用新的native真实文件验证失败根因。

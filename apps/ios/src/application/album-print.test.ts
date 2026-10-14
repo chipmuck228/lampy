@@ -1,4 +1,5 @@
 import {
+  printFailureDiagnostic,
   createAlbumPrintService,
   isAlbumPrintEvaluationOpen,
   type PrintStore,
@@ -52,7 +53,7 @@ const fixture: AlbumLayoutInput = {
     },
   ],
 };
-function setup() {
+function setup(nextId: () => string = () => 'print_one') {
   let active = true;
   const read = jest.fn(
     async () => JSON.parse(JSON.stringify(fixture)) as AlbumLayoutInput,
@@ -91,7 +92,7 @@ function setup() {
     fonts: () => fonts,
     store,
     current: () => active,
-    id: () => 'print_one',
+    id: nextId,
     now: () => '2026-10-14',
     layout: (input) =>
       paginateAlbumLayout(input, createGlyphWidthMeasurer(), {
@@ -142,12 +143,10 @@ it('blocks missing media before staging', async () => {
 });
 it('cleans staged files if source edits while generating', async () => {
   const { service, read, store } = setup();
-  read
-    .mockResolvedValueOnce(fixture)
-    .mockResolvedValueOnce({
-      ...fixture,
-      album: { ...fixture.album, name: '后来改了' },
-    });
+  read.mockResolvedValueOnce(fixture).mockResolvedValueOnce({
+    ...fixture,
+    album: { ...fixture.album, name: '后来改了' },
+  });
   await expect(service.save('plain')).rejects.toMatchObject({
     code: 'SOURCE_CHANGED',
   });
@@ -208,4 +207,67 @@ it('repeated submits cannot start another copy job', async () => {
   });
   await first;
   expect(store.commit).toHaveBeenCalledTimes(1);
+});
+
+it('repeated generation after appending records produces a new frozen edition', async () => {
+  let count = 0;
+  const { service, read, store } = setup(() => `print_${++count}`);
+  const first = await service.save('plain');
+  const expanded = JSON.parse(JSON.stringify(fixture)) as AlbumLayoutInput;
+  expanded.entries.push({
+    ...expanded.entries[0],
+    momentId: 'm2',
+    note: '后来收入的新记录',
+    media: [],
+  });
+  expanded.album.updatedAt = '2026-10-15';
+  read.mockResolvedValue(expanded);
+  const second = await service.save('plain');
+  expect(first.manifest.id).not.toBe(second.manifest.id);
+  expect(first.manifest.content.entries).toHaveLength(1);
+  expect(second.manifest.content.entries).toHaveLength(2);
+  expect(store.commit).toHaveBeenCalledTimes(2);
+});
+it('a new album can generate independently after a prior album finished', async () => {
+  const first = setup(() => 'print_first');
+  await first.service.save('plain');
+  const second = setup(() => 'print_second');
+  second.read.mockResolvedValue({
+    ...fixture,
+    album: { ...fixture.album, id: 'book2', name: '新册' },
+  });
+  const result = await second.service.save('handmade');
+  expect(result.manifest.albumId).toBe('book2');
+  expect(result.manifest.name).toBe('新册');
+  expect(first.store.discard).not.toHaveBeenCalled();
+});
+it('PDF text check failure includes its stage and a safe fixed reason', async () => {
+  const { service, store } = setup();
+  const original = store.writePdf;
+  store.writePdf = async (...args) => ({
+    ...(await original(...args)),
+    textSelectable: false,
+  });
+  try {
+    await service.save('plain');
+    throw new Error('expected failure');
+  } catch (caught) {
+    expect(printFailureDiagnostic(caught)).toEqual({
+      stage: 'PDF_CHECK',
+      code: 'INVALID_PDF',
+      reason: 'PDF_TEXT',
+    });
+  }
+});
+it('diagnostics never copy a private native error message or path', () => {
+  expect(
+    printFailureDiagnostic(
+      new Error('private note at /private/user/media.jpg'),
+      'COPY_MEDIA',
+    ),
+  ).toEqual({ stage: 'COPY_MEDIA', code: 'PRINT_OPERATION_FAILED' });
+});
+
+it('retains a fixed native error code behind an exception prefix without copying the message', () => {
+  expect(printFailureDiagnostic(new Error('Native exception: PDF_REOPEN_FAILED'), 'WRITE_PDF')).toEqual({ stage: 'WRITE_PDF', code: 'PDF_REOPEN_FAILED' });
 });

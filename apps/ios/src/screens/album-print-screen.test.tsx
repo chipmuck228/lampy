@@ -102,3 +102,16 @@ it('cancelled generation cannot surface a late saved result', async () => {
   });
   expect(view.queryByText('Late edition')).toBeNull();
 });
+
+it('failed generation exposes only the safe diagnostic stage and code', async () => {
+  mockSave.mockRejectedValueOnce(new Error('PDF_REOPEN_FAILED'));
+  const view = await render(wrap());
+  await waitFor(() => expect(mockList).toHaveBeenCalled());
+  await fireEvent.press(view.getByText('生成并保存测试PDF'));
+  await waitFor(() =>
+    expect(view.getByTestId('album-print-failure-diagnostic')).toBeTruthy(),
+  );
+  expect(
+    view.getByTestId('album-print-failure-diagnostic').props.children,
+  ).toBe('UNKNOWN / PDF_REOPEN_FAILED');
+});

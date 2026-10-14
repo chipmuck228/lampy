@@ -7,7 +7,11 @@ import {
 } from 'react';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { isAlbumPrintEvaluationOpen } from '../application/album-print';
+import {
+  isAlbumPrintEvaluationOpen,
+  printFailureDiagnostic,
+  type PrintFailureDiagnostic,
+} from '../application/album-print';
 import type { AlbumReadingStyle } from '../application/album-reading';
 import {
   createExpoAlbumPrint,
@@ -42,6 +46,9 @@ export default function AlbumPrintScreen() {
   const [ready, setReady] = useState(false);
   const [retry, setRetry] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<PrintFailureDiagnostic | null>(
+    null,
+  );
   const [error, setError] = useState(false);
   const active = useRef(false);
   const locked = useRef(blocked);
@@ -64,6 +71,7 @@ export default function AlbumPrintScreen() {
       const epoch = ++generation.current;
       setSaved([]);
       setError(false);
+      setDiagnostic(null);
       setReady(false);
       if (!blocked && id)
         void Promise.all([listSavedAlbumPrints(id), readAlbumReadingState(id)])
@@ -74,8 +82,11 @@ export default function AlbumPrintScreen() {
               setReady(true);
             }
           })
-          .catch(() => {
-            if (active.current && generation.current === epoch) setError(true);
+          .catch((caught) => {
+            if (active.current && generation.current === epoch) {
+              setError(true);
+              setDiagnostic(printFailureDiagnostic(caught, 'LOAD_SAVED'));
+            }
           });
       return () => {
         active.current = false;
@@ -98,10 +109,14 @@ export default function AlbumPrintScreen() {
     owner.current = epoch;
     setBusy(true);
     setError(false);
+    setDiagnostic(null);
     try {
       await work(() => current(epoch));
-    } catch {
-      if (current(epoch)) setError(true);
+    } catch (caught) {
+      if (current(epoch)) {
+        setError(true);
+        setDiagnostic(printFailureDiagnostic(caught));
+      }
     } finally {
       if (owner.current === epoch) {
         owner.current = null;
@@ -170,6 +185,13 @@ export default function AlbumPrintScreen() {
             >
               <Text style={styles.action}>{tr('再试一次')}</Text>
             </Pressable>
+          ) : null}
+          {error && diagnostic ? (
+            <Text testID="album-print-failure-diagnostic" style={styles.meta}>
+              {[diagnostic.stage, diagnostic.code, diagnostic.reason]
+                .filter(Boolean)
+                .join(' / ')}
+            </Text>
           ) : null}
           {!saved.length && !busy ? (
             <Text style={styles.meta}>{tr('尚未生成测试成品。')}</Text>
