@@ -284,3 +284,21 @@ describe('album layout pagination', () => {
     }
   });
 });
+
+it('uses physical A5 and keeps multi-line notes from ending in a single-line continuation', async () => {
+  const fixture = input([ready({ momentId: 'long', note: '一段很长的原文。'.repeat(500) })]);
+  const layout = await paginateAlbumLayout(fixture, createGlyphWidthMeasurer(), { generatedAt: '2026-10-14', timezone: clock });
+  expect(layout.pageSize.widthPt).toBeCloseTo(148 * 72 / 25.4, 6);
+  expect(layout.pageSize.heightPt).toBeCloseTo(210 * 72 / 25.4, 6);
+  expect(albumLayoutIntegrity(layout, fixture)).toEqual({ ok: true });
+  const chunks = layout.pages.flatMap(page => page.blocks).filter(block => block.kind === 'note');
+  expect(chunks.length).toBeGreaterThan(2);
+  expect(chunks.every(block => block.kind === 'note' && block.lines.length >= 2)).toBe(true);
+  expect(layout.pages.every(page => page.rendering?.pageCount === layout.pages.length)).toBe(true);
+});
+it('never carries a previous known date into an unknown-time record continuation', async () => {
+  const fixture = input([ready({ momentId: 'dated', note: '已知日期' }), ready({ momentId: 'unknown', occurredAt: undefined, occurredAtPrecision: 'unknown', note: '日期未确认的长文。'.repeat(400) })]);
+  const layout = await paginateAlbumLayout(fixture, createGlyphWidthMeasurer(), { generatedAt: '2026-10-14', timezone: clock });
+  expect(albumLayoutIntegrity(layout, fixture)).toEqual({ ok: true });
+  expect(layout.pages.flatMap(page => page.blocks).filter(block => block.kind === 'day-rule' && block.momentId === 'unknown')).toEqual([]);
+});

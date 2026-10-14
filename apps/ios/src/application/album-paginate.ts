@@ -201,7 +201,11 @@ export async function paginateAlbumLayout(
         if (blocks.length > 0) commitPage();
       }
       const room = Math.floor(remaining() / role.lineHeightPt);
-      const take = Math.min(Math.max(room, 0), measured.length - cursor);
+      let take = Math.min(Math.max(room, 0), measured.length - cursor);
+      if (kind !== 'cover-name' && measured.length - cursor > 1) {
+        if (take < 2 && blocks.length > 0) { commitPage(); continue; }
+        if (measured.length - cursor - take === 1 && take > 2) take -= 1;
+      }
       if (take < 1) {
         if (blocks.length > 0) {
           commitPage();
@@ -296,6 +300,7 @@ export async function paginateAlbumLayout(
     }
 
     const dated = dateKeyAndLabel(record, options.timezone);
+    if (!dated.key) { printedDateKey = null; printedDateLabel = null; }
     const showDate = !!dated.key && dated.key !== printedDateKey;
     if (showDate && remaining() < albumDateRole.lineHeightPt + albumBodyRole.lineHeightPt * 2) commitPage();
     if (showDate && dated.key && dated.label) {
@@ -344,6 +349,7 @@ export async function paginateAlbumLayout(
           assetId: audio.assetId,
           status: audio.availability,
           durationMs: audio.durationMs,
+          printHint: tr('在电子册中听'),
           text: missing
             ? `${ALBUM_AUDIO_MISSING}${time ? ` · ${time}` : ''}`
             : `${ALBUM_AUDIO_LABEL}${time ? ` · ${time}` : ''}`,
@@ -442,7 +448,7 @@ export async function paginateAlbumLayout(
     generatedAt: options.generatedAt,
     unicodeUnit: 'unicode-scalar',
     pages: pages.map(page => ({ ...page, rendering: {
-      serif: ALBUM_SERIF_FONT, ui: ALBUM_UI_FONT,
+      serif: ALBUM_SERIF_FONT, ui: ALBUM_UI_FONT, pageCount: pages.length, pageNumbers: true,
       copy: { imageMissing: ALBUM_IMAGE_MISSING, sourceGone: ALBUM_SOURCE_GONE,
         sourceUnreadable: ALBUM_SOURCE_UNREADABLE, sourceChanged: ALBUM_SOURCE_CHANGED },
     } })),

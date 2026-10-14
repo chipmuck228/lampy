@@ -808,5 +808,21 @@
   "家里的生活册将在之后开放。": "Family albums will be available later.",
   "阅读位置暂时没有记下。": "Your reading position could not be saved.",
   "自动封面": "Automatic cover",
-  "播放声音": "Play audio"
+  "播放声音": "Play audio",
+  "在电子册中听": "Listen in the digital edition",
+  "打印验收": "Print evaluation",
+  "生成并保存测试PDF": "Create and save test PDF",
+  "保存或打印PDF": "Save or print PDF",
+  "PDF不含声音，电子册文件将在后续阶段提供。": "PDF does not contain audio. Digital edition files are planned for a later phase.",
+  "测试成品已保存在本机。": "The test edition is saved on this device.",
+  "尚未生成测试成品。": "No test edition yet.",
+  "正在冻结并排成PDF。": "Freezing content and creating PDF.",
+  "本次没有生成。请核对记录、媒体和原生构建后再试。": "No edition was created. Check records, media and the native build, then retry.",
+  "字体嵌入已核对": "Font embedding checked",
+  "字体嵌入尚未确认": "Font embedding not confirmed",
+  "字体未完整嵌入": "Fonts are not fully embedded",
+  "普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。": "Ordinary text selection checked. Open the PDF to check emoji appearance; emoji may not be copyable.",
+  "页面与文字选择已核对": "Pages and selectable text checked",
+  "开发验收入口，正式导出尚未开放。": "Development evaluation. Production export is not available.",
+  "部分照片低于300DPI，打印前请检查清晰度。": "Some photos are below 300 DPI. Check clarity before printing."
 }

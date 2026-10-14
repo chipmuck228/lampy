@@ -16,6 +16,8 @@ import { isApplicationError } from '../application/errors';
 import { ALBUM_LAYOUT_CANCELLED } from '../application/album-layout-use-cases';
 import {
   ALBUM_CONTENT_WIDTH_PT,
+  ALBUM_PAGE_WIDTH_PT,
+  ALBUM_PAGE_HEIGHT_PT,
   ALBUM_IMAGE_MISSING,
   ALBUM_PREVIEW_ACTION,
   ALBUM_PREVIEW_CANCEL,
@@ -208,10 +210,10 @@ export default function LifeAlbumPreviewScreen() {
 
   const current = showPage ? layout?.pages[page] : undefined;
   const zoomed = zoom > 1;
-  const pageWidth = Math.max(120, Math.min(width - 32, ((height - 220) * 420) / 595));
-  const scale = (pageWidth / 420) * zoom;
-  const paperWidth = 420 * scale;
-  const paperHeight = 595 * scale;
+  const pageWidth = Math.max(120, Math.min(width - 32, ((height - 220) * ALBUM_PAGE_WIDTH_PT) / ALBUM_PAGE_HEIGHT_PT));
+  const scale = (pageWidth / ALBUM_PAGE_WIDTH_PT) * zoom;
+  const paperWidth = ALBUM_PAGE_WIDTH_PT * scale;
+  const paperHeight = ALBUM_PAGE_HEIGHT_PT * scale;
   const playingAssetIds =
     current?.blocks.flatMap((block) =>
       block.kind === 'audio' && clips.card(block.assetId).status === 'playing' ? [block.assetId] : [],
@@ -261,10 +263,6 @@ export default function LifeAlbumPreviewScreen() {
       ) : null}
       {showPage && current ? (
         <>
-          <Text
-            style={styles.meta}
-            accessibilityRole="text"
-          >{tr('第{0}页，共{1}页', [page + 1, layout.pages.length])}</Text>
           <View
             testID="life-album-preview-stage"
             style={[styles.stageFrame, zoomed && styles.stageFrameZoomed]}
@@ -307,8 +305,8 @@ export default function LifeAlbumPreviewScreen() {
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants"
                   style={{
-                    width: 420,
-                    height: 595,
+                    width: ALBUM_PAGE_WIDTH_PT,
+                    height: ALBUM_PAGE_HEIGHT_PT,
                     transform: [{ scale }],
                     transformOrigin: 'top left',
                   }}
@@ -319,7 +317,7 @@ export default function LifeAlbumPreviewScreen() {
                       pageJson={JSON.stringify(current)}
                       mediaJson={JSON.stringify(media)}
                       playingJson={JSON.stringify(playingAssetIds)}
-                      style={{ width: 420, height: 595 }}
+                      style={{ width: ALBUM_PAGE_WIDTH_PT, height: ALBUM_PAGE_HEIGHT_PT }}
                     />
                   ) : (
                     current.blocks.map((block, index) => (
@@ -521,7 +519,7 @@ function AlbumBlockView({
     return (
       <View style={[box, styles.row]}>
         {block.status === 'available' ? <LifeIcon name={playing ? 'pause' : 'play'} size={18} decorative /> : null}
-        <Text style={styles.meta}>{block.text}</Text>
+        <Text style={styles.meta}>{block.text}{block.printHint ? `\n${block.printHint}` : ''}</Text>
       </View>
     );
   }
@@ -592,7 +590,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' },
-  stageFrame: { backgroundColor: paper, overflow: 'hidden' },
+  stageFrame: { marginTop: 24, backgroundColor: paper, overflow: 'hidden' },
   stageFrameZoomed: { flexGrow: 1, minHeight: 280 },
   stage: { backgroundColor: paper, flexGrow: 1 },
   restoreHit: {

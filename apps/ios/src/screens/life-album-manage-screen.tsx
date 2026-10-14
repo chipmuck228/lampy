@@ -1,4 +1,5 @@
 import { tr } from '../i18n';
+import { isAlbumPrintEvaluationOpen } from '../application/album-print';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -214,6 +215,8 @@ export default function LifeAlbumManageScreen() {
           </View>
           {menuOpen ? (
             <View style={styles.menu}>
+              {isAlbumPrintEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <Pressable accessibilityRole="button" accessibilityLabel={tr('打印验收')} style={styles.hit} onPress={() => router.push(`/albums/${albumId}/print`)}><Text style={styles.action}>{tr('打印验收')}</Text></Pressable> : null}
+
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={tr("删除这一册")}

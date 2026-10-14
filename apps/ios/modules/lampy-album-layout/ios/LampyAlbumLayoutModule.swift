@@ -18,6 +18,36 @@ public final class LampyAlbumLayoutModule: Module {
       try writeProbePdf(layoutJson: layoutJson, mediaJson: mediaJson, destPath: destPath)
     }
 
+    AsyncFunction("copyPrintMedia") { (source: String, destination: String) -> [String: Any] in
+      try copyPrintMedia(source, destination)
+    }
+    AsyncFunction("printFileDigest") { (path: String) -> [String: Any] in
+      try printFileDigest(path)
+    }
+    AsyncFunction("writePrintPdf") { (layout: String, media: String, destination: String) -> [String: Any] in
+      try writePrintPdf(layout, media, destination)
+    }
+    AsyncFunction("sharePrintPdf") { (path: String, promise: Promise) in
+      DispatchQueue.main.async {
+        do {
+          let url = try printLocalURL(path)
+          guard FileManager.default.fileExists(atPath: url.path),
+                var controller = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else {
+            promise.reject("SHARE_UNAVAILABLE", "SHARE_UNAVAILABLE"); return
+          }
+          while let presented = controller.presentedViewController { controller = presented }
+          let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+          sheet.popoverPresentationController?.sourceView = controller.view
+          sheet.popoverPresentationController?.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY, width: 1, height: 1)
+          sheet.completionWithItemsHandler = { _, completed, _, error in
+            if error != nil { promise.reject("SHARE_FAILED", "SHARE_FAILED") }
+            else { promise.resolve(completed) }
+          }
+          controller.present(sheet, animated: true)
+        } catch { promise.reject("SHARE_FAILED", "SHARE_FAILED") }
+      }
+    }
+
     View(AlbumPageView.self) {
       Prop("pageJson") { (view: AlbumPageView, json: String) in
         view.pageJson = json
@@ -135,7 +165,7 @@ private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedA
   )
 }
 
-private func resolveFont(name: String, size: CGFloat) -> UIFont {
+func resolveFont(name: String, size: CGFloat) -> UIFont {
   resolveAlbumFont(name: name, size: size).0
 }
 
@@ -165,7 +195,7 @@ private func diagnoseAlbumFonts(serifName: String, uiName: String) -> [String: A
   ]
 }
 
-private func coreTextRunFontNames(text: String, font: UIFont) -> [[String: String]] {
+func coreTextRunFontNames(text: String, font: UIFont) -> [[String: String]] {
   let attributed = NSAttributedString(string: text, attributes: [.font: font])
   let line = CTLineCreateWithAttributedString(attributed)
   let runs = CTLineGetGlyphRuns(line) as? [CTRun] ?? []
@@ -460,7 +490,7 @@ private func albumHexColor(_ value: String?, fallback: UIColor) -> UIColor {
                  blue: CGFloat(rgb & 255) / 255, alpha: 1)
 }
 
-private func drawAlbumPage(
+func drawAlbumPage(
   page: [String: Any],
   media: [String: String],
   playing: [String],
@@ -473,6 +503,12 @@ private func drawAlbumPage(
   let serifName = rendering["serif"] as? String ?? "Songti SC"
   let uiName = rendering["ui"] as? String ?? "PingFang SC"
   let copy = rendering["copy"] as? [String: String] ?? [:]
+  if rendering["pageNumbers"] as? Bool == true {
+    let count = rendering["pageCount"] as? Int ?? 1
+    let number = (page["index"] as? Int ?? 0) + 1
+    let font = resolveFont(name: uiName, size: 10)
+    drawAlbumTextAtBaseline(text: "\(number) / \(count)", font: font, color: albumInkSoftColor(), x: bounds.width / 2 - 12, baselineY: bounds.height - 20, in: context)
+  }
   let playingAssets = Set(playing)
   let blocks = page["blocks"] as? [[String: Any]] ?? []
   for block in blocks {
@@ -535,9 +571,12 @@ private func drawAlbumPage(
       let font = resolveFont(name: spec.name, size: spec.size)
       let status = block["status"] as? String ?? ""
       if status == "available" {
-        drawAudioGlyph(playing: playingAssets.contains(assetId), at: CGPoint(x: x, y: y + (height - 18) / 2))
+        drawAudioGlyph(playing: playingAssets.contains(assetId), at: CGPoint(x: x, y: y + (min(height, 22) - 18) / 2))
       }
       let text = block["text"] as? String ?? ""
+      if let hint = block["printHint"] as? String {
+        drawAlbumTextAtBaseline(text: hint, font: font, color: spec.color, x: x + 26, baselineY: y + 22 + font.ascender, in: context)
+      }
       drawAlbumTextAtBaseline(
         text: text,
         font: font,

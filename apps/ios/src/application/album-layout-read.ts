@@ -104,6 +104,7 @@ export async function readAlbumLayoutInput(deps: {
         role,
         availability,
         intrinsicRatio: width && height ? width / height : role === 'image' ? 1 : null,
+        widthPx: width, heightPx: height,
         durationMs: asset.asset.metadata.durationMs ?? null,
         uri: displayUri ?? undefined,
       });
