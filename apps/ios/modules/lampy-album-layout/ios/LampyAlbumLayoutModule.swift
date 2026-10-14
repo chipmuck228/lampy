@@ -40,11 +40,11 @@ public final class LampyAlbumLayoutModule: Module {
           sheet.popoverPresentationController?.sourceView = controller.view
           sheet.popoverPresentationController?.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY, width: 1, height: 1)
           sheet.completionWithItemsHandler = { _, completed, _, error in
-            if let error = error { promise.reject("SHARE_FAILED", "SHARE_FAILED", error) }
+            if error != nil { promise.reject("SHARE_FAILED", "SHARE_FAILED") }
             else { promise.resolve(completed) }
           }
           controller.present(sheet, animated: true)
-        } catch { promise.reject("SHARE_FAILED", "SHARE_FAILED", error) }
+        } catch { promise.reject("SHARE_FAILED", "SHARE_FAILED") }
       }
     }
 

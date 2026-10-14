@@ -77,9 +77,9 @@ private func fontStream(_ font: CGPDFDictionaryRef) -> String {
 private func collectPageFonts(_ pdf: CGPDFDocument) -> FontCollector {
   let result = FontCollector()
   for index in 1...pdf.numberOfPages {
-    guard let page = pdf.page(at: index) else { continue }
+    guard let page = pdf.page(at: index), let pageDictionary = page.dictionary else { continue }
     var resources: CGPDFDictionaryRef?
-    guard CGPDFDictionaryGetDictionary(page.dictionary, "Resources", &resources), let resources = resources else { continue }
+    guard CGPDFDictionaryGetDictionary(pageDictionary, "Resources", &resources), let resources = resources else { continue }
     var fonts: CGPDFDictionaryRef?
     if CGPDFDictionaryGetDictionary(resources, "Font", &fonts), let fonts = fonts {
       CGPDFDictionaryApplyFunction(fonts, { _, object, info in
@@ -98,7 +98,8 @@ private func collectPageFonts(_ pdf: CGPDFDocument) -> FontCollector {
         let result = Unmanaged<FontCollector>.fromOpaque(info).takeUnretainedValue()
         var stream: CGPDFStreamRef?
         if CGPDFObjectGetValue(object, .stream, &stream), let stream = stream,
-           pdfName(CGPDFStreamGetDictionary(stream), "Subtype") == "Form" { result.hasUninspectedForm = true }
+           let dictionary = CGPDFStreamGetDictionary(stream),
+           pdfName(dictionary, "Subtype") == "Form" { result.hasUninspectedForm = true }
       }, Unmanaged.passUnretained(result).toOpaque())
     }
   }

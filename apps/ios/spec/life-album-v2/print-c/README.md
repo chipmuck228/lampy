@@ -75,3 +75,8 @@ python3 scripts/inspect-album-print.py /实际路径/print_xxx --render
 阶段C为实施候选，保持草稿待验收。D–F、#109不纳入，不部署服务器／不上传TestFlight／不开放正式导出。
 
 本轮自动检查：TypeScript、15个变更TS/TSX文件ESLint、git diff --check PASS；相关Jest 16 suites / 83 tests PASS。Python独立检查脚本语法PASS，实际文件检查未运行。没有跑／宣称全量Jest PASS，旧页面act警告与既有全量基线失败状态保留。
+
+
+## 首次Mac构建反馈修正
+
+2026-10-14用户报告三处Swift编译错误：CGPDFPage.dictionary和CGPDFStreamGetDictionary的结果为可选值，新增显式解包；已安装ExpoModulesCore的Promise.reject仅有Error／Exception单参数或code+description双参数重载，原三参数调用改为双参数，保留脱敏错误。异常catch同样修正。构建脚本依赖分析警告与这三项编译错误无关，本次不修改该脚本。当前环境没有Xcode，不称重新编译通过；需Mac再次构建。
