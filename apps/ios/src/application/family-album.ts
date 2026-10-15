@@ -29,7 +29,17 @@ export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:F
       if(!current())throw new ApplicationError('FAMILY_ALBUM_CANCELLED','The family request is no longer current.');
       await api.validate(token,familyId,albumId,view.validation);return view;
     },current);},
-    validate(view:FamilyAlbumView,current:()=>boolean) {return request(view.familyId,(api,token)=>api.validate(token,view.familyId,view.albumId,view.validation),current);},
+    async validate(view:FamilyAlbumView,current:()=>boolean) {
+      // The validation digest already includes server-side user, membership and authority.
+      // Repeating access() first adds a round trip without strengthening this check.
+      const before=await account();const api=deps.client.albums;
+      if(!api)throw new ApplicationError('FAMILY_ALBUMS_CLOSED','Family albums are not available.');
+      if(!current()||before.userId!==view.access.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','Account changed.');
+      const result=await api.validate(before.token,view.familyId,view.albumId,view.validation);
+      const after=await account();
+      if(!current()||before.token!==after.token||before.userId!==after.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','Account changed.');
+      return result;
+    },
   };
 }
 export type FamilyAlbumUseCases=ReturnType<typeof createFamilyAlbumUseCases>;

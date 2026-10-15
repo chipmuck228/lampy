@@ -50,3 +50,10 @@ it('a late validator from the previous book cannot revive it over the next book'
 it('the family album screen is default off and cannot be enabled in release',()=>{
  expect(familyAlbumEvaluationOpen(true,'1')).toBe(true);expect(familyAlbumEvaluationOpen(false,'1')).toBe(false);expect(familyAlbumEvaluationOpen(true,'')).toBe(false);
 });
+it('renews with one server request and still rejects account changes and mismatched viewers',async()=>{
+ const f=setup();await f.session.setSession({userId:'a',sessionToken:'a'});
+ await f.client.validate(view,()=>true);expect(f.access).not.toHaveBeenCalled();expect(f.validate).toHaveBeenCalledTimes(1);
+ f.validate.mockImplementationOnce(async()=>{await f.session.setSession({userId:'b',sessionToken:'b'});return {valid:true};});
+ await expect(f.client.validate(view,()=>true)).rejects.toMatchObject({code:'FAMILY_ALBUM_CANCELLED'});
+ f.validate.mockClear();await expect(f.client.validate(view,()=>true)).rejects.toMatchObject({code:'FAMILY_ALBUM_CANCELLED'});expect(f.validate).not.toHaveBeenCalled();
+});

@@ -57,3 +57,17 @@ it('collects selected shares into an existing routed-family album without creati
  const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Family book · 2')).toBeTruthy());await fireEvent.press(page.getByText('Family book · 2'));await waitFor(()=>expect(page.getByText('Author · Shared choice')).toBeTruthy());await fireEvent.press(page.getByText('Author · Shared choice'));await fireEvent.press(page.getByText('收入选中的分享'));
  await waitFor(()=>expect(mockMutate).toHaveBeenCalledWith('f',currentBook,{kind:'collect',shareIds:['chosen']}));expect(mockCreate).not.toHaveBeenCalled();
 });
+it('keeps editing usable across slow renewals without redundant directory requests or overlapping checks',async()=>{
+ jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};
+ const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator});
+ mockValidate.mockImplementation(()=>new Promise(resolve=>setTimeout(()=>resolve({valid:true}),1000)));
+ const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('编辑册子')).toBeTruthy());await fireEvent.press(page.getByText('编辑册子'));await fireEvent.changeText(page.getByLabelText('册名'),'Unsaved draft');
+ const directoryCalls=mockDirectory.mock.calls.length;
+ for(let i=0;i<24;i++)await act(async()=>{jest.advanceTimersByTime(500);});
+ expect(page.getByLabelText('册名').props.value).toBe('Unsaved draft');expect(page.queryByText('家庭内容或资格已变化，请重新核对。')).toBeNull();expect(mockDirectory).toHaveBeenCalledTimes(directoryCalls);expect(mockValidate.mock.calls.length).toBeLessThanOrEqual(14);
+});
+it('retry reloads a routed book after a failed validation',async()=>{
+ jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
+ mockValidate.mockRejectedValueOnce(new Error('offline'));await act(async()=>{jest.advanceTimersByTime(500);});expect(page.queryByText('Private original')).toBeNull();
+ mockValidate.mockResolvedValue({valid:true});await fireEvent.press(page.getByText('再试一次'));await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());expect(page.queryByText('家庭内容或资格已变化，请重新核对。')).toBeNull();
+});

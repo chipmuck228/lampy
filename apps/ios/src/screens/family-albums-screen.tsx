@@ -134,9 +134,13 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
         pauseForegroundAudio();
       }
     }, 250);
-    const validate = setInterval(() => {
+    let validating = false;
+    const renew = () => {
+      if (validating) return;
       const current = session.current;
-      if (current && !owner.current) void current.validate().catch(() => {
+      if (current && !owner.current) {
+        validating = true;
+        void current.validate().catch(() => {
         if (session.current === current) {
           epoch.current++;
           setBook(null);
@@ -148,15 +152,18 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
           setFailed(true);
           pauseForegroundAudio();
         }
-      });
-    }, 1500);
+        }).finally(() => { validating = false; });
+      }
+    };
+    renew();
+    const validate = setInterval(renew, 500);
     return () => {
       clearInterval(timer);
       clearInterval(validate);
     };
   }, [book, allowed]);
   useEffect(() => {
-    if (!allowed || failed) return;
+    if (!allowed || failed || (familyId && !access) || (book && !sources.length)) return;
     let disposed = false;
     let pending = false;
     let deadline = Date.now() + 3000;
@@ -183,14 +190,14 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       void (async () => {
         try {
           const app = await getFamilyUseCases();
-          const directory = await app.getFamilies(() => !disposed && epoch.current === ticket);
-          const permission = familyId ? await app.albums.access(familyId) : null;
+          const directory = book ? null : await app.getFamilies(() => !disposed && epoch.current === ticket);
+          const permission = book ? null : familyId ? await app.albums.access(familyId) : null;
           const refreshed = sources.length && familyId ? await app.albums.sources(familyId) : null;
           if (disposed || epoch.current !== ticket) return;
           if (Date.now() - started >= 3000) throw new Error('expired');
           if (access && permission && (access.userId !== permission.userId || access.authority !== permission.authority || access.rulesAcknowledged !== permission.rulesAcknowledged)) throw new Error('changed');
           deadline = started + 3000;
-          setFamilies(directory.families);
+          if (directory) setFamilies(directory.families);
           if (refreshed) {
             setSources(refreshed.shares);
             setSelected(previous => previous.filter(id => refreshed.shares.some(share => share.shareId === id)));
@@ -207,7 +214,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       clearInterval(timer);
       clearInterval(validate);
     };
-  }, [allowed, familyId, access, sources.length, failed]);
+  }, [allowed, familyId, access, sources.length, failed, book]);
   async function run(work: (api: FamilyAlbumUseCases, current: () => boolean) => Promise<void>) {
     if (owner.current || !allowed || !client.current || !familyId) return;
     owner.current = true;
