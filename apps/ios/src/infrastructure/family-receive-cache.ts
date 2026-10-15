@@ -7,6 +7,12 @@ import {
   endFamilyTestCacheDeleteAction,
 } from './family-test-driver';
 
+// Logical namespace remains per account/family/share. Native audio needs a typed local filename.
+export function familyReceivedMediaKey(input:{userId:string;familyId:string;shareId:string;objectId:string;mimeType:string}) {
+  const base=`${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+  return ['audio/mp4','audio/m4a','audio/x-m4a','audio/aac'].includes(input.mimeType.split(';')[0].trim().toLowerCase())?`${base}.m4a`:base;
+}
+
 async function withCacheDeleteAction<T>(
   target: 'isolate' | 'recover',
   work: () => Promise<T>,
@@ -178,9 +184,11 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       return replaceShare(fromShare(userId, share, 'receiving'));
     },
     async saveStoredMedia(input) {
-      const storageKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+      const legacyKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+      const storageKey = familyReceivedMediaKey(input);
       files.delete(`${storageKey}.part`);
       files.set(storageKey, input.bytes);
+      if(storageKey!==legacyKey){files.delete(legacyKey);files.delete(`${legacyKey}.part`);}
       const row: ReceivedMediaRecord = { ...input, storageKey, status: 'stored' };
       const index = media.findIndex(
         (item) =>
@@ -621,7 +629,8 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
       return saveShare(fromShare(userId, share, 'receiving'));
     },
     async saveStoredMedia(input) {
-      const storageKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+      const legacyKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+      const storageKey = familyReceivedMediaKey(input);
       await files.remove(`${storageKey}.part`).catch(() => undefined);
       await files.write(storageKey, input.bytes);
       const row: ReceivedMediaRecord = { ...input, storageKey, status: 'stored' };
@@ -647,6 +656,7 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
           row.status,
         ],
       );
+      if(storageKey!==legacyKey){await files.remove(legacyKey).catch(()=>undefined);await files.remove(`${legacyKey}.part`).catch(()=>undefined);}
       return row;
     },
     listMedia,

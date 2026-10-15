@@ -1,3 +1,4 @@
+import { familyReceivedMediaKey } from '../infrastructure/family-receive-cache';
 import { createFamilyAlbumUseCases } from './family-album';
 import { createFamilyHistoryUseCases } from './family-history-use-cases';
 import { ApplicationError } from './errors';
@@ -1055,6 +1056,7 @@ export function createFamilyUseCases(deps: {
               storedBytes.length === existing.byteLength &&
               sha256MediaBytes(storedBytes) === existing.contentSha256
             ) {
+              if(existing.storageKey!==familyReceivedMediaKey(existing))await deps.receiveCache.saveStoredMedia({...existing,bytes:storedBytes});
               continue;
             }
           }

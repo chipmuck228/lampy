@@ -2,7 +2,7 @@ import { createFamilyCommands } from '../family-api/commands';
 import { createFamilyStore } from '../family-api/store';
 import { createMapAppleVerifier } from '../family-api/apple';
 import { dispatchFamilyApi } from '../family-api/http';
-import { sampleJpegBytes } from '../family-api/media-validate';
+import { sampleJpegBytes, sampleAudioBytes } from '../family-api/media-validate';
 import { createFamilyApiClient, createDispatchTransport } from '../infrastructure/family-http-client';
 import { createMemoryFamilyReceiveCache } from '../infrastructure/family-receive-cache';
 import { createPendingFamilyOperationDisk, createPendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
@@ -314,4 +314,16 @@ it('keeps same-nickname authors separate and retains a departed author on still-
  await x.commands.leaveSelectedFamily(x.b.sessionToken,x.f.familyId,own.membershipId);
  expect((await x.commands.historyShares.getShare(x.a.sessionToken,x.f.familyId,b.shareId)).authorNickname).toBe('同名');
  await expect(x.commands.historyShares.getShare(x.b.sessionToken,x.f.familyId,b.shareId)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
+});
+
+it('keeps shared recording bytes and uses the stored m4a URI, including repair of old extensionless cache',async()=>{
+ const x=await fixture();x.attach();const audio=createAsset({id:'asset_d2',ownerId:'local-user',type:'audio',localUri:'file:///personal/recording.m4a',metadata:{mimeType:'audio/mp4'}},{now:()=>new Date('2026-10-09T00:00:00Z')});x.personal.assets.findById.mockResolvedValue({kind:'ready',asset:audio});x.personal.readAssetBytes.mockResolvedValue(sampleAudioBytes());
+ const preview=await x.history.prepare('moment_d2',x.f.familyId,current);const shared=await x.history.share(preview,HISTORY_AUDIENCE_CONFIRMATION,current);
+ const invite=await x.commands.createInviteLink(x.a.sessionToken,x.f.familyId);await x.commands.acceptInviteLink(x.b.sessionToken,invite.token);await x.session.setSession(x.b);
+ const read=await x.history.read(x.f.familyId,shared.shareId,current);expect(read.media[0].mimeType).toBe('audio/mp4');expect(read.media[0].uri).toMatch(/\.m4a$/);
+ const stored=(await x.cache.listMedia(x.b.userId,x.f.familyId,shared.shareId))[0];expect(await x.cache.readMediaBytes(stored.storageKey)).toEqual(sampleAudioBytes());
+ const legacy=stored.storageKey.replace(/\.m4a$/,'');x.cache.files.set(legacy,x.cache.files.get(stored.storageKey)!);x.cache.files.delete(stored.storageKey);stored.storageKey=legacy;
+ const downloads=x.requests.filter(request=>request.path.endsWith('/content')).length;const repaired=await x.history.read(x.f.familyId,shared.shareId,current);
+ expect(repaired.media[0].uri).toMatch(/\.m4a$/);expect(x.cache.files.has(legacy)).toBe(false);expect(x.requests.filter(request=>request.path.endsWith('/content')).length).toBe(downloads);
+ await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,shared.shareId);await expect(x.history.authorize(x.f.familyId,shared.shareId,current)).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});expect(x.cache.files.size).toBe(0);
 });

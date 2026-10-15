@@ -6,8 +6,9 @@ const mockReplace=jest.fn(),mockCreate=jest.fn(),mockSources=jest.fn(),mockMutat
 const mockDirectory=jest.fn(),mockAccess=jest.fn(),mockList=jest.fn(),mockRead=jest.fn(),mockValidate=jest.fn(),mockPause=jest.fn();
 const mockLock={snapshot:{locked:false}};let mockOpen=true;
 let mockParams:Record<string,string>={};
+let mockAlbumFocusCleanup:(()=>void)|undefined;
 const mockListeners:((s:AppStateStatus)=>void)[]=[];
-jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useLocalSearchParams:()=>mockParams,useRouter:()=>({back:jest.fn(),push:jest.fn(),replace:mockReplace}),useFocusEffect:(fn:()=>void|(()=>void))=>useEffect(fn,[fn])};});
+jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useLocalSearchParams:()=>mockParams,useRouter:()=>({back:jest.fn(),push:jest.fn(),replace:mockReplace}),useFocusEffect:(fn:()=>void|(()=>void))=>useEffect(()=>{const cleanup=fn();mockAlbumFocusCleanup=typeof cleanup==='function'?cleanup:undefined;return cleanup;},[fn])};});
 jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({getFamilies:mockDirectory,albums:{sources:mockSources,mutate:mockMutate,create:mockCreate,access:mockAccess,list:mockList,read:mockRead,validate:mockValidate}})}));
 jest.mock('../application/foreground-audio',()=>({pauseForegroundAudio:()=>mockPause()}));
 jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>mockOpen}));
@@ -108,4 +109,11 @@ it('saves individual fields without closing the editor or discarding the other f
  mockMutate.mockImplementation(async(_family,view,change)=>{const next={...view,name:change.name,opening:change.opening,revision:view.revision+1};mockRead.mockResolvedValue(next);return next;});
  const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('编辑册子')).toBeTruthy());await fireEvent.press(page.getByText('编辑册子'));await fireEvent.changeText(page.getByLabelText('册名'),'Saved name');await fireEvent.changeText(page.getByLabelText('开篇'),'Opening draft');await fireEvent.press(page.getByText('保存册名'));
  await waitFor(()=>expect(page.getByLabelText('册名').props.editable).toBe(true));expect(page.getByLabelText('开篇').props.value).toBe('Opening draft');expect(page.getByText('取消')).toBeTruthy();await fireEvent.press(page.getByText('保存开篇'));await waitFor(()=>expect(mockMutate).toHaveBeenLastCalledWith('f',expect.objectContaining({revision:2,name:'Saved name'}),{kind:'rename',name:'Saved name',opening:'Opening draft'}));
+});
+
+it('stops renewal timers on blur and never pauses audio on the next screen from late work',async()=>{
+ jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
+ let finish!:(value:unknown)=>void;mockValidate.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});
+ await act(async()=>{mockAlbumFocusCleanup?.();});const calls=mockValidate.mock.calls.length;mockPause.mockClear();await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_LEASE_MS+1000);finish({valid:true});});
+ expect(mockPause).not.toHaveBeenCalled();expect(mockValidate).toHaveBeenCalledTimes(calls);expect(page.queryByText('Private original')).toBeNull();
 });

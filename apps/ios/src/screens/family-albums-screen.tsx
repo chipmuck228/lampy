@@ -27,6 +27,8 @@ export default function FamilyAlbumsScreen() {
 function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;routeAlbum:string|null;mode:'new'|'collect'|'read'}) {
   const router = useRouter();
   const lock = useDeviceLock();
+  const [focused, setFocused] = useState(false);
+  const focusedRef = useRef(false);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const allowed = isFamilyProductEntryOpen() && familyAlbumEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) && !lock?.snapshot.locked && foreground;
   const [families, setFamilies] = useState<FamilySummary[]>([]);
@@ -63,6 +65,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   }, []);
   useFocusEffect(useCallback(() => {
     void retry;
+    focusedRef.current=true;setFocused(true);
     const ticket = ++epoch.current;
     let disposed = false;
     session.current?.invalidate();
@@ -102,7 +105,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
             if (disposed || ticket !== epoch.current) return;
             setAlbums(list.albums);
             if (routeAlbum && mode !== 'new') {
-              const reading = createFamilyAlbumReadSession({client:app.albums,onInvalidate:pauseForegroundAudio});
+              const reading = createFamilyAlbumReadSession({client:app.albums,onInvalidate:()=>{if(focusedRef.current)pauseForegroundAudio();}});
               session.current = reading;
               await reading.load(familyId,routeAlbum);
               if (disposed || ticket !== epoch.current) { reading.invalidate(); return; }
@@ -121,6 +124,8 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       }
     })();
     return () => {
+      if(disposed)return;
+      focusedRef.current=false;setFocused(false);
       disposed = true;
       epoch.current++;
       session.current?.invalidate();
@@ -130,8 +135,9 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   }, [allowed, familyId, retry, mode, routeAlbum]));
   // A bounded read lease: expire locally even if a network request hangs.
   useEffect(() => {
-    if (!book || !allowed) return;
+    if (!book || !allowed || !focused) return;
     const timer = setInterval(() => {
+      if(!focusedRef.current)return;
       if (!session.current?.snapshot()) {
         setDiagnostic(`READ_LEASE/EXPIRED ${session.current?.diagnostic()??'NO_SESSION'} busy=${owner.current?1:0}`);
         setChecking(true);
@@ -140,13 +146,13 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     }, 250);
     let validating = false;
     const renew = () => {
-      if (validating) return;
+      if (validating || !focusedRef.current) return;
       const current = session.current;
       if (current && !owner.current) {
         validating = true;
         const started = Date.now();
         void current.validate().catch((error) => {
-        if (session.current === current && !owner.current) {
+        if (focusedRef.current && session.current === current && !owner.current) {
           setChecking(false);
           setDiagnostic(`VALIDATE/${familyAlbumFailureCode(error)}/${Date.now()-started}ms`);
           epoch.current++;
@@ -168,9 +174,9 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       clearInterval(timer);
       clearInterval(validate);
     };
-  }, [book, allowed]);
+  }, [book, allowed, focused]);
   useEffect(() => {
-    if (!allowed || failed || (familyId && !access) || (book && !sources.length)) return;
+    if (!allowed || !focused || failed || (familyId && !access) || (book && !sources.length)) return;
     let disposed = false;
     let pending = false;
     let deadline = Date.now() + FAMILY_ALBUM_LEASE_MS;
@@ -189,10 +195,10 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       setFailed(true);
     };
     const timer = setInterval(() => {
-      if (!disposed && Date.now() > deadline) clear('DIRECTORY_LEASE/EXPIRED');
+      if (focusedRef.current && !disposed && Date.now() > deadline) clear('DIRECTORY_LEASE/EXPIRED');
     }, 250);
     const validate = setInterval(() => {
-      if (pending || owner.current) return;
+      if (pending || owner.current || !focusedRef.current) return;
       pending = true;
       const ticket = epoch.current;
       const started = Date.now();
@@ -223,9 +229,9 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       clearInterval(timer);
       clearInterval(validate);
     };
-  }, [allowed, familyId, access, sources.length, failed, book]);
+  }, [allowed, focused, familyId, access, sources.length, failed, book]);
   async function run(work: (api: FamilyAlbumUseCases, current: () => boolean) => Promise<void>) {
-    if (owner.current || !allowed || !client.current || !familyId) return;
+    if (owner.current || !allowed || !focusedRef.current || !client.current || !familyId) return;
     owner.current = true;
     setBusy(true);
     setFailed(false);
@@ -256,7 +262,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     await run(async(api,current)=>{await api.mutate(familyId!,view,{kind:'reorder',shareIds:order});if(current())await show(api,view.albumId,current,true);});
   }
   async function show(api:FamilyAlbumUseCases,albumId:string,current:()=>boolean,preserve=false) {
-    const reading=createFamilyAlbumReadSession({client:api,onInvalidate:pauseForegroundAudio});
+    const reading=createFamilyAlbumReadSession({client:api,onInvalidate:()=>{if(focusedRef.current)pauseForegroundAudio();}});
     if(!preserve){session.current?.invalidate();session.current=reading;setBook(null);setEditing(false);setOrganizing(false);setSources([]);setSelected([]);}
     await reading.load(familyId!,albumId);
     if(current()){
@@ -266,7 +272,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     }else reading.invalidate();
   }
   return <SettingsPage title={tr(mode === 'new' ? '新建家庭册' : mode === 'collect' ? '添加到家庭册' : '家里的生活册')} backLabel={tr('返回')} accessibilityLabel={tr('家里的生活册')} onBack={() => router.back()}>
-    {allowed ? <><View accessibilityElementsHidden={checking} importantForAccessibility={checking?'no-hide-descendants':'auto'} pointerEvents={checking?'none':'auto'} style={{
+    {allowed && focused ? <><View accessibilityElementsHidden={checking} importantForAccessibility={checking?'no-hide-descendants':'auto'} pointerEvents={checking?'none':'auto'} style={{
       paddingTop: 24,
       gap: 16,
       display:checking?'none':'flex'

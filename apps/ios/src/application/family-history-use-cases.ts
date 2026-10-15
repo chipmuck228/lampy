@@ -350,10 +350,10 @@ export function createFamilyHistoryUseCases(deps: {
           if (bytes.length !== meta.byteLength || sha256MediaBytes(bytes) !== meta.contentSha256) throw error('SHARE_MEDIA_UNAVAILABLE');
           const storageKey = `${a.userId}/${familyId}/${shareId}/${item.objectId}`;
           await check(a, current);
-          await cache.saveStoredMedia({ userId: a.userId, familyId, shareId, objectId: item.objectId,
+          const saved = await cache.saveStoredMedia({ userId: a.userId, familyId, shareId, objectId: item.objectId,
             mimeType: meta.mimeType, byteLength: meta.byteLength, contentSha256: meta.contentSha256, storageKey, bytes });
           await check(a, current);
-          media.push({ objectId: item.objectId, mimeType: meta.mimeType, uri: deps.mediaUri?.(storageKey) || '' });
+          media.push({ objectId: item.objectId, mimeType: meta.mimeType, uri: deps.mediaUri?.(saved.storageKey) || '' });
         }
         // Revalidate after all media awaits. Revocation in the middle cannot publish a readable result.
         await client.getShare(a.sessionToken, familyId, shareId);
