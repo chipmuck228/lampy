@@ -32,6 +32,7 @@ export function familyTestPathKind(method: string, path: string) {
 }
 
 export type FamilyTransportRequest = {
+  timeoutMs?: number;
   method: string;
   path: string;
   sessionToken?: string;
@@ -164,7 +165,7 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
       sources:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-sources`,sessionToken}),
       create:(sessionToken,familyId,input)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken,body:input}),
       read:(sessionToken,familyId,albumId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}`,sessionToken}),
-      validate:(sessionToken,familyId,albumId,validation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}/validate`,sessionToken,body:{validation}}),
+      validate:(sessionToken,familyId,albumId,validation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}/validate`,sessionToken,body:{validation},timeoutMs:5000}),
       mutate:(sessionToken,familyId,albumId,input)=>send({method:'PATCH',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}`,sessionToken,body:input}),
     },
     ...(sharingVersion === 1 ? { history: createFamilyApiClient(transport, 2) } : {}),
@@ -397,10 +398,14 @@ export function createFamilyHttpTransport(deps: {
       else if (input.body !== undefined) headers['content-type'] = 'application/json';
       if (input.sessionToken) headers.authorization = `Bearer ${input.sessionToken}`;
       if (input.idempotencyKey) headers['idempotency-key'] = input.idempotencyKey;
+      const controller=input.timeoutMs?new AbortController():null;
+      let timer:ReturnType<typeof setTimeout>|undefined;
+      const work=(async()=>{
       const response = await fetchImpl(`${baseUrl}${input.path}`, {
         method: input.method,
         headers,
         body: familyFetchBody(input),
+        ...(controller ? {signal:controller.signal} : {}),
       });
       if (input.expectBytes && response.ok) {
         const buffer = await response.arrayBuffer();
@@ -423,6 +428,11 @@ export function createFamilyHttpTransport(deps: {
         }
       }
       return { status: response.status, body };
+      })();
+      if(!input.timeoutMs)return work;
+      const timeout=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller?.abort();reject(new ApplicationError('SERVER_UNREACHABLE','Family request timed out.'));},input.timeoutMs);});
+      try{return await Promise.race([work,timeout]);}finally{if(timer)clearTimeout(timer);}
+
     },
   };
 }

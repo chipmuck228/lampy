@@ -2,6 +2,8 @@ import { ApplicationError } from './errors';
 import type { FamilySessionStore } from './family-use-cases';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
 import { FAMILY_ALBUM_CONFIRMATION, type FamilyAlbumApi, type FamilyAlbumMutation, type FamilyAlbumView } from '../family-api/family-album-types';
+export const FAMILY_ALBUM_LEASE_MS=15000;
+export const FAMILY_ALBUM_RENEW_MS=3000;
 export const FAMILY_ALBUM_RULE_COPY='分享到这里的记录，家人可以阅读，家庭创建者也可以收进生活册，保存或打印。' as const;
 export function familyAlbumEvaluationOpen(dev:boolean,value=process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL) {return dev&&value==='1';}
 export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:FamilySessionStore}) {
@@ -58,7 +60,7 @@ export function createFamilyAlbumReadSession(deps:{client:FamilyAlbumUseCases;no
     async load(familyId:string,albumId:string) {
       clear();const epoch=generation;const started=now();
       try {const next=await deps.client.read(familyId,albumId,()=>epoch===generation);
-        if(epoch===generation&&now()-started<3000){view=next;expires=started+3000;}
+        if(epoch===generation&&now()-started<FAMILY_ALBUM_LEASE_MS){view=next;expires=started+FAMILY_ALBUM_LEASE_MS;}
       } catch(error) {if(epoch===generation)clear();throw error;}
     },
     async validate() {
@@ -66,8 +68,8 @@ export function createFamilyAlbumReadSession(deps:{client:FamilyAlbumUseCases;no
       const candidate=view;const epoch=generation;const started=now();
       pendingSince=started;stage='STARTING';
       try {await deps.client.validate(candidate,()=>epoch===generation,next=>{if(epoch===generation)stage=next;});
-        if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;completed++;stage='COMPLETED';if(now()-started>=3000){stage='TOO_SLOW';expires=0;return false;}expires=started+3000;return true;
-      } catch(error){if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;stage='REJECTED';clear();throw error;}
+        if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;completed++;stage='COMPLETED';if(now()-started>=FAMILY_ALBUM_LEASE_MS){stage='TOO_SLOW';expires=0;return false;}expires=started+FAMILY_ALBUM_LEASE_MS;return true;
+      } catch(error){if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;stage='REJECTED';const code=error&&typeof error==='object'&&'code' in error?error.code:null;if(code==='SERVER_UNREACHABLE'||code==='NETWORK'||code==='RATE_LIMITED'){stage='RETRY';return false;}clear();throw error;}
     },
   };
 }

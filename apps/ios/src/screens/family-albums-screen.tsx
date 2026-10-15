@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, View } from 'react-native';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
-import { createFamilyAlbumReadSession, familyAlbumEvaluationOpen, FAMILY_ALBUM_RULE_COPY } from '../application/family-album';
+import { createFamilyAlbumReadSession, familyAlbumEvaluationOpen, FAMILY_ALBUM_RULE_COPY, FAMILY_ALBUM_LEASE_MS, FAMILY_ALBUM_RENEW_MS } from '../application/family-album';
 import type { FamilyAlbumUseCases } from '../application/family-album';
 import type { FamilyAlbumAccess, FamilyAlbumSummary, FamilyAlbumView } from '../family-api/family-album-types';
 import type { FamilySummary, ShareView } from '../family-api/types';
@@ -158,7 +158,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       }
     };
     renew();
-    const validate = setInterval(renew, 500);
+    const validate = setInterval(renew, FAMILY_ALBUM_RENEW_MS);
     return () => {
       clearInterval(timer);
       clearInterval(validate);
@@ -168,7 +168,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     if (!allowed || failed || (familyId && !access) || (book && !sources.length)) return;
     let disposed = false;
     let pending = false;
-    let deadline = Date.now() + 3000;
+    let deadline = Date.now() + FAMILY_ALBUM_LEASE_MS;
     const clear = (reason:string) => {
       setDiagnostic(reason);
       setChecking(false);
@@ -198,9 +198,9 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
           const permission = book ? null : familyId ? await app.albums.access(familyId) : null;
           const refreshed = sources.length && familyId ? await app.albums.sources(familyId) : null;
           if (disposed || epoch.current !== ticket) return;
-          if (Date.now() - started >= 3000) throw new Error('expired');
+          if (Date.now() - started >= FAMILY_ALBUM_LEASE_MS) throw new Error('expired');
           if (access && permission && (access.userId !== permission.userId || access.authority !== permission.authority || access.rulesAcknowledged !== permission.rulesAcknowledged)) throw new Error('changed');
-          deadline = started + 3000;
+          deadline = started + FAMILY_ALBUM_LEASE_MS;
           if (directory) setFamilies(directory.families);
           if (refreshed) {
             setSources(refreshed.shares);
@@ -212,7 +212,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
           pending = false;
         }
       })();
-    }, 1500);
+    }, FAMILY_ALBUM_RENEW_MS);
     return () => {
       disposed = true;
       clearInterval(timer);

@@ -1,3 +1,4 @@
+import {FAMILY_ALBUM_LEASE_MS,FAMILY_ALBUM_RENEW_MS} from '../application/family-album';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {AppState,Pressable,View} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
@@ -21,7 +22,7 @@ export function FamilyAlbumLibrary(){
  useEffect(()=>{const listener=AppState.addEventListener('change',state=>{if(state!=='active')generation.current++;setForeground(state==='active');});return()=>listener.remove();},[]);
  useFocusEffect(useCallback(()=>{
   void retry;
-  let disposed=false,inFlight=false;const epoch=++generation.current;let deadline=Date.now()+3000;
+  let disposed=false,inFlight=false;const epoch=++generation.current;let deadline=Date.now()+FAMILY_ALBUM_LEASE_MS;
   const current=()=>!disposed&&generation.current===epoch;
   const hide=()=>{setRows([]);setPending([]);setCanCreate(false);};
   hide();setStatus('loading');
@@ -35,15 +36,15 @@ export function FamilyAlbumLibrary(){
      if(!access.rulesAcknowledged)return {family,albums:[],pending:true};
      const list=await app.albums.list(family.familyId);if(list.access.userId!==directory.userId)throw new Error('account changed');return {family,albums:list.albums,pending:false};
     }));
-    if(!current())return;if(Date.now()-started>=3000)throw new Error('expired');
-    deadline=started+3000;
+    if(!current())return;if(Date.now()-started>=FAMILY_ALBUM_LEASE_MS)throw new Error('expired');
+    deadline=started+FAMILY_ALBUM_LEASE_MS;
     setRows(result.flatMap(({family,albums})=>albums.map(album=>({...album,familyName:family.name||tr('未命名家庭')}))));
     setPending(result.filter(item=>item.pending).map(item=>item.family));
     setCanCreate(directory.families.some(family=>family.role==='creator'));setStatus('ready');
    }catch{if(current()){generation.current++;hide();setStatus('failed');}}finally{inFlight=false;}
   }
   if(allowed)void load();
-  const renew=setInterval(()=>void load(),1500);
+  const renew=setInterval(()=>void load(),FAMILY_ALBUM_RENEW_MS);
   const expiry=setInterval(()=>{if(allowed&&current()&&Date.now()>deadline){generation.current++;hide();setStatus('failed');}},250);
   return()=>{disposed=true;generation.current++;clearInterval(renew);clearInterval(expiry);};
  },[allowed,retry]));

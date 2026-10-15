@@ -1,4 +1,4 @@
-import { createFamilyAlbumReadSession,createFamilyAlbumUseCases,familyAlbumEvaluationOpen } from './family-album';
+import { createFamilyAlbumReadSession,createFamilyAlbumUseCases,familyAlbumEvaluationOpen,FAMILY_ALBUM_LEASE_MS } from './family-album';
 import { createMemoryFamilySessionStore } from './family-use-cases';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
 import type { FamilyAlbumAccess,FamilyAlbumView } from '../family-api/family-album-types';
@@ -37,8 +37,8 @@ it('renewal failures clear the old content and invoke audio/task invalidation',a
 });
 it('a hung request cannot renew a view after its locally bounded lease',async()=>{
  const f=setup();await f.session.setSession({userId:'a',sessionToken:'a'});let now=0;
- const reading=createFamilyAlbumReadSession({client:f.client,now:()=>now});await reading.load('f','book');now=3000;expect(reading.snapshot()).toBeNull();
- now=0;await reading.load('f','book');f.validate.mockImplementationOnce(async()=>{now=4000;return{valid:true};});
+ const reading=createFamilyAlbumReadSession({client:f.client,now:()=>now});await reading.load('f','book');now=FAMILY_ALBUM_LEASE_MS;expect(reading.snapshot()).toBeNull();
+ now=0;await reading.load('f','book');f.validate.mockImplementationOnce(async()=>{now=FAMILY_ALBUM_LEASE_MS+1000;return{valid:true};});
  expect(await reading.validate()).toBe(false);expect(reading.snapshot()).toBeNull();
 });
 it('a late validator from the previous book cannot revive it over the next book',async()=>{
@@ -60,6 +60,12 @@ it('renews with one server request and still rejects account changes and mismatc
 it('reports only renewal stage and timings when a server request hangs',async()=>{
  const f=setup();await f.session.setSession({userId:'a',sessionToken:'a'});let now=0;const reading=createFamilyAlbumReadSession({client:f.client,now:()=>now});await reading.load('f','book');
  let finish!:(value:{valid:true})=>void;f.validate.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));const work=reading.validate();
- for(let i=0;i<100&&!finish;i++)await Promise.resolve();now=3100;
- expect(reading.diagnostic()).toBe('stage=SERVER_REQUEST pendingMs=3100 lastMs=none completed=0');expect(reading.snapshot()).toBeNull();reading.invalidate();finish({valid:true});expect(await work).toBe(false);
+ for(let i=0;i<100&&!finish;i++)await Promise.resolve();now=FAMILY_ALBUM_LEASE_MS+100;
+ expect(reading.diagnostic()).toBe(`stage=SERVER_REQUEST pendingMs=${FAMILY_ALBUM_LEASE_MS+100} lastMs=none completed=0`);expect(reading.snapshot()).toBeNull();reading.invalidate();finish({valid:true});expect(await work).toBe(false);
+});
+it('retries transient network errors without extending old access or discarding a still-qualified view',async()=>{
+ const f=setup();await f.session.setSession({userId:'a',sessionToken:'a'});let now=0;const reading=createFamilyAlbumReadSession({client:f.client,now:()=>now});await reading.load('f','book');
+ f.validate.mockRejectedValueOnce({code:'SERVER_UNREACHABLE'});now=5000;expect(await reading.validate()).toBe(false);expect(reading.snapshot()).toEqual(view);
+ now=6000;expect(await reading.validate()).toBe(true);f.validate.mockRejectedValueOnce({code:'NETWORK'});now=7000;expect(await reading.validate()).toBe(false);
+ now=6000+FAMILY_ALBUM_LEASE_MS;expect(reading.snapshot()).toBeNull();
 });

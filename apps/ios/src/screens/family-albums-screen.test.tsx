@@ -1,3 +1,4 @@
+import {FAMILY_ALBUM_LEASE_MS,FAMILY_ALBUM_RENEW_MS} from '../application/family-album';
 import {act,fireEvent,render,waitFor} from '@testing-library/react-native';
 import {AppState,type AppStateStatus} from 'react-native';
 import FamilyAlbumsScreen from './family-albums-screen';
@@ -37,7 +38,7 @@ it('clears on background and prevents a late read from restoring private content
 });
 it('expires locally while the authority request hangs',async()=>{
  jest.useFakeTimers();const page=await openBook();mockValidate.mockImplementation(()=>new Promise(()=>{}));mockDirectory.mockImplementation(()=>new Promise(()=>{}));
- await act(async()=>{jest.advanceTimersByTime(4000);});expect(page.queryByText('Private original')).toBeNull();expect(page.getByText('正在重新核对家庭内容，请稍候。')).toBeTruthy();
+ await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_LEASE_MS+1000);});expect(page.queryByText('Private original')).toBeNull();expect(page.getByText('正在重新核对家庭内容，请稍候。')).toBeTruthy();
 });
 
 it('opens a routed book immediately without a family or album picker',async()=>{
@@ -63,30 +64,35 @@ it('keeps editing usable across slow renewals without redundant directory reques
  mockValidate.mockImplementation(()=>new Promise(resolve=>setTimeout(()=>resolve({valid:true}),1000)));
  const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('编辑册子')).toBeTruthy());await fireEvent.press(page.getByText('编辑册子'));await fireEvent.changeText(page.getByLabelText('册名'),'Unsaved draft');
  const directoryCalls=mockDirectory.mock.calls.length;
- for(let i=0;i<24;i++)await act(async()=>{jest.advanceTimersByTime(500);});
+ for(let i=0;i<24;i++)await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});
  expect(page.getByLabelText('册名').props.value).toBe('Unsaved draft');expect(page.queryByText('家庭内容或资格已变化，请重新核对。')).toBeNull();expect(mockDirectory).toHaveBeenCalledTimes(directoryCalls);expect(mockValidate.mock.calls.length).toBeLessThanOrEqual(14);
 });
 it('retry reloads a routed book after a failed validation',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
- mockValidate.mockRejectedValueOnce(new Error('offline'));await act(async()=>{jest.advanceTimersByTime(500);});expect(page.queryByText('Private original')).toBeNull();
+ mockValidate.mockRejectedValueOnce(new Error('offline'));await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});expect(page.queryByText('Private original')).toBeNull();
  mockValidate.mockResolvedValue({valid:true});await fireEvent.press(page.getByText('再试一次'));await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());expect(page.queryByText('家庭内容或资格已变化，请重新核对。')).toBeNull();
 });
 
 it('distinguishes a server validation rejection from local expiry without exposing private errors',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
- mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED',message:'secret body'});await act(async()=>{jest.advanceTimersByTime(500);});
+ mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED',message:'secret body'});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});
  expect(page.getByTestId('family-album-diagnostic').props.children).toMatch(/^开发诊断：VALIDATE\/FAMILY_ALBUM_CHANGED\/\d+ms$/);expect(page.queryByText(/secret body/)).toBeNull();
 });
 it('hides an expired editor while a check hangs and restores the draft only after a fresh check',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator});
  const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('编辑册子')).toBeTruthy());await fireEvent.press(page.getByText('编辑册子'));await fireEvent.changeText(page.getByLabelText('册名'),'Kept draft');
- let finish!:(value:unknown)=>void;mockValidate.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(500);});await act(async()=>{jest.advanceTimersByTime(3500);});
+ let finish!:(value:unknown)=>void;mockValidate.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_LEASE_MS+500);});
  expect(page.queryByLabelText('册名')).toBeNull();expect(page.getByText('正在重新核对家庭内容，请稍候。')).toBeTruthy();expect(page.queryByText('家庭内容或资格已变化，请重新核对。')).toBeNull();
  await act(async()=>{finish({valid:true});});expect(page.queryByLabelText('册名')).toBeNull();
- await act(async()=>{jest.advanceTimersByTime(500);});await act(async()=>{jest.advanceTimersByTime(250);});expect(page.getByLabelText('册名').props.value).toBe('Kept draft');expect(page.queryByTestId('family-album-checking')).toBeNull();
+ await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});await act(async()=>{jest.advanceTimersByTime(250);});expect(page.getByLabelText('册名').props.value).toBe('Kept draft');expect(page.queryByTestId('family-album-checking')).toBeNull();
 });
 it('never restores a hidden draft if the fresh server check reports withdrawal',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
- let finish!:(value:unknown)=>void;mockValidate.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(500);});await act(async()=>{jest.advanceTimersByTime(3500);});expect(page.queryByText('Private original')).toBeNull();
- mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED'});await act(async()=>{finish({valid:true});});await act(async()=>{jest.advanceTimersByTime(500);});expect(page.queryByText('Private original')).toBeNull();expect(page.getByText('家庭内容或资格已变化，请重新核对。')).toBeTruthy();
+ let finish!:(value:unknown)=>void;mockValidate.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_LEASE_MS+500);});expect(page.queryByText('Private original')).toBeNull();
+ mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED'});await act(async()=>{finish({valid:true});});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});expect(page.queryByText('Private original')).toBeNull();expect(page.getByText('家庭内容或资格已变化，请重新核对。')).toBeTruthy();
+});
+it('keeps the editor visible for a minute of four-second renewals',async()=>{
+ jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator});mockValidate.mockImplementation(()=>new Promise(resolve=>setTimeout(()=>resolve({valid:true}),4000)));
+ const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('编辑册子')).toBeTruthy());await fireEvent.press(page.getByText('编辑册子'));await fireEvent.changeText(page.getByLabelText('册名'),'Stable draft');
+ for(let i=0;i<60;i++){await act(async()=>{jest.advanceTimersByTime(1000);});expect(page.queryByTestId('family-album-checking')).toBeNull();expect(page.getByLabelText('册名').props.value).toBe('Stable draft');}
 });

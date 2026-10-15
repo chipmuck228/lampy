@@ -1,3 +1,4 @@
+import {FAMILY_ALBUM_LEASE_MS} from '../application/family-album';
 import {act,fireEvent,render,waitFor} from '@testing-library/react-native';
 import {AppState,type AppStateStatus} from 'react-native';
 import {FamilyAlbumLibrary} from './family-album-library';
@@ -27,6 +28,6 @@ it('offers no creation to ordinary members and hides content on background or lo
 });
 it('expires the library even if renewal hangs and ignores late responses',async()=>{
  jest.useFakeTimers();const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());let finish!:(value:unknown)=>void;
- mockDirectory.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(4000);});expect(page.queryByText('Our days')).toBeNull();
+ mockDirectory.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_LEASE_MS+1000);});expect(page.queryByText('Our days')).toBeNull();
  await act(async()=>{finish({userId:'a',families:[{familyId:'f',name:'Home',role:'creator'}]});});expect(page.queryByText('Our days')).toBeNull();
 });
