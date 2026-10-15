@@ -23,6 +23,11 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  listFamilyAlbums(familyId:string): Promise<import('./family-album-types').FamilyAlbumRecord[]>;
+  findFamilyAlbum(albumId:string): Promise<import('./family-album-types').FamilyAlbumRecord | null>;
+  saveFamilyAlbum(album:import('./family-album-types').FamilyAlbumRecord): Promise<void>;
+  findFamilyAlbumNotice(familyId:string,membershipId:string): Promise<import('./family-album-types').FamilyAlbumNotice | null>;
+  saveFamilyAlbumNotice(notice:import('./family-album-types').FamilyAlbumNotice): Promise<void>;
   findAppleChallenge(id: string): Promise<import('./types').AppleChallenge | null>;
   saveAppleChallenge(challenge: import('./types').AppleChallenge): Promise<void>;
   deleteAppleChallenge(id: string): Promise<void>;
@@ -122,6 +127,11 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async listFamilyAlbums(familyId) { return store.familyAlbums.filter(row=>row.familyId===familyId).map(row=>({...row,shareIds:[...row.shareIds]})); },
+    async findFamilyAlbum(id) { const row=store.familyAlbums.find(row=>row.albumId===id);return row?{...row,shareIds:[...row.shareIds]}:null; },
+    async saveFamilyAlbum(row) { replaceBy(store.familyAlbums,row=>row.albumId,{...row,shareIds:[...row.shareIds]}); },
+    async findFamilyAlbumNotice(familyId,membershipId) { return store.familyAlbumNotices.find(row=>row.familyId===familyId&&row.membershipId===membershipId)??null; },
+    async saveFamilyAlbumNotice(row) { replaceBy(store.familyAlbumNotices,row=>`${row.familyId}:${row.membershipId}`,{...row}); },
     async findAppleChallenge(id) { return store.appleChallenges.find(c => c.id === id) ?? null; },
     async saveAppleChallenge(c) { store.appleChallenges.push({...c}); },
     async deleteAppleChallenge(id) { store.appleChallenges = store.appleChallenges.filter(c => c.id !== id); },

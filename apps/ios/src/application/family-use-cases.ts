@@ -1,3 +1,4 @@
+import { createFamilyAlbumUseCases } from './family-album';
 import { createFamilyHistoryUseCases } from './family-history-use-cases';
 import { ApplicationError } from './errors';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
@@ -463,6 +464,7 @@ export function createFamilyUseCases(deps: {
     }
   }
   return {
+    albums: createFamilyAlbumUseCases({client:deps.client,session:deps.session}),
     history,
     async previewInviteLink(token: string) {
       if(!deps.client.previewInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');

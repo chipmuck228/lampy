@@ -1,3 +1,4 @@
+import { createFamilyAlbumCommands } from './family-album-commands';
 import { createAppleAuthCommands } from './apple-auth-commands';
 import { createFamilyTransferCommands } from './transfer-commands';
 import { createInviteLinkCommands, type InviteLinkCommands } from './invite-link-commands';
@@ -45,6 +46,7 @@ import { assertHistoryEnabled, HISTORY_CONFIRMATION } from './history-policy';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = InviteLinkCommands & {
+  albums: import('./family-album-types').FamilyAlbumApi;
   transfers: ReturnType<typeof createFamilyTransferCommands>;
   historyShares: ShareCommands;
   getFamilyHistoryPolicy(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
@@ -267,6 +269,7 @@ export function createFamilyCommands(deps: {
   legacyAppleLoginEnabled?: boolean;
   inviteLinksEnabled?: boolean;
   historySharingEnabled?: boolean;
+  familyAlbumsEnabled?: boolean;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -322,6 +325,7 @@ export function createFamilyCommands(deps: {
   }
 
   return {
+    albums: createFamilyAlbumCommands({authed:withAuthedUser,clock,enabled:deps.familyAlbumsEnabled===true&&deps.historySharingEnabled===true}),
     transfers: createFamilyTransferCommands({authed:withAuthedUser,clock,id:()=>`transfer_${ids.invitationId()}`}),
     historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled, operatorOnly,
       historyPolicy: 'family-history-v2', historyEnabled: deps.historySharingEnabled === true }),
@@ -363,6 +367,7 @@ export function createFamilyCommands(deps: {
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
         familyHistoryV2: deps.historySharingEnabled === true,
+        familyAlbums: deps.familyAlbumsEnabled === true && deps.historySharingEnabled === true,
         argon2id: ARGON2ID_PRODUCTION,
       };
     },

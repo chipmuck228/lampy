@@ -59,6 +59,7 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 }
 
 export type FamilyApiClient = {
+  albums?: import('../family-api/family-album-types').FamilyAlbumApi;
   registerControlledEmail?(input: { email: string; password: string; nickname: string }): Promise<SignInResult>;
   signInWithControlledEmail?(input: { email: string; password: string }): Promise<SignInResult>;
   getMyProfile?(sessionToken: string): Promise<import('../family-api/types').UserProfile>;
@@ -156,6 +157,16 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
   }
 
   return {
+    albums: {
+      access:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken}),
+      acknowledge:(sessionToken,familyId,membershipId,confirmation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,body:{membershipId,confirmation}}),
+      list:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken}),
+      sources:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-sources`,sessionToken}),
+      create:(sessionToken,familyId,input)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken,body:input}),
+      read:(sessionToken,familyId,albumId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}`,sessionToken}),
+      validate:(sessionToken,familyId,albumId,validation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}/validate`,sessionToken,body:{validation}}),
+      mutate:(sessionToken,familyId,albumId,input)=>send({method:'PATCH',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}`,sessionToken,body:input}),
+    },
     ...(sharingVersion === 1 ? { history: createFamilyApiClient(transport, 2) } : {}),
     getHistoryPolicy(sessionToken, familyId) { return send({ method: 'GET', path: `/v2/families/${familyId}/history-policy`, sessionToken }); },
     confirmHistoryPolicy(sessionToken, familyId) { return send({ method: 'POST', path: `/v2/families/${familyId}/history-policy`, sessionToken, body: { confirmation: 'new-members-can-read-active-history' } }); },

@@ -72,6 +72,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
     legacyAppleLoginEnabled: plan.mode === 'test',
     inviteLinksEnabled:inviteEnabled,
     historySharingEnabled:env.LAMPY_FAMILY_HISTORY_ENABLED === '1',
+    familyAlbumsEnabled:env.LAMPY_FAMILY_ALBUMS_ENABLED === '1',
     testAccountLoginEnabled: plan.testAccount.testAccountLoginEnabled,
     controlledEmailAccountsEnabled: env.LAMPY_CONTROLLED_EMAIL_ACCOUNTS === '1',
     passwordHasher: plan.mode === 'test' ? createArgon2idPasswordHasher(ARGON2ID_TEST) : undefined,

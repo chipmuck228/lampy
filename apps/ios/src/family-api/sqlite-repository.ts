@@ -232,6 +232,14 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   const tx: FamilyTx = {
+    async listFamilyAlbums(familyId) {
+      const rows=await db.getAll<{json:string}>('SELECT json FROM family_albums WHERE family_id = ? ORDER BY album_id',[familyId]);
+      return rows.map(row=>JSON.parse(row.json));
+    },
+    async findFamilyAlbum(albumId) {const row=await db.getFirst<{json:string}>('SELECT json FROM family_albums WHERE album_id = ?',[albumId]);return row?JSON.parse(row.json):null;},
+    async saveFamilyAlbum(row) {await db.run('INSERT INTO family_albums(album_id,family_id,json) VALUES(?,?,?) ON CONFLICT(album_id) DO UPDATE SET json=excluded.json WHERE family_albums.family_id=excluded.family_id',[row.albumId,row.familyId,JSON.stringify(row)]);},
+    async findFamilyAlbumNotice(familyId,membershipId) {const row=await db.getFirst<{json:string}>('SELECT json FROM family_album_notices WHERE family_id = ? AND membership_id = ?',[familyId,membershipId]);return row?JSON.parse(row.json):null;},
+    async saveFamilyAlbumNotice(row) {await db.run('INSERT INTO family_album_notices(family_id,membership_id,json) VALUES(?,?,?) ON CONFLICT(family_id,membership_id) DO UPDATE SET json=excluded.json',[row.familyId,row.membershipId,JSON.stringify(row)]);},
     async findAppleChallenge(id) {
       const r = await db.getFirst<{ id: string; nonce: string; intent: "login" | "link"; user_id: string | null; session_token: string | null; expires_at: string }>('SELECT * FROM family_apple_challenges WHERE id=?', [id]);
       return r ? {id:r.id,nonce:r.nonce,intent:r.intent,userId:r.user_id,sessionToken:r.session_token,expiresAt:r.expires_at} : null;
