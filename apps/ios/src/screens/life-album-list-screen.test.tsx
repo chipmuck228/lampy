@@ -125,6 +125,25 @@ describe('life album list root', () => {
     expect(view.getByTestId('life-album-cover-wall')).toBeTruthy();
   });
 
+  it('opens the guide in either tab and changes copy with the selected source', async () => {
+    mockList.mockResolvedValue({status:'ready',albums:sampleAlbums});
+    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue('dismissed');
+    const view=await render(wrap());
+    await waitFor(()=>expect(view.getByTestId('life-album-guide-reopen')).toBeTruthy());
+    await fireEvent.press(view.getByTestId('life-album-source-family'));
+    await fireEvent.press(view.getByTestId('life-album-guide-reopen'));
+    expect(view.getByTestId('life-album-guide')).toBeTruthy();
+    expect(view.getByText('把家人的日子，收成一册。')).toBeTruthy();
+    expect(view.getByText(/当前尚未开放家庭册文件导出。/)).toBeTruthy();
+    expect(view.queryByTestId('life-album-cover-wall')).toBeNull();
+    await fireEvent.press(view.getByTestId('life-album-source-personal'));
+    expect(view.getByText(/移出只改变册子，不会删除原记录。/)).toBeTruthy();
+    expect(view.queryByText('把家人的日子，收成一册。')).toBeNull();
+    await fireEvent.press(view.getByTestId('life-album-guide-dismiss'));
+    await fireEvent.press(view.getByTestId('life-album-guide-reopen'));
+    expect(view.getByText(/移出只改变册子，不会删除原记录。/)).toBeTruthy();
+  });
+
   it('renders a cover wall with image, words, and missing-uri fallback tiles', async () => {
     mockList.mockResolvedValue({ status: 'ready', albums: sampleAlbums });
     const view = await render(wrap());

@@ -250,15 +250,14 @@ export default function LifeAlbumListScreen() {
               scrollRef.current?.scrollTo({ y: 0, animated: false });
             }}><Text style={[styles.action, source === part && { textDecorationLine: 'underline' }]}>{tr(part === 'personal' ? '我的' : '家里的')}</Text></Pressable>)}
         </View>
-        {source === 'family' ? (isFamilyProductEntryOpen() && familyAlbumEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <FamilyAlbumLibrary /> : <Text style={styles.meta}>{tr('家里的生活册将在之后开放。')}</Text>) : <>
         {showGuideBody ? (
           <View
             testID="life-album-guide"
             style={[styles.guide, empty && styles.guideEmpty]}
             accessibilityRole="summary"
           >
-            <Text style={styles.guideTitle}>{ALBUM_GUIDE_TITLE}</Text>
-            <Text style={styles.guideBody}>{ALBUM_GUIDE_BODY}</Text>
+            <Text style={styles.guideTitle}>{source === 'family' ? tr('把家人的日子，收成一册。') : ALBUM_GUIDE_TITLE}</Text>
+            <Text style={styles.guideBody}>{source === 'family' ? tr("在“家里的”查看已创建的家庭册。家庭创建者可以点“新建家庭册”，填写册名；管理多个家庭时，先选择所属家庭。也可以从家庭页选中一个家，点“添加到家庭册”，选择已有册子，再收入选中的分享或当前全部分享。册内可以继续收入、上移或移出记录；普通成员可以阅读。首次使用需确认该家的说明，分享撤回后不再显示原文和媒体。当前尚未开放家庭册文件导出。") : ALBUM_GUIDE_BODY}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={ALBUM_GUIDE_DISMISS}
@@ -277,6 +276,7 @@ export default function LifeAlbumListScreen() {
           </Text>
         ) : null}
 
+        {source === 'family' ? (isFamilyProductEntryOpen() && familyAlbumEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <FamilyAlbumLibrary /> : <Text style={styles.meta}>{tr('家里的生活册将在之后开放。')}</Text>) : <>
         {status === 'loading' ? <Text style={styles.meta}>{ALBUM_LOADING}</Text> : null}
         {status === 'error' ? (
           <View>
