@@ -36,6 +36,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [failed, setFailed] = useState(false);
+  const [diagnostic, setDiagnostic] = useState('');
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(0);
   const accountId = useRef<string | null>(null);
@@ -68,6 +69,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     setSelected([]);
     setFamilies([]);
     setFailed(false);
+    setDiagnostic('');
     if (allowed) void (async () => {
       try {
         const app = await getFamilyUseCases();
@@ -101,8 +103,9 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
             }
           }
         }
-      } catch {
+      } catch (error) {
         if (!disposed && ticket === epoch.current) {
+          setDiagnostic(`LOAD/${familyAlbumFailureCode(error)}`);
           setFailed(true);
           setBook(null);
           setAccess(null);
@@ -123,6 +126,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     if (!book || !allowed) return;
     const timer = setInterval(() => {
       if (!session.current?.snapshot()) {
+        setDiagnostic('READ_LEASE/EXPIRED');
         session.current?.invalidate();
         setBook(null);
         setAccess(null);
@@ -140,8 +144,10 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       const current = session.current;
       if (current && !owner.current) {
         validating = true;
-        void current.validate().catch(() => {
+        const started = Date.now();
+        void current.validate().catch((error) => {
         if (session.current === current) {
+          setDiagnostic(`VALIDATE/${familyAlbumFailureCode(error)}/${Date.now()-started}ms`);
           epoch.current++;
           setBook(null);
           setAccess(null);
@@ -167,7 +173,8 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     let disposed = false;
     let pending = false;
     let deadline = Date.now() + 3000;
-    const clear = () => {
+    const clear = (reason:string) => {
+      setDiagnostic(reason);
       epoch.current++;
       session.current?.invalidate();
       pauseForegroundAudio();
@@ -180,7 +187,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       setFailed(true);
     };
     const timer = setInterval(() => {
-      if (!disposed && Date.now() > deadline) clear();
+      if (!disposed && Date.now() > deadline) clear('DIRECTORY_LEASE/EXPIRED');
     }, 250);
     const validate = setInterval(() => {
       if (pending || owner.current) return;
@@ -202,8 +209,8 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
             setSources(refreshed.shares);
             setSelected(previous => previous.filter(id => refreshed.shares.some(share => share.shareId === id)));
           }
-        } catch {
-          if (!disposed && epoch.current === ticket) clear();
+        } catch (error) {
+          if (!disposed && epoch.current === ticket) clear(`DIRECTORY/${familyAlbumFailureCode(error)}/${Date.now()-started}ms`);
         } finally {
           pending = false;
         }
@@ -223,8 +230,9 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     const ticket = ++epoch.current;
     try {
       await work(client.current, () => epoch.current === ticket && AppState.currentState === 'active');
-    } catch {
+    } catch (error) {
       if (epoch.current === ticket) {
+        setDiagnostic(`ACTION/${familyAlbumFailureCode(error)}`);
         session.current?.invalidate();
         setBook(null);
         setAccess(null);
@@ -346,10 +354,18 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
           })} disabled={busy} />}
         </> : null}
       </View> : null}
-      {failed ? <><Text>{tr('家庭内容或资格已变化，请重新核对。')}</Text>{<FamilyAlbumButton label={tr('再试一次')} onPress={() => setRetry(value => value + 1)} disabled={busy} />}</> : null}
+      {failed ? <><Text>{tr('家庭内容或资格已变化，请重新核对。')}</Text>{__DEV__ ? <Text selectable testID="family-album-diagnostic" style={{...type.meta,color:inkSoft}}>{`开发诊断：${diagnostic}`}</Text> : null}{<FamilyAlbumButton label={tr('再试一次')} onPress={() => setRetry(value => value + 1)} disabled={busy} />}</> : null}
     </View> : null}
   </SettingsPage>;
 }
 function FamilyAlbumButton({label,onPress,disabled}:{label:string;onPress:()=>void;disabled:boolean}) {
   return <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.action,color:disabled?inkSoft:sage}}>{label}</Text></Pressable>;
+}
+
+function familyAlbumFailureCode(error:unknown) {
+  const code=error&&typeof error==='object'&&'code' in error?error.code:null;
+  if(typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(code))return code;
+  if(error instanceof Error&&error.message==='expired')return 'EXPIRED';
+  if(error instanceof Error&&error.message==='changed')return 'AUTHORITY_CHANGED';
+  return 'UNKNOWN';
 }

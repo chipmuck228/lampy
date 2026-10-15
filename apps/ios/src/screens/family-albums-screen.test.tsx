@@ -71,3 +71,9 @@ it('retry reloads a routed book after a failed validation',async()=>{
  mockValidate.mockRejectedValueOnce(new Error('offline'));await act(async()=>{jest.advanceTimersByTime(500);});expect(page.queryByText('Private original')).toBeNull();
  mockValidate.mockResolvedValue({valid:true});await fireEvent.press(page.getByText('再试一次'));await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());expect(page.queryByText('家庭内容或资格已变化，请重新核对。')).toBeNull();
 });
+
+it('distinguishes a server validation rejection from local expiry without exposing private errors',async()=>{
+ jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
+ mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED',message:'secret body'});await act(async()=>{jest.advanceTimersByTime(500);});
+ expect(page.getByTestId('family-album-diagnostic').props.children).toMatch(/^开发诊断：VALIDATE\/FAMILY_ALBUM_CHANGED\/\d+ms$/);expect(page.queryByText(/secret body/)).toBeNull();
+});
