@@ -111,6 +111,7 @@ export default function FamilyDirectoryScreen() {
       {state.status === 'failed' ? <View style={styles.connection} testID="family-connection-failed">
         <Text style={styles.name}>{tr('暂时连不上，稍后再看看。')}</Text>
         <Text style={styles.meta}>{tr('你的家庭没有因此消失。')}</Text>
+        {__DEV__ ? <Text selectable testID="family-directory-diagnostic" style={styles.meta}>{familyDirectoryDiagnostic(state.error)}</Text> : null}
         <Pressable style={styles.createHit} onPress={() => void refresh()} accessibilityRole="button"><Text style={styles.action}>{tr('再试一次')}</Text></Pressable>
       </View> : null}
 <View style={styles.rootActions}>
@@ -242,3 +243,13 @@ const styles = StyleSheet.create({
   coverMark: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
 
 });
+
+// Do not print exception messages, response bodies, credentials or account data.
+function familyDirectoryDiagnostic(error: unknown) {
+  const rawCode = error && typeof error === 'object' && 'code' in error ? error.code : null;
+  const code = typeof rawCode === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(rawCode) ? rawCode : 'UNKNOWN';
+  const kind = error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name) ? error.name : 'Error';
+  let origin = 'NOT_CONFIGURED';
+  try { origin = new URL(process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL || '').origin; } catch { /* invalid or absent config */ }
+  return `开发诊断：FAMILY_LIST/${code}/${kind}\nAPI: ${origin}`;
+}
