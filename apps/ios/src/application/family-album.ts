@@ -66,7 +66,7 @@ export function createFamilyAlbumReadSession(deps:{client:FamilyAlbumUseCases;no
       const candidate=view;const epoch=generation;const started=now();
       pendingSince=started;stage='STARTING';
       try {await deps.client.validate(candidate,()=>epoch===generation,next=>{if(epoch===generation)stage=next;});
-        if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;completed++;stage='COMPLETED';if(now()-started>=3000){stage='TOO_SLOW';clear();return false;}expires=started+3000;return true;
+        if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;completed++;stage='COMPLETED';if(now()-started>=3000){stage='TOO_SLOW';expires=0;return false;}expires=started+3000;return true;
       } catch(error){if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;stage='REJECTED';clear();throw error;}
     },
   };

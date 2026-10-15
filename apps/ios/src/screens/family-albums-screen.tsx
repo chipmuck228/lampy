@@ -37,6 +37,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   const [name, setName] = useState('');
   const [failed, setFailed] = useState(false);
   const [diagnostic, setDiagnostic] = useState('');
+  const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(0);
   const accountId = useRef<string | null>(null);
@@ -70,6 +71,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     setFamilies([]);
     setFailed(false);
     setDiagnostic('');
+    setChecking(false);
     if (allowed) void (async () => {
       try {
         const app = await getFamilyUseCases();
@@ -127,16 +129,9 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     const timer = setInterval(() => {
       if (!session.current?.snapshot()) {
         setDiagnostic(`READ_LEASE/EXPIRED ${session.current?.diagnostic()??'NO_SESSION'} busy=${owner.current?1:0}`);
-        session.current?.invalidate();
-        setBook(null);
-        setAccess(null);
-        setAlbums([]);
-        setFamilies([]);
-        setSources([]);
-        setSelected([]);
-        setFailed(true);
+        setChecking(true);
         pauseForegroundAudio();
-      }
+      } else setChecking(false);
     }, 250);
     let validating = false;
     const renew = () => {
@@ -147,6 +142,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
         const started = Date.now();
         void current.validate().catch((error) => {
         if (session.current === current) {
+          setChecking(false);
           setDiagnostic(`VALIDATE/${familyAlbumFailureCode(error)}/${Date.now()-started}ms`);
           epoch.current++;
           setBook(null);
@@ -175,6 +171,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     let deadline = Date.now() + 3000;
     const clear = (reason:string) => {
       setDiagnostic(reason);
+      setChecking(false);
       epoch.current++;
       session.current?.invalidate();
       pauseForegroundAudio();
@@ -232,6 +229,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       await work(client.current, () => epoch.current === ticket && AppState.currentState === 'active');
     } catch (error) {
       if (epoch.current === ticket) {
+        setChecking(false);
         setDiagnostic(`ACTION/${familyAlbumFailureCode(error)}`);
         session.current?.invalidate();
         setBook(null);
@@ -259,6 +257,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     setSelected([]);
     await reading.load(familyId!, albumId);
     if (current()) {
+      setChecking(false);
       setBook(reading.snapshot());
       setAccess(reading.snapshot()?.access ?? null);
       if (mode === 'collect' && reading.snapshot()?.access.canManage) {
@@ -268,9 +267,10 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     } else reading.invalidate();
   }
   return <SettingsPage title={tr(mode === 'new' ? '新建家庭册' : mode === 'collect' ? '添加到家庭册' : '家里的生活册')} backLabel={tr('返回')} accessibilityLabel={tr('家里的生活册')} onBack={() => router.back()}>
-    {allowed ? <View style={{
+    {allowed ? <><View accessibilityElementsHidden={checking} importantForAccessibility={checking?'no-hide-descendants':'auto'} pointerEvents={checking?'none':'auto'} style={{
       paddingTop: 24,
-      gap: 16
+      gap: 16,
+      display:checking?'none':'flex'
     }}>
       {!familyId ? <Text style={{...type.body,color:inkSoft}}>{tr('选择这册所属的家庭')}</Text> : <Text style={{...type.meta,color:inkSoft}}>{families.find(family=>family.familyId===familyId)?.name}</Text>}
       {mode === 'collect' && !book ? <Text style={{...type.body,color:inkSoft}}>{tr('选择已有家庭册，再收入这个家的分享。')}</Text> : null}
@@ -312,7 +312,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       {book ? <View style={{
         gap: 12
       }}>{book.cover && !editing ? <FamilyAlbumCoverPreview key={`${book.cover.shareId}/${book.cover.objectId}`} familyId={book.familyId} cover={book.cover}/> : null}<Text style={{...type.title,color:ink}}>{book.name}</Text>{book.opening ? <Text>{book.opening}</Text> : null}
-        {book.access.canManage ? <FamilyAlbumButton label={tr('编辑册子')} onPress={()=>setEditing(value=>!value)} disabled={busy}/> : null}
+        {book.access.canManage ? <FamilyAlbumButton label={tr('编辑册子')} onPress={()=>{setSources([]);setSelected([]);setEditing(value=>!value);}} disabled={busy}/> : null}
         {editing && book.access.canManage ? <FamilyAlbumEditor book={book} busy={busy} onCancel={()=>setEditing(false)} onSave={change=>void run(async(api,current)=>{
           await api.mutate(familyId!,book,change);if(current()){setEditing(false);await show(api,book.albumId,current);}
         })}/> : null}
@@ -355,7 +355,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
         </> : null}
       </View> : null}
       {failed ? <><Text>{tr('家庭内容或资格已变化，请重新核对。')}</Text>{__DEV__ ? <Text selectable testID="family-album-diagnostic" style={{...type.meta,color:inkSoft}}>{`开发诊断：${diagnostic}`}</Text> : null}{<FamilyAlbumButton label={tr('再试一次')} onPress={() => setRetry(value => value + 1)} disabled={busy} />}</> : null}
-    </View> : null}
+    </View>{checking ? <View style={{paddingTop:24,gap:16}} testID="family-album-checking"><Text>{tr('正在重新核对家庭内容，请稍候。')}</Text><FamilyAlbumButton label={tr('再试一次')} onPress={()=>setRetry(value=>value+1)} disabled={busy}/>{__DEV__?<Text style={{...type.meta,color:inkSoft}}>{diagnostic}</Text>:null}</View> : null}</> : null}
   </SettingsPage>;
 }
 function FamilyAlbumButton({label,onPress,disabled}:{label:string;onPress:()=>void;disabled:boolean}) {

@@ -853,5 +853,6 @@
   "在“我的”里新建一册，再从回看中的记录选择“收进生活册”，加入已有册子或新建一册。打开册子，可以继续收入、调整顺序或移出记录，也可以连续阅读、查看纸页。移出只改变册子，不会删除原记录。": "Create an album in Mine. From a record in Revisit, choose Collect into an album to use an existing album or create one. Open the album to add, reorder or remove records, read continuously or preview paper pages. Removing a record from an album does not delete the original.",
   "把家人的日子，收成一册。": "Gather your family’s days into a book.",
   "在“家里的”查看已创建的家庭册。家庭创建者可以点“新建家庭册”，填写册名；管理多个家庭时，先选择所属家庭。也可以从家庭页选中一个家，点“添加到家庭册”，选择已有册子，再收入选中的分享或当前全部分享。册内可以继续收入、上移或移出记录；普通成员可以阅读。首次使用需确认该家的说明，分享撤回后不再显示原文和媒体。当前尚未开放家庭册文件导出。": "In Family, browse existing family albums. Family creators can create an album and name it; choose a family first if you manage several. You can also select a family on the Family page, choose Add to a family album, then choose an existing album and collect selected or all currently shared moments. In an album, creators can add, move up or remove moments; ordinary members can read. Confirm the notice for each family on first use. Withdrawn shares no longer show original text or media. Family album file export is not available yet.",
-  "保存修改": "Save changes"
+  "保存修改": "Save changes",
+  "正在重新核对家庭内容，请稍候。": "Checking family content again. Please wait."
 }
