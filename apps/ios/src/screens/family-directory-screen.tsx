@@ -1,3 +1,4 @@
+import { familyAlbumEvaluationOpen } from '../application/family-album';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -169,6 +170,7 @@ export default function FamilyDirectoryScreen() {
             onPress={() => router.push({pathname:'/family-invitations', params:{familyId:f.familyId}})}>
             <Text style={styles.action}>{tr('邀请家人')}</Text>
           </Pressable> : null}
+          {f.role === 'creator' && f.familyId === state.selectedId && familyAlbumEvaluationOpen(__DEV__) ? <Pressable accessibilityRole="button" testID={`family-album-collect-${f.familyId}`} style={styles.cardInvite} onPress={() => router.push({pathname:'/family-albums',params:{familyId:f.familyId,mode:'collect'}})}><Text style={styles.action}>{tr('添加到家庭册')}</Text></Pressable> : null}
           {f.familyId === state.selectedId ? <FamilyCardMembers key={`members-${f.familyId}`} familyId={f.familyId} onChanged={joined} /> : null}
           </View>)}
           {state.pastFamilies.map(f => <View key={f.familyId} testID={`family-past-${f.familyId}`} style={styles.tile} accessible

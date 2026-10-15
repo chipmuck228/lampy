@@ -1,3 +1,4 @@
+import { FamilyAlbumLibrary } from './family-album-library';
 import { familyAlbumEvaluationOpen } from '../application/family-album';
 import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -249,7 +250,7 @@ export default function LifeAlbumListScreen() {
               scrollRef.current?.scrollTo({ y: 0, animated: false });
             }}><Text style={[styles.action, source === part && { textDecorationLine: 'underline' }]}>{tr(part === 'personal' ? '我的' : '家里的')}</Text></Pressable>)}
         </View>
-        {source === 'family' ? (isFamilyProductEntryOpen() && familyAlbumEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <Pressable accessibilityRole="button" style={styles.hit} onPress={() => router.push('/family-albums')}><Text style={styles.action}>{tr('家里的生活册')}</Text></Pressable> : <Text style={styles.meta}>{tr('家里的生活册将在之后开放。')}</Text>) : <>
+        {source === 'family' ? (isFamilyProductEntryOpen() && familyAlbumEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <FamilyAlbumLibrary /> : <Text style={styles.meta}>{tr('家里的生活册将在之后开放。')}</Text>) : <>
         {showGuideBody ? (
           <View
             testID="life-album-guide"

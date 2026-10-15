@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, TextInput, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { AppState, Pressable, View } from 'react-native';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
 import { createFamilyAlbumReadSession, familyAlbumEvaluationOpen, FAMILY_ALBUM_RULE_COPY } from '../application/family-album';
 import type { FamilyAlbumUseCases } from '../application/family-album';
@@ -10,15 +10,23 @@ import { pauseForegroundAudio } from '../application/foreground-audio';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { useDeviceLock } from './device-lock-context';
 import { SettingsPage } from './settings-chrome';
-import { Text } from './life-text';
+import { Text, TextInput, type } from './life-text';
+import { ink, inkSoft, sage, hairline } from './life-page';
 import { tr } from '../i18n';
 export default function FamilyAlbumsScreen() {
+  const params = useLocalSearchParams<{familyId?:string;albumId?:string;mode?:string}>();
+  const routeFamily = typeof params.familyId === 'string' ? params.familyId : null;
+  const routeAlbum = typeof params.albumId === 'string' ? params.albumId : null;
+  const mode = params.mode === 'new' ? 'new' : params.mode === 'collect' ? 'collect' : 'read';
+  return <FamilyAlbumFlow key={`${routeFamily ?? ''}/${routeAlbum ?? ''}/${mode}`} routeFamily={routeFamily} routeAlbum={routeAlbum} mode={mode}/>;
+}
+function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;routeAlbum:string|null;mode:'new'|'collect'|'read'}) {
   const router = useRouter();
   const lock = useDeviceLock();
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const allowed = isFamilyProductEntryOpen() && familyAlbumEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) && !lock?.snapshot.locked && foreground;
   const [families, setFamilies] = useState<FamilySummary[]>([]);
-  const [familyId, setFamilyId] = useState<string | null>(null);
+  const [familyId, setFamilyId] = useState<string | null>(routeFamily);
   const [access, setAccess] = useState<FamilyAlbumAccess | null>(null);
   const [albums, setAlbums] = useState<FamilyAlbumSummary[]>([]);
   const [book, setBook] = useState<FamilyAlbumView | null>(null);
@@ -69,6 +77,10 @@ export default function FamilyAlbumsScreen() {
         accountId.current = directory.userId;
         client.current = app.albums;
         setFamilies(directory.families);
+        if (!familyId && mode === 'new') {
+          const creators = directory.families.filter(family => family.role === 'creator');
+          if (creators.length === 1) { setFamilyId(creators[0].familyId); return; }
+        }
         if (familyId && directory.families.some(family => family.familyId === familyId)) {
           const permission = await app.albums.access(familyId);
           if (disposed || ticket !== epoch.current) return;
@@ -77,6 +89,13 @@ export default function FamilyAlbumsScreen() {
             const list = await app.albums.list(familyId);
             if (disposed || ticket !== epoch.current) return;
             setAlbums(list.albums);
+            if (routeAlbum && mode !== 'new') {
+              const reading = createFamilyAlbumReadSession({client:app.albums,onInvalidate:pauseForegroundAudio});
+              session.current = reading;
+              await reading.load(familyId,routeAlbum);
+              if (disposed || ticket !== epoch.current) { reading.invalidate(); return; }
+              setBook(reading.snapshot());setAccess(reading.snapshot()?.access ?? null);
+            }
           }
         }
       } catch {
@@ -95,7 +114,7 @@ export default function FamilyAlbumsScreen() {
       client.current = null;
       pauseForegroundAudio();
     };
-  }, [allowed, familyId, retry]));
+  }, [allowed, familyId, retry, mode, routeAlbum]));
   // A bounded read lease: expire locally even if a network request hangs.
   useEffect(() => {
     if (!book || !allowed) return;
@@ -224,34 +243,40 @@ export default function FamilyAlbumsScreen() {
     if (current()) {
       setBook(reading.snapshot());
       setAccess(reading.snapshot()?.access ?? null);
+      if (mode === 'collect' && reading.snapshot()?.access.canManage) {
+        const result = await api.sources(familyId!);
+        if (current() && reading.snapshot()) setSources(result.shares);
+      }
     } else reading.invalidate();
   }
-  return <SettingsPage title={tr('家里的生活册')} backLabel={tr('返回')} accessibilityLabel={tr('家里的生活册')} onBack={() => router.back()}>
+  return <SettingsPage title={tr(mode === 'new' ? '新建家庭册' : mode === 'collect' ? '添加到家庭册' : '家里的生活册')} backLabel={tr('返回')} accessibilityLabel={tr('家里的生活册')} onBack={() => router.back()}>
     {allowed ? <View style={{
       paddingTop: 24,
       gap: 16
     }}>
-      <Text>{tr('开发验收入口，家庭册导出尚未开放。')}</Text>
-      {families.map(family => <View key={family.familyId}>{<FamilyAlbumButton label={family.name} onPress={() => {
+      {!familyId ? <Text style={{...type.body,color:inkSoft}}>{tr('选择这册所属的家庭')}</Text> : <Text style={{...type.meta,color:inkSoft}}>{families.find(family=>family.familyId===familyId)?.name}</Text>}
+      {mode === 'collect' && !book ? <Text style={{...type.body,color:inkSoft}}>{tr('选择已有家庭册，再收入这个家的分享。')}</Text> : null}
+      {!familyId ? families.filter(family=>mode !== 'new' || family.role === 'creator').map(family => <View key={family.familyId}>{<FamilyAlbumButton label={family.name} onPress={() => {
           epoch.current++;
           session.current?.invalidate();
           setFamilyId(family.familyId);
           requestId.current = null;
           setName('');
           setRetry(value => value + 1);
-        }} disabled={busy} />}</View>)}
+        }} disabled={busy} />}</View>) : null}
       {access && !access.rulesAcknowledged ? <><Text>{tr(FAMILY_ALBUM_RULE_COPY)}</Text><Text>{tr('已经交付的文件和纸书无法追回。')}</Text>
         {<FamilyAlbumButton label={tr('我知道了')} onPress={() => void run(async (api, current) => {
           await api.acknowledge(familyId!, access.membershipId);
           if (current()) setRetry(value => value + 1);
         })} disabled={busy} />}</> : null}
       {access?.rulesAcknowledged ? <>
-        {albums.map(album => <View key={album.albumId}>{<FamilyAlbumButton label={`${album.name} · ${album.entryCount}`} onPress={() => void run((api, current) => show(api, album.albumId, current))} disabled={busy} />}</View>)}
-        {access.canManage ? <><TextInput accessibilityLabel={tr('册名')} value={name} onChangeText={value => {
+        {mode !== 'new' && !book ? albums.map(album => <View key={album.albumId}>{<FamilyAlbumButton label={`${album.name} · ${album.entryCount}`} onPress={() => void run((api, current) => show(api, album.albumId, current))} disabled={busy} />}</View>) : null}
+        {mode !== 'new' && !book && albums.length===0 ? <Text style={{...type.body,color:inkSoft}}>{tr('这个家还没有家庭册。')}</Text> : null}
+        {access.canManage && mode === 'new' ? <><Text style={{...type.body,color:inkSoft}}>{tr('给这册起个名字')}</Text><TextInput accessibilityLabel={tr('册名')} placeholder={tr('册名')} style={{...type.body,color:ink,minHeight:52,borderBottomWidth:1,borderBottomColor:hairline}} value={name} onChangeText={value => {
             setName(value);
             requestId.current = null;
           }} maxLength={200} />
-          {<FamilyAlbumButton label={tr('新建一册')} onPress={() => void run(async (api, current) => {
+          {<FamilyAlbumButton label={tr('新建家庭册')} onPress={() => void run(async (api, current) => {
             const operation = requestId.current ?? `album_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
             requestId.current = operation;
             const created = await api.create(familyId!, {
@@ -262,13 +287,18 @@ export default function FamilyAlbumsScreen() {
             });
             if (!current()) return;
             requestId.current = null;
-            await show(api, created.albumId, current);
+            router.replace({pathname:'/family-albums',params:{familyId:familyId!,albumId:created.albumId,mode:'read'}});
           })} disabled={busy || !name.trim()} />}</> : null}
+        {access.canManage && mode === 'collect' && !book ? <FamilyAlbumButton label={tr('新建家庭册')} onPress={()=>router.push({pathname:'/family-albums',params:{familyId:familyId!,mode:'new'}})} disabled={busy}/> : null}
       </> : null}
       {book ? <View style={{
         gap: 12
-      }}><Text>{book.name}</Text>{book.opening ? <Text>{book.opening}</Text> : null}
-        {book.items.map(item => <View key={item.shareId}>{item.status === 'active' ? <><Text>{item.share.authorNickname || tr('家人')}</Text><Text>{item.share.snapshot.note}</Text>{item.share.snapshot.media.length ? <FamilyAlbumButton label={tr('照片与声音请在家庭分享中查看。')} onPress={() => router.push({pathname:'/family-record/[id]',params:{id:item.shareId,familyId:familyId!}})} disabled={busy} /> : null}</> : <Text>{tr('这条分享已不可用。')}</Text>}
+      }}><Text style={{...type.title,color:ink}}>{book.name}</Text>{book.opening ? <Text>{book.opening}</Text> : null}
+        {book.items.map((item,index) => <View key={item.shareId}>{item.status === 'active' ? <><Text>{item.share.authorNickname || tr('家人')}</Text><Text>{item.share.snapshot.note}</Text>{item.share.snapshot.media.length ? <FamilyAlbumButton label={tr('照片与声音请在家庭分享中查看。')} onPress={() => router.push({pathname:'/family-record/[id]',params:{id:item.shareId,familyId:familyId!}})} disabled={busy} /> : null}</> : <Text>{tr('这条分享已不可用。')}</Text>}
+          {book.access.canManage && index>0 ? <FamilyAlbumButton label={tr('上移这条记录')} onPress={()=>void run(async(api,current)=>{
+            const order=book.items.map(row=>row.shareId);[order[index-1],order[index]]=[order[index],order[index-1]];
+            await api.mutate(familyId!,book,{kind:'reorder',shareIds:order});if(current())await show(api,book.albumId,current);
+          })} disabled={busy}/> : null}
           {book.access.canManage ? <FamilyAlbumButton label={tr('移出这一册')} onPress={() => void run(async (api, current) => {
             await api.mutate(familyId!, book, {
               kind: 'remove',
@@ -307,5 +337,5 @@ export default function FamilyAlbumsScreen() {
   </SettingsPage>;
 }
 function FamilyAlbumButton({label,onPress,disabled}:{label:string;onPress:()=>void;disabled:boolean}) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={{minHeight:48,justifyContent:'center'}}><Text>{label}</Text></Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.action,color:disabled?inkSoft:sage}}>{label}</Text></Pressable>;
 }

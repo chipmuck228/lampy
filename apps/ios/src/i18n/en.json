@@ -838,5 +838,16 @@
   "普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。": "Ordinary text selection checked. Open the PDF to check emoji appearance; emoji may not be copyable.",
   "页面与文字选择已核对": "Pages and selectable text checked",
   "开发验收入口，正式导出尚未开放。": "Development evaluation. Production export is not available.",
-  "部分照片低于300DPI，打印前请检查清晰度。": "Some photos are below 300 DPI. Check clarity before printing."
+  "部分照片低于300DPI，打印前请检查清晰度。": "Some photos are below 300 DPI. Check clarity before printing.",
+  "正在读取家庭册。": "Loading family albums.",
+  "还没有家庭册，把家人的日子慢慢收在一起。": "No family albums yet. Gather your family’s days into a book.",
+  "确认 {0} 的家庭册说明": "Read the album notice for {0}",
+  "新建家庭册": "Create a family album",
+  "家庭创建者可以把分享收成一册。": "The family creator can collect shared moments into an album.",
+  "添加到家庭册": "Add to a family album",
+  "选择这册所属的家庭": "Choose the family for this album",
+  "选择已有家庭册，再收入这个家的分享。": "Choose an album, then collect this family’s shared moments.",
+  "这个家还没有家庭册。": "This family has no albums yet.",
+  "给这册起个名字": "Give this album a name",
+  "上移这条记录": "Move this moment up"
 }
