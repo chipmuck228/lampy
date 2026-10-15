@@ -83,6 +83,23 @@ describe.each(['memory','sqlite'] as const)('family album commands on %s',kind=>
    await expect(f.commands.albums.mutate('a','f',book.albumId,{authority:book.access.authority,revision:1,change:{kind:'collect',shareIds:[]}})).rejects.toMatchObject({code:'FAMILY_ALBUM_AUTHORITY_CHANGED'});
   }finally{await f.clean();}
  });
+ it('atomically edits name, opening and a qualified manual cover, falling back after withdrawal',async()=>{
+  const f=await fixture(kind);try {
+   await f.repository.withTransaction(async tx=>{const photo=(await tx.findMediaObject('photo'))!;await tx.saveMediaObject({...photo,objectId:'photo2',storageKey:'photo2',contentSha256:'b'.repeat(64)});const share=(await tx.findShare('s2'))!;await tx.saveShare({...share,shareId:'s3',sourceMomentId:'s3',snapshot:{...share.snapshot,media:[{objectId:'photo2',mimeType:'image/png',byteLength:10}]}});});
+   const book=await f.create();const collected=await f.commands.albums.mutate('a','f',book.albumId,{authority:book.access.authority,revision:1,change:{kind:'collect',shareIds:'all'}});
+   const edit={kind:'edit' as const,name:'New name',opening:'Opening',coverChoice:{shareId:'s3',objectId:'photo2'}};
+   await f.acknowledge('b');await expect(f.commands.albums.mutate('b','f',book.albumId,{authority:collected.access.authority,revision:collected.revision,change:edit})).rejects.toMatchObject({code:'FORBIDDEN'});
+   await expect(f.commands.albums.mutate('a','f',book.albumId,{authority:collected.access.authority,revision:collected.revision,change:{...edit,coverChoice:{shareId:'foreign',objectId:'photo'}}})).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
+   expect((await f.commands.albums.read('a','f',book.albumId)).name).toBe(book.name);
+   const edited=await f.commands.albums.mutate('a','f',book.albumId,{authority:collected.access.authority,revision:collected.revision,change:edit});
+   expect(edited).toMatchObject({name:'New name',opening:'Opening',cover:{shareId:'s3',objectId:'photo2'},coverChoice:{shareId:'s3',objectId:'photo2'}});
+   expect((await f.commands.albums.list('a','f')).albums[0]).not.toHaveProperty('coverChoice');
+   await f.commands.historyShares.revokeShare('b','f','s3');const withdrawn=await f.commands.albums.read('a','f',book.albumId);
+   expect(withdrawn.cover).toEqual({shareId:'s1',objectId:'photo'});expect(withdrawn.coverChoice).toBeNull();expect(JSON.stringify(withdrawn)).not.toContain('photo2');
+   await expect(f.commands.albums.mutate('a','f',book.albumId,{authority:withdrawn.access.authority,revision:withdrawn.revision,change:edit})).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
+   await expect(f.commands.albums.validate('a','f',book.albumId,edited.validation)).rejects.toMatchObject({code:'FAMILY_ALBUM_CHANGED'});
+  }finally{await f.clean();}
+ });
  it('removal, rejoin, sign-out and dissolution cannot reuse earlier access or acknowledgments',async()=>{
   const f=await fixture(kind);try {
    const book=await f.create();await f.acknowledge('b');

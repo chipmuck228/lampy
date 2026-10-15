@@ -61,8 +61,18 @@ export function createFamilyAlbumCommands(deps:{
         if(object&&object.ownerUserId===share.authorUserId&&object.mimeType.startsWith('image/')) {cover={shareId,objectId:object.objectId};break;}
       }
     }
-    const {shareIds: _references,...metadata}=row;void _references;
-    return {...metadata,access:permission,items,cover,validation:digest([metadata,permission,items,cover])};
+    let coverChoice:FamilyAlbumView['cover']=null;
+    if(row.coverChoice) {
+      const item=items.find(item=>item.shareId===row.coverChoice?.shareId);
+      if(item?.status==='active') {
+        const media=item.share.snapshot.media.find(media=>media.objectId===row.coverChoice?.objectId);
+        const object=media?await tx.findMediaObject(media.objectId):null;
+        if(object&&object.ownerUserId===item.share.authorUserId&&object.mimeType.startsWith('image/'))coverChoice={shareId:item.shareId,objectId:object.objectId};
+      }
+    }
+    if(coverChoice)cover=coverChoice;
+    const {shareIds: _references,coverChoice:_choice,...metadata}=row;void _references;void _choice;
+    return {...metadata,coverChoice,access:permission,items,cover,validation:digest([metadata,permission,items,cover])};
   }
   return {
     access(session,familyId) {return authed(session,(tx,userId)=>access(tx,familyId,userId));},
@@ -76,7 +86,7 @@ export function createFamilyAlbumCommands(deps:{
     list(session,familyId) {return authed(session,async(tx,userId)=>{
       const permission=await access(tx,familyId,userId);acknowledged(permission);
       const rows=await tx.listFamilyAlbums(familyId);
-      return {access:permission,albums:rows.map(({shareIds,...row})=>({...row,entryCount:shareIds.length}))};
+      return {access:permission,albums:rows.map(({shareIds,coverChoice,...row})=>{void coverChoice;return {...row,entryCount:shareIds.length};})};
     });},
     sources(session,familyId) {return authed(session,async(tx,userId)=>{
       const permission=await access(tx,familyId,userId);acknowledged(permission);
@@ -111,6 +121,18 @@ export function createFamilyAlbumCommands(deps:{
         if(!Array.isArray(candidates)||candidates.length>2000||new Set(candidates).size!==candidates.length)fail('BAD_REQUEST');
         for(const shareId of candidates) {id(shareId);if(!await visible(tx,familyId,shareId))fail('SHARE_NOT_FOUND');}
         row.shareIds=[...new Set([...row.shareIds,...candidates])];
+      } else if(change.kind==='edit') {
+        name(change.name);opening(change.opening);
+        const choice=change.coverChoice;
+        if(choice!==null) {
+          if(!choice||typeof choice!=='object')fail('BAD_REQUEST');id(choice.shareId);id(choice.objectId);
+          if(!row.shareIds.includes(choice.shareId))fail('SHARE_NOT_FOUND');
+          const share=await visible(tx,familyId,choice.shareId);
+          const media=share?.snapshot.media.find(media=>media.objectId===choice.objectId);
+          const object=media?await tx.findMediaObject(choice.objectId):null;
+          if(!share||!object||object.ownerUserId!==share.authorUserId||!object.mimeType.startsWith('image/'))fail('SHARE_NOT_FOUND');
+        }
+        row.name=change.name.trim();row.opening=change.opening;row.coverChoice=choice?{shareId:choice.shareId,objectId:choice.objectId}:null;
       } else if(change.kind==='remove') {id(change.shareId);row.shareIds=row.shareIds.filter(id=>id!==change.shareId);}
       else if(change.kind==='reorder') {
         if(!Array.isArray(change.shareIds)||change.shareIds.length!==row.shareIds.length||new Set(change.shareIds).size!==row.shareIds.length||change.shareIds.some(id=>!row.shareIds.includes(id)))fail('BAD_REQUEST');

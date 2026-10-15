@@ -28,7 +28,7 @@ it('does not request private data when default gate or device lock is closed',as
 });
 it('requires the rule notice before listing and gives ordinary members no write or export controls',async()=>{
  mockAccess.mockResolvedValue({...permission,rulesAcknowledged:false});const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Family')).toBeTruthy());await fireEvent.press(page.getByText('Family'));await waitFor(()=>expect(page.getByText('我知道了')).toBeTruthy());expect(mockList).not.toHaveBeenCalled();await page.unmount();
- mockAccess.mockResolvedValue(permission);const reading=await openBook();expect(reading.getByText('这条分享已不可用。')).toBeTruthy();expect(reading.queryByText('移出这一册')).toBeNull();expect(reading.queryByText('新建一册')).toBeNull();expect(reading.queryByText('生成 PDF')).toBeNull();
+ mockAccess.mockResolvedValue(permission);const reading=await openBook();expect(reading.getByText('这条分享已不可用。')).toBeTruthy();expect(reading.queryByText('移出这一册')).toBeNull();expect(reading.queryByText('新建一册')).toBeNull();expect(reading.queryByText('编辑册子')).toBeNull();expect(reading.queryByText('生成 PDF')).toBeNull();
 });
 it('clears on background and prevents a late read from restoring private content',async()=>{
  let finish!:(value:unknown)=>void;mockRead.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));

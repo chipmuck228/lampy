@@ -1,3 +1,4 @@
+import { FamilyAlbumEditor, FamilyAlbumCoverPreview } from './family-album-editor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, View } from 'react-native';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -32,6 +33,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   const [book, setBook] = useState<FamilyAlbumView | null>(null);
   const [sources, setSources] = useState<ShareView[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -59,6 +61,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     let disposed = false;
     session.current?.invalidate();
     setBook(null);
+    setEditing(false);
     setAccess(null);
     setAlbums([]);
     setSources([]);
@@ -293,7 +296,11 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       </> : null}
       {book ? <View style={{
         gap: 12
-      }}><Text style={{...type.title,color:ink}}>{book.name}</Text>{book.opening ? <Text>{book.opening}</Text> : null}
+      }}>{book.cover && !editing ? <FamilyAlbumCoverPreview key={`${book.cover.shareId}/${book.cover.objectId}`} familyId={book.familyId} cover={book.cover}/> : null}<Text style={{...type.title,color:ink}}>{book.name}</Text>{book.opening ? <Text>{book.opening}</Text> : null}
+        {book.access.canManage ? <FamilyAlbumButton label={tr('编辑册子')} onPress={()=>setEditing(value=>!value)} disabled={busy}/> : null}
+        {editing && book.access.canManage ? <FamilyAlbumEditor book={book} busy={busy} onCancel={()=>setEditing(false)} onSave={change=>void run(async(api,current)=>{
+          await api.mutate(familyId!,book,change);if(current()){setEditing(false);await show(api,book.albumId,current);}
+        })}/> : null}
         {book.items.map((item,index) => <View key={item.shareId}>{item.status === 'active' ? <><Text>{item.share.authorNickname || tr('家人')}</Text><Text>{item.share.snapshot.note}</Text>{item.share.snapshot.media.length ? <FamilyAlbumButton label={tr('照片与声音请在家庭分享中查看。')} onPress={() => router.push({pathname:'/family-record/[id]',params:{id:item.shareId,familyId:familyId!}})} disabled={busy} /> : null}</> : <Text>{tr('这条分享已不可用。')}</Text>}
           {book.access.canManage && index>0 ? <FamilyAlbumButton label={tr('上移这条记录')} onPress={()=>void run(async(api,current)=>{
             const order=book.items.map(row=>row.shareId);[order[index-1],order[index]]=[order[index],order[index-1]];
