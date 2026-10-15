@@ -1,6 +1,7 @@
+import { AlbumCreateFields } from './album-workflow-controls';
 import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 
 import { getUseCases } from '../application/container';
@@ -29,8 +30,6 @@ import {
   shouldApplyAlbumNewRequest,
 } from './life-album-new-request';
 import { firstSearchParam } from './lookback-origin';
-import { ink, inkSoft, sage } from './life-page';
-import { Text, TextInput, type } from './life-text';
 import { SettingsPage } from './settings-chrome';
 
 export { shouldApplyAlbumNewRequest } from './life-album-new-request';
@@ -258,59 +257,7 @@ export default function LifeAlbumNewScreen() {
       scrollEnabled={false}
       onBack={leaveWithoutWrite}
     >
-      <Text style={styles.label}>{tr("册名")}</Text>
-      <TextInput
-        testID="life-album-new-name"
-        value={displayName}
-        onChangeText={setName}
-        placeholder={DEFAULT_ALBUM_NAME}
-        editable={!saving && !nameLocked}
-        autoCorrect={false}
-        autoCapitalize="none"
-        style={[styles.input, nameLocked && styles.inputLocked]}
-      />
-      {error ? (
-        <Text testID="life-album-new-error" style={styles.error}>
-          {error}
-        </Text>
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: saving }}
-        accessibilityLabel={shownSubmitLabel}
-        testID="life-album-new-save"
-        onPress={() => {
-          void save();
-        }}
-        style={styles.hit}
-      >
-        <Text style={[styles.action, saving && styles.disabled]}>
-          {saving ? submitBusyLabel : shownSubmitLabel}
-        </Text>
-      </Pressable>
-      <View />
+      <AlbumCreateFields name={displayName} onChangeName={setName} placeholder={DEFAULT_ALBUM_NAME} locked={nameLocked} busy={saving} error={error} submitLabel={shownSubmitLabel} busyLabel={submitBusyLabel} onSubmit={()=>void save()}/>
     </SettingsPage>
   );
 }
-
-const styles = StyleSheet.create({
-  label: { ...type.meta, color: inkSoft, marginBottom: 8, marginTop: 8 },
-  input: {
-    fontSize: type.body.fontSize,
-    color: ink,
-    width: '100%',
-    minHeight: 48,
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingRight: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: sage,
-  },
-  inputLocked: {
-    color: inkSoft,
-  },
-  action: { ...type.action, color: sage },
-  disabled: { opacity: 0.45 },
-  error: { ...type.meta, color: inkSoft },
-  hit: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
-});

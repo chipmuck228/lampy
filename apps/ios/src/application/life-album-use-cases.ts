@@ -1,3 +1,4 @@
+import { moveAlbumReference } from './album-entry-order';
 import { dateLabel, tr } from '../i18n';
 import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
 import type { AssetRepository, MomentRepository } from '../infrastructure/repositories';
@@ -492,13 +493,9 @@ export function createLifeAlbumUseCases(deps: {
   }): Promise<AlbumManageView> {
     const current = await albums.listEntries(input.albumId);
     const ids = current.map((entry) => entry.momentId);
-    const index = ids.indexOf(input.momentId);
-    if (index < 0) throw new ApplicationError(ALBUM_REORDER_INVALID, tr("这一册的顺序没有改成。可以再试。"));
-    const swap = input.direction === 'up' ? index - 1 : index + 1;
-    if (swap < 0 || swap >= ids.length) return toManageView(input.albumId);
-    const next = ids.slice();
-    const [moved] = next.splice(index, 1);
-    next.splice(swap, 0, moved);
+    const next=moveAlbumReference(ids,input.momentId,input.direction);
+    if(!next)throw new ApplicationError(ALBUM_REORDER_INVALID,tr("这一册的顺序没有改成。可以再试。"));
+    if(next.every((id,index)=>id===ids[index]))return toManageView(input.albumId);
     return reorderAlbumEntries({ albumId: input.albumId, momentIds: next });
   }
 

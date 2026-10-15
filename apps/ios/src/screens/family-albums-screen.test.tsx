@@ -47,7 +47,7 @@ it('opens a routed book immediately without a family or album picker',async()=>{
 it('new flow skips family selection for a single eligible creator and opens the created book',async()=>{
  mockParams={mode:'new'};mockDirectory.mockResolvedValue({userId:'a',families:[{familyId:'f',name:'Family',role:'creator'}]});mockAccess.mockResolvedValue({...permission,role:'creator',canManage:true});mockCreate.mockResolvedValue(book);
  const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByLabelText('册名')).toBeTruthy());expect(page.queryByText('Family book · 2')).toBeNull();
- await fireEvent.changeText(page.getByLabelText('册名'),'Our days');await fireEvent.press(page.getByText('新建家庭册'));await waitFor(()=>expect(mockReplace).toHaveBeenCalledWith({pathname:'/family-albums',params:{familyId:'f',albumId:'book',mode:'read'}}));expect(mockCreate).toHaveBeenCalledWith('f',expect.objectContaining({name:'Our days',authority:'current'}));
+ await fireEvent.changeText(page.getByLabelText('册名'),'Our days');await fireEvent.press(page.getByText('创建这一册'));await waitFor(()=>expect(mockReplace).toHaveBeenCalledWith({pathname:'/family-albums',params:{familyId:'f',albumId:'book',mode:'read'}}));expect(mockCreate).toHaveBeenCalledWith('f',expect.objectContaining({name:'Our days',authority:'current'}));
 });
 it('collect entry stays within its routed family and offers existing books',async()=>{
  mockParams={familyId:'f',mode:'collect'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Family book · 2')).toBeTruthy());expect(page.queryByText('选择这册所属的家庭')).toBeNull();expect(mockAccess).toHaveBeenCalledWith('f');
@@ -95,4 +95,17 @@ it('keeps the editor visible for a minute of four-second renewals',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator});mockValidate.mockImplementation(()=>new Promise(resolve=>setTimeout(()=>resolve({valid:true}),4000)));
  const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('编辑册子')).toBeTruthy());await fireEvent.press(page.getByText('编辑册子'));await fireEvent.changeText(page.getByLabelText('册名'),'Stable draft');
  for(let i=0;i<60;i++){await act(async()=>{jest.advanceTimersByTime(1000);});expect(page.queryByTestId('family-album-checking')).toBeNull();expect(page.getByLabelText('册名').props.value).toBe('Stable draft');}
+});
+it('uses organize/done with bounded up/down/remove controls and preserves organizing after a move',async()=>{
+ mockParams={familyId:'f',albumId:'book',mode:'read'};const creator={...permission,role:'creator',canManage:true};const currentBook={...book,access:creator};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue(currentBook);mockMutate.mockResolvedValue(currentBook);
+ const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('整理')).toBeTruthy());expect(page.queryByTestId('family-album-move-down-s')).toBeNull();await fireEvent.press(page.getByText('整理'));
+ expect(page.getByTestId('family-album-move-up-s').props.accessibilityState.disabled).toBe(true);expect(page.getByTestId('family-album-move-down-old').props.accessibilityState.disabled).toBe(true);
+ mockRead.mockResolvedValue({...currentBook,revision:2,items:[currentBook.items[1],currentBook.items[0]]});await fireEvent.press(page.getByTestId('family-album-move-down-s'));await waitFor(()=>expect(mockMutate).toHaveBeenCalledWith('f',currentBook,{kind:'reorder',shareIds:['old','s']}));await waitFor(()=>expect(page.getByTestId('family-album-move-down-s').props.accessibilityState.disabled).toBe(true));
+ expect(page.getByText('完成')).toBeTruthy();await fireEvent.press(page.getByText('完成'));expect(page.queryByTestId('family-album-move-up-s')).toBeNull();expect(page.getByText('整理')).toBeTruthy();
+});
+it('saves individual fields without closing the editor or discarding the other field draft',async()=>{
+ mockParams={familyId:'f',albumId:'book',mode:'read'};const creator={...permission,role:'creator',canManage:true};const currentBook={...book,access:creator};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue(currentBook);
+ mockMutate.mockImplementation(async(_family,view,change)=>{const next={...view,name:change.name,opening:change.opening,revision:view.revision+1};mockRead.mockResolvedValue(next);return next;});
+ const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('编辑册子')).toBeTruthy());await fireEvent.press(page.getByText('编辑册子'));await fireEvent.changeText(page.getByLabelText('册名'),'Saved name');await fireEvent.changeText(page.getByLabelText('开篇'),'Opening draft');await fireEvent.press(page.getByText('保存册名'));
+ await waitFor(()=>expect(page.getByLabelText('册名').props.editable).toBe(true));expect(page.getByLabelText('开篇').props.value).toBe('Opening draft');expect(page.getByText('取消')).toBeTruthy();await fireEvent.press(page.getByText('保存开篇'));await waitFor(()=>expect(mockMutate).toHaveBeenLastCalledWith('f',expect.objectContaining({revision:2,name:'Saved name'}),{kind:'rename',name:'Saved name',opening:'Opening draft'}));
 });
