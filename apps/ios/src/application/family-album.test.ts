@@ -57,3 +57,9 @@ it('renews with one server request and still rejects account changes and mismatc
  await expect(f.client.validate(view,()=>true)).rejects.toMatchObject({code:'FAMILY_ALBUM_CANCELLED'});
  f.validate.mockClear();await expect(f.client.validate(view,()=>true)).rejects.toMatchObject({code:'FAMILY_ALBUM_CANCELLED'});expect(f.validate).not.toHaveBeenCalled();
 });
+it('reports only renewal stage and timings when a server request hangs',async()=>{
+ const f=setup();await f.session.setSession({userId:'a',sessionToken:'a'});let now=0;const reading=createFamilyAlbumReadSession({client:f.client,now:()=>now});await reading.load('f','book');
+ let finish!:(value:{valid:true})=>void;f.validate.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));const work=reading.validate();
+ for(let i=0;i<100&&!finish;i++)await Promise.resolve();now=3100;
+ expect(reading.diagnostic()).toBe('stage=SERVER_REQUEST pendingMs=3100 lastMs=none completed=0');expect(reading.snapshot()).toBeNull();reading.invalidate();finish({valid:true});expect(await work).toBe(false);
+});

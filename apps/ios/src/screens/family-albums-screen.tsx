@@ -126,7 +126,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     if (!book || !allowed) return;
     const timer = setInterval(() => {
       if (!session.current?.snapshot()) {
-        setDiagnostic('READ_LEASE/EXPIRED');
+        setDiagnostic(`READ_LEASE/EXPIRED ${session.current?.diagnostic()??'NO_SESSION'} busy=${owner.current?1:0}`);
         session.current?.invalidate();
         setBook(null);
         setAccess(null);

@@ -29,13 +29,16 @@ export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:F
       if(!current())throw new ApplicationError('FAMILY_ALBUM_CANCELLED','The family request is no longer current.');
       await api.validate(token,familyId,albumId,view.validation);return view;
     },current);},
-    async validate(view:FamilyAlbumView,current:()=>boolean) {
+    async validate(view:FamilyAlbumView,current:()=>boolean,onStage?:(stage:string)=>void) {
       // The validation digest already includes server-side user, membership and authority.
       // Repeating access() first adds a round trip without strengthening this check.
+      onStage?.('ACCOUNT_BEFORE');
       const before=await account();const api=deps.client.albums;
       if(!api)throw new ApplicationError('FAMILY_ALBUMS_CLOSED','Family albums are not available.');
       if(!current()||before.userId!==view.access.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','Account changed.');
+      onStage?.('SERVER_REQUEST');
       const result=await api.validate(before.token,view.familyId,view.albumId,view.validation);
+      onStage?.('ACCOUNT_AFTER');
       const after=await account();
       if(!current()||before.token!==after.token||before.userId!==after.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','Account changed.');
       return result;
@@ -46,9 +49,11 @@ export type FamilyAlbumUseCases=ReturnType<typeof createFamilyAlbumUseCases>;
 // Memory only: no album snapshot, private media or position is persisted in a personal store.
 export function createFamilyAlbumReadSession(deps:{client:FamilyAlbumUseCases;now?:()=>number;onInvalidate?:()=>void}) {
   let generation=0;let view:FamilyAlbumView|null=null;let expires=0;const now=deps.now??Date.now;
+  let stage='NOT_STARTED',pendingSince:number|null=null,lastMs:number|null=null,completed=0;
   const clear=()=>{generation++;view=null;expires=0;deps.onInvalidate?.();};
   return {
     invalidate:clear,
+    diagnostic() {return `stage=${stage} pendingMs=${pendingSince===null?0:Math.max(0,now()-pendingSince)} lastMs=${lastMs??'none'} completed=${completed}`;},
     snapshot() {return view&&now()<expires?view:null;},
     async load(familyId:string,albumId:string) {
       clear();const epoch=generation;const started=now();
@@ -59,9 +64,10 @@ export function createFamilyAlbumReadSession(deps:{client:FamilyAlbumUseCases;no
     async validate() {
       if(!view){clear();return false;}
       const candidate=view;const epoch=generation;const started=now();
-      try {await deps.client.validate(candidate,()=>epoch===generation);
-        if(epoch!==generation)return false;if(now()-started>=3000){clear();return false;}expires=started+3000;return true;
-      } catch(error){if(epoch!==generation)return false;clear();throw error;}
+      pendingSince=started;stage='STARTING';
+      try {await deps.client.validate(candidate,()=>epoch===generation,next=>{if(epoch===generation)stage=next;});
+        if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;completed++;stage='COMPLETED';if(now()-started>=3000){stage='TOO_SLOW';clear();return false;}expires=started+3000;return true;
+      } catch(error){if(epoch!==generation)return false;lastMs=now()-started;pendingSince=null;stage='REJECTED';clear();throw error;}
     },
   };
 }
