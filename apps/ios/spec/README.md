@@ -35,3 +35,5 @@
 | `family-member-profiles-stage2/` | 家庭成员系统头像墙、昵称与点选操作；权限不按昵称，正式入口仍关闭 |
 
 - [家庭分享身份 · 阶段 3](family-share-author-stage3/README.md)
+
+- [Phase F1 · 受控公网联调准备](family-public-preflight-f1/README.md)
