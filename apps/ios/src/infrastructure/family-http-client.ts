@@ -407,7 +407,7 @@ export function createFamilyHttpTransport(deps: {
       const metadata=(input.method.toUpperCase()==='GET'&&(input.path==='/v2/me/families'||/^\/v2\/families\/[^/]+\/(albums|album-access)$/.test(input.path)))||(input.method.toUpperCase()==='POST'&&/^\/v2\/families\/[^/]+\/albums\/[^/]+\/validate$/.test(input.path));
       const id=trace&&metadata?`diag-${diagnosticNonce}-${++diagnosticRequestSequence}`:null;
       if(id)headers['x-lampy-request-id']=id;
-      const network:FamilyNetworkDiagnostic={id,engine:deps.fetchImpl?'INJECTED':(fetchImpl as typeof fetch&{polyfill?:boolean}).polyfill===true?'RN':'OTHER',rnRequested:process.env.EXPO_PUBLIC_USE_RN_FETCH==='1'||process.env.EXPO_PUBLIC_USE_RN_FETCH==='true',phase:'HEADERS',status:null};
+      const network:FamilyNetworkDiagnostic={id,engine:(fetchImpl as typeof fetch&{polyfill?:boolean}).polyfill===true?'RN':deps.fetchImpl?'INJECTED':'OTHER',rnRequested:process.env.EXPO_PUBLIC_USE_RN_FETCH==='1'||process.env.EXPO_PUBLIC_USE_RN_FETCH==='true',phase:'HEADERS',status:null};
       const controller=input.timeoutMs?new AbortController():null;
       let timer:ReturnType<typeof setTimeout>|undefined;
       const work=(async()=>{

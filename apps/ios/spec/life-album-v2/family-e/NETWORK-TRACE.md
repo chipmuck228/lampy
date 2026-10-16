@@ -4,6 +4,12 @@ Status: NOT RESOLVED. User reports the family list still cycles DIRECTORY_HTTP t
 
 User's operator probe for the specified current test account returned local directory200/46ms, five concurrent lists200/8–12ms; server-side HTTPS directory200/738ms, concurrent lists200/557–1203ms. This is a short observation window, not a guarantee against intermittent backend contention or the exact simulator session. Health/Safari/unauthenticated checks cannot diagnose authenticated App response reading.
 
+## Correlated result and explicit XHR trial
+
+2026-10-16: App request diag-c141f1dc5ff56000-27 timed out waiting for HEADERS after 5038ms (engine OTHER, rnRequested=1). The SAME ID has API START and FINISH200/2ms at 14:39:19 server time. Node FINISH does not prove device receipt. This narrows investigation to the response path/client networking, without proving a specific library defect.
+
+Family transport now explicitly receives whatwg-fetch 3.6.20 (the RN XHR-backed implementation), rather than depending on global fetch or the Expo environment switch. It is a direct pinned JS dependency already present transitively. No native build or API update required. The actual polyfill marker reports engine=RN. Existing timeout, cancellation, authorization and 15-second lease protections remain. Regression tests verify it ignores replaced global fetch and aborts its XHR. Simulator outcome remains NOT VERIFIED; test library dwell, individual book/editor, audio, and withdrawal/account changes before acceptance.
+
 ## Added observations
 
 Development App + FAMILY_ALBUM_EVAL only: selected directory/access/list/validate requests carry a process-random diagnostic ID `diag-<16 hex>-<counter>`. No IDs are derived from account, family, session or content. Timeout errors preserve this ID through the API/use-case wrappers into the existing list diagnostic. `wait=HEADERS` means fetch has not returned response headers; `wait=TEXT http=200` means headers/status arrived and buffered text reading has not completed; BYTES labels buffered media reads. `engine=RN` recognizes the whatwg-fetch polyfill marker; OTHER is unrecognized and must not be asserted to be Expo (wrappers may also obscure the marker); INJECTED is for tests. rnRequested records the environment request, not proof of execution.

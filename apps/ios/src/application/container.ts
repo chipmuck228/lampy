@@ -7,6 +7,7 @@ import {
   type FamilyUseCases,
 } from './family-use-cases';
 import { createExpoAudioCapture } from '../infrastructure/expo-audio';
+import { familyXhrFetch } from '../infrastructure/family-xhr-fetch';
 import { familyApiBaseUrl } from '../infrastructure/family-config';
 import { createFamilyApiClient, createFamilyHttpTransport, type FamilyApiClient } from '../infrastructure/family-http-client';
 import { createSqlitePendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
@@ -102,7 +103,7 @@ const familyLoader = createUseCaseLoader(async () => {
   const repos = createSqliteRepositories(db);
   return createIosFamilyUseCases({
     db,
-    client: createFamilyApiClient(createFamilyHttpTransport({ baseUrl: familyApiBaseUrl() })),
+    client: createFamilyApiClient(createFamilyHttpTransport({ baseUrl: familyApiBaseUrl(), fetchImpl: familyXhrFetch })),
     session: createSecureFamilySessionStore(),
     personal: {
       moments: repos.moments,
