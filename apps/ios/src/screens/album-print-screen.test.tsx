@@ -8,6 +8,7 @@ import {
 import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AlbumPrintScreen from './album-print-screen';
+import {AlbumPrintFailure} from '../application/album-print';
 const mockSave = jest.fn();
 const mockShare = jest.fn();
 const mockLocked = { locked: false };
@@ -52,6 +53,9 @@ beforeEach(() => {
 });
 afterEach(async () => {
   delete process.env.EXPO_PUBLIC_ALBUM_PRINT_EVAL;
+  delete process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED;
+  delete process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED;
+  delete process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID;
   await cleanup();
 });
 it('default-off route cannot expose the generation action', async () => {
@@ -118,4 +122,12 @@ it('failed generation exposes only the safe diagnostic stage and code', async ()
   expect(
     view.getByTestId('album-print-failure-diagnostic').props.children,
   ).toBe('UNKNOWN / PDF_REOPEN_FAILED');
+});
+
+it('exposes the formal PDF entry only under its switch and surfaces the protected entitlement denial',async()=>{
+ process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED='1';process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED='1';process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID='app.lampy.export';delete process.env.EXPO_PUBLIC_ALBUM_PRINT_EVAL;
+ mockSave.mockRejectedValueOnce(new AlbumPrintFailure({stage:'AUTHORIZE_EXPORT',code:'EXPORT_PURCHASE_REQUIRED'}));
+ const page=await render(wrap());await waitFor(()=>expect(mockList).toHaveBeenCalled());
+ expect(page.queryByText('开发验收入口，正式导出尚未开放。')).toBeNull();await fireEvent.press(page.getByText('生成PDF'));
+ await waitFor(()=>expect(page.getByText('请先解锁或恢复导出权益，再点生成PDF。')).toBeTruthy());expect(mockShare).not.toHaveBeenCalled();
 });

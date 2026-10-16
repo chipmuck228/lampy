@@ -53,7 +53,7 @@ const fixture: AlbumLayoutInput = {
     },
   ],
 };
-function setup(nextId: () => string = () => 'print_one') {
+function setup(nextId: () => string = () => 'print_one',authorize?:()=>Promise<void>) {
   let active = true;
   const read = jest.fn(
     async () => JSON.parse(JSON.stringify(fixture)) as AlbumLayoutInput,
@@ -89,6 +89,7 @@ function setup(nextId: () => string = () => 'print_one') {
   } as AlbumFontDiagnosis;
   const service = createAlbumPrintService({
     read,
+    authorize,
     fonts: () => fonts,
     store,
     current: () => active,
@@ -296,4 +297,15 @@ it('color glyphs do not bypass failed ordinary text checks', async () => {
     colorGlyphRanges: [{page: 0, block: 0, line: 0, startUTF16: 1, endUTF16: 3}]});
   await expect(service.save('plain')).rejects.toMatchObject({code: 'INVALID_PDF'});
   expect(store.discard).toHaveBeenCalled();
+});
+
+it('denies paid export before reading private source or creating staging files',async()=>{
+ const authorize=jest.fn(async()=>{throw {code:'EXPORT_PURCHASE_REQUIRED'};});const f=setup(undefined,authorize);
+ await expect(f.service.save('plain')).rejects.toMatchObject({diagnostic:{stage:'AUTHORIZE_EXPORT',code:'EXPORT_PURCHASE_REQUIRED'}});
+ expect(f.read).not.toHaveBeenCalled();expect(f.store.begin).not.toHaveBeenCalled();expect(f.store.commit).not.toHaveBeenCalled();
+});
+it('rechecks ownership before publishing and cleans staging when access is revoked',async()=>{
+ const authorize=jest.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce({code:'EXPORT_PURCHASE_REQUIRED'});const f=setup(undefined,authorize);
+ await expect(f.service.save('plain')).rejects.toMatchObject({diagnostic:{stage:'AUTHORIZE_EXPORT',code:'EXPORT_PURCHASE_REQUIRED'}});
+ expect(authorize).toHaveBeenCalledTimes(2);expect(f.store.writePdf).toHaveBeenCalled();expect(f.store.commit).not.toHaveBeenCalled();expect(f.store.discard).toHaveBeenCalledWith('print_one');
 });
