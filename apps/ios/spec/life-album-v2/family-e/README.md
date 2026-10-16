@@ -154,3 +154,8 @@ API 列表增加可选 cover 引用，优先有效手选封面，再按册内顺
 目录阶段诊断细分为 DIRECTORY_REVOKE/ACCOUNT/HTTP/ACCOUNT_CHECK/CACHE/READY，并在整轮超时保留 phase；无用户/家庭/册名/正文/token。以区分网络、账号读取和缓存等待，而不是笼统显示整轮超时。无云端、数据库或原生变更。
 
 验证：6 suites / 72 tests 通过（历史/移除/撤回/目录与账号隔离、HTTP超时取消、列表续验及阶段诊断、家庭册应用）；TypeScript、改动ESLint、diff检查通过。模拟器待用户更新后重验停留和封面/声音。
+
+
+## 登录请求诊断待收集
+
+134f5e0 后用户报告代理例外及清理 Metro/重开 App 后仍 DIRECTORY_HTTP/SERVER_UNREACHABLE ~5020ms；本机保护正常解锁，不能将缓存修复或代理例外视为现场问题已解决。新增 operator-only family-api-read-probe.cjs 比较指定账号已有会话在服务器本机和 HTTPS 的目录及并发册子列表耗时；不输出凭据/私人内容，不重启服务，不改 App。步骤、限制与3项安全/超时测试见 NETWORK-PROBE.md，现场结果待收集。
