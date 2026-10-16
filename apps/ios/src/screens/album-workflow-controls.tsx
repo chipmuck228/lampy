@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import {useState} from 'react';
+import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput, type } from './life-text';
-import { ink, inkSoft, paperDeep, sage } from './life-page';
+import { hairline, ink, inkSoft, paperDeep, placeholder, sage } from './life-page';
 import { tr } from '../i18n';
 import { ALBUM_OPENING_HINT } from '../application/life-album';
 // Shared presentation for personal and family albums; persistence/permission stay with adapters.
@@ -113,11 +114,29 @@ export function AlbumEditorFields({
   maxName?: number;
   maxOpening?: number;
 }) {
-  return <><Text style={styles.label}>{tr('册名')}</Text><TextInput accessibilityLabel={tr('册名')} testID={`${prefix}-name`} value={name} onChangeText={onName} editable={!busy} maxLength={maxName} style={styles.input} /><Pressable accessibilityRole="button" accessibilityState={{
-      disabled: busy
-    }} accessibilityLabel={tr('保存册名')} testID={`${prefix}-save-name`} disabled={busy} onPress={onSaveName} style={styles.hit}><Text style={[styles.action, busy && styles.disabled]}>{tr('保存册名')}</Text></Pressable><Text style={styles.label}>{tr('开篇')}</Text><Text style={styles.hint}>{ALBUM_OPENING_HINT}</Text><TextInput accessibilityLabel={tr('开篇')} testID={`${prefix}-opening`} value={opening} onChangeText={onOpening} editable={!busy} multiline maxLength={maxOpening} style={styles.input} /><Pressable accessibilityRole="button" accessibilityState={{
-      disabled: busy
-    }} accessibilityLabel={tr('保存开篇')} testID={`${prefix}-save-opening`} disabled={busy} onPress={onSaveOpening} style={styles.hit}><Text style={[styles.action, busy && styles.disabled]}>{tr('保存开篇')}</Text></Pressable></>;
+  const [focused,setFocused]=useState<'name'|'opening'|null>(null);
+  const saveName=()=>{if(!busy){Keyboard.dismiss();onSaveName();}};
+  const saveOpening=()=>{if(!busy){Keyboard.dismiss();onSaveOpening();}};
+  return <View style={styles.editorFields}>
+    <View style={styles.field}>
+      <View style={styles.fieldHeading}>
+        <Text style={styles.label}>{tr('册名')}</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{disabled:busy}} accessibilityLabel={tr('保存册名')} testID={`${prefix}-save-name`} disabled={busy} onPress={saveName} style={styles.fieldDone}>
+          <Text style={[styles.fieldDoneLabel,busy&&styles.disabled]}>{tr('完成')}</Text>
+        </Pressable>
+      </View>
+      <TextInput accessibilityLabel={tr('册名')} testID={`${prefix}-name`} value={name} onChangeText={onName} editable={!busy} maxLength={maxName} placeholder={tr('册名')} placeholderTextColor={placeholder} returnKeyType="done" onSubmitEditing={saveName} onFocus={()=>setFocused('name')} onBlur={()=>setFocused(value=>value==='name'?null:value)} style={[styles.input,focused==='name'&&styles.inputFocused]}/>
+    </View>
+    <View style={styles.field}>
+      <View style={styles.fieldHeading}>
+        <Text style={styles.label}>{tr('开篇')}</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{disabled:busy}} accessibilityLabel={tr('保存开篇')} testID={`${prefix}-save-opening`} disabled={busy} onPress={saveOpening} style={styles.fieldDone}>
+          <Text style={[styles.fieldDoneLabel,busy&&styles.disabled]}>{tr('完成')}</Text>
+        </Pressable>
+      </View>
+      <TextInput accessibilityLabel={tr('开篇')} accessibilityHint={ALBUM_OPENING_HINT} testID={`${prefix}-opening`} value={opening} onChangeText={onOpening} editable={!busy} multiline maxLength={maxOpening} placeholder={ALBUM_OPENING_HINT} placeholderTextColor={placeholder} onFocus={()=>setFocused('opening')} onBlur={()=>setFocused(value=>value==='opening'?null:value)} style={[styles.input,styles.openingInput,focused==='opening'&&styles.inputFocused]}/>
+    </View>
+  </View>;
 }
 const styles = StyleSheet.create({
   createLabel: {
@@ -182,7 +201,19 @@ const styles = StyleSheet.create({
     ...type.meta,
     color: inkSoft
   },
+  editorFields: {gap: 16},
+  field: {gap: 4},
+  fieldHeading: {flexDirection: 'row',alignItems: 'center',justifyContent: 'space-between',gap: 12},
+  fieldDone: {minWidth: 48,minHeight: 44,alignItems: 'flex-end',justifyContent: 'center',paddingHorizontal: 4},
+  fieldDoneLabel: {...type.meta,color: sage},
+  inputFocused: {borderColor: sage},
+  openingInput: {minHeight: 112,maxHeight: 240,textAlignVertical: 'top'},
   input: {
+    backgroundColor: paperDeep,
+    borderWidth: 1,
+    borderColor: hairline,
+    borderRadius: 10,
+    paddingHorizontal: 12,
     fontSize: type.body.fontSize,
     color: ink,
     minHeight: 48,
