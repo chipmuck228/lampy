@@ -1,6 +1,6 @@
 import {LifeIcon} from './life-icons';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { albumEntryCountLabel } from '../application/life-album';
@@ -24,6 +24,19 @@ export function AlbumCoverFace({
   wordsTestID?: string;
   privateMedia?: boolean;
 }) {
+  const [reduceMotion, setReduceMotion] = useState(true);
+  useEffect(() => {
+    let active = true;
+    let changed = false;
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => {
+      changed = true;
+      if (active) setReduceMotion(value);
+    });
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => {
+      if (active && !changed) setReduceMotion(value);
+    }).catch(() => undefined);
+    return () => { active = false; subscription.remove(); };
+  }, []);
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const showImage = !!coverUri && failedUri !== coverUri;
 
@@ -34,6 +47,7 @@ export function AlbumCoverFace({
           source={{ uri: coverUri }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          transition={reduceMotion ? 0 : {duration: 240, effect: 'cross-dissolve'}}
           cachePolicy={privateMedia ? "none" : undefined}
           accessibilityIgnoresInvertColors
           onError={() => setFailedUri(coverUri)}
