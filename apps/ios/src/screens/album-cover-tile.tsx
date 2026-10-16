@@ -47,7 +47,7 @@ export function AlbumCoverFace({
           source={{ uri: coverUri }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
-          transition={reduceMotion ? 0 : {duration: 240, effect: 'cross-dissolve'}}
+          transition={reduceMotion ? 0 : {duration: 960, effect: 'cross-dissolve'}}
           cachePolicy={privateMedia ? "none" : undefined}
           accessibilityIgnoresInvertColors
           onError={() => setFailedUri(coverUri)}
