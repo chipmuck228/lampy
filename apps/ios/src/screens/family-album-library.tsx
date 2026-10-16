@@ -1,17 +1,16 @@
 import {FamilyAlbumCoverPreview} from './family-album-editor';
 import {albumCoverWallLayout,ALBUM_COVER_WALL_GAP} from './album-cover-wall';
-import {LifeIcon} from './life-icons';
 import {FAMILY_ALBUM_LEASE_MS,FAMILY_ALBUM_RENEW_MS} from '../application/family-album';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {AppState,Pressable,StyleSheet,View} from 'react-native';
+import {AppState,Pressable,View} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {getFamilyUseCases} from '../application/container';
 import type {FamilyAlbumSummary} from '../family-api/family-album-types';
 import type {FamilySummary} from '../family-api/types';
 import {useDeviceLock} from './device-lock-context';
-import {AlbumCoverFace,AlbumCoverMeta} from './album-cover-tile';
+import {AlbumCoverFace,AlbumCoverMeta,AlbumCreateTile} from './album-cover-tile';
 import {Text,type} from './life-text';
-import {ink,inkSoft,sage,paperDeep} from './life-page';
+import {inkSoft} from './life-page';
 import {tr} from '../i18n';
 type Row=FamilyAlbumSummary & {familyName:string};
 // This panel lives inside the same list page as personal albums. Nothing is persisted.
@@ -64,9 +63,10 @@ export function FamilyAlbumLibrary(){
     <AlbumCoverMeta name={album.name} entryCount={album.entryCount}/>
     <Text style={{...type.meta,color:inkSoft}} numberOfLines={1}>{album.familyName}</Text>
    </Pressable>)}
+   {canCreate?<AlbumCreateTile width={layout.tileWidth} height={layout.tileHeight} label={tr('新建家庭册')} testID="family-album-new" onPress={()=>router.push({pathname:'/family-albums',params:{mode:'new'}})}/>:null}
    </View>
    {pending.map(family=><Pressable key={family.familyId} accessibilityRole="button" onPress={()=>router.push({pathname:'/family-albums',params:{familyId:family.familyId,mode:'read'}})} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.meta,color:inkSoft}}>{tr('确认 {0} 的家庭册说明',[family.name||tr('未命名家庭')])}</Text></Pressable>)}
-   {canCreate?<Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/family-albums',params:{mode:'new'}})} style={{minHeight:48,marginTop:4,paddingHorizontal:16,justifyContent:'center',alignItems:'center',borderRadius:24,backgroundColor:paperDeep,borderWidth:StyleSheet.hairlineWidth,borderColor:sage,flexDirection:'row',gap:6,alignSelf:'flex-start'}}><LifeIcon name="plus" size={18} decorative/><Text style={{...type.action,color:ink}}>{tr('新建家庭册')}</Text></Pressable>:<Text style={{...type.meta,color:inkSoft}}>{tr('家庭创建者可以把分享收成一册。')}</Text>}
+   {!canCreate?<Text style={{...type.meta,color:inkSoft}}>{tr('家庭创建者可以把分享收成一册。')}</Text>:null}
   </>:null}
  </View>;
 }

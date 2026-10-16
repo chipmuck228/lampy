@@ -320,4 +320,13 @@ describe('life album list root', () => {
     expect(scrollTo).toHaveBeenCalledTimes(1);
     spy.mockRestore();
   });
+
+it('places a plus-only creation slot inside the cover wall and opens the creation page',async()=>{
+ mockList.mockResolvedValue({status:'ready',albums:sampleAlbums});
+ const page=await render(wrap());await waitFor(()=>expect(page.getByTestId('life-album-new')).toBeTruthy());
+ await fireEvent(page.getByTestId('life-album-cover-wall'),'layout',{nativeEvent:{layout:{width:340}}});
+ expect(page.getByTestId('life-album-new').props.style).toMatchObject({width:164});expect(page.queryByText('新建一册')).toBeNull();
+ await fireEvent.press(page.getByTestId('life-album-new'));expect(mockPush).toHaveBeenCalledWith('/albums/new');
+});
+
 });

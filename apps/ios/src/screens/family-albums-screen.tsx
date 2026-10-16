@@ -148,32 +148,56 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
       } else setChecking(false);
     }, 250);
     let validating = false;
+    let disposed = false;
+    let needsRefresh = false;
     const renew = () => {
       if (validating || !focusedRef.current) return;
       const current = session.current;
       if (current && !owner.current) {
         validating = true;
         const started = Date.now();
-        void current.validate().catch((error) => {
-        if (focusedRef.current && session.current === current && !owner.current) {
-          setChecking(false);
-          setDiagnostic(`VALIDATE/${familyAlbumFailureCode(error)}/${Date.now()-started}ms`);
-          epoch.current++;
-          setBook(null);
-          setAccess(null);
-          setAlbums([]);
-          setFamilies([]);
-          setSources([]);
-          setSelected([]);
-          setFailed(true);
-          pauseForegroundAudio();
-        }
-        }).finally(() => { validating = false; });
+        const ticket=epoch.current;
+        const active=()=>!disposed&&focusedRef.current&&session.current===current&&!owner.current&&epoch.current===ticket;
+        const refresh=async()=>{
+          // Keep the editor mounted but inaccessible until a NEW view is qualified.
+          setChecking(true);
+          await current.load(book.familyId,book.albumId);
+          if(!active())return;
+          const next=current.snapshot();
+          if(!next)return; // A slow read cannot grant a fresh lease; retry while hidden.
+          if(next.access.userId!==book.access.userId||next.access.membershipId!==book.access.membershipId){current.invalidate();throw {code:'FAMILY_ALBUM_CANCELLED'};}
+          needsRefresh=false;
+          setSources([]);setSelected([]);setBook(next);setAccess(next.access);setChecking(false);
+        };
+        void (async()=>{
+          try{
+            if(needsRefresh)await refresh();
+            else try{await current.validate();}catch(error){
+              if(!active())return;
+              if(familyAlbumFailureCode(error)!=='FAMILY_ALBUM_CHANGED')throw error;
+              needsRefresh=true;setDiagnostic('REFRESH/CONTENT_CHANGED');
+              await refresh();
+            }
+          }catch(error){
+            if(!active())return;
+            const code=familyAlbumFailureCode(error);
+            // Refresh transport failures must not turn into permanent loss of a draft.
+            if(needsRefresh&&(code==='NETWORK'||code==='SERVER_UNREACHABLE'||code==='RATE_LIMITED')){
+              setChecking(true);setDiagnostic(`REFRESH/${code}`);return;
+            }
+            setChecking(false);
+            setDiagnostic(`VALIDATE/${code}/${Date.now()-started}ms`);
+            epoch.current++;
+            setBook(null);setAccess(null);setAlbums([]);setFamilies([]);setSources([]);setSelected([]);
+            setFailed(true);pauseForegroundAudio();
+          }
+        })().finally(() => { validating = false; });
       }
     };
     renew();
     const validate = setInterval(renew, FAMILY_ALBUM_RENEW_MS);
     return () => {
+      disposed = true;
       clearInterval(timer);
       clearInterval(validate);
     };

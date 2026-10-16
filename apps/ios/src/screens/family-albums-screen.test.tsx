@@ -74,10 +74,10 @@ it('retry reloads a routed book after a failed validation',async()=>{
  mockValidate.mockResolvedValue({valid:true});await fireEvent.press(page.getByText('再试一次'));await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());expect(page.queryByText('家庭内容或资格已变化，请重新核对。')).toBeNull();
 });
 
-it('distinguishes a server validation rejection from local expiry without exposing private errors',async()=>{
+it('distinguishes a server access rejection from local expiry without exposing private errors',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
- mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED',message:'secret body'});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});
- expect(page.getByTestId('family-album-diagnostic').props.children).toMatch(/^开发诊断：VALIDATE\/FAMILY_ALBUM_CHANGED\/\d+ms$/);expect(page.queryByText(/secret body/)).toBeNull();
+ mockValidate.mockRejectedValueOnce({code:'NOT_IN_FAMILY',message:'secret body'});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});
+ expect(page.getByTestId('family-album-diagnostic').props.children).toMatch(/^开发诊断：VALIDATE\/NOT_IN_FAMILY\/\d+ms$/);expect(page.queryByText(/secret body/)).toBeNull();
 });
 it('hides an expired editor while a check hangs and restores the draft only after a fresh check',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator});
@@ -90,7 +90,7 @@ it('hides an expired editor while a check hangs and restores the draft only afte
 it('never restores a hidden draft if the fresh server check reports withdrawal',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
  let finish!:(value:unknown)=>void;mockValidate.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_LEASE_MS+500);});expect(page.queryByText('Private original')).toBeNull();
- mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED'});await act(async()=>{finish({valid:true});});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});expect(page.queryByText('Private original')).toBeNull();expect(page.getByText('家庭内容或资格已变化，请重新核对。')).toBeTruthy();
+ mockRead.mockRejectedValueOnce({code:'NOT_IN_FAMILY'});mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED'});await act(async()=>{finish({valid:true});});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});expect(page.queryByText('Private original')).toBeNull();expect(page.getByText('家庭内容或资格已变化，请重新核对。')).toBeTruthy();
 });
 it('keeps the editor visible for a minute of four-second renewals',async()=>{
  jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator});mockValidate.mockImplementation(()=>new Promise(resolve=>setTimeout(()=>resolve({valid:true}),4000)));
@@ -126,4 +126,26 @@ it('uses compact summaries for organizing and expands the same qualified book fo
  await fireEvent.press(page.getByText('看看这一册'));
  expect(page.getByText('Private original').props.numberOfLines).toBeUndefined();expect(page.getByText('An opening')).toBeTruthy();expect(page.queryByText('整理')).toBeNull();expect(page.queryByText('编辑册子')).toBeNull();
  await fireEvent.press(page.getByText('返回整理'));expect(page.getByText('Private original').props.numberOfLines).toBe(3);expect(page.getByText('整理')).toBeTruthy();
+});
+
+it('refreshes changed content automatically, preserving unsaved editing fields',async()=>{
+ jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator});
+ const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('编辑册子')).toBeTruthy());await fireEvent.press(page.getByText('编辑册子'));await fireEvent.changeText(page.getByLabelText('册名'),'Unsaved name');
+ mockRead.mockResolvedValue({...book,access:creator,validation:'v2',items:[{shareId:'s',status:'withdrawn'}]});mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED'});
+ await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});
+ expect(page.queryByText('Private original')).toBeNull();expect(page.getByLabelText('册名').props.value).toBe('Unsaved name');expect(page.queryByText('再试一次')).toBeNull();expect(mockRead.mock.calls.length).toBeGreaterThanOrEqual(2);
+});
+it('keeps old content hidden and retries a transient failure during automatic refresh',async()=>{
+ jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
+ mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED'});mockRead.mockRejectedValueOnce({code:'SERVER_UNREACHABLE'});
+ await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});expect(page.queryByText('Private original')).toBeNull();expect(page.getByTestId('family-album-checking')).toBeTruthy();
+ mockRead.mockResolvedValue({...book,validation:'v2',items:[{shareId:'s',status:'withdrawn'}]});await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});expect(page.queryByText('Private original')).toBeNull();expect(page.queryByTestId('family-album-checking')).toBeNull();expect(page.queryByText('再试一次')).toBeNull();
+});
+
+it('does not publish a late automatic refresh after leaving the album',async()=>{
+ jest.useFakeTimers();mockParams={familyId:'f',albumId:'book',mode:'read'};const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
+ let finish!:(value:unknown)=>void;mockRead.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));mockValidate.mockRejectedValueOnce({code:'FAMILY_ALBUM_CHANGED'});
+ await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_RENEW_MS);});expect(page.queryByText('Private original')).toBeNull();
+ await act(async()=>{mockAlbumFocusCleanup?.();});const pauses=mockPause.mock.calls.length;
+ await act(async()=>{finish({...book,validation:'v2'});});expect(page.queryByText('Private original')).toBeNull();expect(mockPause).toHaveBeenCalledTimes(pauses);
 });

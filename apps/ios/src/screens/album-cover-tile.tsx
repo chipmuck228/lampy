@@ -1,5 +1,6 @@
+import {LifeIcon} from './life-icons';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { albumEntryCountLabel } from '../application/life-album';
@@ -58,6 +59,13 @@ export function AlbumCoverMeta({ name, entryCount }: { name: string; entryCount:
       <Text style={styles.tileMeta}>{albumEntryCountLabel(entryCount)}</Text>
     </View>
   );
+}
+
+/** A creation slot occupies the same cover grid cell as an existing book. */
+export function AlbumCreateTile({width,height,label,onPress,testID}:{width:number;height:number;label:string;onPress:()=>void;testID?:string}) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} testID={testID} style={{width,minHeight:48,gap:6}}>
+    <View style={[styles.cover,{width,height,alignItems:'center',justifyContent:'center'}]}><LifeIcon name="plus" size={32} color={inkSoft} decorative/></View>
+  </Pressable>;
 }
 
 const styles = StyleSheet.create({

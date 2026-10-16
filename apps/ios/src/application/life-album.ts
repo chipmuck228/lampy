@@ -6,7 +6,7 @@ export const ALBUM_EMPTY_LEAD = tr("把一些日子，放在一起。");
 export const ALBUM_EMPTY_HINT = tr("先收下一条，也可以慢慢添。");
 export const ALBUM_GUIDE_TITLE = tr("把一些日子，收成一册。");
 export const ALBUM_GUIDE_BODY =
-  tr("在“我的”里新建一册，再从回看中的记录选择“收进生活册”，加入已有册子或新建一册。打开册子，可以继续收入、调整顺序或移出记录，也可以连续阅读、查看纸页。移出只改变册子，不会删除原记录。");
+  tr("在“我的”里点册子列表末尾的“＋”新建一册，再从回看中的记录选择“收进生活册”，加入已有册子或新建一册。打开册子，可以继续收入、调整顺序或移出记录，也可以连续阅读、查看纸页。移出只改变册子，不会删除原记录。");
 export const ALBUM_GUIDE_DISMISS = tr("收起说明");
 export const ALBUM_GUIDE_REOPEN = tr("怎么使用");
 /** Shown when dismiss succeeded in-session but SecureStore write failed. */
