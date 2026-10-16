@@ -117,3 +117,13 @@ it('stops renewal timers on blur and never pauses audio on the next screen from 
  await act(async()=>{mockAlbumFocusCleanup?.();});const calls=mockValidate.mock.calls.length;mockPause.mockClear();await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_LEASE_MS+1000);finish({valid:true});});
  expect(mockPause).not.toHaveBeenCalled();expect(mockValidate).toHaveBeenCalledTimes(calls);expect(page.queryByText('Private original')).toBeNull();
 });
+
+it('uses compact summaries for organizing and expands the same qualified book for reading',async()=>{
+ mockParams={familyId:'f',albumId:'book',mode:'read'};
+ const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator,opening:'An opening'});
+ const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
+ expect(page.getByText('Private original').props.numberOfLines).toBe(3);expect(page.getByText('编辑册子')).toBeTruthy();expect(page.queryByText('An opening')).toBeNull();
+ await fireEvent.press(page.getByText('看看这一册'));
+ expect(page.getByText('Private original').props.numberOfLines).toBeUndefined();expect(page.getByText('An opening')).toBeTruthy();expect(page.queryByText('整理')).toBeNull();expect(page.queryByText('编辑册子')).toBeNull();
+ await fireEvent.press(page.getByText('返回整理'));expect(page.getByText('Private original').props.numberOfLines).toBe(3);expect(page.getByText('整理')).toBeTruthy();
+});

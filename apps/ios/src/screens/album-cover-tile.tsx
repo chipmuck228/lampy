@@ -14,12 +14,14 @@ export function AlbumCoverFace({
   width,
   height,
   wordsTestID,
+  privateMedia = false,
 }: {
   name: string;
   coverUri: string | null;
   width: number;
   height: number;
   wordsTestID?: string;
+  privateMedia?: boolean;
 }) {
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const showImage = !!coverUri && failedUri !== coverUri;
@@ -31,6 +33,7 @@ export function AlbumCoverFace({
           source={{ uri: coverUri }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          cachePolicy={privateMedia ? "none" : undefined}
           accessibilityIgnoresInvertColors
           onError={() => setFailedUri(coverUri)}
         />

@@ -7,7 +7,7 @@ const mockLock={snapshot:{locked:false}};const mockListeners:((s:AppStateStatus)
 jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useRouter:()=>({push:mockPush}),useFocusEffect:(fn:()=>void|(()=>void))=>useEffect(fn,[fn])};});
 jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({getFamilies:mockDirectory,albums:{access:mockAccess,list:mockList}})}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
-jest.mock('./album-cover-tile',()=>({AlbumCoverFace:()=>null}));
+jest.mock('./album-cover-tile',()=>({...jest.requireActual('./album-cover-tile'),AlbumCoverFace:()=>null}));
 beforeEach(()=>{jest.clearAllMocks();mockLock.snapshot.locked=false;mockListeners.length=0;
  Object.defineProperty(AppState,'currentState',{configurable:true,writable:true,value:'active'});
  jest.spyOn(AppState,'addEventListener').mockImplementation((_event,fn)=>{mockListeners.push(fn);return {remove:()=>{const i=mockListeners.indexOf(fn);if(i>=0)mockListeners.splice(i,1);}};});
@@ -30,4 +30,12 @@ it('expires the library even if renewal hangs and ignores late responses',async(
  jest.useFakeTimers();const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());let finish!:(value:unknown)=>void;
  mockDirectory.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));await act(async()=>{jest.advanceTimersByTime(FAMILY_ALBUM_LEASE_MS+1000);});expect(page.queryByText('Our days')).toBeNull();
  await act(async()=>{finish({userId:'a',families:[{familyId:'f',name:'Home',role:'creator'}]});});expect(page.queryByText('Our days')).toBeNull();
+});
+
+it('uses the personal cover-wall geometry and the same title/count metadata',async()=>{
+ const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());
+ await fireEvent(page.getByTestId('family-album-cover-wall'),'layout',{nativeEvent:{layout:{width:340}}});
+ expect(page.getByText('Our days')).toBeTruthy();expect(page.getByText('3条')).toBeTruthy();expect(page.getByText('Home')).toBeTruthy();
+ const tile=page.getByRole('button',{name:'Our days，3条记录，Home'});
+ expect(tile.props.style).toMatchObject({width:164,gap:6});
 });

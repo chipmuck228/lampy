@@ -93,8 +93,11 @@ describe.each(['memory','sqlite'] as const)('family album commands on %s',kind=>
    expect((await f.commands.albums.read('a','f',book.albumId)).name).toBe(book.name);
    const edited=await f.commands.albums.mutate('a','f',book.albumId,{authority:collected.access.authority,revision:collected.revision,change:edit});
    expect(edited).toMatchObject({name:'New name',opening:'Opening',cover:{shareId:'s3',objectId:'photo2'},coverChoice:{shareId:'s3',objectId:'photo2'}});
-   expect((await f.commands.albums.list('a','f')).albums[0]).not.toHaveProperty('coverChoice');
+   const summary=(await f.commands.albums.list('a','f')).albums[0];
+   expect(summary).not.toHaveProperty('coverChoice');expect(summary.cover).toEqual(edited.cover);
+   expect(JSON.stringify(summary)).not.toContain('原文');expect(summary).not.toHaveProperty('items');
    await f.commands.historyShares.revokeShare('b','f','s3');const withdrawn=await f.commands.albums.read('a','f',book.albumId);
+   expect((await f.commands.albums.list('a','f')).albums[0].cover).toEqual({shareId:'s1',objectId:'photo'});
    expect(withdrawn.cover).toEqual({shareId:'s1',objectId:'photo'});expect(withdrawn.coverChoice).toBeNull();expect(JSON.stringify(withdrawn)).not.toContain('photo2');
    await expect(f.commands.albums.mutate('a','f',book.albumId,{authority:withdrawn.access.authority,revision:withdrawn.revision,change:edit})).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
    await expect(f.commands.albums.validate('a','f',book.albumId,edited.validation)).rejects.toMatchObject({code:'FAMILY_ALBUM_CHANGED'});

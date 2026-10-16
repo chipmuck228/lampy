@@ -25,7 +25,7 @@ export type FamilyAlbumMutation =
   | {kind:'reorder'; shareIds: string[]}
   | {kind:'edit';name:string;opening:string|null;coverChoice:FamilyAlbumCover|null}
   | {kind:'rename'; name: string; opening: string | null};
-export type FamilyAlbumSummary = Omit<FamilyAlbumRecord,'shareIds'|'coverChoice'> & {entryCount:number};
+export type FamilyAlbumSummary = Omit<FamilyAlbumRecord,'shareIds'|'coverChoice'> & {entryCount:number;cover?:FamilyAlbumCover|null};
 export type FamilyAlbumApi = {
   access(session: string,familyId: string): Promise<FamilyAlbumAccess>;
   acknowledge(session: string,familyId: string,membershipId: string,confirmation: string): Promise<FamilyAlbumAccess>;

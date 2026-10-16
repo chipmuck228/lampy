@@ -86,7 +86,26 @@ export function createFamilyAlbumCommands(deps:{
     list(session,familyId) {return authed(session,async(tx,userId)=>{
       const permission=await access(tx,familyId,userId);acknowledged(permission);
       const rows=await tx.listFamilyAlbums(familyId);
-      return {access:permission,albums:rows.map(({shareIds,coverChoice,...row})=>{void coverChoice;return {...row,entryCount:shareIds.length};})};
+      // Summaries expose a current cover reference, never record bodies or private file URLs.
+      const shares=new Map((await tx.listSharesInFamily(familyId)).map(share=>[share.shareId,share]));
+      const objects=new Map<string,Awaited<ReturnType<FamilyTx['findMediaObject']>>>();
+      const albums=[];
+      for(const {shareIds,coverChoice,...row} of rows){
+        let cover:FamilyAlbumView['cover']=null;
+        const candidates=coverChoice&&shareIds.includes(coverChoice.shareId)?[coverChoice.shareId,...shareIds]:shareIds;
+        for(let index=0;index<candidates.length&&!cover;index++){
+          const share=shares.get(candidates[index]);if(!share||share.familyId!==familyId||share.status!=='active')continue;
+          const manual=!!coverChoice&&index===0&&shareIds.includes(coverChoice.shareId);
+          for(const media of share.snapshot.media){
+            if(manual&&media.objectId!==coverChoice!.objectId)continue;
+            if(!objects.has(media.objectId))objects.set(media.objectId,await tx.findMediaObject(media.objectId));
+            const object=objects.get(media.objectId);
+            if(object&&object.ownerUserId===share.authorUserId&&object.mimeType.startsWith('image/')){cover={shareId:share.shareId,objectId:object.objectId};break;}
+          }
+        }
+        albums.push({...row,entryCount:shareIds.length,cover});
+      }
+      return {access:permission,albums};
     });},
     sources(session,familyId) {return authed(session,async(tx,userId)=>{
       const permission=await access(tx,familyId,userId);acknowledged(permission);

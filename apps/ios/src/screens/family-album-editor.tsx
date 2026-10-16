@@ -1,3 +1,4 @@
+import {AlbumCoverFace} from './album-cover-tile';
 import { AlbumEditorFields } from './album-workflow-controls';
 import {normalizeAlbumName} from '../application/life-album';
 import {useCallback,useState} from 'react';
@@ -23,12 +24,13 @@ export function FamilyAlbumEditor({book,busy,onSave}:{book:FamilyAlbumView;busy:
  </View>;
 }
 // The parent hides this preview on expiry and unmounts it on withdrawal or loss of access.
-export function FamilyAlbumCoverPreview({familyId,cover}:{familyId:string;cover:FamilyAlbumCover}){
+export function FamilyAlbumCoverPreview({familyId,cover,compact=false,tile}:{familyId:string;cover:FamilyAlbumCover;compact?:boolean;tile?:{name:string;width:number;height:number}}){
  const [uri,setUri]=useState<string|null>(null);
  useFocusEffect(useCallback(()=>{
   let current=true;setUri(null);
   void (async()=>{try{const app=await getFamilyUseCases();const read=await app.history.read(familyId,cover.shareId,()=>current);if(current)setUri(read.media.find(media=>media.objectId===cover.objectId)?.uri??null);}catch{if(current)setUri(null);}})();
   return()=>{current=false;setUri(null);};
  },[familyId,cover.shareId,cover.objectId]));
- return uri?<Image accessibilityLabel={tr('家庭照片')} source={{uri}} cachePolicy="none" contentFit="contain" style={{width:'100%',height:180}}/>:null;
+ if(tile)return <AlbumCoverFace name={tile.name} coverUri={uri} width={tile.width} height={tile.height} privateMedia/>;
+ return uri?<Image accessibilityLabel={tr('家庭照片')} source={{uri}} cachePolicy="none" contentFit={compact?'cover':'contain'} style={compact?{width:72,height:96}:{width:'100%',height:180}}/>:null;
 }
