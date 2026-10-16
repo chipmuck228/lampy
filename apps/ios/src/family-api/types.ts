@@ -118,6 +118,7 @@ export type FamilyHealth = {
   testAccountLogin: boolean;
   testAccountLoginReason: TestAccountHealth['testAccountLoginReason'];
   familyHistoryV2?: boolean;
+  familyAlbums?: boolean;
   controlledEmailAccounts?: boolean;
   emailRegistration?: boolean;
   publicTestLogin?: boolean;

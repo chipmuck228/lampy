@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import {LifeIcon} from './life-icons';
+import { useEffect, useState } from 'react';
+import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { albumEntryCountLabel } from '../application/life-album';
@@ -14,13 +15,30 @@ export function AlbumCoverFace({
   width,
   height,
   wordsTestID,
+  privateMedia = false,
+  showWordsFallback = true,
 }: {
   name: string;
   coverUri: string | null;
   width: number;
   height: number;
   wordsTestID?: string;
+  privateMedia?: boolean;
+  showWordsFallback?: boolean;
 }) {
+  const [reduceMotion, setReduceMotion] = useState(true);
+  useEffect(() => {
+    let active = true;
+    let changed = false;
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => {
+      changed = true;
+      if (active) setReduceMotion(value);
+    });
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => {
+      if (active && !changed) setReduceMotion(value);
+    }).catch(() => undefined);
+    return () => { active = false; subscription.remove(); };
+  }, []);
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const showImage = !!coverUri && failedUri !== coverUri;
 
@@ -31,16 +49,18 @@ export function AlbumCoverFace({
           source={{ uri: coverUri }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          transition={reduceMotion ? 0 : {duration: 1920, effect: 'cross-dissolve'}}
+          cachePolicy={privateMedia ? "none" : undefined}
           accessibilityIgnoresInvertColors
           onError={() => setFailedUri(coverUri)}
         />
-      ) : (
+      ) : showWordsFallback ? (
         <View style={styles.wordsCover} testID={wordsTestID}>
           <Text style={styles.wordsName} numberOfLines={3}>
             {name}
           </Text>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -55,6 +75,13 @@ export function AlbumCoverMeta({ name, entryCount }: { name: string; entryCount:
       <Text style={styles.tileMeta}>{albumEntryCountLabel(entryCount)}</Text>
     </View>
   );
+}
+
+/** A creation slot occupies the same cover grid cell as an existing book. */
+export function AlbumCreateTile({width,height,label,onPress,testID}:{width:number;height:number;label:string;onPress:()=>void;testID?:string}) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} testID={testID} style={{width,minHeight:48,gap:6}}>
+    <View style={[styles.cover,{width,height,alignItems:'center',justifyContent:'center'}]}><LifeIcon name="plus" size={32} color={inkSoft} decorative/></View>
+  </Pressable>;
 }
 
 const styles = StyleSheet.create({

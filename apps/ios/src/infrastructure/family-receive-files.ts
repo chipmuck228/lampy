@@ -9,6 +9,7 @@ function throwIfTestCacheDeleteArmed() {
 }
 
 export type FamilyReceiveFileStore = {
+  stamp?(storageKey: string): Promise<string | null>;
   write(storageKey: string, bytes: Uint8Array): Promise<void>;
   read(storageKey: string): Promise<Uint8Array>;
   remove(storageKey: string): Promise<void>;
@@ -39,6 +40,11 @@ export function createExpoFamilyReceiveFiles(rootDir?: string): FamilyReceiveFil
   const dest = (storageKey: string) => `${rootDir ?? familyCacheDirectory()}${storageKey}`;
 
   return {
+    async stamp(storageKey) {
+      // Native file digest avoids transferring/base64-decoding whole photos in JS.
+      const info = await FileSystem.getInfoAsync(dest(storageKey), {md5:true});
+      return info.exists && !info.isDirectory && info.md5 ? `${info.size}:${info.md5}` : null;
+    },
     async write(storageKey, bytes) {
       const file = dest(storageKey);
       const directory = file.slice(0, file.lastIndexOf('/') + 1);

@@ -186,6 +186,14 @@ const MIGRATIONS = [
      SELECT 'controlled-password',login_normalized,user_id,created_at FROM family_test_credentials;`,
   `CREATE TABLE family_apple_challenges (id TEXT PRIMARY KEY, nonce TEXT NOT NULL UNIQUE, intent TEXT NOT NULL CHECK(intent IN ('login','link')), user_id TEXT REFERENCES family_accounts(user_id), session_token TEXT, expires_at TEXT NOT NULL);
    CREATE INDEX family_apple_challenges_expiry ON family_apple_challenges(expires_at);`,
+  `CREATE TABLE family_albums (
+    album_id TEXT PRIMARY KEY NOT NULL, family_id TEXT NOT NULL, json TEXT NOT NULL
+  );
+  CREATE INDEX family_albums_by_family ON family_albums(family_id);
+  CREATE TABLE family_album_notices (
+    family_id TEXT NOT NULL, membership_id TEXT NOT NULL, json TEXT NOT NULL,
+    PRIMARY KEY(family_id,membership_id)
+  );`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28] as const;

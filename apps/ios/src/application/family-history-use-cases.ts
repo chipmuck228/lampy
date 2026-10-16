@@ -2,7 +2,7 @@ import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { ApplicationError } from './errors';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
 import type { FamilySessionStore } from './family-use-cases';
-import type { FamilyReceiveCache } from '../infrastructure/family-receive-cache';
+import {familyReceivedMediaKey, type FamilyReceiveCache} from '../infrastructure/family-receive-cache';
 import type { PendingFamilyOperationStore } from '../infrastructure/pending-family-operations';
 import type { AssetRead, MomentRead } from '../infrastructure/repositories';
 import type { FamilySummary, ShareView, FamilyRoster, FamilyTransfer } from '../family-api/types';
@@ -53,6 +53,13 @@ export function createFamilyHistoryUseCases(deps: {
     const result = () => base() && (generations.get(familyId) ?? 0) === generation
       && (!shareId || (shareGenerations.get(shareKey) ?? 0) === shareGeneration);
     qualifierBase.set(result, base); return result;
+  }
+  // Digest memo only: never stores media/URIs or grants access. Every hit still
+  // needs fresh share/media authorization and a matching native file digest.
+  const verifiedFiles = new Map<string,string>();
+  function rememberFile(key:string, fingerprint:string) {
+    verifiedFiles.delete(key); verifiedFiles.set(key,fingerprint);
+    if (verifiedFiles.size > 128) verifiedFiles.delete(verifiedFiles.keys().next().value!);
   }
   let cacheTail: Promise<unknown> = Promise.resolve();
   async function account(): Promise<Account> {
@@ -158,6 +165,9 @@ export function createFamilyHistoryUseCases(deps: {
       await check(a, current);
       const ids = await deps.receiveCache.listFamilyIds(userId); await check(a, current);
       const removed = new Set([...ids, ...generations.keys()].filter(id => !activeIds.includes(id)));
+      // An unchanged directory must not wait behind downloads in cacheTail.
+      // Removed families still invalidate immediately and await serialized cleanup below.
+      if(removed.size===0)return;
       for (const familyId of removed) generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
       const job = cacheTail.catch(() => undefined).then(async () => {
         for (const familyId of removed) await deps.receiveCache!.isolateFamily(userId, familyId);
@@ -322,7 +332,7 @@ export function createFamilyHistoryUseCases(deps: {
       await cacheWork(a, familyId, undefined, current, c => c.replaceVisible(a.userId, familyId, result.shares));
       return { userId: a.userId, shares: result.shares };
     },
-    async read(familyId: string, shareId: string, current: HistoryCurrent): Promise<HistoryReading> {
+    async read(familyId: string, shareId: string, current: HistoryCurrent, objectId?: string): Promise<HistoryReading> {
       current = qualified(familyId, current, shareId);
       const a = await account();
       const client = api();
@@ -330,37 +340,69 @@ export function createFamilyHistoryUseCases(deps: {
       try { share = await client.getShare(a.sessionToken, familyId, shareId); }
       catch(e) { await invalidateDenied(a,familyId,shareId,current,e); throw e; }
       await check(a, current);
+      if (objectId && !share.snapshot.media.some(item => item.objectId === objectId)) throw error('SHARE_MEDIA_UNAVAILABLE');
       let received: HistoryReading['media'];
-      try { received = await cacheWork(a, familyId, shareId, current, async cache => {
-        await cache.beginReceive(a.userId, share);
+      try {
+        // Authorization requests run before entering the file-write queue, so
+        // cached covers do not serialize their network round trips.
+        const selected=share.snapshot.media.filter(item=>!objectId || item.objectId===objectId);
+        const metadata=new Map(await Promise.all(selected.map(async item=>{
+          const meta=await client.getShareMedia(a.sessionToken,familyId,shareId,item.objectId);
+          await check(a,current);
+          return [item.objectId,meta] as const;
+        })));
+        received = await cacheWork(a, familyId, shareId, current, async cache => {
+        // A cover read is partial; never claim the whole share was received.
+        if (objectId) await cache.upsertListed(a.userId, share);
+        else await cache.beginReceive(a.userId, share);
         const media: HistoryReading['media'] = [];
         for (const item of share.snapshot.media) {
+          if (objectId && item.objectId !== objectId) continue;
           await check(a, current);
           // Metadata always comes from a fresh authenticated request, including for a cached file.
-          const meta = await client.getShareMedia(a.sessionToken, familyId, shareId, item.objectId);
+          const meta = metadata.get(item.objectId)!;
           await check(a, current);
           const stored = (await cache.listMedia(a.userId, familyId, shareId)).find(m => m.objectId === item.objectId && m.status === 'stored');
+          const canonicalKey=familyReceivedMediaKey({userId:a.userId,familyId,shareId,objectId:item.objectId,mimeType:meta.mimeType});
+          const stamp=stored ? await cache.mediaStamp?.(stored.storageKey).catch(()=>null) : null;
+          const fingerprint=stamp ? `${meta.byteLength}/${meta.contentSha256}/${meta.mimeType}/${stamp}` : null;
+          if (stored && stored.storageKey===canonicalKey && fingerprint && verifiedFiles.get(stored.storageKey)===fingerprint) {
+            await check(a,current);
+            media.push({objectId:item.objectId,mimeType:meta.mimeType,uri:deps.mediaUri?.(stored.storageKey) || ''});
+            continue;
+          }
           let bytes: Uint8Array | undefined;
           if (stored) try { bytes = await cache.readMediaBytes(stored.storageKey); } catch { /* fetch below */ }
-          if (!bytes || bytes.length !== meta.byteLength || sha256MediaBytes(bytes) !== meta.contentSha256) {
+          const verifiedStored = !!bytes && bytes.length === meta.byteLength && sha256MediaBytes(bytes) === meta.contentSha256;
+          if (!verifiedStored) {
             const content = await client.getShareMediaContent(a.sessionToken, familyId, shareId, item.objectId);
             await check(a, current);
             bytes = content.bytes;
           }
-          if (bytes.length !== meta.byteLength || sha256MediaBytes(bytes) !== meta.contentSha256) throw error('SHARE_MEDIA_UNAVAILABLE');
+          if (!verifiedStored && (!bytes || bytes.length !== meta.byteLength || sha256MediaBytes(bytes) !== meta.contentSha256)) throw error('SHARE_MEDIA_UNAVAILABLE');
+          if (!bytes) throw error('SHARE_MEDIA_UNAVAILABLE');
+          if (stored && verifiedStored && fingerprint) rememberFile(stored.storageKey,fingerprint);
+          // Reuse the verified private file instead of rewriting it on every focus.
+          if (verifiedStored && stored && stored.storageKey === canonicalKey && stored.mimeType === meta.mimeType && stored.contentSha256 === meta.contentSha256 && stored.byteLength === meta.byteLength) {
+            media.push({objectId:item.objectId,mimeType:meta.mimeType,uri:deps.mediaUri?.(stored.storageKey) || ''});
+            continue;
+          }
           const storageKey = `${a.userId}/${familyId}/${shareId}/${item.objectId}`;
           await check(a, current);
-          await cache.saveStoredMedia({ userId: a.userId, familyId, shareId, objectId: item.objectId,
+          const saved = await cache.saveStoredMedia({ userId: a.userId, familyId, shareId, objectId: item.objectId,
             mimeType: meta.mimeType, byteLength: meta.byteLength, contentSha256: meta.contentSha256, storageKey, bytes });
           await check(a, current);
-          media.push({ objectId: item.objectId, mimeType: meta.mimeType, uri: deps.mediaUri?.(storageKey) || '' });
+          const savedStamp=await cache.mediaStamp?.(saved.storageKey).catch(()=>null);
+          if (savedStamp) rememberFile(saved.storageKey,`${meta.byteLength}/${meta.contentSha256}/${meta.mimeType}/${savedStamp}`);
+          media.push({ objectId: item.objectId, mimeType: meta.mimeType, uri: deps.mediaUri?.(saved.storageKey) || '' });
         }
-        // Revalidate after all media awaits. Revocation in the middle cannot publish a readable result.
+        return media;
+      });
+        // Still revalidate before publishing, outside the file-write queue.
         await client.getShare(a.sessionToken, familyId, shareId);
         await check(a, current);
-        await cache.markReceived(a.userId, familyId, shareId);
-        return media;
-      }); } catch(e) { await invalidateDenied(a,familyId,shareId,current,e); throw e; }
+        if (!objectId) await cacheWork(a,familyId,shareId,current,cache=>cache.markReceived(a.userId,familyId,shareId));
+      } catch(e) { await invalidateDenied(a,familyId,shareId,current,e); throw e; }
       await check(a, current);
       return { userId: a.userId, share, media: received };
     },

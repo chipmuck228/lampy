@@ -49,6 +49,9 @@ function statusFor(code: string) {
     case FAMILY_ERROR.INVITE_REVOKED:
     case FAMILY_ERROR.INVITE_ALREADY_USED:
     case FAMILY_ERROR.FAMILY_DISSOLVED:
+    case 'FAMILY_ALBUM_RULES_REQUIRED':
+    case 'FAMILY_ALBUM_AUTHORITY_CHANGED':
+    case 'FAMILY_ALBUM_CHANGED':
     case FAMILY_ERROR.CONFLICT:
     case FAMILY_ERROR.FAMILY_SELECTION_REQUIRED:
     case FAMILY_ERROR.FAMILY_LIMIT_REACHED:
@@ -57,6 +60,7 @@ function statusFor(code: string) {
       return 409;
     case 'FAMILY_POLICY_UPGRADE_REQUIRED':
       return 409;
+    case 'FAMILY_ALBUMS_CLOSED':
     case 'FAMILY_HISTORY_CLOSED':
       return 503;
     case FAMILY_ERROR.BAD_REQUEST:
@@ -64,6 +68,7 @@ function statusFor(code: string) {
       return 400;
     case FAMILY_ERROR.MEDIA_NOT_FOUND:
       return 404;
+    case 'FAMILY_ALBUM_TOO_LARGE':
     case FAMILY_ERROR.MEDIA_TOO_LARGE:
     case FAMILY_ERROR.PAYLOAD_TOO_LARGE:
       return 413;
@@ -71,6 +76,7 @@ function statusFor(code: string) {
       return 415;
     case FAMILY_ERROR.MEDIA_WRITE_FAILED:
       return 507;
+    case 'FAMILY_ALBUM_NOT_FOUND':
     case FAMILY_ERROR.SHARE_NOT_FOUND:
       return 404;
     case FAMILY_ERROR.SHARE_MEDIA_INCOMPLETE:
@@ -156,6 +162,20 @@ export async function dispatchFamilyApi(
     if (method === 'POST' && path === '/v2/families') {
       return { status: 200, body: await commands.createNamedFamily(token || '', readString(body, 'name'), idempotencyKey || '') };
     }
+
+    const albumAccess = /^\/v2\/families\/([^/]+)\/album-access$/.exec(path);
+    if(albumAccess&&method==='GET')return {status:200,body:await commands.albums.access(token||'',albumAccess[1])};
+    if(albumAccess&&method==='POST')return {status:200,body:await commands.albums.acknowledge(token||'',albumAccess[1],readString(body,'membershipId'),readString(body,'confirmation'))};
+    const albumSources = /^\/v2\/families\/([^/]+)\/album-sources$/.exec(path);
+    if(albumSources&&method==='GET')return {status:200,body:await commands.albums.sources(token||'',albumSources[1])};
+    const albums = /^\/v2\/families\/([^/]+)\/albums$/.exec(path);
+    if(albums&&method==='GET')return {status:200,body:await commands.albums.list(token||'',albums[1])};
+    if(albums&&method==='POST')return {status:200,body:await commands.albums.create(token||'',albums[1],body as Parameters<typeof commands.albums.create>[2])};
+    const album = /^\/v2\/families\/([^/]+)\/albums\/([^/]+)$/.exec(path);
+    if(album&&method==='GET')return {status:200,body:await commands.albums.read(token||'',album[1],album[2])};
+    if(album&&method==='PATCH')return {status:200,body:await commands.albums.mutate(token||'',album[1],album[2],body as Parameters<typeof commands.albums.mutate>[3])};
+    const validateAlbum = /^\/v2\/families\/([^/]+)\/albums\/([^/]+)\/validate$/.exec(path);
+    if(validateAlbum&&method==='POST')return {status:200,body:await commands.albums.validate(token||'',validateAlbum[1],validateAlbum[2],readString(body,'validation'))};
 
     const links = /^\/v2\/families\/([^/]+)\/invitations$/.exec(path);
     if (links && method === 'POST') return { status:200, body:await commands.createInviteLink(token || '',links[1]) };

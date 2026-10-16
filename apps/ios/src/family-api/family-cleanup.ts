@@ -6,6 +6,7 @@ import type { MediaBlobStore } from './media-blobs';
 export async function runFamilyCleanup(db: FamilySql, blobs: MediaBlobStore, now = new Date(), limit = 20) {
   if (!Number.isFinite(now.getTime()) || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('Invalid cleanup arguments.');
   const at = now.toISOString();
+  const albumTables = await db.getFirst<{name:string}>("SELECT name FROM sqlite_master WHERE type='table' AND name='family_albums'");
   const due = await db.getAll<{ family_id: string }>(`SELECT family_id FROM family_families
     WHERE status='dissolved' AND cleanup_deadline <= ? AND cleaned_at IS NULL
     ORDER BY cleanup_deadline, family_id LIMIT ?`, [at, limit]);
@@ -22,6 +23,10 @@ export async function runFamilyCleanup(db: FamilySql, blobs: MediaBlobStore, now
           WHERE family_id=? AND status='dissolved' AND cleanup_deadline<=? AND cleaned_at IS NULL`, [id, at]);
         if (!family) return;
         await db.run('UPDATE family_families SET cleanup_attempts=cleanup_attempts+1, cleanup_error=NULL WHERE family_id=?', [id]);
+        if (albumTables) {
+          await db.run('DELETE FROM family_albums WHERE family_id=?', [id]);
+          await db.run('DELETE FROM family_album_notices WHERE family_id=?', [id]);
+        }
         if (family.snapshots_purged_at) return;
         const objects = await db.getAll<{ object_id: string; storage_key: string }>(`SELECT DISTINCT m.object_id,m.storage_key
           FROM family_media_objects m JOIN family_shares s ON s.family_id=?

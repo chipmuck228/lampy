@@ -1,3 +1,4 @@
+import {familyNetworkError,type FamilyNetworkDiagnostic} from './family-network-diagnostic';
 import { ApplicationError } from '../application/errors';
 import type {
   FamilyView,
@@ -32,6 +33,7 @@ export function familyTestPathKind(method: string, path: string) {
 }
 
 export type FamilyTransportRequest = {
+  timeoutMs?: number;
   method: string;
   path: string;
   sessionToken?: string;
@@ -59,6 +61,7 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 }
 
 export type FamilyApiClient = {
+  albums?: import('../family-api/family-album-types').FamilyAlbumApi;
   registerControlledEmail?(input: { email: string; password: string; nickname: string }): Promise<SignInResult>;
   signInWithControlledEmail?(input: { email: string; password: string }): Promise<SignInResult>;
   getMyProfile?(sessionToken: string): Promise<import('../family-api/types').UserProfile>;
@@ -140,7 +143,7 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
         errorCode: appError?.code || 'SERVER_UNREACHABLE',
       });
       const message = error instanceof Error ? error.message : 'Family server is unreachable.';
-      throw new ApplicationError(appError?.code || 'SERVER_UNREACHABLE', message);
+      throw appError ?? new ApplicationError('SERVER_UNREACHABLE', message);
     }
     const failed = (response.body || {}) as ErrorBody;
     recordFamilyTestLastRequest({
@@ -156,6 +159,16 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
   }
 
   return {
+    albums: {
+      access:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,timeoutMs:5000}),
+      acknowledge:(sessionToken,familyId,membershipId,confirmation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,body:{membershipId,confirmation}}),
+      list:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken,timeoutMs:5000}),
+      sources:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-sources`,sessionToken}),
+      create:(sessionToken,familyId,input)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken,body:input}),
+      read:(sessionToken,familyId,albumId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}`,sessionToken}),
+      validate:(sessionToken,familyId,albumId,validation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}/validate`,sessionToken,body:{validation},timeoutMs:5000}),
+      mutate:(sessionToken,familyId,albumId,input)=>send({method:'PATCH',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}`,sessionToken,body:input}),
+    },
     ...(sharingVersion === 1 ? { history: createFamilyApiClient(transport, 2) } : {}),
     getHistoryPolicy(sessionToken, familyId) { return send({ method: 'GET', path: `/v2/families/${familyId}/history-policy`, sessionToken }); },
     confirmHistoryPolicy(sessionToken, familyId) { return send({ method: 'POST', path: `/v2/families/${familyId}/history-policy`, sessionToken, body: { confirmation: 'new-members-can-read-active-history' } }); },
@@ -176,7 +189,7 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
       return send({ method: 'POST', path: '/v1/auth/test-account', body: input });
     },
     listFamilies(sessionToken) {
-      return send({ method: 'GET', path: '/v2/me/families', sessionToken });
+      return send({ method: 'GET', path: '/v2/me/families', sessionToken, timeoutMs:5000 });
     },
     createNamedFamily(sessionToken, name, idempotencyKey) {
       return send({ method: 'POST', path: '/v2/families', sessionToken, idempotencyKey, body: { name } });
@@ -358,9 +371,13 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
   };
 }
 
+let diagnosticRequestSequence=0;
+const diagnosticNonce=(Math.random().toString(16).slice(2)+'0000000000000000').slice(0,16);
+
 export function createFamilyHttpTransport(deps: {
   baseUrl: string;
   fetchImpl?: typeof fetch;
+  trace?: boolean;
 }): FamilyTransport {
   const baseUrl = deps.baseUrl.replace(/\/+$/, '');
   const fetchImpl = deps.fetchImpl ?? globalThis.fetch;
@@ -386,11 +403,21 @@ export function createFamilyHttpTransport(deps: {
       else if (input.body !== undefined) headers['content-type'] = 'application/json';
       if (input.sessionToken) headers.authorization = `Bearer ${input.sessionToken}`;
       if (input.idempotencyKey) headers['idempotency-key'] = input.idempotencyKey;
+      const trace=deps.trace??(typeof __DEV__!=='undefined'&&__DEV__&&process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL==='1');
+      const metadata=(input.method.toUpperCase()==='GET'&&(input.path==='/v2/me/families'||/^\/v2\/families\/[^/]+\/(albums|album-access)$/.test(input.path)))||(input.method.toUpperCase()==='POST'&&/^\/v2\/families\/[^/]+\/albums\/[^/]+\/validate$/.test(input.path));
+      const id=trace&&metadata?`diag-${diagnosticNonce}-${++diagnosticRequestSequence}`:null;
+      if(id)headers['x-lampy-request-id']=id;
+      const network:FamilyNetworkDiagnostic={id,engine:(fetchImpl as typeof fetch&{polyfill?:boolean}).polyfill===true?'RN':deps.fetchImpl?'INJECTED':'OTHER',rnRequested:process.env.EXPO_PUBLIC_USE_RN_FETCH==='1'||process.env.EXPO_PUBLIC_USE_RN_FETCH==='true',phase:'HEADERS',status:null};
+      const controller=input.timeoutMs?new AbortController():null;
+      let timer:ReturnType<typeof setTimeout>|undefined;
+      const work=(async()=>{
       const response = await fetchImpl(`${baseUrl}${input.path}`, {
         method: input.method,
         headers,
         body: familyFetchBody(input),
+        ...(controller ? {signal:controller.signal} : {}),
       });
+      network.status=response.status;network.phase=input.expectBytes&&response.ok?'BYTES':'TEXT';
       if (input.expectBytes && response.ok) {
         const buffer = await response.arrayBuffer();
         return {
@@ -412,6 +439,11 @@ export function createFamilyHttpTransport(deps: {
         }
       }
       return { status: response.status, body };
+      })();
+      if(!input.timeoutMs)return work.catch(error=>{throw familyNetworkError(error,network);});
+      const timeout=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller?.abort();reject(new ApplicationError('SERVER_UNREACHABLE','Family request timed out.'));},input.timeoutMs);});
+      try{return await Promise.race([work,timeout]);}catch(error){throw familyNetworkError(error,network);}finally{if(timer)clearTimeout(timer);}
+
     },
   };
 }

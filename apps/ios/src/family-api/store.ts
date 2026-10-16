@@ -17,6 +17,8 @@ export type IdempotentRecord = {
 };
 
 export type FamilyStore = {
+  familyAlbums: import('./family-album-types').FamilyAlbumRecord[];
+  familyAlbumNotices: import('./family-album-types').FamilyAlbumNotice[];
   appleChallenges: import('./types').AppleChallenge[];
   profiles: import('./types').UserProfile[];
   directoryHistory: (import('./types').PastFamilySummary & { userId: string; status: 'left' | 'removed' | 'dissolved' })[];
@@ -37,6 +39,7 @@ export type FamilyStore = {
 
 export function createFamilyStore(): FamilyStore {
   return {
+    familyAlbums: [], familyAlbumNotices: [],
     appleChallenges: [],
     profiles: [],
     directoryHistory: [],

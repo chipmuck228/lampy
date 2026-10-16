@@ -7,6 +7,12 @@ import {
   endFamilyTestCacheDeleteAction,
 } from './family-test-driver';
 
+// Logical namespace remains per account/family/share. Native audio needs a typed local filename.
+export function familyReceivedMediaKey(input:{userId:string;familyId:string;shareId:string;objectId:string;mimeType:string}) {
+  const base=`${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+  return ['audio/mp4','audio/m4a','audio/x-m4a','audio/aac'].includes(input.mimeType.split(';')[0].trim().toLowerCase())?`${base}.m4a`:base;
+}
+
 async function withCacheDeleteAction<T>(
   target: 'isolate' | 'recover',
   work: () => Promise<T>,
@@ -51,6 +57,7 @@ export type FamilyCacheCleanup = {
 };
 
 export type FamilyReceiveCache = {
+  mediaStamp?(storageKey: string): Promise<string | null>;
   listFamilyIds?(userId: string): Promise<string[]>;
   list(userId: string, familyId: string): Promise<ReceivedShareRecord[]>;
   find(userId: string, familyId: string, shareId: string): Promise<ReceivedShareRecord | null>;
@@ -178,9 +185,11 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
       return replaceShare(fromShare(userId, share, 'receiving'));
     },
     async saveStoredMedia(input) {
-      const storageKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+      const legacyKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+      const storageKey = familyReceivedMediaKey(input);
       files.delete(`${storageKey}.part`);
       files.set(storageKey, input.bytes);
+      if(storageKey!==legacyKey){files.delete(legacyKey);files.delete(`${legacyKey}.part`);}
       const row: ReceivedMediaRecord = { ...input, storageKey, status: 'stored' };
       const index = media.findIndex(
         (item) =>
@@ -195,6 +204,10 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
     },
     async listMedia(userId, familyId, shareId) {
       return media.filter((row) => row.userId === userId && row.familyId === familyId && row.shareId === shareId);
+    },
+    async mediaStamp(storageKey) {
+      const bytes = files.get(storageKey);
+      return bytes ? `${bytes.length}:${sha256MediaBytes(bytes)}` : null;
     },
     async readMediaBytes(storageKey) {
       const bytes = files.get(storageKey);
@@ -621,7 +634,8 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
       return saveShare(fromShare(userId, share, 'receiving'));
     },
     async saveStoredMedia(input) {
-      const storageKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+      const legacyKey = `${input.userId}/${input.familyId}/${input.shareId}/${input.objectId}`;
+      const storageKey = familyReceivedMediaKey(input);
       await files.remove(`${storageKey}.part`).catch(() => undefined);
       await files.write(storageKey, input.bytes);
       const row: ReceivedMediaRecord = { ...input, storageKey, status: 'stored' };
@@ -647,9 +661,11 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
           row.status,
         ],
       );
+      if(storageKey!==legacyKey){await files.remove(legacyKey).catch(()=>undefined);await files.remove(`${legacyKey}.part`).catch(()=>undefined);}
       return row;
     },
     listMedia,
+    async mediaStamp(storageKey) { return files.stamp?.(storageKey) ?? null; },
     async readMediaBytes(storageKey) {
       return files.read(storageKey);
     },

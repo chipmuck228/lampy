@@ -1,3 +1,5 @@
+import { familyReceivedMediaKey } from '../infrastructure/family-receive-cache';
+import { createFamilyAlbumUseCases } from './family-album';
 import { createFamilyHistoryUseCases } from './family-history-use-cases';
 import { ApplicationError } from './errors';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
@@ -463,6 +465,7 @@ export function createFamilyUseCases(deps: {
     }
   }
   return {
+    albums: createFamilyAlbumUseCases({client:deps.client,session:deps.session}),
     history,
     async previewInviteLink(token: string) {
       if(!deps.client.previewInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
@@ -494,19 +497,19 @@ export function createFamilyUseCases(deps: {
       const result=await deps.client.acceptInviteLink(a.sessionToken,token);await assertSameAccount(a);
       if(!isCurrent()) throw new ApplicationError('STALE_FAMILY_REQUEST','Invitation screen is inactive.');return result;
     },
-    async getFamilies(isCurrent: () => boolean = () => true): Promise<FamilyListView & { userId: string }> {
+    async getFamilies(isCurrent: () => boolean = () => true, onStage?: (stage:string)=>void): Promise<FamilyListView & { userId: string }> {
       const request = ++directoryRequest;
       const current = () => isCurrent() && request === directoryRequest;
-      await flushPendingRevoke();
-      const account = await requireAccount();
+      onStage?.('DIRECTORY_REVOKE');await flushPendingRevoke();
+      onStage?.('DIRECTORY_ACCOUNT');const account = await requireAccount();
       if (!current()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Directory request is inactive.');
       if (!deps.client.listFamilies) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED', 'Family service must be upgraded.');
       try {
-        const result = await deps.client.listFamilies(account.sessionToken);
-        await assertSameAccount(account);
+        onStage?.('DIRECTORY_HTTP');const result = await deps.client.listFamilies(account.sessionToken);
+        onStage?.('DIRECTORY_ACCOUNT_CHECK');await assertSameAccount(account);
         if (!current()) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Directory request is inactive.');
-        await history.reconcileFamilies(account.userId, result.families.map(f => f.familyId), current);
-        return { ...result, userId: account.userId };
+        onStage?.('DIRECTORY_CACHE');await history.reconcileFamilies(account.userId, result.families.map(f => f.familyId), current);
+        onStage?.('DIRECTORY_READY');return { ...result, userId: account.userId };
       } catch (error) {
         await assertSameAccount(account);
         const appError = asApplicationError(error);
@@ -1053,6 +1056,7 @@ export function createFamilyUseCases(deps: {
               storedBytes.length === existing.byteLength &&
               sha256MediaBytes(storedBytes) === existing.contentSha256
             ) {
+              if(existing.storageKey!==familyReceivedMediaKey(existing))await deps.receiveCache.saveStoredMedia({...existing,bytes:storedBytes});
               continue;
             }
           }

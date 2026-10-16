@@ -184,3 +184,18 @@ it('shows ended families as read-only markers without counting or mounting privi
  expect(page.queryByTestId('family-invite-dissolved')).toBeNull();expect(page.queryByText('现在还没有家庭。')).toBeNull();
  expect(page.getByTestId('family-open-create').props.accessibilityState.disabled).toBe(false);
 });
+
+it('shows a bounded development error code without exposing exception messages or credentials',async()=>{
+ mockOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://secret:password@family-test.yunpura.com/private?token=hidden';
+ mockFamilies.mockRejectedValue(Object.assign(new Error('private body token'),{code:'SERVER_UNREACHABLE'}));
+ const page=await render(<FamilyDirectoryScreen/>);
+ await waitFor(()=>expect(page.getByTestId('family-directory-diagnostic')).toBeTruthy());
+ expect(page.getByTestId('family-directory-diagnostic').props.children).toBe('开发诊断：FAMILY_LIST/SERVER_UNREACHABLE/Error\nAPI: https://family-test.yunpura.com');
+ expect(page.queryByText(/private body token/)).toBeNull();delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
+});
+
+it('opens collection only for the selected creator family under the evaluation gate',async()=>{
+ process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL='1';mockOpen.mockReturnValue(true);
+ const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByTestId('family-select-home')).toBeTruthy());await fireEvent.press(page.getByTestId('family-select-home'));await fireEvent.press(page.getByTestId('family-album-collect-home'));
+ expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-albums',params:{familyId:'home',mode:'collect'}});delete process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL;
+});

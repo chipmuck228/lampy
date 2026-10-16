@@ -71,3 +71,9 @@ it('E1 reconciles only missing family caches after a successful list, never afte
  await family.getFamilies();expect(isolate).toHaveBeenCalledWith('a','gone');expect(isolate).toHaveBeenCalledTimes(1);
  expect(await cache.listFamilyIds!('a')).toEqual(['kept']);
 });
+
+it('reports bounded directory stages without account or family identifiers',async()=>{
+ const {session,family}=harness(async()=>({status:200,body:{families:[summary],limit:10}}));await session.setSession({userId:'a',sessionToken:'token-a'});
+ const stages:string[]=[];await family.getFamilies(()=>true,stage=>stages.push(stage));
+ expect(stages).toEqual(['DIRECTORY_REVOKE','DIRECTORY_ACCOUNT','DIRECTORY_HTTP','DIRECTORY_ACCOUNT_CHECK','DIRECTORY_CACHE','DIRECTORY_READY']);
+});

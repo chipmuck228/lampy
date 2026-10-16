@@ -1,3 +1,5 @@
+import { FamilyAlbumLibrary } from './family-album-library';
+import { familyAlbumEvaluationOpen } from '../application/family-album';
 import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -23,7 +25,7 @@ import {
 } from '../application/life-album';
 import { createSecureAlbumListGuideStore } from '../infrastructure/album-list-guide-store';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
-import { AlbumCoverFace, AlbumCoverMeta } from './album-cover-tile';
+import { AlbumCoverFace, AlbumCoverMeta, AlbumCreateTile } from './album-cover-tile';
 import { albumCoverWallLayout, ALBUM_COVER_WALL_GAP } from './album-cover-wall';
 import {
   albumListRestoreScrollY,
@@ -32,7 +34,6 @@ import {
 import { peekAlbumListScroll, rememberAlbumListScroll } from './album-list-session';
 import { hairline, ink, inkSoft, pageGutter, paper, paperDeep, sage } from './life-page';
 import { Text, type } from './life-text';
-import { LifeIcon } from './life-icons';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 import { dismissToRootNav } from './root-nav-switch';
 import { usePageMetrics } from './use-page-metrics';
@@ -248,15 +249,14 @@ export default function LifeAlbumListScreen() {
               scrollRef.current?.scrollTo({ y: 0, animated: false });
             }}><Text style={[styles.action, source === part && { textDecorationLine: 'underline' }]}>{tr(part === 'personal' ? '我的' : '家里的')}</Text></Pressable>)}
         </View>
-        {source === 'family' ? <Text style={styles.meta}>{tr('家里的生活册将在之后开放。')}</Text> : <>
         {showGuideBody ? (
           <View
             testID="life-album-guide"
             style={[styles.guide, empty && styles.guideEmpty]}
             accessibilityRole="summary"
           >
-            <Text style={styles.guideTitle}>{ALBUM_GUIDE_TITLE}</Text>
-            <Text style={styles.guideBody}>{ALBUM_GUIDE_BODY}</Text>
+            <Text style={styles.guideTitle}>{source === 'family' ? tr('把家人的日子，收成一册。') : ALBUM_GUIDE_TITLE}</Text>
+            <Text style={styles.guideBody}>{source === 'family' ? tr("在“家里的”查看已创建的家庭册。家庭创建者可以点册子列表末尾的“＋”，填写册名；管理多个家庭时，先选择所属家庭。也可以从家庭页选中一个家，点“添加到家庭册”，选择已有册子，再收入选中的分享或当前全部分享。册内可以继续收入，或点“整理”调整顺序和移出记录；普通成员可以阅读。首次使用需确认该家的说明，分享撤回后不再显示原文和媒体。当前尚未开放家庭册文件导出。") : ALBUM_GUIDE_BODY}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={ALBUM_GUIDE_DISMISS}
@@ -275,6 +275,7 @@ export default function LifeAlbumListScreen() {
           </Text>
         ) : null}
 
+        {source === 'family' ? (isFamilyProductEntryOpen() && familyAlbumEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <FamilyAlbumLibrary /> : <Text style={styles.meta}>{tr('家里的生活册将在之后开放。')}</Text>) : <>
         {status === 'loading' ? <Text style={styles.meta}>{ALBUM_LOADING}</Text> : null}
         {status === 'error' ? (
           <View>
@@ -302,7 +303,7 @@ export default function LifeAlbumListScreen() {
           </View>
         ) : null}
 
-        {status === 'ready' && albums.length > 0 ? (
+        {status !== 'loading' ? (
           <View
             testID="life-album-cover-wall"
             style={[styles.wall, { gap: ALBUM_COVER_WALL_GAP }]}
@@ -312,7 +313,7 @@ export default function LifeAlbumListScreen() {
               setWallWidth((prev) => (prev === next ? prev : next));
             }}
           >
-            {albums.map((album) => (
+            {(status === 'ready' ? albums : []).map((album) => (
               <Pressable
                 key={album.id}
                 accessibilityRole="button"
@@ -331,21 +332,10 @@ export default function LifeAlbumListScreen() {
                 <AlbumCoverMeta name={album.name} entryCount={album.entryCount} />
               </Pressable>
             ))}
+            <AlbumCreateTile width={wallLayout.tileWidth} height={wallLayout.tileHeight} label={ALBUM_NEW_ACTION} testID="life-album-new" onPress={()=>router.push('/albums/new')}/>
           </View>
         ) : null}
 
-        {status !== 'loading' ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={ALBUM_NEW_ACTION}
-            testID="life-album-new"
-            onPress={() => router.push('/albums/new')}
-            style={styles.createHit}
-          >
-            <LifeIcon name="plus" size={18} color={ink} decorative />
-            <Text style={styles.createLabel}>{ALBUM_NEW_ACTION}</Text>
-          </Pressable>
-        ) : null}
         </>}
       </View>
     </RootReadingLayout>
@@ -391,18 +381,4 @@ const styles = StyleSheet.create({
     minHeight: 48,
     gap: 6,
   },
-  createHit: {
-    minHeight: 48,
-    marginTop: 4,
-    paddingHorizontal: 16,
-    borderRadius: 24,
-    backgroundColor: paperDeep,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: sage,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-  },
-  createLabel: { ...type.action, color: ink },
 });

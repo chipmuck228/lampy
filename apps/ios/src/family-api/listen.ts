@@ -1,3 +1,4 @@
+import {traceFamilyHttp} from './http-trace';
 import { publicTestAuthPlan, publicTestPeer, createPublicAuthAdmission, isPublicAuthRequest, publicAuthBodyDeadline } from './public-test-auth';
 import { INVITE_WEB_HTML, INVITE_WEB_CSS, inviteWebJs, inviteAssociation } from './invite-web';
 import { invitationOrigin, makeFamilyInviteLink } from '../infrastructure/family-invite-link';
@@ -72,6 +73,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
     legacyAppleLoginEnabled: plan.mode === 'test',
     inviteLinksEnabled:inviteEnabled,
     historySharingEnabled:env.LAMPY_FAMILY_HISTORY_ENABLED === '1',
+    familyAlbumsEnabled:env.LAMPY_FAMILY_ALBUMS_ENABLED === '1',
     testAccountLoginEnabled: plan.testAccount.testAccountLoginEnabled,
     controlledEmailAccountsEnabled: env.LAMPY_CONTROLLED_EMAIL_ACCOUNTS === '1',
     passwordHasher: plan.mode === 'test' ? createArgon2idPasswordHasher(ARGON2ID_TEST) : undefined,
@@ -107,6 +109,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
 
   const admitAuth = createPublicAuthAdmission();
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    traceFamilyHttp(req,res,env.LAMPY_FAMILY_HTTP_TRACE==='1');
     let cancelBodyDeadline: (() => void) | undefined;
     let releaseAuth: (() => void) | undefined;
     try {

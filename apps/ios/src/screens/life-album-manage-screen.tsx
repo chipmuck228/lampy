@@ -1,3 +1,5 @@
+import {albumManageStyles} from './album-manage-styles';
+import { AlbumManageToolbar, AlbumEntryActions, AlbumEditorFields } from './album-workflow-controls';
 import { tr } from '../i18n';
 import { isAlbumPrintEvaluationOpen } from '../application/album-print';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -11,7 +13,6 @@ import {
   ALBUM_DELETE_CONFIRM,
   ALBUM_GONE,
   ALBUM_MISSING_SOURCE,
-  ALBUM_OPENING_HINT,
   ALBUM_READ_FAILED,
   ALBUM_RETRY,
   ALBUM_WORDS_COVER,
@@ -31,7 +32,7 @@ import {
 import { firstSearchParam } from './lookback-origin';
 import { momentHref } from './lookback-chrome';
 import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
-import { Text, TextInput, type } from './life-text';
+import { Text, type } from './life-text';
 import { LifeIcon, LifeIconButton } from './life-icons';
 import { SettingsPage } from './settings-chrome';
 
@@ -246,104 +247,10 @@ export default function LifeAlbumManageScreen() {
               </Pressable>
             </View>
           ) : null}
-          <View style={styles.toolbar}>
-            {editing ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={tr("取消")}
-                testID="life-album-cancel-edit"
-                onPress={closeEditor}
-                style={styles.hit}
-              >
-                <Text style={styles.action}>{tr("取消")}</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={tr("编辑册子")}
-                testID="life-album-edit"
-                onPress={() => {
-                  setMenuOpen(false);
-                  setEditing(true);
-                }}
-                style={styles.hit}
-              >
-                <Text style={styles.action}>{tr("编辑册子")}</Text>
-              </Pressable>
-            )}
-            {organizing ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={tr('完成')}
-                testID="life-album-organize-done"
-                onPress={() => setOrganizing(false)}
-                style={styles.doneHit}
-              >
-                <Text style={styles.doneLabel}>{tr('完成')}</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={tr("整理")}
-                testID="life-album-organize"
-                onPress={() => {
-                  setMenuOpen(false);
-                  setOrganizing(true);
-                }}
-                style={styles.hit}
-              >
-                <Text style={styles.action}>{tr("整理")}</Text>
-              </Pressable>
-            )}
-          </View>
+          <AlbumManageToolbar editing={editing} organizing={organizing} busy={busy} onEdit={()=>{if(editing)closeEditor();else {setMenuOpen(false);setEditing(true);}}} onOrganize={()=>{setMenuOpen(false);setOrganizing(value=>!value);}}/>
           {editing ? (
             <View testID="life-album-editor" style={styles.edit}>
-              <Text style={styles.label}>{tr("册名")}</Text>
-              <TextInput
-                testID="life-album-manage-name"
-                value={name}
-                onChangeText={setName}
-                editable={!busy}
-                style={styles.input}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ disabled: busy }}
-                accessibilityLabel={tr("保存册名")}
-                testID="life-album-manage-save-name"
-                disabled={busy}
-                onPress={() => {
-                  if (busyRef.current) return;
-                  void run((app) => app.updateAlbum({ albumId, name }), 'name');
-                }}
-                style={styles.hit}
-              >
-                <Text style={[styles.action, busy && styles.disabled]}>{tr("保存册名")}</Text>
-              </Pressable>
-              <Text style={styles.label}>{tr("开篇")}</Text>
-              <Text style={styles.hint}>{ALBUM_OPENING_HINT}</Text>
-              <TextInput
-                testID="life-album-manage-opening"
-                value={opening}
-                onChangeText={setOpening}
-                editable={!busy}
-                multiline
-                style={styles.input}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ disabled: busy }}
-                accessibilityLabel={tr("保存开篇")}
-                testID="life-album-manage-save-opening"
-                disabled={busy}
-                onPress={() => {
-                  if (busyRef.current) return;
-                  void run((app) => app.updateAlbum({ albumId, opening }), 'opening');
-                }}
-                style={styles.hit}
-              >
-                <Text style={[styles.action, busy && styles.disabled]}>{tr("保存开篇")}</Text>
-              </Pressable>
+              <AlbumEditorFields name={name} opening={opening} busy={busy} onName={setName} onOpening={setOpening} onSaveName={()=>{if(!busyRef.current)void run(app=>app.updateAlbum({albumId,name}),'name');}} onSaveOpening={()=>{if(!busyRef.current)void run(app=>app.updateAlbum({albumId,opening}),'opening');}}/>
               <Text style={styles.label}>{tr("封面")}</Text>
               <CoverChoice
                 selected={view.album.cover}
@@ -409,8 +316,6 @@ function AlbumEntryRow({
   onMoveDown: () => void;
   onRemove: () => void;
 }) {
-  const moveUpDisabled = busy || index === 0;
-  const moveDownDisabled = busy || last;
   const duration = formatAlbumAudioDuration(entry.audioDurationMs);
   const ready = entry.source === 'ready';
   return (
@@ -474,43 +379,7 @@ function AlbumEntryRow({
           )}
         </View>
       </Pressable>
-      {organizing ? (
-        <View style={styles.row}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: moveUpDisabled }}
-            accessibilityLabel={tr("上移")}
-            testID={`life-album-move-up-${entry.momentId}`}
-            disabled={moveUpDisabled}
-            onPress={onMoveUp}
-            style={styles.hit}
-          >
-            <Text style={[styles.action, moveUpDisabled && styles.disabled]}>{tr("上移")}</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: moveDownDisabled }}
-            accessibilityLabel={tr("下移")}
-            testID={`life-album-move-down-${entry.momentId}`}
-            disabled={moveDownDisabled}
-            onPress={onMoveDown}
-            style={styles.hit}
-          >
-            <Text style={[styles.action, moveDownDisabled && styles.disabled]}>{tr("下移")}</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: busy }}
-            accessibilityLabel={tr("移出")}
-            testID={`life-album-remove-${entry.momentId}`}
-            disabled={busy}
-            onPress={onRemove}
-            style={styles.hit}
-          >
-            <Text style={[styles.action, busy && styles.disabled]}>{tr("移出")}</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      {organizing ? <AlbumEntryActions id={entry.momentId} first={index===0} last={last} busy={busy} onMoveUp={onMoveUp} onMoveDown={onMoveDown} onRemove={onRemove}/> : null}
     </View>
   );
 }
@@ -584,21 +453,7 @@ function CoverChoice({
 
 const styles = StyleSheet.create({
   block: { gap: 10, paddingTop: 24 },
-  hero: { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 },
-  heroCover: {
-    width: 72,
-    height: 96,
-    borderRadius: 4,
-    backgroundColor: paperDeep,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    padding: 8,
-    flexShrink: 0,
-  },
-  heroImage: { width: 72, height: 96 },
-  heroWords: { ...type.meta, color: ink, fontSize: 13, lineHeight: 18 },
-  heroCopy: { flex: 1, minWidth: 0, gap: 6 },
-  heroTitle: { ...type.action, color: ink, flexShrink: 1 },
+  ...albumManageStyles,
   previewHit: {
     minHeight: 48,
     paddingHorizontal: 16,
@@ -610,17 +465,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   previewLabel: { ...type.action, color: ink },
-  toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center' },
-  doneHit: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    borderRadius: 24,
-    backgroundColor: paperDeep,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: sage,
-    justifyContent: 'center',
-  },
-  doneLabel: { ...type.action, color: ink },
   menu: { gap: 4 },
   edit: { gap: 8 },
   label: { ...type.meta, color: sage, marginTop: 4 },
@@ -628,28 +472,9 @@ const styles = StyleSheet.create({
   meta: { ...type.meta, color: inkSoft },
   body: { ...type.body, color: ink },
   excerpt: { ...type.body, color: ink },
-  input: {
-    fontSize: type.body.fontSize,
-    color: ink,
-    minHeight: 48,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
   action: { ...type.action, color: sage },
   danger: { ...type.action, color: inkSoft },
   disabled: { opacity: 0.45 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  entry: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: hairline,
-    paddingTop: 10,
-    gap: 6,
-  },
-  entryHit: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 48 },
-  entryCopy: { flex: 1, minWidth: 0, gap: 2 },
-  thumb: { width: 56, height: 56, borderRadius: 4, backgroundColor: paperDeep, flexShrink: 0 },
-  mediaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  audioMark: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   covers: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   coverChip: {
     minHeight: 48,

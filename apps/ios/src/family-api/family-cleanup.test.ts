@@ -60,11 +60,20 @@ it('creator-only explicit membership, immediate denial, pending invite/transfer 
   expect(await db.getFirst('SELECT cleanup_deadline FROM family_families WHERE family_id=?', [x.f.familyId])).toEqual({ cleanup_deadline: deadline });
 });
 it('waits until deadline, persists across reopen, removes snapshots and replay copies, and never touches personal files', async () => {
-  const x = await setup(); await commands.dissolveFamily(x.a.sessionToken, x.f.familyId);
+  const x = await setup();
+  await createSqliteFamilyRepository(db).withTransaction(async tx => {
+    await tx.saveFamilyAlbum({albumId:'album',familyId:x.f.familyId,name:'Private album',opening:null,shareIds:[x.shared.shareId],revision:1,createdAt:start,updatedAt:start});
+    await tx.saveFamilyAlbumNotice({familyId:x.f.familyId,membershipId:x.ar.membershipId,userId:x.a.userId,version:1,acceptedAt:start});
+  });
+  await commands.dissolveFamily(x.a.sessionToken, x.f.familyId);
   expect((await runFamilyCleanup(db, blobs, new Date(Date.parse(deadline) - 1))).checked).toBe(0);
   expect(blobs.files.has(x.photo.objectId)).toBe(true);
+  expect(await db.getAll('SELECT * FROM family_albums')).toHaveLength(1);
+  expect(await db.getAll('SELECT * FROM family_album_notices')).toHaveLength(1);
   await db.close(); db = openFamilySqliteDatabase(path.join(dir, 'f.sqlite')); commands = build();
   expect(await runFamilyCleanup(db, blobs, new Date(deadline))).toMatchObject({ completed: 1, failed: 0, removedFiles: 1 });
+  expect(await db.getAll('SELECT * FROM family_albums')).toEqual([]);
+  expect(await db.getAll('SELECT * FROM family_album_notices')).toEqual([]);
   expect(await db.getAll('SELECT * FROM family_shares')).toEqual([]);
   expect(await db.getAll('SELECT * FROM family_media_objects')).toEqual([]);
   expect(JSON.stringify(await db.getAll('SELECT * FROM family_idempotency'))).not.toContain('Private original');
