@@ -159,3 +159,8 @@ API 列表增加可选 cover 引用，优先有效手选封面，再按册内顺
 ## 登录请求诊断待收集
 
 134f5e0 后用户报告代理例外及清理 Metro/重开 App 后仍 DIRECTORY_HTTP/SERVER_UNREACHABLE ~5020ms；本机保护正常解锁，不能将缓存修复或代理例外视为现场问题已解决。新增 operator-only family-api-read-probe.cjs 比较指定账号已有会话在服务器本机和 HTTPS 的目录及并发册子列表耗时；不输出凭据/私人内容，不重启服务，不改 App。步骤、限制与3项安全/超时测试见 NETWORK-PROBE.md，现场结果待收集。
+
+
+## 同请求编号端到端诊断待采集
+
+用户回报切换 RN fetch 后仍出现目录HTTP超时，不能将Expo SDK已知缺陷视为此次根因。云端同账号GET实测：本机目录46ms、5册并发8–12ms，HTTPS目录738ms、册子557–1203ms，均200；这只是一段观测窗口。增加开发端请求随机编号、HEADERS/TEXT/BYTES阶段、状态、RN标记与环境请求值；服务端需临时 LAMPY_FAMILY_HTTP_TRACE=1，按同编号记录到达/完成/断连耗时，不记录凭据或私密内容。无需迁移或原生build，但需更新两个服务端文件后重启；步骤、回退和限制见 NETWORK-TRACE.md。现场端到端结果待采集，不宣称问题已解决。

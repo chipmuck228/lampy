@@ -286,3 +286,14 @@ describe('family API listen startup', () => {
     }
   });
 });
+
+it('echoes and logs a diagnostic request ID without logging the authenticated header or URL',async()=>{
+ const lines:string[]=[];const spy=jest.spyOn(console,'log').mockImplementation(line=>{lines.push(String(line));});
+ const server=await startFamilyApiServer({port:0,host:'127.0.0.1',env:{LAMPY_FAMILY_API_MODE:'test',LAMPY_FAMILY_API_TEST_TOKENS:'review-token:apple.review.sub',LAMPY_FAMILY_HTTP_TRACE:'1'}});
+ try{
+  const id='diag-abcdef0123456789-9';const response=await new Promise<{status?:number;id?:string|string[]}>((resolve,reject)=>{
+   const req=httpRequest({hostname:'127.0.0.1',port:server.port,path:'/v2/me/families',method:'GET',headers:{authorization:'Bearer private-token','x-lampy-request-id':id}},res=>{res.resume();res.on('end',()=>resolve({status:res.statusCode,id:res.headers['x-lampy-request-id']}));});req.on('error',reject);req.end();
+  });
+  expect(response).toEqual({status:401,id});const output=lines.join('\n');expect(output).toContain('START');expect(output).toContain('FINISH');expect(output).not.toContain('private-token');expect(output).not.toContain('/v2/me/families');
+ }finally{await server.close();spy.mockRestore();}
+});

@@ -1,3 +1,4 @@
+import {traceFamilyHttp} from './http-trace';
 import { publicTestAuthPlan, publicTestPeer, createPublicAuthAdmission, isPublicAuthRequest, publicAuthBodyDeadline } from './public-test-auth';
 import { INVITE_WEB_HTML, INVITE_WEB_CSS, inviteWebJs, inviteAssociation } from './invite-web';
 import { invitationOrigin, makeFamilyInviteLink } from '../infrastructure/family-invite-link';
@@ -108,6 +109,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
 
   const admitAuth = createPublicAuthAdmission();
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    traceFamilyHttp(req,res,env.LAMPY_FAMILY_HTTP_TRACE==='1');
     let cancelBodyDeadline: (() => void) | undefined;
     let releaseAuth: (() => void) | undefined;
     try {

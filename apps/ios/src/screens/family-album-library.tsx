@@ -1,3 +1,4 @@
+import {familyNetworkDiagnostic} from '../infrastructure/family-network-diagnostic';
 import {FamilyAlbumCoverPreview} from './family-album-editor';
 import {albumCoverWallLayout,ALBUM_COVER_WALL_GAP} from './album-cover-wall';
 import {FAMILY_ALBUM_LEASE_MS,FAMILY_ALBUM_RENEW_MS} from '../application/family-album';
@@ -57,7 +58,7 @@ export function FamilyAlbumLibrary(){
        return {family,albums:list.albums,pending:false};
       }catch(error){
        if(libraryFailureCode(error)==='FAMILY_ALBUM_RULES_REQUIRED')return {family,albums:[],pending:true};
-       throw {code:libraryFailureCode(error),stage:'ALBUM_LIST'};
+       throw {code:libraryFailureCode(error),stage:'ALBUM_LIST',networkDiagnostic:error&&typeof error==='object'&&'networkDiagnostic' in error?error.networkDiagnostic:undefined};
       }finally{phases.delete(index);}
      }));
      return {directory,result};
@@ -75,7 +76,7 @@ export function FamilyAlbumLibrary(){
     if(!requestCurrent())return;
     const code=libraryFailureCode(error),phase=[...phases.values()].sort().join(',')||stage;
     if(error&&typeof error==='object'&&'stage' in error&&typeof error.stage==='string'&&/^[A-Z_]+$/.test(error.stage))stage=error.stage;
-    lastFailure=`LIBRARY/${stage}/${code} elapsedMs=${Date.now()-started} phase=${phase}`;setDiagnostic(lastFailure);
+    lastFailure=`LIBRARY/${stage}/${code} elapsedMs=${Date.now()-started} phase=${phase} ${familyNetworkDiagnostic(error)}`.trim();setDiagnostic(lastFailure);
     if(code==='NETWORK'||code==='SERVER_UNREACHABLE'||code==='RATE_LIMITED'||code==='STALE_FAMILY_REQUEST'){
      // Keep the existing lease, never extend it on a failed refresh.
      if(Date.now()>=deadline){hide();setStatus('checking');expired=true;}

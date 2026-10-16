@@ -1,3 +1,4 @@
+import {familyNetworkError,type FamilyNetworkDiagnostic} from './family-network-diagnostic';
 import { ApplicationError } from '../application/errors';
 import type {
   FamilyView,
@@ -142,7 +143,7 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
         errorCode: appError?.code || 'SERVER_UNREACHABLE',
       });
       const message = error instanceof Error ? error.message : 'Family server is unreachable.';
-      throw new ApplicationError(appError?.code || 'SERVER_UNREACHABLE', message);
+      throw appError ?? new ApplicationError('SERVER_UNREACHABLE', message);
     }
     const failed = (response.body || {}) as ErrorBody;
     recordFamilyTestLastRequest({
@@ -370,9 +371,13 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
   };
 }
 
+let diagnosticRequestSequence=0;
+const diagnosticNonce=(Math.random().toString(16).slice(2)+'0000000000000000').slice(0,16);
+
 export function createFamilyHttpTransport(deps: {
   baseUrl: string;
   fetchImpl?: typeof fetch;
+  trace?: boolean;
 }): FamilyTransport {
   const baseUrl = deps.baseUrl.replace(/\/+$/, '');
   const fetchImpl = deps.fetchImpl ?? globalThis.fetch;
@@ -398,6 +403,11 @@ export function createFamilyHttpTransport(deps: {
       else if (input.body !== undefined) headers['content-type'] = 'application/json';
       if (input.sessionToken) headers.authorization = `Bearer ${input.sessionToken}`;
       if (input.idempotencyKey) headers['idempotency-key'] = input.idempotencyKey;
+      const trace=deps.trace??(typeof __DEV__!=='undefined'&&__DEV__&&process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL==='1');
+      const metadata=(input.method.toUpperCase()==='GET'&&(input.path==='/v2/me/families'||/^\/v2\/families\/[^/]+\/(albums|album-access)$/.test(input.path)))||(input.method.toUpperCase()==='POST'&&/^\/v2\/families\/[^/]+\/albums\/[^/]+\/validate$/.test(input.path));
+      const id=trace&&metadata?`diag-${diagnosticNonce}-${++diagnosticRequestSequence}`:null;
+      if(id)headers['x-lampy-request-id']=id;
+      const network:FamilyNetworkDiagnostic={id,engine:deps.fetchImpl?'INJECTED':(fetchImpl as typeof fetch&{polyfill?:boolean}).polyfill===true?'RN':'OTHER',rnRequested:process.env.EXPO_PUBLIC_USE_RN_FETCH==='1'||process.env.EXPO_PUBLIC_USE_RN_FETCH==='true',phase:'HEADERS',status:null};
       const controller=input.timeoutMs?new AbortController():null;
       let timer:ReturnType<typeof setTimeout>|undefined;
       const work=(async()=>{
@@ -407,6 +417,7 @@ export function createFamilyHttpTransport(deps: {
         body: familyFetchBody(input),
         ...(controller ? {signal:controller.signal} : {}),
       });
+      network.status=response.status;network.phase=input.expectBytes&&response.ok?'BYTES':'TEXT';
       if (input.expectBytes && response.ok) {
         const buffer = await response.arrayBuffer();
         return {
@@ -429,9 +440,9 @@ export function createFamilyHttpTransport(deps: {
       }
       return { status: response.status, body };
       })();
-      if(!input.timeoutMs)return work;
+      if(!input.timeoutMs)return work.catch(error=>{throw familyNetworkError(error,network);});
       const timeout=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller?.abort();reject(new ApplicationError('SERVER_UNREACHABLE','Family request timed out.'));},input.timeoutMs);});
-      try{return await Promise.race([work,timeout]);}finally{if(timer)clearTimeout(timer);}
+      try{return await Promise.race([work,timeout]);}catch(error){throw familyNetworkError(error,network);}finally{if(timer)clearTimeout(timer);}
 
     },
   };
