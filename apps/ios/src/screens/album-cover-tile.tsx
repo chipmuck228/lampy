@@ -16,6 +16,7 @@ export function AlbumCoverFace({
   height,
   wordsTestID,
   privateMedia = false,
+  showWordsFallback = true,
 }: {
   name: string;
   coverUri: string | null;
@@ -23,6 +24,7 @@ export function AlbumCoverFace({
   height: number;
   wordsTestID?: string;
   privateMedia?: boolean;
+  showWordsFallback?: boolean;
 }) {
   const [reduceMotion, setReduceMotion] = useState(true);
   useEffect(() => {
@@ -52,13 +54,13 @@ export function AlbumCoverFace({
           accessibilityIgnoresInvertColors
           onError={() => setFailedUri(coverUri)}
         />
-      ) : (
+      ) : showWordsFallback ? (
         <View style={styles.wordsCover} testID={wordsTestID}>
           <Text style={styles.wordsName} numberOfLines={3}>
             {name}
           </Text>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }

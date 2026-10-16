@@ -31,6 +31,6 @@ export function FamilyAlbumCoverPreview({familyId,cover,compact=false,tile}:{fam
   void (async()=>{try{const app=await getFamilyUseCases();const read=await app.history.read(familyId,cover.shareId,()=>current,cover.objectId);if(current)setUri(read.media.find(media=>media.objectId===cover.objectId)?.uri??null);}catch{if(current)setUri(null);}})();
   return()=>{current=false;setUri(null);};
  },[familyId,cover.shareId,cover.objectId]));
- if(tile)return <AlbumCoverFace name={tile.name} coverUri={uri} width={tile.width} height={tile.height} privateMedia/>;
+ if(tile)return <AlbumCoverFace name={tile.name} coverUri={uri} width={tile.width} height={tile.height} privateMedia showWordsFallback={false}/>;
  return uri?<Image accessibilityLabel={tr('家庭照片')} source={{uri}} cachePolicy="none" contentFit={compact?'cover':'contain'} style={compact?{width:72,height:96}:{width:'100%',height:180}}/>:null;
 }
