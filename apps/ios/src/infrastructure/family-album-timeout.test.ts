@@ -13,3 +13,11 @@ it('cleans up the validation deadline after a successful response',async()=>{
  const client=createFamilyApiClient(createFamilyHttpTransport({baseUrl:'https://family-test.yunpura.com',fetchImpl}));
  await expect(client.albums!.validate('token','f','b','digest')).resolves.toEqual({valid:true});await jest.advanceTimersByTimeAsync(6000);expect(signal?.aborted).toBe(false);
 });
+
+it.each(['directory','access','list'] as const)('cancels a hung %s metadata HTTP request after five seconds',async(kind)=>{
+ jest.useFakeTimers();let signal:AbortSignal|null|undefined;
+ const fetchImpl=jest.fn((_url:unknown,init?:RequestInit)=>{signal=init?.signal;return new Promise(()=>{});}) as unknown as typeof fetch;
+ const client=createFamilyApiClient(createFamilyHttpTransport({baseUrl:'https://family-test.yunpura.com',fetchImpl}));
+ const work=kind==='directory'?client.listFamilies!('token'):kind==='access'?client.albums!.access('token','f'):client.albums!.list('token','f');const rejected=expect(work).rejects.toMatchObject({code:'SERVER_UNREACHABLE'});
+ await jest.advanceTimersByTimeAsync(5000);await rejected;expect(signal?.aborted).toBe(true);
+});

@@ -141,3 +141,16 @@ API 列表增加可选 cover 引用，优先有效手选封面，再按册内顺
 新增验证：健康列表连续3分钟、暂时失败后恢复、持续断网不过期延长、过期后新鲜数据恢复、旧挂起响应不恢复、共享目录请求被替代重试、明确失权即时隐藏及诊断净化、单请求元数据读取与账号切换。模拟器需确认此前约10秒出现重试的现象；若再次失败，列表页现在可以提供开发诊断。
 
 本轮检查：3 suites / 43 tests 通过；最终列表专项10项通过，TypeScript、改动 ESLint、diff 检查通过。模拟器故障原因待新版诊断确认。
+
+
+## 列表超时截图：目录不再等待无关媒体缓存队列
+
+用户截图显示 LIBRARY/REQUEST_TIMEOUT/SERVER_UNREACHABLE elapsedMs=10016，随后 LIBRARY/LEASE/EXPIRED ageMs=15218。它证明刷新整轮超时及本地资格到期，不代表服务端明确失权，也不能据此单独断定公网故障。
+
+代码与红/绿测试复现了客户端阻塞路径：history.read 在 cacheTail 内下载媒体；getFamilies 每次调用 reconcileFamilies，即使 removed 为空，仍排队等待 cacheTail。因此无须清理的目录会被封面/记录媒体下载拖住。本次 removed 为空即返回；有家庭需要隔离时，仍立即递增 generation、串行清理后返回。测试先在旧实现确认失败，再在修复后确认不等待；另测移除期间挂起下载的旧读取拒绝、清理仍完成。现场是否还有其他网络等待需模拟器复验。
+
+列表直接调用每家 albums.list，利用服务端已经执行的资格/规则检查及返回 access，省掉额外 access 请求；未确认规则由 FAMILY_ALBUM_RULES_REQUIRED 响应呈现对应家庭提示，不读取册子正文。目录、album-access、album-list 三种只读 HTTP 请求具有5秒 timeout+AbortController（除原有 validate 外），不再只依靠外层10秒逻辑超时。底层 fetch 若忽略取消仍由 Promise.race 返回，旧请求号继续隔离迟到结果。
+
+目录阶段诊断细分为 DIRECTORY_REVOKE/ACCOUNT/HTTP/ACCOUNT_CHECK/CACHE/READY，并在整轮超时保留 phase；无用户/家庭/册名/正文/token。以区分网络、账号读取和缓存等待，而不是笼统显示整轮超时。无云端、数据库或原生变更。
+
+验证：6 suites / 72 tests 通过（历史/移除/撤回/目录与账号隔离、HTTP超时取消、列表续验及阶段诊断、家庭册应用）；TypeScript、改动ESLint、diff检查通过。模拟器待用户更新后重验停留和封面/声音。

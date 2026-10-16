@@ -38,25 +38,27 @@ export function FamilyAlbumLibrary(){
   hide();setStatus('loading');setDiagnostic('');
   async function load(){
    if(!allowed||inFlight||!current())return;
-   inFlight=true;const id=++loadId,started=Date.now();let stage='DIRECTORY';
+   inFlight=true;const id=++loadId,started=Date.now();let stage='CONTAINER';const phases=new Map<number,string>();
    const requestCurrent=()=>current()&&id===loadId;
    let timer:ReturnType<typeof setTimeout>|undefined;
    try{
     const work=(async()=>{
-     const app=await getFamilyUseCases();const directory=await app.getFamilies(requestCurrent);
+     const app=await getFamilyUseCases();stage='DIRECTORY';const directory=await app.getFamilies(requestCurrent,next=>{if(requestCurrent()&&/^[A-Z_]+$/.test(next))stage=next;});
      if(!requestCurrent())return null;
-     const result=await Promise.all(directory.families.map(async family=>{
-      let familyStage='ALBUM_ACCESS';
+     stage='ALBUM_LIST';
+     const result=await Promise.all(directory.families.map(async(family,index)=>{
+      phases.set(index,'ALBUM_LIST');
       try{
-       const access=await app.albums.access(family.familyId);
-       if(!requestCurrent())return null;
-       if(access.userId!==directory.userId)throw {code:'ACCOUNT_CHANGED'};
-       if(!access.rulesAcknowledged)return {family,albums:[],pending:true};
-       familyStage='ALBUM_LIST';const list=await app.albums.list(family.familyId);
+       // list() already checks membership/rules and returns qualified access.
+       const list=await app.albums.list(family.familyId);
        if(!requestCurrent())return null;
        if(list.access.userId!==directory.userId)throw {code:'ACCOUNT_CHANGED'};
+       if(list.access.rulesAcknowledged===false)return {family,albums:[],pending:true};
        return {family,albums:list.albums,pending:false};
-      }catch(error){throw {code:libraryFailureCode(error),stage:familyStage};}
+      }catch(error){
+       if(libraryFailureCode(error)==='FAMILY_ALBUM_RULES_REQUIRED')return {family,albums:[],pending:true};
+       throw {code:libraryFailureCode(error),stage:'ALBUM_LIST'};
+      }finally{phases.delete(index);}
      }));
      return {directory,result};
     })();
@@ -71,9 +73,9 @@ export function FamilyAlbumLibrary(){
     setCanCreate(data.directory.families.some(family=>family.role==='creator'));setStatus('ready');setDiagnostic('');lastFailure='';
    }catch(error){
     if(!requestCurrent())return;
-    const code=libraryFailureCode(error);
+    const code=libraryFailureCode(error),phase=[...phases.values()].sort().join(',')||stage;
     if(error&&typeof error==='object'&&'stage' in error&&typeof error.stage==='string'&&/^[A-Z_]+$/.test(error.stage))stage=error.stage;
-    lastFailure=`LIBRARY/${stage}/${code} elapsedMs=${Date.now()-started}`;setDiagnostic(lastFailure);
+    lastFailure=`LIBRARY/${stage}/${code} elapsedMs=${Date.now()-started} phase=${phase}`;setDiagnostic(lastFailure);
     if(code==='NETWORK'||code==='SERVER_UNREACHABLE'||code==='RATE_LIMITED'||code==='STALE_FAMILY_REQUEST'){
      // Keep the existing lease, never extend it on a failed refresh.
      if(Date.now()>=deadline){hide();setStatus('checking');expired=true;}

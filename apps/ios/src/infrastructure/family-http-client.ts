@@ -159,9 +159,9 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
 
   return {
     albums: {
-      access:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken}),
+      access:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,timeoutMs:5000}),
       acknowledge:(sessionToken,familyId,membershipId,confirmation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,body:{membershipId,confirmation}}),
-      list:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken}),
+      list:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken,timeoutMs:5000}),
       sources:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-sources`,sessionToken}),
       create:(sessionToken,familyId,input)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken,body:input}),
       read:(sessionToken,familyId,albumId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}`,sessionToken}),
@@ -188,7 +188,7 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
       return send({ method: 'POST', path: '/v1/auth/test-account', body: input });
     },
     listFamilies(sessionToken) {
-      return send({ method: 'GET', path: '/v2/me/families', sessionToken });
+      return send({ method: 'GET', path: '/v2/me/families', sessionToken, timeoutMs:5000 });
     },
     createNamedFamily(sessionToken, name, idempotencyKey) {
       return send({ method: 'POST', path: '/v2/families', sessionToken, idempotencyKey, body: { name } });

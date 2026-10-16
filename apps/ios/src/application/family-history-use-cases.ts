@@ -158,6 +158,9 @@ export function createFamilyHistoryUseCases(deps: {
       await check(a, current);
       const ids = await deps.receiveCache.listFamilyIds(userId); await check(a, current);
       const removed = new Set([...ids, ...generations.keys()].filter(id => !activeIds.includes(id)));
+      // An unchanged directory must not wait behind downloads in cacheTail.
+      // Removed families still invalidate immediately and await serialized cleanup below.
+      if(removed.size===0)return;
       for (const familyId of removed) generations.set(familyId, (generations.get(familyId) ?? 0) + 1);
       const job = cacheTail.catch(() => undefined).then(async () => {
         for (const familyId of removed) await deps.receiveCache!.isolateFamily(userId, familyId);

@@ -327,3 +327,24 @@ it('keeps shared recording bytes and uses the stored m4a URI, including repair o
  expect(repaired.media[0].uri).toMatch(/\.m4a$/);expect(x.cache.files.has(legacy)).toBe(false);expect(x.requests.filter(request=>request.path.endsWith('/content')).length).toBe(downloads);
  await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,shared.shareId);await expect(x.history.authorize(x.f.familyId,shared.shareId,current)).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});expect(x.cache.files.size).toBe(0);
 });
+
+it('does not block an unchanged family directory behind an in-flight media download',async()=>{
+ const x=await fixture();x.attach();const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const started=deferred<void>(),gate=deferred<{bytes:Uint8Array;mimeType:string}>();
+ x.client.history!.getShareMediaContent=async()=>{started.resolve();return gate.promise;};
+ const reading=x.history.read(x.f.familyId,shared.shareId,current);await started.promise;
+ let reconciled=false;const reconcile=x.history.reconcileFamilies(x.a.userId,[x.f.familyId],current).then(()=>{reconciled=true;});
+ try{for(let i=0;i<100&&!reconciled;i++)await Promise.resolve();expect(reconciled).toBe(true);}
+ finally{gate.resolve({bytes:sampleJpegBytes(),mimeType:'image/jpeg'});await reading;await reconcile;}
+});
+
+it('still invalidates a removed family immediately while its queued cleanup waits for a download',async()=>{
+ const x=await fixture();x.attach();const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const started=deferred<void>(),gate=deferred<{bytes:Uint8Array;mimeType:string}>();
+ x.client.history!.getShareMediaContent=async()=>{started.resolve();return gate.promise;};
+ const reading=x.history.read(x.f.familyId,shared.shareId,current);const rejected=expect(reading).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});await started.promise;
+ let reconciled=false;const reconcile=x.history.reconcileFamilies(x.a.userId,[],current).then(()=>{reconciled=true;});
+ for(let i=0;i<100;i++)await Promise.resolve();expect(reconciled).toBe(false);
+ gate.resolve({bytes:sampleJpegBytes(),mimeType:'image/jpeg'});await rejected;await reconcile;
+ expect(await x.cache.listFamilyIds!(x.a.userId)).toEqual([]);
+});

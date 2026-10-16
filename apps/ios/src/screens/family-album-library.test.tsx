@@ -19,8 +19,8 @@ it('shows books directly and opens the exact book without another family picker'
  await fireEvent.press(page.getByText('Our days'));expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-albums',params:{familyId:'f',albumId:'b',mode:'read'}});
  await fireEvent.press(page.getByLabelText('新建家庭册'));expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-albums',params:{mode:'new'}});
 });
-it('shows an empty state, keeps notices per family, and never fetches unacknowledged books',async()=>{
- mockAccess.mockResolvedValue({userId:'a',rulesAcknowledged:false});const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('确认 Home 的家庭册说明')).toBeTruthy());expect(mockList).not.toHaveBeenCalled();expect(page.getByLabelText('新建家庭册')).toBeTruthy();
+it('shows an empty state, keeps notices per family, and uses the rules-required list response without a separate access request',async()=>{
+ mockList.mockRejectedValue({code:'FAMILY_ALBUM_RULES_REQUIRED'});const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('确认 Home 的家庭册说明')).toBeTruthy());expect(mockList).toHaveBeenCalledTimes(1);expect(mockAccess).not.toHaveBeenCalled();expect(page.getByLabelText('新建家庭册')).toBeTruthy();
 });
 it('offers no creation to ordinary members and hides content on background or lock',async()=>{
  mockDirectory.mockResolvedValue({userId:'a',families:[{familyId:'f',name:'Home',role:'member'}]});const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());expect(page.queryByLabelText('新建家庭册')).toBeNull();
@@ -56,8 +56,8 @@ it('hides on sustained network failure at the lease boundary and automatically r
 });
 it('shows a safe stage diagnostic and immediately hides on an explicit access denial',async()=>{
  jest.useFakeTimers();const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());
- mockAccess.mockRejectedValueOnce({code:'NOT_IN_FAMILY',message:'private name'});await act(async()=>{jest.advanceTimersByTime(3000);});
- expect(page.queryByText('Our days')).toBeNull();expect(page.getByText('再试一次')).toBeTruthy();expect(page.getByTestId('family-album-library-diagnostic').props.children).toMatch(/^开发诊断：LIBRARY\/ALBUM_ACCESS\/NOT_IN_FAMILY elapsedMs=/);expect(page.queryByText('private name')).toBeNull();
+ mockList.mockRejectedValueOnce({code:'NOT_IN_FAMILY',message:'private name'});await act(async()=>{jest.advanceTimersByTime(3000);});
+ expect(page.queryByText('Our days')).toBeNull();expect(page.getByText('再试一次')).toBeTruthy();expect(page.getByTestId('family-album-library-diagnostic').props.children).toMatch(/^开发诊断：LIBRARY\/ALBUM_LIST\/NOT_IN_FAMILY elapsedMs=/);expect(page.queryByText('private name')).toBeNull();
  await fireEvent.press(page.getByText('再试一次'));await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());
 });
 it('does not expire a healthy library during several minutes of serial refreshes',async()=>{
@@ -69,4 +69,10 @@ it('retries a superseded shared directory request without clearing a valid list'
  jest.useFakeTimers();const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());
  mockDirectory.mockRejectedValueOnce({code:'STALE_FAMILY_REQUEST'});await act(async()=>{jest.advanceTimersByTime(3000);});expect(page.getByText('Our days')).toBeTruthy();expect(page.queryByText('再试一次')).toBeNull();
  await act(async()=>{jest.advanceTimersByTime(3000);});expect(page.getByText('Our days')).toBeTruthy();expect(page.queryByTestId('family-album-library-diagnostic')).toBeNull();
+});
+
+it('shows which directory stage is blocked when the aggregate deadline fires',async()=>{
+ jest.useFakeTimers();mockDirectory.mockImplementation((_current:()=>boolean,stage:(value:string)=>void)=>{stage('DIRECTORY_CACHE');return new Promise(()=>{});});
+ const page=await render(<FamilyAlbumLibrary/>);await act(async()=>{jest.advanceTimersByTime(10000);});
+ expect(page.getByTestId('family-album-library-diagnostic').props.children).toMatch(/REQUEST_TIMEOUT\/SERVER_UNREACHABLE.*phase=DIRECTORY_CACHE/);
 });
