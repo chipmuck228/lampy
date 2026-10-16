@@ -69,3 +69,11 @@ it('retries transient network errors without extending old access or discarding 
  now=6000;expect(await reading.validate()).toBe(true);f.validate.mockRejectedValueOnce({code:'NETWORK'});now=7000;expect(await reading.validate()).toBe(false);
  now=6000+FAMILY_ALBUM_LEASE_MS;expect(reading.snapshot()).toBeNull();
 });
+
+it('reads access/list metadata once per endpoint while checking both the returned viewer and local session',async()=>{
+ const f=setup();await f.session.setSession({userId:'a',sessionToken:'a'});await f.client.access('f');expect(f.access).toHaveBeenCalledTimes(1);
+ const list=jest.fn(async()=>({access:permission,albums:[]}));const client=createFamilyAlbumUseCases({session:f.session,client:{albums:{access:f.access,list}} as unknown as FamilyApiClient});
+ f.access.mockClear();await expect(client.list('f')).resolves.toMatchObject({albums:[]});expect(f.access).not.toHaveBeenCalled();expect(list).toHaveBeenCalledTimes(1);
+ list.mockResolvedValueOnce({access:{...permission,userId:'b'},albums:[]});await expect(client.list('f')).rejects.toMatchObject({code:'UNAUTHENTICATED'});
+ list.mockImplementationOnce(async()=>{await f.session.setSession({userId:'b',sessionToken:'b'});return {access:permission,albums:[]};});await expect(client.list('f')).rejects.toMatchObject({code:'FAMILY_ALBUM_CANCELLED'});
+});

@@ -11,18 +11,18 @@ export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:F
     const token=await deps.session.getSessionToken();const userId=await deps.session.getUserId();
     if(!token||!userId)throw new ApplicationError('UNAUTHENTICATED','Sign in is required.');return {token,userId};
   }
-  async function request<T>(familyId:string,work:(api:FamilyAlbumApi,token:string)=>Promise<T>,current=()=>true) {
+  async function request<T>(familyId:string,work:(api:FamilyAlbumApi,token:string,userId:string)=>Promise<T>,current=()=>true,preflight=true) {
     const before=await account();const api=deps.client.albums;
     if(!api)throw new ApplicationError('FAMILY_ALBUMS_CLOSED','Family albums are not available.');
     const check=async()=>{const after=await account();if(!current()||before.token!==after.token||before.userId!==after.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','The family request is no longer current.');};
-    const access=await api.access(before.token,familyId);await check();
-    if(access.userId!==before.userId)throw new ApplicationError('UNAUTHENTICATED','Account changed.');
-    const result=await work(api,before.token);await check();return result;
+    if(preflight){const access=await api.access(before.token,familyId);await check();checkViewer(access.userId,before.userId);}
+    const result=await work(api,before.token,before.userId);await check();return result;
   }
+  function checkViewer(actual:string,expected:string){if(actual!==expected)throw new ApplicationError('UNAUTHENTICATED','Account changed.');}
   return {
-    access(familyId:string) {return request(familyId,(api,token)=>api.access(token,familyId));},
+    access(familyId:string) {return request(familyId,async(api,token,userId)=>{const access=await api.access(token,familyId);checkViewer(access.userId,userId);return access;},()=>true,false);},
     acknowledge(familyId:string,membershipId:string) {return request(familyId,(api,token)=>api.acknowledge(token,familyId,membershipId,FAMILY_ALBUM_CONFIRMATION));},
-    list(familyId:string) {return request(familyId,(api,token)=>api.list(token,familyId));},
+    list(familyId:string) {return request(familyId,async(api,token,userId)=>{const list=await api.list(token,familyId);checkViewer(list.access.userId,userId);return list;},()=>true,false);},
     sources(familyId:string) {return request(familyId,(api,token)=>api.sources(token,familyId));},
     create(familyId:string,input:Parameters<FamilyAlbumApi['create']>[2]) {return request(familyId,(api,token)=>api.create(token,familyId,input));},
     mutate(familyId:string,view:FamilyAlbumView,change:FamilyAlbumMutation) {return request(familyId,(api,token)=>api.mutate(token,familyId,view.albumId,{authority:view.access.authority,revision:view.revision,change}));},
