@@ -28,7 +28,7 @@ export function FamilyAlbumCoverPreview({familyId,cover,compact=false,tile}:{fam
  const [uri,setUri]=useState<string|null>(null);
  useFocusEffect(useCallback(()=>{
   let current=true;setUri(null);
-  void (async()=>{try{const app=await getFamilyUseCases();const read=await app.history.read(familyId,cover.shareId,()=>current);if(current)setUri(read.media.find(media=>media.objectId===cover.objectId)?.uri??null);}catch{if(current)setUri(null);}})();
+  void (async()=>{try{const app=await getFamilyUseCases();const read=await app.history.read(familyId,cover.shareId,()=>current,cover.objectId);if(current)setUri(read.media.find(media=>media.objectId===cover.objectId)?.uri??null);}catch{if(current)setUri(null);}})();
   return()=>{current=false;setUri(null);};
  },[familyId,cover.shareId,cover.objectId]));
  if(tile)return <AlbumCoverFace name={tile.name} coverUri={uri} width={tile.width} height={tile.height} privateMedia/>;

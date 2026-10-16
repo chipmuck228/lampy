@@ -348,3 +348,22 @@ it('still invalidates a removed family immediately while its queued cleanup wait
  gate.resolve({bytes:sampleJpegBytes(),mimeType:'image/jpeg'});await rejected;await reconcile;
  expect(await x.cache.listFamilyIds!(x.a.userId)).toEqual([]);
 });
+
+it('reads only the selected cover and reuses its private file without another download or write',async()=>{
+ const x=await fixture();x.attach();const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const share=await x.client.history!.getShare(x.a.sessionToken,x.f.familyId,shared.shareId);
+ const photo=share.snapshot.media[0];
+ const get=jest.spyOn(x.client.history!,'getShare').mockResolvedValue({...share,snapshot:{...share.snapshot,media:[photo,{...photo,objectId:'unrequested-photo'}]}});
+ const meta=jest.spyOn(x.client.history!,'getShareMedia');const content=jest.spyOn(x.client.history!,'getShareMediaContent');const save=jest.spyOn(x.cache,'saveStoredMedia');
+ const first=await x.history.read(x.f.familyId,shared.shareId,current,photo.objectId);
+ expect(first.media).toHaveLength(1);expect(meta).toHaveBeenCalledTimes(1);expect(content).toHaveBeenCalledTimes(1);expect(save).toHaveBeenCalledTimes(1);
+ expect((await x.cache.find(x.a.userId,x.f.familyId,shared.shareId))?.receiveStatus).not.toBe('received');
+ const again=await x.history.read(x.f.familyId,shared.shareId,current,photo.objectId);
+ expect(again.media[0].uri).toBe(first.media[0].uri);expect(meta).toHaveBeenCalledTimes(2);expect(content).toHaveBeenCalledTimes(1);expect(save).toHaveBeenCalledTimes(1);
+ const stored=(await x.cache.listMedia(x.a.userId,x.f.familyId,shared.shareId))[0];x.cache.files.delete(stored.storageKey);
+ await x.history.read(x.f.familyId,shared.shareId,current,photo.objectId);
+ expect(content).toHaveBeenCalledTimes(2);expect(save).toHaveBeenCalledTimes(2);
+ get.mockRestore();await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,shared.shareId);
+ await expect(x.history.read(x.f.familyId,shared.shareId,current,photo.objectId)).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
+ expect(x.cache.files.size).toBe(0);
+});

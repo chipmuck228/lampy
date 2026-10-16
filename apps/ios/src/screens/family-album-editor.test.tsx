@@ -13,7 +13,7 @@ it('uses separate name/opening saves and saves covers on selection like the pers
  await fireEvent.press(page.getByText('保存册名'));expect(save).toHaveBeenLastCalledWith({kind:'rename',name:'New name',opening:'Old opening'});
  await fireEvent.press(page.getByText('保存开篇'));expect(save).toHaveBeenLastCalledWith({kind:'rename',name:'Old name',opening:'Opening'});
  await fireEvent.press(page.getByLabelText('选这张照片做封面 · Author · 照片 1'));expect(save).toHaveBeenLastCalledWith({kind:'edit',name:'Old name',opening:'Old opening',coverChoice:{shareId:'s',objectId:'photo'}});
- await waitFor(()=>expect(mockRead).toHaveBeenCalledWith('f','s',expect.any(Function)));
+ await waitFor(()=>expect(mockRead).toHaveBeenCalledWith('f','s',expect.any(Function),'photo'));
 });
 it('restores auto on selection and blocks all writes while busy',async()=>{
  const save=jest.fn();const selected={...book,coverChoice:{shareId:'s',objectId:'photo'}};const page=await render(<FamilyAlbumEditor book={selected} busy={false} onSave={save}/>);
