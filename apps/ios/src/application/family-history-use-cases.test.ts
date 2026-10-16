@@ -354,16 +354,30 @@ it('reads only the selected cover and reuses its private file without another do
  const share=await x.client.history!.getShare(x.a.sessionToken,x.f.familyId,shared.shareId);
  const photo=share.snapshot.media[0];
  const get=jest.spyOn(x.client.history!,'getShare').mockResolvedValue({...share,snapshot:{...share.snapshot,media:[photo,{...photo,objectId:'unrequested-photo'}]}});
- const meta=jest.spyOn(x.client.history!,'getShareMedia');const content=jest.spyOn(x.client.history!,'getShareMediaContent');const save=jest.spyOn(x.cache,'saveStoredMedia');
+ const meta=jest.spyOn(x.client.history!,'getShareMedia');const content=jest.spyOn(x.client.history!,'getShareMediaContent');const save=jest.spyOn(x.cache,'saveStoredMedia');const readBytes=jest.spyOn(x.cache,'readMediaBytes');
  const first=await x.history.read(x.f.familyId,shared.shareId,current,photo.objectId);
  expect(first.media).toHaveLength(1);expect(meta).toHaveBeenCalledTimes(1);expect(content).toHaveBeenCalledTimes(1);expect(save).toHaveBeenCalledTimes(1);
  expect((await x.cache.find(x.a.userId,x.f.familyId,shared.shareId))?.receiveStatus).not.toBe('received');
  const again=await x.history.read(x.f.familyId,shared.shareId,current,photo.objectId);
+ expect(readBytes).not.toHaveBeenCalled();
  expect(again.media[0].uri).toBe(first.media[0].uri);expect(meta).toHaveBeenCalledTimes(2);expect(content).toHaveBeenCalledTimes(1);expect(save).toHaveBeenCalledTimes(1);
- const stored=(await x.cache.listMedia(x.a.userId,x.f.familyId,shared.shareId))[0];x.cache.files.delete(stored.storageKey);
+ const stored=(await x.cache.listMedia(x.a.userId,x.f.familyId,shared.shareId))[0];
+ const original=x.cache.files.get(stored.storageKey)!;const corrupt=new Uint8Array(original);corrupt[0]^=1;x.cache.files.set(stored.storageKey,corrupt);
  await x.history.read(x.f.familyId,shared.shareId,current,photo.objectId);
  expect(content).toHaveBeenCalledTimes(2);expect(save).toHaveBeenCalledTimes(2);
+ x.cache.files.delete(stored.storageKey);
+ await x.history.read(x.f.familyId,shared.shareId,current,photo.objectId);
+ expect(content).toHaveBeenCalledTimes(3);expect(save).toHaveBeenCalledTimes(3);
  get.mockRestore();await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,shared.shareId);
  await expect(x.history.read(x.f.familyId,shared.shareId,current,photo.objectId)).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
  expect(x.cache.files.size).toBe(0);
+});
+
+it('authorizes cached cover metadata concurrently instead of waiting inside the file queue',async()=>{
+ const x=await fixture();x.attach();const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const share=await x.client.history!.getShare(x.a.sessionToken,x.f.familyId,shared.shareId);const photo=share.snapshot.media[0];
+ const original=x.client.history!.getShareMedia.bind(x.client.history);const both=deferred<void>();let calls=0;
+ jest.spyOn(x.client.history!,'getShareMedia').mockImplementation(async(...args)=>{if(++calls===2)both.resolve();await both.promise;return original(...args);});
+ const results=await Promise.all([x.history.read(x.f.familyId,shared.shareId,current,photo.objectId),x.history.read(x.f.familyId,shared.shareId,current,photo.objectId)]);
+ expect(calls).toBe(2);expect(results[0].media[0].uri).toBe(results[1].media[0].uri);
 });

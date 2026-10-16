@@ -57,6 +57,7 @@ export type FamilyCacheCleanup = {
 };
 
 export type FamilyReceiveCache = {
+  mediaStamp?(storageKey: string): Promise<string | null>;
   listFamilyIds?(userId: string): Promise<string[]>;
   list(userId: string, familyId: string): Promise<ReceivedShareRecord[]>;
   find(userId: string, familyId: string, shareId: string): Promise<ReceivedShareRecord | null>;
@@ -203,6 +204,10 @@ export function createMemoryFamilyReceiveCache(): FamilyReceiveCache & {
     },
     async listMedia(userId, familyId, shareId) {
       return media.filter((row) => row.userId === userId && row.familyId === familyId && row.shareId === shareId);
+    },
+    async mediaStamp(storageKey) {
+      const bytes = files.get(storageKey);
+      return bytes ? `${bytes.length}:${sha256MediaBytes(bytes)}` : null;
     },
     async readMediaBytes(storageKey) {
       const bytes = files.get(storageKey);
@@ -660,6 +665,7 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
       return row;
     },
     listMedia,
+    async mediaStamp(storageKey) { return files.stamp?.(storageKey) ?? null; },
     async readMediaBytes(storageKey) {
       return files.read(storageKey);
     },
