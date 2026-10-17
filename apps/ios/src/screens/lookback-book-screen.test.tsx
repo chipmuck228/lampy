@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Dimensions, StyleSheet } from 'react-native';
+import { AppState, Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
@@ -104,6 +104,7 @@ function bookView(overrides: Record<string, unknown> = {}) {
 
 describe('lookback book screen', () => {
   beforeEach(async () => {
+    Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});
     await cleanup();
     mockPush.mockReset();
     mockReplace.mockReset();
@@ -221,7 +222,17 @@ describe('lookback book screen', () => {
     });
     expect(view.getByText('慢慢看')).toBeTruthy();
     await fireEvent.press(view.getByTestId('lookback-calendar-open'));
-    expect(mockPush).toHaveBeenCalledWith('/lookback/calendar');
+    await waitFor(()=>expect(view.getByTestId('lookback-calendar-popup')).toBeTruthy());
+    expect(mockPush).not.toHaveBeenCalledWith('/lookback/calendar');
+    expect(view.getByTestId('lookback-day-count-2026-09-27').props.children).toBe(14);
+    await fireEvent.press(view.getByTestId('calendar-backdrop'));
+    expect(view.queryByTestId('lookback-calendar-popup')).toBeNull();
+    await fireEvent.press(view.getByTestId('lookback-calendar-open'));
+    await waitFor(()=>expect(view.getByTestId('lookback-day-2026-09-27')).toBeTruthy());
+    mockGetHistoryDay.mockClear();
+    await fireEvent.press(view.getByTestId('lookback-day-2026-09-27'));
+    await waitFor(()=>expect(mockGetHistoryDay).toHaveBeenCalledWith(2026,9,27,0));
+    expect(view.queryByTestId('lookback-calendar-popup')).toBeNull();
     expect(view.getByText('LAMPY · 时间里的记录')).toBeTruthy();
     expect(view.getByTestId('lookback-header-rule')).toBeTruthy();
     const header = StyleSheet.flatten(view.getByTestId('lookback-header').props.style);

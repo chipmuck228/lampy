@@ -898,7 +898,8 @@
   "更早的月份": "Earlier month",
   "更晚的月份": "Later month",
   "选择月份": "Choose a month",
-  "小圆点标记有记录的日期。": "Dots mark days with moments.",
+  "日期下的数字是当天的记录条数。": "Numbers below dates show how many moments that day holds.",
+  "关闭日历": "Close calendar",
   "还没有日期明确的记录。": "No moments with a known day yet.",
   "日期未确认的记录仍在时间目录中。": "Moments without a confirmed date remain in the time index."
 }

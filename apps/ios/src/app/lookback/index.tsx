@@ -1,4 +1,5 @@
 import { tr } from '../../i18n';
+import LookbackCalendarPopup from '../../screens/lookback-calendar-popup';
 import { leaveVoiceHref } from '../../screens/leave-voice-intent';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -155,6 +156,8 @@ export default function LookbackIndexScreen() {
   const [view, setView] = useState<LookbackBookView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [calendarOpen,setCalendarOpen]=useState(false);
+  const closeCalendar=useCallback(()=>setCalendarOpen(false),[]);
   const [expand, setExpand] = useState<MonthExpand | null>(null);
   const [scope, setScope] = useState<LookbackReadingScope | null>(null);
   const [reading, setReading] = useState<ReadingState>({ status: 'idle' });
@@ -1099,13 +1102,14 @@ export default function LookbackIndexScreen() {
   ) : null;
 
   return (
+    <>
     <LookbackScaffold
       title={tr("回看")}
       kicker={tr("LAMPY · 时间里的记录")}
       subtitle={tr("慢慢看")}
       onSubtitlePress={() => {
         void clipsRef.current.pause();
-        router.push('/lookback/calendar');
+        setCalendarOpen(true);
       }}
       path="/lookback"
       root
@@ -1355,5 +1359,10 @@ export default function LookbackIndexScreen() {
       ) : null}
       </Animated.View>
     </LookbackScaffold>
+    <LookbackCalendarPopup visible={calendarOpen} onClose={closeCalendar} onOpenDay={date=>{
+      setCalendarOpen(false);
+      void loadScope({kind:'day',...date},{locate:true});
+    }}/>
+    </>
   );
 }
