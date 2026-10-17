@@ -20,7 +20,7 @@ REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 npx expo start --dev-client --lan --por
 
 保留已存在的 LampyLocal.storekit。已有 #116 原生构建可直接连接新 Metro，无需为免费纸页重做 Pods。由 Xcode ⌘R 启动，或只验收免费预览时从当前开发构建连接此 Metro。localhost、127.0.0.1、::1 继续绕过代理。
 
-入口：我的生活册 → 家里的 → 某一册 → 看纸页。未购买和普通成员也应能使用两种风格；家庭付费 PDF 开关为 0 时不应出现新导出入口。
+入口：我的生活册 → 家里的 → 某一册 → 看看这一册 → 连续阅读中选择“素纸／手作” → 看纸页。与“我的”保持相同的入口顺序和操作。纸页沿用所选风格，纸页里不另放一排风格按钮。未购买和普通成员也能使用两种风格；家庭付费 PDF 开关为 0 时不应出现新导出入口。
 
 | 项目 | 通过标准 |
 | --- | --- |
@@ -38,7 +38,7 @@ REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 npx expo start --dev-client --lan --por
 
 这部分需另完成真实商品与 Apple Sandbox 服务配置，不能用 app.lampy.export.test 本地交易替代。先按 README.md 部署 API 并确认 migration 31、服务器购买来源验证，客户端使用真实商品 ID 并开启统一购买和家庭 PDF 开关，prebuild/Pods/重编；Xcode StoreKit Configuration 设 None。参照 paid-export-f/F2-ACCEPTANCE.md 做只读 preflight。开关默认关闭，不要修改公共归档脚本跳过此项。
 
-测试当前 creator 购买后明确解锁本家庭，再从看纸页或管理页进入“导出这一册”，点“生成PDF”。购买、解锁、生成和系统保存均为显式操作，不能自动扣款或自动生成。
+测试当前 creator 购买后明确解锁本家庭，再从册子管理页进入“导出这一册”，点“生成PDF”。购买、解锁、生成和系统保存均为显式操作，不能自动扣款或自动生成。
 
 验收：素纸/手作各生成一次；同册添加记录重生成、另一册生成；保存到系统文件并离线打开；普通成员和未解锁家庭不能新生成；转交后仅新 creator 可使用该家庭授权，个人权益不转移；原购买退款后停止新生成，旧 PDF 仍可打开；生成期间撤回/排序/转交/锁定/离页，不交付本次成品；已有 withdrawn 条目应阻止生成而不是静默漏掉。
 
