@@ -1103,6 +1103,10 @@ export default function LookbackIndexScreen() {
       title={tr("回看")}
       kicker={tr("LAMPY · 时间里的记录")}
       subtitle={tr("慢慢看")}
+      onSubtitlePress={() => {
+        void clipsRef.current.pause();
+        router.push('/lookback/calendar');
+      }}
       path="/lookback"
       root
       locateKey={catalogOpen ? null : locateKey}

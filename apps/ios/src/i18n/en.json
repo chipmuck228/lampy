@@ -892,5 +892,13 @@
   "家庭文件导出尚未开放。": "Family file export is not available yet.",
   "还没有生成PDF。": "No PDF has been generated yet.",
   "保存PDF": "Save PDF",
-  "本家庭已解锁，可以制作PDF。": "This family is unlocked and can create PDFs."
+  "本家庭已解锁，可以制作PDF。": "This family is unlocked and can create PDFs.",
+  "打开记录日历": "Open moment calendar",
+  "记录日历": "Moment calendar",
+  "更早的月份": "Earlier month",
+  "更晚的月份": "Later month",
+  "选择月份": "Choose a month",
+  "小圆点标记有记录的日期。": "Dots mark days with moments.",
+  "还没有日期明确的记录。": "No moments with a known day yet.",
+  "日期未确认的记录仍在时间目录中。": "Moments without a confirmed date remain in the time index."
 }
