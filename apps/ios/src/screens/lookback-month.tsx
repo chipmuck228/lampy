@@ -114,7 +114,7 @@ function MonthDayCell({
       style={styles.cell}
     >
       <Text style={styles.filledNumeral}>{cell.numeral}</Text>
-      <View style={styles.mark} />
+      <Text testID={`lookback-day-count-${year}-${pad2(month)}-${pad2(cell.day)}`} style={styles.count}>{cell.count}</Text>
     </Pressable>
   );
 }
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   },
   quietNumeral: { fontSize: 16, lineHeight: 22, color: '#5C5851' },
   filledNumeral: { fontSize: 16, lineHeight: 22, color: '#25231F' },
-  mark: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#53604F' },
+  count: { fontSize: 11, lineHeight: 15, color: '#53604F', textAlign: 'center' },
   entries: { gap: 4, width: '100%', minWidth: 0 },
   entryHeading: { fontSize: 16, lineHeight: 22, color: '#5C5851', paddingTop: 8 },
   entryHit: { minHeight: 44, justifyContent: 'center' },

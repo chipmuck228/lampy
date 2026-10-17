@@ -233,6 +233,7 @@ export function LookbackScaffold({
   title,
   kicker,
   subtitle,
+  onSubtitlePress,
   headerAction,
   headerTrailing,
   path,
@@ -263,6 +264,7 @@ export function LookbackScaffold({
   title: string;
   kicker?: string;
   subtitle?: string;
+  onSubtitlePress?: () => void;
   headerAction?: ReactNode;
   headerTrailing?: ReactNode;
   path: string;
@@ -369,10 +371,12 @@ export function LookbackScaffold({
           </Text>
         </View>
         <View style={styles.heroTrail}>
-          {subtitle ? (
-            <Text style={styles.topMark} testID="lookback-subtitle">
-              {subtitle}
-            </Text>
+          {subtitle ? onSubtitlePress ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('打开记录日历')} testID="lookback-calendar-open" onPress={onSubtitlePress} style={{minHeight:44,justifyContent:'center'}}>
+              <Text style={styles.topMark} testID="lookback-subtitle">{subtitle}</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.topMark} testID="lookback-subtitle">{subtitle}</Text>
           ) : null}
           {headerTrailing}
         </View>

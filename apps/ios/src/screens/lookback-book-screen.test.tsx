@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Dimensions, StyleSheet } from 'react-native';
+import { AppState, Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LookbackIndexScreen from '../app/lookback/index';
@@ -103,8 +103,9 @@ function bookView(overrides: Record<string, unknown> = {}) {
 }
 
 describe('lookback book screen', () => {
-  beforeEach(() => {
-    cleanup();
+  beforeEach(async () => {
+    Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});
+    await cleanup();
     mockPush.mockReset();
     mockReplace.mockReset();
     mockBack.mockReset();
@@ -140,7 +141,7 @@ describe('lookback book screen', () => {
     expect(view.getByTestId('lookback-leave-fab')).toBeTruthy();
     expect(view.getByTestId('lookback-leave-fab').props.accessibilityElementsHidden).toBe(false);
     expect(view.queryByTestId('lookback-unconfirmed')).toBeNull();
-    view.unmount();
+    await view.unmount();
   });
 
   it('does not treat unknown dates as an empty library', async () => {
@@ -170,7 +171,7 @@ describe('lookback book screen', () => {
     });
     expect(view.getByTestId('lookback-catalog-range').props.children).toBe('时间未确认');
     expect(view.queryByTestId('lookback-empty')).toBeNull();
-    view.unmount();
+    await view.unmount();
   });
 
   it('opens recorded months on the lookback book without a top back', async () => {
@@ -220,6 +221,18 @@ describe('lookback book screen', () => {
       expect(view.getByTestId('lookback-reading-title')).toBeTruthy();
     });
     expect(view.getByText('慢慢看')).toBeTruthy();
+    await fireEvent.press(view.getByTestId('lookback-calendar-open'));
+    await waitFor(()=>expect(view.getByTestId('lookback-calendar-popup')).toBeTruthy());
+    expect(mockPush).not.toHaveBeenCalledWith('/lookback/calendar');
+    expect(view.getByTestId('lookback-day-count-2026-09-27').props.children).toBe(14);
+    await fireEvent.press(view.getByTestId('calendar-backdrop'));
+    expect(view.queryByTestId('lookback-calendar-popup')).toBeNull();
+    await fireEvent.press(view.getByTestId('lookback-calendar-open'));
+    await waitFor(()=>expect(view.getByTestId('lookback-day-2026-09-27')).toBeTruthy());
+    mockGetHistoryDay.mockClear();
+    await fireEvent.press(view.getByTestId('lookback-day-2026-09-27'));
+    await waitFor(()=>expect(mockGetHistoryDay).toHaveBeenCalledWith(2026,9,27,0));
+    expect(view.queryByTestId('lookback-calendar-popup')).toBeNull();
     expect(view.getByText('LAMPY · 时间里的记录')).toBeTruthy();
     expect(view.getByTestId('lookback-header-rule')).toBeTruthy();
     const header = StyleSheet.flatten(view.getByTestId('lookback-header').props.style);
@@ -230,7 +243,7 @@ describe('lookback book screen', () => {
     expect(kicker.fontSize).toBe(11);
     expect(view.getByTestId('lookback-catalog-toggle')).toBeTruthy();
     expect(view.getByTestId('lookback-leave-fab').props.accessibilityElementsHidden).toBe(false);
-    fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
+    await fireEvent.press(view.getByTestId('lookback-catalog-toggle'));
     await waitFor(() => {
       expect(view.getByTestId('lookback-book-year-2026')).toBeTruthy();
     });
@@ -245,7 +258,7 @@ describe('lookback book screen', () => {
     expect(view.queryByTestId('lookback-year-2026')).toBeNull();
     expect(view.getByTestId('root-nav-band')).toBeTruthy();
     expect(view.queryByTestId('lookback-back')).toBeNull();
-    view.unmount();
+    await view.unmount();
   });
 
   it('consumes a year-only intent without expanding a month or inventing a day', async () => {
@@ -259,7 +272,7 @@ describe('lookback book screen', () => {
     expect(view.queryByTestId('lookback-book-selected-day')).toBeNull();
     expect(view.getByTestId('lookback-book-locate-year-2026')).toBeTruthy();
     expect(takeLookbackBookIntent()).toBeNull();
-    view.unmount();
+    await view.unmount();
   });
 
   it('replaces a year deep link onto /lookback with a one-shot year intent', async () => {
@@ -270,7 +283,7 @@ describe('lookback book screen', () => {
     });
     expect(takeLookbackBookIntent()).toEqual({ year: 2026 });
     expect(takeLookbackBookIntent()).toBeNull();
-    yearPage.unmount();
+    await yearPage.unmount();
   });
 
   it('replaces a month deep link onto /lookback with a one-shot month intent', async () => {
@@ -281,7 +294,7 @@ describe('lookback book screen', () => {
       expect(mockReplace).toHaveBeenCalledWith('/lookback');
     });
     expect(peekLookbackBookIntentForTests()).toEqual({ year: 2026, month: 9 });
-    monthPage.unmount();
+    await monthPage.unmount();
   });
 
   it('writes the day route into a book intent when leaving a cold day page', async () => {
@@ -310,10 +323,10 @@ describe('lookback book screen', () => {
     await waitFor(() => {
       expect(day.getByText('门口的风')).toBeTruthy();
     });
-    fireEvent.press(day.getByTestId('lookback-back'));
+    await fireEvent.press(day.getByTestId('lookback-back'));
     expect(takeLookbackBookIntent()).toEqual({ year: 2026, month: 1, day: 2 });
     expect(mockDismissTo).toHaveBeenCalledWith('/lookback');
     expect(mockBack).not.toHaveBeenCalled();
-    day.unmount();
+    await day.unmount();
   });
 });
