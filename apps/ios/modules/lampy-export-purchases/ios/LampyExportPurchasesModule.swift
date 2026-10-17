@@ -35,7 +35,15 @@ private actor ExportPurchaseStore {
   }
 
   private func product(_ id: String) async throws -> Product {
-    guard let item = try await Product.products(for: [id]).first,
+    #if DEBUG
+    print("[LampyStoreKit] product-query start id=\(id) bundle=\(Bundle.main.bundleIdentifier ?? "unknown")")
+    #endif
+    let products = try await Product.products(for: [id])
+    #if DEBUG
+    let details = products.map { "\($0.id):\($0.type)" }.joined(separator: ",")
+    print("[LampyStoreKit] product-query returned count=\(products.count) products=\(details)")
+    #endif
+    guard let item = products.first,
           item.id == id, item.type == .nonConsumable else { throw ExportPurchaseFailure.unavailable }
     return item
   }
@@ -44,7 +52,20 @@ private actor ExportPurchaseStore {
     let id = try configuredExportProductID(expected)
     let owned = try await owns(id)
     // Existing verified owners can export even if the price lookup is offline.
-    let item = try? await product(id)
+    let item: Product?
+    do {
+      item = try await product(id)
+    } catch {
+      #if DEBUG
+      // Log error identifiers only: no account, receipt, or transaction data.
+      let nativeError = error as NSError
+      print("[LampyStoreKit] product-query failed domain=\(nativeError.domain) code=\(nativeError.code)")
+      if let underlying = nativeError.userInfo[NSUnderlyingErrorKey] as? NSError {
+        print("[LampyStoreKit] underlying domain=\(underlying.domain) code=\(underlying.code)")
+      }
+      #endif
+      item = nil
+    }
     var result: [String: Any] = ["owned": owned, "product": NSNull()]
     if let item = item { result["product"] = ["id": item.id, "name": item.displayName, "price": item.displayPrice] }
     return result
