@@ -11,7 +11,8 @@
 ```bash
 npm ci
 npm run check-env
-read -r -p '输入大于 App Store Connect 已上传编号的新 build number：' LAMPY_BUILD_NUMBER
+printf '输入大于 App Store Connect 已上传编号的新 build number：'
+read -r LAMPY_BUILD_NUMBER
 export LAMPY_BUILD_NUMBER
 export LAMPY_ARCHIVE_OUT="$HOME/WeChatProjects/lampy-testflight-preview-artifacts/$LAMPY_BUILD_NUMBER"
 bash scripts/release-archive.sh --family-internal --prepare
@@ -54,8 +55,14 @@ Archive 使用 generic iOS 设备 Release，不需要 Metro。检查报告没有
 | --- | --- |
 | #118 模拟器家庭预览 | 用户已通过；iPhone 17 Pro Max / iOS 26.3.1 |
 | 内部 Release 入口与关闭导出自动检查 | 见本 PR 检查结果 |
-| Mac prepare / Pods / Xcode Release | 待用户执行 |
-| 真机安装、无 Metro 冷启动 | 未验证 |
-| Archive 静态检查 | 未验证 |
-| 上传及 TestFlight 内部安装 | 未执行 |
+| Mac prepare / Pods / Xcode Release | 用户已完成，Build 10 |
+| 真机安装、无 Metro 冷启动 | 用户报告通过；TestFlight Build 10 |
+| Archive 静态检查 | 未收到独立检查报告，不单独记为已通过 |
+| 上传及 TestFlight 内部安装 | 用户已完成，Build 10 可下载安装 |
 | 真实 Sandbox / 家庭付费 PDF | 延期，保持关闭 |
+
+### 2026-10-17 用户验收：TestFlight Build 10
+
+用户明确确认以下四项通过：脱离 Xcode/Metro 后杀进程冷启动；登录、家庭分享、家庭册素纸／手作及纸页预览；无购买、正式导出或打印验收入口；本机保护与后台停止声音正常。真机型号、OS 和二进制源码 SHA 未单独提供，不沿用此前模拟器型号作为真机证据。本次仅记录用户实测，不声称代为安装或查看归档报告。更广泛的飞行模式、账号切换等未逐项确认，不扩展为已通过。
+
+云端用户提供的健康响应为 unifiedPurchases=false、familyAlbumExport=false，家庭服务及家庭册开启；家庭付费 PDF 和真实 Sandbox 继续延期，客户端构建配置保持关闭。手动 Xcode 构建环境缺少关闭标志的错误已由 73cbcc5 修复，并有独立进程加载生成环境的回归测试。
