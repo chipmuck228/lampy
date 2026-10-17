@@ -21,16 +21,46 @@ private actor ExportPurchaseStore {
   private var busy = false
 
   func owns(_ id: String) async throws -> Bool {
+    #if DEBUG
+    print("[LampyStoreKit] entitlement-query start id=\(id)")
+    var count = 0
+    #endif
     for await result in Transaction.currentEntitlements {
+      #if DEBUG
+      count += 1
+      #endif
       switch result {
       case .verified(let transaction):
+        #if DEBUG
+        print("[LampyStoreKit] entitlement verified product=\(transaction.productID) type=\(transaction.productType) revoked=\(transaction.revocationDate != nil)")
+        #endif
         if transaction.productID == id && transaction.productType == .nonConsumable && transaction.revocationDate == nil {
           return true
         }
-      case .unverified(let transaction, _):
+      case .unverified(let transaction, let error):
+        #if DEBUG
+        let verificationError = error as NSError
+        print("[LampyStoreKit] entitlement unverified product=\(transaction.productID) domain=\(verificationError.domain) code=\(verificationError.code)")
+        #endif
         if transaction.productID == id { throw ExportPurchaseFailure.unverified }
       }
     }
+    #if DEBUG
+    print("[LampyStoreKit] entitlement-query end count=\(count) owned=false")
+    // Observe pending deliveries without granting access or finishing them.
+    var unfinishedCount = 0
+    for await result in Transaction.unfinished {
+      unfinishedCount += 1
+      switch result {
+      case .verified(let transaction):
+        print("[LampyStoreKit] unfinished verified product=\(transaction.productID) type=\(transaction.productType)")
+      case .unverified(let transaction, let error):
+        let verificationError = error as NSError
+        print("[LampyStoreKit] unfinished unverified product=\(transaction.productID) domain=\(verificationError.domain) code=\(verificationError.code)")
+      }
+    }
+    print("[LampyStoreKit] unfinished-query end count=\(unfinishedCount)")
+    #endif
     return false
   }
 
@@ -110,9 +140,21 @@ public final class LampyExportPurchasesModule: Module {
     Events("onEntitlementsChanged")
     OnCreate { [weak self] in
       guard let id = try? configuredExportProductID() else { return }
+      #if DEBUG
+      print("[LampyStoreKit] transaction-listener start id=\(id)")
+      #endif
       self?.updates = Task { [weak self] in
         for await result in Transaction.updates {
           if Task.isCancelled { return }
+          #if DEBUG
+          switch result {
+          case .verified(let transaction):
+            print("[LampyStoreKit] transaction-update verified product=\(transaction.productID)")
+          case .unverified(let transaction, let error):
+            let verificationError = error as NSError
+            print("[LampyStoreKit] transaction-update unverified product=\(transaction.productID) domain=\(verificationError.domain) code=\(verificationError.code)")
+          }
+          #endif
           // Unverified transactions never grant or finish an entitlement.
           guard case .verified(let transaction) = result, transaction.productID == id else { continue }
           await transaction.finish()
