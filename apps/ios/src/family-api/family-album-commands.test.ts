@@ -171,3 +171,54 @@ it('runs client transport through HTTP for rule receipt, collection, reordering 
   expect((await api.list('a','f')).albums).toHaveLength(1);
  }finally{await f.clean();}
 });
+
+
+it('family PDF requires a live creator and family source, and rechecks content after Apple verification',async()=>{
+ const f=await fixture('sqlite');
+ try {
+  const initial=await f.create();
+  const book=await f.commands.albums.mutate('a','f',initial.albumId,{authority:initial.access.authority,revision:initial.revision,change:{kind:'collect',shareIds:['s1']}});
+  await expect(f.commands.albums.authorizeExport!('a','f',book.albumId,book.validation)).rejects.toMatchObject({code:'FAMILY_ALBUM_EXPORT_CLOSED'});
+  let token='';let revoked=false;
+  const verify=jest.fn(async()=>({originalTransactionId:'100',transactionId:'100',environment:'Sandbox' as const,productId:'paid',appAccountToken:token,revoked,signedAt:revoked?200:100}));
+  const commands=createFamilyCommands({repository:f.repository,clock,apple:createMapAppleVerifier({}),historySharingEnabled:true,familyAlbumsEnabled:true,unifiedPurchasesEnabled:true,familyAlbumExportEnabled:true,unifiedProductId:'paid',purchaseVerifier:{environment:'Sandbox',verify}});
+  const current=await commands.albums.read('a','f',book.albumId);
+  await expect(commands.albums.authorizeExport!('a','f',book.albumId,current.validation)).rejects.toMatchObject({code:'PURCHASE_REQUIRED'});
+  token=(await commands.purchases.context('a')).appAccountToken;
+  await commands.purchases.claim('a','100');await commands.purchases.unlockFamily('a','f');
+  expect(await commands.albums.authorizeExport!('a','f',book.albumId,current.validation)).toEqual({allowed:true,userId:'a'});
+  expect(await dispatchFamilyApi(commands,{method:'POST',path:`/v2/families/f/albums/${book.albumId}/export-access`,headers:{authorization:'Bearer a'},body:{validation:current.validation}})).toEqual({status:200,body:{allowed:true,userId:'a'}});
+  await f.acknowledge('b');
+  const member=await commands.albums.read('b','f',book.albumId);
+  await expect(commands.albums.authorizeExport!('b','f',book.albumId,member.validation)).rejects.toMatchObject({code:'FORBIDDEN'});
+  verify.mockImplementationOnce(async()=>{
+    await f.repository.withTransaction(async tx=>{const row=(await tx.findShare('s1'))!;await tx.saveShare({...row,status:'revoked'});});
+    return {originalTransactionId:'100',transactionId:'100',environment:'Sandbox' as const,productId:'paid',appAccountToken:token,revoked:false,signedAt:100};
+  });
+  await expect(commands.albums.authorizeExport!('a','f',book.albumId,current.validation)).rejects.toMatchObject({code:'FAMILY_ALBUM_CHANGED'});
+  const removed=await commands.albums.read('a','f',book.albumId);
+  await expect(commands.albums.authorizeExport!('a','f',book.albumId,removed.validation)).rejects.toMatchObject({code:'FAMILY_ALBUM_INCOMPLETE'});
+ } finally {await f.clean();}
+});
+
+it('creator transfer carries the family grant without giving the recipient personal purchase rights; refund stops new PDF',async()=>{
+ const f=await fixture('memory');
+ try {
+  const initial=await f.create();
+  await f.commands.albums.mutate('a','f',initial.albumId,{authority:initial.access.authority,revision:initial.revision,change:{kind:'collect',shareIds:['s1']}});
+  let token='';let revoked=false;
+  const verify=async()=>({originalTransactionId:'100',transactionId:'100',environment:'Sandbox' as const,productId:'paid',appAccountToken:token,revoked,signedAt:revoked?200:100});
+  const commands=createFamilyCommands({repository:f.repository,clock,apple:createMapAppleVerifier({}),historySharingEnabled:true,familyAlbumsEnabled:true,unifiedPurchasesEnabled:true,familyAlbumExportEnabled:true,unifiedProductId:'paid',purchaseVerifier:{environment:'Sandbox',verify}});
+  token=(await commands.purchases.context('a')).appAccountToken;
+  await commands.purchases.claim('a','100');await commands.purchases.unlockFamily('a','f');
+  await f.repository.withTransaction(async tx=>{for(const member of await tx.listActiveMembers('f'))await tx.saveMembership({...member,role:member.userId==='b'?'creator':'member'});});
+  await f.acknowledge('b');
+  const book=await commands.albums.read('b','f',initial.albumId);
+  expect((await commands.purchases.context('b')).owned).toBe(false);
+  expect(await commands.albums.authorizeExport!('b','f',book.albumId,book.validation)).toEqual({allowed:true,userId:'b'});
+  const old=await commands.albums.read('a','f',initial.albumId);
+  await expect(commands.albums.authorizeExport!('a','f',old.albumId,old.validation)).rejects.toMatchObject({code:'FORBIDDEN'});
+  revoked=true;
+  await expect(commands.albums.authorizeExport!('b','f',book.albumId,book.validation)).rejects.toMatchObject({code:'PURCHASE_REQUIRED'});
+ } finally {await f.clean();}
+});

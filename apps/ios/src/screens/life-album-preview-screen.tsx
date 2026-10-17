@@ -69,9 +69,14 @@ const NativeAlbumPageView = requireAlbumNativePageView() as
   | import('react').ComponentType<{ pageJson: string; mediaJson: string; playingJson: string; style?: object }>
   | null;
 
-export default function LifeAlbumPreviewScreen() {
+export type FamilyPaperPresentation = {
+  albumId:string;layout:AlbumLayout|null;media:AlbumLayoutMediaMap;style:AlbumReadingStyle;
+  blocked:boolean;loading:boolean;error:string|null;retry:()=>void;current:()=>boolean;
+};
+export default function LifeAlbumPreviewScreen({family}:{family?:FamilyPaperPresentation} = {}) {
   const router = useRouter();
-  const albumId = firstSearchParam(useLocalSearchParams<{ id?: string | string[] }>().id) ?? '';
+  const routeId = firstSearchParam(useLocalSearchParams<{ id?: string | string[] }>().id) ?? '';
+  const albumId = family ? family.albumId : routeId;
   const lock = useDeviceLock();
   const clips = useRecentClipPlayback();
   const pauseRef = useRef(clips.pause);
@@ -79,19 +84,24 @@ export default function LifeAlbumPreviewScreen() {
     pauseRef.current = clips.pause;
   }, [clips.pause]);
   const { width, height } = useWindowDimensions();
-  const [layout, setLayout] = useState<AlbumLayout | null>(null);
-  const [media, setMedia] = useState<AlbumLayoutMediaMap>({});
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [personalLayout, setLayout] = useState<AlbumLayout | null>(null);
+  const [personalMedia, setMedia] = useState<AlbumLayoutMediaMap>({});
+  const [personalError, setError] = useState<string | null>(null);
+  const [personalLoading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [readingStyle, setReadingStyle] = useState<AlbumReadingStyle>('plain');
+  const [personalStyle, setReadingStyle] = useState<AlbumReadingStyle>('plain');
   const pageSeq = useRef(0);
   const attempt = useRef<AlbumPreviewPageAttempt | null>(null);
   const probeAlive = useRef(false);
   const blockedRef = useRef(false);
 
-  const blocked = !!lock?.snapshot.locked;
+  const layout = family ? family.layout : personalLayout;
+  const media = family ? family.media : personalMedia;
+  const error = family ? family.error : personalError;
+  const loading = family ? family.loading : personalLoading;
+  const readingStyle = family ? family.style : personalStyle;
+  const blocked = !!lock?.snapshot.locked || !!family?.blocked;
   const showPage = !!layout && !loading && !error && !blocked && layout.albumId === albumId;
 
   useEffect(() => {
@@ -109,6 +119,7 @@ export default function LifeAlbumPreviewScreen() {
     const previousId = abandonAlbumPreviewAttempt(attempt.current);
     attempt.current = null;
     cancelOwnedRequest(previousId);
+    if(family){setPage(0);setZoom(1);return;}
     if (!albumId || blocked) {
       setLayout(null);
       setMedia({});
@@ -182,7 +193,7 @@ export default function LifeAlbumPreviewScreen() {
         setError(isApplicationError(caught) ? caught.message : ALBUM_PREVIEW_FAILED);
       }
     });
-  }, [albumId, blocked, cancelOwnedRequest]);
+  }, [albumId, blocked, cancelOwnedRequest, family]);
 
   useFocusEffect(
     useCallback(() => {
@@ -237,7 +248,7 @@ export default function LifeAlbumPreviewScreen() {
             accessibilityRole="button"
             accessibilityLabel={ALBUM_RETRY}
             testID="life-album-preview-retry"
-            onPress={load}
+            onPress={family?.retry ?? load}
             style={styles.hit}
           >
             <Text style={styles.action}>{ALBUM_RETRY}</Text>
@@ -367,6 +378,7 @@ export default function LifeAlbumPreviewScreen() {
                       testID={`life-album-preview-audio-${block.assetId}`}
                       disabled={!canPlay}
                       onPress={() => {
+                        if(family&&!family.current())return;
                         if (playing) {
                           void pauseRef.current();
                           return;
@@ -486,7 +498,7 @@ export default function LifeAlbumPreviewScreen() {
   );
 }
 
-function AlbumBlockView({
+export function AlbumBlockView({
   readingStyle,
   block,
   media,

@@ -127,7 +127,10 @@ export function createExpoAlbumPrint(albumId: string, current: () => boolean) {
       ).input;
     },
     fonts: () => diagnoseAlbumFonts(ALBUM_SERIF_FONT, ALBUM_UI_FONT),
-    async layout(input, style, fonts) {
+    layout: layoutAlbumPrint,
+  });
+}
+export async function layoutAlbumPrint(input: import('../application/album-layout-input').AlbumLayoutInput, style: import('../application/album-reading').AlbumReadingStyle, fonts: NonNullable<ReturnType<typeof diagnoseAlbumFonts>>) {
       const layout = await paginateAlbumLayout(
         input,
         {
@@ -166,13 +169,12 @@ export function createExpoAlbumPrint(albumId: string, current: () => boolean) {
           ...page.rendering!,
           serif: fonts.serif.fontName,
           ui: fonts.ui.fontName,
+          style,
           paper: ALBUM_READING_STYLES[style].paper,
           photoBorderWidth: ALBUM_READING_STYLES[style].photoBorderWidth,
         },
       }));
       return layout;
-    },
-  });
 }
 export type SavedPrintSummary = Pick<
   PrintManifest,

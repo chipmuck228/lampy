@@ -1,3 +1,4 @@
+import { familyPdfEnabled } from '../application/family-album-paper';
 import {albumManageStyles as bookStyles} from './album-manage-styles';
 import { AlbumCreateFields, AlbumManageToolbar, AlbumEntryActions } from './album-workflow-controls';
 import { DEFAULT_ALBUM_NAME, normalizeAlbumName, albumEntryCountLabel } from '../application/life-album';
@@ -42,7 +43,6 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(DEFAULT_ALBUM_NAME);
   const [organizing, setOrganizing] = useState(false);
-  const [reading,setReading]=useState(false);
   const [failed, setFailed] = useState(false);
   const [diagnostic, setDiagnostic] = useState('');
   const [checking, setChecking] = useState(false);
@@ -74,7 +74,6 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     setBook(null);
     setEditing(false);
     setOrganizing(false);
-    setReading(false);
     setAccess(null);
     setAlbums([]);
     setSources([]);
@@ -335,20 +334,19 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
         <View style={bookStyles.heroCover}>{book.cover ? <FamilyAlbumCoverPreview key={`${book.cover.shareId}/${book.cover.objectId}`} familyId={book.familyId} cover={book.cover} compact/> : <Text style={bookStyles.heroWords} numberOfLines={3}>{book.name}</Text>}</View>
         <View style={bookStyles.heroCopy}><Text style={bookStyles.heroTitle} numberOfLines={2}>{book.name}</Text><Text style={{...type.meta,color:inkSoft}}>{albumEntryCountLabel(book.items.length)}</Text>
         <Text style={{...type.meta,color:inkSoft}}>{families.find(family=>family.familyId===book.familyId)?.name}</Text>
-        {book.items.length?<FamilyAlbumButton label={tr(reading?'返回整理':'看看这一册')} onPress={()=>{setReading(value=>!value);setEditing(false);setOrganizing(false);setSources([]);setSelected([]);}} disabled={busy}/>:<Text style={{...type.meta,color:inkSoft}}>{tr('先收下一条，也可以慢慢添。')}</Text>}
+        {book.items.length?<FamilyAlbumButton label={tr('看看这一册')} onPress={()=>router.push({pathname:'/family-album-reading',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>:<Text style={{...type.meta,color:inkSoft}}>{tr('先收下一条，也可以慢慢添。')}</Text>}
         </View></View>
-        {reading && book.opening ? <Text style={{...type.body,color:ink}}>{book.opening}</Text> : null}
-        {book.access.canManage && !reading ? <AlbumManageToolbar prefix="family-album" editing={editing} organizing={organizing} busy={busy} onEdit={()=>{setSources([]);setSelected([]);setEditing(value=>!value);}} onOrganize={()=>{setSources([]);setSelected([]);setOrganizing(value=>!value);}}/> : null}
+        {book.items.length?<View style={{flexDirection:'row',gap:24}}><FamilyAlbumButton label={tr('看纸页')} onPress={()=>router.push({pathname:'/family-album-paper',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>{book.access.canManage&&familyPdfEnabled()?<FamilyAlbumButton label={tr('导出这一册')} onPress={()=>router.push({pathname:'/family-album-print',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>:null}</View>:null}
+        {book.access.canManage ? <AlbumManageToolbar prefix="family-album" editing={editing} organizing={organizing} busy={busy} onEdit={()=>{setSources([]);setSelected([]);setEditing(value=>!value);}} onOrganize={()=>{setSources([]);setSelected([]);setOrganizing(value=>!value);}}/> : null}
         {editing && book.access.canManage ? <FamilyAlbumEditor book={book} busy={busy} onSave={change=>void run(async(api,current)=>{
           await api.mutate(familyId!,book,change);if(current())await show(api,book.albumId,current,true);
         })}/> : null}
         {book.items.map((item,index) => <View key={item.shareId} style={bookStyles.entry} testID={`family-album-entry-${item.shareId}`}>
           {item.status === 'active' ? <Pressable accessibilityRole="button" accessibilityLabel={item.share.snapshot.note||tr('第{0}条',[index+1])} disabled={busy||organizing} onPress={()=>router.push({pathname:'/family-record/[id]',params:{id:item.shareId,familyId:familyId!}})} style={bookStyles.entryHit}>
-          {!reading&&item.share.snapshot.media.find(media=>media.mimeType.startsWith('image/'))?<FamilyAlbumCoverPreview familyId={book.familyId} cover={{shareId:item.shareId,objectId:item.share.snapshot.media.find(media=>media.mimeType.startsWith('image/'))!.objectId}} tile={{name:'',width:56,height:56}}/>:null}
+          {item.share.snapshot.media.find(media=>media.mimeType.startsWith('image/'))?<FamilyAlbumCoverPreview familyId={book.familyId} cover={{shareId:item.shareId,objectId:item.share.snapshot.media.find(media=>media.mimeType.startsWith('image/'))!.objectId}} tile={{name:'',width:56,height:56}}/>:null}
           <View style={bookStyles.entryCopy}>
-          {item.share.snapshot.note?<Text style={{...type.body,color:ink}} numberOfLines={reading?undefined:3}>{item.share.snapshot.note}</Text>:null}
+          {item.share.snapshot.note?<Text style={{...type.body,color:ink}} numberOfLines={3}>{item.share.snapshot.note}</Text>:null}
           <Text style={{...type.meta,color:inkSoft}}>{item.share.authorNickname || tr('家人')}{item.share.snapshot.occurredAt&&item.share.snapshot.occurredAtPrecision!=='unknown'?` · ${item.share.snapshot.occurredAt.slice(0,10)}`:''}</Text>
-          {reading?item.share.snapshot.media.filter(media=>media.mimeType.startsWith('image/')).map(media=><FamilyAlbumCoverPreview key={media.objectId} familyId={book.familyId} cover={{shareId:item.shareId,objectId:media.objectId}}/>):null}
           {item.share.snapshot.media.length?<View style={bookStyles.mediaRow}>
           {item.share.snapshot.media.some(media=>media.mimeType.startsWith('image/'))?<Text style={{...type.meta,color:inkSoft}}>{tr('{0}张照片',[item.share.snapshot.media.filter(media=>media.mimeType.startsWith('image/')).length])}</Text>:null}
           {item.share.snapshot.media.some(media=>media.mimeType.startsWith('audio/'))?<Text style={{...type.meta,color:inkSoft}}>{tr('有声音')}</Text>:null}
@@ -356,7 +354,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
           </View></Pressable>:<Text style={{...type.body,color:ink}}>{tr('这条分享已不可用。')}</Text>}
           {book.access.canManage && organizing ? <AlbumEntryActions prefix="family-album" id={item.shareId} first={index===0} last={index===book.items.length-1} busy={busy} onMoveUp={()=>void moveEntry(book,item.shareId,'up')} onMoveDown={()=>void moveEntry(book,item.shareId,'down')} onRemove={()=>void run(async(api,current)=>{await api.mutate(familyId!,book,{kind:'remove',shareId:item.shareId});if(current())await show(api,book.albumId,current,true);})}/> : null}
         </View>)}
-        {book.access.canManage && !reading && !editing && !organizing ? <>
+        {book.access.canManage && !editing && !organizing ? <>
           {<FamilyAlbumButton label={tr('收入记录')} onPress={() => void run(async (api, current) => {
             const result = await api.sources(familyId!);
             if (current()) {

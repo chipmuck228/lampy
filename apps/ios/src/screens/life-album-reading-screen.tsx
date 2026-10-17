@@ -61,11 +61,19 @@ const fonts = albumReadingFonts();
 const timezone = {
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
 };
-export default function LifeAlbumReadingScreen() {
+export type FamilyReadingPresentation = {
+  albumId:string;input:AlbumLayoutInput|null;blocked:boolean;error:boolean;
+  preference:{style:AlbumReadingStyle;position:AlbumReadingPosition|null};
+  onPersist:(style:AlbumReadingStyle,position:AlbumReadingPosition|null)=>Promise<void>;
+  onPaper:()=>void;retry:()=>void;current:()=>boolean;
+};
+export default function LifeAlbumReadingScreen({family}:{family?:FamilyReadingPresentation} = {}) {
   const router = useRouter();
-  const albumId =
+  const routeId =
     firstSearchParam(useLocalSearchParams<{ id?: string | string[] }>().id) ??
     '';
+  const albumId = family ? family.albumId : routeId;
+  const persistFamily = family?.onPersist;
   const lock = useDeviceLock();
   const clips = useRecentClipPlayback();
   const pause = useRef(clips.pause);
@@ -77,9 +85,9 @@ export default function LifeAlbumReadingScreen() {
   const [foreground, setForeground] = useState(
     AppState.currentState === 'active',
   );
-  const blocked = !!lock?.snapshot.locked || !foreground;
+  const blocked = !!lock?.snapshot.locked || !foreground || !!family?.blocked;
   const [input, setInput] = useState<AlbumLayoutInput | null>(null);
-  const [style, setStyle] = useState<AlbumReadingStyle>('plain');
+  const [style, setStyle] = useState<AlbumReadingStyle>(family?.preference.style ?? 'plain');
   const [error, setError] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -100,12 +108,12 @@ export default function LifeAlbumReadingScreen() {
     timer.current = null;
     const state = latest.current;
     if (state)
-      void saveAlbumReadingState(state.id, state.style, state.position).catch(
+      void (persistFamily ? persistFamily(state.style,state.position) : saveAlbumReadingState(state.id, state.style, state.position)).catch(
         () => {
           if (alive.current && latest.current?.id === state.id) setSaveError(true);
         },
       );
-  }, []);
+  }, [persistFamily]);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       setForeground(state === 'active');
@@ -129,7 +137,8 @@ export default function LifeAlbumReadingScreen() {
       contentReady.current = false;
       restoring.current = true;
       latest.current = null;
-      if (!blocked && albumId)
+      if(family){saved.current=family.preference.position;setStyle(family.preference.style);}
+      if (!family && !blocked && albumId)
         void (async () => {
           try {
             const app = await getUseCases();
@@ -161,9 +170,10 @@ export default function LifeAlbumReadingScreen() {
         if (requestId != null)
           void getUseCases().then((app) => app.cancelAlbumLayout(requestId));
       };
-    }, [albumId, blocked, retry, persist]),
+    }, [albumId, blocked, retry, persist, family]),
   );
-  const shown = !blocked && input?.album.id === albumId ? input : null;
+  const candidate = family ? family.input : input;
+  const shown = !blocked && candidate?.album.id === albumId ? candidate : null;
   const fingerprint = useMemo(
     () => (shown ? albumReadingFingerprint(shown) : ''),
     [shown],
@@ -262,9 +272,10 @@ export default function LifeAlbumReadingScreen() {
             accessibilityRole="button"
             accessibilityLabel={tr('看纸页')}
             onPress={() => {
+              if(family&&!family.current())return;
               persist();
               void pause.current();
-              router.push(`/albums/${albumId}/preview`);
+              if(family)family.onPaper();else router.push(`/albums/${albumId}/preview`);
             }}
             style={styles.hit}
           >
@@ -309,11 +320,11 @@ export default function LifeAlbumReadingScreen() {
                     saved.current = latest.current?.position ?? saved.current;
                     latest.current = { id: albumId, style: choice, position: saved.current };
                   setStyle(choice);
-                    void saveAlbumReadingState(
+                    void (persistFamily ? persistFamily(choice,saved.current) : saveAlbumReadingState(
                       albumId,
                       choice,
                       saved.current,
-                    ).catch(() => setSaveError(true));
+                    )).catch(() => setSaveError(true));
                   }}
                 >
                   <Text
@@ -327,6 +338,7 @@ export default function LifeAlbumReadingScreen() {
             <View style={styles.cover}>
               {coverMedia?.availability === 'available' && coverMedia.uri ? (
                 <Image
+                  cachePolicy={family ? 'none' : undefined}
                   source={{ uri: coverMedia.uri }}
                   contentFit="contain"
                   style={{
@@ -374,6 +386,7 @@ export default function LifeAlbumReadingScreen() {
                           {date.label}
                         </Text>
                       ) : null}
+                      {record.attribution ? <Text style={fonts.meta}>{record.attribution}</Text> : null}
                       {record.note ? (
                         <Text style={fonts.body}>{record.note}</Text>
                       ) : null}
@@ -382,6 +395,7 @@ export default function LifeAlbumReadingScreen() {
                           {item.role === 'image' ? (
                             item.uri && item.availability === 'available' ? (
                               <Image
+                  cachePolicy={family ? 'none' : undefined}
                                 source={{ uri: item.uri }}
                                 contentFit="contain"
                                 accessibilityIgnoresInvertColors
@@ -413,7 +427,7 @@ export default function LifeAlbumReadingScreen() {
                               style={styles.audio}
                               testID={`album-reading-audio-${item.assetId}`}
                               onPress={() => {
-                                if (blocked || !alive.current) return;
+                                if (blocked || !alive.current || (family&&!family.current())) return;
                                 if (
                                   clips.card(item.assetId).status === 'playing'
                                 )
@@ -484,13 +498,13 @@ export default function LifeAlbumReadingScreen() {
       ) : !blocked ? (
         <View style={styles.message}>
           <Text style={fonts.meta}>
-            {error ? ALBUM_READ_FAILED : tr('生活册正在读出来。')}
+            {(family?.error ?? error) ? ALBUM_READ_FAILED : tr('生活册正在读出来。')}
           </Text>
-          {error ? (
+          {(family?.error ?? error) ? (
             <Pressable
               accessibilityRole="button"
               style={styles.hit}
-              onPress={() => setRetry((value) => value + 1)}
+              onPress={family?.retry ?? (() => setRetry((value) => value + 1))}
             >
               <Text style={fonts.date}>{ALBUM_RETRY}</Text>
             </Pressable>

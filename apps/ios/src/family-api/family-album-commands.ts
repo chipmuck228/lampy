@@ -12,6 +12,8 @@ function name(value:unknown):asserts value is string {if(typeof value!=='string'
 function opening(value:unknown) {if(value!==null&&(typeof value!=='string'||value.length>20000))fail('BAD_REQUEST');}
 export function createFamilyAlbumCommands(deps:{
   enabled:boolean; clock:FamilyClock;
+  exportEnabled?:boolean;
+  exportEligibility?:(session:string,familyId:string)=>Promise<{eligible:boolean;canExport:boolean}>;
   authed<T>(session:string,work:(tx:FamilyTx,userId:string)=>Promise<T>):Promise<T>;
 }):FamilyAlbumApi {
   async function access(tx:FamilyTx,familyId:string,userId:string):Promise<FamilyAlbumAccess> {
@@ -25,7 +27,7 @@ export function createFamilyAlbumCommands(deps:{
     const notice=await tx.findFamilyAlbumNotice(familyId,membership.membershipId);
     return {familyId,userId,membershipId:membership.membershipId,role:membership.role,authority,
       rulesAcknowledged:notice?.version===FAMILY_ALBUM_RULE_VERSION&&notice.userId===userId,rulesVersion:1,
-      canManage:membership.role==='creator',canExport:false};
+      canManage:membership.role==='creator',canExport:deps.exportEnabled===true&&membership.role==='creator'};
   }
   function authed<T>(session:string,work:(tx:FamilyTx,userId:string)=>Promise<T>) {
     if(!deps.enabled) return Promise.reject(new FamilyError('FAMILY_ALBUMS_CLOSED','FAMILY_ALBUMS_CLOSED'));
@@ -75,6 +77,23 @@ export function createFamilyAlbumCommands(deps:{
     return {...metadata,coverChoice,access:permission,items,cover,validation:digest([metadata,permission,items,cover])};
   }
   return {
+    async authorizeExport(session,familyId,albumId,validation) {
+      if(!deps.exportEnabled || !deps.exportEligibility)fail('FAMILY_ALBUM_EXPORT_CLOSED');
+      const check=()=>authed(session,async(tx,userId)=>{
+        const permission=await access(tx,familyId,userId);creator(permission,permission.authority);
+        const current=await view(tx,await album(tx,familyId,albumId),permission);
+        if(current.validation!==validation)fail('FAMILY_ALBUM_CHANGED');
+        if(current.items.length===0 || current.items.some(item=>item.status!=='active'))fail('FAMILY_ALBUM_INCOMPLETE');
+        return {allowed:true as const,userId};
+      });
+      const before=await check();
+      // Apple network verification never occupies the SQLite write transaction.
+      const eligibility=await deps.exportEligibility(session,familyId);
+      if(!eligibility.eligible||!eligibility.canExport)fail('PURCHASE_REQUIRED');
+      const after=await check();
+      if(before.userId!==after.userId)fail('UNAUTHENTICATED');
+      return after;
+    },
     access(session,familyId) {return authed(session,(tx,userId)=>access(tx,familyId,userId));},
     acknowledge(session,familyId,membershipId,confirmation) {return authed(session,async(tx,userId)=>{
       const permission=await access(tx,familyId,userId);

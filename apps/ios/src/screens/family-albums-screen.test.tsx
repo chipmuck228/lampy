@@ -2,13 +2,13 @@ import {FAMILY_ALBUM_LEASE_MS,FAMILY_ALBUM_RENEW_MS} from '../application/family
 import {act,fireEvent,render,waitFor} from '@testing-library/react-native';
 import {AppState,type AppStateStatus} from 'react-native';
 import FamilyAlbumsScreen from './family-albums-screen';
-const mockReplace=jest.fn(),mockCreate=jest.fn(),mockSources=jest.fn(),mockMutate=jest.fn();
+const mockPush=jest.fn(),mockReplace=jest.fn(),mockCreate=jest.fn(),mockSources=jest.fn(),mockMutate=jest.fn();
 const mockDirectory=jest.fn(),mockAccess=jest.fn(),mockList=jest.fn(),mockRead=jest.fn(),mockValidate=jest.fn(),mockPause=jest.fn();
 const mockLock={snapshot:{locked:false}};let mockOpen=true;
 let mockParams:Record<string,string>={};
 let mockAlbumFocusCleanup:(()=>void)|undefined;
 const mockListeners:((s:AppStateStatus)=>void)[]=[];
-jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useLocalSearchParams:()=>mockParams,useRouter:()=>({back:jest.fn(),push:jest.fn(),replace:mockReplace}),useFocusEffect:(fn:()=>void|(()=>void))=>useEffect(()=>{const cleanup=fn();mockAlbumFocusCleanup=typeof cleanup==='function'?cleanup:undefined;return cleanup;},[fn])};});
+jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useLocalSearchParams:()=>mockParams,useRouter:()=>({back:jest.fn(),push:mockPush,replace:mockReplace}),useFocusEffect:(fn:()=>void|(()=>void))=>useEffect(()=>{const cleanup=fn();mockAlbumFocusCleanup=typeof cleanup==='function'?cleanup:undefined;return cleanup;},[fn])};});
 jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({getFamilies:mockDirectory,albums:{sources:mockSources,mutate:mockMutate,create:mockCreate,access:mockAccess,list:mockList,read:mockRead,validate:mockValidate}})}));
 jest.mock('../application/foreground-audio',()=>({pauseForegroundAudio:()=>mockPause()}));
 jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>mockOpen}));
@@ -118,14 +118,12 @@ it('stops renewal timers on blur and never pauses audio on the next screen from 
  expect(mockPause).not.toHaveBeenCalled();expect(mockValidate).toHaveBeenCalledTimes(calls);expect(page.queryByText('Private original')).toBeNull();
 });
 
-it('uses compact summaries for organizing and expands the same qualified book for reading',async()=>{
+it('keeps organizing summaries compact and opens the shared continuous reader',async()=>{
  mockParams={familyId:'f',albumId:'book',mode:'read'};
- const creator={...permission,role:'creator',canManage:true};mockAccess.mockResolvedValue(creator);mockRead.mockResolvedValue({...book,access:creator,opening:'An opening'});
  const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
- expect(page.getByText('Private original').props.numberOfLines).toBe(3);expect(page.getByText('编辑册子')).toBeTruthy();expect(page.queryByText('An opening')).toBeNull();
+ expect(page.getByText('Private original').props.numberOfLines).toBe(3);
  await fireEvent.press(page.getByText('看看这一册'));
- expect(page.getByText('Private original').props.numberOfLines).toBeUndefined();expect(page.getByText('An opening')).toBeTruthy();expect(page.queryByText('整理')).toBeNull();expect(page.queryByText('编辑册子')).toBeNull();
- await fireEvent.press(page.getByText('返回整理'));expect(page.getByText('Private original').props.numberOfLines).toBe(3);expect(page.getByText('整理')).toBeTruthy();
+ expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-album-reading',params:{familyId:'f',albumId:'book'}});
 });
 
 it('refreshes changed content automatically, preserving unsaved editing fields',async()=>{

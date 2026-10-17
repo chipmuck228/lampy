@@ -53,7 +53,7 @@ const fixture: AlbumLayoutInput = {
     },
   ],
 };
-function setup(nextId: () => string = () => 'print_one',authorize?:()=>Promise<void>) {
+function setup(nextId: () => string = () => 'print_one',authorize?:()=>Promise<void>,afterCommit?:()=>Promise<void>) {
   let active = true;
   const read = jest.fn(
     async () => JSON.parse(JSON.stringify(fixture)) as AlbumLayoutInput,
@@ -90,6 +90,7 @@ function setup(nextId: () => string = () => 'print_one',authorize?:()=>Promise<v
   const service = createAlbumPrintService({
     read,
     authorize,
+    afterCommit,
     fonts: () => fonts,
     store,
     current: () => active,
@@ -308,4 +309,12 @@ it('rechecks ownership before publishing and cleans staging when access is revok
  const authorize=jest.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce({code:'EXPORT_PURCHASE_REQUIRED'});const f=setup(undefined,authorize);
  await expect(f.service.save('plain')).rejects.toMatchObject({diagnostic:{stage:'AUTHORIZE_EXPORT',code:'EXPORT_PURCHASE_REQUIRED'}});
  expect(authorize).toHaveBeenCalledTimes(2);expect(f.store.writePdf).toHaveBeenCalled();expect(f.store.commit).not.toHaveBeenCalled();expect(f.store.discard).toHaveBeenCalledWith('print_one');
+});
+
+it('removes the committed edition if the final family delivery check fails',async()=>{
+ const after=jest.fn(async()=>{throw Error('FAMILY_ALBUM_CHANGED');});
+ const {service,store}=setup(()=> 'print_one',undefined,after);
+ await expect(service.save('plain')).rejects.toThrow('FAMILY_ALBUM_CHANGED');
+ expect(store.commit).toHaveBeenCalled();expect(store.discard).toHaveBeenCalledWith('print_one');
+ expect(after).toHaveBeenCalledTimes(1);
 });

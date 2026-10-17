@@ -273,6 +273,7 @@ export function createFamilyCommands(deps: {
   historySharingEnabled?: boolean;
   familyAlbumsEnabled?: boolean;
   unifiedPurchasesEnabled?:boolean;
+  familyAlbumExportEnabled?:boolean;
   unifiedProductId?:string;
   purchaseVerifier?:import('./purchase-types').PurchaseVerifier;
 }): FamilyCommands {
@@ -329,11 +330,12 @@ export function createFamilyCommands(deps: {
     );
   }
 
-  const purchases=createPurchaseCommands({enabled:deps.unifiedPurchasesEnabled===true,productId:deps.unifiedProductId,verifier:deps.purchaseVerifier,clock,authed:withAuthedUser});
+  const familyExportEnabled=deps.familyAlbumExportEnabled===true&&deps.familyAlbumsEnabled===true&&deps.historySharingEnabled===true&&deps.unifiedPurchasesEnabled===true;
+  const purchases=createPurchaseCommands({familyExportEnabled,enabled:deps.unifiedPurchasesEnabled===true,productId:deps.unifiedProductId,verifier:deps.purchaseVerifier,clock,authed:withAuthedUser});
 
   return {
     purchases,
-    albums: createFamilyAlbumCommands({authed:withAuthedUser,clock,enabled:deps.familyAlbumsEnabled===true&&deps.historySharingEnabled===true}),
+    albums: createFamilyAlbumCommands({authed:withAuthedUser,clock,exportEnabled:familyExportEnabled,exportEligibility:(session,familyId)=>purchases.familyAccess(session,familyId),enabled:deps.familyAlbumsEnabled===true&&deps.historySharingEnabled===true}),
     transfers: createFamilyTransferCommands({authed:withAuthedUser,clock,id:()=>`transfer_${ids.invitationId()}`}),
     historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled, operatorOnly,
       historyPolicy: 'family-history-v2', historyEnabled: deps.historySharingEnabled === true }),
@@ -376,6 +378,7 @@ export function createFamilyCommands(deps: {
         testAccountLoginReason: testHealth.testAccountLoginReason,
         familyHistoryV2: deps.historySharingEnabled === true,
         unifiedPurchases:deps.unifiedPurchasesEnabled===true,
+        familyAlbumExport:familyExportEnabled,
         familyAlbums: deps.familyAlbumsEnabled === true && deps.historySharingEnabled === true,
         argon2id: ARGON2ID_PRODUCTION,
       };

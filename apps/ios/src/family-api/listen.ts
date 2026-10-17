@@ -75,6 +75,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
     inviteLinksEnabled:inviteEnabled,
     historySharingEnabled:env.LAMPY_FAMILY_HISTORY_ENABLED === '1',
     unifiedPurchasesEnabled:env.LAMPY_UNIFIED_PURCHASES==='1',
+    familyAlbumExportEnabled:env.LAMPY_FAMILY_ALBUM_EXPORT_ENABLED==='1',
     unifiedProductId:env.LAMPY_UNIFIED_PRODUCT_ID,
     purchaseVerifier:applePurchaseVerifier(env),
     familyAlbumsEnabled:env.LAMPY_FAMILY_ALBUMS_ENABLED === '1',

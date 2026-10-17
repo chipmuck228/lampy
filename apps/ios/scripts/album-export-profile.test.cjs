@@ -37,3 +37,9 @@ test('unified purchases fail closed without paid export and mirror a separate na
 test('cannot configure a free formal export path',()=>{
  assert.throws(()=>configureAlbumExport({}, {EXPO_PUBLIC_ALBUM_EXPORT_ENABLED:'1'}), /require paid/);
 });
+
+test('family PDF requires unified paid purchases and the public profile clears it',()=>{
+ assert.throws(()=>configureAlbumExport({}, {EXPO_PUBLIC_FAMILY_ALBUM_EXPORT_ENABLED:'1'}), /unified/);
+ const output=execFileSync('bash',['-c','source "$1"; node -e \'console.log(process.env.EXPO_PUBLIC_FAMILY_ALBUM_EXPORT_ENABLED)\'','family-export-release',path.join(__dirname,'release-public-env.sh')],{env:{...process.env,EXPO_PUBLIC_FAMILY_ALBUM_EXPORT_ENABLED:'1'},encoding:'utf8'});
+ assert.equal(output.trim(),'0');
+});

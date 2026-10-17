@@ -32,6 +32,7 @@ export type PrintFailureDiagnostic = {
   reason?: string;
 };
 const PRINT_ERROR_CODES = [
+  'PURCHASE_REQUIRED','PURCHASE_VERIFICATION_UNAVAILABLE','FAMILY_ALBUM_EXPORT_CLOSED','FAMILY_ALBUM_CHANGED','FAMILY_ALBUM_INCOMPLETE','FAMILY_ALBUM_CANCELLED','FORBIDDEN','NOT_IN_FAMILY','UNAUTHENTICATED',
   'EXPORT_CLOSED','EXPORT_PURCHASE_REQUIRED','EXPORT_PURCHASE_UNAVAILABLE','EXPORT_CANCELLED',
   'CANCELLED',
   'SOURCE_CHANGED',
@@ -183,6 +184,7 @@ export function manifestDigest(manifest: PrintManifest) {
 export function createAlbumPrintService(deps: {
   read(): Promise<AlbumLayoutInput>;
   authorize?: () => Promise<void>;
+  afterCommit?: () => Promise<void>;
   fonts(): AlbumFontDiagnosis | null;
   layout(
     input: AlbumLayoutInput,
@@ -354,6 +356,9 @@ export function createAlbumPrintService(deps: {
         assertCurrent();
         stage = 'COMMIT';
         const saved = await deps.store.commit(id);
+        assertCurrent();
+        stage = 'AUTHORIZE_DELIVERY';
+        await deps.afterCommit?.();
         assertCurrent();
         return { ...saved, manifest };
       } catch (error) {
