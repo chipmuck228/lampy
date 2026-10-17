@@ -99,7 +99,6 @@ export function FamilyAlbumLibrary(){
  },[allowed,retry]));
  if(!allowed)return null;
  return <View style={{gap:16}} testID="family-album-library">
-  {status==='loading'?<Text style={{...type.meta,color:inkSoft}}>{tr('正在读取家庭册。')}</Text>:null}
   {status==='failed'?<><Text>{tr('家庭内容或资格已变化，请重新核对。')}</Text><Pressable accessibilityRole="button" onPress={()=>setRetry(value=>value+1)} style={{minHeight:48,justifyContent:'center'}}><Text>{tr('再试一次')}</Text></Pressable></>:null}
   {status==='checking'?<Text>{tr('正在重新核对家庭内容，请稍候。')}</Text>:null}
   {__DEV__&&diagnostic?<Text selectable testID="family-album-library-diagnostic" style={{...type.meta,color:inkSoft}}>{`开发诊断：${diagnostic}`}</Text>:null}
