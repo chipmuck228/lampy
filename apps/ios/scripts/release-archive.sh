@@ -130,13 +130,8 @@ fi
 EXPO_USE_PRECOMPILED_MODULES=0 pod install --project-directory=ios
 
 if [[ "$FAMILY_INTERNAL" == 1 ]]; then
-  # Persist non-secret bundle flags for later manual Xcode Run/Archive. Expo dotenv is disabled.
-  {
-    printf 'export NODE_BINARY=%q\n' "$(command -v node)"
-    for key in LAMPY_BUILD_PROFILE LAMPY_BUILD_NUMBER EXPO_NO_DOTENV EXPO_PUBLIC_FAMILY_INTERNAL_TEST EXPO_PUBLIC_FAMILY_ENTRY_OPEN EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS EXPO_PUBLIC_FAMILY_API_BASE_URL EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS EXPO_PUBLIC_FAMILY_TEST_DRIVER EXPO_PUBLIC_FAMILY_TEST_INVITE_CODE; do
-      printf 'export %s=%q\n' "$key" "${!key}"
-    done
-  } > "$ROOT/ios/.xcode.env.local"
+  # Persist the entire non-secret internal profile for later Xcode Run/Archive.
+  bash "$ROOT/scripts/write-family-xcode-env.sh" "$ROOT/ios/.xcode.env.local"
 fi
 
 PLIST="$ROOT/ios/Lampy/Info.plist"

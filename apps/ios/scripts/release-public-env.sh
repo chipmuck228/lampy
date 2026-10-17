@@ -4,6 +4,7 @@
 # Overrides leftover shell flags. scripts/release-archive.sh also stashes local dotenv.
 
 export EXPO_PUBLIC_FAMILY_INTERNAL_TEST=0
+export EXPO_PUBLIC_FAMILY_ALBUM_EVAL=0
 unset LAMPY_BUILD_PROFILE
 unset EXPO_PUBLIC_FAMILY_ENTRY_OPEN
 unset EXPO_PUBLIC_FAMILY_API_BASE_URL
