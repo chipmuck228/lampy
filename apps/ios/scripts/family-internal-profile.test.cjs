@@ -20,3 +20,14 @@ test('archive shell closes inherited exports and restores only internal family p
  });
  assert.equal(result.trim(),'1');
 });
+
+test('manual Xcode process receives closed switches without inheriting preparation shell',()=>{
+ const {execFileSync}=require('node:child_process');const fs=require('node:fs');const os=require('node:os');const path=require('node:path');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'lampy-xcode-env-'));const output=path.join(dir,'.xcode.env.local');const cwd=path.join(__dirname,'..');
+ try {
+  execFileSync('bash',['-c','source scripts/release-public-env.sh; source scripts/family-internal-env.sh; bash scripts/write-family-xcode-env.sh "$1"','prepare',output],{cwd,env:{...process.env,LAMPY_BUILD_NUMBER:'99'}});
+  const clean={PATH:process.env.PATH,HOME:process.env.HOME};
+  const result=execFileSync('bash',['-c',`source "$1"; "$NODE_BINARY" -e 'require("./scripts/family-internal-profile.cjs").internalProfile(process.env); console.log(process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID === "" ? "closed" : "open")'`,'xcode',output],{cwd,env:clean,encoding:'utf8'});
+  assert.equal(result.trim(),'closed');
+ } finally {fs.rmSync(dir,{recursive:true,force:true});}
+});
