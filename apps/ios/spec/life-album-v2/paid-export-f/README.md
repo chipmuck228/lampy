@@ -1,6 +1,6 @@
 # 阶段 F1：默认关闭的一次购买导出
 
-基线 main d09eaf1；独立分支 ios/life-album-paid-export-f。用户确认一次购买解锁，价格和正式商品 ID 后续由 App Store Connect 配置。没有设置价格、发布商品或进行真实扣款。阶段 F 尚未完成发布验收；本 PR 应保持 draft，原生编译、StoreKit 和沙盒实测均待验收。
+基线 main d09eaf1；独立分支 ios/life-album-paid-export-f。用户确认一次购买解锁，价格和正式商品 ID 后续由 App Store Connect 配置。没有设置价格、发布商品或进行真实扣款。阶段 F 尚未完成发布验收。2026-10-17 用户完成 Mac 编译与本地 StoreKit 模拟器验收；真实 Apple sandbox、真机与 TestFlight 仍待验收。允许作为默认关闭能力合并，不等于开放收费。
 
 ## 本次交付
 
@@ -47,7 +47,7 @@ Apple 原始参考：
 - https://developer.apple.com/documentation/storekit/product/purchase(options:)
 - https://developer.apple.com/documentation/xcode/setting-up-storekit-testing-in-xcode
 
-## 必测矩阵（全部待 Mac 验收）
+## 必测矩阵（本地实测范围见下方记录）
 
 1. 默认关闭：Release 无正式入口，直接路由也不显示生成；不查询/购买商品。开发打印 flag 仅开发有效。
 2. 正式开、付费关：免费生成 PDF，不访问 StoreKit。
@@ -68,4 +68,14 @@ Apple 原始参考：
 
 购买通过 Apple StoreKit 处理；不向支付流程发送册名、记录正文、照片、声音或家庭成员列表，不保存付款卡信息、Apple 密码或交易明文日志。应用不上传收据/JWS 到家庭 API，本阶段也不授予家庭服务端导出权限。上架前仍需按真实支付与数据处理行为更新隐私披露、App Store 商品说明和审核材料，验收退款/恢复与账号切换。
 
-发布缺口：正式商品 ID / 定价 / 商品可售状态未配置；原生模块和 native flag 未在 Mac 编译；本地 StoreKit、Apple sandbox、TestFlight 和真机权益回归未通过；家庭服务端支付证明与家庭文件导出未实施；阶段 D 仍暂停。以上不能被开关值代替，本 PR 不自动合并或开放收费。
+发布缺口：正式商品 ID / 定价 / 商品可售状态未配置；Apple sandbox、TestFlight、跨设备恢复和真机权益回归未通过；家庭服务端支付证明与家庭文件导出未实施；阶段 D 仍暂停。以上不能被开关值代替，本 PR 不自动合并或开放收费。
+
+## 2026-10-17 合并前审查与实测
+
+用户报告 iPhone 17 Pro Max（模拟器列表 iOS 26.3；Xcode 显示 26.3.1）本地 StoreKit 测试通过：App 内购买、取消购买、显式恢复、重启保留权益、同册新增记录后再生成、其他个人册无需重复购买、PDF 保存到系统文件、退款后阻止新生成且已保存文件仍可打开。不是我们在 Linux 代跑的原生结果，也不代表真实 Apple Sandbox 或跨设备恢复通过。pending、购买中后台/锁定等完整实机矩阵仍待验收。
+
+商品查询为空的系统证据：StoreKit 本机 catalog 请求 localhost 动态端口经过 127.0.0.1:7897 代理，返回 HTTP 502。Mac 系统代理和代理客户端均应让 localhost、127.0.0.1、::1 直连；应用于本地地址而非绑定某个临时端口。修改后重启模拟器，从 Xcode 运行。之后返回 verified 非消耗型权益和 count=1 商品。无需修改价格或重建商品。
+
+审查发现并修复正式归档继承测试终端导出开关的问题：release-public-env.sh 强制清除正式/付费/开发打印开关和商品 ID，回归测试以污染环境执行真实 shell profile 并核对 native 配置。普通正式归档始终保持未开放；付费候选包需后续独立的显式配置与验收。
+
+合并检查：导出前/提交前授权、清理、StoreKit verified/type/product/revocation 校验、默认关闭及家庭 canExport=false 边界审查。DEBUG 日志仅商品/验证错误标识，不打印交易ID、收据或账号。不存在未解决的 GitHub review threads。真实商业开放与隐私/商品材料仍是发布门槛，不能把合并当作支付上线。
