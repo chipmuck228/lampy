@@ -1,7 +1,7 @@
 import {albumManageStyles} from './album-manage-styles';
 import { AlbumManageToolbar, AlbumEntryActions, AlbumEditorFields } from './album-workflow-controls';
 import { tr } from '../i18n';
-import { isAlbumPrintEvaluationOpen } from '../application/album-print';
+import {albumExportEntryOpen,albumExportConfig} from '../application/album-export-access';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -216,7 +216,7 @@ export default function LifeAlbumManageScreen() {
           </View>
           {menuOpen ? (
             <View style={styles.menu}>
-              {isAlbumPrintEvaluationOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <Pressable accessibilityRole="button" accessibilityLabel={tr('打印验收')} style={styles.hit} onPress={() => router.push(`/albums/${albumId}/print`)}><Text style={styles.action}>{tr('打印验收')}</Text></Pressable> : null}
+              {albumExportEntryOpen(typeof __DEV__ !== 'undefined' && __DEV__) ? <Pressable accessibilityRole="button" accessibilityLabel={tr(albumExportConfig().enabled?'导出这一册':'打印验收')} style={styles.hit} onPress={() => router.push(`/albums/${albumId}/print`)}><Text style={styles.action}>{tr(albumExportConfig().enabled?'导出这一册':'打印验收')}</Text></Pressable> : null}
 
               <Pressable
                 accessibilityRole="button"

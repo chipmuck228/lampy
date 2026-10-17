@@ -32,6 +32,7 @@ export type PrintFailureDiagnostic = {
   reason?: string;
 };
 const PRINT_ERROR_CODES = [
+  'EXPORT_CLOSED','EXPORT_PURCHASE_REQUIRED','EXPORT_PURCHASE_UNAVAILABLE','EXPORT_CANCELLED',
   'CANCELLED',
   'SOURCE_CHANGED',
   'MISSING_CONTENT',
@@ -181,6 +182,7 @@ export function manifestDigest(manifest: PrintManifest) {
 }
 export function createAlbumPrintService(deps: {
   read(): Promise<AlbumLayoutInput>;
+  authorize?: () => Promise<void>;
   fonts(): AlbumFontDiagnosis | null;
   layout(
     input: AlbumLayoutInput,
@@ -204,6 +206,10 @@ export function createAlbumPrintService(deps: {
       };
       try {
         assertCurrent();
+        stage = 'AUTHORIZE_EXPORT';
+        await deps.authorize?.();
+        assertCurrent();
+        stage = 'READ_SOURCE';
         const first = await deps.read();
         assertCurrent();
         stage = 'CHECK_INPUT';
@@ -342,6 +348,9 @@ export function createAlbumPrintService(deps: {
         };
         stage = 'WRITE_MANIFEST';
         await deps.store.writeManifest(id, manifest);
+        assertCurrent();
+        stage = 'AUTHORIZE_EXPORT';
+        await deps.authorize?.();
         assertCurrent();
         stage = 'COMMIT';
         const saved = await deps.store.commit(id);

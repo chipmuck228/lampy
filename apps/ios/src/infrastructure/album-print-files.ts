@@ -1,3 +1,4 @@
+import {albumExportAccess} from './album-export-purchases';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
   albumPrintNative,
@@ -113,6 +114,7 @@ export function createExpoAlbumPrintStore(): PrintStore {
 export function createExpoAlbumPrint(albumId: string, current: () => boolean) {
   return createAlbumPrintService({
     current,
+    authorize:()=>albumExportAccess.assert(current),
     store: createExpoAlbumPrintStore(),
     id: () => `print_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
     now: () => new Date().toISOString(),

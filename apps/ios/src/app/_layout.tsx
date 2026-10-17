@@ -1,3 +1,4 @@
+import {observeExportEntitlements} from '../infrastructure/album-export-purchases';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,6 +14,7 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function RootLayout() {
   useEffect(() => ensureStartupOverlayFailsafe(), []);
+  useEffect(()=>observeExportEntitlements(()=>{}),[]);
 
   return (
     <DeviceLockProvider>

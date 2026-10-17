@@ -1,2 +1,3 @@
 const { configure } = require('./scripts/family-internal-profile.cjs');
-module.exports = ({ config }) => configure(config, process.env);
+const { configureAlbumExport } = require('./scripts/album-export-profile.cjs');
+module.exports = ({ config }) => configureAlbumExport(configure(config, process.env), process.env);

@@ -1,3 +1,5 @@
+import {AlbumExportUnlock} from './album-export-unlock';
+import {albumExportConfig,albumExportEntryOpen,AlbumExportAccessError} from '../application/album-export-access';
 import {
   useCallback,
   useEffect,
@@ -8,7 +10,6 @@ import {
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  isAlbumPrintEvaluationOpen,
   printFailureDiagnostic,
   type PrintFailureDiagnostic,
 } from '../application/album-print';
@@ -34,7 +35,9 @@ export default function AlbumPrintScreen() {
     firstSearchParam(useLocalSearchParams<{ id?: string | string[] }>().id) ??
     '';
   const lock = useDeviceLock();
-  const enabled = isAlbumPrintEvaluationOpen(
+  const config=albumExportConfig();
+  const formal=config.enabled;
+  const enabled = albumExportEntryOpen(
     typeof __DEV__ !== 'undefined' && __DEV__,
   );
   const [foreground, setForeground] = useState(
@@ -50,6 +53,7 @@ export default function AlbumPrintScreen() {
     null,
   );
   const [error, setError] = useState(false);
+  const [accessNotice,setAccessNotice]=useState(false);
   const active = useRef(false);
   const locked = useRef(blocked);
   const generation = useRef(0);
@@ -110,10 +114,12 @@ export default function AlbumPrintScreen() {
     setBusy(true);
     setError(false);
     setDiagnostic(null);
+    setAccessNotice(false);
     try {
       await work(() => current(epoch));
     } catch (caught) {
       if (current(epoch)) {
+        if(caught instanceof AlbumExportAccessError||printFailureDiagnostic(caught).code.startsWith('EXPORT_')){setAccessNotice(true);return;}
         setError(true);
         setDiagnostic(printFailureDiagnostic(caught));
       }
@@ -126,16 +132,16 @@ export default function AlbumPrintScreen() {
   }
   return (
     <SettingsPage
-      title={tr('打印验收')}
+      title={tr(formal?'导出这一册':'打印验收')}
       backLabel={tr('这一册')}
-      accessibilityLabel={tr('打印验收')}
+      accessibilityLabel={tr(formal?'导出这一册':'打印验收')}
       onBack={() => router.back()}
     >
       {!blocked ? (
         <View style={styles.body}>
-          <Text style={styles.meta}>
-            {tr('开发验收入口，正式导出尚未开放。')}
-          </Text>
+          {!formal?<Text style={styles.meta}>{tr('开发验收入口，正式导出尚未开放。')}</Text>:null}
+          {formal&&config.paid?<AlbumExportUnlock/>:null}
+          {accessNotice?<Text accessibilityLiveRegion="polite" style={styles.meta}>{tr('请先解锁或恢复导出权益，再点生成PDF。')}</Text>:null}
           <Text style={styles.meta}>
             {tr('PDF不含声音，电子册文件将在后续阶段提供。')}
           </Text>
@@ -158,7 +164,7 @@ export default function AlbumPrintScreen() {
             }
           >
             <Text style={styles.action}>
-              {busy ? tr('正在冻结并排成PDF。') : tr('生成并保存测试PDF')}
+              {busy ? tr('正在冻结并排成PDF。') : tr(formal?'生成PDF':'生成并保存测试PDF')}
             </Text>
           </Pressable>
           {busy ? (
@@ -186,7 +192,7 @@ export default function AlbumPrintScreen() {
               <Text style={styles.action}>{tr('再试一次')}</Text>
             </Pressable>
           ) : null}
-          {error && diagnostic ? (
+          {error && diagnostic && !formal ? (
             <Text testID="album-print-failure-diagnostic" style={styles.meta}>
               {[diagnostic.stage, diagnostic.code, diagnostic.reason]
                 .filter(Boolean)
@@ -194,7 +200,7 @@ export default function AlbumPrintScreen() {
             </Text>
           ) : null}
           {!saved.length && !busy ? (
-            <Text style={styles.meta}>{tr('尚未生成测试成品。')}</Text>
+            <Text style={styles.meta}>{tr(formal?'尚未生成PDF。':'尚未生成测试成品。')}</Text>
           ) : null}
           {saved.map((edition) => (
             <View key={edition.id} style={styles.edition}>
@@ -203,7 +209,7 @@ export default function AlbumPrintScreen() {
                 {edition.createdAt} · A5 · {edition.pdf.pageCount} ·{' '}
                 {(edition.pdf.bytes / 1024).toFixed(0)} KB
               </Text>
-              <Text style={styles.meta}>{tr('测试成品已保存在本机。')}</Text>
+              <Text style={styles.meta}>{tr(formal?'PDF已生成在本机，保存到系统文件请点下方按钮。':'测试成品已保存在本机。')}</Text>
               <Text style={styles.meta}>{tr(edition.pdf.emojiVisualCheckRequired
                 ? '普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。'
                 : '页面与文字选择已核对')}</Text>
