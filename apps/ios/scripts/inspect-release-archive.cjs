@@ -153,6 +153,8 @@ function inspectArchive(archivePath, expected = expectedFromAppJson()) {
   const api = plistPrint(info, 'LampyFamilyAPI');
   if (expected.profile === 'family-internal') {
     if (profile !== 'family-internal' || api !== 'https://family-test.yunpura.com') problems.push('family_profile_mismatch');
+    if (plistPrint(info, 'LampyFamilyAlbumPreviewEnabled') !== 'true') problems.push('family_preview_marker_missing');
+    if (plistPrint(info, 'LampyUnifiedPurchasesEnabled') !== 'false' || plistPrint(info, 'LampyPaidExportEnabled') !== 'false' || plistPrint(info, 'LampyExportProductID') !== '') problems.push('internal_paid_export_not_closed');
     const entitlements = spawnSync('codesign', ['-d', '--entitlements', ':-', app], {encoding:'utf8'});
     if (!`${entitlements.stdout || ''} ${entitlements.stderr || ''}`.includes('applinks:family-test.yunpura.com')) problems.push('family_associated_domain_missing');
   } else if (profile || api) problems.push('unexpected_family_profile');

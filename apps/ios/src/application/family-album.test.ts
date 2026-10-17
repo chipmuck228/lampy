@@ -47,8 +47,12 @@ it('a late validator from the previous book cannot revive it over the next book'
  const pending=reading.validate();for(let i=0;i<100&&!finish;i++)await Promise.resolve();expect(finish).toBeDefined();reading.invalidate();f.read.mockResolvedValueOnce({...view,albumId:'second',name:'Second'});
  await reading.load('f','second');finish({valid:true});expect(await pending).toBe(false);expect(reading.snapshot()?.albumId).toBe('second');
 });
-it('the family album screen is default off and cannot be enabled in release',()=>{
- expect(familyAlbumEvaluationOpen(true,'1')).toBe(true);expect(familyAlbumEvaluationOpen(false,'1')).toBe(false);expect(familyAlbumEvaluationOpen(true,'')).toBe(false);
+it('family albums require a development or explicit internal build plus the preview flag',()=>{
+ expect(familyAlbumEvaluationOpen(true,'1',false)).toBe(true);
+ expect(familyAlbumEvaluationOpen(false,'1',false)).toBe(false);
+ expect(familyAlbumEvaluationOpen(false,'1',true)).toBe(true);
+ expect(familyAlbumEvaluationOpen(false,'0',true)).toBe(false);
+ expect(familyAlbumEvaluationOpen(true,'',false)).toBe(false);
 });
 it('renews with one server request and still rejects account changes and mismatched viewers',async()=>{
  const f=setup();await f.session.setSession({userId:'a',sessionToken:'a'});
@@ -76,4 +80,16 @@ it('reads access/list metadata once per endpoint while checking both the returne
  f.access.mockClear();await expect(client.list('f')).resolves.toMatchObject({albums:[]});expect(f.access).not.toHaveBeenCalled();expect(list).toHaveBeenCalledTimes(1);
  list.mockResolvedValueOnce({access:{...permission,userId:'b'},albums:[]});await expect(client.list('f')).rejects.toMatchObject({code:'UNAUTHENTICATED'});
  list.mockImplementationOnce(async()=>{await f.session.setSession({userId:'b',sessionToken:'b'});return {access:permission,albums:[]};});await expect(client.list('f')).rejects.toMatchObject({code:'FAMILY_ALBUM_CANCELLED'});
+});
+
+it('release preview requires the exact internal marker, origin and product gates',()=>{
+ const testEnv=process.env;
+ const keys=['EXPO_PUBLIC_FAMILY_INTERNAL_TEST','EXPO_PUBLIC_FAMILY_API_BASE_URL','EXPO_PUBLIC_FAMILY_ENTRY_OPEN','EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS','EXPO_PUBLIC_FAMILY_ALBUM_EVAL'] as const;
+ const before=keys.map(key=>testEnv[key]);
+ try {
+  const values=['1','https://family-test.yunpura.com','1','1','1'];
+  keys.forEach((key,index)=>{testEnv[key]=values[index];});
+  expect(familyAlbumEvaluationOpen(false)).toBe(true);
+  for(const key of keys){const value=testEnv[key];testEnv[key]='';expect(familyAlbumEvaluationOpen(false)).toBe(false);testEnv[key]=value;}
+ } finally {keys.forEach((key,index)=>{if(before[index]===undefined)delete testEnv[key];else testEnv[key]=before[index];});}
 });

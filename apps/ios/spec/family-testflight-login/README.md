@@ -1,5 +1,7 @@
 # Family internal TestFlight login and build profile
 
+> 当前家庭预览候选包以 [family-testflight-preview/TESTING.md](../family-testflight-preview/TESTING.md) 为准：内部 Release 增加家庭册和双风格纸页入口，付费与导出关闭。下文保留此前登录切片的历史验收，不代表当前归档或真机已通过。
+
 Independent slice after #104 merge 708fb8c. Internal testers only; no public registration, paid access, password recovery or account deletion added. Invited operator accounts are provisioned on the server. This PR does not deploy the server or upload an archive.
 
 ## Login
