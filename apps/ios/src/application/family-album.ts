@@ -20,6 +20,14 @@ export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:F
   }
   function checkViewer(actual:string,expected:string){if(actual!==expected)throw new ApplicationError('UNAUTHENTICATED','Account changed.');}
   return {
+    authorizeExport(view:FamilyAlbumView,current:()=>boolean) {
+      return request(view.familyId,async(api,token,userId)=>{
+        if(userId!==view.access.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','Account changed.');
+        if(!api.authorizeExport)throw new ApplicationError('FAMILY_ALBUM_EXPORT_CLOSED','Service upgrade required.');
+        const result=await api.authorizeExport(token,view.familyId,view.albumId,view.validation);
+        checkViewer(result.userId,userId);return result;
+      },current,false);
+    },
     access(familyId:string) {return request(familyId,async(api,token,userId)=>{const access=await api.access(token,familyId);checkViewer(access.userId,userId);return access;},()=>true,false);},
     acknowledge(familyId:string,membershipId:string) {return request(familyId,(api,token)=>api.acknowledge(token,familyId,membershipId,FAMILY_ALBUM_CONFIRMATION));},
     list(familyId:string) {return request(familyId,async(api,token,userId)=>{const list=await api.list(token,familyId);checkViewer(list.access.userId,userId);return list;},()=>true,false);},

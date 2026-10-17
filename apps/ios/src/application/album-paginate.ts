@@ -318,6 +318,11 @@ export async function paginateAlbumLayout(
       printedDateLabel = dated.label;
     }
 
+    if(record.attribution) {
+      const lines=await measurer.measure(record.attribution,albumMetaRole,ALBUM_CONTENT_WIDTH_PT);
+      for(const line of lines)place({kind:'recorded-at',momentId:record.momentId,label:albumSliceCodePoints(record.attribution,line.start,line.end),
+        box:{xPt:CONTENT_LEFT,yPt:y,widthPt:ALBUM_CONTENT_WIDTH_PT,heightPt:albumMetaRole.lineHeightPt}},albumMetaRole.lineHeightPt);
+    }
     const images = record.media.filter((item) => item.role === 'image');
     if (record.note) {
       await placeWrapped('note', record.note, { momentId: record.momentId, revision: record.revision ?? 0 });

@@ -167,6 +167,7 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
       unlockFamily:(sessionToken,familyId)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/purchase-access`,sessionToken,timeoutMs:12000}),
     },
     albums: {
+      authorizeExport:(sessionToken,familyId,albumId,validation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/albums/${encodeURIComponent(albumId)}/export-access`,sessionToken,body:{validation},timeoutMs:12000}),
       access:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,timeoutMs:5000}),
       acknowledge:(sessionToken,familyId,membershipId,confirmation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,body:{membershipId,confirmation}}),
       list:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/albums`,sessionToken,timeoutMs:5000}),

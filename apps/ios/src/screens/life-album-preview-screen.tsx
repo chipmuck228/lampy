@@ -486,7 +486,7 @@ export default function LifeAlbumPreviewScreen() {
   );
 }
 
-function AlbumBlockView({
+export function AlbumBlockView({
   readingStyle,
   block,
   media,

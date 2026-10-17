@@ -11,7 +11,7 @@ export type VerifiedPurchase = {
 export type PurchaseRecord = VerifiedPurchase & {key:string;userId:string;checkedAt:string};
 export type FamilyPurchaseGrant = {familyId:string;purchaseKey:string;unlockedBy:string;unlockedAt:string};
 export type PurchaseContext = {userId:string;appAccountToken:string;owned:boolean;createdFamilyCount:number;canCreateFamily:boolean};
-export type FamilyExportEligibility = {familyId:string;eligible:boolean;reason:'eligible'|'not-creator'|'locked';canExport:false};
+export type FamilyExportEligibility = {familyId:string;eligible:boolean;reason:'eligible'|'not-creator'|'locked';canExport:boolean};
 export type PurchaseApi = {
   context(session:string):Promise<PurchaseContext>;
   claim(session:string,transactionId:string):Promise<PurchaseContext>;

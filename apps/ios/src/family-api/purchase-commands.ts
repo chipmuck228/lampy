@@ -5,7 +5,7 @@ import type {FamilyClock} from './types';
 import type {FamilyExportEligibility,PurchaseContext,PurchaseRecord,PurchaseVerifier,VerifiedPurchase} from './purchase-types';
 
 export function createPurchaseCommands(deps:{
-  enabled:boolean; productId?:string; verifier?:PurchaseVerifier; clock:FamilyClock;
+  enabled:boolean; familyExportEnabled?:boolean; productId?:string; verifier?:PurchaseVerifier; clock:FamilyClock;
   authed<T>(session:string,work:(tx:FamilyTx,userId:string)=>Promise<T>):Promise<T>;
 }) {
   function fail(code:string):never {throw new FamilyError(code,code);}
@@ -72,7 +72,7 @@ export function createPurchaseCommands(deps:{
     const m=await member(tx,userId,familyId);
     const sources=await Promise.all((await tx.listPurchaseGrants(familyId)).map(g=>tx.findPurchase(g.purchaseKey)));
     const eligible=m.role==='creator'&&sources.some(r=>r&&fresh(r));
-    return {familyId,eligible,reason:m.role!=='creator'?'not-creator':eligible?'eligible':'locked',canExport:false};
+    return {familyId,eligible,reason:m.role!=='creator'?'not-creator':eligible?'eligible':'locked',canExport:deps.familyExportEnabled===true&&eligible};
   }
   return {
     enabled:deps.enabled,

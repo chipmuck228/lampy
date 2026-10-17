@@ -1,3 +1,4 @@
+import { familyPdfEnabled } from '../application/family-album-paper';
 import {albumManageStyles as bookStyles} from './album-manage-styles';
 import { AlbumCreateFields, AlbumManageToolbar, AlbumEntryActions } from './album-workflow-controls';
 import { DEFAULT_ALBUM_NAME, normalizeAlbumName, albumEntryCountLabel } from '../application/life-album';
@@ -337,6 +338,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
         <Text style={{...type.meta,color:inkSoft}}>{families.find(family=>family.familyId===book.familyId)?.name}</Text>
         {book.items.length?<FamilyAlbumButton label={tr(reading?'返回整理':'看看这一册')} onPress={()=>{setReading(value=>!value);setEditing(false);setOrganizing(false);setSources([]);setSelected([]);}} disabled={busy}/>:<Text style={{...type.meta,color:inkSoft}}>{tr('先收下一条，也可以慢慢添。')}</Text>}
         </View></View>
+        {book.items.length?<View style={{flexDirection:'row',gap:24}}><FamilyAlbumButton label={tr('看纸页')} onPress={()=>router.push({pathname:'/family-album-paper',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>{book.access.canManage&&familyPdfEnabled()?<FamilyAlbumButton label={tr('导出这一册')} onPress={()=>router.push({pathname:'/family-album-print',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>:null}</View>:null}
         {reading && book.opening ? <Text style={{...type.body,color:ink}}>{book.opening}</Text> : null}
         {book.access.canManage && !reading ? <AlbumManageToolbar prefix="family-album" editing={editing} organizing={organizing} busy={busy} onEdit={()=>{setSources([]);setSelected([]);setEditing(value=>!value);}} onOrganize={()=>{setSources([]);setSelected([]);setOrganizing(value=>!value);}}/> : null}
         {editing && book.access.canManage ? <FamilyAlbumEditor book={book} busy={busy} onSave={change=>void run(async(api,current)=>{

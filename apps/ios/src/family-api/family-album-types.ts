@@ -11,7 +11,7 @@ export type FamilyAlbumNotice = { familyId: string; membershipId: string; userId
 export type FamilyAlbumAccess = {
   familyId: string; userId: string; membershipId: string; role: 'creator' | 'member';
   authority: string; rulesAcknowledged: boolean; rulesVersion: 1;
-  canManage: boolean; canExport: false;
+  canManage: boolean; canExport: boolean;
 };
 export type FamilyAlbumItem = {shareId: string; status: 'withdrawn'} | {shareId: string; status: 'active'; share: ShareView};
 export type FamilyAlbumView = Omit<FamilyAlbumRecord,'shareIds'|'coverChoice'> & {
@@ -27,6 +27,7 @@ export type FamilyAlbumMutation =
   | {kind:'rename'; name: string; opening: string | null};
 export type FamilyAlbumSummary = Omit<FamilyAlbumRecord,'shareIds'|'coverChoice'> & {entryCount:number;cover?:FamilyAlbumCover|null};
 export type FamilyAlbumApi = {
+  authorizeExport?(session:string,familyId:string,albumId:string,validation:string):Promise<{allowed:true;userId:string}>;
   access(session: string,familyId: string): Promise<FamilyAlbumAccess>;
   acknowledge(session: string,familyId: string,membershipId: string,confirmation: string): Promise<FamilyAlbumAccess>;
   list(session: string,familyId: string): Promise<{access:FamilyAlbumAccess;albums:FamilyAlbumSummary[]}>;

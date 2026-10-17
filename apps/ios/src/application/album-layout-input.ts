@@ -19,6 +19,7 @@ export type AlbumLayoutRecordInput = {
   presence: AlbumSourcePresence;
   revision: number | null;
   note: string;
+  attribution?: string;
   feeling: string;
   occurredAt?: string;
   occurredAtPrecision: string;

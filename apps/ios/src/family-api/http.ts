@@ -36,7 +36,9 @@ function statusFor(code: string) {
   switch (code) {
     case 'PURCHASE_RATE_LIMITED': return 429;
     case 'PURCHASE_VERIFICATION_UNAVAILABLE': return 503;
+    case 'FAMILY_ALBUM_EXPORT_CLOSED':
     case 'PURCHASES_CLOSED': return 404;
+    case 'FAMILY_ALBUM_INCOMPLETE': return 409;
     case FAMILY_ERROR.UNAUTHENTICATED:
     case FAMILY_ERROR.APPLE_TOKEN_INVALID:
     case FAMILY_ERROR.AUTH_FAILED:
@@ -186,6 +188,11 @@ export async function dispatchFamilyApi(
     const album = /^\/v2\/families\/([^/]+)\/albums\/([^/]+)$/.exec(path);
     if(album&&method==='GET')return {status:200,body:await commands.albums.read(token||'',album[1],album[2])};
     if(album&&method==='PATCH')return {status:200,body:await commands.albums.mutate(token||'',album[1],album[2],body as Parameters<typeof commands.albums.mutate>[3])};
+    const exportAlbum = /^\/v2\/families\/([^/]+)\/albums\/([^/]+)\/export-access$/.exec(path);
+    if(exportAlbum&&method==='POST'){
+      if(!commands.albums.authorizeExport)throw new FamilyError('FAMILY_ALBUM_EXPORT_CLOSED','FAMILY_ALBUM_EXPORT_CLOSED');
+      return {status:200,body:await commands.albums.authorizeExport(token||'',exportAlbum[1],exportAlbum[2],readString(body,'validation'))};
+    }
     const validateAlbum = /^\/v2\/families\/([^/]+)\/albums\/([^/]+)\/validate$/.exec(path);
     if(validateAlbum&&method==='POST')return {status:200,body:await commands.albums.validate(token||'',validateAlbum[1],validateAlbum[2],readString(body,'validation'))};
 

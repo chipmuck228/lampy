@@ -888,5 +888,9 @@
   "本段最多 1 分钟，到限自动停止并保留。": "Up to 1 minute. Recording stops automatically and is kept.",
   "本段最多 30 分钟，到限自动停止并保留。": "Up to 30 minutes. Recording stops automatically and is kept.",
   "已解锁最长30分钟录音和成品导出，无需重复购买。": "Recordings up to 30 minutes and edition exports are unlocked. No repeat purchase needed.",
-  "免费录音每段1分钟；一次购买解锁最长30分钟录音和全部成品导出。": "Free recordings are up to 1 minute each. One purchase unlocks recordings up to 30 minutes and all edition exports."
+  "免费录音每段1分钟；一次购买解锁最长30分钟录音和全部成品导出。": "Free recordings are up to 1 minute each. One purchase unlocks recordings up to 30 minutes and all edition exports.",
+  "家庭文件导出尚未开放。": "Family file export is not available yet.",
+  "还没有生成PDF。": "No PDF has been generated yet.",
+  "保存PDF": "Save PDF",
+  "本家庭已解锁，可以制作PDF。": "This family is unlocked and can create PDFs."
 }
