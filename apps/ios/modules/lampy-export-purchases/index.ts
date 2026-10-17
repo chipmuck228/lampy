@@ -5,6 +5,8 @@ export type ExportPurchaseOutcome = {status:'purchased'|'cancelled'|'pending'|'a
 export type ExportPurchasesNative = {
   hasEntitlement(productId:string):Promise<boolean>;
   status(productId:string):Promise<ExportPurchaseStatus>;
+  currentPurchase(productId:string,accountToken:string):Promise<{transactionId:string}|null>;
+  purchaseForAccount(productId:string,accountToken:string):Promise<ExportPurchaseOutcome>;
   purchase(productId:string):Promise<ExportPurchaseOutcome>;
   restore(productId:string):Promise<ExportPurchaseStatus>;
   addListener(event:'onEntitlementsChanged',listener:()=>void):{remove():void};

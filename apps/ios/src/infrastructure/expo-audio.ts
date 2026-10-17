@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+import { FREE_RECORDING_MS, PAID_RECORDING_MS } from '../application/recording-access';
 import type { AudioCapture, AudioPlayback, PlaybackStatus, RecordedAudio } from './media';
 
 type NativeRecorder = {
@@ -6,7 +7,7 @@ type NativeRecorder = {
   currentTime: number;
   uri: string | null;
   prepareToRecordAsync(options?: object): Promise<void>;
-  record(): void;
+  record(options?: { forDuration: number }): void;
   stop(): Promise<void>;
   release?: () => void;
   getStatus(): { durationMillis: number; isRecording: boolean };
@@ -202,12 +203,13 @@ export function createExpoAudioCapture(): AudioCapture {
 
   let recorder: NativeRecorder | null = null;
   let startedAt = 0;
+  let durationLimitMs = FREE_RECORDING_MS;
 
   function harvest(current: NativeRecorder, elapsedMs: number): RecordedAudio | null {
     const status = current.getStatus();
     const durationMs = Math.max(
       0,
-      status.durationMillis || secondsToMs(current.currentTime) || elapsedMs,
+      status.durationMillis || secondsToMs(current.currentTime) || Math.min(elapsedMs, durationLimitMs),
     );
     const uri = current.uri;
     if (!uri || durationMs <= 0) return null;
@@ -249,7 +251,7 @@ export function createExpoAudioCapture(): AudioCapture {
       const result = await native.requestRecordingPermissionsAsync();
       return result.granted ? 'granted' : 'denied';
     },
-    async start(canStart) {
+    async start(canStart, maxDurationMs = FREE_RECORDING_MS) {
       if (canStart && !canStart()) throw new Error('recording cancelled');
       if (recorder?.isRecording) {
         throw new Error('already recording');
@@ -263,7 +265,9 @@ export function createExpoAudioCapture(): AudioCapture {
         try {
           await next.prepareToRecordAsync(RECORDING_OPTIONS);
           if (canStart && !canStart()) throw new Error('recording cancelled');
-          next.record();
+          const limit = maxDurationMs === PAID_RECORDING_MS ? PAID_RECORDING_MS : FREE_RECORDING_MS;
+          next.record({ forDuration: limit / 1000 });
+          durationLimitMs = limit;
           recorder = next;
           startedAt = Date.now();
         } catch (error) {
@@ -299,7 +303,9 @@ export function createExpoAudioCapture(): AudioCapture {
     getElapsedMs() {
       if (!recorder) return 0;
       const status = recorder.getStatus();
-      return Math.max(0, status.durationMillis || secondsToMs(recorder.currentTime));
+      // Expo resets duration tracking after native automatic completion.
+      const elapsed = startedAt ? Math.min(Date.now() - startedAt, durationLimitMs) : 0;
+      return Math.max(0, status.durationMillis || secondsToMs(recorder.currentTime) || elapsed);
     },
   };
 }

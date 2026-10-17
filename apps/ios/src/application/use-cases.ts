@@ -1,3 +1,4 @@
+import { FREE_RECORDING_MS, PAID_RECORDING_MS } from './recording-access';
 import { tr } from '../i18n';
 import { createAsset, type AssetRecord } from '../domain-adapters/asset-commands';
 import { LOCAL_OWNER_ID } from '../domain-adapters/identity';
@@ -303,6 +304,7 @@ export function createUseCases(deps: {
   library?: ImageSource;
   camera?: ImageSource;
   capture?: AudioCapture;
+  recordingLimit?: () => Promise<number>;
   clock?: Clock;
   ownerId?: string;
   id?: () => string;
@@ -311,6 +313,7 @@ export function createUseCases(deps: {
   timezoneOffsetMinutes?: number;
   timezone?: HistoryClock;
 }) {
+  let recordingLimitMs = FREE_RECORDING_MS;
   const ownerId = deps.ownerId || LOCAL_OWNER_ID;
   const clock = deps.clock || defaultClock();
   const nextId = deps.id || defaultId;
@@ -907,7 +910,14 @@ export function createUseCases(deps: {
     if (options?.canStart && !options.canStart()) {
       throw new ApplicationError('RECORDING_CANCELLED', tr("这次录音没有开始，可以再点录音。"));
     }
-    await deps.capture.start(options?.canStart);
+    // Snapshot the budget once: a refund or network change must not discard a live recording.
+    const requested = await deps.recordingLimit?.().catch(() => FREE_RECORDING_MS);
+    const limit = requested === PAID_RECORDING_MS ? PAID_RECORDING_MS : FREE_RECORDING_MS;
+    if (options?.canStart && !options.canStart()) {
+      throw new ApplicationError('RECORDING_CANCELLED', tr("这次录音没有开始，可以再点录音。"));
+    }
+    await deps.capture.start(options?.canStart, limit);
+    recordingLimitMs = limit;
   }
 
   async function addRecordedAudio(draftId: string, recorded: RecordedAudio): Promise<ComposerViewModel> {
@@ -1147,6 +1157,7 @@ export function createUseCases(deps: {
     removeDraftImage,
     removeDraftAudio,
     saveTextMoment,
+    getRecordingLimitMs() { return recordingLimitMs; },
     getRecordingElapsedMs() {
       return deps.capture?.getElapsedMs() ?? 0;
     },

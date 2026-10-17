@@ -873,5 +873,20 @@
   "生成PDF": "Generate PDF",
   "尚未生成PDF。": "No PDF has been generated yet.",
   "PDF已生成在本机，保存到系统文件请点下方按钮。": "The PDF is ready on this device. Use the button below to save it to Files.",
-  "正在核对导出权益。": "Checking export access."
+  "正在核对导出权益。": "Checking export access.",
+  "请先到家庭页面登录Lampy，再解锁或恢复购买。": "Sign in to Lampy from the Family page before purchasing or restoring.",
+  "查看家庭导出资格": "Check family export eligibility",
+  "已解锁本家庭的导出资格；家庭文件导出尚未开放。": "Export eligibility is unlocked for this family. Family file export is not available yet.",
+  "本家庭尚未解锁导出资格；只有当前创建者可以解锁。": "Export eligibility is locked. Only the current creator can unlock it.",
+  "使用我的购买解锁这个家庭": "Unlock this family with my purchase",
+  "家庭资格暂时无法核对，请重试。": "Family eligibility could not be checked. Please retry.",
+  "购买将关联当前Lampy账号，不随家庭转交。": "This purchase is linked to your current Lampy account and does not transfer with a family.",
+  "已解锁成品制作，无需重复购买。": "Edition creation is unlocked. No repeat purchase needed.",
+  "一次购买解锁成品制作；记录、整理和阅读仍然免费。": "One purchase unlocks edition creation. Recording, organizing and reading remain free.",
+  "已到本段录音时长，声音已保留在草稿中。": "This recording reached its limit and has been kept in your draft.",
+  "即将到本段时长，录音会自动停止并保留。": "Almost at the limit. Recording will stop automatically and be kept.",
+  "本段最多 1 分钟，到限自动停止并保留。": "Up to 1 minute. Recording stops automatically and is kept.",
+  "本段最多 30 分钟，到限自动停止并保留。": "Up to 30 minutes. Recording stops automatically and is kept.",
+  "已解锁最长30分钟录音和成品导出，无需重复购买。": "Recordings up to 30 minutes and edition exports are unlocked. No repeat purchase needed.",
+  "免费录音每段1分钟；一次购买解锁最长30分钟录音和全部成品导出。": "Free recordings are up to 1 minute each. One purchase unlocks recordings up to 30 minutes and all edition exports."
 }

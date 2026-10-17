@@ -232,6 +232,19 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   const tx: FamilyTx = {
+    async purchaseToken(userId) {return (await db.getFirst<{token:string}>('SELECT token FROM family_purchase_tokens WHERE user_id=?',[userId]))?.token??null;},
+    async savePurchaseToken(userId,token) {await db.run('INSERT INTO family_purchase_tokens(user_id,token) VALUES(?,?)',[userId,token]);},
+    async findPurchase(key) {const r=await db.getFirst<{json:string}>('SELECT json FROM family_purchases WHERE purchase_key=?',[key]);return r?JSON.parse(r.json):null;},
+    async listPurchases(userId) {return (await db.getAll<{json:string}>('SELECT json FROM family_purchases WHERE user_id=?',[userId])).map(r=>JSON.parse(r.json));},
+    async savePurchase(row) {
+      const old=await tx.findPurchase(row.key);
+      if(old&&old.userId!==row.userId)throw new FamilyError('PURCHASE_ACCOUNT_MISMATCH','Purchase is bound to another account.');
+      if(old&&row.signedAt<old.signedAt)return;
+      const next={...row,revoked:!!old?.revoked&&row.signedAt<=old.signedAt||row.revoked};
+      await db.run('INSERT INTO family_purchases(purchase_key,user_id,json) VALUES(?,?,?) ON CONFLICT(purchase_key) DO UPDATE SET json=excluded.json',[row.key,row.userId,JSON.stringify(next)]);
+    },
+    async listPurchaseGrants(familyId) {return (await db.getAll<{json:string}>('SELECT json FROM family_purchase_grants WHERE family_id=?',[familyId])).map(r=>JSON.parse(r.json));},
+    async savePurchaseGrant(row) {await db.run('INSERT INTO family_purchase_grants(family_id,purchase_key,json) VALUES(?,?,?) ON CONFLICT(family_id,purchase_key) DO UPDATE SET json=excluded.json',[row.familyId,row.purchaseKey,JSON.stringify(row)]);},
     async listFamilyAlbums(familyId) {
       const rows=await db.getAll<{json:string}>('SELECT json FROM family_albums WHERE family_id = ? ORDER BY album_id',[familyId]);
       return rows.map(row=>JSON.parse(row.json));

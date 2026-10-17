@@ -34,10 +34,16 @@ function asRecord(body: unknown): Record<string, unknown> {
 
 function statusFor(code: string) {
   switch (code) {
+    case 'PURCHASE_RATE_LIMITED': return 429;
+    case 'PURCHASE_VERIFICATION_UNAVAILABLE': return 503;
+    case 'PURCHASES_CLOSED': return 404;
     case FAMILY_ERROR.UNAUTHENTICATED:
     case FAMILY_ERROR.APPLE_TOKEN_INVALID:
     case FAMILY_ERROR.AUTH_FAILED:
       return 401;
+    case 'PURCHASE_REQUIRED':
+    case 'PURCHASE_ACCOUNT_MISMATCH':
+    case 'PURCHASE_INVALID':
     case FAMILY_ERROR.FORBIDDEN:
       return 403;
     case FAMILY_ERROR.INVITE_NOT_FOUND:
@@ -155,6 +161,12 @@ export async function dispatchFamilyApi(
     if (method === 'POST' && path === '/v1/auth/sign-out') {
       return { status: 200, body: await commands.signOut(token || '') };
     }
+
+    if(method==='GET'&&path==='/v2/me/purchase-access')return {status:200,body:await commands.purchases.context(token||'')};
+    if(method==='POST'&&path==='/v2/me/purchase-access')return {status:200,body:await commands.purchases.claim(token||'',readString(body,'transactionId'))};
+    const purchaseFamily=/^\/v2\/families\/([^/]+)\/purchase-access$/.exec(path);
+    if(purchaseFamily&&method==='GET')return {status:200,body:await commands.purchases.familyAccess(token||'',purchaseFamily[1])};
+    if(purchaseFamily&&method==='POST')return {status:200,body:await commands.purchases.unlockFamily(token||'',purchaseFamily[1])};
 
     if (method === 'GET' && path === '/v2/me/families') {
       return { status: 200, body: await commands.listFamilies(token || '') };

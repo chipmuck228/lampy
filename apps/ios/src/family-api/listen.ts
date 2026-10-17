@@ -1,3 +1,4 @@
+import {applePurchaseVerifier} from './purchase-apple-node';
 import {traceFamilyHttp} from './http-trace';
 import { publicTestAuthPlan, publicTestPeer, createPublicAuthAdmission, isPublicAuthRequest, publicAuthBodyDeadline } from './public-test-auth';
 import { INVITE_WEB_HTML, INVITE_WEB_CSS, inviteWebJs, inviteAssociation } from './invite-web';
@@ -73,6 +74,9 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
     legacyAppleLoginEnabled: plan.mode === 'test',
     inviteLinksEnabled:inviteEnabled,
     historySharingEnabled:env.LAMPY_FAMILY_HISTORY_ENABLED === '1',
+    unifiedPurchasesEnabled:env.LAMPY_UNIFIED_PURCHASES==='1',
+    unifiedProductId:env.LAMPY_UNIFIED_PRODUCT_ID,
+    purchaseVerifier:applePurchaseVerifier(env),
     familyAlbumsEnabled:env.LAMPY_FAMILY_ALBUMS_ENABLED === '1',
     testAccountLoginEnabled: plan.testAccount.testAccountLoginEnabled,
     controlledEmailAccountsEnabled: env.LAMPY_CONTROLLED_EMAIL_ACCOUNTS === '1',

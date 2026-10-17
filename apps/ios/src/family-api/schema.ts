@@ -194,6 +194,10 @@ const MIGRATIONS = [
     family_id TEXT NOT NULL, membership_id TEXT NOT NULL, json TEXT NOT NULL,
     PRIMARY KEY(family_id,membership_id)
   );`,
+  `CREATE TABLE family_purchase_tokens(user_id TEXT PRIMARY KEY NOT NULL REFERENCES family_accounts(user_id),token TEXT UNIQUE NOT NULL);
+   CREATE TABLE family_purchases(purchase_key TEXT PRIMARY KEY NOT NULL,user_id TEXT NOT NULL REFERENCES family_accounts(user_id),json TEXT NOT NULL);
+   CREATE INDEX family_purchases_by_user ON family_purchases(user_id);
+   CREATE TABLE family_purchase_grants(family_id TEXT NOT NULL REFERENCES family_families(family_id),purchase_key TEXT NOT NULL REFERENCES family_purchases(purchase_key),json TEXT NOT NULL,PRIMARY KEY(family_id,purchase_key));`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28] as const;

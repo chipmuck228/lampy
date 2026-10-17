@@ -1,3 +1,5 @@
+import {FamilyPurchasePanel} from './family-purchase-panel';
+import {unifiedPurchasesEnabled} from '../application/unified-purchases';
 import { familyAlbumEvaluationOpen } from '../application/family-album';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -149,6 +151,7 @@ export default function FamilyDirectoryScreen() {
           </View>
         </View> : null}
         {state.families.length === 0 && state.pastFamilies.length === 0 ? <Text style={styles.empty}>{tr('现在还没有家庭。')}</Text> : null}
+        {unifiedPurchasesEnabled()&&state.families.find(f=>f.familyId===state.selectedId)?.role==='creator'&&state.selectedId?<FamilyPurchasePanel key={state.selectedId} familyId={state.selectedId}/>:null}
         <View style={styles.wall} testID="family-cover-wall">
           {state.families.map(f => <View key={f.familyId} testID={`family-tile-${f.familyId}`} style={styles.tile}><Pressable testID={`family-select-${f.familyId}`}
             style={styles.selection} disabled={busy} accessibilityRole="button"

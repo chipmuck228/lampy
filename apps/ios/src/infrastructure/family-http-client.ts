@@ -61,6 +61,7 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 }
 
 export type FamilyApiClient = {
+  purchases?: import('../family-api/purchase-types').PurchaseApi;
   albums?: import('../family-api/family-album-types').FamilyAlbumApi;
   registerControlledEmail?(input: { email: string; password: string; nickname: string }): Promise<SignInResult>;
   signInWithControlledEmail?(input: { email: string; password: string }): Promise<SignInResult>;
@@ -159,6 +160,12 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
   }
 
   return {
+    purchases: {
+      context:sessionToken=>send({method:'GET',path:'/v2/me/purchase-access',sessionToken,timeoutMs:12000}),
+      claim:(sessionToken,transactionId)=>send({method:'POST',path:'/v2/me/purchase-access',sessionToken,body:{transactionId},timeoutMs:12000}),
+      familyAccess:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/purchase-access`,sessionToken,timeoutMs:12000}),
+      unlockFamily:(sessionToken,familyId)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/purchase-access`,sessionToken,timeoutMs:12000}),
+    },
     albums: {
       access:(sessionToken,familyId)=>send({method:'GET',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,timeoutMs:5000}),
       acknowledge:(sessionToken,familyId,membershipId,confirmation)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/album-access`,sessionToken,body:{membershipId,confirmation}}),

@@ -1,3 +1,5 @@
+> 本页保留 F1 历史验收；F2 当前规则见 UNIFIED-RIGHTS.md，录音和导出测试见 RECORDING-EXPORT-ACCEPTANCE.md。
+
 # 阶段 F1：默认关闭的一次购买导出
 
 基线 main d09eaf1；独立分支 ios/life-album-paid-export-f。用户确认一次购买解锁，价格和正式商品 ID 后续由 App Store Connect 配置。没有设置价格、发布商品或进行真实扣款。阶段 F 尚未完成发布验收。2026-10-17 用户完成 Mac 编译与本地 StoreKit 模拟器验收；真实 Apple sandbox、真机与 TestFlight 仍待验收。允许作为默认关闭能力合并，不等于开放收费。
@@ -79,3 +81,5 @@ Apple 原始参考：
 审查发现并修复正式归档继承测试终端导出开关的问题：release-public-env.sh 强制清除正式/付费/开发打印开关和商品 ID，回归测试以污染环境执行真实 shell profile 并核对 native 配置。普通正式归档始终保持未开放；付费候选包需后续独立的显式配置与验收。
 
 合并检查：导出前/提交前授权、清理、StoreKit verified/type/product/revocation 校验、默认关闭及家庭 canExport=false 边界审查。DEBUG 日志仅商品/验证错误标识，不打印交易ID、收据或账号。不存在未解决的 GitHub review threads。真实商业开放与隐私/商品材料仍是发布门槛，不能把合并当作支付上线。
+
+2026-10-17 后续设计更新：统一购买不再仅个人 PDF；最新规则与 F2 实施边界见 [UNIFIED-RIGHTS](UNIFIED-RIGHTS.md)。本页 F1 交付与本地验收为历史基线，不代表统一服务端权益已通过真实 Sandbox。

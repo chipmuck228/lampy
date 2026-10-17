@@ -1,3 +1,4 @@
+import {unifiedPurchasesEnabled} from '../application/unified-purchases';
 import {useEffect,useRef,useState} from 'react';
 import {Pressable,View} from 'react-native';
 import {albumExportConfig} from '../application/album-export-access';
@@ -7,13 +8,14 @@ import {Text,type} from './life-text';
 import {inkSoft,sage} from './life-page';
 import {tr} from '../i18n';
 export function AlbumExportUnlock(){
+  const unified=unifiedPurchasesEnabled();
   const [status,setStatus]=useState<ExportPurchaseStatus|null>(null);
   const [retry,setRetry]=useState(0);
   const [working,setWorking]=useState(false),[notice,setNotice]=useState(''),[loading,setLoading]=useState(true);
   const active=useRef(false),sequence=useRef(0),owner=useRef(false);
   useEffect(()=>{
     active.current=true;
-    const refresh=async()=>{const ticket=++sequence.current;try{const next=await albumExportAccess.status();if(active.current&&ticket===sequence.current){setStatus(next);setNotice('');setLoading(false);}}catch{if(active.current&&ticket===sequence.current){setNotice(tr('暂时无法核对导出权益，请稍后再试。'));setLoading(false);}}};
+    const refresh=async()=>{const ticket=++sequence.current;try{const next=await albumExportAccess.status();if(active.current&&ticket===sequence.current){setStatus(next);setNotice('');setLoading(false);}}catch(error){if(active.current&&ticket===sequence.current){setNotice(tr(error&&typeof error==='object'&&'code' in error&&error.code==='UNAUTHENTICATED'?'请先到家庭页面登录Lampy，再解锁或恢复购买。':'暂时无法核对导出权益，请稍后再试。'));setLoading(false);}}};
     void refresh();const stop=observeExportEntitlements(()=>void refresh());
     return()=>{active.current=false;stop();};
   },[retry]);
@@ -30,7 +32,8 @@ export function AlbumExportUnlock(){
   const configured=albumExportConfig().productId;
   const product=status?.product;
   return <View testID="album-export-unlock" style={{gap:8}}>
-    <Text style={{...type.meta,color:inkSoft}}>{tr(status?.owned?'已解锁导出，新导出无需再次购买。':'一次购买解锁导出；创建、整理和阅读仍然免费。')}</Text>
+    <Text style={{...type.meta,color:inkSoft}}>{tr(status?.owned?'已解锁最长30分钟录音和成品导出，无需重复购买。':'免费录音每段1分钟；一次购买解锁最长30分钟录音和全部成品导出。')}</Text>
+    {unified?<Text style={{...type.meta,color:inkSoft}}>{tr('购买将关联当前Lampy账号，不随家庭转交。')}</Text>:null}
     {!status?.owned&&product?.id===configured&&product.price?<Pressable accessibilityRole="button" disabled={working} accessibilityState={{disabled:working}} onPress={()=>void run(false)} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.action,color:sage}}>{tr('解锁导出 · {0}',[product.price])}</Text></Pressable>:null}
     {loading?<Text style={{...type.meta,color:inkSoft}}>{tr('正在核对导出权益。')}</Text>:null}
     {!loading&&!status?.owned&&!product?<Text style={{...type.meta,color:inkSoft}}>{tr('商品暂时不可用，请稍后再试。')}</Text>:null}

@@ -23,6 +23,13 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  purchaseToken(userId:string):Promise<string|null>;
+  savePurchaseToken(userId:string,token:string):Promise<void>;
+  findPurchase(key:string):Promise<import('./purchase-types').PurchaseRecord|null>;
+  listPurchases(userId:string):Promise<import('./purchase-types').PurchaseRecord[]>;
+  savePurchase(row:import('./purchase-types').PurchaseRecord):Promise<void>;
+  listPurchaseGrants(familyId:string):Promise<import('./purchase-types').FamilyPurchaseGrant[]>;
+  savePurchaseGrant(row:import('./purchase-types').FamilyPurchaseGrant):Promise<void>;
   listFamilyAlbums(familyId:string): Promise<import('./family-album-types').FamilyAlbumRecord[]>;
   findFamilyAlbum(albumId:string): Promise<import('./family-album-types').FamilyAlbumRecord | null>;
   saveFamilyAlbum(album:import('./family-album-types').FamilyAlbumRecord): Promise<void>;
@@ -127,6 +134,13 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async purchaseToken(userId) {return store.purchaseTokens.find(r=>r.userId===userId)?.token??null;},
+    async savePurchaseToken(userId,token) {replaceBy(store.purchaseTokens,r=>r.userId,{userId,token});},
+    async findPurchase(key) {const r=store.purchases.find(r=>r.key===key);return r?{...r}:null;},
+    async listPurchases(userId) {return store.purchases.filter(r=>r.userId===userId).map(r=>({...r}));},
+    async savePurchase(row) {const old=store.purchases.find(r=>r.key===row.key);if(old&&old.userId!==row.userId)throw new FamilyError('PURCHASE_ACCOUNT_MISMATCH','Purchase is bound to another account.');if(old&&row.signedAt<old.signedAt)return;replaceBy(store.purchases,r=>r.key,{...row,revoked:!!old?.revoked&&row.signedAt<=old.signedAt||row.revoked});},
+    async listPurchaseGrants(familyId) {return store.purchaseGrants.filter(r=>r.familyId===familyId).map(r=>({...r}));},
+    async savePurchaseGrant(row) {replaceBy(store.purchaseGrants,r=>r.familyId+':'+r.purchaseKey,{...row});},
     async listFamilyAlbums(familyId) { return store.familyAlbums.filter(row=>row.familyId===familyId).map(row=>({...row,shareIds:[...row.shareIds],...(row.coverChoice?{coverChoice:{...row.coverChoice}}:{})})); },
     async findFamilyAlbum(id) { const row=store.familyAlbums.find(row=>row.albumId===id);return row?{...row,shareIds:[...row.shareIds],...(row.coverChoice?{coverChoice:{...row.coverChoice}}:{})}:null; },
     async saveFamilyAlbum(row) { replaceBy(store.familyAlbums,row=>row.albumId,{...row,shareIds:[...row.shareIds],...(row.coverChoice?{coverChoice:{...row.coverChoice}}:{})}); },
