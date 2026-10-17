@@ -17,6 +17,9 @@ export type IdempotentRecord = {
 };
 
 export type FamilyStore = {
+  purchaseTokens: {userId:string;token:string}[];
+  purchases: import('./purchase-types').PurchaseRecord[];
+  purchaseGrants: import('./purchase-types').FamilyPurchaseGrant[];
   familyAlbums: import('./family-album-types').FamilyAlbumRecord[];
   familyAlbumNotices: import('./family-album-types').FamilyAlbumNotice[];
   appleChallenges: import('./types').AppleChallenge[];
@@ -39,6 +42,7 @@ export type FamilyStore = {
 
 export function createFamilyStore(): FamilyStore {
   return {
+    purchaseTokens: [], purchases: [], purchaseGrants: [],
     familyAlbums: [], familyAlbumNotices: [],
     appleChallenges: [],
     profiles: [],

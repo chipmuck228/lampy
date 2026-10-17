@@ -1,3 +1,6 @@
+import {FamilyPurchasePanel} from './family-purchase-panel';
+import {AlbumExportUnlock} from './album-export-unlock';
+import {unifiedPurchasesEnabled} from '../application/unified-purchases';
 import { familyAlbumEvaluationOpen } from '../application/family-album';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -25,6 +28,7 @@ export default function FamilyDirectoryScreen() {
   const [retrying, setRetrying] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [purchaseRequired,setPurchaseRequired]=useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -88,6 +92,7 @@ export default function FamilyDirectoryScreen() {
       if (request !== sequence.current) return;
       const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
       if (code !== 'NETWORK' && code !== 'SERVER_UNREACHABLE') { operation.current = null; setRetrying(false); }
+      if(code==='PURCHASE_REQUIRED'){setPurchaseRequired(true);setMessage(tr('第一个家庭免费，创建更多家庭需要解锁。'));return;}
       setMessage(tr(code === 'FAMILY_LIMIT_REACHED' ? '最多可以加入或创建10个家庭。' : code === 'NETWORK' || code === 'SERVER_UNREACHABLE' ? '创建还未确认。可以用同一个名称再试一次。' : '未能创建家庭。请检查名称后再试。'));
     } finally {
       if (submitOwner.current === request) {
@@ -139,6 +144,8 @@ export default function FamilyDirectoryScreen() {
         </View>
         {formOpen || retrying ? <View style={styles.form} testID="family-create-form">
           <Text style={styles.name}>{tr('给这个家起个名字')}</Text>
+          {unifiedPurchasesEnabled()?<Text style={styles.meta}>{tr('第一个家庭免费，创建更多家庭和个人PDF导出使用同一份购买。')}</Text>:null}
+          {unifiedPurchasesEnabled()&&purchaseRequired?<AlbumExportUnlock/>:null}
           <TextInput accessibilityLabel={tr('家庭名称')} placeholder={tr('家庭名称')} value={name} editable={!busy && !retrying}
             onChangeText={setName} maxLength={80} style={styles.input} />
           <View style={styles.formActions}>
@@ -149,6 +156,7 @@ export default function FamilyDirectoryScreen() {
           </View>
         </View> : null}
         {state.families.length === 0 && state.pastFamilies.length === 0 ? <Text style={styles.empty}>{tr('现在还没有家庭。')}</Text> : null}
+        {unifiedPurchasesEnabled()&&state.families.find(f=>f.familyId===state.selectedId)?.role==='creator'&&state.selectedId?<FamilyPurchasePanel key={state.selectedId} familyId={state.selectedId}/>:null}
         <View style={styles.wall} testID="family-cover-wall">
           {state.families.map(f => <View key={f.familyId} testID={`family-tile-${f.familyId}`} style={styles.tile}><Pressable testID={`family-select-${f.familyId}`}
             style={styles.selection} disabled={busy} accessibilityRole="button"

@@ -101,14 +101,15 @@ private actor ExportPurchaseStore {
     return result
   }
 
-  func purchase(_ expected: String) async throws -> [String: String] {
+  func purchase(_ expected: String, accountToken: UUID? = nil) async throws -> [String: String] {
     let id = try configuredExportProductID(expected)
     guard !busy else { throw ExportPurchaseFailure.busy }
     busy = true
     defer { busy = false }
     if try await owns(id) { return ["status": "already-owned"] }
     let item = try await product(id)
-    switch try await item.purchase() {
+    let options: Set<Product.PurchaseOption> = accountToken.map { [.appAccountToken($0)] } ?? []
+    switch try await item.purchase(options: options) {
     case .success(let result):
       guard case .verified(let transaction) = result,
             transaction.productID == id, transaction.productType == .nonConsumable,
@@ -119,6 +120,18 @@ private actor ExportPurchaseStore {
     case .pending: return ["status": "pending"]
     @unknown default: throw ExportPurchaseFailure.unavailable
     }
+  }
+
+  func currentPurchase(_ expected: String, accountToken: String) async throws -> [String: String]? {
+    let id = try configuredExportProductID(expected)
+    guard let token = UUID(uuidString: accountToken) else { throw ExportPurchaseFailure.unavailable }
+    for await result in Transaction.currentEntitlements {
+      guard case .verified(let transaction) = result else { continue }
+      if transaction.productID == id && transaction.productType == .nonConsumable && transaction.revocationDate == nil && transaction.ownershipType == .purchased && transaction.appAccountToken == token {
+        return ["transactionId": String(transaction.id)]
+      }
+    }
+    return nil
   }
 
   func restore(_ expected: String) async throws -> [String: Any] {
@@ -164,11 +177,25 @@ public final class LampyExportPurchasesModule: Module {
     }
     OnDestroy { [weak self] in self?.updates?.cancel(); self?.updates = nil }
     AsyncFunction("hasEntitlement") { (expected: String) async throws -> Bool in
+      guard Bundle.main.object(forInfoDictionaryKey: "LampyUnifiedPurchasesEnabled") as? Bool != true else { throw ExportPurchaseFailure.disabled }
       let id = try configuredExportProductID(expected)
       return try await ExportPurchaseStore.shared.owns(id)
     }
     AsyncFunction("status") { (expected: String) async throws -> [String: Any] in try await ExportPurchaseStore.shared.status(expected) }
-    AsyncFunction("purchase") { (expected: String) async throws -> [String: String] in try await ExportPurchaseStore.shared.purchase(expected) }
+    AsyncFunction("purchase") { (expected: String) async throws -> [String: String] in
+      guard Bundle.main.object(forInfoDictionaryKey: "LampyUnifiedPurchasesEnabled") as? Bool != true else { throw ExportPurchaseFailure.disabled }
+      return try await ExportPurchaseStore.shared.purchase(expected)
+    }
+    AsyncFunction("purchaseForAccount") { (expected: String, accountToken: String) async throws -> [String: String] in
+      guard Bundle.main.object(forInfoDictionaryKey: "LampyUnifiedPurchasesEnabled") as? Bool == true,
+            let token = UUID(uuidString: accountToken) else { throw ExportPurchaseFailure.disabled }
+      // Existing purchases bound to another Lampy account are never silently reassigned.
+      if try await ExportPurchaseStore.shared.owns(expected), try await ExportPurchaseStore.shared.currentPurchase(expected, accountToken: accountToken) == nil { throw ExportPurchaseFailure.unavailable }
+      return try await ExportPurchaseStore.shared.purchase(expected, accountToken: token)
+    }
+    AsyncFunction("currentPurchase") { (expected: String, accountToken: String) async throws -> [String: String]? in
+      return try await ExportPurchaseStore.shared.currentPurchase(expected, accountToken: accountToken)
+    }
     AsyncFunction("restore") { (expected: String) async throws -> [String: Any] in try await ExportPurchaseStore.shared.restore(expected) }
   }
 }

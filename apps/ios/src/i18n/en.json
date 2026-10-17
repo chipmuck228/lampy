@@ -873,5 +873,16 @@
   "生成PDF": "Generate PDF",
   "尚未生成PDF。": "No PDF has been generated yet.",
   "PDF已生成在本机，保存到系统文件请点下方按钮。": "The PDF is ready on this device. Use the button below to save it to Files.",
-  "正在核对导出权益。": "Checking export access."
+  "正在核对导出权益。": "Checking export access.",
+  "请先到家庭页面登录Lampy，再解锁或恢复购买。": "Sign in to Lampy from the Family page before purchasing or restoring.",
+  "已解锁个人导出和更多家庭，无需重复购买。": "Personal PDF export and more families are unlocked. No repeat purchase needed.",
+  "免费创建一个家庭；一次购买解锁个人PDF导出和更多家庭。": "Create one family for free. One purchase unlocks personal PDF export and more families.",
+  "第一个家庭免费，创建更多家庭需要解锁。": "Your first family is free. Unlock access to create more families.",
+  "第一个家庭免费，创建更多家庭和个人PDF导出使用同一份购买。": "Your first family is free. One purchase unlocks more families and personal PDF export.",
+  "查看家庭导出资格": "Check family export eligibility",
+  "已解锁本家庭的导出资格；家庭文件导出尚未开放。": "Export eligibility is unlocked for this family. Family file export is not available yet.",
+  "本家庭尚未解锁导出资格；只有当前创建者可以解锁。": "Export eligibility is locked. Only the current creator can unlock it.",
+  "使用我的购买解锁这个家庭": "Unlock this family with my purchase",
+  "家庭资格暂时无法核对，请重试。": "Family eligibility could not be checked. Please retry.",
+  "购买将关联当前Lampy账号，不随家庭转交。": "This purchase is linked to your current Lampy account and does not transfer with a family."
 }

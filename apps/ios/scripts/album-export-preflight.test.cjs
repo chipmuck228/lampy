@@ -13,6 +13,11 @@ test('detects JS/native drift and disabled native purchase configuration', () =>
   const f = fixture(); f.native = {enabled: false, productId: 'old'};
   assert.deepEqual(inspect(f), ['NATIVE_PAID_DISABLED', 'NATIVE_PRODUCT_MISMATCH']);
 });
+test('detects a unified flag enabled only in Metro without native rebuild', () => {
+  const f=fixture();f.env.EXPO_PUBLIC_UNIFIED_PURCHASES='1';
+  assert.deepEqual(inspect(f),['NATIVE_UNIFIED_MISMATCH']);
+  f.native.unified=true;assert.deepEqual(inspect(f),[]);
+});
 test('sandbox rejects a selected local StoreKit configuration and the known local SKU', () => {
   const f = fixture(); f.mode = 'sandbox';
   assert.deepEqual(inspect(f), ['SANDBOX_REQUIRES_STOREKIT_NONE', 'SANDBOX_REQUIRES_REAL_PRODUCT']);

@@ -17,3 +17,5 @@ A不自动开工B–F。商业模式未定前可做明确隔离的开发验收�
 2026-10-16：一次购买解锁方案已确认，F1 的默认关闭配置、真实 StoreKit 接口及个人 PDF 授权路径已实施候选，详见 [paid-export-f/README.md](paid-export-f/README.md)。商品配置、原生编译和真实支付验收仍待完成；D 暂停，家庭完整文件导出保持关闭，不能将 F1 视作 F 全部完成。
 
 2026-10-17：F1 PR #115 合并至 main cfaccf4；本地 StoreKit 模拟器验收通过但正式开关仍关闭。F2 从该基线独立开始，只读配置预检与真实 Sandbox/真机验收准备见 [F2-ACCEPTANCE](paid-export-f/F2-ACCEPTANCE.md)，D 与家庭完整导出继续暂停。
+
+2026-10-17：按用户确认推进 F2 统一购买与家庭来源解锁：免费一个当前 creator 家庭、个人购买不转移、家庭资格随 creator、退款按交易来源传播。设计与开关/验收见 [UNIFIED-RIGHTS](paid-export-f/UNIFIED-RIGHTS.md)。商品名称和 Sandbox 在实施后再推进，不自动开放收费或家庭完整文件导出。

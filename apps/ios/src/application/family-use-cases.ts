@@ -442,6 +442,14 @@ export function createFamilyUseCases(deps: {
     }
   }
 
+  async function purchaseRequest<T>(work:(api:NonNullable<FamilyApiClient['purchases']>,token:string)=>Promise<T>,isCurrent=()=>true) {
+    const a=await requireAccount();
+    if(!isCurrent())throw new ApplicationError('STALE_FAMILY_REQUEST','Purchase screen is inactive.');
+    if(!deps.client.purchases)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+    const result=await work(deps.client.purchases,a.sessionToken);await assertSameAccount(a);
+    if(!isCurrent())throw new ApplicationError('STALE_FAMILY_REQUEST','Purchase screen is inactive.');
+    return result;
+  }
   const history = createFamilyHistoryUseCases(deps);
   let directoryRequest = 0;
   let emailAuthRequest = 0;
@@ -465,6 +473,11 @@ export function createFamilyUseCases(deps: {
     }
   }
   return {
+    purchaseAccountContext:(current?:()=>boolean)=>purchaseRequest((api,token)=>api.context(token),current),
+    claimPurchase:(transactionId:string,current?:()=>boolean)=>purchaseRequest((api,token)=>api.claim(token,transactionId),current),
+    familyPurchaseAccess:(familyId:string,current?:()=>boolean)=>purchaseRequest((api,token)=>api.familyAccess(token,familyId),current),
+    unlockFamilyPurchase:(familyId:string,current?:()=>boolean)=>purchaseRequest((api,token)=>api.unlockFamily(token,familyId),current),
+    async assertPurchaseAccount(userId:string) {if((await requireAccount()).userId!==userId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');},
     albums: createFamilyAlbumUseCases({client:deps.client,session:deps.session}),
     history,
     async previewInviteLink(token: string) {

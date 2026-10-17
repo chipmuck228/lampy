@@ -14,6 +14,7 @@ function inspect({mode, env, native, scheme, storekit}) {
   try { expected = configureAlbumExport({}, env).ios.infoPlist; }
   catch { return ['INVALID_EXPORT_CONFIG']; }
   if (!expected.LampyPaidExportEnabled) problems.push('PAID_TEST_FLAGS_REQUIRED');
+  if (Boolean(native.unified) !== (env.EXPO_PUBLIC_UNIFIED_PURCHASES === '1')) problems.push('NATIVE_UNIFIED_MISMATCH');
   if (native.enabled !== true) problems.push('NATIVE_PAID_DISABLED');
   if (!expected.LampyExportProductID || native.productId !== expected.LampyExportProductID) problems.push('NATIVE_PRODUCT_MISMATCH');
   const launch = /<LaunchAction\b[\s\S]*?<\/LaunchAction>/.exec(scheme)?.[0];
@@ -48,7 +49,9 @@ function main(args) {
   const schemeFile = path.resolve(root, options.scheme || 'ios/Lampy.xcodeproj/xcshareddata/xcschemes/Lampy.xcscheme');
   const read = key => execFileSync('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, plist], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
   let native;
-  try { native = {enabled: read('LampyPaidExportEnabled') === 'true', productId: read('LampyExportProductID')}; }
+  let unified=false;
+  try {unified=read('LampyUnifiedPurchasesEnabled')==='true';} catch { /* Older F1 builds default to off. */ }
+  try { native = {unified,enabled: read('LampyPaidExportEnabled') === 'true', productId: read('LampyExportProductID')}; }
   catch { throw Error('NATIVE_PLIST_UNREADABLE_OR_NOT_GENERATED'); }
   const scheme = fs.readFileSync(schemeFile, 'utf8');
   const storekit = options.storekit ? {file: options.storekit, data: JSON.parse(fs.readFileSync(path.resolve(root, options.storekit), 'utf8'))} : null;

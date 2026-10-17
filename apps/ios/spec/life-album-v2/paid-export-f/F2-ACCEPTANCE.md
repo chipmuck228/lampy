@@ -1,6 +1,6 @@
-# F2：真实付费发布准备（尚未开放）
+# F2：统一权益实施与真实付费发布准备（尚未开放）
 
-基线：main cfaccf4（PR #115 已合并）。本片只增加只读配置预检与验收流程，不改购买语义、不配置真实商品或价格、不自动上传/购买，不开启公共导出。不恢复阶段 D 或家庭完整文件导出。
+基线：main cfaccf4（PR #115 已合并）。本片先实施用户确认的统一购买规则，见 [UNIFIED-RIGHTS](UNIFIED-RIGHTS.md)，并保留只读配置预检。不配置真实商品/价格，不自动上传/购买，不开启公共收费。D 和家庭完整文件导出继续暂停。
 
 ## 本次可执行的检查
 
@@ -13,7 +13,7 @@
 ## 从本地 StoreKit 切换真实 Apple Sandbox
 
 1. 在 App Store Connect 准备实际 non-consumable 商品 ID、价格、本地化、应用与商业配置，并创建 Sandbox 测试账号。这些资料和操作尚未完成，不使用本地测试价格作为商业定价。
-2. 同一个开发终端设置正式入口/付费开关为 1，商品变量填写真实配置 ID。重新 prebuild、Pods 和 Mac 重编，确保 native 商品 ID 同步。保持家庭完整导出关闭。
+2. 同一个开发终端设置正式入口/付费开关为 1，商品变量填写后续确认的真实配置 ID，并设置 EXPO_PUBLIC_UNIFIED_PURCHASES=1；服务器先按 UNIFIED-RIGHTS.md 配置交易验证并部署 migration 31。重新 prebuild、Pods 和 Mac 重编，确保 native 商品 ID 同步。保持家庭完整导出关闭。
 3. Xcode 当前运行 Scheme → Run → Options → StoreKit Configuration 选 None。运行 `npm run album-export:preflight -- --mode sandbox`。本工具拒绝已知的本地示例 ID app.lampy.export.test；其他 ID 的 App Store 可售状态必须实测，不能靠字符串检查证明。
 4. 同一环境启动 Metro，在真机开发构建中验证真实 Sandbox（不做生产扣款）。账号与设备准备参考 Apple 官方说明；不把本地交易管理器里购买视作此项通过。
 5. 完成下面矩阵后记录代码 SHA、构建号、设备/OS、测试环境和结果；不记录密码、token、JWS 或收据。预检永远输出 appleSandbox/releaseReady=NOT_VERIFIED。
@@ -37,3 +37,5 @@ Apple 参考：
 - https://developer.apple.com/documentation/xcode/setting-up-storekit-testing-in-xcode
 - https://developer.apple.com/documentation/storekit/testing-in-app-purchases-with-sandbox
 - https://developer.apple.com/help/app-store-connect/test-in-app-purchases/create-a-sandbox-apple-account
+
+统一权益测试须先登录 Lampy。Xcode 本地 StoreKit 仅用于原生购买/预检，不能为云 API 产生 Apple 签名的真实交易。自动测试通过不替代新 Swift 编译和真实 Sandbox 服务端验证；正式商品命名与商业定价仍待后续，不沿用“仅个人 PDF”作为最终说明。

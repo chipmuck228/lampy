@@ -1,3 +1,4 @@
+import {createPurchaseCommands} from './purchase-commands';
 import { createFamilyAlbumCommands } from './family-album-commands';
 import { createAppleAuthCommands } from './apple-auth-commands';
 import { createFamilyTransferCommands } from './transfer-commands';
@@ -46,6 +47,7 @@ import { assertHistoryEnabled, HISTORY_CONFIRMATION } from './history-policy';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = InviteLinkCommands & {
+  purchases: import('./purchase-types').PurchaseApi;
   albums: import('./family-album-types').FamilyAlbumApi;
   transfers: ReturnType<typeof createFamilyTransferCommands>;
   historyShares: ShareCommands;
@@ -270,6 +272,9 @@ export function createFamilyCommands(deps: {
   inviteLinksEnabled?: boolean;
   historySharingEnabled?: boolean;
   familyAlbumsEnabled?: boolean;
+  unifiedPurchasesEnabled?:boolean;
+  unifiedProductId?:string;
+  purchaseVerifier?:import('./purchase-types').PurchaseVerifier;
 }): FamilyCommands {
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
@@ -324,7 +329,10 @@ export function createFamilyCommands(deps: {
     );
   }
 
+  const purchases=createPurchaseCommands({enabled:deps.unifiedPurchasesEnabled===true,productId:deps.unifiedProductId,verifier:deps.purchaseVerifier,clock,authed:withAuthedUser});
+
   return {
+    purchases,
     albums: createFamilyAlbumCommands({authed:withAuthedUser,clock,enabled:deps.familyAlbumsEnabled===true&&deps.historySharingEnabled===true}),
     transfers: createFamilyTransferCommands({authed:withAuthedUser,clock,id:()=>`transfer_${ids.invitationId()}`}),
     historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled, operatorOnly,
@@ -367,6 +375,7 @@ export function createFamilyCommands(deps: {
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
         familyHistoryV2: deps.historySharingEnabled === true,
+        unifiedPurchases:deps.unifiedPurchasesEnabled===true,
         familyAlbums: deps.familyAlbumsEnabled === true && deps.historySharingEnabled === true,
         argon2id: ARGON2ID_PRODUCTION,
       };
@@ -422,7 +431,11 @@ export function createFamilyCommands(deps: {
         return { families, ...(pastFamilies.length ? { pastFamilies } : {}), limit: 10 as const };
       });
     },
-    createNamedFamily(sessionToken, rawName, idempotencyKey) {
+    async createNamedFamily(sessionToken, rawName, idempotencyKey) {
+      if(purchases.enabled) {
+        const replay=idempotencyKey?await withAuthedUser(sessionToken,(tx,userId)=>tx.findIdempotent(userId,'createNamedFamily',idempotencyKey)):null;
+        if(!replay)await purchases.prepareCreation(sessionToken);
+      }
       return withAuthedUser(sessionToken, async (tx, userId) => {
         const name = rawName.trim();
         if (!name || Array.from(name).length > 40 || /[\u0000-\u001f\u007f]/.test(name) || !idempotencyKey || idempotencyKey.length > 128) {
@@ -437,6 +450,7 @@ export function createFamilyCommands(deps: {
           return { familyId: family.familyId, name: family.name || '', createdAt: family.createdAt, role: member.role,
             memberCount: (await tx.listActiveMembers(family.familyId)).length };
         }
+        await purchases.assertCanCreate(tx,userId);
         let count = 0;
         for (const membership of await tx.findMembershipsForUser(userId)) {
           if (membership.status === 'active' && (await tx.findFamily(membership.familyId))?.status === 'active') count++;
@@ -446,12 +460,14 @@ export function createFamilyCommands(deps: {
         const familyId = ids.familyId();
         await tx.saveFamily({ familyId, name, createdAt: now, status: 'active', historyPolicy: deps.historySharingEnabled ? 'family-history-v2' : 'legacy' });
         await tx.saveMembership({ membershipId: ids.membershipId(), familyId, userId, role: 'creator', status: 'active', joinedAt: now });
+        await purchases.grantCreated(tx,userId,familyId);
         return writeIdempotent(tx, userId, 'createNamedFamily', idempotencyKey, fingerprint,
           { familyId, name, createdAt: now, role: 'creator' as const, memberCount: 1 });
       });
     },
 
-    createFamily(sessionToken, idempotencyKey) {
+    async createFamily(sessionToken, idempotencyKey) {
+      if(purchases.enabled)await purchases.prepareCreation(sessionToken);
       return withAuthedUser(sessionToken, async (tx, userId) => {
         const fingerprint = fingerprintCreateFamily();
         const cached = await readIdempotent<FamilyView>(tx, userId, 'createFamily', idempotencyKey, fingerprint);
@@ -460,6 +476,7 @@ export function createFamilyCommands(deps: {
         if (existing) {
           throw new FamilyError(FAMILY_ERROR.ALREADY_IN_FAMILY, 'This account already belongs to a family.');
         }
+        await purchases.assertCanCreate(tx,userId);
         const now = iso(clock.now());
         const familyId = ids.familyId();
         await tx.saveFamily({ familyId, createdAt: now, status: 'active' });
@@ -478,6 +495,7 @@ export function createFamilyCommands(deps: {
           }
           throw error;
         }
+        await purchases.grantCreated(tx,userId,familyId);
         return writeIdempotent(tx, userId, 'createFamily', idempotencyKey, fingerprint, await toFamilyView(tx, familyId, userId));
       });
     },

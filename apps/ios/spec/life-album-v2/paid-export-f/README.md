@@ -79,3 +79,5 @@ Apple 原始参考：
 审查发现并修复正式归档继承测试终端导出开关的问题：release-public-env.sh 强制清除正式/付费/开发打印开关和商品 ID，回归测试以污染环境执行真实 shell profile 并核对 native 配置。普通正式归档始终保持未开放；付费候选包需后续独立的显式配置与验收。
 
 合并检查：导出前/提交前授权、清理、StoreKit verified/type/product/revocation 校验、默认关闭及家庭 canExport=false 边界审查。DEBUG 日志仅商品/验证错误标识，不打印交易ID、收据或账号。不存在未解决的 GitHub review threads。真实商业开放与隐私/商品材料仍是发布门槛，不能把合并当作支付上线。
+
+2026-10-17 后续设计更新：统一购买不再仅个人 PDF；最新规则与 F2 实施边界见 [UNIFIED-RIGHTS](UNIFIED-RIGHTS.md)。本页 F1 交付与本地验收为历史基线，不代表统一服务端权益已通过真实 Sandbox。
