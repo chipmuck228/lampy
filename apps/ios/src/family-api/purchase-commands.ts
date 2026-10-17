@@ -34,9 +34,14 @@ export function createPurchaseCommands(deps:{
     for(const m of await tx.findMembershipsForUser(userId))if(m.role==='creator'&&m.status==='active'&&(await tx.findFamily(m.familyId))?.status==='active')count++;
     return count;
   }
+  async function activeFamilies(tx:FamilyTx,userId:string) {
+    let count=0;
+    for(const m of await tx.findMembershipsForUser(userId))if(m.status==='active'&&(await tx.findFamily(m.familyId))?.status==='active')count++;
+    return count;
+  }
   async function context(tx:FamilyTx,userId:string):Promise<PurchaseContext> {
     const count=await created(tx,userId);const owned=(await tx.listPurchases(userId)).some(fresh);
-    return {userId,appAccountToken:await token(tx,userId),owned,createdFamilyCount:count,canCreateFamily:count===0||owned};
+    return {userId,appAccountToken:await token(tx,userId),owned,createdFamilyCount:count,canCreateFamily:(await activeFamilies(tx,userId))<10};
   }
   async function member(tx:FamilyTx,userId:string,familyId:string) {
     if((await tx.findFamily(familyId))?.status!=='active')fail('FAMILY_DISSOLVED');
@@ -72,16 +77,6 @@ export function createPurchaseCommands(deps:{
   return {
     enabled:deps.enabled,
     refreshUser:(session:string)=>refresh(session),
-    async prepareCreation(session:string) {
-      enabled();
-      const count=await deps.authed(session,created);
-      // The free first family must not depend on Apple's availability.
-      if(count>0)await refresh(session);
-    },
-    async assertCanCreate(tx:FamilyTx,userId:string) {
-      if(!deps.enabled)return;
-      const view=await context(tx,userId);if(!view.canCreateFamily)fail('PURCHASE_REQUIRED');
-    },
     async grantCreated(tx:FamilyTx,userId:string,familyId:string) {
       if(!deps.enabled)return;
       const purchase=(await tx.listPurchases(userId)).find(fresh);

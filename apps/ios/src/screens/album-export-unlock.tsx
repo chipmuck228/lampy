@@ -32,7 +32,7 @@ export function AlbumExportUnlock(){
   const configured=albumExportConfig().productId;
   const product=status?.product;
   return <View testID="album-export-unlock" style={{gap:8}}>
-    <Text style={{...type.meta,color:inkSoft}}>{tr(unified?(status?.owned?'已解锁个人导出和更多家庭，无需重复购买。':'免费创建一个家庭；一次购买解锁个人PDF导出和更多家庭。'):status?.owned?'已解锁导出，新导出无需再次购买。':'一次购买解锁导出；创建、整理和阅读仍然免费。')}</Text>
+    <Text style={{...type.meta,color:inkSoft}}>{tr(unified?(status?.owned?'已解锁成品制作，无需重复购买。':'一次购买解锁成品制作；记录、整理和阅读仍然免费。'):status?.owned?'已解锁导出，新导出无需再次购买。':'一次购买解锁导出；创建、整理和阅读仍然免费。')}</Text>
     {unified?<Text style={{...type.meta,color:inkSoft}}>{tr('购买将关联当前Lampy账号，不随家庭转交。')}</Text>:null}
     {!status?.owned&&product?.id===configured&&product.price?<Pressable accessibilityRole="button" disabled={working} accessibilityState={{disabled:working}} onPress={()=>void run(false)} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.action,color:sage}}>{tr('解锁导出 · {0}',[product.price])}</Text></Pressable>:null}
     {loading?<Text style={{...type.meta,color:inkSoft}}>{tr('正在核对导出权益。')}</Text>:null}

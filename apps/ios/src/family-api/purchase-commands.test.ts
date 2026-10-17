@@ -34,21 +34,21 @@ describe.each(['memory','sqlite'] as const)('unified purchase policy (%s)',kind=
   let f:Awaited<ReturnType<typeof fixture>>;
   beforeEach(async()=>{dir=await mkdtemp(path.join(tmpdir(),'lampy-purchases-'));f=await fixture(kind==='sqlite'?path.join(dir,'family.db'):undefined);});
   afterEach(async()=>{await f.db?.close();await rm(dir,{recursive:true,force:true});});
-  it('one free active creator family, deletion restores eligibility and replay consumes nothing',async()=>{
+  it('family creation is free and idempotent regardless of purchase state',async()=>{
     const one=await f.commands.createNamedFamily(f.a.sessionToken,'One','one');
     expect(await f.commands.createNamedFamily(f.a.sessionToken,'One','one')).toEqual(one);
-    await expect(f.commands.createNamedFamily(f.a.sessionToken,'Two','two')).rejects.toMatchObject({code:'PURCHASE_REQUIRED'});
+    expect((await f.commands.createNamedFamily(f.a.sessionToken,'Two','two')).role).toBe('creator');
     await f.commands.dissolveFamily(f.a.sessionToken,one.familyId);
     expect((await f.commands.createNamedFamily(f.a.sessionToken,'Two','two')).role).toBe('creator');
     expect(f.verify).not.toHaveBeenCalled();
   });
-  it('serializes simultaneous free creation and does not allow the legacy route to bypass the rule',async()=>{
+  it('allows concurrent free creation while preserving the legacy route compatibility limits',async()=>{
     const results=await Promise.allSettled([f.commands.createNamedFamily(f.a.sessionToken,'One','one'),f.commands.createNamedFamily(f.a.sessionToken,'Two','two')]);
-    expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+    expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(2);
     await expect(f.commands.createFamily(f.a.sessionToken,'legacy')).rejects.toBeDefined();
-    expect((await f.commands.listFamilies(f.a.sessionToken)).families).toHaveLength(1);
+    expect((await f.commands.listFamilies(f.a.sessionToken)).families).toHaveLength(2);
   });
-  it('verified purchase enables more families and records a durable family source',async()=>{
+  it('verified purchase records a durable family export source',async()=>{
     await f.commands.createNamedFamily(f.a.sessionToken,'Free','free');
     expect((await f.buy(f.a.sessionToken,'100')).owned).toBe(true);
     const paid=await f.commands.createNamedFamily(f.a.sessionToken,'Paid','paid');
@@ -84,12 +84,13 @@ describe.each(['memory','sqlite'] as const)('unified purchase policy (%s)',kind=
     const response=await dispatchFamilyApi(f.commands,{method:'POST',path:'/v2/me/purchase-access',headers:{authorization:`Bearer ${f.b.sessionToken}`},body:{owned:true}});
     expect(response.status).toBe(400);
   });
-  it('refund blocks new paid creation without deleting families and cannot be undone by replay',async()=>{
+  it('refund blocks paid capabilities, but never blocks free family creation',async()=>{
     await f.buy(f.a.sessionToken,'100');
     const first=await f.commands.createNamedFamily(f.a.sessionToken,'First','first');
     f.transactions.get('100')!.revoked=true;
-    await expect(f.commands.createNamedFamily(f.a.sessionToken,'Second','second')).rejects.toMatchObject({code:'PURCHASE_REQUIRED'});
-    expect((await f.commands.listFamilies(f.a.sessionToken)).families[0].familyId).toBe(first.familyId);
+    expect((await f.commands.purchases.context(f.a.sessionToken)).owned).toBe(false);
+    expect((await f.commands.createNamedFamily(f.a.sessionToken,'Second','second')).role).toBe('creator');
+    expect((await f.commands.listFamilies(f.a.sessionToken)).families.some(row=>row.familyId===first.familyId)).toBe(true);
     f.transactions.get('100')!.revoked=false;
     expect((await f.commands.purchases.claim(f.a.sessionToken,'100')).owned).toBe(false);
   });
@@ -98,7 +99,7 @@ describe.each(['memory','sqlite'] as const)('unified purchase policy (%s)',kind=
     f.verify.mockRejectedValue(Error('network'));
     await expect(f.commands.purchases.familyAccess(f.a.sessionToken,family.familyId)).rejects.toThrow('network');
     expect((await f.commands.listFamilies(f.a.sessionToken)).families).toHaveLength(1);
-    await expect(f.commands.createNamedFamily(f.a.sessionToken,'Second','second')).rejects.toThrow('network');
+    expect((await f.commands.createNamedFamily(f.a.sessionToken,'Second','second')).role).toBe('creator');
   });
   it('the first free family does not depend on Apple purchase availability',async()=>{
     await f.buy(f.a.sessionToken,'100');f.verify.mockClear();f.verify.mockRejectedValue(Error('network'));
@@ -112,9 +113,9 @@ describe.each(['memory','sqlite'] as const)('unified purchase policy (%s)',kind=
     const members=await f.repository.withTransaction(tx=>tx.listActiveMembers(family.familyId));
     const transfer=await f.commands.transfers.create(f.a.sessionToken,family.familyId,{requestId:'give',fromMembershipId:members.find(m=>m.userId===f.a.userId)!.membershipId,toMembershipId:members.find(m=>m.userId===f.b.userId)!.membershipId});
     await f.commands.transfers.respond(f.b.sessionToken,family.familyId,transfer.transferId,transfer.revision,'accept');
-    expect((await f.commands.purchases.context(f.b.sessionToken))).toMatchObject({owned:false,createdFamilyCount:2,canCreateFamily:false});
+    expect((await f.commands.purchases.context(f.b.sessionToken))).toMatchObject({owned:false,createdFamilyCount:2,canCreateFamily:true});
     expect((await f.commands.purchases.familyAccess(f.b.sessionToken,family.familyId)).eligible).toBe(true);
-    await expect(f.commands.createNamedFamily(f.b.sessionToken,'Another','another')).rejects.toMatchObject({code:'PURCHASE_REQUIRED'});
+    expect((await f.commands.createNamedFamily(f.b.sessionToken,'Another','another')).role).toBe('creator');
   });
   it('denies an in-flight unlock after creator transfer and leaves the grant owner unchanged',async()=>{
     await f.buy(f.a.sessionToken,'100');const family=await f.commands.createNamedFamily(f.a.sessionToken,'Family','family');await f.addB(family.familyId);

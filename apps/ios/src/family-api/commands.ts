@@ -432,10 +432,6 @@ export function createFamilyCommands(deps: {
       });
     },
     async createNamedFamily(sessionToken, rawName, idempotencyKey) {
-      if(purchases.enabled) {
-        const replay=idempotencyKey?await withAuthedUser(sessionToken,(tx,userId)=>tx.findIdempotent(userId,'createNamedFamily',idempotencyKey)):null;
-        if(!replay)await purchases.prepareCreation(sessionToken);
-      }
       return withAuthedUser(sessionToken, async (tx, userId) => {
         const name = rawName.trim();
         if (!name || Array.from(name).length > 40 || /[\u0000-\u001f\u007f]/.test(name) || !idempotencyKey || idempotencyKey.length > 128) {
@@ -450,7 +446,6 @@ export function createFamilyCommands(deps: {
           return { familyId: family.familyId, name: family.name || '', createdAt: family.createdAt, role: member.role,
             memberCount: (await tx.listActiveMembers(family.familyId)).length };
         }
-        await purchases.assertCanCreate(tx,userId);
         let count = 0;
         for (const membership of await tx.findMembershipsForUser(userId)) {
           if (membership.status === 'active' && (await tx.findFamily(membership.familyId))?.status === 'active') count++;
@@ -467,7 +462,6 @@ export function createFamilyCommands(deps: {
     },
 
     async createFamily(sessionToken, idempotencyKey) {
-      if(purchases.enabled)await purchases.prepareCreation(sessionToken);
       return withAuthedUser(sessionToken, async (tx, userId) => {
         const fingerprint = fingerprintCreateFamily();
         const cached = await readIdempotent<FamilyView>(tx, userId, 'createFamily', idempotencyKey, fingerprint);
@@ -476,7 +470,6 @@ export function createFamilyCommands(deps: {
         if (existing) {
           throw new FamilyError(FAMILY_ERROR.ALREADY_IN_FAMILY, 'This account already belongs to a family.');
         }
-        await purchases.assertCanCreate(tx,userId);
         const now = iso(clock.now());
         const familyId = ids.familyId();
         await tx.saveFamily({ familyId, createdAt: now, status: 'active' });

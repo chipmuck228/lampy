@@ -1,5 +1,4 @@
 import {FamilyPurchasePanel} from './family-purchase-panel';
-import {AlbumExportUnlock} from './album-export-unlock';
 import {unifiedPurchasesEnabled} from '../application/unified-purchases';
 import { familyAlbumEvaluationOpen } from '../application/family-album';
 import { useCallback, useRef, useState } from 'react';
@@ -28,7 +27,6 @@ export default function FamilyDirectoryScreen() {
   const [retrying, setRetrying] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  const [purchaseRequired,setPurchaseRequired]=useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -92,7 +90,6 @@ export default function FamilyDirectoryScreen() {
       if (request !== sequence.current) return;
       const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
       if (code !== 'NETWORK' && code !== 'SERVER_UNREACHABLE') { operation.current = null; setRetrying(false); }
-      if(code==='PURCHASE_REQUIRED'){setPurchaseRequired(true);setMessage(tr('第一个家庭免费，创建更多家庭需要解锁。'));return;}
       setMessage(tr(code === 'FAMILY_LIMIT_REACHED' ? '最多可以加入或创建10个家庭。' : code === 'NETWORK' || code === 'SERVER_UNREACHABLE' ? '创建还未确认。可以用同一个名称再试一次。' : '未能创建家庭。请检查名称后再试。'));
     } finally {
       if (submitOwner.current === request) {
@@ -144,8 +141,6 @@ export default function FamilyDirectoryScreen() {
         </View>
         {formOpen || retrying ? <View style={styles.form} testID="family-create-form">
           <Text style={styles.name}>{tr('给这个家起个名字')}</Text>
-          {unifiedPurchasesEnabled()?<Text style={styles.meta}>{tr('第一个家庭免费，创建更多家庭和个人PDF导出使用同一份购买。')}</Text>:null}
-          {unifiedPurchasesEnabled()&&purchaseRequired?<AlbumExportUnlock/>:null}
           <TextInput accessibilityLabel={tr('家庭名称')} placeholder={tr('家庭名称')} value={name} editable={!busy && !retrying}
             onChangeText={setName} maxLength={80} style={styles.input} />
           <View style={styles.formActions}>
