@@ -658,6 +658,27 @@ describe('expo audio session routing', () => {
     expect(player.play).toHaveBeenCalledTimes(1);
   });
 
+  it('uses native duration caps and can harvest a file already stopped at its limit', async () => {
+    const { capture } = loadAdapters();
+    const record = jest.spyOn(AudioRecorder.prototype, 'record');
+    await capture.start(undefined, 60_000);
+    expect(record).toHaveBeenLastCalledWith({ forDuration: 60 });
+    createdRecorders[0].isRecording = false;
+    // Real Expo clears both duration counters on automatic completion.
+    createdRecorders[0].currentTime = 0;
+    jest.spyOn(createdRecorders[0], 'getStatus').mockReturnValue({ durationMillis: 0, isRecording: false });
+    const now = jest.spyOn(Date, 'now');
+    const before = now.mock.results[0]?.value ?? Date.now();
+    now.mockReturnValue(before + 60_500);
+    expect(capture.getElapsedMs()).toBe(60_000);
+    expect((await capture.stop()).durationMs).toBe(60_000);
+    now.mockRestore();
+    await capture.start(undefined, 1_800_000);
+    expect(record).toHaveBeenLastCalledWith({ forDuration: 1800 });
+    await capture.stop();
+    record.mockRestore();
+  });
+
   it('checks startup eligibility again after native preparation', async () => {
     const { capture } = loadAdapters();
     const record = jest.spyOn(AudioRecorder.prototype, 'record');

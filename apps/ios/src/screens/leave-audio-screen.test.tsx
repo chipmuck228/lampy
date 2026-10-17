@@ -11,6 +11,7 @@ const mockInterrupt = jest.fn();
 const mockRemove = jest.fn();
 const mockSave = jest.fn();
 const mockElapsed = jest.fn();
+const mockLimit = jest.fn();
 
 jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void | (() => void)) => {
@@ -40,6 +41,7 @@ jest.mock('../application/container', () => ({
     removeDraftAudio: mockRemove,
     saveTextMoment: mockSave,
     getRecordingElapsedMs: mockElapsed,
+    getRecordingLimitMs: mockLimit,
   }),
 }));
 
@@ -85,6 +87,8 @@ describe('leave audio actions', () => {
     mockRemove.mockReset();
     mockSave.mockReset();
     mockElapsed.mockReset();
+    mockLimit.mockReset();
+    mockLimit.mockReturnValue(60_000);
     mockRestore.mockResolvedValue(emptyDraft);
     mockElapsed.mockReturnValue(1500);
     mockSave.mockResolvedValue({ id: 'moment_draft' });
@@ -180,7 +184,7 @@ describe('leave audio actions', () => {
     expect(view.getByText('一段声音 · 4秒')).toBeTruthy();
     expect(view.getByLabelText('播放，4秒')).toBeTruthy();
     expect(mockRemove).not.toHaveBeenCalled();
-    expect(mockBegin).toHaveBeenCalledWith('moment_draft', { replace: true });
+    expect(mockBegin).toHaveBeenCalledWith('moment_draft', { replace: true, canStart: expect.any(Function) });
   });
 
   it('shows an enabled remove control on a restored recording', async () => {
@@ -215,10 +219,43 @@ describe('leave audio actions', () => {
     expect(view.getByLabelText('播放，4秒')).toBeTruthy();
     expect(view.queryByText('正在播放')).toBeNull();
   });
-});
 
 // Page tests model a foreground navigation screen.
 beforeEach(() => {
   const { AppState } = jest.requireActual('react-native');
   Object.defineProperty(AppState, 'currentState', { value: 'active', writable: true, configurable: true });
+});
+
+it('automatically stops at sixty seconds, keeps the draft, and never saves or buys automatically', async () => {
+  mockRestore.mockResolvedValue(emptyDraft);
+  mockBegin.mockResolvedValue(undefined);
+  mockElapsed.mockReturnValue(60_000);
+  mockFinish.mockResolvedValue(recordedDraft);
+  const view = await render(wrap());
+  await waitFor(() => expect(view.getByTestId('composer-sound')).toBeTruthy());
+  await fireEvent.press(view.getByTestId('composer-sound'));
+  await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(view.getByText('一段声音 · 4秒')).toBeTruthy());
+  expect(mockSave).not.toHaveBeenCalled();
+  expect(mockInterrupt).not.toHaveBeenCalled();
+});
+
+it('lets an owner record past one minute and stops exactly once at the thirty-minute boundary', async () => {
+  mockRestore.mockResolvedValue(emptyDraft);
+  mockBegin.mockResolvedValue(undefined);
+  mockLimit.mockReturnValue(1_800_000);
+  mockElapsed.mockReturnValue(61_000);
+  mockFinish.mockResolvedValue(recordedDraft);
+  const view = await render(wrap());
+  await waitFor(() => expect(view.getByTestId('composer-sound')).toBeTruthy());
+  await fireEvent.press(view.getByTestId('composer-sound'));
+  await waitFor(() => expect(view.getByText('本段最多 30 分钟，到限自动停止并保留。')).toBeTruthy());
+  await waitFor(() => expect(mockElapsed).toHaveBeenCalled());
+  expect(mockFinish).not.toHaveBeenCalled();
+  mockElapsed.mockReturnValue(1_800_000);
+  await waitFor(() => expect(mockFinish).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(view.getByText('一段声音 · 4秒')).toBeTruthy());
+  expect(mockSave).not.toHaveBeenCalled();
+});
+
 });

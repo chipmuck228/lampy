@@ -30,14 +30,12 @@ export function createAlbumExportAccess(deps:{config:()=>AlbumExportConfig;dev:b
       if(!current())throw new AlbumExportAccessError('EXPORT_CANCELLED');
       const initial=deps.config();
       if(!albumExportEntryOpen(deps.dev,initial,deps.evaluation?.()))throw new AlbumExportAccessError('EXPORT_CLOSED');
-      // Development evaluation may not bypass a configured paid production path.
-      if(initial.enabled&&initial.paid){
-        const owned=await requirePurchases().hasEntitlement();
-        if(!current())throw new AlbumExportAccessError('EXPORT_CANCELLED');
-        const latest=deps.config();
-        if(!latest.enabled||latest.paid!==initial.paid||latest.productId!==initial.productId)throw new AlbumExportAccessError('EXPORT_CLOSED');
-        if(!owned)throw new AlbumExportAccessError('EXPORT_PURCHASE_REQUIRED');
-      }
+      if(!initial.enabled || !initial.paid)throw new AlbumExportAccessError('EXPORT_CLOSED');
+      const owned=await requirePurchases().hasEntitlement();
+      if(!current())throw new AlbumExportAccessError('EXPORT_CANCELLED');
+      const latest=deps.config();
+      if(!latest.enabled||latest.paid!==initial.paid||latest.productId!==initial.productId)throw new AlbumExportAccessError('EXPORT_CLOSED');
+      if(!owned)throw new AlbumExportAccessError('EXPORT_PURCHASE_REQUIRED');
       if(!current())throw new AlbumExportAccessError('EXPORT_CANCELLED');
     },
     status:()=>requirePurchases().status(),

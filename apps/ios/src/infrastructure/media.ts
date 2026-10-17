@@ -72,7 +72,7 @@ export interface MediaStore {
 
 export interface AudioCapture {
   requestPermission(): Promise<MediaPermission>;
-  start(canStart?: () => boolean): Promise<void>;
+  start(canStart?: () => boolean, maxDurationMs?: number): Promise<void>;
   stop(): Promise<RecordedAudio>;
   interrupt(): Promise<RecordedAudio | null>;
   isRecording(): boolean;

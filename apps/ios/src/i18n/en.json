@@ -882,5 +882,11 @@
   "家庭资格暂时无法核对，请重试。": "Family eligibility could not be checked. Please retry.",
   "购买将关联当前Lampy账号，不随家庭转交。": "This purchase is linked to your current Lampy account and does not transfer with a family.",
   "已解锁成品制作，无需重复购买。": "Edition creation is unlocked. No repeat purchase needed.",
-  "一次购买解锁成品制作；记录、整理和阅读仍然免费。": "One purchase unlocks edition creation. Recording, organizing and reading remain free."
+  "一次购买解锁成品制作；记录、整理和阅读仍然免费。": "One purchase unlocks edition creation. Recording, organizing and reading remain free.",
+  "已到本段录音时长，声音已保留在草稿中。": "This recording reached its limit and has been kept in your draft.",
+  "即将到本段时长，录音会自动停止并保留。": "Almost at the limit. Recording will stop automatically and be kept.",
+  "本段最多 1 分钟，到限自动停止并保留。": "Up to 1 minute. Recording stops automatically and is kept.",
+  "本段最多 30 分钟，到限自动停止并保留。": "Up to 30 minutes. Recording stops automatically and is kept.",
+  "已解锁最长30分钟录音和成品导出，无需重复购买。": "Recordings up to 30 minutes and edition exports are unlocked. No repeat purchase needed.",
+  "免费录音每段1分钟；一次购买解锁最长30分钟录音和全部成品导出。": "Free recordings are up to 1 minute each. One purchase unlocks recordings up to 30 minutes and all edition exports."
 }

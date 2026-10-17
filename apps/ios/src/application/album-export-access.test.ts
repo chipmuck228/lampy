@@ -5,10 +5,10 @@ function setup(){
  const access=createAlbumExportAccess({config:()=>config,dev:true,evaluation:()=> '1',purchases:()=>native});
  return {access,native,change:(next:Partial<AlbumExportConfig>)=>{config={...config,...next};}};
 }
-it('is default closed in release, including a development flag, and uses no billing when export is free',async()=>{
+it('is default closed in release, including a development flag, and rejects unpaid export including development evaluation',async()=>{
  expect(albumExportEntryOpen(false,{enabled:false,paid:false,productId:''},'1')).toBe(false);
  expect(albumExportEntryOpen(true,{enabled:false,paid:false,productId:''},'1')).toBe(true);
- const f=setup();f.change({paid:false});await f.access.assert(()=>true);expect(f.native.hasEntitlement).not.toHaveBeenCalled();expect(f.native.purchase).not.toHaveBeenCalled();
+ const f=setup();f.change({paid:false});await expect(f.access.assert(()=>true)).rejects.toMatchObject({code:'EXPORT_CLOSED'});expect(f.native.hasEntitlement).not.toHaveBeenCalled();expect(f.native.purchase).not.toHaveBeenCalled();
 });
 it('does not let the evaluation flag bypass enabled paid export, and generation never purchases',async()=>{
  const f=setup();await expect(f.access.assert(()=>true)).rejects.toMatchObject({code:'EXPORT_PURCHASE_REQUIRED'});expect(f.native.purchase).not.toHaveBeenCalled();
@@ -36,4 +36,10 @@ it('serializes purchase/restore and never retries a purchase automatically',asyn
 it('does not open the purchase sheet if the flag changes during the ownership precheck',async()=>{
  const f=setup();f.native.hasEntitlement.mockImplementationOnce(async()=>{f.change({paid:false});return false;});
  await expect(f.access.purchase()).rejects.toMatchObject({code:'EXPORT_CLOSED'});expect(f.native.purchase).not.toHaveBeenCalled();
+});
+
+it('evaluation-only access never grants free PDF creation',async()=>{
+ const f=setup();f.change({enabled:false,paid:false});
+ await expect(f.access.assert(()=>true)).rejects.toMatchObject({code:'EXPORT_CLOSED'});
+ expect(f.native.hasEntitlement).not.toHaveBeenCalled();
 });

@@ -1,3 +1,5 @@
+> 本页保留 F1 历史验收；F2 当前规则见 UNIFIED-RIGHTS.md，录音和导出测试见 RECORDING-EXPORT-ACCEPTANCE.md。
+
 # 阶段 F1：默认关闭的一次购买导出
 
 基线 main d09eaf1；独立分支 ios/life-album-paid-export-f。用户确认一次购买解锁，价格和正式商品 ID 后续由 App Store Connect 配置。没有设置价格、发布商品或进行真实扣款。阶段 F 尚未完成发布验收。2026-10-17 用户完成 Mac 编译与本地 StoreKit 模拟器验收；真实 Apple sandbox、真机与 TestFlight 仍待验收。允许作为默认关闭能力合并，不等于开放收费。

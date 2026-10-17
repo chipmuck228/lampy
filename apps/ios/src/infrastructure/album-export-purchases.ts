@@ -1,7 +1,7 @@
 import {createUnifiedPurchases,unifiedPurchasesEnabled} from '../application/unified-purchases';
 import {albumExportConfig,createAlbumExportAccess} from '../application/album-export-access';
 import {exportPurchasesNative} from '../../modules/lampy-export-purchases';
-export const albumExportAccess=createAlbumExportAccess({config:albumExportConfig,dev:typeof __DEV__!=='undefined'&&__DEV__,evaluation:()=>process.env.EXPO_PUBLIC_ALBUM_PRINT_EVAL,purchases:()=>{
+export function getConfiguredPurchases(){
   const native=exportPurchasesNative();if(!native)return null;
   const id=albumExportConfig().productId;
   if(unifiedPurchasesEnabled()) {
@@ -13,7 +13,8 @@ export const albumExportAccess=createAlbumExportAccess({config:albumExportConfig
     });
   }
   return {hasEntitlement:()=>native.hasEntitlement(id),status:()=>native.status(id),purchase:()=>native.purchase(id),restore:()=>native.restore(id)};
-}});
+}
+export const albumExportAccess=createAlbumExportAccess({config:albumExportConfig,dev:typeof __DEV__!=='undefined'&&__DEV__,evaluation:()=>process.env.EXPO_PUBLIC_ALBUM_PRINT_EVAL,purchases:getConfiguredPurchases});
 export function observeExportEntitlements(listener:()=>void) {
   const config=albumExportConfig();
   if(!config.enabled||!config.paid||!config.productId)return ()=>{};

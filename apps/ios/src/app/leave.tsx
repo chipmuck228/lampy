@@ -1,4 +1,5 @@
 import { appLanguage, tr } from '../i18n';
+import { FREE_RECORDING_MS } from '../application/recording-access';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput, type } from '../screens/life-text';
@@ -103,6 +104,8 @@ export default function LeaveScreen() {
   const [unknownMedia, setUnknownMedia] = useState<UnknownMediaView[]>([]);
   const [phase, setPhase] = useState<RecordPhase>('ready');
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [recordingLimitMs, setRecordingLimitMs] = useState(FREE_RECORDING_MS);
+  const limitStopRef = useRef<() => void>(() => {});
   const [restored, setRestored] = useState(false);
   const [confirmingAbandon, setConfirmingAbandon] = useState(false);
   const [occurred, setOccurred] = useState<OccurredChoiceView>({ kind: 'today', label: tr("今天") });
@@ -257,14 +260,17 @@ export default function LeaveScreen() {
       void getUseCases()
         .then((app) => app.getRecordingElapsedMs())
         .then((next) => {
-          if (!cancelled) setElapsedMs(next);
+          if (!cancelled) {
+            setElapsedMs(Math.min(next, recordingLimitMs));
+            if (next >= recordingLimitMs) limitStopRef.current();
+          }
         });
     }, 250);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [phase]);
+  }, [phase, recordingLimitMs]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -453,6 +459,7 @@ export default function LeaveScreen() {
         canStart,
         waitUntilReady: () => waitForRecordingForeground(stillHere, canStart),
       });
+      setRecordingLimitMs(app.getRecordingLimitMs?.() ?? FREE_RECORDING_MS);
       if (!canStart()) {
         await app.interruptDraftRecording(id);
         throw new Error('recording cancelled');
@@ -527,7 +534,7 @@ export default function LeaveScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId, audio, images.length, params.quick, lock?.snapshot.locked]);
 
-  function stopRecording() {
+  function stopRecording(atLimit = false) {
     const id = draftIdRef.current;
     if (!id || abandoningRef.current || phaseRef.current !== 'recording') return;
     setRecordPhase('processing');
@@ -539,7 +546,7 @@ export default function LeaveScreen() {
         if (abandoningRef.current || draftIdRef.current !== id) return;
         applyComposer(next);
         setRecordPhase(next.audio ? 'stopped' : 'failed');
-        setMessage(null);
+        setMessage(atLimit && next.audio ? tr("已到本段录音时长，声音已保留在草稿中。") : null);
       })
       .catch((error) => {
         if (abandoningRef.current || draftIdRef.current !== id) return;
@@ -552,6 +559,8 @@ export default function LeaveScreen() {
         setBusy('idle');
       });
   }
+
+  limitStopRef.current = () => stopRecording(true);
 
   function interruptRecording() {
     const id = draftIdRef.current;
@@ -650,13 +659,22 @@ export default function LeaveScreen() {
   function rerecord() {
     const id = draftIdRef.current;
     if (!id || busyRef.current || abandoningRef.current) return;
+    const generation = recordingGeneration.current;
+    const canStart = () => mountedRef.current && focusedRef.current && !abandoningRef.current &&
+      draftIdRef.current === id && recordingGeneration.current === generation &&
+      AppState.currentState === 'active' && (!lockRef.current || !lockRef.current.snapshot.locked);
     busyRef.current = true;
     setBusy('audio');
     setPreviewBoundId(null);
     void sound.stop();
     void enqueue(async () => {
       const app = await getUseCases();
-      await app.beginDraftRecording(id, { replace: true });
+      await app.beginDraftRecording(id, { replace: true, canStart });
+      if (!canStart()) {
+        await app.interruptDraftRecording(id);
+        throw new Error('recording cancelled');
+      }
+      setRecordingLimitMs(app.getRecordingLimitMs?.() ?? FREE_RECORDING_MS);
     })
       .then(() => {
         setElapsedMs(0);
@@ -952,6 +970,13 @@ export default function LeaveScreen() {
             }
           />
           <MomentUnknownMedia items={unknownMedia} testIDPrefix="composer-unknown" />
+          {phase === 'recording' && (
+            <Text accessibilityLiveRegion="polite" testID="recording-limit-notice" style={{ color: inkSoft }}>
+              {recordingLimitMs - elapsedMs <= 10_000
+                ? tr("即将到本段时长，录音会自动停止并保留。")
+                : recordingLimitMs === FREE_RECORDING_MS ? tr("本段最多 1 分钟，到限自动停止并保留。") : tr("本段最多 30 分钟，到限自动停止并保留。")}
+            </Text>
+          )}
           <DraftSoundBar
             phase={phase}
             elapsedMs={elapsedMs}
@@ -966,7 +991,7 @@ export default function LeaveScreen() {
             disabled={composerLocked}
             removeDisabled={busy !== 'idle' || confirmingAbandon}
             onStart={() => startRecording()}
-            onStop={stopRecording}
+            onStop={() => stopRecording()}
             onPlay={() => {
               if (!audio?.uri) return;
               setPreviewBoundId(audio.id);

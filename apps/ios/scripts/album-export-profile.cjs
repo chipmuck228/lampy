@@ -5,6 +5,7 @@ function configureAlbumExport(config,env){
   }
   const enabled=env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED==='1';
   const paid=enabled&&env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED==='1';
+  if(enabled&&!paid)throw new Error('All formal album exports require paid export');
   const unified=env.EXPO_PUBLIC_UNIFIED_PURCHASES==='1';
   if(unified&&!paid)throw new Error('Unified purchases require enabled paid export');
   const id=(env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID||'').trim();

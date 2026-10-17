@@ -33,3 +33,7 @@ test('unified purchases fail closed without paid export and mirror a separate na
  assert.equal(cfg.ios.infoPlist.LampyUnifiedPurchasesEnabled,true);
  assert.equal(configureAlbumExport({},{}).ios.infoPlist.LampyUnifiedPurchasesEnabled,false);
 });
+
+test('cannot configure a free formal export path',()=>{
+ assert.throws(()=>configureAlbumExport({}, {EXPO_PUBLIC_ALBUM_EXPORT_ENABLED:'1'}), /require paid/);
+});

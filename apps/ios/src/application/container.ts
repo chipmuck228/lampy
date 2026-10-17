@@ -1,6 +1,9 @@
 import { convertExpoImageForFamilyShare } from '../infrastructure/family-share-image';
 import { deviceTimezoneOffsetMinutes } from '../domain-adapters/calendar';
 import { createUseCases } from './use-cases';
+import { resolveRecordingLimit } from './recording-access';
+import { albumExportConfig } from './album-export-access';
+import { getConfiguredPurchases } from '../infrastructure/album-export-purchases';
 import {
   createFamilyUseCases,
   type FamilySessionStore,
@@ -59,6 +62,11 @@ const defaultLoader = createUseCaseLoader(async () => {
     library: createExpoLibrarySource(),
     camera: createExpoCameraSource(),
     capture: createExpoAudioCapture(),
+    recordingLimit: () => resolveRecordingLimit(async () => {
+      const config = albumExportConfig();
+      if (!config.enabled || !config.paid || !config.productId) return false;
+      return (await getConfiguredPurchases()?.hasEntitlement()) === true;
+    }),
     timezoneOffsetMinutes: deviceTimezoneOffsetMinutes(),
     timezone: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' },
   });
