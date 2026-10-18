@@ -1,3 +1,4 @@
+import { isWebsiteOpenLink } from "../infrastructure/website-open-link";
 import { isFamilyProductEntryOpen } from "../infrastructure/family-config";
 import {
   parseFamilyInviteLink,
@@ -9,6 +10,7 @@ export function redirectSystemPath({
   path: string;
   initial: boolean;
 }) {
+  if (isWebsiteOpenLink(path)) return "/";
   const token = parseFamilyInviteLink(path);
   if (token && isFamilyProductEntryOpen()) {
     rememberFamilyInvite(token);
