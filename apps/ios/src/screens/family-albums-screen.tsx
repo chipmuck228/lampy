@@ -1,3 +1,4 @@
+import {subscribeFamilySafety} from '../application/family-safety-events';
 import { familyPdfEnabled } from '../application/family-album-paper';
 import {albumManageStyles as bookStyles} from './album-manage-styles';
 import { AlbumCreateFields, AlbumManageToolbar, AlbumEntryActions } from './album-workflow-controls';
@@ -65,6 +66,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     });
     return () => sub.remove();
   }, []);
+  useEffect(()=>subscribeFamilySafety(()=>{epoch.current++;session.current?.invalidate();setBook(null);setSources([]);setAlbums([]);setRetry(n=>n+1);}),[]);
   useFocusEffect(useCallback(() => {
     void retry;
     focusedRef.current=true;setFocused(true);

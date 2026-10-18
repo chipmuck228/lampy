@@ -1,3 +1,4 @@
+import {memorySafetyTx} from './safety-repository';
 import {purgeMemoryAccount} from './account-purge-memory';
 import { FamilyError, FAMILY_ERROR } from './errors';
 import type {
@@ -23,7 +24,7 @@ import {
   listActiveMembers,
 } from './store';
 
-export type FamilyTx = {
+export type FamilyTx = import('./safety-types').SafetyTx & {
   purgeAccount(userId:string):Promise<void>;
   isMediaStorageKeyLive(key:string):Promise<boolean>;
   enqueueAccountMediaCleanup(key:string):Promise<void>;
@@ -140,6 +141,7 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    ...memorySafetyTx(store),
     async purgeAccount(userId) {purgeMemoryAccount(store,userId);},
     async isMediaStorageKeyLive(key) {return store.mediaObjects.some(r=>r.storageKey===key);},
     async enqueueAccountMediaCleanup(key) {if(!store.accountMediaCleanup.includes(key))store.accountMediaCleanup.push(key);},

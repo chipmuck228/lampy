@@ -2,6 +2,10 @@ import type {FamilySql} from './schema';
 import type {FamilyAlbumRecord} from './family-album-types';
 // Called inside the repository's BEGIN IMMEDIATE. Retired files are queued before rows disappear.
 export async function purgeSqliteAccount(db:FamilySql,userId:string) {
+ await db.run('DELETE FROM family_safety_reports WHERE reporter_user_id=? OR author_user_id=?',[userId,userId]);
+ await db.run('DELETE FROM family_user_blocks WHERE user_id=? OR target_user_id=?',[userId,userId]);
+ for(const table of ['family_content_moderation','family_moderation_audit'])await db.run(`DELETE FROM ${table} WHERE share_id IN (SELECT share_id FROM family_shares WHERE author_user_id=?)`,[userId]);
+ await db.run('DELETE FROM family_auth_rate_limits WHERE bucket=?',['safety-report:'+userId]);
  const solo=await db.getAll<{family_id:string}>(`SELECT DISTINCT family_id FROM family_memberships m
  WHERE user_id=? AND role='creator' AND status='active' AND NOT EXISTS
  (SELECT 1 FROM family_memberships o WHERE o.family_id=m.family_id AND o.user_id<>? AND o.status='active')`,[userId,userId]);

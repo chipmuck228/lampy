@@ -1,3 +1,4 @@
+import {subscribeFamilySafety} from '../application/family-safety-events';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -21,6 +22,7 @@ export function useFamilyPaper(familyId:string,albumId:string,withMedia:boolean)
   const valid=useCallback(()=>!hidden.current&&AppState.currentState==='active'&&Date.now()<expires.current,[]);
   const capture=useCallback(()=>{const epoch=generation.current;return()=>epoch===generation.current&&valid();},[valid]);
   useEffect(()=>{const sub=AppState.addEventListener('change',state=>{if(state!=='active'){generation.current++;expires.current=0;}setForeground(state==='active');});return()=>sub.remove();},[]);
+  useEffect(()=>subscribeFamilySafety(()=>{generation.current++;expires.current=0;setView(null);setPrepared(null);setRetry(n=>n+1);}),[]);
   useFocusEffect(useCallback(()=>{
     void retry;
     const epoch=++generation.current;let disposed=false,checking=false,lastCheck=Date.now();let book:FamilyAlbumView|null=null;

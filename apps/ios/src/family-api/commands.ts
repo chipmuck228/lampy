@@ -1,3 +1,4 @@
+import {createFamilySafetyCommands} from './safety-commands';
 import {createAccountDeletionCommands} from './account-deletion';
 import {createPurchaseCommands} from './purchase-commands';
 import { createFamilyAlbumCommands } from './family-album-commands';
@@ -48,6 +49,7 @@ import { assertHistoryEnabled, HISTORY_CONFIRMATION } from './history-policy';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = InviteLinkCommands & {
+  safety: import('./safety-types').FamilySafetyApi;
   purchases: import('./purchase-types').PurchaseApi;
   albums: import('./family-album-types').FamilyAlbumApi;
   transfers: ReturnType<typeof createFamilyTransferCommands>;
@@ -338,6 +340,7 @@ export function createFamilyCommands(deps: {
 
   return {
     purchases,
+    safety: createFamilySafetyCommands({clock,authed:withAuthedUser}),
     albums: createFamilyAlbumCommands({authed:withAuthedUser,clock,exportEnabled:familyExportEnabled,exportEligibility:(session,familyId)=>purchases.familyAccess(session,familyId),enabled:deps.familyAlbumsEnabled===true&&deps.historySharingEnabled===true}),
     transfers: createFamilyTransferCommands({authed:withAuthedUser,clock,id:()=>`transfer_${ids.invitationId()}`}),
     historyShares: createShareCommands({ repository, blobs, clock, testAccountLoginEnabled, operatorOnly,

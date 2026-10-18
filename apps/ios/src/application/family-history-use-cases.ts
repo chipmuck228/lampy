@@ -1,3 +1,4 @@
+import {familySafetyGeneration} from './family-safety-events';
 import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { ApplicationError } from './errors';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
@@ -45,12 +46,13 @@ export function createFamilyHistoryUseCases(deps: {
   const shareGenerations = new Map<string, number>();
   const qualifierBase = new WeakMap<HistoryCurrent, HistoryCurrent>();
   function qualified(familyId: string, current: HistoryCurrent, shareId?: string): HistoryCurrent {
+    const safetyGeneration = familySafetyGeneration();
     const generation = generations.get(familyId) ?? 0;
     generations.set(familyId, generation);
     const shareKey = `${familyId}/${shareId ?? ''}`;
     const shareGeneration = shareGenerations.get(shareKey) ?? 0;
     const base = qualifierBase.get(current) ?? current;
-    const result = () => base() && (generations.get(familyId) ?? 0) === generation
+    const result = () => base() && familySafetyGeneration() === safetyGeneration && (generations.get(familyId) ?? 0) === generation
       && (!shareId || (shareGenerations.get(shareKey) ?? 0) === shareGeneration);
     qualifierBase.set(result, base); return result;
   }
@@ -159,6 +161,12 @@ export function createFamilyHistoryUseCases(deps: {
   }
 
   return {
+    async clearSafetyCache(userId: string) {
+      verifiedFiles.clear();
+      for (const id of generations.keys()) generations.set(id,(generations.get(id)??0)+1);
+      const job=cacheTail.catch(()=>undefined).then(()=>deps.receiveCache?.isolateAccount(userId));
+      cacheTail=job; await job;
+    },
     async reconcileFamilies(userId: string, activeIds: string[], current: HistoryCurrent) {
       const a = await account(); if (a.userId !== userId) throw error('STALE_FAMILY_REQUEST');
       if (!deps.receiveCache?.listFamilyIds) return;
