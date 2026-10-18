@@ -32,7 +32,7 @@ export function createPublicAuthAdmission(max = 4) {
 }
 
 export function isPublicAuthRequest(method: string | undefined, route: string) {
-  return (method || '').toUpperCase() === 'POST' && /^\/v[12]\/auth\//.test(route);
+  return (method || '').toUpperCase() === 'POST' && (/^\/v[12]\/auth\//.test(route) || route === '/v2/me/account/delete');
 }
 
 // Request-body deadline only. Cancel as soon as the body is read, before queued Argon2.

@@ -60,6 +60,7 @@ function statusFor(code: string) {
     case 'FAMILY_ALBUM_RULES_REQUIRED':
     case 'FAMILY_ALBUM_AUTHORITY_CHANGED':
     case 'FAMILY_ALBUM_CHANGED':
+    case 'ACCOUNT_HAS_MANAGED_FAMILY':
     case FAMILY_ERROR.CONFLICT:
     case FAMILY_ERROR.FAMILY_SELECTION_REQUIRED:
     case FAMILY_ERROR.FAMILY_LIMIT_REACHED:
@@ -136,10 +137,11 @@ export async function dispatchFamilyApi(
 
     if (method === 'POST' && path === '/v2/auth/apple/challenge') {
       const intent = readString(body,'intent');
-      if (intent !== 'login' && intent !== 'link') throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Invalid Apple intent.');
+      if (intent !== 'login' && intent !== 'link' && intent !== 'delete') throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Invalid Apple intent.');
       return {status:200,body:await commands.beginAppleAuth(intent,token,request.peer)};
     }
     if (method === 'POST' && path === '/v2/auth/apple/complete') return {status:200,body:await commands.completeAppleAuth({challengeId:readString(body,'challengeId'),identityToken:readString(body,'identityToken')},token)};
+    if (method === 'POST' && path === '/v2/me/account/delete') return {status:200,body:await commands.deleteAccount(token || '',{challengeId:readString(body,'challengeId'),identityToken:readString(body,'identityToken'),authorizationCode:readString(body,'authorizationCode'),confirmation:readString(body,'confirmation')})};
     if (method === 'GET' && path === '/v2/me/apple') return {status:200,body:await commands.getAppleLink(token || '')};
     if (method === 'POST' && path === '/v1/auth/apple') {
       return { status: 200, body: await commands.signInWithApple(readString(body, 'identityToken')) };

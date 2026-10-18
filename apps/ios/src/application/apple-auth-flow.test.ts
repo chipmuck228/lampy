@@ -35,3 +35,15 @@ it('successful login saves session once and newer auth prevents older completion
  const d=deferred<string>();const authorize=jest.fn(()=>d.promise);const old=h.family.authenticateApple('login',authorize,()=>true);while(!authorize.mock.calls.length)await Promise.resolve();
  await h.family.authenticateApple('login',async()=> 'second',()=>true);d.resolve('old');await expect(old).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
 });
+it('confirmed deletion clears the family identity even when its screen becomes inactive during server work',async()=>{
+ const h=setup();await h.session.setSession({userId:'a',sessionToken:'old'});let current=true;
+ h.client.deleteAccount=jest.fn(async()=>{current=false;return {deleted:true as const,appleRevocation:'revoked' as const,mediaCleanup:'completed' as const};});
+ await h.family.deleteAccount(async nonce=>{expect(nonce).toBe('nonce');return {identityToken:'fresh',authorizationCode:'code'};},()=>current);
+ expect(h.client.deleteAccount).toHaveBeenCalledWith('old',expect.objectContaining({identityToken:'fresh',authorizationCode:'code',confirmation:'delete-my-lampy-account-v1'}));
+ expect(await h.session.getSessionToken()).toBeNull();
+});
+it('canceled or stale deletion authorization never reaches the deletion endpoint',async()=>{
+ const h=setup();await h.session.setSession({userId:'a',sessionToken:'old'});h.client.deleteAccount=jest.fn();
+ await expect(h.family.deleteAccount(async()=>{throw Error('cancel');},()=>true)).rejects.toThrow('cancel');
+ expect(h.client.deleteAccount).not.toHaveBeenCalled();expect(await h.session.getSessionToken()).toBe('old');
+});

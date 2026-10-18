@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
 import { createFamilyDirectory } from '../application/family-directory';
-import { isFamilyProductEntryOpen, isControlledEmailAccountsOpen } from '../infrastructure/family-config';
+import { isFamilyV1ReleaseBuild, isFamilyProductEntryOpen, isControlledEmailAccountsOpen } from '../infrastructure/family-config';
 import { tr, appLanguage } from '../i18n';
 import { useDeviceLock } from './device-lock-context';
 import { SettingsPage } from './settings-chrome';
@@ -108,7 +108,7 @@ export default function FamilyDirectoryScreen() {
         <Text style={styles.welcomeTitle}>{tr('有些日子，想和家人一起留着。')}</Text>
         <Text style={styles.welcomeBody}>{tr('登录后，可以创建自己的家庭。')}</Text>
         <Pressable style={styles.createHit} testID="family-sign-in" accessibilityRole="button"
-          onPress={() => router.push(isControlledEmailAccountsOpen() ? '/family-email-account' : '/account-diagnostics')}><Text style={styles.action}>{tr('登录家庭')}</Text></Pressable>
+          onPress={() => router.push((isFamilyV1ReleaseBuild() || isControlledEmailAccountsOpen()) ? '/family-email-account' : '/account-diagnostics')}><Text style={styles.action}>{tr('登录家庭')}</Text></Pressable>
         <Text style={styles.privacyHint}>{tr('自己的记录，仍在这台设备上。')}</Text>
       </View> : null}
       {state.status === 'failed' ? <View style={styles.connection} testID="family-connection-failed">

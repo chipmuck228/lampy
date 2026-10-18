@@ -5,6 +5,7 @@ import { ApplicationError } from '../application/errors';
 export type AppleIdentityTokenSource = {
   isAvailable(): Promise<boolean>;
   requestIdentityToken(nonce?: string): Promise<string>;
+  requestAuthorization(nonce:string):Promise<{identityToken:string;authorizationCode:string|null}>;
 };
 
 export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
@@ -13,6 +14,9 @@ export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
       return AppleAuthentication.isAvailableAsync();
     },
     async requestIdentityToken(nonce?: string) {
+      return (await this.requestAuthorization(nonce || '')).identityToken;
+    },
+    async requestAuthorization(nonce: string) {
       const available = await AppleAuthentication.isAvailableAsync();
       if (!available) {
         throw new ApplicationError('APPLE_UNAVAILABLE', 'Sign in with Apple is not available on this device.');
@@ -25,7 +29,7 @@ export function createExpoAppleIdentityTokenSource(): AppleIdentityTokenSource {
         if (!credential.identityToken) {
           throw new ApplicationError('APPLE_TOKEN_INVALID', 'Apple did not return an identity token.');
         }
-        return credential.identityToken;
+        return {identityToken:credential.identityToken,authorizationCode:credential.authorizationCode};
       } catch (error) {
         if (error instanceof ApplicationError) throw error;
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_REQUEST_CANCELED') {

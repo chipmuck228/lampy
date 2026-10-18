@@ -1,3 +1,4 @@
+import {purgeMemoryAccount} from './account-purge-memory';
 import { FamilyError, FAMILY_ERROR } from './errors';
 import type {
   Account,
@@ -23,6 +24,11 @@ import {
 } from './store';
 
 export type FamilyTx = {
+  purgeAccount(userId:string):Promise<void>;
+  isMediaStorageKeyLive(key:string):Promise<boolean>;
+  enqueueAccountMediaCleanup(key:string):Promise<void>;
+  listAccountMediaCleanup():Promise<string[]>;
+  completeAccountMediaCleanup(key:string):Promise<void>;
   purchaseToken(userId:string):Promise<string|null>;
   savePurchaseToken(userId:string,token:string):Promise<void>;
   findPurchase(key:string):Promise<import('./purchase-types').PurchaseRecord|null>;
@@ -134,6 +140,11 @@ function replaceBy<T>(rows: T[], keyOf: (row: T) => string, next: T) {
 export function createMemoryFamilyRepository(store: FamilyStore): FamilyRepository {
   let chain = Promise.resolve();
   const tx: FamilyTx = {
+    async purgeAccount(userId) {purgeMemoryAccount(store,userId);},
+    async isMediaStorageKeyLive(key) {return store.mediaObjects.some(r=>r.storageKey===key);},
+    async enqueueAccountMediaCleanup(key) {if(!store.accountMediaCleanup.includes(key))store.accountMediaCleanup.push(key);},
+    async listAccountMediaCleanup() {return [...store.accountMediaCleanup].slice(0,100);},
+    async completeAccountMediaCleanup(key) {store.accountMediaCleanup=store.accountMediaCleanup.filter(k=>k!==key);},
     async purchaseToken(userId) {return store.purchaseTokens.find(r=>r.userId===userId)?.token??null;},
     async savePurchaseToken(userId,token) {replaceBy(store.purchaseTokens,r=>r.userId,{userId,token});},
     async findPurchase(key) {const r=store.purchases.find(r=>r.key===key);return r?{...r}:null;},

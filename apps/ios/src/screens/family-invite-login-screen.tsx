@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { currentFamilyInvite } from '../infrastructure/family-invite-link';
-import { isFamilyProductEntryOpen, isControlledEmailAccountsOpen, isFamilyInternalTestBuild } from '../infrastructure/family-config';
+import { isFamilyV1ReleaseBuild, isFamilyProductEntryOpen, isControlledEmailAccountsOpen, isFamilyInternalTestBuild } from '../infrastructure/family-config';
 import { isPersonalSettingsDiagnosticsOpen } from '../application/personal-settings-visibility';
 import { tr } from '../i18n';
 import { useState } from 'react';
@@ -12,12 +12,12 @@ import { useDeviceLock } from './device-lock-context';
 
 export default function FamilyInviteLoginScreen() {
   const router = useRouter();
-  const [emailMode,setEmailMode] = useState(isControlledEmailAccountsOpen);
+  const [emailMode,setEmailMode] = useState(()=>isFamilyV1ReleaseBuild() || isControlledEmailAccountsOpen());
   const params = useLocalSearchParams<{returnTo?: string; generation?: string}>();
   const lock = useDeviceLock();
   const target = params.returnTo === '/family' ? '/family' : '/family-invite';
   const internal = isFamilyInternalTestBuild();
-  const valid = isFamilyProductEntryOpen() && (internal || isPersonalSettingsDiagnosticsOpen()) &&
+  const valid = isFamilyProductEntryOpen() && (isFamilyV1ReleaseBuild() || internal || isPersonalSettingsDiagnosticsOpen()) &&
     !lock?.snapshot.locked && currentFamilyInvite()?.generation === Number(params.generation);
   function back() {
     if (router.canGoBack()) router.back();
