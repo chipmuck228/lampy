@@ -10,4 +10,12 @@ App 分享入口仍是 https://yunpura.com。官网按钮直接使用 https://op
 
 AASA 的 appID 必须匹配实际签名 application-identifier，当前配套网站按现有项目 B283NY984J.app.lampy.ios 配置，签名和 Apple CDN 验证仍待 Mac/真机验收。第三方 IM 不保证支持 Universal Links，不支持时展示官网下载说明，用户可从 Safari 或桌面打开。未安装时同一链接显示 TestFlight 页面，由用户明确点击安装；App 不检测网页是否安装、不自动付费。
 
-已有 2 个 Jest 套件6项测试、14项 Node 配置回归测试通过；TypeScript 与目标 ESLint 通过。测试覆盖冷/热路由、恶意/无关地址拒绝、与原家庭域名合并及幂等、不改变关闭支付配置。自动检查不证明线上域名或 iOS 关联已经生效；本片未在 Mac 重编、未上传 TestFlight、未改 DNS，也未部署官网。
+已有 2 个 Jest 套件6项测试、14项 Node 配置回归测试通过；TypeScript 与目标 ESLint 通过。测试覆盖冷/热路由、恶意/无关地址拒绝、与原家庭域名合并及幂等、不改变关闭支付配置。上述为实施阶段自动检查记录；当时尚未验证线上关联。后续部署和人工结果见下节。
+
+## 2026-10-18 用户真机验收
+
+官网 PR #1 已合并 main（b9b3399），用户确认中文安装页与域名关联文件正确，open.yunpura.com 已连接 Production。用户按 PR #121 重编流程操作后明确报告真机测试通过，并授权合并本 PR。本次未单独提供设备型号、OS、构建号或逐项日志，不推断具体值，也不将所有第三方 IM 均标记为已通过。
+
+合并前复核公共链接白名单、原有家庭邀请分支、关联域名合并及付费关闭配置，未发现阻塞项。保留实施阶段6项Jest、14项Node配置测试、TypeScript/ESLint通过记录；此次最终新增提交仅记录验收，没有运行时代码修改。GitHub combined status 没有状态记录，不宣称CI绿灯。
+
+本次仅合并 main，不构建、上传或分发新的 TestFlight 包。现有旧 TestFlight 包不会自动获得此次原生关联。家庭付费 PDF 继续延期并保持关闭。
