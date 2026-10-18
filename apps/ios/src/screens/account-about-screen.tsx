@@ -1,7 +1,7 @@
 import { tr } from '../i18n';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 
 import { hairline, inkSoft } from './life-page';
 import { Text, type } from './life-text';
@@ -12,8 +12,8 @@ import { SettingsAboutMark } from './settings-rows';
 export default function AccountAboutScreen() {
   const router = useRouter();
   const version = lampyAppVersionLabel({
-    version: Constants.nativeAppVersion,
-    build: Constants.nativeBuildVersion,
+    version: Application.nativeApplicationVersion,
+    build: Application.nativeBuildVersion,
   });
   return (
     <SettingsPage

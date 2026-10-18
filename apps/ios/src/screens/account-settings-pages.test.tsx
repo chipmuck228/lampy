@@ -25,10 +25,13 @@ jest.mock('expo-router', () => ({
 jest.mock('expo-constants', () => ({
   __esModule: true,
   default: {
-    nativeAppVersion: '1.2.3',
-    nativeBuildVersion: '45',
     expoConfig: { version: '9.9.9', ios: { buildNumber: '99' } },
   },
+}));
+
+jest.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.2.3',
+  nativeBuildVersion: '45',
 }));
 
 function wrap(node: ReactElement) {

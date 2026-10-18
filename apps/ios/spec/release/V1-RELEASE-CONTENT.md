@@ -53,3 +53,7 @@ Apple 的审核指南 1.2 要求共享／用户内容应用具备内容过滤、
 4. 横屏和大字号可完整阅读，并能正常返回设置。
 5. 个人默认关闭构建仍使用原说明；本片不改变录音、分享、阅读、登录、删除、付费或导出权限。
 6. 云端 timer 单独按上述流程安装验收。无需再次执行迁移 32，也不因本片重置正式或测试数据库。
+
+## About 原生版本信息
+
+About 使用 expo-application 读取实际安装包的版本号及 build number，避免旧 expo-constants 字段始终为空。不使用 Expo manifest 版本冒充安装包版本。新增原生依赖后，Mac 必须重新 npm ci、执行发布 prepare（重新生成原生工程并安装 Pods）并编译；仅 reload 无效。验收时核对 About 与 Xcode 安装包 Version / Build 一致。云端无需更新或迁移。
