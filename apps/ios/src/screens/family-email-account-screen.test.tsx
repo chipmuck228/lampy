@@ -2,8 +2,9 @@ import { Alert, AppState } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { ApplicationError } from '../application/errors';
 import FamilyEmailAccountScreen from './family-email-account-screen';
+const mockDelete=jest.fn(),mockAuthorization=jest.fn();let mockFormal=false;
 const mockAppleAvailable=jest.fn();const mockAppleToken=jest.fn();const mockAppleStatus=jest.fn();const mockAuthenticateApple=jest.fn();
-jest.mock('../infrastructure/expo-apple-auth',()=>({createExpoAppleIdentityTokenSource:()=>({isAvailable:mockAppleAvailable,requestIdentityToken:mockAppleToken})}));
+jest.mock('../infrastructure/expo-apple-auth',()=>({createExpoAppleIdentityTokenSource:()=>({isAvailable:mockAppleAvailable,requestIdentityToken:mockAppleToken,requestAuthorization:mockAuthorization})}));
 jest.mock('./apple-auth-button',()=>{const {Pressable,Text}=jest.requireActual('react-native');return {AppleAuthButton:({disabled,onPress}:any)=><Pressable testID="apple-auth-button" disabled={disabled} onPress={onPress}><Text>Apple</Text></Pressable>};});
 let mockInternal=false;let mockDiagnostics=true;
 const mockPush=jest.fn(),mockDismiss=jest.fn(),mockBack=jest.fn();
@@ -11,13 +12,13 @@ const mockSignOut=jest.fn();
 const mockHealth=jest.fn(),mockRegister=jest.fn(),mockLogin=jest.fn(),mockRead=jest.fn(),mockUpdate=jest.fn();
 let mockOpen=true;const mockLock={snapshot:{locked:false}};
 jest.mock('expo-router',()=>({useRouter:()=>({push:mockPush,dismissTo:mockDismiss,back:mockBack,canGoBack:()=>true}),useFocusEffect:(callback:()=>unknown)=>{const React=jest.requireActual('react');React.useEffect(callback,[callback]);}}));
-jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({getAppleLink:mockAppleStatus,authenticateApple:mockAuthenticateApple,signOut:mockSignOut,getControlledEmailAvailability:mockHealth,registerControlledEmail:mockRegister,signInWithControlledEmail:mockLogin,getMyProfile:mockRead,updateMyProfile:mockUpdate})}));
-jest.mock('../infrastructure/family-config',()=>({isFamilyInternalTestBuild:()=>mockInternal,isControlledEmailAccountsOpen:()=>mockOpen,isFamilyProductEntryOpen:()=>true}));
+jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({deleteAccount:mockDelete,getAppleLink:mockAppleStatus,authenticateApple:mockAuthenticateApple,signOut:mockSignOut,getControlledEmailAvailability:mockHealth,registerControlledEmail:mockRegister,signInWithControlledEmail:mockLogin,getMyProfile:mockRead,updateMyProfile:mockUpdate})}));
+jest.mock('../infrastructure/family-config',()=>({isFamilyV1ReleaseBuild:()=>mockFormal,isFamilyInternalTestBuild:()=>mockInternal,isControlledEmailAccountsOpen:()=>mockOpen,isFamilyProductEntryOpen:()=>true}));
 jest.mock('../application/personal-settings-visibility',()=>({isPersonalSettingsDiagnosticsOpen:()=>mockDiagnostics}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
 jest.mock('./life-icons',()=>({LifeIcon:()=>null}));
-beforeEach(()=>{jest.clearAllMocks();mockInternal=false;mockDiagnostics=true;mockOpen=true;mockLock.snapshot.locked=false;Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});mockHealth.mockResolvedValue({controlledEmailAccounts:true,emailRegistration:true});mockRegister.mockResolvedValue({userId:'a'});mockLogin.mockResolvedValue({userId:'a'});mockRead.mockResolvedValue({userId:'a',nickname:'原昵称',avatar:'system',updatedAt:'now'});mockUpdate.mockImplementation(async(nickname:string)=>({userId:'a',nickname,avatar:'system',updatedAt:'now'}));});
+beforeEach(()=>{jest.clearAllMocks();jest.spyOn(AppState,'addEventListener').mockImplementation(()=>({remove:jest.fn()}));mockFormal=false;mockInternal=false;mockDiagnostics=true;mockOpen=true;mockLock.snapshot.locked=false;Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});mockHealth.mockResolvedValue({controlledEmailAccounts:true,emailRegistration:true});mockRegister.mockResolvedValue({userId:'a'});mockLogin.mockResolvedValue({userId:'a'});mockRead.mockResolvedValue({userId:'a',nickname:'原昵称',avatar:'system',updatedAt:'now'});mockUpdate.mockImplementation(async(nickname:string)=>({userId:'a',nickname,avatar:'system',updatedAt:'now'}));});
 it('closed and locked routes never read service or show identity controls',async()=>{
  mockOpen=false;const page=await render(<FamilyEmailAccountScreen/>);expect(mockHealth).not.toHaveBeenCalled();expect(page.queryByTestId('email-account-email')).toBeNull();await page.unmount();mockOpen=true;mockLock.snapshot.locked=true;await render(<FamilyEmailAccountScreen/>);expect(mockHealth).not.toHaveBeenCalled();
 });
@@ -183,4 +184,39 @@ it('late Apple A completion cannot clear the newer B submission lock',async()=>{
   await fireEvent.press(page.getByTestId('apple-auth-button'));expect(mockAuthenticateApple).toHaveBeenCalledTimes(2);
   await act(async()=>finishB({userId:'b'}));expect(done).toHaveBeenCalledTimes(1);
  } finally {await page.unmount();subscription.mockRestore();}
+});
+
+it('formal Apple-only login works without controlled email or diagnostics',async()=>{
+ mockFormal=true;mockOpen=false;mockDiagnostics=false;mockAppleAvailable.mockResolvedValue(true);mockAppleToken.mockResolvedValue('fresh');
+ mockHealth.mockResolvedValue({controlledEmailAccounts:false,appleLogin:true,accountDeletion:true});
+ mockAuthenticateApple.mockImplementation(async(_intent,authorize)=>authorize('nonce'));
+ const done=jest.fn();const page=await render(<FamilyEmailAccountScreen onAuthenticated={done}/>);
+ await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeTruthy());
+ expect(page.queryByTestId('email-account-email')).toBeNull();expect(page.queryByTestId('email-account-password')).toBeNull();expect(page.queryByTestId('email-account-submit')).toBeNull();
+ expect(page.queryByText('其他登录方式')).toBeNull();
+ await fireEvent.press(page.getByTestId('apple-auth-button'));expect(done).toHaveBeenCalledTimes(1);
+ expect(mockLogin).not.toHaveBeenCalled();expect(mockRegister).not.toHaveBeenCalled();
+});
+it('formal deletion is explicitly confirmed and requests fresh native Apple authorization',async()=>{
+ mockFormal=true;mockOpen=false;mockDiagnostics=false;mockAppleAvailable.mockResolvedValue(true);
+ mockHealth.mockResolvedValue({controlledEmailAccounts:false,appleLogin:true,accountDeletion:true});
+ mockAuthorization.mockResolvedValue({identityToken:'fresh',authorizationCode:'code'});
+ mockDelete.mockImplementation(async authorize=>{await authorize('delete-nonce');return {deleted:true,appleRevocation:'revoked',mediaCleanup:'completed'};});
+ const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
+ try {
+ const page=await render(<FamilyEmailAccountScreen profileMode embedded/>);await waitFor(()=>expect(page.getByTestId('account-delete')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('account-delete'));expect(mockDelete).not.toHaveBeenCalled();expect(alert.mock.calls[0][2]![0].style).toBe('cancel');
+ await act(async()=>alert.mock.calls[0][2]![1].onPress!());expect(mockAuthorization).toHaveBeenCalledWith('delete-nonce');
+ expect(page.getByText('账号已删除。本机私人记录保留。')).toBeTruthy();expect(page.queryByTestId('account-delete')).toBeNull();
+ }finally{alert.mockRestore();}
+});
+it('formal deletion failure keeps profile for retry and shows creator resolution',async()=>{
+ mockFormal=true;mockOpen=false;mockDiagnostics=false;mockAppleAvailable.mockResolvedValue(true);
+ mockHealth.mockResolvedValue({appleLogin:true,accountDeletion:true});mockDelete.mockRejectedValue(new ApplicationError('ACCOUNT_HAS_MANAGED_FAMILY','Transfer first'));
+ const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
+ try {
+ const page=await render(<FamilyEmailAccountScreen profileMode/>);await waitFor(()=>expect(page.getByTestId('account-delete')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('account-delete'));await act(async()=>alert.mock.calls[0][2]![1].onPress!());
+ expect(page.getByText('请先转交或解散仍有其他成员的家庭，再删除账号。')).toBeTruthy();expect(page.getByTestId('account-delete')).toBeTruthy();
+ }finally{alert.mockRestore();}
 });

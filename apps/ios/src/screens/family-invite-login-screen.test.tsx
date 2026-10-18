@@ -1,19 +1,19 @@
 import { act, render } from '@testing-library/react-native';
 import FamilyInviteLoginScreen from './family-invite-login-screen';
 import { currentFamilyInvite, forgetFamilyInvite, rememberFamilyInvite } from '../infrastructure/family-invite-link';
-let mockInternal=false;let mockDiagnostics=true;
+let mockFormal=false;let mockInternal=false;let mockDiagnostics=true;
 const mockBack=jest.fn(),mockDismiss=jest.fn();
 let mockParams:{returnTo:string;generation:string};
 let mockProps:any;let mockEmailProps:any;let mockEmailOpen=false;
 const mockLock={snapshot:{locked:false}};
 jest.mock('expo-router',()=>({useRouter:()=>({canGoBack:()=>true,back:mockBack,dismissTo:mockDismiss}),useLocalSearchParams:()=>mockParams}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
-jest.mock('../infrastructure/family-config',()=>({isFamilyInternalTestBuild:()=>mockInternal,isControlledEmailAccountsOpen:()=>mockEmailOpen,isFamilyProductEntryOpen:()=>true}));
+jest.mock('../infrastructure/family-config',()=>({isFamilyV1ReleaseBuild:()=>mockFormal,isFamilyInternalTestBuild:()=>mockInternal,isControlledEmailAccountsOpen:()=>mockEmailOpen,isFamilyProductEntryOpen:()=>true}));
 jest.mock('../application/personal-settings-visibility',()=>({isPersonalSettingsDiagnosticsOpen:()=>mockDiagnostics}));
 jest.mock('./family-email-account-screen',()=>({__esModule:true,default:(props:any)=>{mockEmailProps=props;return null;}}));
 jest.mock('./account-screen',()=>({__esModule:true,default:(props:any)=>{mockProps=props;return null;}}));
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
-beforeEach(()=>{jest.clearAllMocks();mockInternal=false;mockDiagnostics=true;mockProps=null;mockEmailProps=null;mockEmailOpen=false;mockLock.snapshot.locked=false;const i=rememberFamilyInvite('a'.repeat(64));mockParams={returnTo:'/family',generation:String(i.generation)};});
+beforeEach(()=>{jest.clearAllMocks();mockFormal=false;mockInternal=false;mockDiagnostics=true;mockProps=null;mockEmailProps=null;mockEmailOpen=false;mockLock.snapshot.locked=false;const i=rememberFamilyInvite('a'.repeat(64));mockParams={returnTo:'/family',generation:String(i.generation)};});
 afterEach(()=>forgetFamilyInvite());
 it('returns on success without consuming the invite and cancel also preserves it',async()=>{
  const page=await render(<FamilyInviteLoginScreen/>);
@@ -51,4 +51,9 @@ it('alternative sign-in keeps the original valid invitation flow',async()=>{
 });
 it('internal Release preserves invitation without diagnostic fallback',async()=>{
  mockInternal=true;mockDiagnostics=false;mockEmailOpen=true;await render(<FamilyInviteLoginScreen/>);expect(mockEmailProps).toBeTruthy();expect(mockEmailProps.onOtherSignIn).toBeUndefined();expect(mockProps).toBeNull();const invite=currentFamilyInvite();await act(async()=>mockEmailProps.onAuthenticated());expect(mockBack).toHaveBeenCalledTimes(1);expect(currentFamilyInvite()).toEqual(invite);
+});
+
+it('formal invite uses Apple account flow with diagnostics and email closed, preserving invite',async()=>{
+ mockFormal=true;mockDiagnostics=false;mockEmailOpen=false;await render(<FamilyInviteLoginScreen/>);
+ expect(mockEmailProps).toBeTruthy();expect(mockProps).toBeNull();await act(async()=>mockEmailProps.onAuthenticated());expect(currentFamilyInvite()).not.toBeNull();expect(mockBack).toHaveBeenCalledTimes(1);
 });

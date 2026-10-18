@@ -1,4 +1,12 @@
 {
+  "请先转交或解散仍有其他成员的家庭，再删除账号。": "Transfer or dissolve families that still have other members before deleting your account.",
+  "家庭账号服务暂不可用，请稍后再试。": "Family account services are unavailable. Please try again later.",
+  "删除账号": "Delete account",
+  "将永久删除云端账号、本人家庭分享及媒体，并退出所有设备。本机私人记录保留。若仍管理有其他成员的家庭，请先转交或解散。此操作不能撤销。": "Permanently delete your server account, your family shares and media, and sign out all devices. Private moments on this device stay. Transfer or dissolve any families you manage with other members first. This cannot be undone.",
+  "账号已删除。本机私人记录保留。": "Your account has been deleted. Private moments on this device stay.",
+  "账号已删除。本机私人记录保留。Apple授权未能自动撤销，请在系统设置的通过Apple登录中停止使用Lampy。": "Your account has been deleted. Private moments on this device stay. Apple authorization could not be revoked automatically. Stop using Lampy under Sign in with Apple in system Settings.",
+  "请解锁后继续。": "Unlock to continue.",
+  "通过Apple登录，开始使用家庭。个人记录仍保存在本机。": "Sign in with Apple to use families. Your private moments stay on this device.",
   "返回整理": "Back to organizing",
   "收入记录": "Add moments",
   "移出这一册": "Remove from this album",

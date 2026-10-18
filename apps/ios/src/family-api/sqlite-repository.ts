@@ -1,3 +1,4 @@
+import {purgeSqliteAccount} from './account-purge-sqlite';
 import { FamilyError, FAMILY_ERROR } from './errors';
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
 import type { FamilySql } from './schema';
@@ -232,6 +233,12 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   const tx: FamilyTx = {
+    async purgeAccount(userId) {await purgeSqliteAccount(db,userId);},
+    async isMediaStorageKeyLive(key) {return Boolean(await db.getFirst('SELECT object_id FROM family_media_objects WHERE storage_key=? LIMIT 1',[key]));},
+    async enqueueAccountMediaCleanup(key) {await db.run('INSERT OR IGNORE INTO family_account_media_cleanup(storage_key) VALUES(?)',[key]);},
+    async listAccountMediaCleanup() {return (await db.getAll<{storage_key:string}>('SELECT storage_key FROM family_account_media_cleanup ORDER BY storage_key LIMIT 100')).map(r=>r.storage_key);},
+    async completeAccountMediaCleanup(key) {await db.run('DELETE FROM family_account_media_cleanup WHERE storage_key=?',[key]);},
+
     async purchaseToken(userId) {return (await db.getFirst<{token:string}>('SELECT token FROM family_purchase_tokens WHERE user_id=?',[userId]))?.token??null;},
     async savePurchaseToken(userId,token) {await db.run('INSERT INTO family_purchase_tokens(user_id,token) VALUES(?,?)',[userId,token]);},
     async findPurchase(key) {const r=await db.getFirst<{json:string}>('SELECT json FROM family_purchases WHERE purchase_key=?',[key]);return r?JSON.parse(r.json):null;},

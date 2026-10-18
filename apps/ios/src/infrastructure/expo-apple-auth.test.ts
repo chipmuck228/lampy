@@ -13,3 +13,7 @@ it('native cancellation and unsupported devices fail without a token',async()=>{
  (Apple.isAvailableAsync as jest.Mock).mockResolvedValue(false);await expect(createExpoAppleIdentityTokenSource().requestIdentityToken('nonce')).rejects.toMatchObject({code:'APPLE_UNAVAILABLE'});
  expect(Apple.signInAsync).toHaveBeenCalledTimes(1);
 });
+it('returns the fresh authorization code for explicit account deletion',async()=>{
+ (Apple.signInAsync as jest.Mock).mockResolvedValue({identityToken:'token',authorizationCode:'once-only-code'});
+ expect(await createExpoAppleIdentityTokenSource().requestAuthorization('delete-nonce')).toEqual({identityToken:'token',authorizationCode:'once-only-code'});
+});

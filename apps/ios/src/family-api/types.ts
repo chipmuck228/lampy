@@ -124,6 +124,7 @@ export type FamilyHealth = {
   emailRegistration?: boolean;
   publicTestLogin?: boolean;
   appleLogin?: boolean;
+  accountDeletion?: boolean;
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
 
@@ -238,7 +239,7 @@ export type InviteLinkView = Omit<InviteLink, 'tokenHash' | 'acceptedByUserId' |
 export type CreatedInviteLink = InviteLinkView & { token: string };
 export type InvitePreview = { name: string; expiresAt: string; status: InvitationStatus | 'dissolved'; };
 
-export type AppleChallenge = { id: string; nonce: string; intent: "login" | "link"; userId: string | null; sessionToken: string | null; expiresAt: string };
+export type AppleChallenge = { id: string; nonce: string; intent: "login" | "link" | "delete"; userId: string | null; sessionToken: string | null; expiresAt: string };
 export type AppleAuthInput = { challengeId: string; identityToken: string };
 
 export type AppleIdentity = {
@@ -272,3 +273,6 @@ export type FamilyTransfer = {
   status: 'pending' | 'accepted' | 'cancelled' | 'invalid'; revision: number;
   createdAt: string; updatedAt: string;
 };
+
+export type DeleteAccountInput = {challengeId: string; identityToken: string; authorizationCode?: string; confirmation: string};
+export type DeleteAccountResult = {deleted: true; appleRevocation: 'revoked' | 'manual-required'; mediaCleanup: 'completed' | 'pending'};

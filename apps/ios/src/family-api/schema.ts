@@ -198,6 +198,15 @@ const MIGRATIONS = [
    CREATE TABLE family_purchases(purchase_key TEXT PRIMARY KEY NOT NULL,user_id TEXT NOT NULL REFERENCES family_accounts(user_id),json TEXT NOT NULL);
    CREATE INDEX family_purchases_by_user ON family_purchases(user_id);
    CREATE TABLE family_purchase_grants(family_id TEXT NOT NULL REFERENCES family_families(family_id),purchase_key TEXT NOT NULL REFERENCES family_purchases(purchase_key),json TEXT NOT NULL,PRIMARY KEY(family_id,purchase_key));`,
+  `ALTER TABLE family_apple_challenges RENAME TO family_apple_challenges_old;
+   DROP INDEX family_apple_challenges_expiry;
+   CREATE TABLE family_apple_challenges (id TEXT PRIMARY KEY, nonce TEXT NOT NULL UNIQUE,
+     intent TEXT NOT NULL CHECK(intent IN ('login','link','delete')), user_id TEXT REFERENCES family_accounts(user_id), session_token TEXT, expires_at TEXT NOT NULL);
+   INSERT INTO family_apple_challenges SELECT * FROM family_apple_challenges_old;
+   DROP TABLE family_apple_challenges_old;
+   CREATE INDEX family_apple_challenges_expiry ON family_apple_challenges(expires_at);
+   CREATE TABLE family_account_media_cleanup (storage_key TEXT PRIMARY KEY NOT NULL);`,
+
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28] as const;

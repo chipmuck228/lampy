@@ -382,7 +382,7 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
         onBack={() => dismissSettingsToRecent(router)}
       >
         <SettingsIntro />
-        {isControlledEmailAccountsOpen() && isFamilyProductEntryOpen() && (isFamilyInternalTestBuild() || diagnosticsAllowed) ? <SettingsGroup title={tr("我的资料")}><FamilyEmailAccountScreen profileMode embedded/></SettingsGroup> : null}
+        {isFamilyProductEntryOpen() && (isFamilyV1ReleaseBuild() || (isControlledEmailAccountsOpen() && (isFamilyInternalTestBuild() || diagnosticsAllowed))) ? <SettingsGroup title={tr("我的资料")}><FamilyEmailAccountScreen profileMode embedded/></SettingsGroup> : null}
         <SettingsGroup title={tr("本机")}>
           <DeviceLockSettings />
           <SettingsLink

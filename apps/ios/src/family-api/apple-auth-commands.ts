@@ -7,17 +7,17 @@ export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple
   function open() { if(!deps.enabled) throw new FamilyError(FAMILY_ERROR.FORBIDDEN,'Apple sign-in is not enabled.'); }
   function invalid() { return new FamilyError(FAMILY_ERROR.APPLE_TOKEN_INVALID,'Apple request expired or was already used. Please start again.'); }
   return {
-    async beginAppleAuth(intent:'login'|'link',sessionToken?:string,peer='unknown') {
+    async beginAppleAuth(intent:'login'|'link'|'delete',sessionToken?:string,peer='unknown') {
       open();
       return deps.repository.withTransaction(async tx => {
-        const userId = intent === 'link' ? await deps.requireUser(tx,sessionToken) : null;
+        const userId = intent !== 'login' ? await deps.requireUser(tx,sessionToken) : null;
         const now=deps.clock.now(); const bucket='apple-challenge:'+peer;
         const row=await tx.findRateLimit(bucket);
         const active=row && now.getTime()-Date.parse(row.windowStartedAt)<60_000;
         if(active && row.hitCount>=10) throw new FamilyError(FAMILY_ERROR.RATE_LIMITED,'Try again later.');
         await tx.saveRateLimit({bucket,windowStartedAt:active?row.windowStartedAt:now.toISOString(),hitCount:active?row.hitCount+1:1});
         await tx.pruneAppleChallenges(now.toISOString());
-        const c={id:randomBytes(32).toString('hex'),nonce:randomBytes(32).toString('hex'),intent,userId,sessionToken:intent==='link'?sessionToken! : null,expiresAt:new Date(now.getTime()+5*60_000).toISOString()};
+        const c={id:randomBytes(32).toString('hex'),nonce:randomBytes(32).toString('hex'),intent,userId,sessionToken:intent!=='login'?sessionToken! : null,expiresAt:new Date(now.getTime()+5*60_000).toISOString()};
         await tx.saveAppleChallenge(c);
         return {challengeId:c.id,nonce:c.nonce,expiresAt:c.expiresAt};
       });
@@ -31,7 +31,7 @@ export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple
       // Claim before network verification: failures require a fresh authorization, never replay.
       const c=await deps.repository.withTransaction(async tx=>{
         const c=await tx.findAppleChallenge(input.challengeId);
-        if(!c || Date.parse(c.expiresAt)<=deps.clock.now().getTime()) throw invalid();
+        if(!c || c.intent==='delete' || Date.parse(c.expiresAt)<=deps.clock.now().getTime()) throw invalid();
         if(c.intent==='link' && (c.sessionToken!==token || await deps.requireUser(tx,token)!==c.userId)) throw invalid();
         await tx.deleteAppleChallenge(c.id);return c;
       });

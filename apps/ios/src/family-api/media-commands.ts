@@ -232,7 +232,8 @@ export function createMediaCommands(deps: {
           }
         });
       } catch (error) {
-        await deps.blobs.remove(objectId);
+        try {await deps.blobs.remove(objectId);}
+        catch {await deps.repository.withTransaction(tx=>tx.enqueueAccountMediaCleanup(objectId));}
         if (error instanceof FamilyError) throw error;
         throw new FamilyError(FAMILY_ERROR.MEDIA_WRITE_FAILED, 'Media metadata could not be stored.');
       }

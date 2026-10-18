@@ -1,3 +1,5 @@
+import {appleRevokerFromEnv} from './apple-revocation-node';
+import {drainAccountMedia} from './account-deletion';
 import {applePurchaseVerifier} from './purchase-apple-node';
 import {traceFamilyHttp} from './http-trace';
 import { publicTestAuthPlan, publicTestPeer, createPublicAuthAdmission, isPublicAuthRequest, publicAuthBodyDeadline } from './public-test-auth';
@@ -68,6 +70,8 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
   const inviteOrigin=invitationOrigin(env.LAMPY_FAMILY_INVITE_ORIGIN);
   const inviteEnabled=env.LAMPY_FAMILY_INVITES_ENABLED === '1' && Boolean(inviteOrigin);
   const publicAuth = publicTestAuthPlan({ ...env, LAMPY_FAMILY_API_HOST: options?.host ?? env.LAMPY_FAMILY_API_HOST });
+  const trustedAppleProxy=env.LAMPY_APPLE_TRUST_LOOPBACK_PROXY==='1';
+  if(trustedAppleProxy && (options?.host ?? env.LAMPY_FAMILY_API_HOST)!=='127.0.0.1')throw new Error('Trusted Apple proxy requires explicit 127.0.0.1 binding.');
   const authOpts = {
     publicTestLoginEnabled: publicAuth.enabled,
     appleLoginEnabled: env.LAMPY_APPLE_LOGIN_ENABLED === '1',
@@ -97,14 +101,15 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
           await applyFamilyApiSchema(db);
           const mediaRoot = (env.LAMPY_FAMILY_MEDIA_PATH || path.join(path.dirname(path.resolve(plan.databasePath)), 'media')).trim();
           mkdirSync(mediaRoot, { recursive: true });
+          const repository=createSqliteFamilyRepository(db);
+          const apple=createAppleJwksVerifier({audience:plan.appleClientId,fetchJwks:fetchAppleJwks,verifySignature:verifyAppleJwtSignature});
+          const blobs=createDirectoryMediaBlobStore(mediaRoot);
+          await drainAccountMedia(repository,blobs);
           return createFamilyCommands({
-            repository: createSqliteFamilyRepository(db),
-            apple: createAppleJwksVerifier({
-              audience: plan.appleClientId,
-              fetchJwks: fetchAppleJwks,
-              verifySignature: verifyAppleJwtSignature,
-            }),
-            mediaBlobs: createDirectoryMediaBlobStore(mediaRoot),
+            repository,
+            apple,
+            appleRevoker:appleRevokerFromEnv(env,apple),
+            mediaBlobs: blobs,
             ...authOpts,
           });
         })();
@@ -135,7 +140,8 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
       }
       const authRequest = isPublicAuthRequest(req.method, route);
       let peer = req.socket.remoteAddress || 'unknown';
-      if (publicAuth.enabled && authRequest) {
+      if (authRequest) {
+        if(publicAuth.enabled || trustedAppleProxy) {
         const trusted = publicTestPeer(req.socket.remoteAddress, req.headers['x-lampy-client-ip']);
         if (!trusted) {
           res.writeHead(403, { 'content-type': 'application/json' });
@@ -143,6 +149,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
           return;
         }
         peer = trusted;
+        }
         releaseAuth = admitAuth();
         if (!releaseAuth) {
           res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '5' });

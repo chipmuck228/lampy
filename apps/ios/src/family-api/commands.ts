@@ -1,3 +1,4 @@
+import {createAccountDeletionCommands} from './account-deletion';
 import {createPurchaseCommands} from './purchase-commands';
 import { createFamilyAlbumCommands } from './family-album-commands';
 import { createAppleAuthCommands } from './apple-auth-commands';
@@ -57,8 +58,9 @@ export type FamilyCommands = InviteLinkCommands & {
   signInWithControlledEmail(input: { email: string; password: string }, peer?: string): Promise<SignInResult>;
   getMyProfile(sessionToken: string): Promise<import('./types').UserProfile>;
   updateMyProfile(sessionToken: string, nickname: string): Promise<import('./types').UserProfile>;
+  deleteAccount(sessionToken:string,input:import('./types').DeleteAccountInput):Promise<import('./types').DeleteAccountResult>;
   health(): FamilyHealth;
-  beginAppleAuth(intent: 'login' | 'link', sessionToken?: string, peer?: string): Promise<{challengeId:string;nonce:string;expiresAt:string}>;
+  beginAppleAuth(intent: 'login' | 'link' | 'delete', sessionToken?: string, peer?: string): Promise<{challengeId:string;nonce:string;expiresAt:string}>;
   completeAppleAuth(input: import('./types').AppleAuthInput, sessionToken?: string): Promise<SignInResult | {linked:true;userId:string}>;
   getAppleLink(sessionToken: string): Promise<{linked:boolean}>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
@@ -258,6 +260,7 @@ export function createFamilyCommands(deps: {
   store?: FamilyStore;
   repository?: FamilyRepository;
   apple: AppleVerifier;
+  appleRevoker?: import('./account-deletion').AppleRevoker;
   clock?: FamilyClock;
   ids?: FamilyIds;
   inviteTtlMs?: number;
@@ -374,6 +377,7 @@ export function createFamilyCommands(deps: {
         emailRegistration: deps.publicTestLoginEnabled !== true && testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true,
         publicTestLogin: deps.publicTestLoginEnabled === true,
         appleLogin: deps.appleLoginEnabled === true,
+        accountDeletion: deps.appleLoginEnabled === true,
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,
         familyHistoryV2: deps.historySharingEnabled === true,
@@ -383,6 +387,9 @@ export function createFamilyCommands(deps: {
         argon2id: ARGON2ID_PRODUCTION,
       };
     },
+    ...createAccountDeletionCommands({repository,apple:deps.apple,revoker:deps.appleRevoker,blobs,clock,
+      enabled:deps.appleLoginEnabled === true,
+      requireUser:(tx,token)=>requireUser(tx,token,clock,testAccountLoginEnabled,operatorOnly)}),
     ...createAppleAuthCommands({repository, apple:deps.apple, clock, ids, sessionTtlMs, enabled:deps.appleLoginEnabled === true,
       requireUser: (tx, token) => requireUser(tx,token,clock,testAccountLoginEnabled,operatorOnly)}),
     async signInWithApple(identityToken: string) {

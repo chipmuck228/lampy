@@ -78,8 +78,9 @@ export type FamilyApiClient = {
   revokeInviteLink?(session: string, id: string): Promise<import('../family-api/types').InviteLinkView>;
   previewInviteLink?(token: string): Promise<import('../family-api/types').InvitePreview>;
   acceptInviteLink?(session: string, token: string): Promise<FamilySummary>;
-  beginAppleAuth?(intent:'login'|'link',sessionToken?:string):Promise<{challengeId:string;nonce:string;expiresAt:string}>;
+  beginAppleAuth?(intent:'login'|'link'|'delete',sessionToken?:string):Promise<{challengeId:string;nonce:string;expiresAt:string}>;
   completeAppleAuth?(input:import('../family-api/types').AppleAuthInput,sessionToken?:string):Promise<SignInResult | {linked:true;userId:string}>;
+  deleteAccount?(sessionToken:string,input:import('../family-api/types').DeleteAccountInput):Promise<import('../family-api/types').DeleteAccountResult>;
   getAppleLink?(sessionToken:string):Promise<{linked:boolean}>;
   signInWithApple(identityToken: string): Promise<SignInResult>;
   signInWithTestAccount(input: { login: string; password: string }): Promise<SignInResult>;
@@ -160,6 +161,7 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
   }
 
   return {
+    deleteAccount:(sessionToken,input)=>send({method:'POST',path:'/v2/me/account/delete',sessionToken,body:input,timeoutMs:45000}),
     purchases: {
       context:sessionToken=>send({method:'GET',path:'/v2/me/purchase-access',sessionToken,timeoutMs:12000}),
       claim:(sessionToken,transactionId)=>send({method:'POST',path:'/v2/me/purchase-access',sessionToken,body:{transactionId},timeoutMs:12000}),

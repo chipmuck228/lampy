@@ -41,6 +41,9 @@ const db = openFamilySqliteDatabase(databasePath);
   try {
     const schema = await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations');
     if (!schema || schema.version < 25) { process.stderr.write('Run family-api:migrate before cleanup (schema 25 required).\n'); process.exitCode = 1; return; }
+    const {drainAccountMedia}=require(path.join(familyApiRoot,'account-deletion.ts'));
+    const {createSqliteFamilyRepository}=require(path.join(familyApiRoot,'sqlite-repository.ts'));
+    if(schema.version>=32 && !await drainAccountMedia(createSqliteFamilyRepository(db),createDirectoryMediaBlobStore(mediaPath)))process.exitCode=1;
     const report = await runFamilyCleanup(db, createDirectoryMediaBlobStore(mediaPath));
     process.stdout.write(JSON.stringify(report) + '\n');
     if (report.failed) process.exitCode = 1;

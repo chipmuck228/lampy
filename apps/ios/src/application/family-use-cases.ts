@@ -795,6 +795,23 @@ export function createFamilyUseCases(deps: {
       return deps.client.listPendingInvitations(sessionToken, familyId);
     },
 
+    async deleteAccount(authorize:(nonce:string)=>Promise<{identityToken:string;authorizationCode:string|null}>,isCurrent:()=>boolean) {
+      const account=await requireAccount();
+      const check=async()=>{await assertSameAccount(account);if(!isCurrent())throw new ApplicationError('STALE_FAMILY_REQUEST','Deletion request is inactive.');};
+      await check();
+      if(!deps.client.beginAppleAuth||!deps.client.deleteAccount)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const c=await deps.client.beginAppleAuth('delete',account.sessionToken);await check();
+      const credential=await authorize(c.nonce);await check();
+      const result=await deps.client.deleteAccount(account.sessionToken,{challengeId:c.challengeId,identityToken:credential.identityToken,authorizationCode:credential.authorizationCode||undefined,confirmation:'delete-my-lampy-account-v1'});
+      if(result.deleted!==true)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Deletion was not confirmed.');
+      // Server deletion already completed. Clear this identity even if the screen became inactive.
+      await assertSameAccount(account);
+      emailAuthRequest++;
+      await deps.session.clearSession();await cache.clear();await safeIsolateAccount(account.userId);
+      await deps.session.clearPendingRevoke();
+      selectedMediaUpload={status:'idle'};shareConfirm={status:'idle'};shareRevoke={status:'idle'};
+      return result;
+    },
     async signOut(): Promise<SignOutResult> {
       emailAuthRequest++;
       const token = await deps.session.getSessionToken();
