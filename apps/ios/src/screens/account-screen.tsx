@@ -1,5 +1,5 @@
 import FamilyEmailAccountScreen from './family-email-account-screen';
-import { isControlledEmailAccountsOpen, isFamilyInternalTestBuild, isFamilyProductEntryOpen } from '../infrastructure/family-config';
+import { isControlledEmailAccountsOpen, isFamilyV1ReleaseBuild, isFamilyInternalTestBuild, isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -401,13 +401,13 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
           />
         </SettingsGroup>
         <SettingsGroup title="Lampy">
-          <SettingsLink
+          {!isFamilyV1ReleaseBuild() ? <SettingsLink
             icon="subscribe"
             title={tr("订阅与付费")}
             detail={tr("目前没有付费项目")}
             testID="account-open-subscribe"
             onPress={() => router.push('/account/subscribe')}
-          />
+          /> : null}
           <SettingsLink
             icon="help"
             title={tr("使用帮助")}

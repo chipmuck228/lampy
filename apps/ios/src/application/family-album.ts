@@ -1,4 +1,4 @@
-import { isFamilyInternalTestBuild } from '../infrastructure/family-config';
+import { isFamilyInternalTestBuild, isFamilyV1ReleaseBuild } from '../infrastructure/family-config';
 import { ApplicationError } from './errors';
 import type { FamilySessionStore } from './family-use-cases';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
@@ -6,7 +6,7 @@ import { FAMILY_ALBUM_CONFIRMATION, type FamilyAlbumApi, type FamilyAlbumMutatio
 export const FAMILY_ALBUM_LEASE_MS=15000;
 export const FAMILY_ALBUM_RENEW_MS=3000;
 export const FAMILY_ALBUM_RULE_COPY='分享到这里的记录，家人可以阅读，家庭创建者也可以收进生活册，保存或打印。' as const;
-export function familyAlbumEvaluationOpen(dev:boolean,value=process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL,internal=isFamilyInternalTestBuild()) {return (dev||internal)&&value==='1';}
+export function familyAlbumEvaluationOpen(dev:boolean,value=process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL,internal=isFamilyInternalTestBuild(),formal=isFamilyV1ReleaseBuild()) {return (dev||internal||formal)&&value==='1';}
 export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:FamilySessionStore}) {
   async function account() {
     const token=await deps.session.getSessionToken();const userId=await deps.session.getUserId();

@@ -105,3 +105,9 @@ it('requires explicit internal profile and approved HTTPS origin',()=>{
  for(const url of ['http://family-test.yunpura.com','https://family-test.yunpura.com.evil.test','http://127.0.0.1:8787','https://family-test.yunpura.com/path']) expect(isFamilyInternalTestBuild('1',url,'1','1')).toBe(false);
  expect(isFamilyInternalTestBuild('0','https://family-test.yunpura.com','1','1')).toBe(false);
 });
+
+test('formal release requires production origin and no test identity',()=>{
+ const {isFamilyV1ReleaseBuild}=require('./family-config');
+ expect(isFamilyV1ReleaseBuild('1','https://family.yunpura.com','1','0','0')).toBe(true);
+ for(const args of [['0','https://family.yunpura.com','1','0','0'],['1','https://family-test.yunpura.com','1','0','0'],['1','https://family.yunpura.com','1','1','0'],['1','https://family.yunpura.com','1','0','1']])expect(isFamilyV1ReleaseBuild(...args)).toBe(false);
+});

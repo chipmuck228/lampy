@@ -13,6 +13,7 @@ function internalProfile(env) {
 }
 function configure(config, env) {
   if (!env.LAMPY_BUILD_PROFILE) return config;
+  if (env.LAMPY_BUILD_PROFILE === 'appstore-v1') return require('./appstore-v1-profile.cjs').configureAppstoreV1(config, env);
   const profile = internalProfile(env);
   return {...config, ios:{...config.ios, buildNumber:profile.build, infoPlist:{...config.ios.infoPlist, LampyFamilyAlbumPreviewEnabled:true, LampyBuildProfile:'family-internal', LampyFamilyAPI:profile.api}}};
 }
