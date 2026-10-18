@@ -14,7 +14,7 @@ import { useDeviceLock } from './device-lock-context';
 import { SettingsPage } from './settings-chrome';
 import { Text, TextInput, type } from './life-text';
 import { LifeIcon } from './life-icons';
-import { hairline, ink, inkSoft, sage, paperDeep } from './life-page';
+import { hairline, ink, inkSoft, sage, paperDeep, clay, paper } from './life-page';
 
 function errorCopy(error: unknown) {
   if (isApplicationError(error)) {
@@ -209,7 +209,7 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
   const title=tr(profileMode ? '我的资料' : register ? '创建账号' : '登录家庭');
   const content = <>
     {!allowed ? <Text>{tr(formal ? '请解锁后继续。' : '测试账号入口暂未开放。')}</Text> : <>
-      {profileMode ? <View style={styles.avatar}><LifeIcon name="person" size={56} color={sage}/></View> : <Text style={styles.explanation}>{tr(formal ? '通过Apple登录，开始使用家庭。个人记录仍保存在本机。' : internal ? '请使用受邀测试账号登录。' : '邮箱仅用作测试账号，不会发送邮件。')}</Text>}
+      {profileMode ? (profile ? <View testID="settings-profile-avatar" style={styles.avatar}><LifeIcon name="person" size={56} color={sage}/></View> : ready && embedded ? <View style={styles.avatar}><Pressable testID="settings-profile-login" style={[styles.primary,styles.profileLogin]} accessibilityRole="button" onPress={() => router.push({pathname:'/family-email-account',params:{returnTo:'settings'}})}><Text style={styles.action}>{tr('登录')}</Text></Pressable></View> : null) : <Text style={styles.explanation}>{tr(formal ? '通过Apple登录，开始使用家庭。个人记录仍保存在本机。' : internal ? '请使用受邀测试账号登录。' : '邮箱仅用作测试账号，不会发送邮件。')}</Text>}
       {loading ? <Text>{tr('正在读取。')}</Text> : null}
       {ready ? <View style={styles.form}>
         {appleAvailable && !register && (!profileMode || profile) && !(formal && profileMode) ? <View style={{gap:12}}>
@@ -221,16 +221,18 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
           <TextInput testID="email-account-password" accessibilityLabel={tr('密码')} placeholder={tr('密码')} value={password} onChangeText={setPassword} secureTextEntry textContentType={register ? 'newPassword' : 'password'} maxLength={128} editable={!busy} style={styles.input}/>
         </> : null}
         {(profileMode && profile) || register ? <TextInput testID="email-account-nickname" accessibilityLabel={tr('昵称')} placeholder={tr('昵称')} value={nickname} onChangeText={setNickname} editable={!busy} style={styles.input}/> : null}
-        {profileMode && !profile ? <View><Text>{tr('请先登录。')}</Text>{embedded ? <Pressable testID="settings-profile-login" style={styles.hit} accessibilityRole="button" onPress={() => router.push({pathname:'/family-email-account',params:{returnTo:'settings'}})}><Text style={styles.action}>{tr('登录')}</Text></Pressable> : null}</View> : (profileMode || !formal) ? <Pressable testID="email-account-submit" style={styles.primary} accessibilityRole="button" accessibilityState={{disabled:busy}} disabled={busy} onPress={()=>void submit()}><Text style={styles.action}>{tr(busy ? '正在处理。' : profileMode ? '保存昵称' : register ? '创建并登录' : '登录')}</Text></Pressable> : null}
+        {profileMode && !profile ? (!embedded ? <Text>{tr('请先登录。')}</Text> : null) : (profileMode || !formal) ? <Pressable testID="email-account-submit" style={styles.primary} accessibilityRole="button" accessibilityState={{disabled:busy}} disabled={busy} onPress={()=>void submit()}><Text style={styles.action}>{tr(busy ? '正在处理。' : profileMode ? '保存昵称' : register ? '创建并登录' : '登录')}</Text></Pressable> : null}
         {!profileMode && registrationAllowed ? <Pressable testID="email-account-toggle" style={styles.hit} accessibilityRole="button" disabled={busy} onPress={()=>{setRegister(!register);setMessage(null);setPassword('');}}><Text style={styles.action}>{tr(register ? '已有账号，去登录' : '没有账号，创建一个')}</Text></Pressable> : null}
       </View> : !loading ? <Pressable style={styles.hit} accessibilityRole="button" onPress={()=>void load(++sequence.current)}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable> : null}
       {!profileMode && !internal && !formal ? <Pressable style={styles.hit} accessibilityRole="button" disabled={busy} onPress={() => { if(onOtherSignIn) onOtherSignIn(); else router.push('/account-diagnostics'); }}><Text style={styles.action}>{tr('其他登录方式')}</Text></Pressable> : null}
-      {profileMode && profile ? <Pressable testID="email-account-sign-out" style={styles.hit} accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={confirmSignOut}><Text style={styles.action}>{tr('退出登录')}</Text></Pressable> : null}
-      {formal && profileMode && profile ? <Pressable testID="account-delete" style={styles.hit} accessibilityRole="button" disabled={busy} onPress={confirmDeletion}><Text style={styles.action}>{tr('删除账号')}</Text></Pressable> : null}
+      {profileMode && profile ? <View style={styles.profileActions}>
+        <Pressable testID="email-account-sign-out" style={styles.primary} accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={confirmSignOut}><Text style={styles.action}>{tr('退出登录')}</Text></Pressable>
+        {formal ? <Pressable testID="account-delete" style={[styles.primary,styles.destructive]} accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={confirmDeletion}><Text style={[styles.action,styles.destructiveLabel]}>{tr('删除账号')}</Text></Pressable> : null}
+      </View> : null}
       {formal && ready && !profileMode && !appleAvailable ? <Text>{tr('这台设备暂不能使用Apple登录。')}</Text> : null}
       {message ? <Text testID="email-account-message" style={styles.explanation}>{message}</Text> : null}
     </>}
   </>;
   return embedded ? <View testID="settings-profile">{content}</View> : <SettingsPage title={title} accessibilityLabel={title} backLabel={tr('返回')} onBack={cancel} pageTestID="family-email-page">{content}</SettingsPage>;
 }
-const styles=StyleSheet.create({form:{gap:16},input:{...type.action,color:ink,minHeight:48,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline,paddingVertical:12},primary:{minHeight:48,borderRadius:24,backgroundColor:paperDeep,alignItems:'center',justifyContent:'center',padding:12},hit:{minHeight:48,justifyContent:'center'},action:{...type.action,color:sage},explanation:{...type.meta,color:inkSoft,marginVertical:16},avatar:{alignItems:'center',marginVertical:24}});
+const styles=StyleSheet.create({form:{gap:16},input:{...type.action,color:ink,minHeight:48,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline,paddingVertical:12},primary:{minHeight:48,borderRadius:24,backgroundColor:paperDeep,alignItems:'center',justifyContent:'center',padding:12},profileLogin:{minWidth:160,maxWidth:'100%'},profileActions:{gap:16,marginTop:16},destructive:{backgroundColor:clay},destructiveLabel:{color:paper},hit:{minHeight:48,justifyContent:'center'},action:{...type.action,color:sage},explanation:{...type.meta,color:inkSoft,marginVertical:16},avatar:{alignItems:'center',marginVertical:24}});

@@ -62,6 +62,8 @@ it('embedded settings saves and signs out in place without navigation', async ()
  const page=await render(<FamilyEmailAccountScreen profileMode embedded/>);
  await waitFor(()=>expect(page.getByTestId('email-account-nickname').props.value).toBe('原昵称'));
  expect(page.getByTestId('settings-profile')).toBeTruthy();
+ expect(page.getByTestId('settings-profile-avatar')).toBeTruthy();
+ expect(page.queryByTestId('settings-profile-login')).toBeNull();
  await fireEvent.changeText(page.getByTestId('email-account-nickname'),'新名字');
  await fireEvent.press(page.getByTestId('email-account-submit'));
  expect(mockUpdate).toHaveBeenCalledWith('新名字',expect.any(Function));
@@ -70,6 +72,8 @@ it('embedded settings saves and signs out in place without navigation', async ()
  await act(async()=>alert.mock.calls[0][2]![1].onPress!());
  expect(page.queryByTestId('email-account-nickname')).toBeNull();
  expect(page.getByTestId('settings-profile-login')).toBeTruthy();
+ expect(page.queryByTestId('settings-profile-avatar')).toBeNull();
+ expect(page.queryByText('请先登录。')).toBeNull();
  expect(mockPush).not.toHaveBeenCalled();expect(mockDismiss).not.toHaveBeenCalled();
  alert.mockRestore();
 });
@@ -77,6 +81,8 @@ it('signed out settings offers login returning to settings, not an editable empt
  mockRead.mockRejectedValue(new ApplicationError('UNAUTHENTICATED','Sign in required'));
  const page=await render(<FamilyEmailAccountScreen profileMode embedded/>);
  await waitFor(()=>expect(page.getByTestId('settings-profile-login')).toBeTruthy());
+ expect(page.queryByTestId('settings-profile-avatar')).toBeNull();
+ expect(page.queryByText('请先登录。')).toBeNull();
  expect(page.queryByTestId('email-account-nickname')).toBeNull();
  await fireEvent.press(page.getByTestId('settings-profile-login'));
  expect(mockPush).toHaveBeenCalledWith({pathname:'/family-email-account',params:{returnTo:'settings'}});
