@@ -47,6 +47,7 @@ export function applyClosedReleasePublicEnv(
 ): Record<string, string | undefined> {
   return {
     ...env,
+    EXPO_PUBLIC_APPSTORE_V1: '0',
     EXPO_PUBLIC_FAMILY_INTERNAL_TEST: '0',
     EXPO_PUBLIC_FAMILY_ALBUM_EVAL: '0',
     EXPO_PUBLIC_FAMILY_ENTRY_OPEN: '',

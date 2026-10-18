@@ -93,3 +93,9 @@ it('release preview requires the exact internal marker, origin and product gates
   for(const key of keys){const value=testEnv[key];testEnv[key]='';expect(familyAlbumEvaluationOpen(false)).toBe(false);testEnv[key]=value;}
  } finally {keys.forEach((key,index)=>{if(before[index]===undefined)delete testEnv[key];else testEnv[key]=before[index];});}
 });
+
+test('formal release permits free preview without dev/internal mode',()=>{
+ expect(familyAlbumEvaluationOpen(false,'1',false,true)).toBe(true);
+ expect(familyAlbumEvaluationOpen(false,'0',false,true)).toBe(false);
+ expect(familyAlbumEvaluationOpen(false,'1',false,false)).toBe(false);
+});

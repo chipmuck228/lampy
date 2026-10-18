@@ -151,12 +151,13 @@ function inspectArchive(archivePath, expected = expectedFromAppJson()) {
   report.team = codesignTeam(app);
   const profile = plistPrint(info, 'LampyBuildProfile');
   const api = plistPrint(info, 'LampyFamilyAPI');
-  if (expected.profile === 'family-internal') {
-    if (profile !== 'family-internal' || api !== 'https://family-test.yunpura.com') problems.push('family_profile_mismatch');
+  if (expected.profile === 'family-internal' || expected.profile === 'appstore-v1') {
+    if (profile !== expected.profile || api !== (expected.profile === 'appstore-v1' ? 'https://family.yunpura.com' : 'https://family-test.yunpura.com')) problems.push('family_profile_mismatch');
     if (plistPrint(info, 'LampyFamilyAlbumPreviewEnabled') !== 'true') problems.push('family_preview_marker_missing');
     if (plistPrint(info, 'LampyUnifiedPurchasesEnabled') !== 'false' || plistPrint(info, 'LampyPaidExportEnabled') !== 'false' || plistPrint(info, 'LampyExportProductID') !== '') problems.push('internal_paid_export_not_closed');
+    if (expected.profile === 'appstore-v1' && plistPrint(info, 'LampyEmailLoginEnabled') !== 'false') problems.push('v1_email_login_not_closed');
     const entitlements = spawnSync('codesign', ['-d', '--entitlements', ':-', app], {encoding:'utf8'});
-    if (!`${entitlements.stdout || ''} ${entitlements.stderr || ''}`.includes('applinks:family-test.yunpura.com')) problems.push('family_associated_domain_missing');
+    if (!`${entitlements.stdout || ''} ${entitlements.stderr || ''}`.includes(expected.profile === 'appstore-v1' ? 'applinks:family.yunpura.com' : 'applinks:family-test.yunpura.com')) problems.push('family_associated_domain_missing');
   } else if (profile || api) problems.push('unexpected_family_profile');
 
   if (report.bundleId !== expected.bundleId) problems.push('bundle_id_mismatch');
@@ -217,6 +218,10 @@ if (require.main === module) {
   if (process.env.LAMPY_BUILD_PROFILE === 'family-internal') {
     const internal = require('./family-internal-profile.cjs').internalProfile(process.env);
     expected.build = internal.build; expected.profile = 'family-internal';
+  }
+  if (process.env.LAMPY_BUILD_PROFILE === 'appstore-v1') {
+    const formal = require('./appstore-v1-profile.cjs').appstoreV1Profile(process.env);
+    Object.assign(expected, {build: formal.build, version: formal.version, profile: 'appstore-v1'});
   }
   const report = inspectArchive(archive, expected);
   printReport(report);

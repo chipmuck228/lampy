@@ -12,27 +12,31 @@ if [[ "${1:-}" == "--inspect" ]]; then
   exit $?
 fi
 
-if [[ -n "${1:-}" && "${1:-}" != "--family-internal" ]]; then
-  echo "usage: release-archive.sh [--family-internal [--prepare|--inspect ARCHIVE]]" >&2
+if [[ -n "${1:-}" && "${1:-}" != "--family-internal" && "${1:-}" != "--appstore-v1" ]]; then
+  echo "usage: release-archive.sh [--family-internal|--appstore-v1 [--prepare|--inspect ARCHIVE]]" >&2
   exit 2
 fi
-if [[ "${1:-}" == "--family-internal" && -n "${2:-}" && "${2:-}" != "--prepare" && "${2:-}" != "--inspect" ]]; then
-  echo "unknown internal archive option" >&2
+if [[ ( "${1:-}" == "--family-internal" || "${1:-}" == "--appstore-v1" ) && -n "${2:-}" && "${2:-}" != "--prepare" && "${2:-}" != "--inspect" ]]; then
+  echo "unknown archive profile option" >&2
   exit 2
 fi
 
-FAMILY_INTERNAL=0
+EXPLICIT_PROFILE=0
 PREPARE_ONLY=0
-if [[ "${1:-}" == "--family-internal" ]]; then
-  FAMILY_INTERNAL=1
+if [[ "${1:-}" == "--family-internal" || "${1:-}" == "--appstore-v1" ]]; then
+  EXPLICIT_PROFILE=1
   [[ "${2:-}" != "--prepare" ]] || PREPARE_ONLY=1
 fi
 
 # shellcheck source=./release-public-env.sh
 source "$ROOT/scripts/release-public-env.sh"
-if [[ "$FAMILY_INTERNAL" == 1 ]]; then
-  source "$ROOT/scripts/family-internal-env.sh"
-  node -e 'require("./scripts/family-internal-profile.cjs").internalProfile(process.env)'
+if [[ "$EXPLICIT_PROFILE" == 1 ]]; then
+  if [[ "${1:-}" == "--appstore-v1" ]]; then
+    source "$ROOT/scripts/appstore-v1-env.sh"
+  else
+    source "$ROOT/scripts/family-internal-env.sh"
+  fi
+  node -e 'require("./scripts/family-internal-profile.cjs").configure(require("./app.json").expo,process.env)'
   if [[ "${2:-}" == "--inspect" ]]; then
     node "$ROOT/scripts/inspect-release-archive.cjs" "${3:?archive path required}"
     exit $?
@@ -88,7 +92,7 @@ REPORT="$OUT/archive-report.txt"
   echo "xcode=$(xcodebuild -version | tr '\n' ' ')"
   echo "bundle=app.lampy.ios"
   echo "team=B283NY984J"
-  echo "version=$(node -p "require('./app.json').expo.version")"
+  echo "version=$(node -p "require('./scripts/family-internal-profile.cjs').configure(require('./app.json').expo,process.env).version")"
   echo "build=$(node -p 'require("./scripts/family-internal-profile.cjs").configure(require("./app.json").expo,process.env).ios.buildNumber')"
   echo "profile=${LAMPY_BUILD_PROFILE:-personal}"
   echo "EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS=${EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS-}"
@@ -129,8 +133,8 @@ fi
 
 EXPO_USE_PRECOMPILED_MODULES=0 pod install --project-directory=ios
 
-if [[ "$FAMILY_INTERNAL" == 1 ]]; then
-  # Persist the entire non-secret internal profile for later Xcode Run/Archive.
+if [[ "$EXPLICIT_PROFILE" == 1 ]]; then
+  # Persist the entire non-secret explicit profile for later Xcode Run/Archive.
   bash "$ROOT/scripts/write-family-xcode-env.sh" "$ROOT/ios/.xcode.env.local"
 fi
 

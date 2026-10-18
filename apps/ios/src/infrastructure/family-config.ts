@@ -50,3 +50,14 @@ export function isFamilyInternalTestBuild(
 ) {
   return marker === '1' && base === 'https://family-test.yunpura.com' && entry === '1' && email === '1';
 }
+
+/** Formal release opt-in; API configuration alone must not enable release features. */
+export function isFamilyV1ReleaseBuild(
+  marker = process.env.EXPO_PUBLIC_APPSTORE_V1,
+  base = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL,
+  entry = process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN,
+  email = process.env.EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS,
+  internal = process.env.EXPO_PUBLIC_FAMILY_INTERNAL_TEST,
+) {
+  return marker === '1' && base === 'https://family.yunpura.com' && entry === '1' && email === '0' && internal === '0';
+}
