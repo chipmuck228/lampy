@@ -1,3 +1,4 @@
+jest.mock('expo-application', () => ({ nativeApplicationVersion: null, nativeBuildVersion: null }));
 jest.mock('expo-localization', () => ({ getLocales: () => [{ languageTag: 'zh-CN', languageCode: 'zh' }] }));
 jest.mock('expo-font', () => ({
   loadAsync: jest.fn(async () => undefined),

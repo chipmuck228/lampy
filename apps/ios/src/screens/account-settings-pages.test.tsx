@@ -25,10 +25,13 @@ jest.mock('expo-router', () => ({
 jest.mock('expo-constants', () => ({
   __esModule: true,
   default: {
-    nativeAppVersion: '1.2.3',
-    nativeBuildVersion: '45',
     expoConfig: { version: '9.9.9', ios: { buildNumber: '99' } },
   },
+}));
+
+jest.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.2.3',
+  nativeBuildVersion: '45',
 }));
 
 function wrap(node: ReactElement) {
@@ -189,4 +192,14 @@ describe('account settings pages', () => {
     expect(view.getByTestId('account-scroll').props.automaticallyAdjustKeyboardInsets).toBe(false);
     expect(view.getByTestId('account-scroll').props.contentInsetAdjustmentBehavior).toBe('never');
   });
+});
+
+it('formal storage page distinguishes server shares from private local records',async()=>{
+ const keys=['EXPO_PUBLIC_APPSTORE_V1','EXPO_PUBLIC_FAMILY_API_BASE_URL','EXPO_PUBLIC_FAMILY_ENTRY_OPEN','EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS','EXPO_PUBLIC_FAMILY_INTERNAL_TEST'];const previous=keys.map(key=>process.env[key]);
+ try {
+  ['1','https://family.yunpura.com','1','0','0'].forEach((value,index)=>{process.env[keys[index]]=value;});
+  const view=await render(wrap(<AccountStorageScreen/>));
+  expect(view.getByTestId('account-storage-family').props.children).toContain('家庭共享内容保存在服务器');
+  expect(view.getByTestId('account-personal').props.children).toContain('这台设备');
+ }finally{keys.forEach((key,index)=>{if(previous[index]===undefined)delete process.env[key];else process.env[key]=previous[index];});}
 });
