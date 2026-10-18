@@ -1,3 +1,4 @@
+import {familySafetyGeneration} from './family-safety-events';
 import { isFamilyInternalTestBuild, isFamilyV1ReleaseBuild } from '../infrastructure/family-config';
 import { ApplicationError } from './errors';
 import type { FamilySessionStore } from './family-use-cases';
@@ -13,9 +14,10 @@ export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:F
     if(!token||!userId)throw new ApplicationError('UNAUTHENTICATED','Sign in is required.');return {token,userId};
   }
   async function request<T>(familyId:string,work:(api:FamilyAlbumApi,token:string,userId:string)=>Promise<T>,current=()=>true,preflight=true) {
+    const safetyGeneration=familySafetyGeneration();
     const before=await account();const api=deps.client.albums;
     if(!api)throw new ApplicationError('FAMILY_ALBUMS_CLOSED','Family albums are not available.');
-    const check=async()=>{const after=await account();if(!current()||before.token!==after.token||before.userId!==after.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','The family request is no longer current.');};
+    const check=async()=>{const after=await account();if(safetyGeneration!==familySafetyGeneration()||!current()||before.token!==after.token||before.userId!==after.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','The family request is no longer current.');};
     if(preflight){const access=await api.access(before.token,familyId);await check();checkViewer(access.userId,before.userId);}
     const result=await work(api,before.token,before.userId);await check();return result;
   }
