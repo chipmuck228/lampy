@@ -1,5 +1,7 @@
 import { tr } from '../i18n';
-export const SETTINGS_HELP_CHAPTERS = [
+import { isFamilyV1ReleaseBuild } from '../infrastructure/family-config';
+import { V1_HELP_CHAPTERS } from './settings-v1-copy';
+const PERSONAL_HELP_CHAPTERS = [
   {
     title: tr("留下文字、照片和声音"),
     paragraphs: [
@@ -52,3 +54,5 @@ export const SETTINGS_HELP_CHAPTERS = [
     ],
   },
 ] as const;
+
+export const SETTINGS_HELP_CHAPTERS = isFamilyV1ReleaseBuild() ? [...PERSONAL_HELP_CHAPTERS, ...V1_HELP_CHAPTERS] : PERSONAL_HELP_CHAPTERS;

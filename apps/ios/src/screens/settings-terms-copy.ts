@@ -1,7 +1,9 @@
 import { tr } from '../i18n';
-export const SETTINGS_TERMS_UPDATED = tr("2026年10月2日");
+import { isFamilyV1ReleaseBuild } from '../infrastructure/family-config';
+import { V1_TERMS_CHAPTERS } from './settings-v1-copy';
+export const SETTINGS_TERMS_UPDATED = tr(isFamilyV1ReleaseBuild() ? "2026年10月18日" : "2026年10月2日");
 
-export const SETTINGS_TERMS_CHAPTERS = [
+const PERSONAL_TERMS_CHAPTERS = [
   {
     title: tr("这份说明"),
     paragraphs: [
@@ -49,3 +51,5 @@ export const SETTINGS_TERMS_CHAPTERS = [
     ],
   },
 ] as const;
+
+export const SETTINGS_TERMS_CHAPTERS = isFamilyV1ReleaseBuild() ? V1_TERMS_CHAPTERS : PERSONAL_TERMS_CHAPTERS;

@@ -1,0 +1,17 @@
+[Unit]
+Description=Lampy family retired media and dissolved-family cleanup
+After=lampy-family.service
+
+[Service]
+Type=oneshot
+User=lampy-family
+Group=lampy-family
+WorkingDirectory=/opt/lampy-family/apps/ios
+EnvironmentFile=/etc/lampy/family.env
+ExecStart=/usr/local/bin/node /opt/lampy-family/apps/ios/scripts/family-api-cleanup.cjs
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/lampy-family
