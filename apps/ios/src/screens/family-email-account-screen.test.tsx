@@ -74,6 +74,7 @@ it('embedded settings saves and signs out in place without navigation', async ()
  expect(page.getByTestId('settings-profile-login')).toBeTruthy();
  expect(page.queryByTestId('settings-profile-avatar')).toBeNull();
  expect(page.queryByText('请先登录。')).toBeNull();
+ expect(page.queryByTestId('email-account-message')).toBeNull();
  expect(mockPush).not.toHaveBeenCalled();expect(mockDismiss).not.toHaveBeenCalled();
  alert.mockRestore();
 });

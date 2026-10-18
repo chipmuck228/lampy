@@ -182,7 +182,7 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
       const result=await service.signOut();if(!current(seq)) return;
       if(result.local === 'still-signed-in') {setMessage(tr('退出还未完成，请再试一次。'));return;}
       setProfile(null);setNickname('');setPassword('');
-      setMessage(tr(result.server === 'unconfirmed' ? '已退出这台设备，联网后会继续撤销会话。' : '已退出这台设备。'));
+      setMessage(result.server === 'unconfirmed' ? tr('已退出这台设备，联网后会继续撤销会话。') : null);
     } catch(error) {if(current(seq)) setMessage(errorCopy(error));}
     finally {if(owner.current===seq){owner.current=null;if(current(seq))setBusy(false);}}
   }
