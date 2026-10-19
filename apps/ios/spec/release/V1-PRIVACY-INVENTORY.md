@@ -100,3 +100,7 @@
 - [Expo Privacy manifests](https://docs.expo.dev/guides/apple-privacy/)：按 SDK 版本、原生库及实际生成包核对 manifest 和 API 原因，不能仅由依赖声明推定最终包完整。
 
 此清单仅记录技术依据及待确认项，不替代实际运营数据处理核查或发布主体的合规判断。
+
+### 后续只读核验工具
+
+已增加独立的照片和数据库只读探针，执行步骤见 [V1-PRIVACY-PROBE-WALK.md](V1-PRIVACY-PROBE-WALK.md)。它们不接入 App 或 API 启动路径，不修改上传、保留或清理策略。4 项本地工具测试通过，但真实上传照片、生产限流记录和主机配置尚未验收。工具 JSON 不输出实际坐标、IP、邮箱或会话令牌。
