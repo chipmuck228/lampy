@@ -1,7 +1,14 @@
 import type {FamilyStore} from './store';
 export function purgeMemoryAccount(s:FamilyStore,userId:string) {
+ const erasedShares=new Set(s.shares.filter(r=>r.authorUserId===userId).map(r=>r.shareId));
+ s.sharingRestrictionAudit=s.sharingRestrictionAudit.filter(r=>r.userId!==userId);
+ s.sharingRestrictions=s.sharingRestrictions.filter(r=>r.userId!==userId);
+ s.safetyReports=s.safetyReports.filter(r=>r.reporterUserId!==userId&&r.authorUserId!==userId);
+ s.userBlocks=s.userBlocks.filter(r=>r.userId!==userId&&r.targetUserId!==userId);
+ s.moderation=s.moderation.filter(r=>!erasedShares.has(r.shareId));
+ s.moderationAudit=s.moderationAudit.filter(r=>!erasedShares.has(r.shareId));
  const logins=s.testCredentials.filter(r=>r.userId===userId).map(r=>r.loginNormalized);
- s.rateLimits=s.rateLimits.filter(r=>!logins.some(login=>r.bucket==='test-login:'+login||r.bucket==='email-register:'+login));
+ s.rateLimits=s.rateLimits.filter(r=>r.bucket!=='safety-report:'+userId&&!logins.some(login=>r.bucket==='test-login:'+login||r.bucket==='email-register:'+login));
  const shares=new Set(s.shares.filter(r=>r.authorUserId===userId).map(r=>r.shareId));
  const solo=new Set(s.memberships.filter(m=>m.userId===userId&&m.role==='creator'&&m.status==='active'&&!s.memberships.some(o=>o.familyId===m.familyId&&o.status==='active'&&o.userId!==userId)).map(m=>m.familyId));
  for(const m of s.mediaObjects.filter(r=>r.ownerUserId===userId)) if(!s.accountMediaCleanup.includes(m.storageKey))s.accountMediaCleanup.push(m.storageKey);

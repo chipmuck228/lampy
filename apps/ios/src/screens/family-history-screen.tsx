@@ -1,3 +1,5 @@
+import {FamilySafetyActions} from './family-safety-actions';
+import {subscribeFamilySafety} from '../application/family-safety-events';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -78,6 +80,29 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
   useEffect(() => {
     if (playingKey.current && sound.status !== 'preparing') progress.set(playingKey.current,sound.currentTimeMs);
   }, [sound.status,sound.currentTimeMs]);
+  // Renew a bounded reading lease without redownloading media or flashing the page.
+  useEffect(()=>{
+    if(!allowed||status!=='ready'||policy!=='family-history-v2')return;
+    const current=currentRef.current;let disposed=false,inFlight=false;
+    let checked=Date.now(),expires=checked+15000;
+    const hide=(error:unknown)=>{if(disposed||!current())return;saveProgress();setView(null);setRows([]);setStatus('failed');setMessage(familyHistoryError(error));};
+    const timer=setInterval(()=>{
+      if(disposed||!current())return;
+      if(Date.now()>=expires){hide({code:'FORBIDDEN'});return;}
+      if(inFlight||Date.now()-checked<5000)return;
+      inFlight=true;checked=Date.now();const started=checked;
+      void (async()=>{
+        try {
+          const app=await getFamilyUseCases();if(disposed||!current())return;
+          if(isDetail)await app.history.authorize(familyId,shareId!,current);
+          else {const result=await app.history.list(familyId,current);if(!disposed&&current())setRows(result.shares);}
+          if(!disposed&&current())expires=started+15000;
+        }catch(error){const code=error&&typeof error==='object'&&'code'in error?error.code:null;if(!['NETWORK','SERVER_UNREACHABLE','RATE_LIMITED'].includes(String(code)))hide(error);}
+        finally{inFlight=false;}
+      })();
+    },250);
+    return()=>{disposed=true;clearInterval(timer);};
+  },[allowed,status,policy,isDetail,familyId,shareId,saveProgress]);
   async function play(read: HistoryReading, objectId: string, uri: string) {
     if (busyRef.current || !allowed) return;
     const current = currentRef.current; if (!current()) return;
@@ -105,6 +130,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
     } catch(e){if(current())setMessage(familyHistoryError(e));}
     finally{if(busyOwner.current===current){busyOwner.current=null;busyRef.current=false;setBusy(false);}}
   }
+  useEffect(()=>subscribeFamilySafety(()=>{saveProgress();setView(null);setRows([]);setExpandedId(null);}),[saveProgress]);
   const withdrawn = useCallback(() => { setExpandedId(null); void load(); }, [load]);
   const content = <>
     {!allowed ? <Text>{tr('家庭分享暂未开放。')}</Text> : <>
@@ -137,6 +163,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
       {view ? <View style={inline ? styles.inlineReading : styles.record} testID="family-history-reading">
         <View style={styles.footer}>
           {!inline ? <Text style={[styles.meta, styles.author]}>{familyShareAuthorLabel(view.share, viewer)}</Text> : null}
+          {viewer && viewer !== view.share.authorUserId ? <FamilySafetyActions familyId={familyId} shareId={view.share.shareId} authorUserId={view.share.authorUserId} current={()=>currentRef.current()} onHidden={()=>{if(inline)onWithdrawn?.();else router.back();}}/> : null}
           {viewer === view.share.authorUserId ? <Pressable accessibilityRole="button" testID="history-revoke" disabled={busy} style={styles.hit}
             onPress={() => {
               const expected = view; const current = currentRef.current; if (!current()) return;

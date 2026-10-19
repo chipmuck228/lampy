@@ -1,3 +1,4 @@
+import {familySafetyGeneration} from '../application/family-safety-events';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
@@ -20,8 +21,9 @@ export function useFamilyPrivateRequest() {
     pauseForegroundAudio();
   }, []);
   const begin = useCallback(() => {
+    const safety=familySafetyGeneration();
     const request = ++sequence.current;
-    return () => focused.current && allowedRef.current && AppState.currentState === 'active' && sequence.current === request;
+    return () => familySafetyGeneration()===safety && focused.current && allowedRef.current && AppState.currentState === 'active' && sequence.current === request;
   }, []);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', next => {

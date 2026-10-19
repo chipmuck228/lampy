@@ -1,7 +1,8 @@
+import {familySafetyGeneration,subscribeFamilySafety} from '../application/family-safety-events';
 import {AlbumCoverFace} from './album-cover-tile';
 import { AlbumEditorFields } from './album-workflow-controls';
 import {normalizeAlbumName} from '../application/life-album';
-import {useCallback,useState} from 'react';
+import {useCallback,useEffect,useState} from 'react';
 import {Pressable,View} from 'react-native';
 import {Image} from 'expo-image';
 import {useFocusEffect} from 'expo-router';
@@ -26,11 +27,13 @@ export function FamilyAlbumEditor({book,busy,onSave}:{book:FamilyAlbumView;busy:
 // The parent hides this preview on expiry and unmounts it on withdrawal or loss of access.
 export function FamilyAlbumCoverPreview({familyId,cover,compact=false,tile}:{familyId:string;cover:FamilyAlbumCover;compact?:boolean;tile?:{name:string;width:number;height:number}}){
  const [uri,setUri]=useState<string|null>(null);
+ const [safety,setSafety]=useState(familySafetyGeneration);
+ useEffect(()=>subscribeFamilySafety(()=>{setUri(null);setSafety(familySafetyGeneration());}),[]);
  useFocusEffect(useCallback(()=>{
-  let current=true;setUri(null);
-  void (async()=>{try{const app=await getFamilyUseCases();const read=await app.history.read(familyId,cover.shareId,()=>current,cover.objectId);if(current)setUri(read.media.find(media=>media.objectId===cover.objectId)?.uri??null);}catch{if(current)setUri(null);}})();
+  let current=true;const valid=()=>current&&familySafetyGeneration()===safety;setUri(null);
+  void (async()=>{try{const app=await getFamilyUseCases();const read=await app.history.read(familyId,cover.shareId,valid,cover.objectId);if(valid())setUri(read.media.find(media=>media.objectId===cover.objectId)?.uri??null);}catch{if(valid())setUri(null);}})();
   return()=>{current=false;setUri(null);};
- },[familyId,cover.shareId,cover.objectId]));
+ },[familyId,cover.shareId,cover.objectId,safety]));
  if(tile)return <AlbumCoverFace name={tile.name} coverUri={uri} width={tile.width} height={tile.height} privateMedia showWordsFallback={false}/>;
  return uri?<Image accessibilityLabel={tr('家庭照片')} source={{uri}} cachePolicy="none" contentFit={compact?'cover':'contain'} style={compact?{width:72,height:96}:{width:'100%',height:180}}/>:null;
 }

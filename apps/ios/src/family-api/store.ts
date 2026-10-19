@@ -17,6 +17,12 @@ export type IdempotentRecord = {
 };
 
 export type FamilyStore = {
+  sharingRestrictionAudit: import('./safety-types').SharingRestriction[];
+  sharingRestrictions: import('./safety-types').SharingRestriction[];
+  safetyReports: import('./safety-types').SafetyReport[];
+  userBlocks: import('./safety-types').UserBlock[];
+  moderation: import('./safety-types').ModerationRecord[];
+  moderationAudit: import('./safety-types').ModerationRecord[];
   accountMediaCleanup: string[];
   purchaseTokens: {userId:string;token:string}[];
   purchases: import('./purchase-types').PurchaseRecord[];
@@ -43,6 +49,7 @@ export type FamilyStore = {
 
 export function createFamilyStore(): FamilyStore {
   return {
+    sharingRestrictionAudit: [], sharingRestrictions: [], safetyReports: [], userBlocks: [], moderation: [], moderationAudit: [],
     accountMediaCleanup: [],
     purchaseTokens: [], purchases: [], purchaseGrants: [],
     familyAlbums: [], familyAlbumNotices: [],

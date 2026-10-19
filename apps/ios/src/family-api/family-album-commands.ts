@@ -1,3 +1,5 @@
+import {assertSharedTextAllowed} from './content-policy';
+import {safetyVisible,familySafetyFilter} from './safety-commands';
 import { createHash } from 'node:crypto';
 import { FamilyError } from './errors';
 import { requireFamilyReadPolicy } from './history-policy';
@@ -8,8 +10,8 @@ const MAX_CONTENT_BYTES=8*1024*1024;
 const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function fail(code:string):never {throw new FamilyError(code,code);}
 function id(value:unknown):asserts value is string {if(typeof value!=='string'||!value.trim()||value.length>150||/[\s/\\]/.test(value)) fail('BAD_REQUEST');}
-function name(value:unknown):asserts value is string {if(typeof value!=='string'||!value.trim()||value.length>200)fail('BAD_REQUEST');}
-function opening(value:unknown) {if(value!==null&&(typeof value!=='string'||value.length>20000))fail('BAD_REQUEST');}
+function name(value:unknown):asserts value is string {if(typeof value!=='string'||!value.trim()||value.length>200)fail('BAD_REQUEST');assertSharedTextAllowed(value);}
+function opening(value:unknown) {if(value!==null&&(typeof value!=='string'||value.length>20000))fail('BAD_REQUEST');assertSharedTextAllowed(value as string|null);}
 export function createFamilyAlbumCommands(deps:{
   enabled:boolean; clock:FamilyClock;
   exportEnabled?:boolean;
@@ -42,9 +44,9 @@ export function createFamilyAlbumCommands(deps:{
     id(albumId);const row=await tx.findFamilyAlbum(albumId);
     if(!row||row.familyId!==familyId)fail('FAMILY_ALBUM_NOT_FOUND');return row;
   }
-  async function visible(tx:FamilyTx,familyId:string,shareId:string) {
+  async function visible(tx:FamilyTx,familyId:string,shareId:string,userId:string) {
     const share=await tx.findShare(shareId);
-    return share?.familyId===familyId&&share.status==='active'?share:null;
+    return share?.familyId===familyId&&await safetyVisible(tx,userId,share)?share:null;
   }
   async function shareView(tx:FamilyTx,row:ShareRecord):Promise<ShareView> {
     return {shareId:row.shareId,familyId:row.familyId,authorUserId:row.authorUserId,authorNickname:(await tx.findProfile(row.authorUserId))?.nickname??'',
@@ -52,10 +54,11 @@ export function createFamilyAlbumCommands(deps:{
   }
   async function view(tx:FamilyTx,row:FamilyAlbumRecord,permission:FamilyAlbumAccess):Promise<FamilyAlbumView> {
     let contentBytes=Buffer.byteLength(row.name+(row.opening??''),'utf8');
+    const safe=await familySafetyFilter(tx,permission.userId,row.familyId);
     const items:FamilyAlbumView['items']=[];let cover:FamilyAlbumView['cover']=null;
     for(const shareId of row.shareIds) {
-      const share=await visible(tx,row.familyId,shareId);
-      if(!share) {items.push({shareId,status:'withdrawn'});continue;}
+      const share=await tx.findShare(shareId);
+      if(!share||!safe(share)) {items.push({shareId,status:'withdrawn'});continue;}
       contentBytes+=Buffer.byteLength(JSON.stringify(share.snapshot),'utf8');if(contentBytes>MAX_CONTENT_BYTES)fail('FAMILY_ALBUM_TOO_LARGE');
       const snapshot=await shareView(tx,share);items.push({shareId,status:'active',share:snapshot});
       if(!cover)for(const media of snapshot.snapshot.media) {
@@ -105,6 +108,7 @@ export function createFamilyAlbumCommands(deps:{
     list(session,familyId) {return authed(session,async(tx,userId)=>{
       const permission=await access(tx,familyId,userId);acknowledged(permission);
       const rows=await tx.listFamilyAlbums(familyId);
+      const safe=await familySafetyFilter(tx,userId,familyId);
       // Summaries expose a current cover reference, never record bodies or private file URLs.
       const shares=new Map((await tx.listSharesInFamily(familyId)).map(share=>[share.shareId,share]));
       const objects=new Map<string,Awaited<ReturnType<FamilyTx['findMediaObject']>>>();
@@ -113,7 +117,7 @@ export function createFamilyAlbumCommands(deps:{
         let cover:FamilyAlbumView['cover']=null;
         const candidates=coverChoice&&shareIds.includes(coverChoice.shareId)?[coverChoice.shareId,...shareIds]:shareIds;
         for(let index=0;index<candidates.length&&!cover;index++){
-          const share=shares.get(candidates[index]);if(!share||share.familyId!==familyId||share.status!=='active')continue;
+          const share=shares.get(candidates[index]);if(!share||!safe(share))continue;
           const manual=!!coverChoice&&index===0&&shareIds.includes(coverChoice.shareId);
           for(const media of share.snapshot.media){
             if(manual&&media.objectId!==coverChoice!.objectId)continue;
@@ -128,7 +132,9 @@ export function createFamilyAlbumCommands(deps:{
     });},
     sources(session,familyId) {return authed(session,async(tx,userId)=>{
       const permission=await access(tx,familyId,userId);acknowledged(permission);
-      const rows=(await tx.listSharesInFamily(familyId)).filter(row=>row.status==='active').sort((a,b)=>a.sharedAt.localeCompare(b.sharedAt)||a.shareId.localeCompare(b.shareId));
+      const safe=await familySafetyFilter(tx,userId,familyId);
+      const visibleRows=(await tx.listSharesInFamily(familyId)).filter(safe);
+      const rows=visibleRows.sort((a,b)=>a.sharedAt.localeCompare(b.sharedAt)||a.shareId.localeCompare(b.shareId));
       if(rows.length>2000||rows.reduce((bytes,row)=>bytes+Buffer.byteLength(JSON.stringify(row.snapshot),'utf8'),0)>MAX_CONTENT_BYTES)fail('FAMILY_ALBUM_TOO_LARGE');
       return {access:permission,shares:await Promise.all(rows.map(row=>shareView(tx,row)))};
     });},
@@ -155,9 +161,11 @@ export function createFamilyAlbumCommands(deps:{
       if(!Number.isInteger(input.revision)||row.revision!==input.revision)fail('FAMILY_ALBUM_CHANGED');
       const change=input.change;if(!change||typeof change!=='object')fail('BAD_REQUEST');
       if(change.kind==='collect') {
-        const candidates=change.shareIds==='all'?(await tx.listSharesInFamily(familyId)).filter(row=>row.status==='active').sort((a,b)=>a.sharedAt.localeCompare(b.sharedAt)||a.shareId.localeCompare(b.shareId)).map(row=>row.shareId):change.shareIds;
+        const safe=await familySafetyFilter(tx,userId,familyId);
+        const readable=change.shareIds==='all'?(await tx.listSharesInFamily(familyId)).filter(safe):[];
+        const candidates=change.shareIds==='all'?readable.sort((a,b)=>a.sharedAt.localeCompare(b.sharedAt)||a.shareId.localeCompare(b.shareId)).map(row=>row.shareId):change.shareIds;
         if(!Array.isArray(candidates)||candidates.length>2000||new Set(candidates).size!==candidates.length)fail('BAD_REQUEST');
-        for(const shareId of candidates) {id(shareId);if(!await visible(tx,familyId,shareId))fail('SHARE_NOT_FOUND');}
+        for(const shareId of candidates) {id(shareId);if(!await visible(tx,familyId,shareId,userId))fail('SHARE_NOT_FOUND');}
         row.shareIds=[...new Set([...row.shareIds,...candidates])];
       } else if(change.kind==='edit') {
         name(change.name);opening(change.opening);
@@ -165,7 +173,7 @@ export function createFamilyAlbumCommands(deps:{
         if(choice!==null) {
           if(!choice||typeof choice!=='object')fail('BAD_REQUEST');id(choice.shareId);id(choice.objectId);
           if(!row.shareIds.includes(choice.shareId))fail('SHARE_NOT_FOUND');
-          const share=await visible(tx,familyId,choice.shareId);
+          const share=await visible(tx,familyId,choice.shareId,userId);
           const media=share?.snapshot.media.find(media=>media.objectId===choice.objectId);
           const object=media?await tx.findMediaObject(choice.objectId):null;
           if(!share||!object||object.ownerUserId!==share.authorUserId||!object.mimeType.startsWith('image/'))fail('SHARE_NOT_FOUND');

@@ -90,7 +90,7 @@ it('shows actions only below the selected member and switches selection without 
  expect(mockCreateTransfer).not.toHaveBeenCalled();expect(mockRemove).not.toHaveBeenCalled();
 });
 it('does not offer member management to a recipient or under protection',async()=>{
- const page=await open();expect(page.queryByTestId('family-member-ma')).toBeNull();expect(page.queryByTestId('family-transfer-mb')).toBeNull();
+ const page=await open();await fireEvent.press(page.getByTestId('family-member-ma'));expect(page.getByText('屏蔽内容')).toBeTruthy();expect(page.queryByTestId('family-transfer-mb')).toBeNull();expect(page.queryByTestId('family-remove-ma')).toBeNull();
  mockLock.snapshot.locked=true;await page.rerender(<FamilyCardMembers familyId="home" onChanged={mockChanged}/>);expect(page.queryByText('你')).toBeNull();
 });
 

@@ -1,3 +1,4 @@
+import {sqliteSafetyTx} from './safety-repository';
 import {purgeSqliteAccount} from './account-purge-sqlite';
 import { FamilyError, FAMILY_ERROR } from './errors';
 import { FamilyStoreConstraintError, type FamilyRepository, type FamilyTx } from './repository';
@@ -233,6 +234,7 @@ export function mapFamilySqlConstraint(error: unknown) {
 
 function createSqliteTx(db: FamilySql): FamilyTx {
   const tx: FamilyTx = {
+    ...sqliteSafetyTx(db),
     async purgeAccount(userId) {await purgeSqliteAccount(db,userId);},
     async isMediaStorageKeyLive(key) {return Boolean(await db.getFirst('SELECT object_id FROM family_media_objects WHERE storage_key=? LIMIT 1',[key]));},
     async enqueueAccountMediaCleanup(key) {await db.run('INSERT OR IGNORE INTO family_account_media_cleanup(storage_key) VALUES(?)',[key]);},

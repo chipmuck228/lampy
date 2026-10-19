@@ -2,6 +2,10 @@ import type {FamilySql} from './schema';
 import type {FamilyAlbumRecord} from './family-album-types';
 // Called inside the repository's BEGIN IMMEDIATE. Retired files are queued before rows disappear.
 export async function purgeSqliteAccount(db:FamilySql,userId:string) {
+ await db.run('DELETE FROM family_safety_reports WHERE reporter_user_id=? OR author_user_id=?',[userId,userId]);
+ await db.run('DELETE FROM family_user_blocks WHERE user_id=? OR target_user_id=?',[userId,userId]);
+ for(const table of ['family_content_moderation','family_moderation_audit'])await db.run(`DELETE FROM ${table} WHERE share_id IN (SELECT share_id FROM family_shares WHERE author_user_id=?)`,[userId]);
+ await db.run('DELETE FROM family_auth_rate_limits WHERE bucket=?',['safety-report:'+userId]);
  const solo=await db.getAll<{family_id:string}>(`SELECT DISTINCT family_id FROM family_memberships m
  WHERE user_id=? AND role='creator' AND status='active' AND NOT EXISTS
  (SELECT 1 FROM family_memberships o WHERE o.family_id=m.family_id AND o.user_id<>? AND o.status='active')`,[userId,userId]);
@@ -22,7 +26,7 @@ export async function purgeSqliteAccount(db:FamilySql,userId:string) {
  }
  await db.run('DELETE FROM family_album_notices WHERE json_extract(json,\'$.userId\')=?',[userId]);
  await db.run('DELETE FROM family_purchase_grants WHERE purchase_key IN (SELECT purchase_key FROM family_purchases WHERE user_id=?)',[userId]);
- for(const table of ['family_purchases','family_purchase_tokens','family_sessions','family_apple_challenges','family_user_profiles','family_test_credentials','family_login_identities','family_memberships','family_directory_history'])await db.run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
+ for(const table of ['family_sharing_restrictions','family_sharing_restriction_audit','family_purchases','family_purchase_tokens','family_sessions','family_apple_challenges','family_user_profiles','family_test_credentials','family_login_identities','family_memberships','family_directory_history'])await db.run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
  await db.run('DELETE FROM family_creator_transfers WHERE from_user_id=? OR to_user_id=?',[userId,userId]);
  for(const table of ['family_invite_links','family_invitations'])await db.run(`UPDATE ${table} SET accepted_by_user_id=NULL WHERE accepted_by_user_id=?`,[userId]);
  await db.run('UPDATE family_families SET history_confirmed_by=NULL WHERE history_confirmed_by=?',[userId]);

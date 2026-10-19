@@ -46,6 +46,7 @@ function statusFor(code: string) {
     case 'PURCHASE_REQUIRED':
     case 'PURCHASE_ACCOUNT_MISMATCH':
     case 'PURCHASE_INVALID':
+    case 'SHARING_RESTRICTED':
     case FAMILY_ERROR.FORBIDDEN:
       return 403;
     case FAMILY_ERROR.INVITE_NOT_FOUND:
@@ -150,6 +151,14 @@ export async function dispatchFamilyApi(
     if (method === 'POST' && path === '/v2/auth/email/register') return { status: 201, body: await commands.registerControlledEmail({email:readString(body,'email'),password:readString(body,'password'),nickname:readString(body,'nickname')},request.peer) };
     if (method === 'POST' && path === '/v2/auth/email/login') return { status: 200, body: await commands.signInWithControlledEmail({email:readString(body,'email'),password:readString(body,'password')},request.peer) };
     if (method === 'GET' && path === '/v2/me/profile') return {status:200,body:await commands.getMyProfile(token || '')};
+    if (method === 'GET' && path === '/v2/me/safety/reports') return {status:200,body:await commands.safety.reports(token||'')};
+    if (method === 'GET' && path === '/v2/me/safety/blocks') return {status:200,body:await commands.safety.blocks(token||'')};
+    const safetyReport = /^\/v2\/families\/([^/]+)\/shares\/([^/]+)\/reports$/.exec(path);
+    if (method === 'POST' && safetyReport) return {status:201,body:await commands.safety.report(token||'',safetyReport[1],safetyReport[2],{requestId:readString(body,'requestId'),reason:readString(body,'reason') as import('./safety-types').ReportReason,detail:readString(body,'detail')})};
+    const safetyBlock = /^\/v2\/families\/([^/]+)\/blocks\/([^/]+)$/.exec(path);
+    if (method === 'PUT' && safetyBlock) return {status:200,body:await commands.safety.block(token||'',safetyBlock[1],safetyBlock[2])};
+    const safetyUnblock = /^\/v2\/me\/safety\/blocks\/([^/]+)$/.exec(path);
+    if (method === 'DELETE' && safetyUnblock) return {status:200,body:await commands.safety.unblock(token||'',safetyUnblock[1])};
     if (method === 'PATCH' && path === '/v2/me/profile') return {status:200,body:await commands.updateMyProfile(token || '',readString(body,'nickname'))};
 
     if (method === 'POST' && path === '/v1/auth/test-account') {

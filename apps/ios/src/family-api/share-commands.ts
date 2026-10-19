@@ -1,3 +1,5 @@
+import {assertSharedTextAllowed} from './content-policy';
+import {assertCanShare,safetyVisible,familySafetyFilter} from './safety-commands';
 import { createHash } from 'node:crypto';
 import { assertHistoryEnabled, requireFamilyReadPolicy, HISTORY_CONFIRMATION } from './history-policy';
 import { FAMILY_ERROR, FamilyError } from './errors';
@@ -236,6 +238,8 @@ export function createShareCommands(deps: {
       return deps.repository.withTransaction(async (tx) => {
         const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
         await member(tx, familyId, userId);
+        await assertCanShare(tx,userId);
+        assertSharedTextAllowed(input.note,input.emotion);
 
         if (input.idempotencyKey) {
           const existing = await tx.findIdempotent(userId, shareCommand, input.idempotencyKey);
@@ -245,7 +249,7 @@ export function createShareCommands(deps: {
             }
             const replayed = asShareView(existing.body);
             const row = replayed ? await tx.findShare(replayed.shareId) : null;
-            if (!row || row.authorUserId !== userId || !shareIsActive(row)) {
+            if (!row || row.authorUserId !== userId || !shareIsActive(row) || (await tx.findModeration(row.shareId))?.hidden) {
               throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
             }
             return await toView(tx, row);
@@ -274,7 +278,7 @@ export function createShareCommands(deps: {
           },
         };
         if (sameRevision) {
-          if (!shareIsActive(sameRevision)) {
+          if (!shareIsActive(sameRevision) || (await tx.findModeration(sameRevision.shareId))?.hidden) {
             throw new FamilyError(FAMILY_ERROR.CONFLICT, 'This moment revision was already shared and revoked.');
           }
           if (!snapshotEquals(sameRevision.snapshot, snapshot)) {
@@ -366,8 +370,9 @@ export function createShareCommands(deps: {
         const userId = await requireUser(tx, sessionToken, clock.now(), testAccountLoginEnabled);
         const membership = await member(tx, familyId, userId);
         const rows = await tx.listSharesInFamily(familyId);
+        const safe=await familySafetyFilter(tx,userId,familyId);
         return {
-          shares: await Promise.all(rows.filter((row) => canSeeShare(membership, row, policy)).map(row => toView(tx, row))),
+          shares: await Promise.all(rows.filter(row=>canSeeShare(membership,row,policy)&&safe(row)).map(row=>toView(tx,row))),
         };
       });
     },
@@ -427,7 +432,7 @@ async function authorizeVisibleShare(
   if (!row || row.familyId !== familyId || !shareIsActive(row)) {
     throw new FamilyError(FAMILY_ERROR.SHARE_NOT_FOUND, 'Share was not found.');
   }
-  if (!canSeeShare(membership, row, policy)) {
+  if (!canSeeShare(membership, row, policy) || !await safetyVisible(tx,userId,row)) {
     throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'This share is not available.');
   }
   return { userId, share: row };
