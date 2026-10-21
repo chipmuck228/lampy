@@ -1,0 +1,28 @@
+[Unit]
+Description=Lampy family report admin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lampy-family
+Group=lampy-family
+WorkingDirectory=/opt/lampy-family-admin/apps/ios
+EnvironmentFile=/etc/lampy/admin.env
+ExecStart=/usr/local/bin/node /opt/lampy-family-admin/apps/ios/scripts/family-admin.cjs
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+InaccessiblePaths=-/etc/lampy/keys -/etc/lampy/family.env
+ReadWritePaths=/srv/lampy-family
+ReadOnlyPaths=/srv/lampy-family/media
+LimitCORE=0
+MemoryMax=384M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

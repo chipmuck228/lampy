@@ -1,0 +1,7 @@
+# Add exactly one site block to the existing Caddyfile. DNS A record points to this host.
+admin.yunpura.com {
+    reverse_proxy 127.0.0.1:8790 {
+        header_up Host admin.yunpura.com
+        header_up X-Lampy-Admin-Client {remote_host}
+    }
+}
