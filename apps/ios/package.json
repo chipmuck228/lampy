@@ -54,7 +54,9 @@
     "eslint-config-expo": "^57.0.2",
     "jest": "^29.7.0",
     "jest-expo": "^57.0.5",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "jsdom": "20.0.3",
+    "@types/jsdom": "20.0.1"
   },
   "scripts": {
     "start": "bash ./scripts/start-dev-client.sh",
@@ -77,7 +79,9 @@
     "postinstall": "node ./scripts/apply-native-patches.cjs",
     "native:patch": "node ./scripts/apply-native-patches.cjs",
     "build-tools:test": "node --test ./scripts/inspect-release-archive.test.cjs ./scripts/native-build-fix.test.cjs",
-    "album-export:preflight": "node ./scripts/album-export-preflight.cjs"
+    "album-export:preflight": "node ./scripts/album-export-preflight.cjs",
+    "family-admin": "node ./scripts/family-admin.cjs",
+    "family-admin:password": "node ./scripts/family-admin-password.cjs"
   },
   "expo": {
     "autolinking": {
