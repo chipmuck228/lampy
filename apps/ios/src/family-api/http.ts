@@ -83,6 +83,7 @@ function statusFor(code: string) {
     case FAMILY_ERROR.PAYLOAD_TOO_LARGE:
       return 413;
     case FAMILY_ERROR.MEDIA_UNSUPPORTED:
+    case FAMILY_ERROR.MEDIA_IMAGE_PREPARATION_REQUIRED:
       return 415;
     case FAMILY_ERROR.MEDIA_WRITE_FAILED:
       return 507;

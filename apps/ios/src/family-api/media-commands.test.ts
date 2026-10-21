@@ -39,6 +39,16 @@ function setup(options?: { now?: Date; sessionTtlMs?: number; blobs?: ReturnType
 }
 
 describe('family media object commands', () => {
+  it('rejects metadata-bearing uploads before blob writes or idempotent reuse', async () => {
+    const {commands,store,blobs}=setup();
+    const a=await commands.signInWithApple('apple_alice'), clean=sampleJpegBytes();
+    const dirty=new Uint8Array([255,216,255,225,0,10,69,120,105,102,0,0,1,2,...clean.subarray(2)]);
+    await expect(commands.uploadMedia(a.sessionToken,{bytes:dirty,mimeType:'image/jpeg',idempotencyKey:'photo'})).rejects.toMatchObject({code:'MEDIA_IMAGE_PREPARATION_REQUIRED'});
+    expect(blobs.files.size).toBe(0); expect(store.mediaObjects).toHaveLength(0);
+    await commands.uploadMedia(a.sessionToken,{bytes:clean,mimeType:'image/jpeg',idempotencyKey:'photo'});
+    await expect(commands.uploadMedia(a.sessionToken,{bytes:dirty,mimeType:'image/jpeg',idempotencyKey:'photo'})).rejects.toMatchObject({code:'MEDIA_IMAGE_PREPARATION_REQUIRED'});
+    expect(blobs.files.size).toBe(1);
+  });
   it('stores owner-bound objects without local paths and refuses other accounts', async () => {
     const { commands, store, blobs } = setup();
     const alice = await commands.signInWithApple('apple_alice');

@@ -1,0 +1,83 @@
+# 家庭照片分享副本：元数据最小化
+
+基线 main a17bdc8（#128 已合并）。本片只处理新照片分享副本、上传防线和历史文件只读盘点；不修改私人原记录，不开放购买／成品导出／打印，不增加 schema 迁移。不宣称历史文件已经清理或真机验收完成。
+
+## 实现
+
+- 无元数据容器且符合允许结构的 JPEG／PNG，复制字节使用，不重复有损编码。其他图片（含带 EXIF／ICC 的 JPEG／PNG、HEIC）必须由新的 iOS 原生模块生成独立副本，不能失败后回退上传原文件。
+- 新原生模块 LampyFamilyImages 使用 ImageIO 解码，应用方向／镜像，CGContext 转到 8-bit sRGB，再创建全新的编码目标。不传入源文件的 metadata 字典，不接受文件路径，不创建中间文件，不写回私人库或系统相册。
+- JPEG／HEIC 输出 JPEG（quality 0.9）；PNG 输出 PNG，保留透明度。不裁剪、不拉伸、不主动缩小。输入／输出最多 8 MiB、输入最多 40MP，超限或解码失败停止分享并保留私人内容。原生队列串行，避免并发全图渲染。
+- 原生 sRGB／方向处理完成后，JS 容器白名单去除 JPEG 所有 APP／COM（含 EXIF GPS、XMP、IPTC、缩略图、ICC、备注）及 EOI 后尾部。PNG 只保留 IHDR／PLTE／IDAT／IEND、透明度与固定色彩参数，去除 eXIf、文本、iCCP、私有辅助块和尾部。ICC 只能在已转 sRGB 后删除；不得拿此函数直接改旧原图，否则可能破坏方向／色彩。
+- 解析覆盖 JPEG 多扫描区段和扫描后的 metadata；PNG 校验边界和 CRC，拒绝未知关键块。此检查不是完整图片解码器，也不移除画面中可见文字／地标、像素隐写或声音元数据。
+- 历史／旧分享／选定媒体上传均调用同一准备函数。转换期间切账号／离页／锁定时仍保留资格检查；原图哈希用于源变动检查，上传幂等键使用实际副本字节。
+- 家庭 API 在新照片写文件、去重或幂等重放前检查容器。未满足条件返回 415／MEDIA_IMAGE_PREPARATION_REQUIRED，不保存原始照片。声音路径不变。现有文件读取仍按既有资格及哈希验证，不能通过偷偷重写字节破坏读取一致性。
+
+## 历史只读盘点
+
+脚本：`scripts/family-photo-metadata-audit.cjs`；依赖同版本 `src/family-api/photo-metadata.ts` 及现有 TypeScript。只通过环境读取数据库和媒体目录，严格要求现有 schema 33，以 readOnly 打开，不迁移、不修文件、不创建数据库，不取 GPS 值／照片内容作输出。
+
+扫描所有索引照片，核对大小／SHA256，分类 clean、needsPreparation、invalidOrUnsupported；同时检查未索引媒体文件、partial 和异常路径。拒绝跟随媒体符号链接。不能仅扫描一个测试分享就声称全库已清理。聚合数可能包含其他必要色彩容器，needsPreparation 不等于已发现 GPS。
+
+先在安静时段执行。只读事务保证数据库视图一致，但不能冻结外部媒体写入；有 concurrentChange／integrityMismatch／missing 时应停下来核对、在无写入时重跑，不直接删文件。
+
+在正式 API 的脚本目录安装脚本和新增解析源文件后（不替换正在运行的 API 代码），通过相同用户与环境执行，例如：
+
+```sh
+sudo systemd-run \
+  --unit="lampy-photo-metadata-audit-$(date +%s)" \
+  --wait --pipe --collect \
+  --property=User=lampy-family \
+  --property=Group=lampy-family \
+  --property=EnvironmentFile=/etc/lampy/family.env \
+  --property=NoNewPrivileges=true \
+  --property=ProtectSystem=strict \
+  --property=ProtectHome=true \
+  /usr/local/bin/node \
+  /opt/lampy-family/apps/ios/scripts/family-photo-metadata-audit.cjs
+```
+
+预期 mode=READ_ONLY、schema=33。已有库的数字不能预先填写。clean 只证明符合此容器策略，不证明物理擦除、无外部副本或无所有可能敏感信息。partialFiles、unindexedNeedsPreparation、invalidOrUnsupported 等不为零时仍需处理。
+
+### 不直接覆盖历史文件
+
+旧照片可能依赖 EXIF 方向／ICC；服务端媒体行、分享快照／幂等副本和客户端缓存还引用旧大小与哈希。因此历史处理须在盘点后做独立的受控变更：全尺寸方向与 sRGB 重绘、验证新副本、更新所有有效引用／幂等及缓存版本，再退休旧文件；失败可重试，不批量丢弃正常照片。不因报告有 metadata 就删记录。
+
+当前脚本不会替换文件，也没有自动上传历史照片到第三方服务。生产输出提供前，本片不能宣布第一部分全部验收完成。
+
+## 部署顺序
+
+1. 先完成 Mac 新原生模块构建及真机验证，不是 Metro reload。已有预编译 App 不含此模块；普通无元数据照片仍可走安全复制，带元数据／HEIC 应明确失败而不泄露。
+2. 用未使用的新 build 分发更新客户端，保持 appstore-v1 所有付费／导出开关关闭。
+3. 部署 API 的上传检查并重启 API，schema 仍 33；Admin 服务不需因此重启。旧客户端分享带元数据照片可能被 415 拒绝，必须提前安排升级；文字、声音和既有家庭阅读不改变。
+4. 部署／执行只读盘点，记录新测试分享和全部历史文件结果；完成历史处置后再全量复查。
+
+## 真机矩阵
+
+使用专门测试家庭和无私人内容的照片，不把样本或坐标提交到 git。
+
+| 项目 | 操作及标准 |
+| --- | --- |
+| GPS JPEG／HEIC | 选用已确认带位置的照片，在本机保存后分享到家庭；服务器新副本符合 clean 策略，本机原图／原资产仍保留原元数据与字节 |
+| PNG | 含 EXIF／文本 PNG 分享后无这些块，透明区域正常；不能只测相册截图一种格式 |
+| 方向 | EXIF 1–8，横竖／镜像照片在个人、家庭记录、家庭册封面及纸页方向一致，无裁剪／拉伸 |
+| 色彩 | sRGB／Display P3 照片无明显偏色；转 sRGB 允许正常色域压缩，不承诺 HDR／超出 sRGB 的像素逐值相同 |
+| 重试／再分享 | 同图重试、另一家庭分享、同册／另一册阅读正常，哈希无错配，不重复丢图片 |
+| 失败 | 旧原生构建（需要处理的照片）、解码失败／超限都不退回上传原字节，不改私人内容，可取消照片后分享文字 |
+| 权限 | 转换中离页、后台、锁定、切账号不会提交迟到分享；撤回／屏蔽／下架仍正常收起照片 |
+| 历史 | 全库盘点结果记录，异常文件单独核对；没有因为某个新样本 clean 就宣称旧文件 clean |
+
+## 检查边界
+
+本地可验证容器移除、失败闭合、上传未落盘、个人字节不变、资格／幂等／哈希及只读盘点。当前 Linux 环境不能替代 Xcode／ImageIO 编译或真实 iPhone 的方向、色彩、HEIC 与透明度验收。完成后记录 App build、代码 SHA、API 部署 SHA、schema 33 与聚合盘点结果。
+
+依据：2026-10-21 核对 [Expo 57 ImageManipulator](https://docs.expo.dev/versions/v57.0.0/sdk/imagemanipulator/)、[W3C PNG 规范](https://www.w3.org/TR/png-3/)。原生采用明确 sRGB 位图重绘，不能把普通 exif:false 或未经验证的编码器行为当作去位置证据。
+
+原生 API 参考：[ImageIO 方向变换](https://developer.apple.com/documentation/imageio/kcgimagesourcecreatethumbnailwithtransform)、[CGColorSpace](https://developer.apple.com/documentation/coregraphics/cgcolorspace)。原生编译与真实像素效果仍须 Mac／iPhone 复核。
+
+## 本轮本地验证（2026-10-21）
+
+- 42 个相关 Jest 套件、356 项测试最终复验通过，覆盖 API、Admin、媒体读写／哈希／幂等、分享与账号／家庭资格、撤回、清理及新增照片检查。原来故意不完整的 JPEG／PNG 夹具改为可解码合成图；一个用 EOI 后加字节制造不同照片的夹具改为不同像素编码数据，避免把新策略要求拒绝的尾部当作合法照片。
+- 只读盘点 2 项 Node 测试、appstore-v1 3 项配置测试通过；TypeScript、变更 TS 的针对性 ESLint（零警告）、CLI 语法、差异空白检查通过。
+- 本地 20 组合成图像独立解码像素比较通过，覆盖基线／渐进 JPEG 与 PNG alpha；这只验证容器清理不损坏已有编码流，不代表 Apple 原生重绘的颜色／方向实测。
+- Expo 自动链接 search／resolve 发现 LampyFamilyImages pod 与模块；不是 CocoaPods 安装、Swift 编译或真机验证。
+- 未连接生产服务器、未执行真实历史盘点、未处理真实照片、未改写或清除历史文件、未上传新 TestFlight。验收和部署仍待操作者完成，当前 PR 保持草稿。

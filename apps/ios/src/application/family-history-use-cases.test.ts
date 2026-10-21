@@ -30,6 +30,22 @@ async function fixture() {
   return {commands,a,b,f,session,client,cache,personal,history,requests,attach:()=>{moment={...moment,assetIds:['asset_d2']};},change:()=>{moment={...moment,revision:moment.revision+1,content:{...moment.content,note:'changed'}};}};
 }
 const current=()=>true;
+it('prepares a metadata-bearing JPEG copy before history upload, preserves the private source and aborts on a late conversion',async()=>{
+  const x=await fixture();x.attach();
+  const plain=sampleJpegBytes(), source=new Uint8Array([255,216,255,225,0,10,69,120,105,102,0,0,1,2,...plain.subarray(2)]);
+  x.personal.readAssetBytes.mockResolvedValue(source);
+  const convert=jest.fn(async()=>({bytes:plain,mimeType:'image/jpeg'}));
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:convert}});
+  const p=await history.prepare('moment_d2',x.f.familyId,current);
+  await history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  expect(convert).toHaveBeenCalledWith(source,'image/jpeg');expect(x.requests.find(r=>r.path==='/v1/media')!.bytes).toEqual(plain);
+  expect(source[3]).toBe(225);expect(x.personal.assets.findById.mock.results[0]).toBeDefined();
+  let active=true;
+  const cancelled=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:async()=>{active=false;return {bytes:plain,mimeType:'image/jpeg'};}}});
+  const cp=await cancelled.prepare('moment_d2',x.f.familyId,()=>active), before=x.requests.filter(r=>r.path==='/v1/media').length;
+  await expect(cancelled.share(cp,HISTORY_AUDIENCE_CONFIRMATION,()=>active)).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+  expect(x.requests.filter(r=>r.path==='/v1/media')).toHaveLength(before);
+});
 it('requires explicit consent, binds a target, retries once and sends only the snapshot whitelist',async()=>{
   const x=await fixture();x.attach();
   const preview=await x.history.prepare('moment_d2',x.f.familyId,current);
@@ -135,7 +151,7 @@ it('rejects fake JPEG relabelling and never posts a share',async()=>{
   const x=await fixture();x.attach();(await x.personal.assets.findById()).asset.metadata.mimeType='image/heic';
   const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:async()=>({bytes:new Uint8Array([1,2,3]),mimeType:'image/jpeg'})}});
   const p=await history.prepare('moment_d2',x.f.familyId,current);
-  await expect(history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'MEDIA_CORRUPT'});
+  await expect(history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'SHARE_IMAGE_CONVERSION_FAILED'});
   expect(x.requests.some(r=>r.path==='/v1/media')).toBe(false);
 });
 it('drops a conversion completed after background cancellation',async()=>{
