@@ -43,6 +43,21 @@ for (const engine of ['memory','sqlite']) describe('family safety '+engine,()=>{
   await expect(f.commands.safety.report(f.a.sessionToken,'foreign',f.share.shareId,input)).rejects.toMatchObject({code:'NOT_IN_FAMILY'});
   const response=await dispatchFamilyApi(f.commands,{method:'GET',path:'/v2/me/safety/reports',headers:{}});expect(response.status).toBe(401);
  });
+ it('returns only qualified coarse metadata for old reports, and drops it after withdrawal or membership loss',async()=>{
+  const f=await fixture();await f.commands.updateMyProfile(f.b.sessionToken,'B');
+  const r=await f.commands.safety.report(f.a.sessionToken,f.family.familyId,f.share.shareId,{requestId:'metadata',reason:'privacy',detail:'sensitive explanation'});
+  expect(r.summary).toMatchObject({familyName:'Home',authorNickname:'B',photoCount:1,soundCount:0});
+  const json=JSON.stringify((await f.commands.safety.reports(f.a.sessionToken)).reports);
+  for(const forbidden of ['private family text','sensitive explanation','mimeType','objectId','sourceMomentId',f.photo.objectId])expect(json).not.toContain(forbidden);
+  await f.commands.safety.report(f.c.sessionToken,f.family.familyId,f.share.shareId,{requestId:'metadata-c',reason:'privacy',detail:''});
+  const cm=await f.repository.withTransaction(tx=>tx.findActiveMembership(f.family.familyId,f.c.userId));
+  await f.commands.removeSelectedMember(f.a.sessionToken,f.family.familyId,f.c.userId,cm!.membershipId);
+  expect((await f.commands.safety.reports(f.c.sessionToken)).reports[0].summary).toBeNull();
+  await f.commands.safety.block(f.a.sessionToken,f.family.familyId,f.b.userId);
+  expect((await f.commands.safety.reports(f.a.sessionToken)).reports[0].summary?.authorNickname).toBe('B');
+  await f.commands.historyShares.revokeShare(f.b.sessionToken,f.family.familyId,f.share.shareId);
+  expect((await f.commands.safety.reports(f.a.sessionToken)).reports[0].summary).toBeNull();
+ });
  it('filters shares, media, manual/automatic covers and invalidates old album digest only for blocker',async()=>{
   const f=await fixture();expect(f.album.cover?.objectId).toBe(f.photo.objectId);
   await f.commands.safety.block(f.a.sessionToken,f.family.familyId,f.b.userId);

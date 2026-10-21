@@ -5,7 +5,11 @@ export type SafetyReport = {
   shareId: string; reason: ReportReason; detail: string; createdAt: string;
   status: 'pending' | 'reviewed' | 'restricted';
 };
-export type ReportReceipt = Pick<SafetyReport, 'reportId' | 'reason' | 'createdAt' | 'status'>;
+export type ReportSummary = {
+  familyName: string; authorNickname: string; occurredAt?: string; occurredAtPrecision: string;
+  photoCount: number; soundCount: number;
+};
+export type ReportReceipt = Pick<SafetyReport, 'reportId' | 'reason' | 'createdAt' | 'status'> & { summary?: ReportSummary | null };
 export type UserBlock = { userId: string; targetUserId: string; createdAt: string };
 export type ModerationRecord = {
   shareId: string; hidden: boolean; operator: string; reason: string; updatedAt: string;

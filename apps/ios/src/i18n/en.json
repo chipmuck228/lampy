@@ -999,5 +999,17 @@
   "联系与家庭内容安全": "Contact and family content safety",
   "请勿分享色情、暴力威胁、骚扰、侵权或侵犯隐私的内容。分享前会进行基础文字检查；照片和声音可通过举报交由开发者核对。": "Do not share pornography, violent threats, harassment, or content that violates rights or privacy. Basic text checks run before sharing. Photos and audio can be reported for review by the developer.",
   "开发者每天查看举报。确认违规后可限制家庭分享，严重或重复违规可限制账号继续分享。举报不会自动删除内容，本机私人记录不受影响。": "The developer reviews reports daily. Confirmed violations may result in a family share being restricted. Serious or repeated violations may restrict further sharing by the account. A report does not automatically remove content or affect private records on your device.",
-  "支持与申诉：dev@yunpura.com。可在设置的「屏蔽与举报」查看处理状态。": "Support and appeals: dev@yunpura.com. Check report status under Blocked members and reports in Settings."
+  "支持与申诉：dev@yunpura.com。可在设置的「屏蔽与举报」查看处理状态。": "Support and appeals: dev@yunpura.com. Check report status under Blocked members and reports in Settings.",
+  "开发者每天查看举报。如需帮助或申诉，": "The developer reviews reports daily. For help or an appeal,",
+  "请联系：": "Contact: ",
+  "解除对{0}的屏蔽？": "Unblock {0}?",
+  "只解除这位家人的屏蔽。重新联网核验后，会恢复仍可阅读的内容；已撤回或被限制的内容不会恢复。": "Only this member will be unblocked. Content that is still available will return after an online check. Withdrawn or restricted content will remain unavailable.",
+  "有{0}条家庭分享因内容规则被限制。如有异议，请联系 dev@yunpura.com。": "{0} family shares have been restricted under the content rules. To appeal, contact dev@yunpura.com.",
+  "选择家人：{0}": "Select member: {0}",
+  "选择一位家人，再解除屏蔽。每次只影响所选家人。": "Select a member to unblock. Each action affects only the selected member.",
+  "解除所选家人的屏蔽": "Unblock selected member",
+  "{0}分享的记录": "Record shared by {0}",
+  "家庭记录（目前不可用）": "Family record (currently unavailable)",
+  "照片{0}张 · 声音{1}段": "{0} photos · {1} audio recordings",
+  "举报于{0}": "Reported on {0}"
 }

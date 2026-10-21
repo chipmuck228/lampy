@@ -9,7 +9,19 @@ const validId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0
 export async function assertCanShare(tx: FamilyTx, userId: string) {
   if ((await tx.findSharingRestriction(userId))?.restricted) fail('SHARING_RESTRICTED');
 }
-const receipt = (r: SafetyReport): ReportReceipt => ({ reportId: r.reportId, reason: r.reason, createdAt: r.createdAt, status: r.status });
+async function receipt(tx: FamilyTx, r: SafetyReport): Promise<ReportReceipt> {
+  const result: ReportReceipt = {reportId:r.reportId,reason:r.reason,createdAt:r.createdAt,status:r.status,summary:null};
+  const family=await tx.findFamily(r.familyId), member=await tx.findActiveMembership(r.familyId,r.reporterUserId), row=await tx.findShare(r.shareId);
+  // Coarse metadata only, never body, report detail, source ids, media ids, URLs or bytes.
+  // Do not disclose metadata after withdrawal, family dissolution or loss of membership.
+  if(!family || family.status!=='active' || !member || !row || row.familyId!==r.familyId || row.status!=='active' ||
+    (family.historyPolicy!=='family-history-v2'&&(!row.audienceUserIds.includes(r.reporterUserId)||member.joinedAt>row.sharedAt))) return result;
+  result.summary={familyName:family.name??'',authorNickname:(await tx.findProfile(row.authorUserId))?.nickname??'',
+    occurredAt:row.snapshot.occurredAt,occurredAtPrecision:row.snapshot.occurredAtPrecision,
+    photoCount:row.snapshot.media.filter(m=>m.mimeType.startsWith('image/')).length,
+    soundCount:row.snapshot.media.filter(m=>m.mimeType.startsWith('audio/')).length};
+  return result;
+}
 export async function familySafetyFilter(tx: FamilyTx, userId: string, familyId: string) {
   const blocked=new Set((await tx.listUserBlocks(userId)).map(b=>b.targetUserId));
   const hidden=new Set(await tx.listHiddenShares(familyId));
@@ -40,7 +52,7 @@ export function createFamilySafetyCommands(deps: {
       if(cached) {
         if(cached.requestFingerprint!==fingerprint)fail('CONFLICT');
         const found=await tx.findSafetyReport((cached.body as {reportId:string}).reportId);
-        if(!found)fail('NOT_FOUND');return receipt(found);
+        if(!found)fail('NOT_FOUND');return receipt(tx,found);
       }
       const now=deps.clock.now(),bucket='safety-report:'+userId;
       const previous=await tx.findRateLimit(bucket);
@@ -55,12 +67,12 @@ export function createFamilySafetyCommands(deps: {
       }
       await tx.saveRateLimit(rate);
       await tx.saveIdempotent(userId,'safety-report',input.requestId,{requestFingerprint:fingerprint,status:201,body:{reportId:report.reportId}});
-      return receipt(report);
+      return receipt(tx,report);
     }); },
     reports(session) { return deps.authed(session,async(tx,userId) => {
       const restrictedShares = new Set<string>();
       for (const report of await tx.listSafetyReports()) if (report.authorUserId===userId && (await tx.findModeration(report.shareId))?.hidden) restrictedShares.add(report.shareId);
-      return { reports:(await tx.listSafetyReports(userId)).map(receipt).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)), sharingRestricted:(await tx.findSharingRestriction(userId))?.restricted===true, restrictedShares:[...restrictedShares] };
+      return { reports:(await Promise.all((await tx.listSafetyReports(userId)).map(r=>receipt(tx,r)))).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)), sharingRestricted:(await tx.findSharingRestriction(userId))?.restricted===true, restrictedShares:[...restrictedShares] };
     }); },
     blocks(session) { return deps.authed(session,async(tx,userId) => ({ blocks:await Promise.all((await tx.listUserBlocks(userId)).map(async b=>({...b,nickname:(await tx.findProfile(b.targetUserId))?.nickname??''}))) })); },
     block(session,familyId,targetUserId) { return deps.authed(session,async(tx,userId) => {
