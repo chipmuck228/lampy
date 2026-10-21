@@ -1,3 +1,4 @@
+import { FamilyMemberBlockAction } from './family-member-block-action';
 import { useCallback, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -138,10 +139,9 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
       {roster ? <>
         <View style={styles.wall} testID="family-member-wall">{roster.members.map(member => {
           const label = memberLabel(roster, member);
-          const canManage = roster.role === 'creator' && member.role === 'member' && member.userId !== roster.userId;
-          const selected = canManage && selectedMemberId === member.membershipId;
+          const selected = selectedMemberId === member.membershipId;
           return <View key={member.membershipId} style={styles.member}>
-            {canManage ? <Pressable style={styles.memberHit} disabled={busy} accessibilityRole="button"
+            {member.userId !== roster.userId ? <Pressable style={styles.memberHit} disabled={busy} accessibilityRole="button"
               accessibilityLabel={`${label}，${memberRoleLabel(roster, member)}`} accessibilityState={{ expanded: selected, selected, disabled: busy }}
               testID={`family-member-${member.membershipId}`} onPress={() => setSelectedMemberId(selected ? null : member.membershipId)}>
               <View style={[styles.avatar, selected && styles.avatarSelected]}><LifeIcon name="person" size={40} color={sage}/></View>
@@ -150,19 +150,20 @@ export function FamilyCardMembers({ familyId, onChanged }: { familyId: string; o
 
           </View>;
         })}</View>
-        {roster.members.filter(member => member.membershipId === selectedMemberId && roster.role === 'creator' && member.role === 'member' && member.userId !== roster.userId).map(member => {
+        {roster.members.filter(member => member.membershipId === selectedMemberId && member.userId !== roster.userId).map(member => {
           return <View key={member.membershipId} style={styles.selectedPanel}><Text style={styles.name}>{memberTargetLabel(roster, member)}</Text>
             <View style={styles.memberActions} testID={`family-member-actions-${member.membershipId}`}>
-              {!transfer ? <Pressable style={styles.memberActionHit} disabled={busy} accessibilityRole="button"
+              {roster.role==='creator'&&member.role==='member'&&!transfer ? <Pressable style={styles.memberActionHit} disabled={busy} accessibilityRole="button"
                 accessibilityLabel={tr('向 {0} 转交创建者', [memberTargetLabel(roster, member)])} accessibilityState={{ disabled: busy }}
                 testID={`family-transfer-${member.membershipId}`} onPress={() => confirmTransfer(member)}>
                 <Text style={styles.action}>{tr('移交')}</Text>
               </Pressable> : null}
-              <Pressable style={styles.memberActionHit} disabled={busy} accessibilityRole="button"
+              {roster.role==='creator'&&member.role==='member'?<Pressable style={styles.memberActionHit} disabled={busy} accessibilityRole="button"
                 accessibilityLabel={tr('移除 {0}', [memberTargetLabel(roster, member)])} accessibilityState={{ disabled: busy }}
                 testID={`family-remove-${member.membershipId}`} onPress={() => confirm(member, memberTargetLabel(roster, member))}>
                 <Text style={styles.meta}>{tr('移除')}</Text>
-              </Pressable>
+              </Pressable>:null}
+              <FamilyMemberBlockAction familyId={familyId} userId={member.userId} current={()=>currentRef.current()}/>
             </View>
           </View>;
         })}

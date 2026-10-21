@@ -1,3 +1,4 @@
+import { assertSharedTextAllowed } from './content-policy';
 import { FAMILY_ERROR, FamilyError } from './errors';
 import { isPlausibleEmail, MAX_EMAIL_PASSWORD_LENGTH, normalizeEmail, passwordPolicyError } from './email-normalize';
 import { ARGON2ID_PRODUCTION, createArgon2idPasswordHasher, type PasswordHasher } from './password';
@@ -7,6 +8,7 @@ import type { FamilyClock, FamilyIds, SignInResult, TestAccountHealth } from './
 export function requireProfileNickname(raw: string) {
   const value = raw.normalize('NFC').trim();
   if (!value || Array.from(value).length > 24 || /[\u0000-\u001f\u007f\u2028\u2029]/.test(value)) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST, 'Nickname must be 1 to 24 characters.');
+  assertSharedTextAllowed(value);
   return value;
 }
 

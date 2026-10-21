@@ -11,7 +11,7 @@ const mockListeners:((s:AppStateStatus)=>void)[]=[];
 jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useLocalSearchParams:()=>mockParams,useRouter:()=>({back:jest.fn(),push:mockPush,replace:mockReplace}),useFocusEffect:(fn:()=>void|(()=>void))=>useEffect(()=>{const cleanup=fn();mockAlbumFocusCleanup=typeof cleanup==='function'?cleanup:undefined;return cleanup;},[fn])};});
 jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({getFamilies:mockDirectory,albums:{sources:mockSources,mutate:mockMutate,create:mockCreate,access:mockAccess,list:mockList,read:mockRead,validate:mockValidate}})}));
 jest.mock('../application/foreground-audio',()=>({pauseForegroundAudio:()=>mockPause()}));
-jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>mockOpen}));
+jest.mock('../infrastructure/family-config',()=>({...jest.requireActual('../infrastructure/family-config'),isFamilyProductEntryOpen:()=>mockOpen}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:{children:React.ReactNode})=><View>{children}</View>};});
 const permission={familyId:'f',userId:'a',membershipId:'m',role:'member',authority:'current',rulesAcknowledged:true,rulesVersion:1,canManage:false,canExport:false};

@@ -1,3 +1,4 @@
+import {createFamilySafetyUseCases} from './family-safety-use-cases';
 import { familyReceivedMediaKey } from '../infrastructure/family-receive-cache';
 import { createFamilyAlbumUseCases } from './family-album';
 import { createFamilyHistoryUseCases } from './family-history-use-cases';
@@ -480,6 +481,7 @@ export function createFamilyUseCases(deps: {
     async assertPurchaseAccount(userId:string) {if((await requireAccount()).userId!==userId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');},
     albums: createFamilyAlbumUseCases({client:deps.client,session:deps.session}),
     history,
+    safety: createFamilySafetyUseCases({client:deps.client,session:deps.session,clearCache:history.clearSafetyCache}),
     async previewInviteLink(token: string) {
       if(!deps.client.previewInviteLink) throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
       return deps.client.previewInviteLink(token);

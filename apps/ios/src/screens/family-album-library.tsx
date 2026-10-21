@@ -1,3 +1,4 @@
+import {subscribeFamilySafety} from '../application/family-safety-events';
 import {familyNetworkDiagnostic} from '../infrastructure/family-network-diagnostic';
 import {FamilyAlbumCoverPreview} from './family-album-editor';
 import {albumCoverWallLayout,ALBUM_COVER_WALL_GAP} from './album-cover-wall';
@@ -30,6 +31,7 @@ export function FamilyAlbumLibrary(){
  const [canCreate,setCanCreate]=useState(false),[retry,setRetry]=useState(0);
  const generation=useRef(0);const allowed=foreground&&!lock?.snapshot.locked;
  useEffect(()=>{const listener=AppState.addEventListener('change',state=>{if(state!=='active')generation.current++;setForeground(state==='active');});return()=>listener.remove();},[]);
+ useEffect(()=>subscribeFamilySafety(()=>{generation.current++;setRows([]);setPending([]);setCanCreate(false);setRetry(n=>n+1);}),[]);
  useFocusEffect(useCallback(()=>{
   void retry;
   let disposed=false,inFlight=false,expired=false,loadId=0,lastFailure='';

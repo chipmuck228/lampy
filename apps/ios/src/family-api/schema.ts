@@ -207,6 +207,14 @@ const MIGRATIONS = [
    CREATE INDEX family_apple_challenges_expiry ON family_apple_challenges(expires_at);
    CREATE TABLE family_account_media_cleanup (storage_key TEXT PRIMARY KEY NOT NULL);`,
 
+  `CREATE TABLE family_safety_reports (report_id TEXT PRIMARY KEY NOT NULL, reporter_user_id TEXT NOT NULL, author_user_id TEXT NOT NULL, share_id TEXT NOT NULL, created_at TEXT NOT NULL, json TEXT NOT NULL);
+   CREATE INDEX family_safety_reporter ON family_safety_reports(reporter_user_id,created_at);
+   CREATE INDEX family_safety_share ON family_safety_reports(share_id);
+   CREATE TABLE family_user_blocks (user_id TEXT NOT NULL, target_user_id TEXT NOT NULL, json TEXT NOT NULL, PRIMARY KEY(user_id,target_user_id));
+   CREATE TABLE family_content_moderation (share_id TEXT PRIMARY KEY NOT NULL, json TEXT NOT NULL);
+   CREATE TABLE family_moderation_audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, share_id TEXT NOT NULL, json TEXT NOT NULL);
+   CREATE TABLE family_sharing_restrictions (user_id TEXT PRIMARY KEY NOT NULL, json TEXT NOT NULL);
+   CREATE TABLE family_sharing_restriction_audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, json TEXT NOT NULL);`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28] as const;

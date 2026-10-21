@@ -61,6 +61,7 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 }
 
 export type FamilyApiClient = {
+  safety?: import('../family-api/safety-types').FamilySafetyApi;
   purchases?: import('../family-api/purchase-types').PurchaseApi;
   albums?: import('../family-api/family-album-types').FamilyAlbumApi;
   registerControlledEmail?(input: { email: string; password: string; nickname: string }): Promise<SignInResult>;
@@ -161,6 +162,13 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
   }
 
   return {
+    safety: {
+      report:(sessionToken,familyId,shareId,input)=>send({method:'POST',path:`/v2/families/${encodeURIComponent(familyId)}/shares/${encodeURIComponent(shareId)}/reports`,sessionToken,body:input}),
+      reports:sessionToken=>send({method:'GET',path:'/v2/me/safety/reports',sessionToken}),
+      blocks:sessionToken=>send({method:'GET',path:'/v2/me/safety/blocks',sessionToken}),
+      block:(sessionToken,familyId,target)=>send({method:'PUT',path:`/v2/families/${encodeURIComponent(familyId)}/blocks/${encodeURIComponent(target)}`,sessionToken}),
+      unblock:(sessionToken,target)=>send({method:'DELETE',path:`/v2/me/safety/blocks/${encodeURIComponent(target)}`,sessionToken}),
+    },
     deleteAccount:(sessionToken,input)=>send({method:'POST',path:'/v2/me/account/delete',sessionToken,body:input,timeoutMs:45000}),
     purchases: {
       context:sessionToken=>send({method:'GET',path:'/v2/me/purchase-access',sessionToken,timeoutMs:12000}),

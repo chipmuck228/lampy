@@ -1,3 +1,4 @@
+import {invalidateFamilySafety} from '../application/family-safety-events';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Alert, AppState, type AppStateStatus } from 'react-native';
 import { FamilyHistoryScreen } from './family-history-screen';
@@ -170,4 +171,21 @@ it('shows a live author name and keeps withdrawal bound to author id rather than
  const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
  await waitFor(()=>expect(page.getByText('小禾 分享的')).toBeTruthy());
  expect(page.queryByTestId('history-revoke')).toBeNull();
+});
+
+it('offers report and block only for another author and hides immediately on safety changes',async()=>{
+ const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);
+ await waitFor(()=>expect(page.getByTestId('family-safety-menu')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('family-safety-menu'));
+ expect(page.getByText('举报这条内容')).toBeTruthy();expect(page.getByText('不再看这位家人的内容')).toBeTruthy();
+ await act(async()=>invalidateFamilySafety());expect(page.queryByText('Morning')).toBeNull();
+});
+it('renewal removes restricted content without redownloading photos or automatically playing audio',async()=>{
+ jest.useFakeTimers();
+ try {
+  const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);await waitFor(()=>expect(page.getByText('Morning')).toBeTruthy());
+  mockAuthorize.mockRejectedValueOnce({code:'FORBIDDEN'});
+  await act(async()=>{jest.advanceTimersByTime(5100);});
+  expect(page.queryByText('Morning')).toBeNull();expect(mockRead).toHaveBeenCalledTimes(1);expect(mockPlay).not.toHaveBeenCalled();
+ } finally {jest.useRealTimers();}
 });

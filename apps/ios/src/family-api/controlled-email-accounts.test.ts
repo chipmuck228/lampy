@@ -64,7 +64,7 @@ it('HTTP uses authenticated /me identity, ignores injected userId/avatar/email a
 it('migration 26 keeps existing accounts and SQLite registration, nickname and independent sessions survive restart',async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'lampy-email-'));const filename=path.join(dir,'family.sqlite');let db=openFamilySqliteDatabase(filename);
  try {
-  await applyFamilyApiSchema(db);expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:32});
+  await applyFamilyApiSchema(db);expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:33});
   const build=()=>createFamilyCommands({repository:createSqliteFamilyRepository(db),apple:createMapAppleVerifier({}),testAccountLoginEnabled:true,controlledEmailAccountsEnabled:true,passwordHasher:createArgon2idPasswordHasher(ARGON2ID_TEST)});
   const first=build();const a=await first.registerControlledEmail(input);await first.updateMyProfile(a.sessionToken,'长大的日子');await db.close();db=openFamilySqliteDatabase(filename);
   const second=build();const b=await second.signInWithControlledEmail(input);expect(b.userId).toBe(a.userId);expect(await second.getMyProfile(a.sessionToken)).toMatchObject({nickname:'长大的日子'});
