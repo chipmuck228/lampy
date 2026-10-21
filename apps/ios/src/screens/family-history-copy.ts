@@ -1,6 +1,12 @@
+import { FamilySharePhotoError } from '../application/family-share-photo-error';
 import { appLanguage, dateLabel, tr } from '../i18n';
 export function familyHistoryError(error: unknown) {
   const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
+  if (error instanceof FamilySharePhotoError) {
+    if (['SHARE_IMAGE_SOURCE_TOO_LARGE','SHARE_IMAGE_DIMENSIONS','SHARE_IMAGE_OUTPUT_TOO_LARGE','MEDIA_TOO_LARGE'].includes(error.code)) return tr('照片 {0} 过大，暂时无法分享，可以取消勾选后再试。原照片保留。', [error.photoNumber]);
+    if (code === 'SHARE_IMAGE_CONVERSION_UNAVAILABLE') return tr('照片 {0} 分享需要更新应用，原照片保留。', [error.photoNumber]);
+    return tr('照片 {0} 暂时无法分享，可以取消勾选后再试。原照片保留。', [error.photoNumber]);
+  }
   if (code === 'CONTENT_NOT_ALLOWED') return tr('这段内容暂时不能分享，请调整文字；本机原记录保留。');
   if (code === 'SHARING_RESTRICTED') return tr('此账号暂时不能新增家庭分享。已有记录仍可阅读，如有疑问请联系 dev@yunpura.com。');
   if (code === 'FAMILY_DISSOLVED') return tr('这个家庭已解散，个人记录还在。');

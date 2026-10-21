@@ -1011,5 +1011,9 @@
   "{0}分享的记录": "Record shared by {0}",
   "家庭记录（目前不可用）": "Family record (currently unavailable)",
   "照片{0}张 · 声音{1}段": "{0} photos · {1} audio recordings",
-  "举报于{0}": "Reported on {0}"
+  "举报于{0}": "Reported on {0}",
+  "照片 {0} 过大，暂时无法分享，可以取消勾选后再试。原照片保留。": "Photo {{0}} is too large to share. Deselect it and try again. Your original is kept.",
+  "照片 {0} 分享需要更新应用，原照片保留。": "Update the app to share photo {{0}}. Your original is kept.",
+  "照片 {0} 暂时无法分享，可以取消勾选后再试。原照片保留。": "Photo {{0}} could not be shared. Deselect it and try again. Your original is kept.",
+  "未能分享": "Could not share"
 }

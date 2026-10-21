@@ -16,3 +16,8 @@ it('fails closed on a missing native build or malformed encoder result', async (
   jest.mocked(familyImagesNative).mockReturnValue({prepare:async()=>({base64:'AA==',mimeType:'image/jpeg',width:1,height:1})});
   await expect(convertExpoImageForFamilyShare(new Uint8Array([1]),'image/jpeg')).rejects.toThrow();
 });
+
+it('returns a safe native failure stage without exposing native error details',async()=>{
+  jest.mocked(familyImagesNative).mockReturnValue({prepare:async()=>({error:'DECODE_FAILED'})});
+  await expect(convertExpoImageForFamilyShare(new Uint8Array([1]),'image/heic')).rejects.toMatchObject({code:'SHARE_IMAGE_DECODE_FAILED'});
+});

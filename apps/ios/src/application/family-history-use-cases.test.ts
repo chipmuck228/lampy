@@ -397,3 +397,31 @@ it('authorizes cached cover metadata concurrently instead of waiting inside the 
  const results=await Promise.all([x.history.read(x.f.familyId,shared.shareId,current,photo.objectId),x.history.read(x.f.familyId,shared.shareId,current,photo.objectId)]);
  expect(calls).toBe(2);expect(results[0].media[0].uri).toBe(results[1].media[0].uri);
 });
+
+it.each([{indices:[0,1,2]},{indices:[0,2]},{indices:[2]}])('prepares selected HEIF sources from a three-photo record: $indices',async({indices})=>{
+  const x=await fixture();
+  const original=(await x.personal.moments.findById()).moment;
+  const ids=['heif1','heif2','heif3'];
+  x.personal.moments.findById.mockResolvedValue({kind:'ready',moment:{...original,assetIds:ids}});
+  const base=(await x.personal.assets.findById()).asset;
+  x.personal.assets.findById.mockImplementation(async(id?:string)=>({kind:'ready',asset:{...base,id:id!,localUri:`file:///${id}`,metadata:{mimeType:'image/heic'}}}));
+  x.personal.readAssetBytes.mockImplementation(async(uri?:string)=>new Uint8Array([0,0,0,24,102,116,121,112,104,101,105,99,ids.indexOf(uri!.slice(8))]));
+  let copyNumber=0;
+  const convert=jest.fn(async()=>{const bytes=sampleJpegBytes();const table=bytes.findIndex((v,i)=>v===255&&bytes[i+1]===219);bytes[table+5]+=copyNumber++;return {bytes,mimeType:'image/jpeg'};});
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:convert}});
+  const p=await history.prepare(original.id,x.f.familyId,current,indices.map(i=>ids[i]));
+  await history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  expect(convert).toHaveBeenCalledTimes(indices.length);
+  expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(1);
+});
+it('reports original photo 3 on conversion failure and never commits a partial share',async()=>{
+  const x=await fixture();const original=(await x.personal.moments.findById()).moment;
+  x.personal.moments.findById.mockResolvedValue({kind:'ready',moment:{...original,assetIds:['one','two','three']}});
+  const base=(await x.personal.assets.findById()).asset;
+  x.personal.assets.findById.mockImplementation(async(id?:string)=>({kind:'ready',asset:{...base,id:id!,localUri:`file:///${id}`,metadata:{mimeType:'image/heic'}}}));
+  x.personal.readAssetBytes.mockResolvedValue(new Uint8Array([1,2,3]));
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:async()=>{throw new ApplicationError('SHARE_IMAGE_DECODE_FAILED','decode');}}});
+  const p=await history.prepare(original.id,x.f.familyId,current,['three']);
+  await expect(history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'SHARE_IMAGE_DECODE_FAILED',photoNumber:3,assetId:'three'});
+  expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(0);
+});

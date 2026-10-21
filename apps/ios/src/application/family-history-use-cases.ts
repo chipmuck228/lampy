@@ -1,3 +1,4 @@
+import { FamilySharePhotoError } from './family-share-photo-error';
 import { prepareFamilyShareMedia } from './prepare-family-share-media';
 import {familySafetyGeneration} from './family-safety-events';
 import { utf8ToBytes } from '@noble/hashes/utils.js';
@@ -97,7 +98,7 @@ export function createFamilyHistoryUseCases(deps: {
     const m = JSON.parse(JSON.stringify(found.moment)) as typeof found.moment;
     const selected = selection ?? m.assetIds;
     if (new Set(selected).size !== selected.length || selected.some(id => !m.assetIds.includes(id))) throw error('SOURCE_CHANGED');
-    const media: { assetId: string; mimeType: string; hash: string; bytes: Uint8Array }[] = [];
+    const media: { assetId: string; mimeType: string; hash: string; localUri?: string }[] = [];
     const availableMedia: HistoryPreview['availableMedia'] = [];
     for (const assetId of m.assetIds) {
       const read = await deps.personal!.assets.findById(assetId);
@@ -105,14 +106,14 @@ export function createFamilyHistoryUseCases(deps: {
       availableMedia.push({ assetId, mimeType: read.kind === 'ready' ? read.asset.metadata.mimeType || '' : '' });
       if (!selected.includes(assetId)) continue;
       if (read.kind !== 'ready' || !read.asset.localUri || !deps.personal?.readAssetBytes) {
-        media.push({ assetId, mimeType: '', hash: '', bytes: new Uint8Array() }); continue;
+        media.push({ assetId, mimeType: '', hash: '' }); continue;
       }
       const asset = JSON.parse(JSON.stringify(read.asset)) as typeof read.asset;
       let bytes: Uint8Array;
       try { bytes = await deps.personal.readAssetBytes(asset.localUri); }
       catch { bytes = new Uint8Array(); }
       await check(a, current);
-      media.push({ assetId, mimeType: asset.metadata.mimeType || '', hash: bytes.byteLength ? sha256MediaBytes(bytes) : '', bytes });
+      media.push({ assetId, mimeType: asset.metadata.mimeType || '', hash: bytes.byteLength ? sha256MediaBytes(bytes) : '', localUri: asset.localUri });
     }
     const snapshot = { sourceMomentId: m.id, sourceRevision: m.revision, note: m.content.note,
       emotion: m.content.emotion, occurredAt: m.time.occurredAt, occurredAtPrecision: m.time.occurredAtPrecision };
@@ -289,7 +290,19 @@ export function createFamilyHistoryUseCases(deps: {
       const mediaObjectIds: string[] = [];
       for (const item of read.media) {
         await check(a, current);
-        const outgoing = await prepareFamilyShareMedia(item.bytes, item.mimeType, deps.personal?.convertImageForShare);
+        // Re-read one source at a time; do not retain every full original during conversion.
+        const bytes = await deps.personal!.readAssetBytes!(item.localUri!);
+        await check(a, current);
+        if (sha256MediaBytes(bytes) !== item.hash) throw error('SOURCE_CHANGED');
+        let outgoing;
+        try { outgoing = await prepareFamilyShareMedia(bytes, item.mimeType, deps.personal?.convertImageForShare); }
+        catch (failure) {
+          if (item.mimeType.startsWith('image/')) {
+            const photos = read.availableMedia.filter(m => m.mimeType.startsWith('image/'));
+            throw new FamilySharePhotoError(failure, item.assetId, photos.findIndex(m => m.assetId === item.assetId) + 1);
+          }
+          throw failure;
+        }
         await check(a, current);
         const uploaded = await deps.client.uploadMedia(a.sessionToken, { ...outgoing,
           idempotencyKey: `history-media:${digest({ assetId: item.assetId, hash: sha256MediaBytes(outgoing.bytes), mime: outgoing.mimeType })}` });
