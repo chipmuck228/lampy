@@ -6,6 +6,6 @@ export function familyReadDiagnostic(event: 'LIST_PROGRESS' | 'LIST_READY' | 'ST
   const value = failure && typeof failure === 'object' ? failure as {code?:unknown;httpStatus?:unknown} : {};
   const code = typeof value.code === 'string' && codes.has(value.code) ? value.code : failure ? 'OTHER' : undefined;
   const status = typeof value.httpStatus === 'number' && Number.isInteger(value.httpStatus) && value.httpStatus >= 0 && value.httpStatus <= 599 ? value.httpStatus : undefined;
-  const row = {revision:'photo-read-4',mediaTransport:'EXPO_NATIVE',event,stage,elapsedMs:Math.max(0,Math.round(Date.now()-started)),...(code?{code}:{}),...(status!==undefined?{httpStatus:status}:{}),...(mediaNumber&&Number.isInteger(mediaNumber)&&mediaNumber<=4?{mediaNumber}:{})};
+  const row = {revision:'photo-read-5',mediaTransport:'EXPO_NATIVE',event,stage,elapsedMs:Math.max(0,Math.round(Date.now()-started)),...(code?{code}:{}),...(status!==undefined?{httpStatus:status}:{}),...(mediaNumber&&Number.isInteger(mediaNumber)&&mediaNumber<=4?{mediaNumber}:{})};
   console.info('[LampyFamilyRead]',JSON.stringify(row));
 }

@@ -130,3 +130,15 @@ sudo systemd-run \
 这是一项针对通道耦合的修订，不把 RN 内部阻塞推断当作已证实的唯一根因；真实 iPhone 上是否解决仍待验证。资格仍 15 秒，权限／撤回／哈希与迟到结果检查保留。诊断 revision=photo-read-4、mediaTransport=EXPO_NATIVE，新增 LIST_PROGRESS 的 DIRECTORY／LIST／CACHE 及 LIST_READY，可在仍失败时区分网络／资格读取与缓存等待，不输出私人数据。
 
 47 个相关 Jest 套件／407 项测试、TypeScript、改动 ESLint 通过；新增原生媒体路由／授权和取消信号传递、媒体 body 未完成时 JSON 续期完成、原生取消不回退 RN 的测试。mock 测试不能替代 NSURLSession 真机并发实测。使用现有 Xcode 工程 Release Build／Run 后，先重开昨天失败的原分享（无需重新分享），再测今天／更早记录、收起重开、声音、后台保护与撤回。无需服务端更新、数据库迁移、prebuild clean 或 Pods；保持草稿。
+
+## 2026-10-22 photo-read-4 真机日志：持久缓存重复全图校验
+
+用户新日志中的多次 DIRECTORY／LIST 请求较快，但 CACHE 到 LIST_READY 约 3.6～6.8 秒；一次详情 READY=55931ms。另一条在列表缓存处理结束前发生 LIST_RENEW_FAILED／FAMILY_READ_LEASE_EXPIRED，随后详情媒体 1 返回 STALE_FAMILY_REQUEST。此日志包含成功和失败，不能将 native 媒体通道切换视作完整解决，也没有服务端拒绝证据。
+
+定位持久 SQLite 缓存：replaceVisible 每次对可见记录调用 upsertListed；对已 received 且 revision 未变的行，后者会 reconcile 全部媒体，files.read 将整个文件读入 JS，再逐个 SHA256。内存缓存无此路径，因此先前内存／网络并发测试未反映真实列表续期开销。
+
+修订在 SQLite replaceVisible 中保留已 received 且 revision 相同的行，不在索引刷新中重新校验所有照片。新／变更记录照常写入，远端不再可见的记录照常 isolate 与清除；真实照片读取仍按新鲜服务器权限、哈希和原生文件 stamp 检查；显式磁盘 list／reconcile 保留损坏或丢失文件降级。仅同步索引不构成媒体完整性证明或离线权限。
+
+新增真实 SQLite／文件存储回归：三张已缓存照片刷新四次，旧实现发生 12 次 files.read，修订后为 0；显式磁盘检查仍检测损坏文件；撤回后的行和文件仍清除。旧实现上前两项失败，修订后 6 套件／82 项相关测试（含持久缓存恢复、读取、权限／撤回、声音和屏幕续期）通过；tsc、改动 ESLint、差异检查通过。
+
+诊断更新为 photo-read-5（媒体仍 EXPO_NATIVE），保留 LIST_PROGRESS／LIST_READY 验证缓存段是否缩短。仅 TS／JS 修改，现有 Xcode Release Build／Run 即可，无需重新分享、清缓存／卸载、Pods 或服务器更新。首次公网媒体下载仍有网络耗时；本机真机性能、昨天混合照片分享、反复展开、旧／新记录和撤回／后台保护尚待复验，PR 保持草稿。
