@@ -1,3 +1,4 @@
+import { familyReadDiagnostic } from '../application/family-read-diagnostic';
 import {FamilySafetyActions} from './family-safety-actions';
 import {subscribeFamilySafety} from '../application/family-safety-events';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -55,6 +56,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
   }, []);
   const load = useCallback(async () => {
     const current = begin(); currentRef.current = current;
+    const started = Date.now();
     saveProgress(); setExpandedId(null); setView(null); setRows([]); setViewer(null); setName(''); setPolicy(null); setMessage(null); setStatus('loading');
     try {
       if (isDetail && !shareId) throw { code: 'SHARE_NOT_FOUND' };
@@ -71,7 +73,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
         }
       }
       if (current()) setStatus('ready');
-    } catch (e) { if (current()) { setView(null); setRows([]); setStatus('failed'); setMessage(familyHistoryError(e)); } }
+    } catch (e) { if (current()) { familyReadDiagnostic(isDetail ? 'DETAIL_LOAD_FAILED' : 'LIST_LOAD_FAILED','PUBLISH',started,e); setView(null); setRows([]); setStatus('failed'); setMessage(familyHistoryError(e)); } }
   }, [begin, familyId, shareId, isDetail, saveProgress]);
   useFocusEffect(useCallback(() => {
     enter(); if (allowed) void load();
@@ -85,7 +87,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
     if(!allowed||status!=='ready'||policy!=='family-history-v2')return;
     const current=currentRef.current;let disposed=false,inFlight=false;
     let checked=Date.now(),expires=checked+15000;
-    const hide=(error:unknown)=>{if(disposed||!current())return;saveProgress();setView(null);setRows([]);setStatus('failed');setMessage(familyHistoryError(error));};
+    const hide=(error:unknown)=>{if(disposed||!current())return;familyReadDiagnostic(isDetail ? 'DETAIL_RENEW_FAILED' : 'LIST_RENEW_FAILED','PUBLISH',checked,error);saveProgress();setView(null);setRows([]);setStatus('failed');setMessage(familyHistoryError(error));};
     const timer=setInterval(()=>{
       if(disposed||!current())return;
       if(Date.now()>=expires){hide({code:'FAMILY_READ_LEASE_EXPIRED'});return;}

@@ -112,3 +112,11 @@ sudo systemd-run \
 修订仅让本机缓存操作进入队列，媒体网络下载在队列外等待；当前账号／资格、下载哈希、最终服务端授权仍检查，撤回、退出和移除后的迟到结果仍拒绝显示。资格时限维持 15 秒；超时使用 FAMILY_READ_LEASE_EXPIRED 与准确提示，真正的服务端 FORBIDDEN／SHARE_NOT_FOUND 行为不变。新增列表在详情下载中续期、超过 15 秒等待、下载中撤回、真实续期超时的回归；移除家庭的清理现在不必等待媒体网络完成。
 
 44 个相关 Jest 套件／393 项测试、TypeScript 和改动文件 ESLint 通过。没有在真机重现实际网络速度，仍待用户用原失败分享复验。仅 JS／TS 与文案修改，无原生签名或依赖变动；现有原生工程可直接 Xcode Release Build／Run 安装，无需再次 prebuild clean、Pods、云端部署或迁移。PR 保持草稿。
+
+## 2026-10-22 仍有间歇不可读：待采集客户端失败阶段
+
+用户在 45b0ed9 后仍有两种结果：等待后读全照片，或等待后显示“这份家庭记录现在不可读”。队列回归虽已修复，不能据此宣布真机问题全部解决；45b0ed9 中本地续期超时已经使用另一句文案，仍需区分真实 FORBIDDEN／SHARE_NOT_FOUND 与实际安装版本。
+
+新增临时 Xcode 控制台日志 [LampyFamilyRead]，固定 revision=photo-read-3；记录 START／READY、读取失败阶段 DETAIL／MEDIA_METADATA／CACHE／MEDIA_CONTENT／FINAL_AUTHORIZATION，以及父列表／详情加载或续期失败，保留错误的实际 HTTP 状态。仅输出固定事件／阶段、白名单错误码、序号和耗时，不输出记录 ID、账号、正文、媒体、文件路径、URL、服务器错误描述或会话。覆盖元数据、下载、最终授权和页面错误来源；真正权限拒绝仍隐藏内容，不延长阅读资格或改显示规则。
+
+此提交是诊断增强，尚未修复剩余间歇失败。以原工程 Xcode Release Build／Run 安装，控制台筛选 LampyFamilyRead，复现一次并采集 START 到失败的日志；无需重部署 API 或再次运行服务器探针。诊断在首发合并前应评估移除。46 个相关 Jest 套件／398 项测试、TypeScript、ESLint 通过；另外新增 HTTP 状态保留测试单独验证。保持草稿，不合并。

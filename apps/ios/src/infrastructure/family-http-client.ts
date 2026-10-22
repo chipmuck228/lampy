@@ -128,7 +128,7 @@ function throwIfFailed(status: number, body: unknown): void {
   const error = (body || {}) as ErrorBody;
   const code = error.error?.code || (status === 0 ? 'SERVER_UNREACHABLE' : 'NETWORK');
   const message = error.error?.message || 'Family request failed.';
-  throw new ApplicationError(code, message);
+  throw Object.assign(new ApplicationError(code, message), { httpStatus: status });
 }
 
 export function createFamilyApiClient(transport: FamilyTransport, sharingVersion: 1 | 2 = 1): FamilyApiClient {
