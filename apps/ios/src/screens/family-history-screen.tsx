@@ -2,7 +2,7 @@ import { familyReadDiagnostic } from '../application/family-read-diagnostic';
 import {FamilySafetyActions} from './family-safety-actions';
 import {subscribeFamilySafety} from '../application/family-safety-events';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
@@ -35,6 +35,8 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
   const { allowed, enter, leave, begin } = useFamilyPrivateRequest();
   const [view, setView] = useState<HistoryReading | null>(null);
   const [rows, setRows] = useState<ShareView[]>([]);
+  const scroll = useRef<ScrollView>(null);
+  const anchor = useRef<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -57,7 +59,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
   const load = useCallback(async () => {
     const current = begin(); currentRef.current = current;
     const started = Date.now();
-    saveProgress(); setExpandedId(null); setView(null); setRows([]); setViewer(null); setName(''); setPolicy(null); setMessage(null); setStatus('loading');
+    anchor.current = null; saveProgress(); setExpandedId(null); setView(null); setRows([]); setViewer(null); setName(''); setPolicy(null); setMessage(null); setStatus('loading');
     try {
       if (isDetail && !shareId) throw { code: 'SHARE_NOT_FOUND' };
       const family = await getFamilyUseCases(); if (!current()) return;
@@ -65,7 +67,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
       setName(p.family.name); setPolicy(p.policy);
       if (p.policy === 'family-history-v2') {
         if (isDetail) {
-          const result = await family.history.read(familyId,shareId!,current); if (!current()) return;
+          const result = await family.history.read(familyId,shareId!,current,undefined,partial => { if (current()) { setView(partial); setViewer(partial.userId); setStatus('ready'); } }); if (!current()) return;
           setView(result); setViewer(result.userId);
         } else {
           const result = await family.history.list(familyId,current); if (!current()) return;
@@ -77,7 +79,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
   }, [begin, familyId, shareId, isDetail, saveProgress]);
   useFocusEffect(useCallback(() => {
     enter(); if (allowed) void load();
-    return () => { saveProgress(); leave(); currentRef.current = () => false; busyRef.current = false; busyOwner.current = null; setBusy(false); setExpandedId(null); setStatus('loading'); setPolicy(null); setView(null); setRows([]); setViewer(null); setName(''); };
+    return () => { anchor.current = null; saveProgress(); leave(); currentRef.current = () => false; busyRef.current = false; busyOwner.current = null; setBusy(false); setExpandedId(null); setStatus('loading'); setPolicy(null); setView(null); setRows([]); setViewer(null); setName(''); };
   }, [allowed, enter, leave, load, saveProgress]));
   useEffect(() => {
     if (playingKey.current && sound.status !== 'preparing') progress.set(playingKey.current,sound.currentTimeMs);
@@ -151,7 +153,9 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
           <Pressable style={styles.hit} accessibilityRole="button" onPress={() => router.dismissTo('/lookback')}><Text style={styles.action}>{tr('去回看')}</Text></Pressable>
         </View>
       </View> : null}
-      {rows.map(row => <View key={row.shareId} style={styles.record}>
+      {rows.map(row => <View key={`${row.shareId}:${expandedId === row.shareId ? 'open' : 'closed'}`} testID={`history-row-${row.shareId}`} style={styles.record} onLayout={event => {
+        if (anchor.current === row.shareId) { anchor.current = null; scroll.current?.scrollTo({y:Math.max(0,event.nativeEvent.layout.y-12),animated:false}); }
+      }}>
         <Text style={styles.meta}>{familySnapshotDate(row.snapshot)}</Text>
         {expandedId !== row.shareId && row.snapshot.note ? <Text style={styles.body} numberOfLines={6}>{row.snapshot.note}</Text> : null}
         {expandedId !== row.shareId ? <Text style={styles.meta}>{tr('照片：{0} · 声音：{1}',[row.snapshot.media.filter(m=>m.mimeType.startsWith('image/')).length,row.snapshot.media.filter(m=>m.mimeType.startsWith('audio/')).length])}</Text> : null}
@@ -159,7 +163,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
         <View style={styles.footer}><Text style={[styles.meta, styles.author]}>{familyShareAuthorLabel(row, viewer)}</Text>
         <Pressable accessibilityRole="button" testID={`history-open-${row.shareId}`} style={styles.hit}
           accessibilityState={{expanded:expandedId === row.shareId}} accessibilityLabel={tr(expandedId === row.shareId ? '收起这条家庭记录' : '打开这条家庭记录')}
-          onPress={() => { saveProgress(); setExpandedId(id => id === row.shareId ? null : row.shareId); }}><Text style={styles.action}>{tr(expandedId === row.shareId ? '收起' : '打开')}</Text><LifeIcon name={expandedId === row.shareId ? 'collapse' : 'expand'} /></Pressable></View>
+          onPress={() => { saveProgress(); anchor.current = expandedId === row.shareId ? null : row.shareId; setExpandedId(id => id === row.shareId ? null : row.shareId); }}><Text style={styles.action}>{tr(expandedId === row.shareId ? '收起' : '打开')}</Text><LifeIcon name={expandedId === row.shareId ? 'collapse' : 'expand'} /></Pressable></View>
         {expandedId === row.shareId ? <FamilyHistoryScreen key={`${familyId}/${row.shareId}`} familyId={familyId} shareId={row.shareId} inline onWithdrawn={withdrawn} /> : null}
       </View>)}
       {view ? <View style={inline ? styles.inlineReading : styles.record} testID="family-history-reading">
@@ -176,7 +180,11 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
         </View>
         {!inline ? <Text style={styles.meta}>{familySnapshotDate(view.share.snapshot)}</Text> : null}
         {view.share.snapshot.note ? <Text style={styles.body}>{view.share.snapshot.note}</Text> : null}
-        {view.media.map(media => media.mimeType.startsWith('image/') ? <FamilyPhoto key={media.objectId} uri={media.uri} /> :
+        {view.media.length < view.share.snapshot.media.length ? <Text style={styles.meta} accessibilityLiveRegion="polite">{tr('正在载入照片和声音（{0}/{1}）',[view.media.length,view.share.snapshot.media.length])}</Text> : null}
+        {view.share.snapshot.media.map(item => {
+          const media = view.media.find(m => m.objectId === item.objectId);
+          if (!media) return <View key={item.objectId} testID={`history-pending-${item.objectId}`} style={item.mimeType.startsWith('image/') ? styles.photoPending : undefined}><Text style={styles.meta}>{tr(item.mimeType.startsWith('image/') ? '照片正在载入' : '声音正在载入')}</Text></View>;
+          return media.mimeType.startsWith('image/') ? <FamilyPhoto key={media.objectId} uri={media.uri} /> :
           media.mimeType.startsWith('audio/') ? <View key={media.objectId} style={styles.audio}>
             <Pressable accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}}
               accessibilityLabel={tr(selectedAudio === media.objectId && sound.status === 'playing' ? '暂停' : '播放')}
@@ -187,7 +195,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
             </Pressable>
             {selectedAudio === media.objectId ? <Text style={styles.meta}>{Math.floor(sound.currentTimeMs/1000)}s</Text> : null}
             {selectedAudio === media.objectId && sound.failed ? <Text style={styles.meta}>{tr('这段声音暂时无法播放，其他内容仍然保留。')}</Text> : null}
-          </View> : <Text key={media.objectId} style={styles.meta}>{tr('这份内容暂时无法打开。')}</Text>)}
+          </View> : <Text key={media.objectId} style={styles.meta}>{tr('这份内容暂时无法打开。')}</Text>;})}
         {view.share.snapshot.emotion ? <Text style={styles.meta}>{feelingLabel(view.share.snapshot.emotion)}</Text> : null}
 
       </View> : null}
@@ -195,9 +203,10 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
       {status === 'failed' ? <Pressable accessibilityRole="button" style={styles.hit} onPress={() => void load()}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable> : null}
     </>}
   </>;
-  return inline ? content : <SettingsPage title={tr('家庭记录')} backLabel={tr('家庭')} accessibilityLabel={tr('家庭记录')} onBack={() => { saveProgress(); router.back(); }}>{content}</SettingsPage>;
+  return inline ? content : <SettingsPage scrollRef={scroll} title={tr('家庭记录')} backLabel={tr('家庭')} accessibilityLabel={tr('家庭记录')} onBack={() => { saveProgress(); router.back(); }}>{content}</SettingsPage>;
 }
 const styles=StyleSheet.create({
+  photoPending:{width:'100%',aspectRatio:4/3,justifyContent:'center',alignItems:'center',borderWidth:StyleSheet.hairlineWidth,borderColor:hairline},
   inlineReading:{gap:16},
   author:{maxWidth:'100%',flexShrink:1},
   footer:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:12},

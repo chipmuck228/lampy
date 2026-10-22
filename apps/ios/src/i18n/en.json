@@ -1016,5 +1016,8 @@
   "照片 {0} 分享需要更新应用，原照片保留。": "Update the app to share photo {{0}}. Your original is kept.",
   "照片 {0} 暂时无法分享，可以取消勾选后再试。原照片保留。": "Photo {{0}} could not be shared. Deselect it and try again. Your original is kept.",
   "未能分享": "Could not share",
-  "暂时无法确认阅读资格，请再试一次。": "Reading access could not be confirmed. Please try again."
+  "暂时无法确认阅读资格，请再试一次。": "Reading access could not be confirmed. Please try again.",
+  "正在载入照片和声音（{0}/{1}）": "Loading photos and audio ({{0}}/{{1}})",
+  "照片正在载入": "Loading photo",
+  "声音正在载入": "Loading audio"
 }

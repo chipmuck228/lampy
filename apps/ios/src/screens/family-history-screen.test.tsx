@@ -2,6 +2,7 @@ import {invalidateFamilySafety} from '../application/family-safety-events';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Alert, AppState, type AppStateStatus } from 'react-native';
 import { FamilyHistoryScreen } from './family-history-screen';
+const mockScrollTo=jest.fn();
 const mockPolicy=jest.fn(),mockList=jest.fn(),mockRead=jest.fn(),mockAuthorize=jest.fn(),mockRevoke=jest.fn(),mockPush=jest.fn(),mockPlay=jest.fn();
 let mockOpen=true;
 let mockFocusCleanup:(()=>void)|undefined;
@@ -13,8 +14,8 @@ jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({history:
 jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>mockOpen}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
 jest.mock('./use-sound-player',()=>({useSoundPlayer:()=>mockSound}));
-jest.mock('./settings-chrome',()=>{const {View,Text}=jest.requireActual('react-native');return {SettingsPage:({children,title}:{children:React.ReactNode;title:string})=><View><Text>{title}</Text>{children}</View>};});
-const share={shareId:'share_d2',familyId:'family_d2',authorUserId:'a',snapshot:{note:'Morning',emotion:'平静',occurredAtPrecision:'unknown',media:[]},sourceRevision:1};
+jest.mock('./settings-chrome',()=>{const {View,Text}=jest.requireActual('react-native');return {SettingsPage:({children,title,scrollRef}:{children:React.ReactNode;title:string;scrollRef?:{current:unknown}})=>{if(scrollRef)scrollRef.current={scrollTo:mockScrollTo};return <View><Text>{title}</Text>{children}</View>;}};});
+const share={shareId:'share_d2',familyId:'family_d2',authorUserId:'a',snapshot:{note:'Morning',emotion:'平静',occurredAtPrecision:'unknown',media:[{objectId:'sound',mimeType:'audio/mp4',byteLength:12}]},sourceRevision:1};
 const reading={userId:'b',share,media:[{objectId:'sound',mimeType:'audio/mp4',uri:'file:///family-cache/b/family_d2/share_d2/sound'}]};
 beforeEach(()=>{
   jest.clearAllMocks();mockOpen=true;mockLock.snapshot.locked=false;mockListeners.length=0;mockSound.status='idle';mockSound.currentTimeMs=0;
@@ -30,7 +31,7 @@ it('keeps closed and locked entry private',async()=>{
 });
 it('opens the exact share inline with its family, collapses it, and does not offer member revoke',async()=>{
   const list=await render(<FamilyHistoryScreen familyId="family_d2"/>);await waitFor(()=>expect(list.getByText('Morning')).toBeTruthy());
-  await fireEvent.press(list.getByTestId('history-open-share_d2'));await waitFor(()=>expect(mockRead).toHaveBeenCalledWith('family_d2','share_d2',expect.any(Function)));expect(mockPush).not.toHaveBeenCalled();expect(list.getByTestId('history-open-share_d2').props.accessibilityState.expanded).toBe(true);
+  await fireEvent.press(list.getByTestId('history-open-share_d2'));await waitFor(()=>expect(mockRead).toHaveBeenCalledWith('family_d2','share_d2',expect.any(Function),undefined,expect.any(Function)));expect(mockPush).not.toHaveBeenCalled();expect(list.getByTestId('history-open-share_d2').props.accessibilityState.expanded).toBe(true);
   await fireEvent.press(list.getByTestId('history-open-share_d2'));expect(list.queryByTestId('family-history-reading')).toBeNull();await list.unmount();
   const detail=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);await waitFor(()=>expect(detail.getByText('Morning')).toBeTruthy());
   expect(detail.queryByTestId('history-revoke')).toBeNull();expect(mockPlay).not.toHaveBeenCalled();
@@ -122,7 +123,7 @@ it('keeps only one record expanded and reads the new exact share',async()=>{
   await fireEvent.press(page.getByTestId('history-open-share_d2'));
   await waitFor(()=>expect(mockRead).toHaveBeenCalledTimes(1));
   await fireEvent.press(page.getByTestId('history-open-second'));
-  await waitFor(()=>expect(mockRead).toHaveBeenCalledWith('family_d2','second',expect.any(Function)));
+  await waitFor(()=>expect(mockRead).toHaveBeenCalledWith('family_d2','second',expect.any(Function),undefined,expect.any(Function)));
   expect(page.getByTestId('history-open-share_d2').props.accessibilityState.expanded).toBe(false);
   expect(page.getByTestId('history-open-second').props.accessibilityState.expanded).toBe(true);
   expect(mockPush).not.toHaveBeenCalled();
@@ -220,4 +221,41 @@ it('hides on a real renewal timeout without presenting it as a server denial',as
   expect(page.queryByText('这份家庭记录现在不可读。')).toBeNull();
   await page.unmount();
  }finally{jest.useRealTimers();}
+});
+
+it('shows authorized text and each photo before the whole record finishes',async()=>{
+ const photos=[1,2,3].map(n=>({objectId:`p${n}`,mimeType:'image/jpeg',byteLength:10}));
+ const partial={...reading,share:{...share,snapshot:{...share.snapshot,media:photos}},media:[]};
+ let publish!:(value:unknown)=>void,finish!:(value:unknown)=>void;
+ mockRead.mockImplementationOnce((_f,_s,_c,_o,callback)=>{publish=callback;return new Promise(resolve=>{finish=resolve;});});
+ const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);
+ await waitFor(()=>expect(mockRead).toHaveBeenCalled());
+ await act(async()=>{publish(partial);});
+ expect(page.getByText('Morning')).toBeTruthy();expect(page.getByText('正在载入照片和声音（0/3）')).toBeTruthy();
+ await act(async()=>{publish({...partial,media:[{objectId:'p2',mimeType:'image/jpeg',uri:'file:///verified/p2'}]});});
+ expect(page.getByText('正在载入照片和声音（1/3）')).toBeTruthy();expect(page.getByTestId('history-pending-p1')).toBeTruthy();expect(page.queryByTestId('history-pending-p2')).toBeNull();
+ await act(async()=>{finish({...partial,media:photos.map(m=>({...m,uri:`file:///verified/${m.objectId}`}))});});
+ expect(page.queryByText('正在载入照片和声音（1/3）')).toBeNull();await page.unmount();
+});
+it('anchors the newly selected row after the previous expanded row collapses, then lets the user scroll freely',async()=>{
+ const second={...share,shareId:'second'};mockList.mockResolvedValue({userId:'b',shares:[share,second]});
+ const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
+ await waitFor(()=>expect(page.getByTestId('history-open-share_d2')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('history-open-share_d2'));
+ await fireEvent(page.getByTestId('history-row-share_d2'),'layout',{nativeEvent:{layout:{y:20,height:1200,width:300,x:0}}});
+ mockScrollTo.mockClear();await fireEvent.press(page.getByTestId('history-open-second'));
+ await fireEvent(page.getByTestId('history-row-second'),'layout',{nativeEvent:{layout:{y:240,height:200,width:300,x:0}}});
+ expect(mockScrollTo).toHaveBeenLastCalledWith({y:228,animated:false});
+ await fireEvent(page.getByTestId('history-row-second'),'layout',{nativeEvent:{layout:{y:240,height:1400,width:300,x:0}}});
+ expect(mockScrollTo).toHaveBeenCalledTimes(1);await page.unmount();
+});
+it('ignores incremental media arriving after background protection takes over',async()=>{
+ let publish!:(value:unknown)=>void,finish!:(value:unknown)=>void;
+ mockRead.mockImplementationOnce((_f,_s,_c,_o,callback)=>{publish=callback;return new Promise(resolve=>{finish=resolve;});});
+ const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);
+ await waitFor(()=>expect(mockRead).toHaveBeenCalled());await act(async()=>{publish({...reading,media:[]});});
+ expect(page.getByText('Morning')).toBeTruthy();
+ await act(async()=>{AppState.currentState='background';mockListeners.slice().forEach(fn=>fn('background'));});
+ await act(async()=>{publish(reading);finish(reading);});
+ expect(page.queryByText('Morning')).toBeNull();expect(mockPlay).not.toHaveBeenCalled();await page.unmount();
 });

@@ -453,3 +453,42 @@ it('renews the parent list while an inline detail is still downloading and never
   expect(await readResult).toMatchObject({error:{code:'SHARE_NOT_FOUND'}});
   expect(await x.cache.find(x.a.userId,x.f.familyId,saved.shareId)).toBeNull();
 });
+
+it('publishes text first, downloads at most two media concurrently and preserves snapshot order',async()=>{
+ const x=await fixture();
+ const uploaded=[];
+ for(let i=0;i<3;i++){
+  const bytes=sampleJpegBytes(),table=bytes.findIndex((v,n)=>v===255&&bytes[n+1]===219);bytes[table+5]+=i;
+  uploaded.push(await x.commands.uploadMedia(x.a.sessionToken,{bytes,mimeType:'image/jpeg'}));
+ }
+ const ids=uploaded.map(m=>m.objectId);
+ const shared=await x.commands.historyShares.shareMoment(x.a.sessionToken,x.f.familyId,{sourceMomentId:'progress',sourceRevision:1,note:'Text first',emotion:'',occurredAtPrecision:'unknown',mediaObjectIds:ids,expectedMediaCount:3,audienceConfirmation:HISTORY_AUDIENCE_CONFIRMATION,idempotencyKey:'progress'});
+ const gates=ids.map(()=>deferred<void>()),two=deferred<void>(),three=deferred<void>(),secondShown=deferred<void>();
+ let concurrent=0,max=0,calls=0;
+ const original=x.client.history!.getShareMediaContent.bind(x.client.history);
+ jest.spyOn(x.client.history!,'getShareMediaContent').mockImplementation(async(...args)=>{
+  const index=ids.indexOf(args[3]);concurrent++;max=Math.max(max,concurrent);calls++;
+  if(calls===2)two.resolve();if(calls===3)three.resolve();
+  try{await gates[index].promise;return await original(...args);}finally{concurrent--;}
+ });
+ const seen:{userId:string;share:unknown;media:{objectId:string}[]}[]=[];
+ const read=x.history.read(x.f.familyId,shared.shareId,current,undefined,value=>{seen.push(value);if(value.media.some(m=>m.objectId===ids[1]))secondShown.resolve();});
+ try{
+  await two.promise;expect(calls).toBe(2);expect(seen[0].media).toEqual([]);
+  gates[1].resolve();await secondShown.promise;await three.promise;
+  expect(seen[1].media.map(m=>m.objectId)).toEqual([ids[1]]);expect(max).toBe(2);
+ }finally{gates.forEach(g=>g.resolve());}
+ expect((await read).media.map(m=>m.objectId)).toEqual(ids);
+ expect((await x.cache.find(x.a.userId,x.f.familyId,shared.shareId))?.receiveStatus).toBe('received');
+});
+it('never publishes a downloaded photo after withdrawal during incremental reading',async()=>{
+ const x=await fixture();x.attach();
+ const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const started=deferred<void>(),gate=deferred<void>(),seen=jest.fn();
+ const original=x.client.history!.getShareMediaContent.bind(x.client.history);
+ jest.spyOn(x.client.history!,'getShareMediaContent').mockImplementation(async(...args)=>{const content=await original(...args);started.resolve();await gate.promise;return content;});
+ const reading=x.history.read(x.f.familyId,shared.shareId,current,undefined,seen);
+ const rejected=expect(reading).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
+ await started.promise;await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,shared.shareId);gate.resolve();await rejected;
+ expect(seen).toHaveBeenCalledTimes(1);expect(seen.mock.calls[0][0].media).toEqual([]);
+});

@@ -347,7 +347,7 @@ export function createFamilyHistoryUseCases(deps: {
       familyReadDiagnostic('LIST_READY','PUBLISH',started);
       return { userId: a.userId, shares: result.shares };
     },
-    async read(familyId: string, shareId: string, current: HistoryCurrent, objectId?: string): Promise<HistoryReading> {
+    async read(familyId: string, shareId: string, current: HistoryCurrent, objectId?: string, onProgress?: (reading: HistoryReading) => void): Promise<HistoryReading> {
       current = qualified(familyId, current, shareId);
       const a = await account();
       const client = api();
@@ -360,8 +360,12 @@ export function createFamilyHistoryUseCases(deps: {
       catch(e) { if (!objectId) familyReadDiagnostic('READ_FAILED',stage,started,e,mediaNumber); await invalidateDenied(a,familyId,shareId,current,e); throw e; }
       await check(a, current);
       if (objectId && !share.snapshot.media.some(item => item.objectId === objectId)) throw error('SHARE_MEDIA_UNAVAILABLE');
+      let readingActive = true;
+      const active = () => readingActive && current();
+      let failedMedia: {stage: FamilyReadStage; mediaNumber: number} | undefined;
       let received: HistoryReading['media'];
       try {
+        if (onProgress) { await check(a, active); familyReadDiagnostic('TEXT_READY','PUBLISH',started); onProgress({userId:a.userId,share,media:[]}); await check(a,active); }
         // Authorization requests run before entering the file-write queue, so
         // cached covers do not serialize their network round trips.
         stage = 'MEDIA_METADATA';
@@ -378,31 +382,30 @@ export function createFamilyHistoryUseCases(deps: {
           if (objectId) await cache.upsertListed(a.userId, share);
           else await cache.beginReceive(a.userId, share);
         });
-        const media: HistoryReading['media'] = [];
-        for (const item of share.snapshot.media) {
-          if (objectId && item.objectId !== objectId) continue;
-          await check(a, current);
+        const loadOne = async (item: typeof selected[number]): Promise<HistoryReading['media'][number]> => {
+          let phase: FamilyReadStage = 'CACHE';
+          const number = share.snapshot.media.findIndex(m => m.objectId === item.objectId) + 1;
+          try {
+          await check(a, active);
           // Metadata always comes from a fresh authenticated request, including for a cached file.
           const meta = metadata.get(item.objectId)!;
-          await check(a, current);
-          stage = 'CACHE';
-          mediaNumber = share.snapshot.media.findIndex(m => m.objectId === item.objectId) + 1;
-          const stored = (await cacheWork(a, familyId, shareId, current, cache => cache.listMedia(a.userId, familyId, shareId))).find(m => m.objectId === item.objectId && m.status === 'stored');
+          await check(a, active);
+          phase = 'CACHE';
+          const stored = (await cacheWork(a, familyId, shareId, active, cache => cache.listMedia(a.userId, familyId, shareId))).find(m => m.objectId === item.objectId && m.status === 'stored');
           const canonicalKey=familyReceivedMediaKey({userId:a.userId,familyId,shareId,objectId:item.objectId,mimeType:meta.mimeType});
-          const stamp=stored ? await cacheWork(a, familyId, shareId, current, async cache => await cache.mediaStamp?.(stored.storageKey).catch(()=>null)) : null;
+          const stamp=stored ? await cacheWork(a, familyId, shareId, active, async cache => await cache.mediaStamp?.(stored.storageKey).catch(()=>null)) : null;
           const fingerprint=stamp ? `${meta.byteLength}/${meta.contentSha256}/${meta.mimeType}/${stamp}` : null;
           if (stored && stored.storageKey===canonicalKey && fingerprint && verifiedFiles.get(stored.storageKey)===fingerprint) {
-            await check(a,current);
-            media.push({objectId:item.objectId,mimeType:meta.mimeType,uri:deps.mediaUri?.(stored.storageKey) || ''});
-            continue;
+            await check(a,active);
+            return {objectId:item.objectId,mimeType:meta.mimeType,uri:deps.mediaUri?.(stored.storageKey) || ''};
           }
           let bytes: Uint8Array | undefined;
-          if (stored) try { bytes = await cacheWork(a, familyId, shareId, current, cache => cache.readMediaBytes(stored.storageKey)); } catch (failure) { if (failure instanceof ApplicationError) throw failure; /* fetch below */ }
+          if (stored) try { bytes = await cacheWork(a, familyId, shareId, active, cache => cache.readMediaBytes(stored.storageKey)); } catch (failure) { if (failure instanceof ApplicationError) throw failure; /* fetch below */ }
           const verifiedStored = !!bytes && bytes.length === meta.byteLength && sha256MediaBytes(bytes) === meta.contentSha256;
           if (!verifiedStored) {
-            stage = 'MEDIA_CONTENT';
+            phase = 'MEDIA_CONTENT';
             const content = await client.getShareMediaContent(a.sessionToken, familyId, shareId, item.objectId);
-            await check(a, current);
+            await check(a, active);
             bytes = content.bytes;
           }
           if (!verifiedStored && (!bytes || bytes.length !== meta.byteLength || sha256MediaBytes(bytes) !== meta.contentSha256)) throw error('SHARE_MEDIA_UNAVAILABLE');
@@ -410,28 +413,48 @@ export function createFamilyHistoryUseCases(deps: {
           if (stored && verifiedStored && fingerprint) rememberFile(stored.storageKey,fingerprint);
           // Reuse the verified private file instead of rewriting it on every focus.
           if (verifiedStored && stored && stored.storageKey === canonicalKey && stored.mimeType === meta.mimeType && stored.contentSha256 === meta.contentSha256 && stored.byteLength === meta.byteLength) {
-            media.push({objectId:item.objectId,mimeType:meta.mimeType,uri:deps.mediaUri?.(stored.storageKey) || ''});
-            continue;
+            return {objectId:item.objectId,mimeType:meta.mimeType,uri:deps.mediaUri?.(stored.storageKey) || ''};
           }
           const storageKey = `${a.userId}/${familyId}/${shareId}/${item.objectId}`;
-          await check(a, current);
-          stage = 'CACHE';
+          await check(a, active);
+          phase = 'CACHE';
           const payload = bytes;
-          const saved = await cacheWork(a, familyId, shareId, current, cache => cache.saveStoredMedia({ userId: a.userId, familyId, shareId, objectId: item.objectId,
+          const saved = await cacheWork(a, familyId, shareId, active, cache => cache.saveStoredMedia({ userId: a.userId, familyId, shareId, objectId: item.objectId,
             mimeType: meta.mimeType, byteLength: meta.byteLength, contentSha256: meta.contentSha256, storageKey, bytes: payload }));
-          await check(a, current);
-          const savedStamp=await cacheWork(a, familyId, shareId, current, async cache => await cache.mediaStamp?.(saved.storageKey).catch(()=>null));
+          await check(a, active);
+          const savedStamp=await cacheWork(a, familyId, shareId, active, async cache => await cache.mediaStamp?.(saved.storageKey).catch(()=>null));
           if (savedStamp) rememberFile(saved.storageKey,`${meta.byteLength}/${meta.contentSha256}/${meta.mimeType}/${savedStamp}`);
-          media.push({ objectId: item.objectId, mimeType: meta.mimeType, uri: deps.mediaUri?.(saved.storageKey) || '' });
-        }
-        received = media;
+          return { objectId: item.objectId, mimeType: meta.mimeType, uri: deps.mediaUri?.(saved.storageKey) || '' };
+          } catch (failure) { failedMedia ??= {stage:phase,mediaNumber:number}; readingActive = false; throw failure; }
+        };
+        const results: (HistoryReading['media'][number] | undefined)[] = new Array(selected.length);
+        let next = 0;
+        const worker = async () => {
+          while (readingActive) {
+            const index = next++;
+            if (index >= selected.length) return;
+            const media = await loadOne(selected[index]);
+            if (onProgress) {
+              // Each incremental publication needs fresh authority, just like
+              // final publication. Cache completion alone never grants access.
+              try { await client.getShare(a.sessionToken,familyId,shareId); }
+              catch (failure) { failedMedia ??= {stage:'FINAL_AUTHORIZATION',mediaNumber:index+1}; readingActive = false; throw failure; }
+            }
+            await check(a,active);
+            results[index] = media;
+            if (onProgress) { familyReadDiagnostic('MEDIA_READY','PUBLISH',started,undefined,index+1); onProgress({userId:a.userId,share,media:results.filter((m): m is HistoryReading['media'][number] => !!m)}); }
+          }
+        };
+        await Promise.all(Array.from({length:Math.min(2,selected.length)},worker));
+
+        received = results.filter((m): m is HistoryReading['media'][number] => !!m);
         // Still revalidate before publishing, outside the file-write queue.
         stage = 'FINAL_AUTHORIZATION';
         await client.getShare(a.sessionToken, familyId, shareId);
         await check(a, current);
         stage = 'CACHE';
         if (!objectId) await cacheWork(a,familyId,shareId,current,cache=>cache.markReceived(a.userId,familyId,shareId));
-      } catch(e) { if (!objectId) familyReadDiagnostic('READ_FAILED',stage,started,e,mediaNumber); await invalidateDenied(a,familyId,shareId,current,e); throw e; }
+      } catch(e) { readingActive = false; if (!objectId) familyReadDiagnostic('READ_FAILED',failedMedia?.stage ?? stage,started,e,failedMedia?.mediaNumber ?? mediaNumber); await invalidateDenied(a,familyId,shareId,current,e); throw e; }
       await check(a, current);
       if (!objectId) familyReadDiagnostic('READY','PUBLISH',started);
       return { userId: a.userId, share, media: received };
