@@ -88,7 +88,7 @@ export function FamilyHistoryScreen({ familyId, shareId, inline = false, onWithd
     const hide=(error:unknown)=>{if(disposed||!current())return;saveProgress();setView(null);setRows([]);setStatus('failed');setMessage(familyHistoryError(error));};
     const timer=setInterval(()=>{
       if(disposed||!current())return;
-      if(Date.now()>=expires){hide({code:'FORBIDDEN'});return;}
+      if(Date.now()>=expires){hide({code:'FAMILY_READ_LEASE_EXPIRED'});return;}
       if(inFlight||Date.now()-checked<5000)return;
       inFlight=true;checked=Date.now();const started=checked;
       void (async()=>{

@@ -360,10 +360,12 @@ export function createFamilyHistoryUseCases(deps: {
           await check(a,current);
           return [item.objectId,meta] as const;
         })));
-        received = await cacheWork(a, familyId, shareId, current, async cache => {
-        // A cover read is partial; never claim the whole share was received.
-        if (objectId) await cache.upsertListed(a.userId, share);
-        else await cache.beginReceive(a.userId, share);
+        // Only local cache work belongs on this queue. The parent list must
+        // renew its reading lease while an inline detail is downloading media.
+        await cacheWork(a, familyId, shareId, current, async cache => {
+          if (objectId) await cache.upsertListed(a.userId, share);
+          else await cache.beginReceive(a.userId, share);
+        });
         const media: HistoryReading['media'] = [];
         for (const item of share.snapshot.media) {
           if (objectId && item.objectId !== objectId) continue;
@@ -371,9 +373,9 @@ export function createFamilyHistoryUseCases(deps: {
           // Metadata always comes from a fresh authenticated request, including for a cached file.
           const meta = metadata.get(item.objectId)!;
           await check(a, current);
-          const stored = (await cache.listMedia(a.userId, familyId, shareId)).find(m => m.objectId === item.objectId && m.status === 'stored');
+          const stored = (await cacheWork(a, familyId, shareId, current, cache => cache.listMedia(a.userId, familyId, shareId))).find(m => m.objectId === item.objectId && m.status === 'stored');
           const canonicalKey=familyReceivedMediaKey({userId:a.userId,familyId,shareId,objectId:item.objectId,mimeType:meta.mimeType});
-          const stamp=stored ? await cache.mediaStamp?.(stored.storageKey).catch(()=>null) : null;
+          const stamp=stored ? await cacheWork(a, familyId, shareId, current, async cache => await cache.mediaStamp?.(stored.storageKey).catch(()=>null)) : null;
           const fingerprint=stamp ? `${meta.byteLength}/${meta.contentSha256}/${meta.mimeType}/${stamp}` : null;
           if (stored && stored.storageKey===canonicalKey && fingerprint && verifiedFiles.get(stored.storageKey)===fingerprint) {
             await check(a,current);
@@ -381,7 +383,7 @@ export function createFamilyHistoryUseCases(deps: {
             continue;
           }
           let bytes: Uint8Array | undefined;
-          if (stored) try { bytes = await cache.readMediaBytes(stored.storageKey); } catch { /* fetch below */ }
+          if (stored) try { bytes = await cacheWork(a, familyId, shareId, current, cache => cache.readMediaBytes(stored.storageKey)); } catch (failure) { if (failure instanceof ApplicationError) throw failure; /* fetch below */ }
           const verifiedStored = !!bytes && bytes.length === meta.byteLength && sha256MediaBytes(bytes) === meta.contentSha256;
           if (!verifiedStored) {
             const content = await client.getShareMediaContent(a.sessionToken, familyId, shareId, item.objectId);
@@ -398,15 +400,15 @@ export function createFamilyHistoryUseCases(deps: {
           }
           const storageKey = `${a.userId}/${familyId}/${shareId}/${item.objectId}`;
           await check(a, current);
-          const saved = await cache.saveStoredMedia({ userId: a.userId, familyId, shareId, objectId: item.objectId,
-            mimeType: meta.mimeType, byteLength: meta.byteLength, contentSha256: meta.contentSha256, storageKey, bytes });
+          const payload = bytes;
+          const saved = await cacheWork(a, familyId, shareId, current, cache => cache.saveStoredMedia({ userId: a.userId, familyId, shareId, objectId: item.objectId,
+            mimeType: meta.mimeType, byteLength: meta.byteLength, contentSha256: meta.contentSha256, storageKey, bytes: payload }));
           await check(a, current);
-          const savedStamp=await cache.mediaStamp?.(saved.storageKey).catch(()=>null);
+          const savedStamp=await cacheWork(a, familyId, shareId, current, async cache => await cache.mediaStamp?.(saved.storageKey).catch(()=>null));
           if (savedStamp) rememberFile(saved.storageKey,`${meta.byteLength}/${meta.contentSha256}/${meta.mimeType}/${savedStamp}`);
           media.push({ objectId: item.objectId, mimeType: meta.mimeType, uri: deps.mediaUri?.(saved.storageKey) || '' });
         }
-        return media;
-      });
+        received = media;
         // Still revalidate before publishing, outside the file-write queue.
         await client.getShare(a.sessionToken, familyId, shareId);
         await check(a, current);

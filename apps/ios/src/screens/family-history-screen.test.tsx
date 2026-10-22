@@ -189,3 +189,35 @@ it('renewal removes restricted content without redownloading photos or automatic
   expect(page.queryByText('Morning')).toBeNull();expect(mockRead).toHaveBeenCalledTimes(1);expect(mockPlay).not.toHaveBeenCalled();
  } finally {jest.useRealTimers();}
 });
+
+it('keeps the inline download open while the parent list renews beyond fifteen seconds',async()=>{
+ jest.useFakeTimers();
+ try {
+  let finish!:(value:typeof reading)=>void;
+  mockRead.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+  const page=await render(<FamilyHistoryScreen familyId="family_d2"/>);
+  await waitFor(()=>expect(page.getByTestId('history-open-share_d2')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('history-open-share_d2'));
+  await waitFor(()=>expect(mockRead).toHaveBeenCalledTimes(1));
+  for(let i=0;i<5;i++)await act(async()=>{jest.advanceTimersByTime(5000);});
+  expect(page.getByTestId('history-open-share_d2').props.accessibilityState.expanded).toBe(true);
+  expect(page.queryByText('这份家庭记录现在不可读。')).toBeNull();
+  expect(mockList.mock.calls.length).toBeGreaterThan(3);
+  await act(async()=>{finish(reading);});
+  expect(page.getByTestId('family-history-reading')).toBeTruthy();
+  await page.unmount();
+ }finally{jest.useRealTimers();}
+});
+it('hides on a real renewal timeout without presenting it as a server denial',async()=>{
+ jest.useFakeTimers();
+ try {
+  const page=await render(<FamilyHistoryScreen familyId="family_d2" shareId="share_d2"/>);
+  await waitFor(()=>expect(page.getByText('Morning')).toBeTruthy());
+  mockAuthorize.mockReturnValueOnce(new Promise(()=>{}));
+  await act(async()=>{jest.advanceTimersByTime(16000);});
+  expect(page.queryByText('Morning')).toBeNull();
+  expect(page.getByText('暂时无法确认阅读资格，请再试一次。')).toBeTruthy();
+  expect(page.queryByText('这份家庭记录现在不可读。')).toBeNull();
+  await page.unmount();
+ }finally{jest.useRealTimers();}
+});

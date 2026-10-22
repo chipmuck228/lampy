@@ -357,13 +357,13 @@ it('does not block an unchanged family directory behind an in-flight media downl
  finally{gate.resolve({bytes:sampleJpegBytes(),mimeType:'image/jpeg'});await reading;await reconcile;}
 });
 
-it('still invalidates a removed family immediately while its queued cleanup waits for a download',async()=>{
+it('invalidates and cleans a removed family without waiting for an in-flight download',async()=>{
  const x=await fixture();x.attach();const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
  const started=deferred<void>(),gate=deferred<{bytes:Uint8Array;mimeType:string}>();
  x.client.history!.getShareMediaContent=async()=>{started.resolve();return gate.promise;};
  const reading=x.history.read(x.f.familyId,shared.shareId,current);const rejected=expect(reading).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});await started.promise;
  let reconciled=false;const reconcile=x.history.reconcileFamilies(x.a.userId,[],current).then(()=>{reconciled=true;});
- for(let i=0;i<100;i++)await Promise.resolve();expect(reconciled).toBe(false);
+ for(let i=0;i<100;i++)await Promise.resolve();expect(reconciled).toBe(true);
  gate.resolve({bytes:sampleJpegBytes(),mimeType:'image/jpeg'});await rejected;await reconcile;
  expect(await x.cache.listFamilyIds!(x.a.userId)).toEqual([]);
 });
@@ -430,4 +430,26 @@ it('reports original photo 3 on conversion failure and never commits a partial s
   const p=await history.prepare(original.id,x.f.familyId,current,['three']);
   await expect(history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'SHARE_IMAGE_DECODE_FAILED',photoNumber:3,assetId:'three'});
   expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(0);
+});
+
+it('renews the parent list while an inline detail is still downloading and never publishes a revoked download',async()=>{
+  const x=await fixture();x.attach();
+  const saved=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+  const started=deferred<void>(),gate=deferred<void>();
+  const content=x.client.history!.getShareMediaContent.bind(x.client.history);
+  jest.spyOn(x.client.history!,'getShareMediaContent').mockImplementation(async(...args)=>{started.resolve();await gate.promise;return content(...args);});
+  const read=x.history.read(x.f.familyId,saved.shareId,current);
+  // Attach a rejection handler before releasing a revoked response.
+  const readResult=read.then(value=>({value}),error=>({error}));
+  await started.promise;
+  let renewed=false;
+  const refresh=x.history.list(x.f.familyId,current).then(value=>{renewed=true;return value;});
+  try {
+    for(let i=0;i<100&&!renewed;i++)await Promise.resolve();
+    expect(renewed).toBe(true);
+    expect((await refresh).shares.map(s=>s.shareId)).toContain(saved.shareId);
+    await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,saved.shareId);
+  }finally{gate.resolve();}
+  expect(await readResult).toMatchObject({error:{code:'SHARE_NOT_FOUND'}});
+  expect(await x.cache.find(x.a.userId,x.f.familyId,saved.shareId)).toBeNull();
 });
