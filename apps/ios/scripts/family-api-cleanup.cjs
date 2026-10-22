@@ -22,6 +22,7 @@ Module._extensions['.ts'] = function compileTypescript(module, filename) {
 };
 
 const databasePath = (process.env.LAMPY_FAMILY_DATABASE_PATH || '').trim();
+if (process.argv.length !== 2) { process.stderr.write('Cleanup accepts no arguments or clock overrides.\n'); process.exit(1); }
 if (!databasePath) {
   process.stderr.write('Set LAMPY_FAMILY_DATABASE_PATH to the SQLite file before cleanup.\n');
   process.exit(1);
@@ -40,13 +41,19 @@ const db = openFamilySqliteDatabase(databasePath);
 (async () => {
   try {
     const schema = await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations');
-    if (!schema || schema.version < 25) { process.stderr.write('Run family-api:migrate before cleanup (schema 25 required).\n'); process.exitCode = 1; return; }
-    const {drainAccountMedia}=require(path.join(familyApiRoot,'account-deletion.ts'));
+    if (!schema || schema.version !== 34) { process.stderr.write('Run family-api:migrate before cleanup (schema 34 required).\n'); process.exitCode = 1; return; }
+    const {drainRetiredMediaBatch}=require(path.join(familyApiRoot,'account-deletion.ts'));
+    const {runFamilyDataRetention}=require(path.join(familyApiRoot,'data-retention.ts'));
     const {createSqliteFamilyRepository}=require(path.join(familyApiRoot,'sqlite-repository.ts'));
-    if(schema.version>=32 && !await drainAccountMedia(createSqliteFamilyRepository(db),createDirectoryMediaBlobStore(mediaPath)))process.exitCode=1;
-    const report = await runFamilyCleanup(db, createDirectoryMediaBlobStore(mediaPath));
-    process.stdout.write(JSON.stringify(report) + '\n');
-    if (report.failed) process.exitCode = 1;
+    await db.exec('PRAGMA busy_timeout=5000;');
+    const blobs = createDirectoryMediaBlobStore(mediaPath);
+    const now = new Date();
+    const report = await runFamilyCleanup(db, blobs, now);
+    const retention = await runFamilyDataRetention(db, now);
+    const mediaCleanup = await drainRetiredMediaBatch(createSqliteFamilyRepository(db),blobs);
+    const pending = await db.getFirst('SELECT COUNT(*) AS count FROM family_account_media_cleanup');
+    process.stdout.write(JSON.stringify({...report,retention,mediaCleanup:{...mediaCleanup,pending:pending.count}}) + '\n');
+    if (report.failed || mediaCleanup.failed) process.exitCode = 1;
   } catch { process.stderr.write('Family cleanup failed; check the isolated service/database configuration.\n'); process.exitCode = 1; }
   finally { await db.close(); }
 })();

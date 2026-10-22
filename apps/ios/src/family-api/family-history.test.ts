@@ -36,9 +36,9 @@ it('migrates existing data as legacy without rewriting snapshots, audience or ol
  await db.run("INSERT INTO family_shares(share_id,family_id,author_user_id,source_moment_id,source_revision,snapshot_json,audience_json,shared_at,status) VALUES ('share','old','a','m',1,?,?,'2026-01-01','active')",['{"note":"old"}','["a"]']);
  const before=await db.getAll('SELECT * FROM family_shares');
  await applyFamilyApiSchema(db);await applyFamilyApiSchema(db);
- expect(await db.getAll('SELECT * FROM family_shares')).toEqual(before);
+ expect(await db.getAll('SELECT * FROM family_shares')).toEqual(before.map(row=>({...row as object,content_purged_at:null})));
  expect(await db.getFirst("SELECT history_policy,history_confirmed_at FROM family_families WHERE family_id='old'")).toEqual({history_policy:'legacy',history_confirmed_at:null});
- expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:33});
+ expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:34});
  await db.close();db=openFamilySqliteDatabase(path.join(dir,'old.sqlite'));
  expect((await createSqliteFamilyRepository(db).withTransaction(tx=>tx.findFamily('old')))?.historyPolicy).toBe('legacy');
 });

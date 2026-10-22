@@ -14,17 +14,21 @@ export async function assertDeletionFamilies(tx:FamilyTx,userId:string) {
   }
 }
 // Queue survives process exit; no retired object may be read via the media API.
-export async function drainAccountMedia(repository:FamilyRepository,blobs:MediaBlobStore) {
-  let failed=false;
+export async function drainRetiredMediaBatch(repository:FamilyRepository,blobs:MediaBlobStore) {
+  let failed=0, removed=0;
   const keys=await repository.withTransaction(tx=>tx.listAccountMediaCleanup());
   for(const key of keys) {
     try {
-      if(await repository.withTransaction(tx=>tx.isMediaStorageKeyLive(key))){failed=true;continue;}
-      await blobs.remove(key);await repository.withTransaction(tx=>tx.completeAccountMediaCleanup(key));}
-    catch {failed=true;}
+      if(await repository.withTransaction(tx=>tx.isMediaStorageKeyLive(key))){failed++;continue;}
+      await blobs.remove(key);await repository.withTransaction(tx=>tx.completeAccountMediaCleanup(key));removed++;}
+    catch {failed++;}
   }
   const remaining=await repository.withTransaction(tx=>tx.listAccountMediaCleanup());
-  return !failed&&remaining.length===0;
+  return {checked:keys.length,removed,failed,pendingBatch:remaining.length};
+}
+export async function drainAccountMedia(repository:FamilyRepository,blobs:MediaBlobStore) {
+  const report=await drainRetiredMediaBatch(repository,blobs);
+  return report.failed===0&&report.pendingBatch===0;
 }
 export function createAccountDeletionCommands(deps:{repository:FamilyRepository;apple:AppleVerifier;revoker?:AppleRevoker;blobs:MediaBlobStore;clock:FamilyClock;enabled:boolean;requireUser:(tx:FamilyTx,token?:string)=>Promise<string>}) {
  return {async deleteAccount(token:string,input:DeleteAccountInput):Promise<DeleteAccountResult> {

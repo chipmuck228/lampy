@@ -5,4 +5,4 @@ Module._extensions['.ts']=function(module,file){module._compile(ts.transpileModu
 require('../src/family-admin/server.ts').startFamilyAdmin().then(server=>{
  process.stdout.write(`Lampy admin listening on loopback port ${server.port}\n`);
  for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>{void server.close().then(()=>process.exit(0),()=>process.exit(1));});
-}).catch(()=>{process.stderr.write('Admin startup failed. Check schema 33, paths, origin and credential configuration.\n');process.exitCode=1;});
+}).catch(()=>{process.stderr.write('Admin startup failed. Check schema 33 or 34, paths, origin and credential configuration.\n');process.exitCode=1;});

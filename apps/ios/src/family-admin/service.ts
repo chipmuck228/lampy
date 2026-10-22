@@ -10,7 +10,7 @@ import {sha256MediaBytes} from '../family-api/media-validate';
 function fail(code:string):never {throw new FamilyError(code,code);}
 export async function createAdminService(db:FamilySql,blobs:MediaBlobStore,operator:string,now:()=>Date=()=>new Date()){
  const schema=await db.getFirst<{version:number}>('SELECT MAX(version) AS version FROM family_schema_migrations');
- if(schema?.version!==33)throw Error('Family schema 33 required; admin does not run family migrations.');
+ if(!schema || ![33,34].includes(schema.version))throw Error('Family schema 33 or 34 required; admin does not run family migrations.');
  for(const table of ['family_safety_reports','family_content_moderation','family_sharing_restrictions','family_sharing_restriction_audit'])if(!await db.getFirst("SELECT name FROM sqlite_master WHERE type='table' AND name=?",[table]))throw Error('Family safety tables missing.');
  // Separate operational access audit, not a new family migration or a content copy.
  await db.exec('CREATE TABLE IF NOT EXISTS family_admin_audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT,at TEXT NOT NULL,operator TEXT NOT NULL,event TEXT NOT NULL,report_id TEXT,object_id TEXT); CREATE INDEX IF NOT EXISTS family_admin_audit_at ON family_admin_audit(at);');
@@ -29,6 +29,22 @@ export async function createAdminService(db:FamilySql,blobs:MediaBlobStore,opera
    hidden:moderation?.hidden===true,sharingRestricted:restriction?.restricted===true,authorAvailable:!!author,version};
  }
  return {
+  async restrictedAuthors(page:number){
+   if(!Number.isInteger(page)||page<0||page>10000)fail('BAD_REQUEST');
+   return repo.withTransaction(async tx=>{
+    const rows=await db.getAll<{user_id:string;json:string}>("SELECT user_id,json FROM family_sharing_restrictions WHERE json_extract(json,'$.restricted')=1 ORDER BY user_id LIMIT 51 OFFSET ?",[page*50]);
+    const authors=await Promise.all(rows.slice(0,50).map(async row=>({userId:row.user_id,nickname:(await tx.findProfile(row.user_id))?.nickname??'',restrictedAt:JSON.parse(row.json).updatedAt,version:createHash('sha256').update(row.json).digest('hex')})));
+    await audit('restricted-authors');return {authors,hasMore:rows.length>50,page};
+   });
+  },
+  releaseAuthor(userId:string,input:{reason:unknown;version:unknown}){return repo.withTransaction(async tx=>{
+   if(!/^[A-Za-z0-9_-]{1,200}$/.test(userId)||typeof input.reason!=='string'||!input.reason.trim()||input.reason.length>1000||typeof input.version!=='string')fail('BAD_REQUEST');
+   const row=await db.getFirst<{json:string}>('SELECT json FROM family_sharing_restrictions WHERE user_id=?',[userId]);
+   if(!row||!await tx.findAccountByUserId(userId))fail('NOT_FOUND');
+   if(!JSON.parse(row.json).restricted||createHash('sha256').update(row.json).digest('hex')!==input.version)fail('CONFLICT');
+   await tx.saveSharingRestriction({userId,restricted:false,operator,reason:input.reason.trim(),updatedAt:now().toISOString()});
+   await audit('release-author-direct');return {released:true};
+  });},
   async list(status:string,page:number){if(!['pending','reviewed','restricted','all'].includes(status)||!Number.isInteger(page)||page<0||page>10000)fail('BAD_REQUEST');
    return repo.withTransaction(async()=>{
     const where=status==='all'?'':" WHERE json_extract(json,'$.status')=?";const params=status==='all'?[]:[status];

@@ -13,6 +13,8 @@ import {HISTORY_CONFIRMATION} from '../family-api/history-policy';
 import {startFamilyAdmin,adminConfig,type AdminEnv} from './server';
 import {hashAdminPassword} from './auth';
 import {createAdminService} from './service';
+import {runFamilyDataRetention} from '../family-api/data-retention';
+import {reviewSafetyReport,restrictReportedAuthor} from '../family-api/safety-commands';
 
 // Production-cost scrypt needs headroom on shared CI hosts.
 jest.setTimeout(20000);
@@ -111,4 +113,28 @@ it('does not expose retired media through a deleted account report',async()=>{
 it('allows only one concurrent password derivation even when request bodies arrive together',async()=>{
  await fixture();const results=await Promise.all(Array.from({length:3},()=>request('/api/login','POST',{username:'developer',password})));
  expect(results.filter(r=>r.status===200)).toHaveLength(1);expect(results.filter(r=>r.status===429)).toHaveLength(2);
+});
+
+it('lists and explicitly releases an active author restriction after its report has expired, without restoring hidden content',async()=>{
+ const f=await fixture(),h=await login(),repo=createSqliteFamilyRepository(db);
+ const old=new Date(Date.now()-100*86400000).toISOString();
+ await repo.withTransaction(async tx=>{
+  await reviewSafetyReport(tx,{reportId:f.report.reportId,operator:'op',reason:'rule',hide:true,now:old});
+  await restrictReportedAuthor(tx,{reportId:f.report.reportId,operator:'op',reason:'rule',restricted:true,now:old});
+ });
+ expect((await runFamilyDataRetention(db)).resolvedReports).toBe(1);
+ expect((await request('/api/reports/'+f.report.reportId,'GET',undefined,h)).status).toBe(404);
+ expect((await request('/api/restricted-authors')).status).toBe(401);
+ const listed=await request('/api/restricted-authors?page=0','GET',undefined,h);
+ expect(listed.body.authors).toHaveLength(1);const author=listed.body.authors[0];expect(author.userId).toBe(f.b.userId);
+ expect(JSON.stringify(listed.body)).not.toMatch(/private family text|private record|contentSha256|snapshot/);
+ const route='/api/restricted-authors/'+f.b.userId+'/release';
+ expect((await request(route,'POST',{reason:'approved',version:author.version},{Cookie:h.Cookie})).status).toBe(403);
+ expect((await request(route,'POST',{reason:'',version:author.version},h)).status).toBe(400);
+ expect((await request(route,'POST',{reason:'approved',version:'stale'},h)).status).toBe(409);
+ expect((await request(route,'POST',{reason:'approved',version:author.version},h)).status).toBe(200);
+ expect((await request(route,'POST',{reason:'approved',version:author.version},h)).status).toBe(409);
+ await repo.withTransaction(async tx=>{expect((await tx.findSharingRestriction(f.b.userId))?.restricted).toBe(false);expect((await tx.findModeration(f.share.shareId))?.hidden).toBe(true);});
+ expect((await request('/api/restricted-authors?page=0','GET',undefined,h)).body.authors).toEqual([]);
+ expect((await db.getAll<{event:string}>('SELECT event FROM family_admin_audit')).map(r=>r.event)).toContain('release-author-direct');
 });

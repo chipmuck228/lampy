@@ -70,6 +70,11 @@ export async function startFamilyAdmin(options:{env?:AdminEnv;port?:number;now?:
   if(route==='/api/session'&&method==='GET')return json(res,200,{username:config.username,csrf:session.csrf,expiresAt:session.expiresAt});
   if(route==='/api/logout'&&method==='POST'){auth.revoke(session.key);res.setHeader('Set-Cookie',expiredCookie());await service.loginAudit('logout');return json(res,200,{ok:true});}
   if(route==='/api/reports'&&method==='GET')return json(res,200,await service.list(url.searchParams.get('status')??'pending',Number(url.searchParams.get('page')??'0')));
+  if(route==='/api/restricted-authors'&&method==='GET')return json(res,200,await service.restrictedAuthors(Number(url.searchParams.get('page')??'0')));
+  const authorMatch=/^\/api\/restricted-authors\/([A-Za-z0-9_-]{1,200})\/release$/.exec(route);
+  if(authorMatch&&method==='POST'){
+   const input=await body(req);return json(res,200,await service.releaseAuthor(authorMatch[1],{reason:input.reason,version:input.version}));
+  }
   const match=/^\/api\/reports\/([A-Za-z0-9_-]{1,200})(?:\/(history|decision|media|validation)(?:\/(med_[a-f0-9]+))?)?$/.exec(route);
   if(!match)return json(res,404,{error:'NOT_FOUND'});
   const [,id,action,objectId]=match;

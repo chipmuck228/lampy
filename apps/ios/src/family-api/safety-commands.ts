@@ -107,7 +107,7 @@ export async function reviewSafetyReport(tx: FamilyTx, input: { reportId: string
   }
   if (!input.hide) await tx.saveModeration({shareId:report.shareId,hidden:previous?.hidden??false,operator:input.operator.trim(),reason:input.reason.trim(),updatedAt:input.now});
   for (const r of await tx.listSafetyReports()) if (r.shareId === report.shareId) {
-    await tx.saveSafetyReport({...r,status:input.hide || (await tx.findModeration(r.shareId))?.hidden ? 'restricted' : 'reviewed'});
+    await tx.saveSafetyReport({...r,status:input.hide || (await tx.findModeration(r.shareId))?.hidden ? 'restricted' : 'reviewed',retentionStartedAt:input.now});
   }
 }
 
