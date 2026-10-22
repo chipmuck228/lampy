@@ -145,6 +145,9 @@ it('uploads converted HEIC as validated JPEG without changing the personal asset
   expect(convert).toHaveBeenCalledWith(heic,'image/heic');
   expect(saved.snapshot.media[0].mimeType).toBe('image/jpeg');
   expect(original.metadata.mimeType).toBe('image/heic');
+  const received=await history.read(x.f.familyId,saved.shareId,current);
+  expect(received.media).toHaveLength(1);
+  expect(received.media[0].mimeType).toBe('image/jpeg');
   expect(x.requests.find(r=>r.path==='/v1/media')!.bytes).toEqual(sampleJpegBytes());
 });
 it('rejects fake JPEG relabelling and never posts a share',async()=>{
@@ -408,9 +411,12 @@ it.each([{indices:[0,1,2]},{indices:[0,2]},{indices:[2]}])('prepares selected HE
   x.personal.readAssetBytes.mockImplementation(async(uri?:string)=>new Uint8Array([0,0,0,24,102,116,121,112,104,101,105,99,ids.indexOf(uri!.slice(8))]));
   let copyNumber=0;
   const convert=jest.fn(async()=>{const bytes=sampleJpegBytes();const table=bytes.findIndex((v,i)=>v===255&&bytes[i+1]===219);bytes[table+5]+=copyNumber++;return {bytes,mimeType:'image/jpeg'};});
-  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:convert}});
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:convert},receiveCache:x.cache});
   const p=await history.prepare(original.id,x.f.familyId,current,indices.map(i=>ids[i]));
-  await history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  const saved=await history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  const received=await history.read(x.f.familyId,saved.shareId,current);
+  expect(received.media).toHaveLength(indices.length);
+  expect(received.media.every(media=>media.mimeType==='image/jpeg')).toBe(true);
   expect(convert).toHaveBeenCalledTimes(indices.length);
   expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(1);
 });
