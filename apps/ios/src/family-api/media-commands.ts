@@ -1,3 +1,4 @@
+import { photoMetadataIsClean } from './photo-metadata';
 import { FAMILY_ERROR, FamilyError } from './errors';
 import { fingerprintUploadMedia, sha256MediaBytes } from './media-validate';
 import type { FamilyRepository, FamilyTx } from './repository';
@@ -127,6 +128,11 @@ export function createMediaCommands(deps: {
       await rejectDisallowedTestAccountSession(deps.repository, sessionToken, clock.now(), testAccountLoginEnabled, deps.operatorOnly);
       const mime = deps.assertPayload(input.bytes, input.mimeType);
       const bytes = input.bytes;
+      if (mime.startsWith('image/')) {
+        let clean = false;
+        try { clean = photoMetadataIsClean(bytes, mime); } catch { /* fail closed */ }
+        if (!clean) throw new FamilyError(FAMILY_ERROR.MEDIA_IMAGE_PREPARATION_REQUIRED, 'Update the app to prepare a private image copy.');
+      }
       const sha256 = sha256MediaBytes(bytes);
       const fingerprint = fingerprintUploadMedia(sha256, mime, bytes.length);
 

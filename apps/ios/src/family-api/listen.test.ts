@@ -62,7 +62,9 @@ describe('family API listen startup', () => {
         {confirmation:'new-members-can-read-active-history'},token)).status).toBe(200);
       const ids: string[] = [];
       for (let i = 0; i < 3; i += 1) {
-        const bytes = Buffer.concat([Buffer.from(sampleJpegBytes()), Buffer.from([i])]);
+        // Distinct pixel-coding data, not metadata hidden after JPEG EOI.
+        const bytes = Buffer.from(sampleJpegBytes());
+        bytes[11] = i + 1;
         const media = await new Promise<{ status?: number; body: any }>((resolve, reject) => {
           const req = httpRequest({ hostname: '127.0.0.1', port: listening.port, method: 'POST', path: '/v1/media',
             headers: { authorization: `Bearer ${token}`, 'content-type': 'image/jpeg' },

@@ -748,7 +748,7 @@
   "确认分享": "Confirm share",
   "分享给家里": "Share with family",
   "分享这份媒介 {0}": "Include media {{0}}",
-  "照片分享需要更新测试安装，原照片还在。": "Photo sharing requires an updated test installation. Your original photo is still here.",
+  "照片分享需要更新应用，原照片还在。": "Update the app to share this photo. Your original photo is still here.",
   "这张照片暂时无法分享，可以取消勾选后再试。": "This photo cannot be shared right now. You can deselect it and try again.",
   "这份照片或声音超过分享大小限制，可以取消勾选后再试。": "This photo or sound exceeds the sharing size limit. You can deselect it and try again.",
   "家人可以一起回看": "Your family can revisit together",
@@ -1011,5 +1011,13 @@
   "{0}分享的记录": "Record shared by {0}",
   "家庭记录（目前不可用）": "Family record (currently unavailable)",
   "照片{0}张 · 声音{1}段": "{0} photos · {1} audio recordings",
-  "举报于{0}": "Reported on {0}"
+  "举报于{0}": "Reported on {0}",
+  "照片 {0} 过大，暂时无法分享，可以取消勾选后再试。原照片保留。": "Photo {{0}} is too large to share. Deselect it and try again. Your original is kept.",
+  "照片 {0} 分享需要更新应用，原照片保留。": "Update the app to share photo {{0}}. Your original is kept.",
+  "照片 {0} 暂时无法分享，可以取消勾选后再试。原照片保留。": "Photo {{0}} could not be shared. Deselect it and try again. Your original is kept.",
+  "未能分享": "Could not share",
+  "暂时无法确认阅读资格，请再试一次。": "Reading access could not be confirmed. Please try again.",
+  "正在载入照片和声音（{0}/{1}）": "Loading photos and audio ({{0}}/{{1}})",
+  "照片正在载入": "Loading photo",
+  "声音正在载入": "Loading audio"
 }

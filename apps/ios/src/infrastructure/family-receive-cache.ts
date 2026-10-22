@@ -726,6 +726,11 @@ export function createSqliteFamilyReceiveCache(db: SqlDatabase, files: FamilyRec
     async replaceVisible(userId, familyId, visible) {
       const keep = new Set(visible.map((share) => share.shareId));
       for (const share of visible) {
+        const existing = await find(userId, familyId, share.shareId);
+        // Index renewal is metadata-only: do not re-read every received photo
+        // on every five-second poll. Actual reads still verify server hashes
+        // and file stamps; list() retains explicit disk reconciliation.
+        if (existing?.receiveStatus === 'received' && existing.snapshotRevision === share.sourceRevision) continue;
         await this.upsertListed(userId, share);
       }
       const rows = await db.getAll<ShareRow>(

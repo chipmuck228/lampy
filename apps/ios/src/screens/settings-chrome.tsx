@@ -1,5 +1,5 @@
 import { tr } from '../i18n';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,6 +20,7 @@ export function SettingsPage({
   pageTestID,
   onBack,
   scrollEnabled = true,
+  scrollRef,
   children,
 }: {
   title: string;
@@ -29,6 +30,7 @@ export function SettingsPage({
   pageTestID?: string;
   onBack: () => void;
   scrollEnabled?: boolean;
+  scrollRef?: Ref<ScrollView>;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -71,6 +73,7 @@ export function SettingsPage({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={scrollRef}
           testID={testID ?? 'account-scroll'}
           style={styles.scroll}
           scrollEnabled={scrollEnabled}

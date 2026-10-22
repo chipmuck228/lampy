@@ -1,10 +1,15 @@
+import {fetch as mediaFetch} from 'expo/fetch';
 import {fetch as xhrFetch} from 'whatwg-fetch';
 
 // JSON must not pass through the RN Blob/FileReader queue used by buffered
-// media. Import the binary implementation itself, never global.fetch.
+// media. JSON uses text XHR; binary GETs use Expo's separate native session
+// and native arrayBuffer, never RN Blob/FileReader or global.fetch.
 export const familyXhrFetch: typeof fetch = Object.assign(
   (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const headers = new Headers(init?.headers);
+    if ((init?.method || 'GET').toUpperCase() === 'GET' && headers.get('accept') === '*/*') {
+      return (mediaFetch as typeof fetch)(input, init);
+    }
     if (typeof input !== 'string' || headers.get('accept') !== 'application/json') {
       return xhrFetch(input, init);
     }

@@ -30,6 +30,22 @@ async function fixture() {
   return {commands,a,b,f,session,client,cache,personal,history,requests,attach:()=>{moment={...moment,assetIds:['asset_d2']};},change:()=>{moment={...moment,revision:moment.revision+1,content:{...moment.content,note:'changed'}};}};
 }
 const current=()=>true;
+it('prepares a metadata-bearing JPEG copy before history upload, preserves the private source and aborts on a late conversion',async()=>{
+  const x=await fixture();x.attach();
+  const plain=sampleJpegBytes(), source=new Uint8Array([255,216,255,225,0,10,69,120,105,102,0,0,1,2,...plain.subarray(2)]);
+  x.personal.readAssetBytes.mockResolvedValue(source);
+  const convert=jest.fn(async()=>({bytes:plain,mimeType:'image/jpeg'}));
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:convert}});
+  const p=await history.prepare('moment_d2',x.f.familyId,current);
+  await history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  expect(convert).toHaveBeenCalledWith(source,'image/jpeg');expect(x.requests.find(r=>r.path==='/v1/media')!.bytes).toEqual(plain);
+  expect(source[3]).toBe(225);expect(x.personal.assets.findById.mock.results[0]).toBeDefined();
+  let active=true;
+  const cancelled=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:async()=>{active=false;return {bytes:plain,mimeType:'image/jpeg'};}}});
+  const cp=await cancelled.prepare('moment_d2',x.f.familyId,()=>active), before=x.requests.filter(r=>r.path==='/v1/media').length;
+  await expect(cancelled.share(cp,HISTORY_AUDIENCE_CONFIRMATION,()=>active)).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+  expect(x.requests.filter(r=>r.path==='/v1/media')).toHaveLength(before);
+});
 it('requires explicit consent, binds a target, retries once and sends only the snapshot whitelist',async()=>{
   const x=await fixture();x.attach();
   const preview=await x.history.prepare('moment_d2',x.f.familyId,current);
@@ -129,13 +145,16 @@ it('uploads converted HEIC as validated JPEG without changing the personal asset
   expect(convert).toHaveBeenCalledWith(heic,'image/heic');
   expect(saved.snapshot.media[0].mimeType).toBe('image/jpeg');
   expect(original.metadata.mimeType).toBe('image/heic');
+  const received=await history.read(x.f.familyId,saved.shareId,current);
+  expect(received.media).toHaveLength(1);
+  expect(received.media[0].mimeType).toBe('image/jpeg');
   expect(x.requests.find(r=>r.path==='/v1/media')!.bytes).toEqual(sampleJpegBytes());
 });
 it('rejects fake JPEG relabelling and never posts a share',async()=>{
   const x=await fixture();x.attach();(await x.personal.assets.findById()).asset.metadata.mimeType='image/heic';
   const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:async()=>({bytes:new Uint8Array([1,2,3]),mimeType:'image/jpeg'})}});
   const p=await history.prepare('moment_d2',x.f.familyId,current);
-  await expect(history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'MEDIA_CORRUPT'});
+  await expect(history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'SHARE_IMAGE_CONVERSION_FAILED'});
   expect(x.requests.some(r=>r.path==='/v1/media')).toBe(false);
 });
 it('drops a conversion completed after background cancellation',async()=>{
@@ -338,13 +357,13 @@ it('does not block an unchanged family directory behind an in-flight media downl
  finally{gate.resolve({bytes:sampleJpegBytes(),mimeType:'image/jpeg'});await reading;await reconcile;}
 });
 
-it('still invalidates a removed family immediately while its queued cleanup waits for a download',async()=>{
+it('invalidates and cleans a removed family without waiting for an in-flight download',async()=>{
  const x=await fixture();x.attach();const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
  const started=deferred<void>(),gate=deferred<{bytes:Uint8Array;mimeType:string}>();
  x.client.history!.getShareMediaContent=async()=>{started.resolve();return gate.promise;};
  const reading=x.history.read(x.f.familyId,shared.shareId,current);const rejected=expect(reading).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});await started.promise;
  let reconciled=false;const reconcile=x.history.reconcileFamilies(x.a.userId,[],current).then(()=>{reconciled=true;});
- for(let i=0;i<100;i++)await Promise.resolve();expect(reconciled).toBe(false);
+ for(let i=0;i<100;i++)await Promise.resolve();expect(reconciled).toBe(true);
  gate.resolve({bytes:sampleJpegBytes(),mimeType:'image/jpeg'});await rejected;await reconcile;
  expect(await x.cache.listFamilyIds!(x.a.userId)).toEqual([]);
 });
@@ -380,4 +399,96 @@ it('authorizes cached cover metadata concurrently instead of waiting inside the 
  jest.spyOn(x.client.history!,'getShareMedia').mockImplementation(async(...args)=>{if(++calls===2)both.resolve();await both.promise;return original(...args);});
  const results=await Promise.all([x.history.read(x.f.familyId,shared.shareId,current,photo.objectId),x.history.read(x.f.familyId,shared.shareId,current,photo.objectId)]);
  expect(calls).toBe(2);expect(results[0].media[0].uri).toBe(results[1].media[0].uri);
+});
+
+it.each([{indices:[0,1,2]},{indices:[0,2]},{indices:[2]}])('prepares selected HEIF sources from a three-photo record: $indices',async({indices})=>{
+  const x=await fixture();
+  const original=(await x.personal.moments.findById()).moment;
+  const ids=['heif1','heif2','heif3'];
+  x.personal.moments.findById.mockResolvedValue({kind:'ready',moment:{...original,assetIds:ids}});
+  const base=(await x.personal.assets.findById()).asset;
+  x.personal.assets.findById.mockImplementation(async(id?:string)=>({kind:'ready',asset:{...base,id:id!,localUri:`file:///${id}`,metadata:{mimeType:'image/heic'}}}));
+  x.personal.readAssetBytes.mockImplementation(async(uri?:string)=>new Uint8Array([0,0,0,24,102,116,121,112,104,101,105,99,ids.indexOf(uri!.slice(8))]));
+  let copyNumber=0;
+  const convert=jest.fn(async()=>{const bytes=sampleJpegBytes();const table=bytes.findIndex((v,i)=>v===255&&bytes[i+1]===219);bytes[table+5]+=copyNumber++;return {bytes,mimeType:'image/jpeg'};});
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:convert},receiveCache:x.cache});
+  const p=await history.prepare(original.id,x.f.familyId,current,indices.map(i=>ids[i]));
+  const saved=await history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current);
+  const received=await history.read(x.f.familyId,saved.shareId,current);
+  expect(received.media).toHaveLength(indices.length);
+  expect(received.media.every(media=>media.mimeType==='image/jpeg')).toBe(true);
+  expect(convert).toHaveBeenCalledTimes(indices.length);
+  expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(1);
+});
+it('reports original photo 3 on conversion failure and never commits a partial share',async()=>{
+  const x=await fixture();const original=(await x.personal.moments.findById()).moment;
+  x.personal.moments.findById.mockResolvedValue({kind:'ready',moment:{...original,assetIds:['one','two','three']}});
+  const base=(await x.personal.assets.findById()).asset;
+  x.personal.assets.findById.mockImplementation(async(id?:string)=>({kind:'ready',asset:{...base,id:id!,localUri:`file:///${id}`,metadata:{mimeType:'image/heic'}}}));
+  x.personal.readAssetBytes.mockResolvedValue(new Uint8Array([1,2,3]));
+  const history=createFamilyHistoryUseCases({client:x.client,session:x.session,pending:createPendingFamilyOperationStore(createPendingFamilyOperationDisk()),personal:{...x.personal,convertImageForShare:async()=>{throw new ApplicationError('SHARE_IMAGE_DECODE_FAILED','decode');}}});
+  const p=await history.prepare(original.id,x.f.familyId,current,['three']);
+  await expect(history.share(p,HISTORY_AUDIENCE_CONFIRMATION,current)).rejects.toMatchObject({code:'SHARE_IMAGE_DECODE_FAILED',photoNumber:3,assetId:'three'});
+  expect(x.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/shares'))).toHaveLength(0);
+});
+
+it('renews the parent list while an inline detail is still downloading and never publishes a revoked download',async()=>{
+  const x=await fixture();x.attach();
+  const saved=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+  const started=deferred<void>(),gate=deferred<void>();
+  const content=x.client.history!.getShareMediaContent.bind(x.client.history);
+  jest.spyOn(x.client.history!,'getShareMediaContent').mockImplementation(async(...args)=>{started.resolve();await gate.promise;return content(...args);});
+  const read=x.history.read(x.f.familyId,saved.shareId,current);
+  // Attach a rejection handler before releasing a revoked response.
+  const readResult=read.then(value=>({value}),error=>({error}));
+  await started.promise;
+  let renewed=false;
+  const refresh=x.history.list(x.f.familyId,current).then(value=>{renewed=true;return value;});
+  try {
+    for(let i=0;i<100&&!renewed;i++)await Promise.resolve();
+    expect(renewed).toBe(true);
+    expect((await refresh).shares.map(s=>s.shareId)).toContain(saved.shareId);
+    await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,saved.shareId);
+  }finally{gate.resolve();}
+  expect(await readResult).toMatchObject({error:{code:'SHARE_NOT_FOUND'}});
+  expect(await x.cache.find(x.a.userId,x.f.familyId,saved.shareId)).toBeNull();
+});
+
+it('publishes text first, downloads at most two media concurrently and preserves snapshot order',async()=>{
+ const x=await fixture();
+ const uploaded=[];
+ for(let i=0;i<3;i++){
+  const bytes=sampleJpegBytes(),table=bytes.findIndex((v,n)=>v===255&&bytes[n+1]===219);bytes[table+5]+=i;
+  uploaded.push(await x.commands.uploadMedia(x.a.sessionToken,{bytes,mimeType:'image/jpeg'}));
+ }
+ const ids=uploaded.map(m=>m.objectId);
+ const shared=await x.commands.historyShares.shareMoment(x.a.sessionToken,x.f.familyId,{sourceMomentId:'progress',sourceRevision:1,note:'Text first',emotion:'',occurredAtPrecision:'unknown',mediaObjectIds:ids,expectedMediaCount:3,audienceConfirmation:HISTORY_AUDIENCE_CONFIRMATION,idempotencyKey:'progress'});
+ const gates=ids.map(()=>deferred<void>()),two=deferred<void>(),three=deferred<void>(),secondShown=deferred<void>();
+ let concurrent=0,max=0,calls=0;
+ const original=x.client.history!.getShareMediaContent.bind(x.client.history);
+ jest.spyOn(x.client.history!,'getShareMediaContent').mockImplementation(async(...args)=>{
+  const index=ids.indexOf(args[3]);concurrent++;max=Math.max(max,concurrent);calls++;
+  if(calls===2)two.resolve();if(calls===3)three.resolve();
+  try{await gates[index].promise;return await original(...args);}finally{concurrent--;}
+ });
+ const seen:{userId:string;share:unknown;media:{objectId:string}[]}[]=[];
+ const read=x.history.read(x.f.familyId,shared.shareId,current,undefined,value=>{seen.push(value);if(value.media.some(m=>m.objectId===ids[1]))secondShown.resolve();});
+ try{
+  await two.promise;expect(calls).toBe(2);expect(seen[0].media).toEqual([]);
+  gates[1].resolve();await secondShown.promise;await three.promise;
+  expect(seen[1].media.map(m=>m.objectId)).toEqual([ids[1]]);expect(max).toBe(2);
+ }finally{gates.forEach(g=>g.resolve());}
+ expect((await read).media.map(m=>m.objectId)).toEqual(ids);
+ expect((await x.cache.find(x.a.userId,x.f.familyId,shared.shareId))?.receiveStatus).toBe('received');
+});
+it('never publishes a downloaded photo after withdrawal during incremental reading',async()=>{
+ const x=await fixture();x.attach();
+ const shared=await x.history.share(await x.history.prepare('moment_d2',x.f.familyId,current),HISTORY_AUDIENCE_CONFIRMATION,current);
+ const started=deferred<void>(),gate=deferred<void>(),seen=jest.fn();
+ const original=x.client.history!.getShareMediaContent.bind(x.client.history);
+ jest.spyOn(x.client.history!,'getShareMediaContent').mockImplementation(async(...args)=>{const content=await original(...args);started.resolve();await gate.promise;return content;});
+ const reading=x.history.read(x.f.familyId,shared.shareId,current,undefined,seen);
+ const rejected=expect(reading).rejects.toMatchObject({code:'SHARE_NOT_FOUND'});
+ await started.promise;await x.commands.historyShares.revokeShare(x.a.sessionToken,x.f.familyId,shared.shareId);gate.resolve();await rejected;
+ expect(seen).toHaveBeenCalledTimes(1);expect(seen.mock.calls[0][0].media).toEqual([]);
 });

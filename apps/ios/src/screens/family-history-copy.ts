@@ -1,6 +1,13 @@
+import { FamilySharePhotoError } from '../application/family-share-photo-error';
 import { appLanguage, dateLabel, tr } from '../i18n';
 export function familyHistoryError(error: unknown) {
   const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
+  if (error instanceof FamilySharePhotoError) {
+    if (['SHARE_IMAGE_SOURCE_TOO_LARGE','SHARE_IMAGE_DIMENSIONS','SHARE_IMAGE_OUTPUT_TOO_LARGE','MEDIA_TOO_LARGE'].includes(error.code)) return tr('照片 {0} 过大，暂时无法分享，可以取消勾选后再试。原照片保留。', [error.photoNumber]);
+    if (code === 'SHARE_IMAGE_CONVERSION_UNAVAILABLE') return tr('照片 {0} 分享需要更新应用，原照片保留。', [error.photoNumber]);
+    return tr('照片 {0} 暂时无法分享，可以取消勾选后再试。原照片保留。', [error.photoNumber]);
+  }
+  if (code === 'FAMILY_READ_LEASE_EXPIRED') return tr('暂时无法确认阅读资格，请再试一次。');
   if (code === 'CONTENT_NOT_ALLOWED') return tr('这段内容暂时不能分享，请调整文字；本机原记录保留。');
   if (code === 'SHARING_RESTRICTED') return tr('此账号暂时不能新增家庭分享。已有记录仍可阅读，如有疑问请联系 dev@yunpura.com。');
   if (code === 'FAMILY_DISSOLVED') return tr('这个家庭已解散，个人记录还在。');
@@ -11,7 +18,7 @@ export function familyHistoryError(error: unknown) {
   if (code === 'SOURCE_CHANGED' || code === 'MOMENT_NOT_FOUND') return tr('记录已变化，请重新查看并确认。');
   if (code === 'SHARE_MEDIA_UNAVAILABLE') return tr('这份分享的照片或声音暂时读不出来，请再试一次。');
   if (code === 'SHARE_MEDIA_INCOMPLETE') return tr('照片或声音暂时无法分享，原记录还在。');
-  if (code === 'SHARE_IMAGE_CONVERSION_UNAVAILABLE') return tr('照片分享需要更新测试安装，原照片还在。');
+  if (code === 'SHARE_IMAGE_CONVERSION_UNAVAILABLE' || code === 'MEDIA_IMAGE_PREPARATION_REQUIRED') return tr('照片分享需要更新应用，原照片还在。');
   if (code === 'SHARE_IMAGE_CONVERSION_FAILED' || code === 'MEDIA_UNSUPPORTED' || code === 'MEDIA_CORRUPT') return tr('这张照片暂时无法分享，可以取消勾选后再试。');
   if (code === 'MEDIA_TOO_LARGE') return tr('这份照片或声音超过分享大小限制，可以取消勾选后再试。');
   return tr('暂时读不出来，请再试一次。');

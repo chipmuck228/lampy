@@ -1,3 +1,4 @@
+import { prepareFamilyShareMedia } from './prepare-family-share-media';
 import {createFamilySafetyUseCases} from './family-safety-use-cases';
 import { familyReceivedMediaKey } from '../infrastructure/family-receive-cache';
 import { createFamilyAlbumUseCases } from './family-album';
@@ -388,7 +389,9 @@ export function createFamilyUseCases(deps: {
     const { sessionToken } = await requireAccount();
     selectedMediaUpload = { status: 'uploading' };
     try {
-      const object = await deps.client.uploadMedia(sessionToken, { bytes, mimeType });
+      const outgoing = await prepareFamilyShareMedia(bytes, mimeType, deps.personal?.convertImageForShare);
+      if (sessionToken !== (await requireAccount()).sessionToken) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Account changed.');
+      const object = await deps.client.uploadMedia(sessionToken, outgoing);
       selectedMediaUpload = { status: 'stored', object };
       return object;
     } catch (error) {
@@ -871,11 +874,9 @@ export function createFamilyUseCases(deps: {
       selectedMediaUpload = { status: 'uploading' };
       try {
         const { sessionToken } = await requireAccount();
-        const object = await deps.client.uploadMedia(sessionToken, {
-          bytes: input.bytes,
-          mimeType: input.mimeType,
-          idempotencyKey: input.idempotencyKey,
-        });
+        const outgoing = await prepareFamilyShareMedia(input.bytes, input.mimeType, deps.personal?.convertImageForShare);
+        if (sessionToken !== (await requireAccount()).sessionToken) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Account changed.');
+        const object = await deps.client.uploadMedia(sessionToken, { ...outgoing, idempotencyKey: input.idempotencyKey });
         selectedMediaUpload = { status: 'stored', object };
         return selectedMediaUpload;
       } catch (error) {

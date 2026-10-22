@@ -1,3 +1,4 @@
+import { FamilySharePhotoError } from '../application/family-share-photo-error';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { AppState, type AppStateStatus } from 'react-native';
 import ShareConfirmRoute from '../app/share/[id]';
@@ -67,4 +68,20 @@ it('shows current sharing identity and the exact target before consent',async()=
  await fireEvent.press(page.getByTestId('share-family-fam_d2'));
  await waitFor(()=>expect(page.getByText('以 小禾 的身份，分享给「Window」')).toBeTruthy());
  expect(page.getByTestId('share-confirm')).toBeDisabled();expect(mockShare).not.toHaveBeenCalled();
+});
+
+it('identifies the original photo number when only the third photo is selected',async()=>{
+  const availableMedia=[1,2,3].map(n=>({assetId:`p${n}`,mimeType:'image/heic'}));
+  mockPrepare.mockResolvedValue({...preview,availableMedia,media:[{...availableMedia[2],ready:true}]});
+  mockShare.mockRejectedValue(new FamilySharePhotoError(Error('decode'),'p3',3));
+  const page=await render(<ShareConfirmRoute/>);
+  await waitFor(()=>expect(page.getByText('Window')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('share-family-fam_d2'));
+  await waitFor(()=>expect(page.getByText('照片 3')).toBeTruthy());
+  await fireEvent.press(page.getByTestId('share-history-consent'));await fireEvent.press(page.getByTestId('share-confirm'));
+  await waitFor(()=>expect(page.getByText('照片 3 暂时无法分享，可以取消勾选后再试。原照片保留。')).toBeTruthy());
+  expect(page.getByText('未能分享')).toBeTruthy();expect(page.getByTestId('share-confirm')).toBeDisabled();
+  await fireEvent.press(page.getByTestId('share-select-media-p3'));
+  await waitFor(()=>expect(mockPrepare).toHaveBeenLastCalledWith('moment_d2','fam_d2',expect.any(Function),[]));
+  expect(page.queryByText('未能分享')).toBeNull();expect(mockShare).toHaveBeenCalledTimes(1);
 });

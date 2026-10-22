@@ -1,3 +1,4 @@
+import { FamilySharePhotoError } from '../../application/family-share-photo-error';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,13 +24,14 @@ export default function ShareConfirmRoute() {
   const [policy, setPolicy] = useState<'legacy' | 'family-history-v2' | null>(null);
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<'loading' | 'ready' | 'busy' | 'stored' | 'failed'>('loading');
+  const [failedAssetId, setFailedAssetId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const busy = useRef(false);
   const currentRef = useRef<() => boolean>(() => false);
   const load = useCallback(async () => {
     const current = begin(); currentRef.current = current;
     if (!momentId) { setStatus('failed'); setMessage(tr('记录已变化，请重新查看并确认。')); return; }
-    setFamilies([]); setPreview(null); setTarget(null); setPolicy(null); setConsent(false); setMessage(null); setStatus('loading');
+    setFamilies([]); setPreview(null); setTarget(null); setPolicy(null); setConsent(false); setMessage(null); setFailedAssetId(null); setStatus('loading');
     try {
       const family = await getFamilyUseCases(); if (!current()) return;
       const result = await family.getFamilies(); if (!current()) return;
@@ -45,7 +47,7 @@ export default function ShareConfirmRoute() {
     if (!allowed || busy.current) return;
     busy.current = true;
     const current = begin(); currentRef.current = current;
-    setTarget(selected); setPreview(null); setPolicy(null); setConsent(false); setMessage(null); setStatus('busy');
+    setTarget(selected); setPreview(null); setPolicy(null); setConsent(false); setMessage(null); setFailedAssetId(null); setStatus('busy');
     try {
       const family = await getFamilyUseCases(); if (!current()) return;
       if (upgrade) await family.history.confirmPolicy(selected.familyId, current);
@@ -64,12 +66,12 @@ export default function ShareConfirmRoute() {
     const selected = preview;
     const current = currentRef.current;
     if (!current()) return;
-    busy.current = true; setStatus('busy'); setMessage(null);
+    busy.current = true; setStatus('busy'); setMessage(null); setFailedAssetId(null);
     try {
       const family = await getFamilyUseCases(); if (!current()) return;
       await family.history.share(selected, HISTORY_AUDIENCE_CONFIRMATION, current);
       if (current()) setStatus('stored');
-    } catch (e) { if (current()) { setStatus('failed'); setMessage(familyHistoryError(e)); setConsent(false); } }
+    } catch (e) { if (current()) { setStatus('failed'); setMessage(familyHistoryError(e)); setConsent(false); setFailedAssetId(e instanceof FamilySharePhotoError ? e.assetId : null); } }
     finally { if (current()) busy.current = false; }
   }
   const disabled = status === 'busy' || status === 'stored';
@@ -99,11 +101,12 @@ export default function ShareConfirmRoute() {
         {preview.availableMedia.length ? <Text style={styles.sectionLabel}>{tr('随这一刻分享')}</Text> : null}
         <View style={styles.mediaChoices}>
         {preview.availableMedia.map((media,index) => <Pressable key={media.assetId} accessibilityRole="checkbox"
-          accessibilityState={{checked:preview.media.some(m=>m.assetId===media.assetId),disabled}} disabled={disabled} style={[styles.mediaHit,preview.media.some(m=>m.assetId===media.assetId) && styles.selected]}
+          accessibilityState={{checked:preview.media.some(m=>m.assetId===media.assetId),disabled}} disabled={disabled} style={[styles.mediaHit,preview.media.some(m=>m.assetId===media.assetId) && styles.selected,failedAssetId === media.assetId && styles.failedMedia]}
           testID={`share-select-media-${media.assetId}`} onPress={() => {
             const ids=preview.media.map(m=>m.assetId);
             void choose(preview.family,false,ids.includes(media.assetId) ? ids.filter(id=>id!==media.assetId) : [...ids,media.assetId]);
           }}><LifeIcon name={media.mimeType.startsWith('image/') ? 'photo' : 'record'} color={inkSoft} /><Text style={styles.mediaLabel}>{tr(media.mimeType.startsWith('image/') ? '照片 {0}' : '声音 {0}',[preview.availableMedia.slice(0,index+1).filter(m=>m.mimeType.startsWith(media.mimeType.startsWith('image/') ? 'image/' : 'audio/')).length])}</Text>
+          {failedAssetId === media.assetId ? <Text style={styles.meta}>{tr('未能分享')}</Text> : null}
           {preview.media.some(m=>m.assetId===media.assetId) ? <LifeIcon name="check"/> : null}
         </Pressable>)}
         </View>
@@ -134,6 +137,7 @@ const styles = StyleSheet.create({
   sectionTitle:{gap:6,paddingBottom:8},sectionLabel:{...type.meta,color:inkSoft,marginTop:8},
   mediaChoices:{flexDirection:'row',flexWrap:'wrap',gap:12},
   mediaHit:{minHeight:48,paddingHorizontal:12,paddingVertical:10,borderRadius:12,borderWidth:StyleSheet.hairlineWidth,borderColor:hairline,flexDirection:'row',alignItems:'center',gap:8},
+  failedMedia:{borderWidth:2,borderColor:'#87513D'},
   mediaLabel:{...type.meta,color:ink},
   consent:{minHeight:48,flexDirection:'row',alignItems:'center',gap:12,paddingVertical:16,marginTop:8,borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:hairline},
   checkBox:{width:24,height:24,borderRadius:8,borderWidth:1,borderColor:inkSoft,alignItems:'center',justifyContent:'center'},
