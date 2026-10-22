@@ -120,3 +120,13 @@ sudo systemd-run \
 新增临时 Xcode 控制台日志 [LampyFamilyRead]，固定 revision=photo-read-3；记录 START／READY、读取失败阶段 DETAIL／MEDIA_METADATA／CACHE／MEDIA_CONTENT／FINAL_AUTHORIZATION，以及父列表／详情加载或续期失败，保留错误的实际 HTTP 状态。仅输出固定事件／阶段、白名单错误码、序号和耗时，不输出记录 ID、账号、正文、媒体、文件路径、URL、服务器错误描述或会话。覆盖元数据、下载、最终授权和页面错误来源；真正权限拒绝仍隐藏内容，不延长阅读资格或改显示规则。
 
 此提交是诊断增强，尚未修复剩余间歇失败。以原工程 Xcode Release Build／Run 安装，控制台筛选 LampyFamilyRead，复现一次并采集 START 到失败的日志；无需重部署 API 或再次运行服务器探针。诊断在首发合并前应评估移除。46 个相关 Jest 套件／398 项测试、TypeScript、ESLint 通过；另外新增 HTTP 状态保留测试单独验证。保持草稿，不合并。
+
+## 2026-10-22 真机阶段日志与媒体通道分离
+
+7f92526 真机：今天新分享等待后可打开；昨天 HEIF／相机／PNG 混合分享仍失败，更早记录可读。START 后，父列表 LIST_RENEW_FAILED／FAMILY_READ_LEASE_EXPIRED（该次续期 elapsed 10182ms），随后详情 MEDIA_CONTENT／STALE_FAMILY_REQUEST（整个读取 20361ms，媒体 1）。确认实际运行 photo-read-3，且列表资格过期先发生，媒体迟到结果是后果；没有证据将此判为服务端拒绝或照片损坏。此前缓存队列修订解决了一处阻塞，尚未解决这次等待。
+
+源码核对：当前媒体 GET 仍使用 whatwg-fetch／RN XHR 的 Blob／FileReader，和 JSON 文本 XHR 同属 RN 网络栈。本次改为：Accept */* 的二进制 GET 显式使用 expo/fetch 的已有原生会话与原生 arrayBuffer，JSON 仍为文本 XHR，不改全局 fetch、不改上传通道、不失败回退旧媒体通道。Expo 模块已经随现有 App 原生工程提供，无新增 pod、原生代码或配置。
+
+这是一项针对通道耦合的修订，不把 RN 内部阻塞推断当作已证实的唯一根因；真实 iPhone 上是否解决仍待验证。资格仍 15 秒，权限／撤回／哈希与迟到结果检查保留。诊断 revision=photo-read-4、mediaTransport=EXPO_NATIVE，新增 LIST_PROGRESS 的 DIRECTORY／LIST／CACHE 及 LIST_READY，可在仍失败时区分网络／资格读取与缓存等待，不输出私人数据。
+
+47 个相关 Jest 套件／407 项测试、TypeScript、改动 ESLint 通过；新增原生媒体路由／授权和取消信号传递、媒体 body 未完成时 JSON 续期完成、原生取消不回退 RN 的测试。mock 测试不能替代 NSURLSession 真机并发实测。使用现有 Xcode 工程 Release Build／Run 后，先重开昨天失败的原分享（无需重新分享），再测今天／更早记录、收起重开、声音、后台保护与撤回。无需服务端更新、数据库迁移、prebuild clean 或 Pods；保持草稿。

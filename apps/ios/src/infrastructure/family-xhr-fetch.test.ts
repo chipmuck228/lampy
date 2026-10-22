@@ -1,4 +1,6 @@
+import {fetch as mediaFetch} from 'expo/fetch';
 import {familyXhrFetch} from './family-xhr-fetch';
+jest.mock('expo/fetch',()=>({fetch:jest.fn()}));
 
 it('uses XHR independently of the global fetch and propagates cancellation', async()=>{
  const previousFetch=globalThis.fetch, previousXhr=globalThis.XMLHttpRequest;
@@ -61,5 +63,45 @@ it('cancels the JSON XHR when its existing deadline aborts',async()=>{
   const work=familyXhrFetch('https://family-test.yunpura.com/v2/me/families',{headers:{accept:'application/json'},signal:controller.signal});
   const rejected=expect(work).rejects.toMatchObject({name:'AbortError'});controller.abort();await rejected;
   expect(abort).toHaveBeenCalledTimes(1);
+ }finally{globalThis.XMLHttpRequest=previousXhr;}
+});
+
+it('routes binary downloads through native Expo fetch with original authorization and cancellation',async()=>{
+ const controller=new AbortController(),buffer=new Uint8Array([1,2,3]).buffer;
+ const response={status:200,arrayBuffer:async()=>buffer} as Response;
+ jest.mocked(mediaFetch).mockResolvedValueOnce(response as Awaited<ReturnType<typeof mediaFetch>>);
+ const headers={accept:'*/*',authorization:'Bearer test-only'};
+ const result=await familyXhrFetch('https://family-test.yunpura.com/v2/families/f/shares/s/media/m/content',{method:'GET',headers,signal:controller.signal});
+ expect(result).toBe(response);await expect(result.arrayBuffer()).resolves.toBe(buffer);
+ expect(mediaFetch).toHaveBeenLastCalledWith(expect.any(String),{method:'GET',headers,signal:controller.signal});
+});
+it('finishes JSON renewal while a binary native body is still pending, without Blob/FileReader',async()=>{
+ const previousXhr=globalThis.XMLHttpRequest,reader=Object.getOwnPropertyDescriptor(globalThis,'FileReader');
+ let finish!:(bytes:ArrayBuffer)=>void,finished=false;
+ const body=new Promise<ArrayBuffer>(resolve=>{finish=resolve;});
+ jest.mocked(mediaFetch).mockResolvedValueOnce({status:200,arrayBuffer:()=>body} as Awaited<ReturnType<typeof mediaFetch>>);
+ class JsonXhr {
+  status=200;statusText='';responseText='{"shares":[]}';responseType='';
+  onload=()=>{};onerror=()=>{};onabort=()=>{};ontimeout=()=>{};
+  open=jest.fn();setRequestHeader=jest.fn();abort=jest.fn();
+  getAllResponseHeaders=()=> 'Content-Type: application/json';send=()=>this.onload();
+ }
+ try {
+  Object.defineProperty(globalThis,'FileReader',{configurable:true,writable:true,value:class {constructor(){throw Error('must not use FileReader');}}});
+  globalThis.XMLHttpRequest=JsonXhr as unknown as typeof XMLHttpRequest;
+  const download=familyXhrFetch('https://family-test.yunpura.com/v2/families/f/shares/s/media/m/content',{headers:{accept:'*/*',authorization:'Bearer test-only'}}).then(r=>r.arrayBuffer()).then(()=>{finished=true;});
+  const renewal=await familyXhrFetch('https://family-test.yunpura.com/v2/families/f/shares',{headers:{accept:'application/json',authorization:'Bearer test-only'}});
+  await expect(renewal.text()).resolves.toBe('{"shares":[]}');expect(finished).toBe(false);
+  finish(new Uint8Array([1]).buffer);await download;expect(finished).toBe(true);
+ }finally{globalThis.XMLHttpRequest=previousXhr;if(reader)Object.defineProperty(globalThis,'FileReader',reader);else Reflect.deleteProperty(globalThis,'FileReader');}
+});
+
+it('does not silently fall back to RN networking after a native media cancellation',async()=>{
+ const previousXhr=globalThis.XMLHttpRequest;
+ const xhr=jest.fn();globalThis.XMLHttpRequest=xhr as unknown as typeof XMLHttpRequest;
+ try {
+  jest.mocked(mediaFetch).mockRejectedValueOnce(Object.assign(new Error('cancelled'),{name:'AbortError'}));
+  await expect(familyXhrFetch('https://family-test.yunpura.com/v2/families/f/shares/s/media/m/content',{headers:{accept:'*/*'}})).rejects.toMatchObject({name:'AbortError'});
+  expect(xhr).not.toHaveBeenCalled();
  }finally{globalThis.XMLHttpRequest=previousXhr;}
 });

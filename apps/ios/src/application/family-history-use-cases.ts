@@ -334,12 +334,17 @@ export function createFamilyHistoryUseCases(deps: {
     async list(familyId: string, current: HistoryCurrent) {
       current = qualified(familyId, current);
       const a = await account();
+      const started = Date.now();
+      familyReadDiagnostic('LIST_PROGRESS','DIRECTORY',started);
       await family(a, familyId, current);
+      familyReadDiagnostic('LIST_PROGRESS','LIST',started);
       let result;
       try { result = await api().listVisibleShares(a.sessionToken, familyId); }
       catch(e) { await invalidateDenied(a,familyId,undefined,current,e); throw e; }
       await check(a, current);
+      familyReadDiagnostic('LIST_PROGRESS','CACHE',started);
       await cacheWork(a, familyId, undefined, current, c => c.replaceVisible(a.userId, familyId, result.shares));
+      familyReadDiagnostic('LIST_READY','PUBLISH',started);
       return { userId: a.userId, shares: result.shares };
     },
     async read(familyId: string, shareId: string, current: HistoryCurrent, objectId?: string): Promise<HistoryReading> {
