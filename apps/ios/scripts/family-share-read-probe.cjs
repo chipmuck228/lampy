@@ -52,7 +52,7 @@ async function main(){
   try {
     db.exec('PRAGMA query_only=ON; PRAGMA busy_timeout=3000;');
     const schema=db.prepare('SELECT MAX(version) AS version FROM family_schema_migrations').get().version;
-    if(Number(schema)!==33)throw Error('SCHEMA');
+    if(![33,34].includes(Number(schema)))throw Error('SCHEMA');
     shares=db.prepare("SELECT share_id,family_id,author_user_id FROM family_shares WHERE status='active' ORDER BY shared_at DESC LIMIT 4").all();
     sessions=db.prepare('SELECT token,user_id,expires_at FROM family_sessions ORDER BY expires_at DESC').all();
   }finally{db.close();}

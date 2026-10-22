@@ -31,7 +31,8 @@ describe('login identity migration', () => {
     const before = await Promise.all(tables.map(t => db.getAll(`SELECT * FROM ${t}`)));
     await applyFamilyApiSchema(db); await applyFamilyApiSchema(db);
     await expect(assertFamilyTestAccountSchemaReady(db)).resolves.toBeUndefined();
-    expect(await Promise.all(tables.map(t => db.getAll(`SELECT * FROM ${t}`)))).toEqual(before);
+    const expected=before.map((rows,index)=>index===tables.indexOf('family_shares')?rows.map(row=>({...row as object,content_purged_at:null})):rows);
+    expect(await Promise.all(tables.map(t => db.getAll(`SELECT * FROM ${t}`)))).toEqual(expected);
     expect(await db.getAll('SELECT provider,subject,user_id FROM family_login_identities ORDER BY provider')).toEqual([
       { provider:'apple',subject:'apple-a',user_id:'a' }, { provider:'controlled-password',subject:'same@example.com',user_id:'b' },
     ]);

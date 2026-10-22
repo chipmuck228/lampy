@@ -35,3 +35,8 @@ test('refuses missing files without creating a DB, and refuses a different schem
   assert.throws(()=>audit(file,dir));
  } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
+test('schema 34 retains the same read-only photo inventory contract',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'lampy-photo-audit-34-')),file=path.join(dir,'family.sqlite');const db=new DatabaseSync(file);
+ try{db.exec('CREATE TABLE family_schema_migrations(version INTEGER); INSERT INTO family_schema_migrations VALUES(34); CREATE TABLE family_media_objects(storage_key TEXT,mime_type TEXT,byte_length INTEGER,content_sha256 TEXT);');assert.equal(audit(file,dir).schema,34);}
+ finally{db.close();fs.rmSync(dir,{recursive:true,force:true});}
+});

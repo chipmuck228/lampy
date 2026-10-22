@@ -4,6 +4,8 @@ export type SafetyReport = {
   reportId: string; reporterUserId: string; authorUserId: string; familyId: string;
   shareId: string; reason: ReportReason; detail: string; createdAt: string;
   status: 'pending' | 'reviewed' | 'restricted';
+  // Last review time, or migration grace-period start for historical resolved rows.
+  retentionStartedAt?: string;
 };
 export type ReportSummary = {
   familyName: string; authorNickname: string; occurredAt?: string; occurredAtPrecision: string;

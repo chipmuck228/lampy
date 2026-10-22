@@ -10,7 +10,7 @@ async function fixture(){
  Object.defineProperty(w.HTMLDialogElement.prototype,'showModal',{value:function(){this.setAttribute('open','');}});
  Object.defineProperty(w.HTMLMediaElement.prototype,'pause',{value:jest.fn()});Object.defineProperty(w.HTMLMediaElement.prototype,'load',{value:jest.fn()});
  Object.defineProperty(w.HTMLDialogElement.prototype,'close',{value:function(){this.removeAttribute('open');}});
- let signedIn=false,version='first';
+ let signedIn=false,version='first',restricted=true;
  const report={reportId:'report_test',reason:'privacy',status:'pending',createdAt:'2026-10-21T00:00:00Z',detail:'<script>alert(1)</script>'};
  const detail=()=>({report:{...report},familyName:'Test family',authorNickname:'Test author',share:{note:'<img src=x onerror=alert(1)> private record',occurredAtPrecision:'unknown',media:[{objectId:'med_abc',mimeType:'image/png'},{objectId:'med_def',mimeType:'audio/mp4'}]},hidden:false,sharingRestricted:false,authorAvailable:true,version});
  const fetch=jest.fn(async(url:string,options?:{body?:string})=>{
@@ -19,6 +19,8 @@ async function fixture(){
   else if(url==='/api/logout'){signedIn=false;data={ok:true};}
   else if(!signedIn){status=401;data={error:'SIGN_IN_REQUIRED'};}
   else if(url==='/api/session')data={username:'developer',csrf:'csrf'};
+  else if(url.startsWith('/api/restricted-authors?'))data={authors:restricted?[{userId:'usr_test',nickname:'<b>Test author</b>',restrictedAt:'2026-10-01T00:00:00Z',version:'restriction-v1'}]:[],hasMore:false};
+  else if(url.endsWith('/release')){restricted=false;data={released:true};}
   else if(url.startsWith('/api/reports?'))data={reports:[report],hasMore:false};
   else if(url.endsWith('/history'))data={events:[]};
   else if(url.endsWith('/validation'))data={version};
@@ -54,4 +56,18 @@ it('creates explicit audio controls without autoplay and clears them on logout',
  const button=Array.from(f.get('media').querySelectorAll('button')).find(b=>b.textContent==='载入声音')!;button.click();
  const audio=f.get('media').querySelector('audio')!;expect(audio.controls).toBe(true);expect(audio.autoplay).toBe(false);expect(audio.preload).toBe('none');
  f.get('logout').click();await until(()=>!f.get('login').hidden);expect(f.get('media').querySelector('audio')).toBeNull();
+});
+
+it('releases a listed author independently of a report, with a reason, explicit confirmation and logout clearing',async()=>{
+ const f=await fixture();await f.login();f.get('load-restrictions').click();
+ await until(()=>!!f.get('restriction-list').querySelector('textarea'));
+ expect(f.get('restriction-list').textContent).toContain('<b>Test author</b>');expect(f.get('restriction-list').querySelector('b')).toBeNull();
+ const button=f.get('restriction-list').querySelector('button')!;button.click();expect(f.get('notice').textContent).toBe('请填写处理原因。');
+ (f.get('restriction-list').querySelector('textarea') as HTMLTextAreaElement).value='review completed';button.click();
+ expect(f.get('confirm').hasAttribute('open')).toBe(true);expect(f.fetch.mock.calls.some(c=>c[0].endsWith('/release'))).toBe(false);
+ f.get('cancel-confirm').click();expect(f.fetch.mock.calls.some(c=>c[0].endsWith('/release'))).toBe(false);
+ button.click();f.get('send-confirm').click();await until(()=>f.get('notice').textContent==='处理已完成。');
+ const call=f.fetch.mock.calls.find(c=>c[0].endsWith('/release'))!;expect(call[0]).toBe('/api/restricted-authors/usr_test/release');expect(JSON.parse(call[1]!.body!)).toMatchObject({reason:'review completed',version:'restriction-v1'});
+ expect(f.get('restriction-list').textContent).toContain('当前没有受限制的账号。');
+ f.get('logout').click();await until(()=>!f.get('login').hidden);expect(f.get('restriction-list').textContent).toBe('');
 });

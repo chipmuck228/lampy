@@ -1,5 +1,5 @@
 [Unit]
-Description=Lampy family retired media and dissolved-family cleanup
+Description=Lampy family media and data retention cleanup
 After=lampy-family.service
 
 [Service]

@@ -215,6 +215,15 @@ const MIGRATIONS = [
    CREATE TABLE family_moderation_audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, share_id TEXT NOT NULL, json TEXT NOT NULL);
    CREATE TABLE family_sharing_restrictions (user_id TEXT PRIMARY KEY NOT NULL, json TEXT NOT NULL);
    CREATE TABLE family_sharing_restriction_audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, json TEXT NOT NULL);`,
+  // Retention anchors are separate from creation dates. Existing resolved reports
+  // receive a full grace period starting at migration, never a guessed review date.
+  `ALTER TABLE family_shares ADD COLUMN content_purged_at TEXT;
+   CREATE INDEX family_sessions_expiry ON family_sessions(expires_at);
+   CREATE INDEX family_auth_rate_window ON family_auth_rate_limits(window_started_at);
+   CREATE INDEX family_shares_retirement ON family_shares(status,content_purged_at,revoked_at);
+   UPDATE family_safety_reports SET json=json_set(json,'$.retentionStartedAt',strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+     WHERE json_extract(json,'$.status') IN ('reviewed','restricted')
+       AND json_extract(json,'$.retentionStartedAt') IS NULL;`,
 ];
 
 export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28] as const;

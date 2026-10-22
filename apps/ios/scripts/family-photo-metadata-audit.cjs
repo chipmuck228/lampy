@@ -18,7 +18,7 @@ function audit(database, directory) {
   try {
     db.exec('PRAGMA query_only=ON; PRAGMA busy_timeout=3000; BEGIN;');
     const schema = Number(db.prepare('SELECT MAX(version) AS version FROM family_schema_migrations').get().version);
-    if (schema !== 33) throw Error('SCHEMA');
+    if (![33,34].includes(schema)) throw Error('SCHEMA');
     const result = {schema, mode:'READ_ONLY', indexedPhotos:0, clean:0, needsPreparation:0, invalidOrUnsupported:0,
       missing:0, integrityMismatch:0, unsafePaths:0, unindexedPhotos:0, unindexedNeedsPreparation:0,
       unindexedInvalid:0, partialFiles:0, concurrentChange:0,
@@ -66,6 +66,6 @@ if(require.main===module) {
   try {
     if(process.argv.length!==2)throw Error('NO_ARGUMENTS');
     process.stdout.write(JSON.stringify(audit(process.env.LAMPY_FAMILY_DATABASE_PATH,process.env.LAMPY_FAMILY_MEDIA_PATH))+'\n');
-  } catch {process.stderr.write('Photo audit failed. Check schema 33, existing paths, permissions and a quiet maintenance window. No private values printed.\n');process.exitCode=1;}
+  } catch {process.stderr.write('Photo audit failed. Check schema 33 or 34, existing paths, permissions and a quiet maintenance window. No private values printed.\n');process.exitCode=1;}
 }
 module.exports={audit};
