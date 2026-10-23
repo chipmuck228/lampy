@@ -43,7 +43,15 @@ async function createBackup(config,kind='automatic',now=new Date()){
  const c=await preflight(config),id='backup-'+now.toISOString().replace(/[-:.]/g,'')+'-'+randomBytes(6).toString('hex');
  const partial=path.join(c.root,id+'.partial'),final=path.join(c.root,id);await fs.mkdir(partial,{mode:0o700});
  try{
-  const source=new DatabaseSync(c.database,{readOnly:true});try{await backup(source,path.join(partial,'family.sqlite'));}finally{source.close();}
+  // All writers are stopped by the caller. A WAL database may need to create
+  // -wal/-shm even for a read-only connection after its last writer closes.
+  // Keep the production mount read-only: recover SQLite only on private copies
+  // of the database and optional WAL. Never copy the transient shared-memory file.
+  const sourceDir=path.join(partial,'.source');await fs.mkdir(sourceDir,{mode:0o700});
+  const sourcePath=path.join(sourceDir,'family.sqlite');await digest(c.database,sourcePath);
+  try{await digest(c.database+'-wal',sourcePath+'-wal');}catch(e){if(e.code!=='ENOENT')throw e;}
+  const source=new DatabaseSync(sourcePath);try{await backup(source,path.join(partial,'family.sqlite'));}finally{source.close();}
+  await fs.rm(sourceDir,{recursive:true,force:false});
   await fs.chmod(path.join(partial,'family.sqlite'),0o600);
   const snapshot=new DatabaseSync(path.join(partial,'family.sqlite'));let version,files;
   try{

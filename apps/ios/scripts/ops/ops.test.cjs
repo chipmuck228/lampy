@@ -14,6 +14,27 @@ async function fixture(){
  return {dir,db,root,state,database,media,checkRoot,requireSeparateVolume:false,async close(){db.close();await fs.rm(dir,{recursive:true,force:true});}};
 }
 async function names(f){return (await fs.readdir(f.root)).filter(n=>!n.endsWith('.partial'));}
+test('backs up a closed WAL database without creating production sidecars or changing source bytes',async()=>{
+ const f=await fixture();f.db.close();
+ try{
+  const before=await fs.readFile(f.database),entries=await fs.readdir(path.dirname(f.database));
+  await fs.chmod(f.database,0o400);await fs.chmod(path.dirname(f.database),0o500);
+  await createBackup(f,'manual',now);const id=(await names(f))[0];
+  await verifyBackup(f.root,id);assert.deepEqual(await fs.readFile(f.database),before);
+  assert.deepEqual(await fs.readdir(path.dirname(f.database)),entries);
+  assert.deepEqual((await fs.readdir(path.join(f.root,id))).sort(),['family.sqlite','manifest.json','media']);
+ }finally{await fs.chmod(path.dirname(f.database),0o700);await fs.rm(f.dir,{recursive:true,force:true});}
+});
+test('copies uncheckpointed WAL bytes without changing them and rejects a symlinked WAL',async()=>{
+ const f=await fixture();try{
+  const wal=f.database+'-wal',before=await fs.readFile(wal);assert.ok(before.length>0);
+  await createBackup(f,'manual',now);assert.deepEqual(await fs.readFile(wal),before);
+  const id=(await names(f))[0];await verifyBackup(f.root,id);
+ }finally{await f.close();}
+ const g=await fixture();g.db.close();try{
+  await fs.symlink(g.database,g.database+'-wal');await assert.rejects(createBackup(g,'manual',now));assert.deepEqual(await fs.readdir(g.root),[]);
+ }finally{await fs.rm(g.dir,{recursive:true,force:true});}
+});
 test('copies a live-WAL database and matching media, verifies and rehearses offline without modifying originals',async()=>{
  const f=await fixture();try{
   const result=await createBackup(f,'manual',now),id=(await names(f))[0];assert.equal(result.files,1);assert.doesNotMatch(JSON.stringify(result),/secret|med_abcd|sqlite|\/tmp/);

@@ -19,6 +19,8 @@
 
 ## 备份一致性与失败恢复
 
+2026-10-23 云端验收补充：生产主机在线只读 SQLite 复制探针通过，但停止写入服务后的维护备份返回 SQLITE_CANTOPEN（14）。在线探针不能替代停服条件验证；关闭最后一个 WAL 连接后辅助文件的状态不同。备份流程现先在 root 私有的 .partial/.source 中复制数据库及存在的 WAL（不复制 SHM、不跟随符号链接），仅在该临时副本上打开可写 SQLite 连接，再使用 backup API 制作成品库。生产目录继续只读。临时源副本可能含原会话等字段，权限为目录 0700／文件 0600，成功发布前移除，失败沿用 .partial 清除及崩溃后 24 小时回收规则。停服和禁止运营 CLI 写库仍是前提，不能据在线测试推断允许并发复制。本地新增关闭 WAL、未合并 WAL、源文件不变及 WAL 符号链接回归，12 项运维测试在 Node 22.20.0 通过；修复后的生产备份和恢复演练仍待验收。临时 backup-diagnostic.cjs 与 manual 实例的 90-diagnostic.conf 应在重试正式入口前移除。
+
 运维入口 scripts/lampy-backup.cjs；核心 scripts/ops/backup.cjs，只依赖 Node 内置模块（需要 SQLite backup API，Node >=22.16；生产记录版本 22.20.0，实际主机仍需核对）。API、Admin、cleanup.service 和 cleanup.timer 的服务名固定，不接受任意系统命令或文件路径来自浏览器。
 
 自动／手动备份先检查源路径、备份卷独立设备号和权限，取得全局 flock，在 root 专有目录持久化原服务运行状态／本次 INVOCATION_ID，然后暂停清理 timer、API、Admin 和清理进程。维护窗口期间停止其他直接写库的运营 CLI。SQLite backup 复制数据库后，仅在备份副本删除会话、Apple 挑战和限流桶，并 secure_delete／VACUUM 去掉逻辑空闲页；不改变生产库或登录状态。保留账号身份、业务及幂等记录，避免恢复后延迟操作产生重复业务。
