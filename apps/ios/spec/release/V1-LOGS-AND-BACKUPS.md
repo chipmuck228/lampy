@@ -35,6 +35,8 @@
 
 新增 GET /api/operations，仍需专用 Admin 登录、HTTPS 同源，响应 no-store。root 采集服务只能查询固定服务和最多 100 条 journal；只输出服务名、状态、事件枚举、时间及经过白名单投影的计数，不传原始 MESSAGE、异常描述、IP、账号、记录／媒体 ID、URL、路径、token 或正文。Admin 再次投影固定字段，只读取一个固定路径、root 所有且不可组／全局写入的普通文件，拒绝符号链接。未配置时功能关闭；文件缺失、过期、损坏时提示不可用。
 
+登录后默认进入“举报处理”，运维信息单独位于“运行状态” tab；仅该 tab 可见且页面前台时轮询，切回举报页停止轮询，切换 tab 暂停正在播放的声音；退出清空两页。
+
 Admin 不加入 systemd-journal／adm，不允许执行 journalctl、sudo、shell、备份、恢复或浏览任意文件。lampy-ops-read 组只允许读取脱敏状态文件。页面后台不轮询，自动轮询不延长 30 分钟闲置会话，退出清空显示。运行状态并非外部告警系统：Admin 停机时无法靠 Admin 自己通知，应配合主机 systemctl 与腾讯云基础告警。备份超过 26 小时无成功记录显示需要核对；云快照始终显示待云控制台验证，不伪造“已备份”。
 
 ## 隔离恢复检查，不提供生产覆盖入口
@@ -60,7 +62,7 @@ sudo install -o root -g root -m 0600 /opt/lampy-family/apps/ios/src/family-admin
 确认备份卷确实已挂载后再运行 install，避免在未挂载目录写入备份。ops.env 不复用 family.env／admin.env，更不拷贝 Apple 密钥。手工编辑不同路径时同步检查 unit 的挂载／读写白名单。
 
 5. 安装 backup@.service、backup.timer、backup-prune.timer、ops-collect.service／timer 到 /etc/systemd/system；安装 admin-operations.conf、api-logs.conf 到各自 service.d。Admin 的 EnvironmentFile 若已定义 LAMPY_ADMIN_OPS_FILE，必须同为 /var/lib/lampy-ops/public/status.json（EnvironmentFile 会覆盖 Environment）。API 的 UnsetEnvironment 关闭遗留 HTTP trace。daemon-reload、systemd-analyze verify 后重启 API／Admin，确认登录与功能正常。不要把 API 或 Admin 改为 root 运行。
-6. 日志配置是主机范围：审阅 journald-lampy.conf 后安装到 /etc/systemd/journald.conf.d/60-lampy-retention.conf，重启 journald，核对 cat-config 的最终覆盖值。明确接受主机其他服务同样受 30 天／空间限制；若不接受，不能直接安装全局模板，应另设计独立日志 namespace。
+6. 日志配置是主机范围：审阅 journald-lampy.conf 后安装到 /etc/systemd/journald.conf.d/zz-lampy-retention.conf，重启 journald，核对 cat-config 的最终覆盖值。明确接受主机其他服务同样受 30 天／空间限制；若不接受，不能直接安装全局模板，应另设计独立日志 namespace。
 7. 既有 rsyslog 曾开启 ForwardToSyslog 且 weekly／rotate 4。新 ForwardToSyslog=no 只阻止新的 journal 转发，不清除旧文件。核对 rsyslog 是否另启 imjournal／单独日志动作；为 /etc/logrotate.d/rsyslog 中既有文件组调整为 daily、rotate 30、maxage 30、compress，保留发行版 postrotate 脚本和文件属主，不能另建重叠 glob 规则。先 logrotate -d 验证，再执行正常轮转。旧归档需确认实际到期移除，不能仅看模板宣称完成。Caddy 继续不启用访问日志；核对实际加载配置和其他日志 writer。
 8. 明确接受删除到期旧日志后执行 journalctl --rotate、journalctl --vacuum-time=30d --vacuum-size=256M；核对 journalctl --disk-usage、归档期限和 rsyslog 旧文件。空间限制可使保留少于 30 天。不得为“保险”把旧日志另存永久副本。
 9. 先启用采集并检查 Admin，再手动跑一次备份和隔离恢复，最后开启每日／小时定时器。以下命令均在云主机执行：
@@ -105,3 +107,13 @@ ops-deploy/tencent-snapshot-policy.json 是参数示例，不包含 Region、Dis
 2026-10-23 本地验证：38 个 API／Admin Jest 套件、291 项测试通过；19 项 Node 脚本测试通过，其中 10 项运维核心在 Node 22.20.0 再次通过。TypeScript、变更 Admin TS 的 ESLint（零警告）、入口脚本语法和差异检查通过。systemd 255 对临时模板副本的语法验证通过（仅为验证将 ExecStart／ExecStopPost 替换为 /bin/true），不代表生产二进制路径、挂载、账户、D-Bus 和实际启停已验证。API listen.ts 沿用仓库既有 ESLint／tsc 排除规则，通过实际相关 Jest 编译和 HTTP 测试覆盖。尚未访问云主机、购买磁盘、配置腾讯云、创建生产备份、删除旧日志／副本或修改官网政策，PR 留待部署验收后审查。
 
 参考（2026-10-23）：[SQLite Backup API](https://www.sqlite.org/backup.html)、[Node 22 SQLite backup](https://nodejs.org/download/release/latest-jod/docs/api/sqlite.html)、[journald 配置](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html)、[腾讯云定期快照参数](https://cloud.tencent.com/document/product/362/33558)。
+
+## 2026-10-23 云主机验收进度（操作者回传）
+
+- 独立备份卷 /dev/vdc 挂载 /srv/lampy-backups，root:root 0700，与生产系统盘 /dev/vda2 分离。
+- d52602f 手动备份成功：29 份媒体，121368636 字节；备份 backup-20261023T123143475Z-8f4a559a02bf。隔离恢复成功，schema 33，publishAllowed=false；临时目录清空，目录 0700／文件 0600。未执行生产恢复。
+- API／Admin 已通过覆盖配置运行 /opt/lampy-release-a9f9634，备份 unit 指向 /opt/lampy-backup-d52602f；两个版本的 API／Admin 代码相同。主机健康检查通过，购买／家庭导出关闭；采集及状态文件权限通过，操作者已在浏览器看到运行状态与最近成功备份。此后的 tab 调整尚待部署。
+- 手动 prune 成功（removed=0, partials=0, rejected=0），每日备份、小时 prune、10 秒采集 timer 已启用；每日／小时任务真实触发及实际到期副本删除仍待验收。
+- vendor syslog.conf 会覆盖 60- 前缀配置，主机已改用 zz-lampy-retention.conf，最终 ForwardToSyslog=no，30day／256M 生效。rsyslog 与 ufw 改为 daily／rotate 30／maxage 30，mail.err 纳入原文件组，保留 postrotate。实际轮转成功，journal rotate/vacuum 后占用 240.3M，未发现扫描范围内超过 30 天的数字编号归档。这不是全主机所有日志的统一期限证明，也尚未保证空日志不轮转时未来归档一定及时清除。
+- Caddy 实际运行配置摘要：requestLogConfigPresent=false、logWriters=[]。
+- 待验收：Admin 退出后的接口拒绝、举报列表与详情回归、tab 更新、采集过期显示、强杀补偿、定时真实触发及到期清理、腾讯云快照与历史运维副本盘点；未将这些列为已通过。PR 未合并，#131 与 schema 34 仍暂停。
