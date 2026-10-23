@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const {DatabaseSync}=require('node:sqlite'),{createHash}=require('node:crypto');
 const {createBackup,verifyBackup,rehearse,pruneBackups}=require('./backup.cjs');
 const {maintenance,resume,pruneChecks}=require('../lampy-backup.cjs');
-const {collect}=require('./collector.cjs');
+const {collect,systemdRun}=require('./collector.cjs');
 const now=new Date('2026-10-23T00:00:00.000Z'),DAY=86400000,owner='a'.repeat(32);
 async function fixture(){
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'lampy-ops-')),data=path.join(dir,'data'),root=path.join(dir,'backup'),state=path.join(dir,'state'),checkRoot=path.join(dir,'checks');
@@ -104,4 +104,21 @@ test('collector never forwards raw logs, errors, URLs, identities, tokens or arb
 });
 test('backup and verification remain compatible with schema 34 without applying any migration',async()=>{
  const f=await fixture();try{f.db.exec('INSERT INTO family_schema_migrations VALUES(34); ALTER TABLE private_rows ADD COLUMN content_purged_at TEXT;');await createBackup(f,'manual',now);assert.equal((await verifyBackup(f.root,(await names(f))[0])).schema,34);}finally{await f.close();}
+});
+
+test('retains completed task history after recent logs expire, updates failures and never invents an unrun task',()=>{
+ const unit='lampy-family-cleanup.service';
+ const row={_SYSTEMD_UNIT:unit,__REALTIME_TIMESTAMP:String(now.getTime()*1000),MESSAGE:JSON.stringify({checked:0,completed:0,failed:0,removedFiles:0})};
+ const first=collect({entries:[row],states:{[unit]:'inactive'},now});assert.deepEqual(first.units[2].lastRun,{at:now.toISOString(),result:'success'});
+ const later=new Date(now.getTime()+3600000),second=collect({previous:first,now:later});assert.deepEqual(second.units[2].lastRun,first.units[2].lastRun);assert.equal(second.units[3].lastRun,null);
+ const failed=collect({previous:second,runs:{[unit]:{at:later.toISOString(),result:'failed',message:'secret'}},now:later});assert.deepEqual(failed.units[2].lastRun,{at:later.toISOString(),result:'failed'});assert.doesNotMatch(JSON.stringify(failed),/secret|message/);
+ const invalid=collect({previous:{units:[{unit,lastRun:{at:new Date(later.getTime()+60001).toISOString(),result:'success'}}]},now:later});assert.equal(invalid.units[2].lastRun,null);
+});
+test('reads completed systemd executions in UTC and does not call running or never-run tasks successful',()=>{
+ const p={ExecMainStartTimestamp:'Thu 2026-10-22 23:59:00 UTC',ExecMainExitTimestamp:'Fri 2026-10-23 00:00:00 UTC',ExecMainCode:'1',ExecMainStatus:'0',Result:'success',ActiveState:'inactive'};
+ assert.deepEqual(systemdRun(p,now),{at:now.toISOString(),result:'success'});
+ assert.equal(systemdRun({...p,ActiveState:'activating'},now),null);
+ assert.equal(systemdRun({...p,ExecMainCode:'0'},now),null);
+ assert.equal(systemdRun({...p,ExecMainExitTimestamp:'n/a'},now),null);
+ assert.equal(systemdRun({...p,ExecMainCode:'2',ExecMainStatus:'9',Result:'signal',ActiveState:'failed'},now).result,'failed');
 });

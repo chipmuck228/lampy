@@ -37,6 +37,8 @@
 
 登录后默认进入“举报处理”，运维信息单独位于“运行状态” tab；仅该 tab 可见且页面前台时轮询，切回举报页停止轮询，切换 tab 暂停正在播放的声音；退出清空两页。
 
+任务的 inactive 文案为“当前空闲”，另列最近执行时间和成功／失败；API／Admin 保持进程状态文案。root 采集固定 unit 的 systemd 执行结果（UTC 时间）及已有白名单完成事件，并从上一份安全状态文件续存每个任务的最后一条结果，避免 30 分钟日志窗口到期后丢失。只保留固定 unit、完成时间和结果，不保存原始错误；Admin 再次投影字段。没有可确认记录则显示“暂无可确认记录”，运行中不因 Result 默认 success 被判为完成成功。
+
 Admin 不加入 systemd-journal／adm，不允许执行 journalctl、sudo、shell、备份、恢复或浏览任意文件。lampy-ops-read 组只允许读取脱敏状态文件。页面后台不轮询，自动轮询不延长 30 分钟闲置会话，退出清空显示。运行状态并非外部告警系统：Admin 停机时无法靠 Admin 自己通知，应配合主机 systemctl 与腾讯云基础告警。备份超过 26 小时无成功记录显示需要核对；云快照始终显示待云控制台验证，不伪造“已备份”。
 
 ## 隔离恢复检查，不提供生产覆盖入口
@@ -117,3 +119,5 @@ ops-deploy/tencent-snapshot-policy.json 是参数示例，不包含 Region、Dis
 - vendor syslog.conf 会覆盖 60- 前缀配置，主机已改用 zz-lampy-retention.conf，最终 ForwardToSyslog=no，30day／256M 生效。rsyslog 与 ufw 改为 daily／rotate 30／maxage 30，mail.err 纳入原文件组，保留 postrotate。实际轮转成功，journal rotate/vacuum 后占用 240.3M，未发现扫描范围内超过 30 天的数字编号归档。这不是全主机所有日志的统一期限证明，也尚未保证空日志不轮转时未来归档一定及时清除。
 - Caddy 实际运行配置摘要：requestLogConfigPresent=false、logWriters=[]。
 - 待验收：Admin 退出后的接口拒绝、举报列表与详情回归、tab 更新、采集过期显示、强杀补偿、定时真实触发及到期清理、腾讯云快照与历史运维副本盘点；未将这些列为已通过。PR 未合并，#131 与 schema 34 仍暂停。
+
+任务状态显示更新：22 项 Admin 测试及 14 项运维核心测试通过；TypeScript、变更 TS 的 ESLint、脚本语法及 diff 检查通过。新增执行历史续存、失败更新、UTC 解析、运行中／从未运行不误报和字段脱敏测试。该状态显示更新尚待云端部署。

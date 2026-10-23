@@ -19,3 +19,10 @@ it('does not expose missing, symlinked or writable operational files',async()=>{
   await chmod(file,0o666);expect((await readOperations(file,now)).available).toBe(false);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+it('projects task history without private fields and rejects invalid outcomes or future execution dates',()=>{
+ const v=snapshot();v.units.push({unit:'lampy-family-cleanup.service',state:'inactive',secret:'never',lastRun:{at:new Date(now).toISOString(),result:'failed',message:'private'}} as any);
+ const result=projectOperations(v,now);expect(result.units[2].lastRun).toEqual({at:new Date(now).toISOString(),result:'failed'});expect(JSON.stringify(result)).not.toContain('private');
+ (v.units[1] as any).lastRun.result='pretend-success';expect(projectOperations(v,now).units[2].lastRun).toBeNull();
+ (v.units[1] as any).lastRun={at:new Date(now+60001).toISOString(),result:'success'};expect(projectOperations(v,now).units[2].lastRun).toBeNull();
+});

@@ -4,7 +4,16 @@ const STATES=['active','inactive','failed','activating','deactivating','reloadin
 const EVENTS=['SERVICE_STARTED','SERVICE_STOPPED','SERVICE_MESSAGE','SERVICE_ERROR','CLEANUP_COMPLETE','CLEANUP_FAILED','BACKUP_COMPLETE','BACKUP_FAILED','BACKUP_PRUNE_COMPLETE','RESTORE_REHEARSAL_COMPLETE'];
 function stamp(v){return typeof v==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(v)&&Number.isFinite(Date.parse(v))?v:null;}
 const count=v=>Number.isSafeInteger(v)&&v>=0&&v<=Number.MAX_SAFE_INTEGER?v:0;
-function collect({entries=[],states={},backup={},now=new Date(),resumeRequired=false}){
+const TASKS=UNITS.slice(2);
+function systemdRun(p={},now=new Date()){
+ const parse=v=>typeof v==='string'&&v.length<80&&/ UTC$/.test(v)&&Number.isFinite(Date.parse(v))?new Date(Date.parse(v)).toISOString():null;
+ const start=parse(p.ExecMainStartTimestamp),end=parse(p.ExecMainExitTimestamp);
+ if(!start||!end||end<start||Date.parse(end)>now.getTime()+60000||!['inactive','failed'].includes(p.ActiveState))return null;
+ const code=Number(p.ExecMainCode),status=Number(p.ExecMainStatus);
+ if(!Number.isInteger(code)||code===0||!Number.isInteger(status))return null;
+ return {at:end,result:p.Result==='success'&&code===1&&status===0?'success':'failed'};
+}
+function collect({entries=[],states={},runs={},previous={},backup={},now=new Date(),resumeRequired=false}){
  const logs=[];
  for(const entry of entries.slice(-100)){
   const unit=entry._SYSTEMD_UNIT;if(!UNITS.includes(unit))continue;
@@ -19,7 +28,11 @@ function collect({entries=[],states={},backup={},now=new Date(),resumeRequired=f
   if(event==='SERVICE_MESSAGE'&&Number(entry.PRIORITY)<=3)event='SERVICE_ERROR';
   logs.push({unit,event,at:time.toISOString(),...(counts?{counts}:{})});
  }
- return {format:1,generatedAt:now.toISOString(),units:UNITS.map(unit=>({unit,state:STATES.includes(states[unit])?states[unit]:'unknown'})),logs,
+ const latest=unit=>{
+  const candidates=[(Array.isArray(previous?.units)?previous.units:[]).find(r=>r?.unit===unit)?.lastRun,runs[unit],...logs.filter(r=>r.unit===unit&&['CLEANUP_COMPLETE','CLEANUP_FAILED','BACKUP_COMPLETE','BACKUP_FAILED','BACKUP_PRUNE_COMPLETE'].includes(r.event)).map(r=>({at:r.at,result:r.event.endsWith('_FAILED')?'failed':'success'}))];
+  return candidates.filter(r=>stamp(r?.at)&&['success','failed'].includes(r.result)&&Date.parse(r.at)<=now.getTime()+60000).map(r=>({at:r.at,result:r.result})).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||(a.result==='failed'?-1:b.result==='failed'?1:0))[0]??null;
+ };
+ return {format:1,generatedAt:now.toISOString(),units:UNITS.map(unit=>({unit,state:STATES.includes(states[unit])?states[unit]:'unknown',...(TASKS.includes(unit)?{lastRun:latest(unit)}:{})})),logs,
   backup:{event:['BACKUP_COMPLETE','BACKUP_FAILED','BACKUP_RUNNING'].includes(backup.event)?backup.event:'UNKNOWN',lastSuccess:stamp(backup.lastSuccess),attemptedAt:stamp(backup.attemptedAt),files:count(backup.files),bytes:count(backup.bytes)},resumeRequired:resumeRequired===true,cloudSnapshots:'NOT_VERIFIED'};
 }
-module.exports={UNITS,STATES,EVENTS,collect};
+module.exports={UNITS,STATES,EVENTS,collect,systemdRun};

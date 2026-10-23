@@ -20,7 +20,7 @@ async function fixture(){
   if(url==='/api/login'){signedIn=true;data={username:'developer',csrf:'csrf'};}
   else if(url==='/api/logout'){signedIn=false;data={ok:true};}
   else if(!signedIn){status=401;data={error:'SIGN_IN_REQUIRED'};}
-  else if(url==='/api/operations')data={enabled:true,available:true,generatedAt:new Date().toISOString(),units:[{unit:'lampy-family.service',state:'active'}],logs:[{unit:'lampy-family.service',event:'SERVICE_ERROR',at:new Date().toISOString(),message:'secret raw'}],backup:{event:'BACKUP_COMPLETE',lastSuccess:new Date().toISOString(),files:3}};
+  else if(url==='/api/operations')data={enabled:true,available:true,generatedAt:new Date().toISOString(),units:[{unit:'lampy-family.service',state:'active'},{unit:'lampy-family-cleanup.service',state:'inactive',lastRun:{at:new Date().toISOString(),result:'success'}},{unit:'lampy-family-backup@manual.service',state:'inactive',lastRun:{at:new Date().toISOString(),result:'failed'}},{unit:'lampy-family-backup@automatic.service',state:'inactive',lastRun:null}],logs:[{unit:'lampy-family.service',event:'SERVICE_ERROR',at:new Date().toISOString(),message:'secret raw'}],backup:{event:'BACKUP_COMPLETE',lastSuccess:new Date().toISOString(),files:3}};
   else if(url==='/api/session')data={username:'developer',csrf:'csrf'};
   else if(url.startsWith('/api/reports?'))data={reports:[report],hasMore:false};
   else if(url.endsWith('/history'))data={events:[]};
@@ -61,7 +61,7 @@ it('creates explicit audio controls without autoplay and clears them on logout',
 
 it('shows fixed-field operational status without raw logs and clears it on logout',async()=>{
  const f=await fixture();await f.login();f.get('tab-operations').click();await until(()=>!!f.get('ops-units').textContent);
- expect(f.get('ops-units').textContent).toContain('家庭 API');expect(f.get('ops-backup').textContent).toContain('媒体 3 份');expect(f.get('ops-logs').textContent).toContain('服务错误');expect(f.get('ops-logs').textContent).not.toContain('secret');
+ expect(f.get('ops-units').textContent).toContain('家庭 API · 运行中');expect(f.get('ops-units').textContent).toContain('内容清理 · 当前空闲');expect(f.get('ops-units').textContent).toContain('最近执行：');expect(f.get('ops-units').textContent).toContain('成功');expect(f.get('ops-units').textContent).toContain('失败');expect(f.get('ops-units').textContent).toContain('暂无可确认记录');expect(f.get('ops-backup').textContent).toContain('媒体 3 份');expect(f.get('ops-logs').textContent).toContain('服务错误');expect(f.get('ops-logs').textContent).not.toContain('secret');
  f.get('logout').click();await until(()=>!f.get('login').hidden);expect(f.get('operations').hidden).toBe(true);expect(f.get('ops-units').textContent).toBe('');expect(f.get('ops-logs').textContent).toBe('');
 });
 
