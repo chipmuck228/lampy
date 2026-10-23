@@ -1,0 +1,9 @@
+[Unit]
+Description=Lampy daily consistent family backup
+[Timer]
+OnCalendar=*-*-* 03:10:00 Asia/Shanghai
+RandomizedDelaySec=5m
+Persistent=true
+Unit=lampy-family-backup@automatic.service
+[Install]
+WantedBy=timers.target

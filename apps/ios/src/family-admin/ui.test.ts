@@ -5,7 +5,7 @@ let dom:JSDOM;
 afterEach(()=>dom?.window.close());
 async function until(check:()=>boolean){for(let i=0;i<100;i++){if(check())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');}
 async function fixture(){
- dom=new JSDOM(ADMIN_HTML,{url:'https://admin.example.test',runScripts:'outside-only'});
+ dom=new JSDOM(ADMIN_HTML,{url:'https://admin.example.test',runScripts:'outside-only',pretendToBeVisual:true});
  const w=dom.window,d=w.document;
  Object.defineProperty(w.HTMLDialogElement.prototype,'showModal',{value:function(){this.setAttribute('open','');}});
  Object.defineProperty(w.HTMLMediaElement.prototype,'pause',{value:jest.fn()});Object.defineProperty(w.HTMLMediaElement.prototype,'load',{value:jest.fn()});
@@ -18,6 +18,7 @@ async function fixture(){
   if(url==='/api/login'){signedIn=true;data={username:'developer',csrf:'csrf'};}
   else if(url==='/api/logout'){signedIn=false;data={ok:true};}
   else if(!signedIn){status=401;data={error:'SIGN_IN_REQUIRED'};}
+  else if(url==='/api/operations')data={enabled:true,available:true,generatedAt:new Date().toISOString(),units:[{unit:'lampy-family.service',state:'active'}],logs:[{unit:'lampy-family.service',event:'SERVICE_ERROR',at:new Date().toISOString(),message:'secret raw'}],backup:{event:'BACKUP_COMPLETE',lastSuccess:new Date().toISOString(),files:3}};
   else if(url==='/api/session')data={username:'developer',csrf:'csrf'};
   else if(url.startsWith('/api/reports?'))data={reports:[report],hasMore:false};
   else if(url.endsWith('/history'))data={events:[]};
@@ -54,4 +55,10 @@ it('creates explicit audio controls without autoplay and clears them on logout',
  const button=Array.from(f.get('media').querySelectorAll('button')).find(b=>b.textContent==='载入声音')!;button.click();
  const audio=f.get('media').querySelector('audio')!;expect(audio.controls).toBe(true);expect(audio.autoplay).toBe(false);expect(audio.preload).toBe('none');
  f.get('logout').click();await until(()=>!f.get('login').hidden);expect(f.get('media').querySelector('audio')).toBeNull();
+});
+
+it('shows fixed-field operational status without raw logs and clears it on logout',async()=>{
+ const f=await fixture();await f.login();await until(()=>!f.get('operations').hidden);
+ expect(f.get('ops-units').textContent).toContain('家庭 API');expect(f.get('ops-backup').textContent).toContain('媒体 3 份');expect(f.get('ops-logs').textContent).toContain('服务错误');expect(f.get('ops-logs').textContent).not.toContain('secret');
+ f.get('logout').click();await until(()=>!f.get('login').hidden);expect(f.get('operations').hidden).toBe(true);expect(f.get('ops-units').textContent).toBe('');expect(f.get('ops-logs').textContent).toBe('');
 });

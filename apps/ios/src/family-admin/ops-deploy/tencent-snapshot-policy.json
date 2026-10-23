@@ -1,0 +1,7 @@
+{
+  "AutoSnapshotPolicyName": "lampy-production-data-7d",
+  "IsActivated": true,
+  "IsPermanent": false,
+  "RetentionDays": 7,
+  "Policy": [{"DayOfWeek": [0,1,2,3,4,5,6], "Hour": [4]}]
+}

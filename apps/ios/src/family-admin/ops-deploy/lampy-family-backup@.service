@@ -1,0 +1,25 @@
+[Unit]
+Description=Lampy family backup maintenance (%i)
+After=network-online.target
+RequiresMountsFor=/srv/lampy-backups
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/lampy/ops.env
+WorkingDirectory=/opt/lampy-family/apps/ios
+ExecStart=/usr/bin/flock --nonblock /run/lock/lampy-family-backup.lock /usr/local/bin/node /opt/lampy-family/apps/ios/scripts/lampy-backup.cjs %i
+ExecStopPost=/usr/local/bin/node /opt/lampy-family/apps/ios/scripts/lampy-backup.cjs resume
+TimeoutStartSec=15min
+TimeoutStopSec=3min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/srv/lampy-family
+ReadWritePaths=/srv/lampy-backups /var/lib/lampy-ops /run/lock
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal

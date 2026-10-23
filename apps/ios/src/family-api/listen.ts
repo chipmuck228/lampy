@@ -245,11 +245,11 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
 
 if (require.main === module) {
   startFamilyApiServer()
-    .then((listening) => {
-      process.stdout.write(`${listening.banner}\nhttp://${listening.host}:${listening.port}\n`);
+    .then(() => {
+      process.stdout.write('{"event":"SERVICE_STARTED"}\n');
     })
-    .catch((error) => {
-      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    .catch(() => {
+      process.stderr.write('{"event":"SERVICE_ERROR"}\n');
       process.exit(1);
     });
 }

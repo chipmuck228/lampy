@@ -1,0 +1,9 @@
+[Unit]
+Description=Expire Lampy backups hourly
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=5m
+Persistent=true
+Unit=lampy-family-backup@prune.service
+[Install]
+WantedBy=timers.target

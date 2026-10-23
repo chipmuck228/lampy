@@ -10,7 +10,7 @@ import {sha256MediaBytes} from '../family-api/media-validate';
 function fail(code:string):never {throw new FamilyError(code,code);}
 export async function createAdminService(db:FamilySql,blobs:MediaBlobStore,operator:string,now:()=>Date=()=>new Date()){
  const schema=await db.getFirst<{version:number}>('SELECT MAX(version) AS version FROM family_schema_migrations');
- if(schema?.version!==33)throw Error('Family schema 33 required; admin does not run family migrations.');
+ if(!schema || ![33,34].includes(schema.version))throw Error('Family schema 33 or 34 required; admin does not run family migrations.');
  for(const table of ['family_safety_reports','family_content_moderation','family_sharing_restrictions','family_sharing_restriction_audit'])if(!await db.getFirst("SELECT name FROM sqlite_master WHERE type='table' AND name=?",[table]))throw Error('Family safety tables missing.');
  // Separate operational access audit, not a new family migration or a content copy.
  await db.exec('CREATE TABLE IF NOT EXISTS family_admin_audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT,at TEXT NOT NULL,operator TEXT NOT NULL,event TEXT NOT NULL,report_id TEXT,object_id TEXT); CREATE INDEX IF NOT EXISTS family_admin_audit_at ON family_admin_audit(at);');
