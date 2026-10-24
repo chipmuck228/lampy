@@ -81,3 +81,7 @@ Xcode → Window → Organizer → Archives，定位同一 version/build，使�
 - https://developer.apple.com/documentation/bundleresources/describing-data-use-in-privacy-manifests
 - https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api
 - https://developer.apple.com/documentation/bundleresources/information-property-list/nsphotolibraryaddusagedescription
+
+## First-party disclosure follow-up
+
+See V1-DATA-DISCLOSURE.md for the seven-category mapping, production aggregate probe and App Privacy worksheet. Build14 reports were received: static checks passed within tool scope; collected-data declarations were empty and Xcode PDF blank. The subsequent first-party manifest requires a fresh Archive; final approval remains pending.
