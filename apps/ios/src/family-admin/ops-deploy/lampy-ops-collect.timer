@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh Lampy operational status every ten seconds
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Unit=lampy-ops-collect.service
+[Install]
+WantedBy=timers.target

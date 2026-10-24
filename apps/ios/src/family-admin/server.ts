@@ -1,3 +1,4 @@
+import {readOperations} from './operations';
 import {createServer,type IncomingMessage,type ServerResponse} from 'node:http';
 import {isIP} from 'node:net';
 import {existsSync,realpathSync} from 'node:fs';
@@ -15,7 +16,8 @@ export function adminConfig(env:AdminEnv){
  const database=env.LAMPY_FAMILY_DATABASE_PATH??'',media=env.LAMPY_FAMILY_MEDIA_PATH??'';
  if(!database||!media||!existsSync(database)||!existsSync(media))throw Error('Existing family database and media directory required.');
  const port=Number(env.LAMPY_ADMIN_PORT??8790);if(!Number.isInteger(port)||port<1||port>65535)throw Error('Invalid admin port.');
- return {origin,host:url.host,username,passwordHash,database:realpathSync(database),media:realpathSync(media),port};
+ const opsFile=env.LAMPY_ADMIN_OPS_FILE??'';if(opsFile&&opsFile!=='/var/lib/lampy-ops/public/status.json')throw Error('Invalid operations source.');
+ return {origin,host:url.host,username,passwordHash,database:realpathSync(database),media:realpathSync(media),port,opsFile};
 }
 async function body(req:IncomingMessage){
  if(req.headers['content-type']!=='application/json')throw Error('BAD_REQUEST');
@@ -64,9 +66,10 @@ export async function startFamilyAdmin(options:{env?:AdminEnv;port?:number;now?:
    const old=auth.session(req.headers.cookie,false);if(old)auth.revoke(old.key);
    await service.loginAudit('login');const session=auth.issue();res.setHeader('Set-Cookie',sessionCookie(session.token));return json(res,200,{username:config.username,csrf:session.csrf});
   }
-  const session=auth.session(req.headers.cookie,route!=='/api/session'&&!route.endsWith('/validation'));
+  const session=auth.session(req.headers.cookie,route!=='/api/session'&&route!=='/api/operations'&&!route.endsWith('/validation'));
   if(!session){res.setHeader('Set-Cookie',expiredCookie());return json(res,401,{error:'SIGN_IN_REQUIRED'});}
   if(method==='POST'&&(!req.headers['x-csrf-token']||!secureEqual(String(req.headers['x-csrf-token']),session.csrf)))return json(res,403,{error:'CSRF_REQUIRED'});
+  if(route==='/api/operations'&&method==='GET')return json(res,200,await readOperations(config.opsFile,clock()));
   if(route==='/api/session'&&method==='GET')return json(res,200,{username:config.username,csrf:session.csrf,expiresAt:session.expiresAt});
   if(route==='/api/logout'&&method==='POST'){auth.revoke(session.key);res.setHeader('Set-Cookie',expiredCookie());await service.loginAudit('logout');return json(res,200,{ok:true});}
   if(route==='/api/reports'&&method==='GET')return json(res,200,await service.list(url.searchParams.get('status')??'pending',Number(url.searchParams.get('page')??'0')));

@@ -5,8 +5,10 @@ let dom:JSDOM;
 afterEach(()=>dom?.window.close());
 async function until(check:()=>boolean){for(let i=0;i<100;i++){if(check())return;await new Promise(r=>setTimeout(r,5));}throw Error('UI did not settle');}
 async function fixture(){
- dom=new JSDOM(ADMIN_HTML,{url:'https://admin.example.test',runScripts:'outside-only'});
+ dom=new JSDOM(ADMIN_HTML,{url:'https://admin.example.test',runScripts:'outside-only',pretendToBeVisual:true});
  const w=dom.window,d=w.document;
+ const polls:(()=>void)[]=[],nativeInterval=w.setInterval.bind(w);
+ w.setInterval=((fn:()=>void,ms?:number)=>{if(ms===5000)polls.push(fn);return nativeInterval(fn,ms);}) as typeof w.setInterval;
  Object.defineProperty(w.HTMLDialogElement.prototype,'showModal',{value:function(){this.setAttribute('open','');}});
  Object.defineProperty(w.HTMLMediaElement.prototype,'pause',{value:jest.fn()});Object.defineProperty(w.HTMLMediaElement.prototype,'load',{value:jest.fn()});
  Object.defineProperty(w.HTMLDialogElement.prototype,'close',{value:function(){this.removeAttribute('open');}});
@@ -18,6 +20,7 @@ async function fixture(){
   if(url==='/api/login'){signedIn=true;data={username:'developer',csrf:'csrf'};}
   else if(url==='/api/logout'){signedIn=false;data={ok:true};}
   else if(!signedIn){status=401;data={error:'SIGN_IN_REQUIRED'};}
+  else if(url==='/api/operations')data={enabled:true,available:true,generatedAt:new Date().toISOString(),units:[{unit:'lampy-family.service',state:'active'},{unit:'lampy-family-cleanup.service',state:'inactive',lastRun:{at:new Date().toISOString(),result:'success'}},{unit:'lampy-family-backup@manual.service',state:'inactive',lastRun:{at:new Date().toISOString(),result:'failed'}},{unit:'lampy-family-backup@automatic.service',state:'inactive',lastRun:null}],logs:[{unit:'lampy-family.service',event:'SERVICE_ERROR',at:new Date().toISOString(),message:'secret raw'}],backup:{event:'BACKUP_COMPLETE',lastSuccess:new Date().toISOString(),files:3}};
   else if(url==='/api/session')data={username:'developer',csrf:'csrf'};
   else if(url.startsWith('/api/reports?'))data={reports:[report],hasMore:false};
   else if(url.endsWith('/history'))data={events:[]};
@@ -31,7 +34,7 @@ async function fixture(){
  const submit=(id:string)=>get(id).dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
  async function login(){await until(()=>!(get('login-submit') as HTMLButtonElement).disabled);(get('login-name') as HTMLInputElement).value='developer';(get('login-password') as HTMLInputElement).value='secret';submit('login-form');await until(()=>!get('workspace').hidden);await until(()=>!!d.querySelector('.report-row'));}
  async function open(){(d.querySelector('.report-row') as HTMLButtonElement).click();await until(()=>!get('detail').hidden);await until(()=>get('history').textContent!.includes('暂无处理记录'));}
- return {w,d,get,fetch,submit,login,open};
+ return {w,d,get,fetch,submit,login,open,pollOperations:()=>polls.forEach(fn=>fn())};
 }
 it('requires explicit confirmation and renders untrusted content only as text',async()=>{
  const f=await fixture();await f.login();await f.open();expect(f.get('note').textContent).toContain('<img');expect(f.get('note').querySelector('img')).toBeNull();expect(f.get('report-detail').querySelector('script')).toBeNull();
@@ -54,4 +57,35 @@ it('creates explicit audio controls without autoplay and clears them on logout',
  const button=Array.from(f.get('media').querySelectorAll('button')).find(b=>b.textContent==='载入声音')!;button.click();
  const audio=f.get('media').querySelector('audio')!;expect(audio.controls).toBe(true);expect(audio.autoplay).toBe(false);expect(audio.preload).toBe('none');
  f.get('logout').click();await until(()=>!f.get('login').hidden);expect(f.get('media').querySelector('audio')).toBeNull();
+});
+
+it('shows fixed-field operational status without raw logs and clears it on logout',async()=>{
+ const f=await fixture();await f.login();f.get('tab-operations').click();await until(()=>!!f.get('ops-units').textContent);
+ expect(f.get('ops-units').textContent).toContain('家庭 API · 运行中');expect(f.get('ops-units').textContent).toContain('内容清理 · 当前空闲');expect(f.get('ops-units').textContent).toContain('最近执行：');expect(f.get('ops-units').textContent).toContain('成功');expect(f.get('ops-units').textContent).toContain('失败');expect(f.get('ops-units').textContent).toContain('暂无可确认记录');expect(f.get('ops-backup').textContent).toContain('媒体 3 份');expect(f.get('ops-logs').textContent).toContain('服务错误');expect(f.get('ops-logs').textContent).not.toContain('secret');
+ f.get('logout').click();await until(()=>!f.get('login').hidden);expect(f.get('operations').hidden).toBe(true);expect(f.get('ops-units').textContent).toBe('');expect(f.get('ops-logs').textContent).toBe('');
+});
+
+it('keeps reports separate, polls only the active operations tab, and supports keyboard tabs',async()=>{
+ const f=await fixture();await f.login();
+ const count=()=>f.fetch.mock.calls.filter(c=>c[0]==='/api/operations').length;
+ expect(f.get('operations').hidden).toBe(true);expect(count()).toBe(0);
+ f.pollOperations();expect(count()).toBe(0);
+ f.get('tab-operations').click();await until(()=>!!f.get('ops-units').textContent);
+ expect(f.get('workspace').hidden).toBe(true);expect(f.get('tab-operations').getAttribute('aria-selected')).toBe('true');
+ f.pollOperations();await until(()=>count()===2);
+ f.get('tab-operations').dispatchEvent(new f.w.KeyboardEvent('keydown',{key:'Home',bubbles:true}));
+ expect(f.get('workspace').hidden).toBe(false);expect(f.get('operations').hidden).toBe(true);
+ expect(f.d.activeElement).toBe(f.get('tab-reports'));expect(f.d.querySelector('.report-row')).not.toBeNull();
+ f.pollOperations();expect(count()).toBe(2);
+ f.get('logout').click();await until(()=>!f.get('login').hidden);
+ expect(f.get('admin-tabs').hidden).toBe(true);f.pollOperations();expect(count()).toBe(2);
+});
+it('does not reopen operations when a response arrives after switching back to reports',async()=>{
+ const f=await fixture();await f.login();const original=f.fetch.getMockImplementation()!;
+ let release:(value:any)=>void=()=>{};
+ f.fetch.mockImplementation((url,options)=>url==='/api/operations'?new Promise(resolve=>{release=resolve;}):original(url,options));
+ f.get('tab-operations').click();f.get('tab-reports').click();
+ release({ok:true,status:200,json:async()=>({enabled:true,available:false})});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ expect(f.get('workspace').hidden).toBe(false);expect(f.get('operations').hidden).toBe(true);
 });

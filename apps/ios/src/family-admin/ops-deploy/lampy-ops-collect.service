@@ -1,0 +1,18 @@
+[Unit]
+Description=Publish fixed-field Lampy operational status
+[Service]
+Type=oneshot
+User=root
+Group=lampy-ops-read
+WorkingDirectory=/opt/lampy-family/apps/ios
+ExecStart=/usr/local/bin/node /opt/lampy-family/apps/ios/scripts/lampy-ops-collect.cjs
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/lampy-ops/public
+ReadOnlyPaths=-/var/lib/lampy-ops/backup-status.json
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal

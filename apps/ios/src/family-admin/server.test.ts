@@ -112,3 +112,12 @@ it('allows only one concurrent password derivation even when request bodies arri
  await fixture();const results=await Promise.all(Array.from({length:3},()=>request('/api/login','POST',{username:'developer',password})));
  expect(results.filter(r=>r.status===200)).toHaveLength(1);expect(results.filter(r=>r.status===429)).toHaveLength(2);
 });
+it('operations requires login, is read-only and its polling never extends the idle session',async()=>{
+ let clock=Date.now();await fixture(()=>clock);
+ expect((await request('/api/operations')).status).toBe(401);const h=await login();
+ expect((await request('/api/operations','GET',undefined,h)).body).toEqual({enabled:false,available:false});
+ expect((await request('/api/operations','POST',{},h)).status).toBe(404);
+ // The POST is an intentional interaction; start measuring idle time after it.
+ for(let i=0;i<5;i++){clock+=5*60000;expect((await request('/api/operations','GET',undefined,h)).status).toBe(200);}
+ clock+=5*60000;expect((await request('/api/operations','GET',undefined,h)).status).toBe(401);
+});
