@@ -34,7 +34,7 @@ function run() {
     db.exec('PRAGMA query_only=ON; PRAGMA busy_timeout=3000; BEGIN');
     if(db.prepare('SELECT MAX(version) AS n FROM family_schema_migrations').get().n!==33)throw Error('SCHEMA');
     const samples=[];let indexedPhotos=0,clean=0;
-    for(const row of db.prepare("SELECT storage_key,mime_type,byte_length,content_sha256 FROM family_media_objects WHERE mime_type LIKE 'image/%'").iterate()) {
+    for(const row of db.prepare("SELECT object_id,storage_key,mime_type,byte_length,content_sha256 FROM family_media_objects WHERE mime_type LIKE 'image/%'").iterate()) {
       indexedPhotos++;
       if(!/^med_[a-f0-9]+$/.test(row.storage_key))throw Error('PATH');
       const file=path.join(root,row.storage_key),before=fs.lstatSync(file);
@@ -47,7 +47,13 @@ function run() {
       const metadata=summarize(JSON.parse(raw));
       const after=fs.lstatSync(file);
       if(before.ino!==after.ino || before.size!==after.size || before.mtimeMs!==after.mtimeMs)throw Error('CONCURRENT_CHANGE');
-      samples.push({sample:samples.length+1,format:row.mime_type==='image/jpeg'?'JPEG':row.mime_type==='image/png'?'PNG':'OTHER',...metadata});
+      const references=db.prepare(`SELECT COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN s.status='active' AND f.status='active' THEN 1 ELSE 0 END),0) AS activeShares,
+        COALESCE(SUM(CASE WHEN s.status='revoked' THEN 1 ELSE 0 END),0) AS revokedShares
+        FROM family_shares s JOIN family_families f ON f.family_id=s.family_id
+        WHERE EXISTS (SELECT 1 FROM json_each(s.snapshot_json,'$.media') m
+          WHERE json_extract(m.value,'$.objectId')=?)`).get(row.object_id);
+      samples.push({sample:samples.length+1,format:row.mime_type==='image/jpeg'?'JPEG':row.mime_type==='image/png'?'PNG':'OTHER',...metadata,references:{...references}});
     }
     return {probe:'HISTORICAL_PHOTO_METADATA_DETAIL',mode:'READ_ONLY',schema:33,toolVersion:version,indexedPhotos,clean,candidates:samples.length,samples,privateValues:'NOT_PRINTED',rewrite:'NOT_PERFORMED',backups:'NOT_INSPECTED',physicalErasure:'NOT_VERIFIED'};
   }finally{db.close();}
