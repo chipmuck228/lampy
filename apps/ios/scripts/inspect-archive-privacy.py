@@ -191,6 +191,21 @@ def inspect(archive, expected_build, podfile_lock=None):
             issues.append('LOCALIZED_PLIST_UNREADABLE:' + locale)
     if not any(m['path'] == 'PrivacyInfo.xcprivacy' for m in report['privacyManifests']):
         issues.append('APP_MANIFEST_MISSING')
+    expected = {'NSPrivacyCollectedDataType' + name for name in (
+        'UserID', 'Contacts', 'OtherUserContent', 'PhotosorVideos',
+        'AudioData', 'CustomerSupport', 'OtherDataTypes')}
+    first_party = next((m for m in report['privacyManifests'] if m['path'] == 'PrivacyInfo.xcprivacy'), None)
+    report['firstPartyDisclosure'] = 'BLOCKED'
+    if first_party:
+        rows = first_party['collectedData']
+        types = [r['type'] for r in rows]
+        if set(types) != expected or len(types) != len(expected):
+            issues.append('FIRST_PARTY_COLLECTION_CATEGORIES_MISMATCH')
+        elif any(r.get('linked') is not True or r.get('tracking') is not False
+                 or r.get('purposes') != ['NSPrivacyCollectedDataTypePurposeAppFunctionality'] for r in rows):
+            issues.append('FIRST_PARTY_COLLECTION_USE_MISMATCH')
+        else:
+            report['firstPartyDisclosure'] = 'PASS'
     if not any(b['path'] == 'main.jsbundle' for b in report['binaries']):
         issues.append('JS_BUNDLE_MISSING')
     if not report['privacyManifests']:

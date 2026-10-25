@@ -56,3 +56,12 @@ Build14 (ee19b21) static Archive inspection had no flagged issues, but its app c
 Official references (reviewed 2026-10-24):
 - https://developer.apple.com/app-store/app-privacy-details/ (social graph, generic text, stored IP by use, linked-data and App Functionality definitions)
 - https://developer.apple.com/documentation/technotes/tn3184-adding-data-collection-details-to-your-privacy-manifest
+
+
+## 2026-10-25 production aggregate verification
+
+The developer returned FIRST_PARTY_DISCLOSURE / READ_ONLY, schema 33: accounts 2, nonempty email rows 0; memberships 5, blocks 1, invitations 2; shares 26, media objects 29, albums 2; reports 4, moderation audit 3, restriction audit 3; Apple rate buckets 1, older than 24 hours 1, invalid time 0; purchase rows 0. Private values were not printed. These are point-in-time aggregate counts, not category completeness or deletion proof. They support the mapped account/social graph/content/support/security categories and the closed purchase scope; absence of email rows is consistent with the formal Apple flow. The old rate row confirms persistence beyond the rate window.
+
+Retention deletion remains NOT_VERIFIED; production flags and historical photo metadata remain NOT_INSPECTED. The next dependency is a fresh full photo audit. A needsPreparation result only proves disallowed metadata/container structure, not GPS presence. Do not rewrite/delete indexed bytes in place or infer physical erasure. If any historical metadata-bearing copies remain, perform targeted inspection and an explicitly scoped disposition before final no-location disclosure.
+
+Archive inspection now requires exactly the seven first-party categories in the app root manifest, linked=true, tracking=false, App Functionality only. Empty build14 declarations will now correctly block this strengthened check. SDK required-reason arrays remain independently inspected. Eleven synthetic Archive tests pass; these do not substitute for the next actual Mac Archive.

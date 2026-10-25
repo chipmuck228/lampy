@@ -34,7 +34,7 @@ class ArchivePrivacyTest(unittest.TestCase):
             self.write(locale + '.lproj/InfoPlist.strings',
                        {k: locale + ' purpose' for k in audit.PERMISSIONS})
         self.manifest = {'NSPrivacyTracking': False, 'NSPrivacyTrackingDomains': [],
-                         'NSPrivacyCollectedDataTypes': [], 'NSPrivacyAccessedAPITypes': [
+                         'NSPrivacyCollectedDataTypes': json.loads((SCRIPT.parent.parent / 'app.json').read_text())['expo']['ios']['privacyManifests']['NSPrivacyCollectedDataTypes'], 'NSPrivacyAccessedAPITypes': [
                              {'NSPrivacyAccessedAPIType': 'NSPrivacyAccessedAPICategoryUserDefaults',
                               'NSPrivacyAccessedAPITypeReasons': ['CA92.1']}]}
         self.write('PrivacyInfo.xcprivacy', self.manifest)
@@ -52,6 +52,17 @@ class ArchivePrivacyTest(unittest.TestCase):
     def inspect(self):
         with patch.object(audit.shutil, 'which', return_value=None):
             return audit.inspect(self.archive, '17')
+
+    def test_first_party_collection_must_survive_prebuild(self):
+        self.assertEqual(self.inspect()['firstPartyDisclosure'], 'PASS')
+        self.manifest['NSPrivacyCollectedDataTypes'] = []
+        self.write('PrivacyInfo.xcprivacy', self.manifest)
+        self.assertIn('FIRST_PARTY_COLLECTION_CATEGORIES_MISMATCH', self.inspect()['issues'])
+
+    def test_first_party_use_must_match_questionnaire(self):
+        self.manifest['NSPrivacyCollectedDataTypes'][0]['NSPrivacyCollectedDataTypeLinked'] = False
+        self.write('PrivacyInfo.xcprivacy', self.manifest)
+        self.assertIn('FIRST_PARTY_COLLECTION_USE_MISMATCH', self.inspect()['issues'])
 
     def hashes(self):
         return {str(p.relative_to(self.archive)): audit.digest(p)
