@@ -13,7 +13,7 @@
       "appleTeamId": "B283NY984J",
       "buildNumber": "1",
       "usesAppleSignIn": true,
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "infoPlist": {
         "NSCameraUsageDescription": "Lampy 只在你拍照留下一条生活时使用相机。",
         "NSMicrophoneUsageDescription": "Lampy 只在你录下当时的声音时使用麦克风。",
