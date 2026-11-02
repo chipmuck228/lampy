@@ -34,6 +34,11 @@ export const LIFE_ICON_NAMES = {
   clear: 'xmark.circle.fill',
   refresh: 'arrow.clockwise',
   check: 'checkmark.circle',
+  printer: 'printer',
+  textCursor: 'character.cursor.ibeam',
+  edition: 'square.stack.3d.up',
+  waveform: 'waveform',
+  sealed: 'checkmark.seal',
 } as const;
 
 export type LifeIconName = keyof typeof LIFE_ICON_NAMES;

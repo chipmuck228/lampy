@@ -60,6 +60,9 @@ public final class LampyAlbumLayoutModule: Module {
           view.playingJson = json
         }
       }
+      Prop("renderScale") { (view: AlbumPageView, scale: Double) in
+        view.renderScale = scale
+      }
     }
   }
 }
@@ -630,6 +633,17 @@ final class AlbumPageView: ExpoView {
       DispatchQueue.main.async { [weak self] in
         self?.setNeedsDisplay()
       }
+    }
+  }
+  /// Optional on-screen scale of this 420pt page. Thumbnails draw near their
+  /// displayed pixel size instead of full size and then being minified.
+  /// Geometry and drawing are unchanged; 0 keeps the screen scale.
+  var renderScale: Double = 0 {
+    didSet {
+      guard renderScale != oldValue else { return }
+      let screen = window?.screen.scale ?? UIScreen.main.scale
+      contentScaleFactor = renderScale > 0 ? max(1, min(screen, screen * CGFloat(renderScale))) : screen
+      setNeedsDisplay()
     }
   }
 

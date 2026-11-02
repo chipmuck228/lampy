@@ -37,3 +37,7 @@
 ## 阶段 F1 实施候选（2026-10-16）
 
 阶段 E 已由 #114 合并到 main；阶段 D 仍暂停。用户确认一次购买解锁导出。默认关闭的正式个人 PDF / 付费双开关、StoreKit 非消耗型购买和恢复、生成前/提交前权益检查见 [paid-export-f/README.md](paid-export-f/README.md)。正式商品和原生/沙盒/真机验收尚未完成，不称阶段 F 发布收口完成。家庭 canExport 仍关闭，不因支付成功开放家庭完整导出。
+
+## 导出成品展台（2026-11-02）
+
+独立分支 `ios/album-export-showcase`：个人册导出页改为用真实分页呈现的可翻阅成品、真实数字、单一价格／装订按钮、真实步骤的装订过程与版次书架；PDF、付费门控与默认关闭开关不变。说明、开发演示链接与验证边界见 [export-showcase/README.md](export-showcase/README.md)。
