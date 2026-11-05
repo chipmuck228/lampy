@@ -1,7 +1,7 @@
 import { tr } from '../i18n';
 import { isFamilyV1ReleaseBuild } from '../infrastructure/family-config';
 import { V1_PRIVACY_CHAPTERS } from './settings-v1-copy';
-export const SETTINGS_PRIVACY_UPDATED = tr(isFamilyV1ReleaseBuild() ? "2026年10月18日" : "2026年10月2日");
+export const SETTINGS_PRIVACY_UPDATED = tr(isFamilyV1ReleaseBuild() ? "2026年10月24日" : "2026年10月2日");
 
 const PERSONAL_PRIVACY_CHAPTERS = [
   {

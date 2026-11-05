@@ -1019,5 +1019,12 @@
   "暂时无法确认阅读资格，请再试一次。": "Reading access could not be confirmed. Please try again.",
   "正在载入照片和声音（{0}/{1}）": "Loading photos and audio ({{0}}/{{1}})",
   "照片正在载入": "Loading photo",
-  "声音正在载入": "Loading audio"
+  "声音正在载入": "Loading audio",
+  "家庭成员、角色、邀请及屏蔽关系仅用于家庭访问、管理和阅读过滤，不读取手机通讯录。": "Family membership, roles, invitations and blocks are used only for family access, management and reading filters. Lampy does not read your phone address book.",
+  "登录防滥用会在服务器保存来源IP、限流窗口时间和次数。它们不用于定位、广告分析或跨服务追踪，也不会为这些目的对外提供。": "To prevent login abuse, the server stores the source IP address, rate-limit window time and count. They are not used or disclosed for location inference, advertising analytics or cross-service tracking.",
+  "限流窗口不等于删除期限；当前版本尚未为全部旧限流记录设置统一的自动到期删除规则。举报与处理记录也没有统一的按天到期规则，相关账号或家庭删除规则仍适用。": "A rate-limit window is not a deletion deadline. This version does not yet automatically expire all old rate-limit records. Reports and moderation records also have no uniform age-based expiry; the applicable account and family deletion rules still apply.",
+  "服务器运维备份与系统日志独立于在线内容清理，删除在线内容不代表所有副本立即消失。运维副本按各自保留配置到期处理，不作为用户恢复服务；恢复时需重新核对已撤回、删除和下架状态。": "Operational backups and system logs are separate from online content cleanup. Deleting online content does not immediately erase every copy. Operational copies expire under their respective retention settings and are not a user recovery service. Restoration requires reconciling withdrawn, deleted and moderated content.",
+  "正式Apple登录不请求姓名或邮箱；Lampy保存用于账号识别的Apple标识和你设置的昵称。": "Production Apple sign-in does not request your name or email. Lampy stores the Apple identifier used for your account and the nickname you choose.",
+  "账号、家庭关系与安全数据": "Account, family relationships and security data",
+  "2026年10月24日": "October 24, 2026"
 }
