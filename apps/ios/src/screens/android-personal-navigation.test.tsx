@@ -1,11 +1,11 @@
 import { albumLayoutNativeAvailable } from '../../modules/lampy-album-layout';
+import { Platform } from 'react-native';
+import { render } from '@testing-library/react-native';
+import { RootNavBand } from './root-nav-band';
 jest.mock('../../modules/lampy-album-layout', () => ({
   albumLayoutNativeAvailable: jest.fn(() => true),
   albumNativePageViewAvailable: jest.fn(() => true),
 }));
-import { Platform } from 'react-native';
-import { render } from '@testing-library/react-native';
-import { RootNavBand } from './root-nav-band';
 
 test('Android navigation exposes personal albums but no family even with a family callback', async () => {
   const previous=Platform.OS;
