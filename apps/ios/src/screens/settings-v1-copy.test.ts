@@ -14,7 +14,7 @@ function load(formal:boolean,language='zh-CN') {
  return result;
 }
 it('formal copy describes actual family storage and deletion without claiming families are closed',()=>{
- const copy=load(true);expect(copy.date).toBe('2026年10月18日');
+ const copy=load(true);expect(copy.date).toBe('2026年10月24日');
  const privacy=text(copy.privacy),terms=text(copy.terms),help=text(copy.help);
  expect(privacy).toContain('未主动分享的个人内容不会上传');expect(privacy).toContain('家庭共享内容保存在服务器');expect(privacy).toContain('清理队列');expect(privacy).toContain('30天');
  expect(privacy).toContain('所有会话失效');expect(privacy).toContain('本机私人记录和个人册不随账号删除');
@@ -23,7 +23,7 @@ it('formal copy describes actual family storage and deletion without claiming fa
  for(const content of [privacy,terms,help])expect(content).not.toMatch(/家庭入口.*关闭|账号注册.*未向你开放|导出后再删除|举报按钮|屏蔽按钮|自动恢复个人/);
 });
 it('English release pages translate every heading and paragraph',()=>{
- const copy=load(true,'en-US');expect(copy.date).toBe('October 18, 2026');
+ const copy=load(true,'en-US');expect(copy.date).toBe('October 24, 2026');
  const content=text([...copy.help,...copy.privacy,...copy.terms]);expect(content).not.toMatch(/[\u4e00-\u9fff]/);
  expect(content).toContain('family service');expect(content).toContain('does not delete local private moments');
 });

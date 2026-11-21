@@ -1,7 +1,9 @@
+import { personalRecordsOnly } from '../application/mobile-capabilities';
 import {createUnifiedPurchases,unifiedPurchasesEnabled} from '../application/unified-purchases';
 import {albumExportConfig,createAlbumExportAccess} from '../application/album-export-access';
 import {exportPurchasesNative} from '../../modules/lampy-export-purchases';
 export function getConfiguredPurchases(){
+  if(personalRecordsOnly())return null;
   const native=exportPurchasesNative();if(!native)return null;
   const id=albumExportConfig().productId;
   if(unifiedPurchasesEnabled()) {

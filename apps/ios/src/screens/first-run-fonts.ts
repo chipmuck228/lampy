@@ -1,7 +1,8 @@
+import { Platform } from 'react-native';
 import { appLanguage } from '../i18n';
 import * as Font from 'expo-font';
 
-export const FIRST_RUN_SERIF = appLanguage === 'en' ? 'Georgia' : 'LampyNotoSerifSC';
+export const FIRST_RUN_SERIF = appLanguage === 'en' ? (Platform.OS === 'android' ? 'serif' : 'Georgia') : 'LampyNotoSerifSC';
 export const FIRST_RUN_SANS = appLanguage === 'en' ? 'System' : 'LampyNotoSansSC';
 export const FIRST_RUN_MARK = appLanguage === 'en' ? 'System' : 'LampyDMSans';
 

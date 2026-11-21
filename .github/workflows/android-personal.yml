@@ -1,0 +1,48 @@
+name: Android personal baseline
+on:
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - 'domain/**'
+      - 'projections/**'
+      - '.github/workflows/android-personal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/ios
+    env:
+      EXPO_NO_DOTENV: '1'
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/ios/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '14742923'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - run: npm ci
+      - run: node --test scripts/android-personal.test.cjs
+      - run: npx tsc --noEmit
+      - run: npm run test:android
+      - run: npm run android:prebuild
+      - run: ./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a --no-daemon
+        working-directory: apps/ios/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lampy-android-personal-debug
+          path: apps/ios/android/app/build/outputs/apk/debug/app-debug.apk

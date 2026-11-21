@@ -123,3 +123,22 @@ are immutable and the save action intentionally reuses them. Reimport the new ed
 into Books, select its original/publisher typography for baseline inspection, then test
 large fonts, dark theme, landscape, photos and audio. Browser/XML checks are not an
 Apple Books visual acceptance; device screenshots are still required after this revision.
+
+## Merge review — 2026-11-21
+
+The user confirmed real-device acceptance of independent EPUB creation, large-album
+streaming foundations, progress/cancellation/disk checks, interruption on background,
+lock or leaving the page, and the latest reader typography. Further visual refinement
+will be handled separately. Annual or multi-year capacity and peak device memory have
+not been quantitatively established; this Linux review does not claim an Xcode build.
+
+Integration with main f78fe6e preserves Android capabilities and production purchase /
+export switches remaining closed by default. Review corrected five missing Android icon
+mappings and two English progress interpolation placeholders. TypeScript, changed-file
+ESLint, 15 focused Jest suites (111 tests), 13 profile/native-build script tests and two
+Android script tests passed. The full Jest run exposed four unrelated failures also
+reproduced on pristine main: collect-sheet Reduce Transparency, invite-link sample
+session, navigation expectations, and album-detail accessibility expectations. The new
+i18n failure was fixed and its suite passed. EPUBCheck 5.3.0 sample validation previously
+completed with zero errors and warnings. No server deployment or database migration is
+required.

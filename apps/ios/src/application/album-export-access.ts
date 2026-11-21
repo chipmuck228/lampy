@@ -1,5 +1,7 @@
+import { personalRecordsOnly } from './mobile-capabilities';
 export type AlbumExportConfig = {enabled:boolean;paid:boolean;productId:string};
 export function albumExportConfig():AlbumExportConfig {
+  if (personalRecordsOnly()) return {enabled:false,paid:false,productId:''};
   return {enabled:process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED==='1',paid:process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED==='1',productId:(process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID||'').trim()};
 }
 export function albumExportEntryOpen(dev:boolean,config=albumExportConfig(),evaluation=process.env.EXPO_PUBLIC_ALBUM_PRINT_EVAL){

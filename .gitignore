@@ -12,3 +12,5 @@ apps/ios/android/
 *.p8
 .env
 .env.*
+__pycache__/
+*.pyc

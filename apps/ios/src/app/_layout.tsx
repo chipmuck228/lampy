@@ -1,6 +1,7 @@
 import {observeExportEntitlements} from '../infrastructure/album-export-purchases';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import { ANDROID_EXCLUDED_ROUTES, personalRecordsOnly } from '../application/mobile-capabilities';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -22,12 +23,17 @@ export default function RootLayout() {
       <HomeScreenActionCapture />
       <FirstRunGate>
         <Stack
+          initialRouteName="index"
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: paper },
             animation: 'fade',
           }}
-        />
+        >
+          {personalRecordsOnly() ? <Stack.Protected guard={false}>
+            {ANDROID_EXCLUDED_ROUTES.map(name => <Stack.Screen key={name} name={name} />)}
+          </Stack.Protected> : null}
+        </Stack>
         <HomeScreenActionDispatch />
       </FirstRunGate>
     </DeviceLockProvider>
