@@ -36,6 +36,16 @@ export const LIFE_ICON_NAMES = {
   check: 'checkmark.circle',
 } as const;
 
+const ANDROID_ICON_NAMES = {
+  settings:'settings', person:'account_circle', back:'chevron_left', open:'chevron_right',
+  lock:'lock', info:'info', storage:'storage', subscribe:'credit_card', help:'help',
+  terms:'description', privacy:'front_hand', play:'play_arrow', pause:'pause',
+  replay:'replay', camera:'photo_camera', photo:'photo_library', record:'mic',
+  expand:'expand_more', collapse:'expand_less', plus:'add', recent:'list',
+  lookback:'menu_book', family:'group', album:'book', more:'more_horiz',
+  clear:'cancel', refresh:'refresh', check:'check_circle',
+} as const;
+
 export type LifeIconName = keyof typeof LIFE_ICON_NAMES;
 
 export function LifeIcon({
@@ -51,7 +61,7 @@ export function LifeIcon({
 }) {
   return (
     <SymbolView
-      name={LIFE_ICON_NAMES[name]}
+      name={{ ios: LIFE_ICON_NAMES[name], android: ANDROID_ICON_NAMES[name] }}
       size={size}
       tintColor={color}
       accessibilityElementsHidden={decorative}

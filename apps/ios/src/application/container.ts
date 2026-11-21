@@ -1,3 +1,4 @@
+import { personalRecordsOnly } from './mobile-capabilities';
 import { convertExpoImageForFamilyShare } from '../infrastructure/family-share-image';
 import { deviceTimezoneOffsetMinutes } from '../domain-adapters/calendar';
 import { createUseCases } from './use-cases';
@@ -123,6 +124,7 @@ const familyLoader = createUseCaseLoader(async () => {
 });
 
 export function getFamilyUseCases() {
+  if (personalRecordsOnly()) return Promise.reject(new Error('Family is outside the Android personal milestone'));
   return familyLoader.getUseCases();
 }
 

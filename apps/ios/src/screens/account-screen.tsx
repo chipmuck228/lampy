@@ -1,3 +1,4 @@
+import { personalRecordsOnly } from '../application/mobile-capabilities';
 import FamilyEmailAccountScreen from './family-email-account-screen';
 import { isControlledEmailAccountsOpen, isFamilyV1ReleaseBuild, isFamilyInternalTestBuild, isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { tr } from '../i18n';
@@ -392,17 +393,17 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
             testID="account-open-storage"
             onPress={() => router.push('/account/storage')}
           />
-          <SettingsLink
+          {!personalRecordsOnly() ? <SettingsLink
             icon="album"
             title={tr("我的生活册")}
             detail={tr("收在这台设备上")}
             testID="account-open-albums"
             onPress={() => router.push('/albums')}
-          />
+          /> : null}
         </SettingsGroup>
         {isFamilyProductEntryOpen() ? <SettingsGroup title={tr("家庭内容")}><SettingsLink icon="privacy" title={tr("屏蔽与举报")} testID="account-open-family-content" onPress={()=>router.push('/account/family-content')}/></SettingsGroup> : null}
         <SettingsGroup title="Lampy">
-          {!isFamilyV1ReleaseBuild() ? <SettingsLink
+          {!personalRecordsOnly() && !isFamilyV1ReleaseBuild() ? <SettingsLink
             icon="subscribe"
             title={tr("订阅与付费")}
             detail={tr("目前没有付费项目")}

@@ -61,7 +61,7 @@
   "scripts": {
     "start": "bash ./scripts/start-dev-client.sh",
     "ios": "expo run:ios",
-    "android": "expo run:android",
+    "android": "node ./scripts/android-personal.cjs run",
     "web": "expo start --web",
     "test": "jest",
     "lint": "expo lint",
@@ -81,7 +81,12 @@
     "build-tools:test": "node --test ./scripts/inspect-release-archive.test.cjs ./scripts/native-build-fix.test.cjs",
     "album-export:preflight": "node ./scripts/album-export-preflight.cjs",
     "family-admin": "node ./scripts/family-admin.cjs",
-    "family-admin:password": "node ./scripts/family-admin-password.cjs"
+    "family-admin:password": "node ./scripts/family-admin-password.cjs",
+    "android:prebuild": "node ./scripts/android-personal.cjs prebuild",
+    "android:release": "node ./scripts/android-personal.cjs release",
+    "android:bundle": "node ./scripts/android-personal.cjs bundle",
+    "android:start": "node ./scripts/android-personal.cjs start",
+    "test:android": "jest --config jest.android.config.js --runInBand"
   },
   "expo": {
     "autolinking": {

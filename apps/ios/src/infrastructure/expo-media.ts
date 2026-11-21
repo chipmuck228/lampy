@@ -1,4 +1,4 @@
-import { Image } from 'react-native';
+import { Image, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -38,6 +38,8 @@ function toPicked(asset: ImagePicker.ImagePickerAsset): PickedImage {
 export function createExpoLibrarySource(): ImageSource {
   return {
     async requestPermission() {
+      // Android Photo Picker grants access to selected items without library permission.
+      if (Platform.OS === 'android') return 'granted';
       const current = await ImagePicker.getMediaLibraryPermissionsAsync();
       if (current.status === 'undetermined') {
         await ImagePicker.requestMediaLibraryPermissionsAsync();
