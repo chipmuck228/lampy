@@ -44,7 +44,7 @@ it('preserves text and emoji, escapes markup and excludes private paths and sour
 it('has cover, opening, contents, ordered records, and colophon; no invented exact date', () => {
   const archive = files();
   const opf = new JSDOM(strFromU8(archive['OEBPS/package.opf']), { contentType: 'application/xml' }).window.document;
-  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','title','opening','nav','record-1','closing']);
+  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','opening','record-1']);
   expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('日子未确认');
   expect(strFromU8(archive['OEBPS/style.css'])).toContain('height:auto');
 });
@@ -59,4 +59,25 @@ it('fails closed for absent media, unsafe package paths and missing cover', () =
   expect(() => buildAlbumEpub({ ...options, assets: {} })).toThrow('EPUB_MISSING_CONTENT');
   expect(() => buildAlbumEpub({ ...options, assets: { ...assets, photo: { ...assets.photo, path: '../leak.png' } } })).toThrow('EPUB_INVALID_ASSET');
   expect(() => buildAlbumEpub({ ...options, input: { ...input, album: { ...input.album, cover: { kind: 'image', assetId: 'missing', momentId: 'private-record-id' } } } })).toThrow('EPUB_MISSING_COVER');
+});
+
+it('uses reader paper, compact hierarchy and a single cover instead of duplicate front/end pages', () => {
+  const archive = files();
+  expect(archive['OEBPS/title.xhtml']).toBeUndefined();
+  expect(archive['OEBPS/closing.xhtml']).toBeUndefined();
+  const css = strFromU8(archive['OEBPS/style.css']);
+  expect(css).toContain('background:transparent');
+  expect(css).not.toContain('background:#f6f0e3');
+  expect(css).toContain('break-after:auto');
+  const cover = new JSDOM(strFromU8(archive['OEBPS/cover.xhtml']), { contentType:'application/xml' }).window.document;
+  expect(cover.querySelectorAll('h1')).toHaveLength(1);
+  expect(cover.querySelector('.cover-title')!.textContent).toBe(input.album.name);
+});
+it('lets entries in the same month flow together and keeps the colophon with the final entry', () => {
+  const entries = [input.entries[0], {...input.entries[0],momentId:'second',note:'Second original'}];
+  const archive = unzipSync(buildAlbumEpub({...options,input:{...input,entries}, dates:Object.fromEntries(entries.map(entry=>[entry.momentId,{label:'October 2026',chapter:'October 2026'}]))}));
+  expect(archive['OEBPS/record-2.xhtml']).toBeUndefined();
+  const doc = new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
+  expect(doc.querySelectorAll('article')).toHaveLength(2);
+  expect(doc.querySelector('footer')).not.toBeNull();
 });

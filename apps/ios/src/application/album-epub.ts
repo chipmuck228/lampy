@@ -47,31 +47,97 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
     used.add(asset.path);
     manifest.push(`<item id="asset-${used.size}" href="${asset.path}" media-type="${asset.mime}"${asset.path === coverPath ? ' properties="cover-image"' : ''}/>`);
   }
-  page('cover', input.album.name, `<section class="cover" epub:type="cover"><p class="eyebrow">LAMPY</p>${coverPath ? `<img class="cover-photo" src="${coverPath}" alt="${title}"/>` : '<div class="cover-rule"></div>'}<h1>${title}</h1></section>`);
-  page('title', input.album.name, `<section class="title-page" epub:type="titlepage"><p class="eyebrow">LAMPY</p><h1>${title}</h1><p class="meta">${copy.edition} ${epubEscape(options.createdAt.slice(0, 10))}</p></section>`);
-  if (input.album.opening) { page('opening', copy.opening, `<section epub:type="preface"><h1>${copy.opening}</h1>${paragraphs(input.album.opening)}</section>`); nav.push(`<li><a href="opening.xhtml">${copy.opening}</a></li>`); }
-  // Consecutive date sections only: never sort or regroup the user's chosen order.
-  let previous = ''; let chapterNumber = 0;
+  const subtitle = language === 'zh-Hans' ? `${input.entries.length} 条生活记录` : `${input.entries.length} moments`;
+  page('cover', input.album.name, `<section class="cover" epub:type="cover"><p class="cover-kicker">${language === 'zh-Hans' ? '生活册' : 'A LIFE ALBUM'}</p><h1 class="cover-title">${title}</h1><p class="cover-subtitle">${subtitle}</p>${coverPath ? `<figure class="cover-picture"><img src="${coverPath}" alt="${title}"/></figure>` : '<div class="cover-rule"></div>'}<p class="cover-imprint">LAMPY</p></section>`);
+  if (input.album.opening) {
+    page('opening', copy.opening, `<section class="opening" epub:type="preface"><h1 class="section-label">${copy.opening}</h1><div class="prose">${paragraphs(input.album.opening)}</div></section>`);
+    nav.push(`<li><a href="opening.xhtml">${copy.opening}</a></li>`);
+  }
+  // One XHTML per consecutive month, not one forced page per record.
+  // This preserves the chosen order while allowing short entries to share a page.
+  let group: { name: string; heading: string; entries: string[] } | null = null;
+  const flush = () => {
+    if (group) page(group.name, group.heading, `<section class="chapter"><header class="chapter-head"><h1 class="chapter-title">${epubEscape(group.heading)}</h1></header>${group.entries.join('')}</section>`);
+  };
   input.entries.forEach((record, index) => {
     const date = dates[record.momentId] ?? { label: copy.unknown, chapter: copy.unknown };
-    const chapter = date.chapter;
-    const begins = index === 0 || chapter !== previous; previous = chapter;
-    const name = `record-${index + 1}`;
-    if (begins) { chapterNumber++; nav.push(`<li><a href="${name}.xhtml">${epubEscape(chapter)}</a></li>`); }
-    const media = record.media.map((item, i) => {
-      const asset = assets[item.assetId];
-      if (item.role === 'image') return `<figure><img src="${asset.path}" alt="${copy.photo} ${i + 1}"/></figure>`;
-      if (item.role !== 'audio') throw new Error('EPUB_UNSUPPORTED_MEDIA');
-      const seconds = Math.max(0, Math.round((item.durationMs ?? 0) / 1000));
-      return `<aside class="sound"><p>${copy.listen}${item.durationMs == null ? '' : ` · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}</p><audio controls="controls" preload="none" src="${asset.path}">${copy.listen}</audio></aside>`;
-    }).join('');
-    page(name, date.label, `<article>${begins ? `<header class="chapter"><p class="eyebrow">${String(chapterNumber).padStart(2, '0')}</p><h1>${epubEscape(chapter)}</h1></header>` : ''}<h2 class="date">${epubEscape(date.label)}</h2>${record.attribution ? `<p class="meta">${epubEscape(record.attribution)}</p>` : ''}${paragraphs(record.note)}${record.feeling ? `<p class="feeling">${epubEscape(record.feeling)}</p>` : ''}${media}</article>`);
+    if (!group || group.heading !== date.chapter) {
+      flush(); group = { name: `record-${index + 1}`, heading: date.chapter, entries: [] };
+      nav.push(`<li><a href="${group.name}.xhtml">${epubEscape(date.chapter)}</a></li>`);
+    }
+    const ratio = (i: number) => {
+      const media = record.media[i];
+      return media.intrinsicRatio ?? (media.widthPx && media.heightPx ? media.widthPx / media.heightPx : null);
+    };
+    const figure = (i: number, paired = false) => {
+      const media = record.media[i], asset = assets[media.assetId];
+      const portrait = ratio(i) != null && ratio(i)! < 0.85;
+      return `<figure class="photo${paired ? ' paired' : portrait ? ' portrait' : ' landscape'}"><img src="${asset.path}" alt="${copy.photo} ${i + 1}"/></figure>`;
+    };
+    const mediaParts: string[] = [];
+    for (let i = 0; i < record.media.length; i++) {
+      const item = record.media[i], asset = assets[item.assetId];
+      if (item.role === 'image') {
+        const r = ratio(i), next = record.media[i + 1], nextRatio = next ? ratio(i + 1) : null;
+        if (next?.role === 'image' && r != null && nextRatio != null && r >= 0.6 && r <= 0.85 && nextRatio >= 0.6 && nextRatio <= 0.85) {
+          mediaParts.push(`<div class="photo-pair">${figure(i,true)}${figure(i + 1,true)}</div>`); i++;
+        } else mediaParts.push(figure(i));
+      } else if (item.role === 'audio') {
+        const seconds = Math.max(0, Math.round((item.durationMs ?? 0) / 1000));
+        mediaParts.push(`<aside class="sound"><p class="sound-label">${copy.listen}${item.durationMs == null ? '' : ` · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}</p><audio controls="controls" preload="none" src="${asset.path}">${copy.listen}</audio></aside>`);
+      } else throw new Error('EPUB_UNSUPPORTED_MEDIA');
+    }
+    const feeling = record.feeling ? `<span class="feeling">${epubEscape(record.feeling)}</span>` : '';
+    const end = index === input.entries.length - 1 ? `<footer class="colophon" epub:type="colophon"><p>${copy.edition} ${epubEscape(options.createdAt.slice(0,10))}<span class="imprint">Lampy</span></p></footer>` : '';
+    group.entries.push(`<article class="entry" id="entry-${index + 1}"><header class="entry-head"><p class="entry-meta"><span class="date">${epubEscape(date.label)}</span>${feeling}</p>${record.attribution ? `<p class="attribution">${epubEscape(record.attribution)}</p>` : ''}</header>${record.note ? `<div class="prose">${paragraphs(record.note)}</div>` : ''}<div class="entry-media">${mediaParts.join('')}</div></article>${end}`);
   });
-  page('closing', copy.closing, `<section class="title-page" epub:type="colophon"><div class="cover-rule"></div><h1>${copy.closing}</h1><p>${title}</p><p class="meta">${copy.edition} ${epubEscape(options.createdAt.slice(0, 10))}</p></section>`);
-  page('nav', copy.contents, `<nav epub:type="toc" id="toc"><h1>${copy.contents}</h1><ol><li><a href="cover.xhtml">${title}</a></li>${nav.join('')}<li><a href="closing.xhtml">${copy.closing}</a></li></ol></nav>`, 'nav');
-  // Move the navigable contents between title/opening and records in reading order.
-  const navRef = spine.pop()!; spine.splice(input.album.opening ? 3 : 2, 0, navRef);
-  files['OEBPS/style.css'] = strToU8(`body{font-family:serif;line-height:1.85;margin:5%;color:#292d29;background:#f6f0e3}body.handmade{background:#f3ecdc}h1{font-size:1.8em;line-height:1.45;font-weight:normal}h2.date,.meta,.eyebrow{font-family:sans-serif;font-size:.85em;color:#546353}.eyebrow{letter-spacing:.18em}.title-page,.cover{text-align:center;padding:12% 0;break-after:page}.cover-photo{max-height:65vh;max-width:100%;object-fit:contain}.cover-rule{width:3em;border-top:1px solid #71816a;margin:3em auto}.chapter{padding:2em 0 1em;break-before:page}.date{margin-top:2em}p{orphans:2;widows:2;overflow-wrap:break-word}figure{margin:1.6em 0;break-inside:avoid}img{display:block;max-width:100%;height:auto;margin:auto}.handmade figure{padding:.5em;background:#fffaf0;border:1px solid #dfd6c5}audio{max-width:100%;width:100%}.sound{border-top:1px solid #a7b19f;padding:.5em 0;margin:1.6em 0;break-inside:avoid}.sound p,.feeling{color:#40564a}.feeling{font-size:.9em}ol{padding-left:1.5em}li{margin:.8em 0}a{color:inherit}article{break-after:page}`);
+  flush();
+  page('nav', copy.contents, `<nav epub:type="toc" id="toc"><h1 class="section-label">${copy.contents}</h1><ol><li><a href="cover.xhtml">${title}</a></li>${nav.join('')}</ol></nav>`, 'nav');
+  // The native Books contents menu exposes this navigation; no duplicate printed TOC page.
+  spine.pop();
+  files['OEBPS/style.css'] = strToU8(`
+html,body{margin:0;padding:0;background:transparent}
+body{font-family:"Songti SC","STSong",serif;font-size:1em;line-height:1.65}
+h1,h2,h3,p,figure,ol{margin:0;padding:0}
+h1,h2,h3{font-weight:normal;line-height:1.35}
+p{orphans:2;widows:2;overflow-wrap:break-word}
+.cover{padding:2em .65em 1em;text-align:center;page-break-after:always;break-after:page}
+.cover .cover-kicker{font-family:sans-serif;font-size:.65em;letter-spacing:.2em;text-align:center;color:#657365;margin:0 0 1.1em}
+.cover h1.cover-title{font-size:1.7em;font-weight:normal;line-height:1.35;text-align:center;text-indent:0;margin:0 auto .45em;max-width:12em;overflow-wrap:break-word}
+.cover .cover-subtitle{font-family:sans-serif;font-size:.7em;text-align:center;color:#657365;margin:0 0 1.8em}
+.cover-picture{margin:0 auto;max-width:28em}
+.cover-picture img{display:block;width:100%;height:auto;max-width:100%;margin:0 auto}
+.cover .cover-imprint{font-family:sans-serif;font-size:.6em;letter-spacing:.25em;text-align:center;color:#657365;margin:1.8em 0 0}
+.cover-rule{width:2.5em;border-top:1px solid #899584;margin:3em auto}
+.opening{padding:2.1em .5em 0}
+.section-label{font-family:sans-serif;font-size:.85em;letter-spacing:.08em;margin:0 0 1.5em;text-align:left;color:#657365}
+.chapter{padding:0 .35em}
+.chapter-head{margin:1.3em 0 1.7em;padding:0 0 .65em;border-bottom:1px solid #aab2a4;page-break-after:avoid;break-after:avoid}
+.chapter h1.chapter-title{font-size:1.2em;line-height:1.4;margin:0;text-align:left;text-indent:0}
+.entry{margin:0 0 1.8em;padding:0;page-break-after:auto;break-after:auto}
+.entry+.entry{border-top:1px solid #d9ddd5;padding-top:1.15em}
+.entry-head{margin:0 0 .65em;page-break-after:avoid;break-after:avoid}
+.entry-meta{font-family:sans-serif;font-size:.72em;line-height:1.6;text-align:left;color:#657365}
+.date{font-weight:normal}
+.feeling{font-weight:normal;margin-left:.9em;padding-left:.9em;border-left:1px solid #aab2a4}
+.attribution{font-family:sans-serif;font-size:.72em;margin:.3em 0 0;color:#657365}
+.prose{font-size:1em;line-height:1.65;text-align:left}
+.prose p{margin:0 0 .65em;text-indent:0}
+.entry-media{margin:.85em 0 0}
+.photo{margin:1em auto;page-break-inside:avoid;break-inside:avoid}
+.photo img{display:block;width:100%;max-width:100%;height:auto;margin:0 auto}
+.photo.portrait{width:82%;max-width:22em}
+.photo-pair{display:table;table-layout:fixed;width:100%;margin:1em 0;page-break-inside:avoid;break-inside:avoid}
+.photo.paired{display:table-cell;width:50%;padding:0 .2em;vertical-align:middle}
+.handmade .photo img{box-sizing:border-box;padding:.3em;border:1px solid #cbd1c5}
+.sound{border-top:1px solid #aab2a4;margin:1.1em 0;padding:.65em 0;page-break-inside:avoid;break-inside:avoid}
+.sound-label{font-family:sans-serif;font-size:.75em;margin:0 0 .5em;color:#657365}
+audio{width:100%;max-width:100%}
+.colophon{margin:2.5em 0 0;padding:.8em 0 0;border-top:1px solid #d9ddd5}
+.colophon p{font-family:sans-serif;font-size:.65em;line-height:1.6;color:#657365;text-align:left}
+.imprint{margin-left:1em}
+nav{padding:1em .5em}nav ol{list-style:none}nav li{margin:.7em 0;font-size:.9em}a{color:inherit;text-decoration:none}
+`);
   files['OEBPS/package.opf'] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="${language}"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:lampy:edition:${epubEscape(options.id)}</dc:identifier><dc:title>${title}</dc:title><dc:language>${language}</dc:language><meta property="dcterms:modified">${new Date(options.createdAt).toISOString().replace(/\.\d{3}Z$/, 'Z')}</meta><meta property="rendition:layout">reflowable</meta></metadata><manifest><item id="css" href="style.css" media-type="text/css"/>${manifest.join('')}</manifest><spine>${spine.join('')}</spine></package>`);
   files['META-INF/container.xml'] = strToU8('<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
   return { mimetype: strToU8('application/epub+zip'), ...files };

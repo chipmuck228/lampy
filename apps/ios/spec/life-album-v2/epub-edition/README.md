@@ -103,3 +103,23 @@ Do not uninstall the app or clean its data.
   an actual iPhone; compare small/medium/large photo sets and long audio. A simulated 70 MiB
   streaming test does not replace this acceptance.
 - Deny new export access: no new electronic edition; existing intact EPUB/PDF remains usable.
+
+## Reader typography revision
+
+Device screenshots showed oversized headings, duplicate cover/title pages, a large
+printed contents/end page and author paper color painted as content rectangles.
+The updated design removes duplicate title/end pages and the printed contents page
+(the EPUB navigation remains available in the reader). A single cover leads to the
+optional original opening and compact month sections. Consecutive records in a month
+share one XHTML so short entries can flow on the same reader page. Dates and feelings
+share a quiet metadata line. Portrait photos are inset; consecutive compatible portrait
+pairs may share a row without cropping. Text remains selectable and user-resizable.
+Paper follows the reading application's theme rather than painting body backgrounds.
+A compact colophon sits at the end of the last section. No notes, media order or user
+language are changed. English scaffolding still follows the selected export language.
+
+Create a **new** electronic edition to see this revision: previously completed files
+are immutable and the save action intentionally reuses them. Reimport the new edition
+into Books, select its original/publisher typography for baseline inspection, then test
+large fonts, dark theme, landscape, photos and audio. Browser/XML checks are not an
+Apple Books visual acceptance; device screenshots are still required after this revision.
