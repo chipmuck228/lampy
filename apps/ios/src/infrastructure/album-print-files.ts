@@ -9,6 +9,7 @@ import { getUseCases } from '../application/container';
 import {
   createAlbumPrintService,
   manifestDigest,
+  type AlbumPrintProgress,
   type PrintManifest,
   type PrintStore,
 } from '../application/album-print';
@@ -111,9 +112,14 @@ export function createExpoAlbumPrintStore(): PrintStore {
     },
   };
 }
-export function createExpoAlbumPrint(albumId: string, current: () => boolean) {
+export function createExpoAlbumPrint(
+  albumId: string,
+  current: () => boolean,
+  progress?: (update: AlbumPrintProgress) => void,
+) {
   return createAlbumPrintService({
     current,
+    progress,
     authorize:()=>albumExportAccess.assert(current),
     store: createExpoAlbumPrintStore(),
     id: () => `print_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,

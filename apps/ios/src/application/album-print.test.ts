@@ -2,6 +2,7 @@ import {
   printFailureDiagnostic,
   createAlbumPrintService,
   isAlbumPrintEvaluationOpen,
+  type AlbumPrintProgress,
   type PrintStore,
 } from './album-print';
 import { paginateAlbumLayout } from './album-paginate';
@@ -53,7 +54,7 @@ const fixture: AlbumLayoutInput = {
     },
   ],
 };
-function setup(nextId: () => string = () => 'print_one',authorize?:()=>Promise<void>,afterCommit?:()=>Promise<void>) {
+function setup(nextId: () => string = () => 'print_one',authorize?:()=>Promise<void>,afterCommit?:()=>Promise<void>,progress?:(update:AlbumPrintProgress)=>void) {
   let active = true;
   const read = jest.fn(
     async () => JSON.parse(JSON.stringify(fixture)) as AlbumLayoutInput,
@@ -91,6 +92,7 @@ function setup(nextId: () => string = () => 'print_one',authorize?:()=>Promise<v
     read,
     authorize,
     afterCommit,
+    progress,
     fonts: () => fonts,
     store,
     current: () => active,
@@ -317,4 +319,36 @@ it('removes the committed edition if the final family delivery check fails',asyn
  await expect(service.save('plain')).rejects.toThrow('FAMILY_ALBUM_CHANGED');
  expect(store.commit).toHaveBeenCalled();expect(store.discard).toHaveBeenCalledWith('print_one');
  expect(after).toHaveBeenCalledTimes(1);
+});
+
+it('reports binding steps in order, counting each media copy once', async () => {
+  const steps: AlbumPrintProgress[] = [];
+  const { service } = setup(undefined, undefined, undefined, (update) => steps.push(update));
+  await service.save('plain');
+  expect(steps.map((update) => update.step)).toEqual([
+    'authorize', 'read', 'prepare', 'copy', 'copy', 'layout', 'write', 'verify', 'bind',
+  ]);
+  expect(steps.filter((update) => update.step === 'copy')).toEqual([
+    { step: 'copy', done: 0, total: 2 },
+    { step: 'copy', done: 1, total: 2 },
+  ]);
+});
+it('a throwing progress listener never changes the edition', async () => {
+  const { service, store } = setup(undefined, undefined, undefined, () => {
+    throw new Error('presentation failed');
+  });
+  await expect(service.save('plain')).resolves.toBeTruthy();
+  expect(store.commit).toHaveBeenCalledTimes(1);
+});
+it('does not report progress after the request stops being current', async () => {
+  const steps: string[] = [];
+  const holder: { cancel?: () => void } = {};
+  const { service, store, cancel } = setup(undefined, undefined, undefined, (update) => {
+    steps.push(update.step);
+    if (update.step === 'layout') holder.cancel?.();
+  });
+  holder.cancel = cancel;
+  await expect(service.save('plain')).rejects.toBeTruthy();
+  expect(steps).not.toContain('write');
+  expect(store.commit).not.toHaveBeenCalled();
 });

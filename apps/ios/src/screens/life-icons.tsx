@@ -34,6 +34,11 @@ export const LIFE_ICON_NAMES = {
   clear: 'xmark.circle.fill',
   refresh: 'arrow.clockwise',
   check: 'checkmark.circle',
+  printer: 'printer',
+  textCursor: 'character.cursor.ibeam',
+  edition: 'square.stack.3d.up',
+  waveform: 'waveform',
+  sealed: 'checkmark.seal',
 } as const;
 
 const ANDROID_ICON_NAMES = {
@@ -44,7 +49,8 @@ const ANDROID_ICON_NAMES = {
   expand:'expand_more', collapse:'expand_less', plus:'add', recent:'list',
   lookback:'menu_book', family:'group', album:'book', more:'more_horiz',
   clear:'cancel', refresh:'refresh', check:'check_circle',
-} as const;
+  printer:'print', textCursor:'text_fields', edition:'library_books', waveform:'graphic_eq', sealed:'verified',
+} as const satisfies Record<keyof typeof LIFE_ICON_NAMES, string>;
 
 export type LifeIconName = keyof typeof LIFE_ICON_NAMES;
 
