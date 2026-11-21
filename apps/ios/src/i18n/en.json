@@ -1063,5 +1063,10 @@
   "这一次没有装订成功，原来的记录都还在。": "This binding didn't finish. Your moments are all still here.",
   "逐页复核": "Checking every page",
   "逐页排版": "Setting every page",
-  "页": "pages"
+  "页": "pages",
+  "保存电子册 EPUB": "Save electronic album · EPUB",
+  "包含照片与声音，可用「图书」打开。首次制作需要导出权益；离开Lampy后无法收回。": "Includes photos and audio. Open with Books. Creating a new file requires export access; exported copies cannot be recalled.",
+  "PDF不含声音；装订后可另存包含声音的EPUB电子册。": "PDF has no playable audio. After binding, you can also save an EPUB with audio.",
+  "电子册资源超过64MB，请分成较小的册子后再试。": "Electronic album resources exceed 64 MB. Please split this into smaller albums.",
+  "这段声音暂不支持电子册，请保留PDF并稍后再试。": "An audio format is not supported in this electronic album. You can still save the PDF."
 }

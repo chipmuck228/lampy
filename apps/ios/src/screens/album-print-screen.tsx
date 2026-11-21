@@ -1,3 +1,4 @@
+import { shareAlbumEpub } from '../infrastructure/album-epub-files';
 import { useAlbumExportUnlock } from './album-export-unlock';
 import { albumExportConfig, albumExportEntryOpen, AlbumExportAccessError } from '../application/album-export-access';
 import { unifiedPurchasesEnabled } from '../application/unified-purchases';
@@ -321,11 +322,13 @@ export default function AlbumPrintScreen() {
             {book && !bindable ? (
               <ShowcaseNote live>{tr('这一册里有读不到的记录或媒体。核对后才能装订。')}</ShowcaseNote>
             ) : null}
-            <ShowcaseNote>{tr('PDF不含声音，电子册文件将在后续阶段提供。')}</ShowcaseNote>
+            <ShowcaseNote>{tr('PDF不含声音；装订后可另存包含声音的EPUB电子册。')}</ShowcaseNote>
           </View>
           {error ? (
             <ShowcaseNote live>
-              {formal
+              {diagnostic?.code === 'EPUB_TOO_LARGE' ? tr('电子册资源超过64MB，请分成较小的册子后再试。')
+                : diagnostic?.code === 'EPUB_UNSUPPORTED_AUDIO' ? tr('这段声音暂不支持电子册，请保留PDF并稍后再试。')
+                : formal
                 ? failure === 'changed'
                   ? tr('排的时候记录有变动，这一次没有导出。')
                   : failure === 'missing'
@@ -388,6 +391,13 @@ export default function AlbumPrintScreen() {
                     {tr('部分照片低于300DPI，打印前请检查清晰度。')}
                   </Text>
                 ) : null}
+                <ShowcaseButton
+                  tone="quiet"
+                  label={tr('保存电子册 EPUB')}
+                  disabled={busy}
+                  onPress={() => void run(valid => shareAlbumEpub(edition.id, valid).then(() => undefined))}
+                />
+                <Text style={styles.meta}>{tr('包含照片与声音，可用「图书」打开。首次制作需要导出权益；离开Lampy后无法收回。')}</Text>
                 <ShowcaseButton
                   tone="quiet"
                   label={tr('保存或打印PDF')}

@@ -9,6 +9,8 @@ import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AlbumPrintScreen from './album-print-screen';
 import {AlbumPrintFailure} from '../application/album-print';
+const mockEpub = jest.fn(async () => undefined);
+jest.mock('../infrastructure/album-epub-files', () => ({ shareAlbumEpub: (...args: unknown[]) => mockEpub(...(args as [])) }));
 const mockSave = jest.fn();
 const mockShare = jest.fn();
 const mockLocked = { locked: false };
@@ -145,6 +147,9 @@ it('generation is explicit, uses the saved style, and does not auto-share', asyn
   await waitFor(() => expect(view.getByText('Saved edition')).toBeTruthy());
   expect(mockSave).toHaveBeenCalledWith('handmade');
   expect(mockShare).not.toHaveBeenCalled();
+  expect(mockEpub).not.toHaveBeenCalled();
+  await fireEvent.press(view.getByText('保存电子册 EPUB'));
+  await waitFor(() => expect(mockEpub).toHaveBeenCalledWith('print_1', expect.any(Function)));
   expect(view.getByText('字体嵌入尚未确认')).toBeTruthy();
   expect(view.getByText('普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。')).toBeTruthy();
   expect(view.queryByText('页面与文字选择已核对')).toBeNull();
