@@ -28,8 +28,9 @@ native audio control appearance belong to the reader and require acceptance on d
 
 ## Media and storage
 
-- Native image manipulator decodes/orients HEIF and other supported inputs, makes PNG
-  derivatives at up to 2048 pixels wide, preserving transparency and whole-image aspect.
+- Native image manipulator decodes/orients HEIF and other supported inputs, makes JPEG photo
+  derivatives (quality 0.82) and retains PNG for PNG inputs to preserve transparency.
+  Known dimensions are bounded to 2048 pixels on the long edge without upscaling.
   Original records, frozen PDF media and system photos are not rewritten.
 - M4A/MP4-container audio and MP3 are recognized; unsupported audio fails explicitly.
   No audio is silently dropped. Sound remains a user-triggered native audio element.
@@ -94,3 +95,12 @@ feedback can paint. Existing background/lock invalidation still suppresses late 
 Targeted service/UI suites: 18 tests passed, including the pending-to-failure display.
 Actual device failure stage still requires the user's rerun; do not mark export repaired
 until the file can be created and imported on the device.
+
+## Photo size fix
+
+The device trace reached CONVERT_IMAGE / EPUB_TOO_LARGE: expanded PNG derivatives
+exhausted the 64 MiB resource budget. Photographic inputs now use JPEG; PNG inputs
+retain PNG based on the file signature. The budget applies to packaged derivatives,
+not the aggregate original photo size. Individual source images remain bounded at
+64 MiB and audio is checked against the remaining budget before buffering. The
+64 MiB package limit is unchanged. Device success remains pending a rerun.

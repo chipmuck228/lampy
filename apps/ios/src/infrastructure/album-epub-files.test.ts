@@ -1,3 +1,4 @@
+import { manipulateAsync } from 'expo-image-manipulator';
 import { File } from 'expo-file-system';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
@@ -6,10 +7,10 @@ import * as FS from 'expo-file-system/legacy';
 import { albumPrintNative } from '../../modules/lampy-album-layout';
 import { albumExportAccess } from './album-export-purchases';
 import { manifestDigest, type PrintManifest } from '../application/album-print';
-import { shareAlbumEpub, epubAudioFormat } from './album-epub-files';
-jest.mock('expo-file-system', () => ({ File: jest.fn() }));
+import { shareAlbumEpub, epubAudioFormat, epubImageEncoding } from './album-epub-files';
+jest.mock('expo-file-system', () => ({ File: jest.fn(), FileMode: { ReadOnly: 'r' } }));
 jest.mock('expo-file-system/legacy', () => ({ documentDirectory: 'file:///documents/', getInfoAsync: jest.fn(), readAsStringAsync: jest.fn(), deleteAsync: jest.fn(), writeAsStringAsync: jest.fn(), moveAsync: jest.fn() }));
-jest.mock('expo-image-manipulator', () => ({ manipulateAsync: jest.fn(), SaveFormat: { PNG: 'png' } }));
+jest.mock('expo-image-manipulator', () => ({ manipulateAsync: jest.fn(), SaveFormat: { PNG: 'png', JPEG: 'jpeg' } }));
 jest.mock('./album-export-purchases', () => ({ albumExportAccess: { assert: jest.fn() } }));
 jest.mock('../../modules/lampy-album-layout', () => ({ albumPrintNative: jest.fn() }));
 let manifest = { id: 'print_test', version: 1, content: { entries: [] }, media: [], layout: { pages: [] } } as unknown as PrintManifest;
@@ -70,5 +71,35 @@ it('creates an offline archive from frozen copies, verifies it, and publishes on
     expect(contents['OEBPS/media/asset-0.m4a']).toEqual(bytes);
     expect(FS.moveAsync).toHaveBeenCalledWith(expect.objectContaining({ from: expect.stringMatching(/\.partial$/) }));
     expect(native.sharePrintPdf).toHaveBeenCalledTimes(1);
+  } finally { manifest = old; }
+});
+
+it('uses compact JPEG for photos and preserves PNG transparency by signature', () => {
+  expect(epubImageEncoding(new Uint8Array([255,216,255]), 4032, 3024)).toEqual({ extension: 'jpg', mime: 'image/jpeg', width: 2048 });
+  expect(epubImageEncoding(new Uint8Array([0,0,0,24,102,116,121,112]), 3024, 4032)).toEqual({ extension: 'jpg', mime: 'image/jpeg', width: 1536 });
+  expect(epubImageEncoding(new Uint8Array([137,80,78,71,13,10,26,10]), 100, 200)).toEqual({ extension: 'png', mime: 'image/png', width: 100 });
+});
+
+it.each(['jpeg', 'png'])('packages %s derivatives even when original photos together exceed the package budget', async kind => {
+  const old = manifest;
+  const header = kind === 'png' ? new Uint8Array([137,80,78,71,13,10,26,10]) : new Uint8Array([255,216,255]);
+  const close = jest.fn();
+  let written = new Uint8Array();
+  const photoBytes = new Uint8Array([1,2,3]);
+  manifest = {
+    id: 'print_test', version: 1, createdAt: '2026-11-21T00:00:00Z', style: 'plain',
+    content: { album: { name: 'Photos', opening: null, cover: { kind: 'words' } }, entries: [{ momentId: 'm', presence: 'ready', note: '', feeling: '', media: ['a','b'].map(assetId => ({ assetId, role: 'image', availability: 'available', widthPx: 4032, heightPx: 3024 })) }] },
+    media: ['a','b'].map((assetId, i) => ({ assetId, file: `media-${i}`, sha256: 'frozen', bytes: 40 * 1024 * 1024 })), layout: { pages: [] },
+  } as unknown as PrintManifest;
+  (FS.getInfoAsync as jest.Mock).mockImplementation(async uri => ({ exists: uri.startsWith('file:///cache/'), size: 3 }));
+  (manipulateAsync as jest.Mock).mockResolvedValue({ uri: 'file:///cache/converted' });
+  (File as unknown as jest.Mock).mockImplementation(() => ({ open: () => ({ readBytes: () => header, close }), bytes: async () => photoBytes, write: (data: Uint8Array) => { written = data as Uint8Array<ArrayBuffer>; } }));
+  native.printFileDigest.mockImplementation(async (uri: string) => ({ sha256: /media-[01]$/.test(uri) ? 'frozen' : bytesToHex(sha256(written)), bytes: 40 * 1024 * 1024 }));
+  try {
+    await shareAlbumEpub('print_test', () => true);
+    expect(manipulateAsync).toHaveBeenCalledWith(expect.any(String), [{ resize: { width: 2048 } }], { format: kind === 'png' ? 'png' : 'jpeg', compress: kind === 'png' ? 1 : 0.82 });
+    const files = unzipSync(written);
+    expect(files[`OEBPS/media/asset-0.${kind === 'png' ? 'png' : 'jpg'}`]).toEqual(photoBytes);
+    expect(close).toHaveBeenCalledTimes(2);
   } finally { manifest = old; }
 });

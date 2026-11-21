@@ -1,4 +1,4 @@
-import { File } from 'expo-file-system';
+import { File, FileMode } from 'expo-file-system';
 import * as FS from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -56,7 +56,6 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     }
     report('AUTHORIZE');
     await albumExportAccess.assert(current); check();
-    if (manifest.media.reduce((sum, m) => sum + m.bytes, 0) > LIMIT) throw new Error('EPUB_TOO_LARGE');
     const assets: Record<string, EpubAsset> = {};
     let total = 0;
     for (const entry of manifest.content.entries) for (const media of entry.media) {
@@ -69,14 +68,24 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
       if (actual.sha256 !== frozen.sha256 || actual.bytes !== frozen.bytes) throw new Error('PRINT_FILE_CHANGED');
       let data: Uint8Array; let mime: string; let extension: string;
       if (media.role === 'image') {
-        // Native decoding handles HEIF and orientation. PNG retains transparency; no system font files are embedded.
+        // Read only the signature; frozen copies have extensionless filenames.
+        // Keep PNG for possible transparency; photographic HEIF/JPEG must not expand into PNG.
+        if (actual.bytes > LIMIT) throw new Error('EPUB_TOO_LARGE');
+        const handle = new File(source).open(FileMode.ReadOnly);
+        let header: Uint8Array;
+        try { header = handle.readBytes(8); } finally { handle.close(); }
+        const encoding = epubImageEncoding(header, media.widthPx, media.heightPx);
         report('CONVERT_IMAGE');
-        const image = await manipulateAsync(source, [{ resize: { width: Math.min(media.widthPx || 2048, 2048) } }], { format: SaveFormat.PNG });
+        const image = await manipulateAsync(source, [{ resize: { width: encoding.width } }], {
+          format: encoding.extension === 'png' ? SaveFormat.PNG : SaveFormat.JPEG,
+          compress: encoding.extension === 'png' ? 1 : 0.82,
+        });
         temporary.push(image.uri); check();
         const info = await FS.getInfoAsync(image.uri);
         if (!info.exists || info.size > LIMIT - total) throw new Error('EPUB_TOO_LARGE');
-        data = await new File(image.uri).bytes(); mime = 'image/png'; extension = 'png';
+        data = await new File(image.uri).bytes(); mime = encoding.mime; extension = encoding.extension;
       } else if (media.role === 'audio') {
+        if (actual.bytes > LIMIT - total) throw new Error('EPUB_TOO_LARGE');
         data = await new File(source).bytes();
         const format = epubAudioFormat(data); mime = format.mime; extension = format.extension;
       } else throw new Error('EPUB_UNSUPPORTED_MEDIA');
@@ -127,4 +136,15 @@ export function epubAudioFormat(bytes: Uint8Array) {
   if (bytes.length > 12 && String.fromCharCode(...bytes.slice(4, 8)) === 'ftyp') return { mime: 'audio/mp4', extension: 'm4a' };
   if (String.fromCharCode(...bytes.slice(0, 3)) === 'ID3' || (bytes[0] === 255 && (bytes[1] & 0xe0) === 0xe0 && (bytes[1] & 6) !== 0)) return { mime: 'audio/mpeg', extension: 'mp3' };
   throw new Error('EPUB_UNSUPPORTED_AUDIO');
+}
+
+/** Select by bytes, not the extensionless frozen filename. Bound both landscape and portrait pixels. */
+export function epubImageEncoding(header: Uint8Array, width?: number, height?: number) {
+  const png = [137,80,78,71,13,10,26,10].every((byte, index) => header[index] === byte);
+  const validWidth = width != null && Number.isFinite(width) && width > 0 ? width : 2048;
+  const validHeight = height != null && Number.isFinite(height) && height > 0 ? height : validWidth;
+  return {
+    extension: png ? 'png' : 'jpg', mime: png ? 'image/png' : 'image/jpeg',
+    width: Math.max(1, Math.floor(validWidth * Math.min(1, 2048 / Math.max(validWidth, validHeight)))),
+  };
 }
