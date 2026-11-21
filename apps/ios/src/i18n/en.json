@@ -1068,5 +1068,10 @@
   "包含照片与声音，可用「图书」打开。首次制作需要导出权益；离开Lampy后无法收回。": "Includes photos and audio. Open with Books. Creating a new file requires export access; exported copies cannot be recalled.",
   "PDF不含声音；装订后可另存包含声音的EPUB电子册。": "PDF has no playable audio. After binding, you can also save an EPUB with audio.",
   "电子册资源超过64MB，请分成较小的册子后再试。": "Electronic album resources exceed 64 MB. Please split this into smaller albums.",
-  "这段声音暂不支持电子册，请保留PDF并稍后再试。": "An audio format is not supported in this electronic album. You can still save the PDF."
+  "这段声音暂不支持电子册，请保留PDF并稍后再试。": "An audio format is not supported in this electronic album. You can still save the PDF.",
+  "正在制作电子册，完成后会打开分享菜单。": "Preparing the electronic album. The share menu will open when it is ready.",
+  "电子册已交给所选应用。": "The electronic album was handed to the selected app.",
+  "电子册已保存在Lampy中，可再次点击保存。": "The electronic album is saved in Lampy. Tap again to share it.",
+  "电子册尚未完成，请再试一次。已有PDF和原记录不受影响。": "The electronic album could not be completed. Please try again. Your PDF and original records are unchanged.",
+  "正在制作电子册…": "Preparing electronic album…"
 }

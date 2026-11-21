@@ -1,4 +1,4 @@
-import { shareAlbumEpub } from '../infrastructure/album-epub-files';
+import { AlbumEpubFailure, shareAlbumEpub } from '../infrastructure/album-epub-files';
 import { useAlbumExportUnlock } from './album-export-unlock';
 import { albumExportConfig, albumExportEntryOpen, AlbumExportAccessError } from '../application/album-export-access';
 import { unifiedPurchasesEnabled } from '../application/unified-purchases';
@@ -200,6 +200,26 @@ export default function AlbumPrintScreen() {
     }
   }
   const [binding, setBinding] = useState(false);
+  const [epubState, setEpubState] = useState<{ id: string; pending: boolean; message: string; diagnostic?: string } | null>(null);
+  function electronic(edition: SavedPrintSummary) {
+    void run(async valid => {
+      setEpubState({ id: edition.id, pending: true, message: tr('正在制作电子册，完成后会打开分享菜单。') });
+      try {
+        const shared = await shareAlbumEpub(edition.id, valid);
+        if (valid()) setEpubState({ id: edition.id, pending: false, message: shared ? tr('电子册已交给所选应用。') : tr('电子册已保存在Lampy中，可再次点击保存。') });
+      } catch (error) {
+        if (!valid()) return;
+        const code = error instanceof AlbumEpubFailure ? error.code : 'OPERATION_FAILED';
+        const message = code === 'EPUB_TOO_LARGE' ? tr('电子册资源超过64MB，请分成较小的册子后再试。')
+          : code === 'EXPORT_PURCHASE_REQUIRED' || code === 'EXPORT_PURCHASE_UNAVAILABLE' || code === 'EXPORT_CLOSED' ? tr('请先解锁或恢复导出权益，再装订这一册。')
+          : code === 'EPUB_UNSUPPORTED_AUDIO' ? tr('这段声音暂不支持电子册，请保留PDF并稍后再试。')
+          : tr('电子册尚未完成，请再试一次。已有PDF和原记录不受影响。');
+        setEpubState({ id: edition.id, pending: false, message, diagnostic: error instanceof AlbumEpubFailure ? `${error.stage}/${code}` : code });
+      } finally {
+        if (!valid()) setEpubState(null);
+      }
+    });
+  }
   function bind() {
     void run(async (valid) => {
       setFresh(null);
@@ -393,10 +413,12 @@ export default function AlbumPrintScreen() {
                 ) : null}
                 <ShowcaseButton
                   tone="quiet"
-                  label={tr('保存电子册 EPUB')}
+                  label={epubState?.id === edition.id && epubState.pending ? tr('正在制作电子册…') : tr('保存电子册 EPUB')}
                   disabled={busy}
-                  onPress={() => void run(valid => shareAlbumEpub(edition.id, valid).then(() => undefined))}
+                  onPress={() => electronic(edition)}
                 />
+                {epubState?.id === edition.id ? <Text accessibilityLiveRegion="polite" style={styles.meta}>{epubState.message}</Text> : null}
+                {__DEV__ && epubState?.id === edition.id && epubState.diagnostic ? <Text selectable testID="album-epub-diagnostic" style={styles.meta}>{`EPUB/${epubState.diagnostic}`}</Text> : null}
                 <Text style={styles.meta}>{tr('包含照片与声音，可用「图书」打开。首次制作需要导出权益；离开Lampy后无法收回。')}</Text>
                 <ShowcaseButton
                   tone="quiet"

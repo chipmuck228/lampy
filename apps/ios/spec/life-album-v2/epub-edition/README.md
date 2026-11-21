@@ -82,3 +82,15 @@ inside `apps/ios` after updating. Keep the existing release flags closed for App
 8. Without export rights, a new EPUB must not be created; a previously generated file
    may still be saved. No purchase should start from merely tapping the EPUB action.
 9. Test a large album; oversize resources show the split-album message, not a partial book.
+
+## Device failure feedback follow-up
+
+A device report described the EPUB action as having no visible effect. Root cause is
+not established from that symptom alone. The action now shows local pending/success/
+retry feedback beside its edition. Development builds show a sanitized `EPUB/stage/code`
+on failure and `[LampyEpub]` stage events in Metro/Xcode; no original error messages,
+paths, titles, IDs or content are logged. XML/ZIP construction yields once so pending
+feedback can paint. Existing background/lock invalidation still suppresses late results.
+Targeted service/UI suites: 18 tests passed, including the pending-to-failure display.
+Actual device failure stage still requires the user's rerun; do not mark export repaired
+until the file can be created and imported on the device.

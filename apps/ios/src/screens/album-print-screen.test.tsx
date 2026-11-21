@@ -8,9 +8,13 @@ import {
 import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AlbumPrintScreen from './album-print-screen';
+import { AlbumEpubFailure } from '../infrastructure/album-epub-files';
 import {AlbumPrintFailure} from '../application/album-print';
 const mockEpub = jest.fn(async () => undefined);
-jest.mock('../infrastructure/album-epub-files', () => ({ shareAlbumEpub: (...args: unknown[]) => mockEpub(...(args as [])) }));
+jest.mock('../infrastructure/album-epub-files', () => ({
+  ...jest.requireActual('../infrastructure/album-epub-files'),
+  shareAlbumEpub: (...args: unknown[]) => mockEpub(...(args as [])),
+}));
 const mockSave = jest.fn();
 const mockShare = jest.fn();
 const mockLocked = { locked: false };
@@ -271,4 +275,20 @@ it('a locked device shows no book, counts or price', async () => {
   expect(page.queryByText('Our days')).toBeNull();
   expect(page.queryByText(/解锁导出/)).toBeNull();
   expect(mockGenerate).not.toHaveBeenCalled();
+});
+
+it('shows EPUB progress and an actionable failure beside the saved edition', async () => {
+  mockSave.mockResolvedValueOnce({ manifest: { id: 'print_failure', name: 'Saved for EPUB', createdAt: '2026-11-21T00:00:00Z', style: 'plain', imageDpi: [], pdf: { pageCount: 1, bytes: 1000, fontsEmbedded: true, fontRunNames: [] } } });
+  let reject!: (reason: unknown) => void;
+  mockEpub.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
+  const view = await render(wrap());
+  await waitFor(() => expect(mockList).toHaveBeenCalled());
+  await fireEvent.press(view.getByText('生成并保存测试PDF'));
+  await waitFor(() => expect(view.getByText('Saved for EPUB')).toBeTruthy());
+  await fireEvent.press(view.getByText('保存电子册 EPUB'));
+  await waitFor(() => expect(view.getByText('正在制作电子册…')).toBeTruthy());
+  await act(async () => reject(new AlbumEpubFailure('WRITE_FILE', 'ERR_FILESYSTEM_WRITE')));
+  await waitFor(() => expect(view.getByText('电子册尚未完成，请再试一次。已有PDF和原记录不受影响。')).toBeTruthy());
+  expect(view.getByTestId('album-epub-diagnostic').props.children).toBe('EPUB/WRITE_FILE/ERR_FILESYSTEM_WRITE');
+  expect(view.getByText('保存电子册 EPUB')).toBeTruthy();
 });
