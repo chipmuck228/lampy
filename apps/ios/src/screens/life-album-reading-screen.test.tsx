@@ -1,3 +1,4 @@
+import type { AlbumReadingPosition, AlbumReadingStyle } from '../application/album-reading';
 import {
   act,
   cleanup,
@@ -17,6 +18,7 @@ const mockCancel = jest.fn();
 const mockBack = jest.fn();
 const mockLocked = { locked: false };
 const mockRoute = { id: 'book' };
+let mockPreference: {style: AlbumReadingStyle; position: AlbumReadingPosition | null} = {style:'plain',position:null};
 const mockSave = jest.fn(async (..._args: unknown[]) => undefined);
 jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual('react');
@@ -44,7 +46,7 @@ jest.mock('../application/container', () => ({
   }),
 }));
 jest.mock('../infrastructure/album-reading-store', () => ({
-  readAlbumReadingState: async () => ({ style: 'plain', position: null }),
+  readAlbumReadingState: async () => mockPreference,
   saveAlbumReadingState: (...args: unknown[]) => mockSave(...args),
 }));
 const fixture = {
@@ -96,6 +98,8 @@ function wrap() {
 }
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPreference = {style:'plain',position:null};
+  mockSave.mockImplementation(async () => undefined);
   mockLocked.locked = false;
   mockRoute.id = 'book';
   AppState.currentState = 'active';
@@ -181,4 +185,29 @@ it('a removed record is explicit and cannot expose old text or audio', async () 
   await waitFor(() => expect(view.getByText('这条已经不在。')).toBeTruthy());
   expect(view.queryByText(fixture.entries[0].note)).toBeNull();
   expect(view.queryByTestId('album-reading-audio-a1')).toBeNull();
+});
+
+it('reopens a reader at the persisted position after a new screen instance', async () => {
+  mockSave.mockImplementation(async (...args: unknown[]) => {
+    mockPreference = JSON.parse(JSON.stringify({style:args[1],position:args[2]}));
+  });
+  async function layOut(view: Awaited<ReturnType<typeof render>>) {
+    await waitFor(() => expect(view.getByText('Our days')).toBeTruthy());
+    await fireEvent(view.getByTestId('album-reading-record-m1'), 'layout', {
+      nativeEvent: {layout:{x:0,y:450,width:342,height:300}},
+    });
+    await fireEvent(view.getByTestId('life-album-reading-scroll'), 'contentSizeChange',342,1000);
+  }
+  const first = await render(wrap());
+  await layOut(first);
+  await fireEvent.scroll(first.getByTestId('life-album-reading-scroll'), {
+    nativeEvent:{contentOffset:{y:500}},
+  });
+  await first.unmount();
+  expect(mockPreference.position).toMatchObject({y:500,anchor:'m1',within:50});
+  mockSave.mockClear();
+  const second = await render(wrap());
+  await layOut(second);
+  await second.unmount();
+  expect(mockSave).toHaveBeenLastCalledWith('book','plain',expect.objectContaining({y:500,anchor:'m1',within:50}));
 });

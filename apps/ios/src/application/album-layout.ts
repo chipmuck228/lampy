@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { appLanguage, tr, type AppLanguage } from '../i18n';
 import type { AlbumCover } from './life-album';
 
@@ -13,12 +14,12 @@ export const ALBUM_CONTENT_HEIGHT_PT = ALBUM_PAGE_HEIGHT_PT - ALBUM_MARGIN_TOP_P
 export const ALBUM_RECORD_GAP_PT = 16;
 export const ALBUM_FILL_RATIO = 0.35;
 
-export const ALBUM_SERIF_FONT = appLanguage === 'en' ? 'Georgia' : 'Songti SC';
-export const ALBUM_UI_FONT = appLanguage === 'en' ? 'HelveticaNeue' : 'PingFang SC';
-export const ALBUM_SERIF_LICENSE = appLanguage === 'en'
+export const ALBUM_SERIF_FONT = Platform.OS === 'android' ? 'serif' : appLanguage === 'en' ? 'Georgia' : 'Songti SC';
+export const ALBUM_UI_FONT = Platform.OS === 'android' ? 'sans-serif' : appLanguage === 'en' ? 'HelveticaNeue' : 'PingFang SC';
+export const ALBUM_SERIF_LICENSE = Platform.OS === 'android' ? 'Android system serif with device CJK/emoji fallback; no Apple font files are bundled. Preview and continuous reading may wrap differently across devices.' : appLanguage === 'en'
   ? 'iOS system Georgia. Actual resolution and PDF font embedding must be checked separately; no font file is bundled or redistributed.'
   : '目标为 iOS 系统中文衬线 Songti SC / STSong（Apple 随系统授权；授权外副本不可再分发）。实际解析字体以设备 diagnoseFonts 为准；PDF 是否嵌入字形须查文件 /Font 资源，与许可是两件事。';
-export const ALBUM_UI_LICENSE = appLanguage === 'en'
+export const ALBUM_UI_LICENSE = Platform.OS === 'android' ? 'Android system sans-serif with device CJK/emoji fallback; no font files are redistributed.' : appLanguage === 'en'
   ? 'iOS system Helvetica Neue. Actual resolution and PDF font embedding must be checked separately; no font file is bundled or redistributed.'
   : '目标为 iOS 系统 UI 字体 PingFang SC（Apple 随系统授权；授权外副本不可再分发）。实际解析与 PDF 嵌入情况分别核实。';
 

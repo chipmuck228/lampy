@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import { Platform, AccessibilityInfo } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { COLLECT_SHEET_MASK_SOLID, COLLECT_SHEET_PAPER_SOLID } from './life-album-collect-sheet-chrome';
@@ -123,7 +123,8 @@ describe('life album collect sheet', () => {
       wrap(<LifeAlbumCollectSheet visible momentId="moment_ready" onClose={() => undefined} />),
     );
     await waitFor(() => {
-      expect(view.getByTestId('life-album-sheet-blur')).toBeTruthy();
+      if (Platform.OS === 'ios') expect(view.getByTestId('life-album-sheet-blur')).toBeTruthy();
+      else expect(view.queryByTestId('life-album-sheet-blur')).toBeNull();
     });
   });
 
@@ -158,14 +159,15 @@ describe('life album collect sheet', () => {
   it('updates chrome when Reduce Transparency changes at runtime', async () => {
     let listener: ((value: boolean) => void) | null = null;
     (AccessibilityInfo.addEventListener as jest.Mock).mockImplementation((_name, cb) => {
-      listener = cb;
+      if (_name === 'reduceTransparencyChanged') listener = cb;
       return { remove: jest.fn() };
     });
     const view = await render(
       wrap(<LifeAlbumCollectSheet visible momentId="moment_ready" onClose={() => undefined} />),
     );
     await waitFor(() => {
-      expect(view.getByTestId('life-album-sheet-blur')).toBeTruthy();
+      if (Platform.OS === 'ios') expect(view.getByTestId('life-album-sheet-blur')).toBeTruthy();
+      else expect(view.queryByTestId('life-album-sheet-blur')).toBeNull();
     });
     await act(async () => {
       listener?.(true);

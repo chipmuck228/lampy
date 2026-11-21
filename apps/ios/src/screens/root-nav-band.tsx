@@ -1,4 +1,4 @@
-import { personalRecordsOnly } from '../application/mobile-capabilities';
+import { personalAlbumsAvailable, personalRecordsOnly } from '../application/mobile-capabilities';
 import { tr } from '../i18n';
 import { useState, type ReactNode, type Ref } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type TextLayoutEventData, type ViewStyle } from 'react-native';
@@ -51,7 +51,7 @@ export function RootNavBand({
 }) {
   const { width, height } = usePageMetrics();
   const [painted, setPainted] = useState<Partial<Record<string, { width: number; height: number }>>>({});
-  const destinations = BAND_DESTINATIONS.filter((item) => (item.id !== 'family' || (onFamily && !personalRecordsOnly())) && (item.id !== 'albums' || !personalRecordsOnly()));
+  const destinations = BAND_DESTINATIONS.filter((item) => (item.id !== 'family' || (onFamily && !personalRecordsOnly())) && (item.id !== 'albums' || personalAlbumsAvailable()));
   const items = navBandItemsFor(here, !!onFamily).map((item, index) => ({
     ...item,
     id: destinations[index]?.id ?? item.label,
@@ -160,7 +160,7 @@ export function RootNavBand({
 
   const recentItem = renderItem(BAND_DESTINATIONS[0]);
   const lookbackItem = renderItem(BAND_DESTINATIONS[1]);
-  const albumsItem = personalRecordsOnly() ? null : renderItem(BAND_DESTINATIONS[2]);
+  const albumsItem = personalAlbumsAvailable() ? renderItem(BAND_DESTINATIONS[2]) : null;
   const familyItem = onFamily && !personalRecordsOnly() ? renderItem(BAND_DESTINATIONS[3]) : null;
 
   return (

@@ -1,3 +1,7 @@
+jest.mock('../application/mobile-capabilities', () => ({
+  ...jest.requireActual('../application/mobile-capabilities'),
+  personalAlbumsAvailable: () => true,
+}));
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Dimensions, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
