@@ -1,3 +1,4 @@
+import { personalRecordsOnly } from '../../application/mobile-capabilities';
 import { tr } from '../../i18n';
 import LookbackCalendarPopup from '../../screens/lookback-calendar-popup';
 import { leaveVoiceHref } from '../../screens/leave-voice-intent';
@@ -148,7 +149,7 @@ export default function LookbackIndexScreen() {
   const navigation = useNavigation();
   const lookbackParams = useLocalSearchParams<{ o?: string | string[]; collect?: string | string[] }>();
   const originToken = firstSearchParam(lookbackParams.o);
-  const collectAlbumId = collectAlbumIdFromParam(lookbackParams.collect);
+  const collectAlbumId = personalRecordsOnly() ? null : collectAlbumIdFromParam(lookbackParams.collect);
   const { readingWidth } = useLookbackLayout();
   const insets = useSafeAreaInsets();
   const { width, height } = usePageMetrics();

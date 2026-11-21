@@ -1,3 +1,4 @@
+import { recentSans } from './recent-visual';
 import { tr } from '../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontFamily: 'PingFang SC',
+    fontFamily: recentSans,
     fontSize: 14,
     lineHeight: 18,
     letterSpacing: 1.12,

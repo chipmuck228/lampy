@@ -1,7 +1,8 @@
-import { Image } from 'react-native';
+import * as picker from 'expo-image-picker';
+import { Image, Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 
-import { createExpoMediaStore } from './expo-media';
+import { createExpoMediaStore, createExpoLibrarySource } from './expo-media';
 
 jest.mock('expo-image-picker', () => ({
   getMediaLibraryPermissionsAsync: jest.fn(),
@@ -279,4 +280,18 @@ describe('expo media decode', () => {
 
     await expect(createExpoMediaStore().canPlay('file:///docs/lampy-assets/empty.m4a')).resolves.toBe(false);
   });
+});
+
+test('Android picker opens without requesting broad photo-library permission', async () => {
+  const previous = Platform.OS;
+  try {
+    Object.defineProperty(Platform,'OS',{value:'android',configurable:true});
+    jest.mocked(picker.getMediaLibraryPermissionsAsync).mockClear();
+    jest.mocked(picker.requestMediaLibraryPermissionsAsync).mockClear();
+    await expect(createExpoLibrarySource().requestPermission()).resolves.toBe('granted');
+    expect(picker.getMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+    expect(picker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+  } finally {
+    Object.defineProperty(Platform,'OS',{value:previous,configurable:true});
+  }
 });

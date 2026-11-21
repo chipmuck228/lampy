@@ -1,16 +1,21 @@
+import { personalRecordsOnly } from '../application/mobile-capabilities';
+
 export function isControlledEmailAccountsOpen(value = process.env.EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS) {
+  if (personalRecordsOnly()) return false;
   return value === '1';
 }
 
 export function familyApiBaseUrl(value = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL) {
-  return (value || '').trim();
+  return personalRecordsOnly() ? '' : (value || '').trim();
 }
 
 export function isFamilyApiConfigured(value = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL) {
+  if (personalRecordsOnly()) return false;
   return Boolean(familyApiBaseUrl(value));
 }
 
 export function isFamilyProductEntryOpen(value = process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN) {
+  if (personalRecordsOnly()) return false;
   const raw = (value || '').trim().toLowerCase();
   return raw === '1' || raw === 'true' || raw === 'yes';
 }

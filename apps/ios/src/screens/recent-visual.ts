@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { tr } from '../i18n';
 import { lookbackBookWeekdayName } from '../application/lookback-book';
 import { pad2, parseMillis } from '../domain-adapters/calendar';
@@ -20,8 +21,8 @@ export const recentYearInk = '#A8AB9E';
 export const recentEndInk = '#A3A699';
 export const recentSettings = '#55594D';
 
-export const recentSerif = 'Songti SC';
-export const recentSans = 'PingFang SC';
+export const recentSerif = Platform.OS === 'android' ? 'serif' : 'Songti SC';
+export const recentSans = Platform.OS === 'android' ? 'sans-serif' : 'PingFang SC';
 
 /**
  * Attachment Recent hierarchy, in iOS points.
