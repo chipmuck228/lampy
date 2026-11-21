@@ -2,7 +2,8 @@ import { strToU8, zipSync } from 'fflate';
 import type { AlbumLayoutInput } from './album-layout-input';
 import type { AlbumReadingStyle } from './album-reading';
 
-export type EpubAsset = { path: string; mime: string; bytes: Uint8Array };
+export type EpubResource = { path: string; mime: string };
+export type EpubAsset = EpubResource & { bytes: Uint8Array };
 export type EpubCopy = { contents: string; opening: string; closing: string; listen: string; unknown: string; edition: string; photo: string };
 export const EPUB_COPY = {
   'zh-Hans': { contents: '这一册', opening: '开篇', closing: '留在这一册里', listen: '听听当时的声音', unknown: '日子未确认', edition: '制作于', photo: '记录中的照片' },
@@ -14,11 +15,12 @@ export function epubEscape(value: string): string {
 const paragraphs = (value: string) => value.split(/\r?\n/).map(line => `<p>${epubEscape(line) || '<br/>'}</p>`).join('');
 
 /** A portable, offline publication. No source IDs, private paths, JavaScript or remote URLs. */
-export function buildAlbumEpub(options: {
-  input: AlbumLayoutInput; assets: Record<string, EpubAsset>; id: string; createdAt: string;
+export type AlbumEpubOptions = {
+  input: AlbumLayoutInput; assets: Record<string, EpubResource>; id: string; createdAt: string;
   language: 'zh-Hans' | 'en'; style: AlbumReadingStyle;
   dates: Record<string, { label: string; chapter: string }>;
-}): Uint8Array {
+};
+export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Uint8Array> {
   const { input, assets, language, style, dates } = options;
   if (!input.entries.length || input.entries.some(e => e.presence !== 'ready' || e.media.some(m => m.availability !== 'available' || !assets[m.assetId]))) throw new Error('EPUB_MISSING_CONTENT');
   const copy = EPUB_COPY[language];
@@ -42,7 +44,7 @@ export function buildAlbumEpub(options: {
     const asset = assets[media.assetId];
     if (!/^media\/[a-z0-9-]+\.(png|jpg|m4a|mp3|wav)$/.test(asset.path)) throw new Error('EPUB_INVALID_ASSET');
     if (used.has(asset.path)) continue;
-    used.add(asset.path); files[`OEBPS/${asset.path}`] = asset.bytes;
+    used.add(asset.path);
     manifest.push(`<item id="asset-${used.size}" href="${asset.path}" media-type="${asset.mime}"${asset.path === coverPath ? ' properties="cover-image"' : ''}/>`);
   }
   page('cover', input.album.name, `<section class="cover" epub:type="cover"><p class="eyebrow">LAMPY</p>${coverPath ? `<img class="cover-photo" src="${coverPath}" alt="${title}"/>` : '<div class="cover-rule"></div>'}<h1>${title}</h1></section>`);
@@ -72,7 +74,12 @@ export function buildAlbumEpub(options: {
   files['OEBPS/style.css'] = strToU8(`body{font-family:serif;line-height:1.85;margin:5%;color:#292d29;background:#f6f0e3}body.handmade{background:#f3ecdc}h1{font-size:1.8em;line-height:1.45;font-weight:normal}h2.date,.meta,.eyebrow{font-family:sans-serif;font-size:.85em;color:#546353}.eyebrow{letter-spacing:.18em}.title-page,.cover{text-align:center;padding:12% 0;break-after:page}.cover-photo{max-height:65vh;max-width:100%;object-fit:contain}.cover-rule{width:3em;border-top:1px solid #71816a;margin:3em auto}.chapter{padding:2em 0 1em;break-before:page}.date{margin-top:2em}p{orphans:2;widows:2;overflow-wrap:break-word}figure{margin:1.6em 0;break-inside:avoid}img{display:block;max-width:100%;height:auto;margin:auto}.handmade figure{padding:.5em;background:#fffaf0;border:1px solid #dfd6c5}audio{max-width:100%;width:100%}.sound{border-top:1px solid #a7b19f;padding:.5em 0;margin:1.6em 0;break-inside:avoid}.sound p,.feeling{color:#40564a}.feeling{font-size:.9em}ol{padding-left:1.5em}li{margin:.8em 0}a{color:inherit}article{break-after:page}`);
   files['OEBPS/package.opf'] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="${language}"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:lampy:edition:${epubEscape(options.id)}</dc:identifier><dc:title>${title}</dc:title><dc:language>${language}</dc:language><meta property="dcterms:modified">${new Date(options.createdAt).toISOString().replace(/\.\d{3}Z$/, 'Z')}</meta><meta property="rendition:layout">reflowable</meta></metadata><manifest><item id="css" href="style.css" media-type="text/css"/>${manifest.join('')}</manifest><spine>${spine.join('')}</spine></package>`);
   files['META-INF/container.xml'] = strToU8('<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
-  if (Object.values(files).reduce((sum, bytes) => sum + bytes.length, 0) > 64 * 1024 * 1024) throw new Error('EPUB_TOO_LARGE');
-  // EPUB requires this exact, first, uncompressed entry, without a BOM.
-  return zipSync({ mimetype: [strToU8('application/epub+zip'), { level: 0 }], ...files }, { level: 0 });
+  return { mimetype: strToU8('application/epub+zip'), ...files };
+}
+
+/** Small fixture/reference writer. Device exports use chunked streaming, never this buffer. */
+export function buildAlbumEpub(options: Omit<AlbumEpubOptions, 'assets'> & { assets: Record<string, EpubAsset> }): Uint8Array {
+  const files = albumEpubDocuments(options);
+  for (const asset of Object.values(options.assets)) files[`OEBPS/${asset.path}`] = asset.bytes;
+  return zipSync({ mimetype: [files.mimetype, { level: 0 }], ...Object.fromEntries(Object.entries(files).filter(([path]) => path !== 'mimetype')) }, { level: 0 });
 }

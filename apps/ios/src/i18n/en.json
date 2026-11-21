@@ -1073,5 +1073,15 @@
   "电子册已交给所选应用。": "The electronic album was handed to the selected app.",
   "电子册已保存在Lampy中，可再次点击保存。": "The electronic album is saved in Lampy. Tap again to share it.",
   "电子册尚未完成，请再试一次。已有PDF和原记录不受影响。": "The electronic album could not be completed. Please try again. Your PDF and original records are unchanged.",
-  "正在制作电子册…": "Preparing electronic album…"
+  "正在制作电子册…": "Preparing electronic album…",
+  "电子册超过当前支持的2GB，请分成较小的册子。": "This album exceeds the current 2 GB limit. Please split it into smaller albums.",
+  "本机可用空间不足，请腾出空间后重试。": "Not enough free space. Please free up storage and try again.",
+  "请更新原生构建后再制作电子册。": "Please update the native build before creating an electronic album.",
+  "本次制作已停止，请重新开始。": "Preparation was stopped. Please start again.",
+  "正在制作电子册：{0}/{1}": "Preparing electronic album: {0}/{1}",
+  "取消制作电子册": "Cancel electronic album",
+  "制作电子册（含声音）": "Create electronic album with audio",
+  "无需先生成PDF；电子册会独立保存这一版内容。": "No PDF is required. The electronic album saves an independent edition.",
+  "已制作的电子册": "Electronic editions",
+  "正在收好记录与媒体：{0}/{1}": "Freezing records and media: {0}/{1}"
 }

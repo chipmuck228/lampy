@@ -179,7 +179,7 @@ export function validatePrintLayout(layout: AlbumLayout) {
         throw new AlbumPrintError('INVALID_PDF');
     }
 }
-export function manifestDigest(manifest: PrintManifest) {
+export function manifestDigest(manifest: unknown) {
   return bytesToHex(sha256(utf8ToBytes(JSON.stringify(manifest))));
 }
 /** User-facing binding steps. Diagnostics keep their own stage names. */

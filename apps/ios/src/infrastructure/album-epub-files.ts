@@ -1,20 +1,25 @@
+import { epubSnapshotDirectory } from './album-epub-snapshots';
+import type { EpubSnapshot } from '../application/album-epub-snapshot';
 import { File, FileMode } from 'expo-file-system';
 import * as FS from 'expo-file-system/legacy';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
-import { albumPrintNative } from '../../modules/lampy-album-layout';
-import { buildAlbumEpub, EPUB_COPY, type EpubAsset } from '../application/album-epub';
+import { albumEpubNative, albumPrintNative } from '../../modules/lampy-album-layout';
+import { albumEpubDocuments, EPUB_COPY, type EpubResource } from '../application/album-epub';
 import { manifestDigest, type PrintManifest } from '../application/album-print';
 import { appLanguage, dateLabel } from '../i18n';
 import { albumExportAccess } from './album-export-purchases';
 
-const LIMIT = 64 * 1024 * 1024;
+import { streamEpubArchive, epubMemoryEntry, EPUB_ARCHIVE_MAX, type EpubStreamEntry } from './epub-stream';
+const RESERVE = 32 * 1024 * 1024;
+export type EpubProgress = { stage: EpubStage; done: number; total: number };
+async function assertSpace(bytes: number) {
+  if (await FS.getFreeDiskStorageAsync() < bytes + RESERVE) throw new Error('EPUB_DISK_FULL');
+}
 function editionDirectory(id: string) {
+  if (id.startsWith('epub_')) return epubSnapshotDirectory(id);
   if (!/^print_[a-zA-Z0-9_-]{1,94}$/.test(id) || !FS.documentDirectory) throw new Error('EPUB_INVALID_EDITION');
   return `${FS.documentDirectory}album-print-evaluation/${id}/`;
 }
-export type EpubStage = 'READ_EDITION' | 'AUTHORIZE' | 'READ_MEDIA' | 'CONVERT_IMAGE' | 'PACKAGE' | 'WRITE_FILE' | 'VERIFY_FILE' | 'PUBLISH' | 'SHARE';
+export type EpubStage = 'READ_EDITION' | 'AUTHORIZE' | 'READ_MEDIA' | 'CONVERT_IMAGE' | 'PACKAGE' | 'WRITE_FILE' | 'VERIFY_FILE' | 'PUBLISH' | 'SHARE' | 'CLEANUP';
 export class AlbumEpubFailure extends Error {
   constructor(readonly stage: EpubStage, readonly code: string) { super(`EPUB/${stage}/${code}`); }
 }
@@ -26,23 +31,31 @@ function safeCode(error: unknown): string {
   return 'OPERATION_FAILED';
 }
 /** Export from immutable edition copies, never re-read the changing personal library. */
-export async function shareAlbumEpub(id: string, current: () => boolean, onStage?: (stage: EpubStage) => void) {
+export async function shareAlbumEpub(id: string, current: () => boolean, onStage?: (progress: EpubProgress) => void) {
   const check = () => { if (!current()) throw new Error('CANCELLED'); };
   check();
   const dir = editionDirectory(id);
   const temporary: string[] = [];
+  let work = '';
+  let output: ReturnType<File['open']> | null = null;
   let stage: EpubStage = 'READ_EDITION';
-  const report = (next: EpubStage) => {
+  const report = (next: EpubStage, done = 0, total = 0) => {
     stage = next;
-    if (current()) onStage?.(next);
+    if (current()) onStage?.({ stage: next, done, total });
     if (__DEV__) console.info('[LampyEpub]', JSON.stringify({ event: 'STAGE', stage }));
   };
   // One owner per edition, even if two mounted screens race.
   if (working.has(id)) throw new Error('EPUB_BUSY');
   working.add(id);
   try {
+    // No other job for this edition is active. Remove only abandoned EPUB work, never editions.
+    for (const name of await FS.readDirectoryAsync(dir)) {
+      check();
+      if (/^\.epub-work-[a-zA-Z0-9_-]+$/.test(name) || /^album-(en|zh-Hans)\.epub\.partial$/.test(name))
+        await FS.deleteAsync(`${dir}${name}`, { idempotent: true });
+    }
     report('READ_EDITION');
-    const manifest: PrintManifest = JSON.parse(await FS.readAsStringAsync(`${dir}manifest.json`));
+    const manifest: PrintManifest | EpubSnapshot = JSON.parse(await FS.readAsStringAsync(`${dir}manifest.json`));
     const digest = await FS.readAsStringAsync(`${dir}manifest.sha256`);
     check();
     if (manifest.id !== id || manifest.version !== 1 || manifestDigest(manifest) !== digest) throw new Error('PRINT_FILE_CHANGED');
@@ -52,83 +65,102 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     if ((await FS.getInfoAsync(uri)).exists && (await FS.getInfoAsync(digestUri)).exists) {
       const expected = await FS.readAsStringAsync(digestUri);
       if ((await albumPrintNative().printFileDigest(uri)).sha256 !== expected) throw new Error('PRINT_FILE_CHANGED');
-      check(); report('SHARE'); return await albumPrintNative().sharePrintPdf(uri);
+      check(); report('SHARE'); check(); return await albumPrintNative().sharePrintPdf(uri);
     }
     report('AUTHORIZE');
     await albumExportAccess.assert(current); check();
-    const assets: Record<string, EpubAsset> = {};
+    await assertSpace(RESERVE); check();
+    work = `${dir}.epub-work-${Date.now()}-${Math.random().toString(36).slice(2)}/`;
+    await FS.makeDirectoryAsync(work); check();
+    const assets: Record<string, EpubResource> = {};
+    const mediaEntries: EpubStreamEntry[] = [];
+    const frozenById = new Map(manifest.media.map(item => [item.assetId, item]));
+    const mediaTotal = new Set(manifest.content.entries.flatMap(entry => entry.media.map(media => media.assetId))).size;
     let total = 0;
     for (const entry of manifest.content.entries) for (const media of entry.media) {
       if (assets[media.assetId]) continue;
-      const frozen = manifest.media.find(m => m.assetId === media.assetId);
+      check(); const frozen = frozenById.get(media.assetId);
       if (!frozen || !/^media-\d+$/.test(frozen.file)) throw new Error('EPUB_MISSING_CONTENT');
-      report('READ_MEDIA');
+      report('READ_MEDIA', mediaEntries.length, mediaTotal);
       const source = `${dir}${frozen.file}`;
       const actual = await albumPrintNative().printFileDigest(source); check();
       if (actual.sha256 !== frozen.sha256 || actual.bytes !== frozen.bytes) throw new Error('PRINT_FILE_CHANGED');
-      let data: Uint8Array; let mime: string; let extension: string;
+      let mime: string; let extension: string; let prepared = source; let size = actual.bytes;
       if (media.role === 'image') {
-        // Read only the signature; frozen copies have extensionless filenames.
-        // Keep PNG for possible transparency; photographic HEIF/JPEG must not expand into PNG.
-        if (actual.bytes > LIMIT) throw new Error('EPUB_TOO_LARGE');
+        await assertSpace(RESERVE); check();
+        report('CONVERT_IMAGE', mediaEntries.length, mediaTotal);
+        prepared = `${work}image-${mediaEntries.length}`;
+        const image = await albumEpubNative().prepareImage(source, prepared); check();
+        mime = image.mime; extension = image.extension; size = image.bytes;
+      } else if (media.role === 'audio') {
         const handle = new File(source).open(FileMode.ReadOnly);
         let header: Uint8Array;
-        try { header = handle.readBytes(8); } finally { handle.close(); }
-        const encoding = epubImageEncoding(header, media.widthPx, media.heightPx);
-        report('CONVERT_IMAGE');
-        const image = await manipulateAsync(source, [{ resize: { width: encoding.width } }], {
-          format: encoding.extension === 'png' ? SaveFormat.PNG : SaveFormat.JPEG,
-          compress: encoding.extension === 'png' ? 1 : 0.82,
-        });
-        temporary.push(image.uri); check();
-        const info = await FS.getInfoAsync(image.uri);
-        if (!info.exists || info.size > LIMIT - total) throw new Error('EPUB_TOO_LARGE');
-        data = await new File(image.uri).bytes(); mime = encoding.mime; extension = encoding.extension;
-      } else if (media.role === 'audio') {
-        if (actual.bytes > LIMIT - total) throw new Error('EPUB_TOO_LARGE');
-        data = await new File(source).bytes();
-        const format = epubAudioFormat(data); mime = format.mime; extension = format.extension;
+        try { header = handle.readBytes(16); } finally { handle.close(); }
+        const format = epubAudioFormat(header); mime = format.mime; extension = format.extension;
       } else throw new Error('EPUB_UNSUPPORTED_MEDIA');
-      check(); total += data.length;
-      if (total > LIMIT) throw new Error('EPUB_TOO_LARGE');
-      assets[media.assetId] = { path: `media/asset-${Object.keys(assets).length}.${extension}`, mime, bytes: data };
+      if (!Number.isSafeInteger(size) || size < 0) throw new Error('PRINT_FILE_CHANGED');
+      total += size;
+      if (total > EPUB_ARCHIVE_MAX - RESERVE) throw new Error('EPUB_TOO_LARGE');
+      const path = `media/asset-${mediaEntries.length}.${extension}`;
+      assets[media.assetId] = { path, mime };
+      mediaEntries.push({ name: `OEBPS/${path}`, size, open() {
+        const reader = new File(prepared).open(FileMode.ReadOnly);
+        return { read: size => reader.readBytes(size), close: () => reader.close() };
+      } });
+      report('CONVERT_IMAGE', mediaEntries.length, mediaTotal);
+      await new Promise<void>(resolve => setTimeout(resolve, 0)); check();
     }
-    const dates: Record<string, { label: string; chapter: string }> = {};
-    for (const page of manifest.layout.pages) for (const block of page.blocks) if (block.kind === 'day-rule') {
+    const dates: Record<string, { label: string; chapter: string }> = 'kind' in manifest ? manifest.dates : {};
+    for (const page of ('layout' in manifest ? manifest.layout.pages : [])) for (const block of page.blocks) if (block.kind === 'day-rule') {
       const match = /^([dmy]):(\d{4})(?:-(\d{1,2}))?/.exec(block.dateKey);
       dates[block.momentId] = { label: block.text, chapter: match ? (match[3] ? dateLabel(Number(match[2]), Number(match[3])) : match[2]) : EPUB_COPY[appLanguage].unknown };
     }
     check();
     report('PACKAGE');
-    // Let the local status paint before bounded synchronous ZIP construction.
     await new Promise<void>(resolve => setTimeout(resolve, 0)); check();
-    const archive = buildAlbumEpub({ input: manifest.content, assets, dates, id: `${id}-${appLanguage}`, createdAt: manifest.createdAt, style: manifest.style, language: appLanguage });
-    check();
-    const part = `${uri}.partial`; temporary.push(part);
+    const documents = albumEpubDocuments({ input: manifest.content, assets, dates, id: `${id}-${appLanguage}`, createdAt: manifest.createdAt, style: manifest.style, language: appLanguage });
+    const entries = [...Object.entries(documents).map(([name, data]) => epubMemoryEntry(name, data)), ...mediaEntries];
+    await assertSpace(entries.reduce((sum, item) => sum + item.size, 0) + RESERVE); check();
+    const part = `${work}album.epub`;
     report('WRITE_FILE');
-    new File(part).write(archive);
+    new File(part).create();
+    output = new File(part).open(FileMode.Truncate);
+    const result = await streamEpubArchive({ entries, current, write: chunk => output!.writeBytes(chunk),
+      progress: (done, total) => report('WRITE_FILE', done, total) });
+    output.close(); output = null; check();
     report('VERIFY_FILE');
-    const hash = bytesToHex(sha256(archive));
-    if ((await albumPrintNative().printFileDigest(part)).sha256 !== hash) throw new Error('PRINT_FILE_CHANGED');
+    if ((await albumPrintNative().printFileDigest(part)).sha256 !== result.sha256) throw new Error('PRINT_FILE_CHANGED');
     await albumExportAccess.assert(current); check();
+    const hash = result.sha256;
+    const digestPart = `${work}album.sha256`;
+    await FS.writeAsStringAsync(digestPart, hash); check();
     report('PUBLISH');
-    await FS.moveAsync({ from: part, to: uri });
+    // A missing digest denotes an incomplete prior publication; never replace a verified edition.
+    await FS.deleteAsync(uri, { idempotent: true }); check();
+    await FS.deleteAsync(digestUri, { idempotent: true }); check();
     try {
-      await FS.writeAsStringAsync(digestUri, hash); check();
+      await FS.moveAsync({ from: part, to: uri }); check();
+      await FS.moveAsync({ from: digestPart, to: digestUri }); check();
     } catch (error) {
       await FS.deleteAsync(uri, { idempotent: true });
       await FS.deleteAsync(digestUri, { idempotent: true });
       throw error;
     }
-    report('SHARE');
+    report('SHARE'); check();
     return await albumPrintNative().sharePrintPdf(uri);
   } catch (error) {
     const failure = error instanceof AlbumEpubFailure ? error : new AlbumEpubFailure(stage, safeCode(error));
     if (__DEV__) console.info('[LampyEpub]', JSON.stringify({ event: 'FAILED', stage: failure.stage, code: failure.code }));
     throw failure;
   } finally {
-    await Promise.allSettled(temporary.map(uri => FS.deleteAsync(uri, { idempotent: true })));
-    working.delete(id);
+    let cleanupFailed = false;
+    try {
+      try { output?.close(); } catch { cleanupFailed = true; }
+      if (work) temporary.push(work);
+      const results = await Promise.allSettled(temporary.map(uri => FS.deleteAsync(uri, { idempotent: true })));
+      cleanupFailed ||= results.some(result => result.status === 'rejected');
+    } finally { working.delete(id); }
+    if (cleanupFailed) throw new AlbumEpubFailure('CLEANUP', 'EPUB_CLEANUP_FAILED');
   }
 }
 const working = new Set<string>();
@@ -136,15 +168,4 @@ export function epubAudioFormat(bytes: Uint8Array) {
   if (bytes.length > 12 && String.fromCharCode(...bytes.slice(4, 8)) === 'ftyp') return { mime: 'audio/mp4', extension: 'm4a' };
   if (String.fromCharCode(...bytes.slice(0, 3)) === 'ID3' || (bytes[0] === 255 && (bytes[1] & 0xe0) === 0xe0 && (bytes[1] & 6) !== 0)) return { mime: 'audio/mpeg', extension: 'mp3' };
   throw new Error('EPUB_UNSUPPORTED_AUDIO');
-}
-
-/** Select by bytes, not the extensionless frozen filename. Bound both landscape and portrait pixels. */
-export function epubImageEncoding(header: Uint8Array, width?: number, height?: number) {
-  const png = [137,80,78,71,13,10,26,10].every((byte, index) => header[index] === byte);
-  const validWidth = width != null && Number.isFinite(width) && width > 0 ? width : 2048;
-  const validHeight = height != null && Number.isFinite(height) && height > 0 ? height : validWidth;
-  return {
-    extension: png ? 'png' : 'jpg', mime: png ? 'image/png' : 'image/jpeg',
-    width: Math.max(1, Math.floor(validWidth * Math.min(1, 2048 / Math.max(validWidth, validHeight)))),
-  };
 }

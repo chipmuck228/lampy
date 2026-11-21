@@ -1,106 +1,105 @@
-# Lampy electronic edition — EPUB 3
+# Personal electronic editions — EPUB 3
 
-Base: `ios/album-export-showcase` at `fccabc07478fd13be22df5472a4c66ab1293ddbb`.
-This is a stacked PR: target the showcase branch until that branch is integrated.
+PR135 is stacked on `ios/album-export-showcase` (`fccabc0`). It remains draft until
+native/device acceptance. Paid/export switches for the App Store profile remain closed.
 
-## Delivered behavior
+## User flow
 
-Personal album export keeps its existing purchase and binding flow. After binding,
-each saved edition offers **保存电子册 EPUB / Save electronic album · EPUB**.
-Creating an EPUB uses that edition's frozen content and media, not the current library.
-A later record edit requires binding a new edition. The first EPUB creation requires
-current export access; an already created, intact file remains shareable under the same
-policy as saved PDFs. Creating an EPUB never starts a purchase automatically.
+With local export access enabled and owned, personal album export offers **制作电子册
+（含声音） / Create electronic album with audio**. No PDF, Core Text pagination or font
+inspection is required for this action. The new edition freezes the selected records
+and media, then creates an offline EPUB and opens the system share menu. Completed
+electronic editions are listed independently and can be shared again after restart.
+Existing PDF editions also retain their EPUB action, using that PDF's frozen content.
+Creating a new EPUB requires current export rights; sharing an existing intact file does
+not start a purchase or regenerate it. Original records/photos/audio and PDFs are unchanged.
 
-The publication is reflowable EPUB 3: cover (chosen photo or typographic), title page,
-optional original opening, navigable contents, month/date sections, ordered records,
-full text, photos, audio controls, and a colophon with the edition creation date.
-Consecutive months create sections; records are never sorted or regrouped.
-Unknown dates stay unknown. The date labels come from the edition's frozen paper layout.
-English/Chinese interface copy follows the export language; user-authored content is unchanged.
+Reflowable content includes cover, title page, original opening, linked contents,
+consecutive month sections, original ordered text and photos, user-triggered embedded
+audio, and a dated colophon. Unknown dates stay unknown; records are not regrouped or
+rewritten. Plain/handmade styles use warm paper and restrained green accents. Reader
+font/theme/controls remain reader-owned. No remote resources, scripts, source IDs or
+private file paths appear in the publication. No Apple system font files are embedded.
+This is a finished publication, not an importable library backup; external copies cannot
+be recalled. Family EPUB and Google Play Books acceptance remain out of scope.
 
-Warm ivory, pine accents, restrained type hierarchy and generous spacing form the plain
-style. Handmade adds paper color and photo mats. Reader-selected fonts/themes may
-change the appearance. Use licensed device fonts; no Apple system font files are packaged.
-No synthetic story, background music, automatic playback, scripts, remote resource URLs,
-private file paths, or source account/moment IDs are included. Library cover rendering and
-native audio control appearance belong to the reader and require acceptance on device.
+## Large-album foundation
 
-## Media and storage
+- Media is no longer accumulated as JavaScript byte arrays, and the device path does
+  not use `zipSync`. ZIP entries stream from disk in 64 KiB reads/writes with an
+  incremental SHA-256 digest and an event-loop yield between chunks. Directory metadata
+  and authored text still grow with entry count; memory is not claimed to be constant.
+- Native ImageIO creates transformed thumbnails directly at up to 2048 pixels on the
+  long edge, within an autorelease pool. HEIF/JPEG photos become JPEG at quality 0.82;
+  PNG stays PNG for transparency. Full-resolution UIImages are not used in this path.
+- Prepared pictures live in an owned work directory. Audio streams from the frozen
+  copy and is never loaded whole in JS. Supported audio is M4A/MP4 container or MP3.
+- Disk space is checked before copying/preparing and before ZIP writing. Mid-write
+  failures close handles and clean owned work; originals and completed editions survive.
+- The old 64 MiB package cap is removed. A conservative ZIP32 boundary below 2 GiB and
+  60,000 entries remains; it is a format/safety guard, not a tested capacity promise.
+  No yearly/multiyear device capacity is claimed until pressure tests pass.
+- A new standalone snapshot reads the source again and verifies original media hashes
+  before publication. Changes or lost access abort the edition. Interrupted new snapshots
+  are discarded; completed files survive sharing errors and can be shared explicitly.
 
-- Native image manipulator decodes/orients HEIF and other supported inputs, makes JPEG photo
-  derivatives (quality 0.82) and retains PNG for PNG inputs to preserve transparency.
-  Known dimensions are bounded to 2048 pixels on the long edge without upscaling.
-  Original records, frozen PDF media and system photos are not rewritten.
-- M4A/MP4-container audio and MP3 are recognized; unsupported audio fails explicitly.
-  No audio is silently dropped. Sound remains a user-triggered native audio element.
-- All resources are inside the EPUB. The installed reading application is responsible
-  for playback and its own cloud sync. Lampy does not upload this file to a provider.
-- Package resources are limited to 64 MiB. The current ZIP writer buffers data in JS;
-  very large albums should be split. Streaming packaging is future work.
-- Frozen manifest/media integrity is checked; generated archive digest is checked before
-  publishing. File creation uses a partial file; temporary conversion outputs are cleaned.
-  Background, lock, navigation and cancellation invalidate generation/sharing via existing
-  screen guards. Existing default-off paid/export release flags remain unchanged.
-- No new native module is added. The existing share sheet accepts the EPUB file URL.
-  The parent showcase's renderScale change still requires its documented native rebuild.
+## Background, lock, navigation and cancellation
 
-## Scope
+The policy is **stop, clean, and require an explicit new start**. There is no background
+continuation, scheduled continuation or automatic share on return.
 
-Personal editions only. Family PDF/EPUB export, Google Play Books compatibility,
-custom Apple-specific scripting and a dedicated reader are not delivered here.
-PDF and EPUB use the same frozen edition but do not share page numbers: EPUB reflows.
-The current flow binds PDF before creating EPUB; standalone EPUB creation is future work.
-This file is a finished publication, not a library backup and cannot be imported as records.
-External copies cannot be recalled after withdrawal/deletion in Lampy.
+1. Existing screen foreground/lock/focus generations invalidate work permanently for
+   that attempt; returning to active cannot make an old attempt valid again.
+2. Each copy/conversion boundary and each archive chunk checks validity. A native image
+   conversion already in progress may finish its single bounded task before cleanup;
+   its late result cannot advance the archive or open a share sheet.
+3. A cancel button is shown next to the current action. The operation stays owned until
+   cleanup finishes, so a retry cannot race its old files.
+4. ZIP output is written inside `.epub-work-*`; hashes and current rights are checked
+   before final publication. A cancellation during publication rolls back incomplete output.
+5. All opened readers/writers close on success, error and cancellation. Job ownership is
+   released even if cleanup fails. Cleanup failures are explicit, not successful editions.
+6. After process death there is no promised JS cleanup. On the next catalog/export access,
+   abandoned standalone staging/unpublished snapshots are removed; the next access to a
+   PDF-derived edition removes abandoned EPUB work. Active snapshots are excluded.
+7. The native share method also rejects presentation while the application is not active.
+   A deliberately opened share sheet may temporarily make the app inactive; completed files
+   are retained, and no second sheet is opened automatically.
 
-## Verification
+## Validation and limits
 
-- TypeScript and changed-file ESLint passed; 4 relevant Jest suites, 46 tests passed.
-- EPUBCheck 5.3.0: generated text and photo/AAC fixtures both passed with 0 errors and 0 warnings; not a visual reader test.
-- Native build, actual Apple Books import, visual layout, audio, HEIF conversion, memory
-  peaks and system share availability remain **NOT VERIFIED in this Linux environment**.
+- TypeScript and changed-file ESLint pass. Seven targeted suites / 72 tests pass and cover standalone freezing, source
+  changes, integrity, rights, low disk, chunk cancellation, late native image results,
+  publication rollback, cleanup, retry, active snapshot protection and UI cancellation.
+- A synthetic 70 MiB resource exercises chunked output beyond the former cap with reads
+  no larger than 64 KiB. This is not a device memory or Apple Books performance measurement.
+- Streamed photo/AAC EPUB: EPUBCheck 5.3.0 passes with 0 errors and 0 warnings.
+- **Native iOS compilation is NOT VERIFIED here** (Linux has no Apple SDK). Apple Books
+  import/layout/audio, HEIF orientation/PNG transparency, memory peaks, large real libraries,
+  storage exhaustion and real lifecycle transitions still require Mac/device acceptance.
+- PDF's existing renderer is not rewritten by this change. Users can avoid PDF work for
+  electronic-only output. Family export and release-profile switches remain unchanged.
 
-## Mac/device acceptance
+## Mac rebuild and device acceptance
 
-Use the parent's development build and configured local StoreKit product. Run `npm ci`
-inside `apps/ios` after updating. Keep the existing release flags closed for App Store 1.0.0.
+This update adds native `prepareEpubImage`: **Metro reload alone is insufficient**.
+In the dedicated PR135 worktree, run `npm ci` and `npx pod-install` from `apps/ios`,
+open `ios/Lampy.xcworkspace`, keep the local StoreKit configuration selected, then Run
+from Xcode to the simulator/device. Use the same `.pr135-env.sh` for Metro/Xcode.
+Do not uninstall the app or clean its data.
 
-1. In a development build with personal export enabled, create a real album containing
-   an opening, long Chinese/English text, emoji, portrait/landscape HEIF, camera photo,
-   transparent PNG and a short voice recording. Select a photo cover; also test word cover.
-2. Explicitly bind an edition. Select its EPUB action and choose Books in the system
-   share menu (or save to Files and open the file with Books). Do not publish to a store.
-3. Check cover, title/opening, contents links, original order, unknown/year-only dates,
-   complete text, photo orientation/transparency and manual audio play/pause.
-4. Enable airplane mode after import. Images and all audio must remain available.
-5. Check large text, dark theme, rotation, navigation and searching. Exact PDF pagination
-   and native audio player appearance are not promised.
-6. Modify the original album; export the old edition again: its content must stay unchanged.
-   Bind a new edition and verify the changes appear there. Restart and repeat old-file share.
-7. Cancel the share sheet, background/lock during generation, retry, and verify no late
-   share or successful UI appears while blocked. Check existing PDF and original audio.
-8. Without export rights, a new EPUB must not be created; a previously generated file
-   may still be saved. No purchase should start from merely tapping the EPUB action.
-9. Test a large album; oversize resources show the split-album message, not a partial book.
-
-## Device failure feedback follow-up
-
-A device report described the EPUB action as having no visible effect. Root cause is
-not established from that symptom alone. The action now shows local pending/success/
-retry feedback beside its edition. Development builds show a sanitized `EPUB/stage/code`
-on failure and `[LampyEpub]` stage events in Metro/Xcode; no original error messages,
-paths, titles, IDs or content are logged. XML/ZIP construction yields once so pending
-feedback can paint. Existing background/lock invalidation still suppresses late results.
-Targeted service/UI suites: 18 tests passed, including the pending-to-failure display.
-Actual device failure stage still requires the user's rerun; do not mark export repaired
-until the file can be created and imported on the device.
-
-## Photo size fix
-
-The device trace reached CONVERT_IMAGE / EPUB_TOO_LARGE: expanded PNG derivatives
-exhausted the 64 MiB resource budget. Photographic inputs now use JPEG; PNG inputs
-retain PNG based on the file signature. The budget applies to packaged derivatives,
-not the aggregate original photo size. Individual source images remain bounded at
-64 MiB and audio is checked against the remaining budget before buffering. The
-64 MiB package limit is unchanged. Device success remains pending a rerun.
+- Test the new direct EPUB action before generating any PDF. It must not invoke PDF creation.
+- Test a year-like ordered collection with long text, many portrait/landscape HEIF/JPEG/PNG
+  pictures, transparent PNG, emoji and multiple audio clips. Import into Books and verify
+  contents links, whole photos, orientation and offline playback. Repeat an existing PDF edition.
+- At snapshot copying, image preparation, archive writing and verification, separately cancel,
+  switch to another page, background and lock. Return: no automatic continuation or share.
+  Retry explicitly: no busy deadlock, old completed files intact, original records unchanged.
+- Force-kill during snapshot copy and archive output; restart and verify abandoned work is
+  recovered without deleting completed files or another active job.
+- Interrupt near final publication; incomplete versions must not appear as completed.
+  Cancel or fail only the system share: the completed version remains shareable.
+- Check progress counts and cancel responsiveness. Measure peak memory and elapsed time on
+  an actual iPhone; compare small/medium/large photo sets and long audio. A simulated 70 MiB
+  streaming test does not replace this acceptance.
+- Deny new export access: no new electronic edition; existing intact EPUB/PDF remains usable.

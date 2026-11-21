@@ -1,3 +1,4 @@
+import { createPersonalEpubSnapshot } from '../infrastructure/album-epub-snapshots';
 import {
   act,
   cleanup,
@@ -10,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AlbumPrintScreen from './album-print-screen';
 import { AlbumEpubFailure } from '../infrastructure/album-epub-files';
 import {AlbumPrintFailure} from '../application/album-print';
+jest.mock('../infrastructure/album-epub-snapshots', () => ({ listEpubSnapshots: async () => [], discardUnfinishedEpubSnapshot: async () => {}, createPersonalEpubSnapshot: jest.fn() }));
 const mockEpub = jest.fn(async () => undefined);
 jest.mock('../infrastructure/album-epub-files', () => ({
   ...jest.requireActual('../infrastructure/album-epub-files'),
@@ -153,7 +155,7 @@ it('generation is explicit, uses the saved style, and does not auto-share', asyn
   expect(mockShare).not.toHaveBeenCalled();
   expect(mockEpub).not.toHaveBeenCalled();
   await fireEvent.press(view.getByText('保存电子册 EPUB'));
-  await waitFor(() => expect(mockEpub).toHaveBeenCalledWith('print_1', expect.any(Function)));
+  await waitFor(() => expect(mockEpub).toHaveBeenCalledWith('print_1', expect.any(Function), expect.any(Function)));
   expect(view.getByText('字体嵌入尚未确认')).toBeTruthy();
   expect(view.getByText('普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。')).toBeTruthy();
   expect(view.queryByText('页面与文字选择已核对')).toBeNull();
@@ -291,4 +293,39 @@ it('shows EPUB progress and an actionable failure beside the saved edition', asy
   await waitFor(() => expect(view.getByText('电子册尚未完成，请再试一次。已有PDF和原记录不受影响。')).toBeTruthy());
   expect(view.getByTestId('album-epub-diagnostic').props.children).toBe('EPUB/WRITE_FILE/ERR_FILESYSTEM_WRITE');
   expect(view.getByText('保存电子册 EPUB')).toBeTruthy();
+});
+
+it.each(['cancel', 'leave', 'background'])('invalidates an in-flight EPUB on %s and suppresses its late result', async scenario => {
+  mockSave.mockResolvedValueOnce({ manifest: { id: 'print_stop', name: 'Stop test', createdAt: '2026-11-21T00:00:00Z', style: 'plain', imageDpi: [], pdf: { pageCount: 1, bytes: 1000, fontsEmbedded: true, fontRunNames: [] } } });
+  let validity: (() => boolean) | undefined;
+  let finish!: () => void;
+  mockEpub.mockImplementationOnce((...args: unknown[]) => { validity = args[1] as () => boolean; return new Promise<undefined>(resolve => { finish = () => resolve(undefined); }); });
+  const view = await render(wrap());
+  await waitFor(() => expect(mockList).toHaveBeenCalled());
+  await fireEvent.press(view.getByText('生成并保存测试PDF'));
+  await waitFor(() => expect(view.getByText('Stop test')).toBeTruthy());
+  await fireEvent.press(view.getByText('保存电子册 EPUB'));
+  await waitFor(() => expect(validity).toBeDefined());
+  expect(validity!()).toBe(true);
+  if (scenario === 'cancel') await fireEvent.press(view.getByText('取消制作电子册'));
+  else if (scenario === 'leave') await cleanup();
+  else AppState.currentState = 'background';
+  expect(validity!()).toBe(false);
+  await act(async () => finish());
+  if (scenario !== 'leave') expect(view.queryByText('电子册已交给所选应用。')).toBeNull();
+});
+
+it('creates an independent EPUB without first generating a PDF', async () => {
+  process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED = '1';
+  process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED = '1';
+  process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID = 'app.lampy.export';
+  (createPersonalEpubSnapshot as jest.Mock).mockResolvedValueOnce({ id:'epub_direct' });
+  mockEpub.mockResolvedValueOnce(undefined);
+  const view = await render(wrap());
+  await waitFor(() => expect(view.getByText('制作电子册（含声音）')).toBeTruthy());
+  await waitFor(() => expect(view.getByText('已解锁导出')).toBeTruthy());
+  await fireEvent.press(view.getByText('制作电子册（含声音）'));
+  await waitFor(() => expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','handmade',expect.any(Function),expect.any(Function)));
+  expect(mockSave).not.toHaveBeenCalled();
+  expect(mockEpub).toHaveBeenCalledWith('epub_direct',expect.any(Function),expect.any(Function));
 });
