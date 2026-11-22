@@ -35,6 +35,7 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}
   const [retry,setRetry]=useState(0);const initialRead=useRef(false);
   const [ready,setReady]=useState(false),[busy,setBusy]=useState(false),[email,setEmail]=useState(''),[code,setCode]=useState(''),[nickname,setNickname]=useState('');
   const [ticket,setTicket]=useState<EmailCodeTicket|null>(null),[message,setMessage]=useState<string|null>(null);
+  const [limitedUntil,setLimitedUntil]=useState(0),[limitedAddress,setLimitedAddress]=useState('');
   const [resendAt,setResendAt]=useState(0),[sentTo,setSentTo]=useState(''),[tick,setTick]=useState(()=>Date.now());
   const [foreground,setForeground]=useState(AppState.currentState==='active');
   const accountOwner=useRef<string|null>(null);
@@ -55,26 +56,29 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}
   useEffect(()=>{const sub=AppState.addEventListener('change',state=>{foregroundRef.current=state==='active';setForeground(state==='active');if(state!=='active')conceal();});return()=>sub.remove();},[conceal]);
   useEffect(()=>{if(!lock?.snapshot.locked)return;const timer=setTimeout(conceal,0);return()=>clearTimeout(timer);},[lock?.snapshot.locked,conceal]);
   function choose(next:typeof mode){sequence.current++;setMode(next);setEmail('');setCode('');setTicket(null);setMessage(null);}
-  const normalized=normalizeEmail(email),remaining=sentTo===normalized?Math.max(0,Math.ceil((resendAt-tick)/1000)):0;
+  const normalized=normalizeEmail(email),limited=limitedAddress===normalized?Math.max(0,Math.ceil((limitedUntil-tick)/1000)):0;
+  const recentlyAuthenticated=Date.parse(status.reauthenticationExpiresAt??'')>tick;
+  const activeTicket=ticket&&Date.parse(ticket.expiresAt)>tick?ticket:null;
+  const remaining=sentTo===normalized?Math.max(0,Math.ceil((resendAt-tick)/1000)):0;
   async function send() {
-    if(needsRefresh||busy||!ready||!foregroundRef.current||locked.current||mode==='summary'||mode==='name'||remaining)return;
+    if(needsRefresh||busy||!ready||!foregroundRef.current||locked.current||mode==='summary'||mode==='name'||remaining||limited)return;
     if(!isPlausibleEmail(normalized)){setMessage(tr('请输入有效邮箱。'));return;}
     const n=++sequence.current;action.current='send';setBusy(true);setMessage(null);
     try{const service=await getAccountUseCases();const next=await service.requestEmailCode({email:normalized,intent:mode,language:appLanguage==='en'?'en':'zh'},()=>current(n),accountOwner.current);
-      if(!current(n))return;setTicket(next);setSentTo(normalized);setResendAt(Date.now()+next.resendAfterSeconds*1000);setTick(Date.now());setCode('');setMessage(tr('验证码已发出，请查看收件箱或垃圾邮件。'));
-    }catch(error){if(current(n)){setMessage(errorCopy(error));if(isApplicationError(error)&&['STALE_FAMILY_REQUEST','UNAUTHENTICATED'].includes(error.code))setNeedsRefresh(true);if(isApplicationError(error)&&error.code==='RATE_LIMITED'){setSentTo(normalized);setResendAt(Date.now()+60000);}}}
+      if(!current(n))return;setLimitedUntil(0);setTicket(next);setSentTo(normalized);setResendAt(Date.now()+next.resendAfterSeconds*1000);setTick(Date.now());setCode('');setMessage(tr('验证码已发出，请查看收件箱或垃圾邮件。'));
+    }catch(error){if(current(n)){setMessage(errorCopy(error));if(isApplicationError(error)&&['STALE_FAMILY_REQUEST','UNAUTHENTICATED'].includes(error.code))setNeedsRefresh(true);if(isApplicationError(error)&&error.code==='REAUTHENTICATION_REQUIRED'){setStatus(previous=>({...previous,reauthenticationExpiresAt:undefined}));setTicket(null);setCode('');}if(isApplicationError(error)&&error.code==='RATE_LIMITED'){setLimitedAddress(normalized);setLimitedUntil(Date.now()+(error.retryAfterSeconds??0)*1000);setTick(Date.now());if(!activeTicket||Date.parse(activeTicket.expiresAt)<=Date.now()){setTicket(null);setCode('');setMessage(tr('发送过于频繁，本次没有发出邮件，请稍后再试。'));}else setMessage(tr('新验证码没有发出，仍可使用上一封邮件中的有效验证码。'));}}}
     finally{if(current(n)){action.current=null;setBusy(false);}}
   }
   async function verify() {
-    if(busy||!ticket||mode==='summary'||mode==='name'||!/^\d{6}$/.test(code)||!foregroundRef.current||locked.current)return;
+    if(busy||!ticket||mode==='summary'||mode==='name'||!activeTicket||!/^\d{6}$/.test(code)||!foregroundRef.current||locked.current)return;
     const n=++sequence.current;action.current='verify';setBusy(true);setMessage(null);
     try{const service=await getAccountUseCases();const result=await service.verifyEmailCode({email:normalized,challengeId:ticket.challengeId,intent:mode,code,
       ...(mode==='delete'?{confirmation:'delete-my-lampy-account-v1'}:{})},()=>current(n,true));
       if(!current(n,true))return;setTicket(null);setCode('');
       if('signedIn'in result){accountOwner.current=result.userId;setStatus({signedIn:true,linked:true});if(result.needsProfile)setMode('name');else if(onAuthenticated)onAuthenticated();else{setMode('summary');setMessage(tr('已登录。'));}}
       else if('deleted'in result){accountOwner.current=null;setStatus({signedIn:false,linked:false});setMode('login');setMessage(tr(result.appleRevocation==='manual-required'?'账号已删除。请在 Apple 账号设置中停止使用 Lampy 登录。':'账号已删除，本机个人记录仍保留。'));}
-      else {const state=await service.getEmailCodeAccount();if(!current(n,true))return;setStatus(state);setMode('summary');setMessage(tr('reauthenticated'in result?'验证完成，现在可以更换邮箱。':'邮箱已关联。'));}
-    }catch(error){if(current(n,true)){setCode('');setMessage(errorCopy(error));if(isApplicationError(error)&&['STALE_FAMILY_REQUEST','UNAUTHENTICATED'].includes(error.code))setNeedsRefresh(true);}}
+      else {const state=await service.getEmailCodeAccount();if(!current(n,true))return;setStatus(state);if('reauthenticated'in result){setBusy(false);action.current=null;choose('change');setMessage(tr('身份已确认，请输入新的邮箱地址。'));}else {setMode('summary');setMessage(tr('邮箱已关联。'));}}
+    }catch(error){if(current(n,true)){setCode('');setMessage(errorCopy(error));if(isApplicationError(error)&&['STALE_FAMILY_REQUEST','UNAUTHENTICATED'].includes(error.code))setNeedsRefresh(true);if(isApplicationError(error)&&error.code==='REAUTHENTICATION_REQUIRED')setStatus(previous=>({...previous,reauthenticationExpiresAt:undefined}));}}
     finally{if(current(n)){action.current=null;setBusy(false);}}
   }
   async function name() {
@@ -92,7 +96,8 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}
       {!ready?<>{message?<Text accessibilityLiveRegion="polite">{message}</Text>:<Text>{tr('正在确认账号服务。')}</Text>}{<Action label={tr('再试一次')} onPress={()=>setRetry(value=>value+1)} disabled={false} testID={'email-code-retry'}/>}{onOtherSignIn?<Action label={tr('其他登录方式')} onPress={onOtherSignIn}/>:null}{<Action label={tr('返回')} onPress={onCancel} disabled={false} testID={'email-code-back'}/>}</>:
       mode==='summary'?<>
         <Text>{status.maskedEmail??tr('邮箱已关联。')}</Text>
-        {<Action label={tr('验证当前邮箱')} onPress={()=>choose('reauth')} disabled={busy} testID={'email-code-reauth'}/>}
+        <Text style={styles.note}>{tr('邮箱已验证。')}</Text>
+        {recentlyAuthenticated?<Text testID="email-code-identity-confirmed" style={styles.note}>{tr('身份已确认，可以更换邮箱。')}</Text>:<Action label={tr('更换邮箱前重新验证身份')} onPress={()=>choose('reauth')} disabled={busy} testID="email-code-reauth"/>}
         {<Action label={tr('更换邮箱')} onPress={()=>choose('change')} disabled={busy} testID={'email-code-change'}/>}
         {<Action label={tr('退出登录')} onPress={()=>void logout()} disabled={busy} testID={'email-code-logout'}/>}
         {<Action label={tr('删除账号')} onPress={deletion} disabled={busy} testID={'email-code-delete'}/>}
@@ -101,14 +106,15 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}
         <TextInput testID="email-code-name" accessibilityLabel={tr('昵称')} value={nickname} onChangeText={setNickname} maxLength={24} editable={!busy} style={styles.input}/>
         {<Action label={tr('继续')} onPress={()=>void name()} disabled={busy||!nickname.trim()} testID={'email-code-name-save'}/>}
       </>:<>
-        <Text style={styles.body}>{tr(mode==='delete'?'删除账号会移除家庭账号相关数据，本机个人记录保留。':mode==='reauth'?'请输入当前账号已关联的完整邮箱。':'我们会发送一封邮件，你可以切换到邮箱查看验证码，再回来继续。')}</Text>
+        <Text style={styles.body}>{tr(mode==='delete'?'删除账号会移除家庭账号相关数据，本机个人记录保留。':mode==='reauth'?'请输入当前账号已关联的完整邮箱。':mode==='change'?'请输入新的邮箱地址，我们会向新邮箱发送验证码。':'我们会发送一封邮件，你可以切换到邮箱查看验证码，再回来继续。')}</Text>
         <TextInput testID="email-code-address" accessibilityLabel={tr('邮箱')} value={email} onChangeText={value=>{setEmail(value);setCode('');setTicket(null);}} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="emailAddress" maxLength={254} style={styles.input}/>
-        {<Action label={remaining?`${tr('重新获取')} (${remaining})`:ticket?tr('重新获取'):tr('获取验证码')} onPress={()=>void send()} disabled={needsRefresh||busy||remaining>0} testID={'email-code-send'}/>}
-        {ticket?<>
+        {<Action label={limited?`${tr('稍后重试')} (${limited})`:remaining?`${tr('重新获取')} (${remaining})`:activeTicket?tr('重新获取'):tr('获取验证码')} onPress={()=>void send()} disabled={needsRefresh||busy||remaining>0||limited>0} testID={'email-code-send'}/>}
+        {ticket&&!activeTicket?<Text style={styles.body}>{tr('验证码已过期，请重新获取。')}</Text>:null}
+        {activeTicket?<>
           <TextInput testID="email-code-value" accessibilityLabel={tr('六位验证码')} value={code} onChangeText={value=>setCode(value.replace(/\D/g,'').slice(0,6))} editable={!busy} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={6} style={styles.input}/>
           {<Action label={tr(mode==='delete'?'确认删除账号':'验证并继续')} onPress={()=>mode==='delete'?Alert.alert(tr('删除账号'),tr('这个操作无法撤销。'),[{text:tr('取消'),style:'cancel'},{text:tr('确认删除账号'),style:'destructive',onPress:()=>void verify()}]):void verify()} disabled={busy||code.length!==6} testID={'email-code-verify'}/>}
         </>:null}
-        {mode==='change'&&status.linked?<Action label={tr('先验证当前邮箱')} onPress={()=>choose('reauth')} disabled={busy}/>:null}
+        {mode==='change'&&status.linked&&!recentlyAuthenticated?<Action label={tr('先验证当前邮箱')} onPress={()=>choose('reauth')} disabled={busy}/>:null}
         {mode==='login'?<Text style={styles.note}>{tr('如果已有 Lampy 账号，请先用原来的方式登录，再关联邮箱。')}</Text>:null}
         {onOtherSignIn?<Action label={tr('其他登录方式')} onPress={onOtherSignIn} disabled={busy} testID={'email-code-other'}/>:null}
       </>}

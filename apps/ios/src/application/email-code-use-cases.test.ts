@@ -49,3 +49,13 @@ it('refuses requests and profile/logout actions from a stale account presentatio
  await expect(service.signOutEmailAccount('a')).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
  expect(h.sent).toHaveLength(0);expect(await h.session.getUserId()).toBe('b');
 });
+
+it('preserves actual cooldown and hourly quota waits through the server HTTP contract and client',async()=>{
+ const h=harness(),service=h.cases();const input={email:'user@example.com',intent:'login' as const};
+ await service.requestEmailCode(input,()=>true);
+ await expect(service.requestEmailCode(input,()=>true)).rejects.toMatchObject({code:'RATE_LIMITED',retryAfterSeconds:60});
+ for(let i=1;i<5;i++){h.advance();await service.requestEmailCode(input,()=>true);}
+ // The hourly quota dominates the short resend cooldown; no mail was sent.
+ await expect(service.requestEmailCode(input,()=>true)).rejects.toMatchObject({code:'RATE_LIMITED',retryAfterSeconds:3360});
+ expect(h.sent).toHaveLength(5);
+});

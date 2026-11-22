@@ -16,7 +16,7 @@ beforeEach(()=>{
   Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});
   jest.spyOn(AppState,'addEventListener').mockImplementation((event,listener)=>{if(event==='change')changed=listener;return {remove:jest.fn()};});
   mockService.getEmailCodeAvailability.mockResolvedValue(true);mockService.getEmailCodeAccount.mockResolvedValue({signedIn:false,linked:false});
-  mockService.requestEmailCode.mockResolvedValue({challengeId:'challenge',expiresAt:'later',resendAfterSeconds:60});
+  mockService.requestEmailCode.mockResolvedValue({challengeId:'challenge',expiresAt:new Date(Date.now()+300000).toISOString(),resendAfterSeconds:60});
   mockService.verifyEmailCode.mockResolvedValue({signedIn:true,userId:'a',needsProfile:false});
   mockService.finishEmailProfile.mockResolvedValue({userId:'a',nickname:'小禾'});
 });
@@ -79,4 +79,52 @@ it('changes an existing email through a distinct purpose and requires explicit d
   await act(async()=>alert.mock.calls[1][2]![1].onPress!());
   expect(mockService.verifyEmailCode).toHaveBeenCalledWith(expect.objectContaining({intent:'delete',confirmation:'delete-my-lampy-account-v1'}),expect.any(Function));
  } finally {alert.mockRestore();await deletion.unmount();}
+});
+
+
+it('shows a verified email and does not request identity confirmation again during the recent-authentication window',async()=>{
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com',reauthenticationExpiresAt:new Date(Date.now()+300000).toISOString()});
+ const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);
+ await waitFor(()=>expect(page.getByTestId('email-code-change')).toBeTruthy());
+ expect(page.getByText('邮箱已验证。')).toBeTruthy();expect(page.queryByTestId('email-code-reauth')).toBeNull();
+ await fireEvent.press(page.getByTestId('email-code-change'));expect(page.queryByText('先验证当前邮箱')).toBeNull();
+});
+
+it('moves from successful identity confirmation to a fresh new-email form without reusing the old challenge',async()=>{
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com'});
+ mockService.verifyEmailCode.mockResolvedValue({reauthenticated:true,userId:'a'});
+ const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);await waitFor(()=>expect(page.getByTestId('email-code-reauth')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('email-code-reauth'));await send(page);
+ await fireEvent.changeText(page.getByTestId('email-code-value'),'123456');
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com',reauthenticationExpiresAt:new Date(Date.now()+300000).toISOString()});
+ await fireEvent.press(page.getByTestId('email-code-verify'));
+ expect(page.getByText('身份已确认，请输入新的邮箱地址。')).toBeTruthy();expect(page.queryByText('先验证当前邮箱')).toBeNull();
+ expect(page.getByTestId('email-code-address').props.value).toBe('');expect(page.queryByTestId('email-code-value')).toBeNull();
+ await fireEvent.changeText(page.getByTestId('email-code-address'),'new@example.com');await fireEvent.press(page.getByTestId('email-code-send'));
+ expect(mockService.requestEmailCode).toHaveBeenLastCalledWith(expect.objectContaining({email:'new@example.com',intent:'change'}),expect.any(Function),'a');
+});
+
+it('does not imply delivery or show a code field when the first send is rate limited, and uses the real wait',async()=>{
+ mockService.requestEmailCode.mockRejectedValueOnce(new ApplicationError('RATE_LIMITED','Too many requests',2700));
+ const page=await form();await send(page);
+ expect(page.queryByTestId('email-code-value')).toBeNull();expect(page.getByTestId('email-code-send')).toBeDisabled();
+ expect(page.getByText(/稍后重试 \(2700\)/)).toBeTruthy();expect(page.queryByText('验证码已发出，请查看收件箱或垃圾邮件。')).toBeNull();
+});
+
+it('does not invent a 60-second countdown for a legacy rate-limit response without a retry time',async()=>{
+ mockService.requestEmailCode.mockRejectedValueOnce(new ApplicationError('RATE_LIMITED','Too many requests'));
+ const page=await form();await send(page);expect(page.getByText('发送过于频繁，本次没有发出邮件，请稍后再试。')).toBeTruthy();
+ expect(page.queryByTestId('email-code-value')).toBeNull();expect(page.queryByText(/重新获取 \(/)).toBeNull();
+});
+
+it('keeps only an actually delivered, unexpired code on a failed resend and hides it after expiry',async()=>{
+ jest.useFakeTimers();
+ try {
+  mockService.requestEmailCode.mockResolvedValueOnce({challengeId:'old',expiresAt:new Date(Date.now()+300000).toISOString(),resendAfterSeconds:60});
+  const page=await form();await send(page);await act(async()=>jest.advanceTimersByTime(61000));
+  mockService.requestEmailCode.mockRejectedValueOnce(new ApplicationError('RATE_LIMITED','Too many requests',1800));
+  await fireEvent.press(page.getByTestId('email-code-send'));
+  expect(page.getByTestId('email-code-value')).toBeTruthy();expect(page.getByText('新验证码没有发出，仍可使用上一封邮件中的有效验证码。')).toBeTruthy();
+  await act(async()=>jest.advanceTimersByTime(240000));expect(page.queryByTestId('email-code-value')).toBeNull();await page.unmount();
+ }finally{jest.useRealTimers();}
 });

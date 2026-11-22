@@ -1,7 +1,7 @@
 import {createHmac,randomBytes,randomInt,timingSafeEqual} from 'node:crypto';
 import {FamilyError,FAMILY_ERROR} from './errors';
 import {isPlausibleEmail,normalizeEmail} from './email-normalize';
-import {assertAccountActive,assertRecentAuthentication,attachVerifiedLoginIdentity,loginIdentityKey} from './login-identity';
+import {RECENT_AUTH_MS,assertAccountActive,assertRecentAuthentication,attachVerifiedLoginIdentity,loginIdentityKey} from './login-identity';
 import {assertDeletionFamilies,DELETE_ACCOUNT_CONFIRMATION,drainAccountMedia} from './account-deletion';
 import {incrementLoginRateLimit} from './test-account-commands';
 import type {FamilyRepository,FamilyTx} from './repository';
@@ -37,7 +37,12 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
       open();return deps.repository.withTransaction(async tx=>{
         const userId=await deps.requireUser(tx,token);
         const own=(await tx.listLoginIdentities(userId)).find(i=>i.provider==='email-otp'&&i.namespace===EMAIL_CODE_NAMESPACE);
-        return {signedIn:true,linked:!!own,...(own?{maskedEmail:maskEmail(own.subject)}:{})};
+        const session=await tx.findSession(token);
+        const authenticated=Date.parse(session?.authenticatedAt??'');
+        const recent=Number.isFinite(authenticated)&&authenticated<=deps.clock.now().getTime()&&authenticated+RECENT_AUTH_MS>deps.clock.now().getTime()&&
+          (await tx.listLoginIdentities(userId)).some(i=>loginIdentityKey(i)===session?.authenticatedIdentity);
+        return {signedIn:true,linked:!!own,...(own?{maskedEmail:maskEmail(own.subject)}:{}),
+          ...(recent?{reauthenticationExpiresAt:new Date(authenticated+RECENT_AUTH_MS).toISOString()}:{})};
       });
     },
     async request(input:EmailCodeRequest,token?:string,peer='unknown') {
@@ -54,10 +59,11 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
           {bucket:`email-code:peer:${mac(peer)}`,windowMs:3600_000,max:20},
           {bucket:`email-code:day:${now.toISOString().slice(0,10)}`,windowMs:86400_000,max:options.dailyLimit??200},
         ];
-        const counters=[];
+        const counters=[];let retryAfterSeconds=0;
         for(const limit of limits){const row=await tx.findRateLimit(limit.bucket);const active=row&&now.getTime()-Date.parse(row.windowStartedAt)<limit.windowMs;
-          if(active&&row.hitCount>=limit.max)return {error:new FamilyError(FAMILY_ERROR.RATE_LIMITED,'Too many email requests. Try again later.')};
+          if(active&&row.hitCount>=limit.max)retryAfterSeconds=Math.max(retryAfterSeconds,Math.ceil((Date.parse(row.windowStartedAt)+limit.windowMs-now.getTime())/1000));
           counters.push({bucket:limit.bucket,windowStartedAt:active?row.windowStartedAt:now.toISOString(),hitCount:active?row.hitCount+1:1});}
+        if(retryAfterSeconds)return {error:new FamilyError(FAMILY_ERROR.RATE_LIMITED,'Too many email requests. Try again later.',retryAfterSeconds)};
         for(const row of counters)await tx.saveRateLimit(row);
         const row:EmailCodeChallenge={id,email:address,scope,intent:input.intent,userId,sessionDigest:userId?mac(`session:${token}`):null,
           digest:mac(JSON.stringify(['code',id,address,input.intent,code])),createdAt:now.toISOString(),expiresAt:new Date(now.getTime()+EMAIL_CODE_TTL_MS).toISOString(),attempts:0,status:'pending'};

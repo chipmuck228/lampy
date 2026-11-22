@@ -1,7 +1,7 @@
 export class ApplicationError extends Error {
   readonly code: string;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, readonly retryAfterSeconds?: number) {
     super(message);
     this.name = 'ApplicationError';
     this.code = code;

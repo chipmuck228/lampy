@@ -112,7 +112,7 @@ function statusFor(code: string) {
 
 function fail(error: unknown): FamilyHttpResponse {
   if (isFamilyError(error)) {
-    return { status: statusFor(error.code), body: { error: { code: error.code, message: error.message } } };
+    return { status: statusFor(error.code), body: { error: { code: error.code, message: error.message, ...(error.retryAfterSeconds ? {retryAfterSeconds:error.retryAfterSeconds} : {}) } } };
   }
   return {
     status: 500,

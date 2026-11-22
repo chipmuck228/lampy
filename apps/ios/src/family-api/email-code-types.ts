@@ -6,7 +6,7 @@ export type EmailCodeRequest = {email:string;intent:EmailCodeIntent;language?:'z
 export type EmailCodeTicket = {challengeId:string;expiresAt:string;resendAfterSeconds:number};
 export type EmailCodeVerification = {challengeId:string;email:string;code:string;intent:EmailCodeIntent;confirmation?:string};
 export type EmailCodeResult = (SignInResult & {needsProfile:boolean}) | {linked:true;userId:string} | {reauthenticated:true;userId:string} | DeleteAccountResult;
-export type EmailCodeStatus = {signedIn:boolean;linked:boolean;maskedEmail?:string};
+export type EmailCodeStatus = {signedIn:boolean;linked:boolean;maskedEmail?:string;reauthenticationExpiresAt?:string};
 export type EmailCodeChallenge = {
   sequence?:number;id:string;email:string;scope:string;intent:EmailCodeIntent;digest:string;
   userId:string|null;sessionDigest:string|null;createdAt:string;expiresAt:string;attempts:number;status:'pending'|'active';

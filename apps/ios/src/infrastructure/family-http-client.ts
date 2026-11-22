@@ -125,14 +125,15 @@ export type FamilyApiClient = {
   ): Promise<{ mimeType: string; bytes: Uint8Array }>;
 };
 
-type ErrorBody = { error?: { code?: string; message?: string } };
+type ErrorBody = { error?: { code?: string; message?: string; retryAfterSeconds?: number } };
 
 function throwIfFailed(status: number, body: unknown): void {
   if (status >= 200 && status < 300) return;
   const error = (body || {}) as ErrorBody;
   const code = error.error?.code || (status === 0 ? 'SERVER_UNREACHABLE' : 'NETWORK');
   const message = error.error?.message || 'Family request failed.';
-  throw new ApplicationError(code, message);
+  const wait=error.error?.retryAfterSeconds;
+  throw new ApplicationError(code, message,typeof wait==='number'&&Number.isFinite(wait)&&wait>0?Math.ceil(wait):undefined);
 }
 
 export function createFamilyApiClient(transport: FamilyTransport, sharingVersion: 1 | 2 = 1): FamilyApiClient {

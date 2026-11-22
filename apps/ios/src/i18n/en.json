@@ -1182,5 +1182,14 @@
   "PDF": "PDF",
   "看看纸页": "Preview the pages",
   "收起纸页": "Close the page preview",
-  "{0}条记录 · {1}张照片": "{{0}} moments · {{1}} photos"
+  "{0}条记录 · {1}张照片": "{{0}} moments · {{1}} photos",
+  "新验证码没有发出，仍可使用上一封邮件中的有效验证码。": "A new code was not sent. You can still use the valid code in your previous email.",
+  "身份已确认，请输入新的邮箱地址。": "Identity confirmed. Enter your new email address.",
+  "邮箱已验证。": "Email verified.",
+  "身份已确认，可以更换邮箱。": "Identity confirmed. You can change your email.",
+  "更换邮箱前重新验证身份": "Confirm your identity before changing email",
+  "请输入新的邮箱地址，我们会向新邮箱发送验证码。": "Enter your new email address. We will send a code to it.",
+  "稍后重试": "Try again later",
+  "发送过于频繁，本次没有发出邮件，请稍后再试。": "No email was sent because requests are too frequent. Please try again later.",
+  "验证码已过期，请重新获取。": "This code has expired. Request a new one."
 }

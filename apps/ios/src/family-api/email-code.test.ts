@@ -33,7 +33,7 @@ for(const sqlite of [false,true])describe(sqlite?'SQLite email codes':'memory em
     await c.updateMyProfile(first.sessionToken,'小禾');await c.createNamedFamily(first.sessionToken,'家','first');
     advance();const again=await login('person@example.com');expect(again.userId).toBe(first.userId);expect(again.needsProfile).toBe(false);
     expect((await c.listFamilies(again.sessionToken)).families).toHaveLength(1);
-    expect(await c.emailCode.status(again.sessionToken)).toEqual({signedIn:true,linked:true,maskedEmail:'p***@example.com'});
+    expect(await c.emailCode.status(again.sessionToken)).toMatchObject({signedIn:true,linked:true,maskedEmail:'p***@example.com',reauthenticationExpiresAt:new Date(now.getTime()+300000).toISOString()});
     const stored=await repository.withTransaction(tx=>tx.findLoginIdentity('email-otp','person@example.com',EMAIL_CODE_NAMESPACE));
     expect(stored?.userId).toBe(first.userId);expect(stored?.verifiedAt).toBeTruthy();
   });
@@ -69,8 +69,8 @@ for(const sqlite of [false,true])describe(sqlite?'SQLite email codes':'memory em
     await expect(verify(latest)).resolves.toHaveProperty('sessionToken');
   });
   it('enforces resend and per-address limits before calling the sender',async()=>{
-    await request();await expect(request()).rejects.toMatchObject({code:'RATE_LIMITED'});expect(deliveries).toHaveLength(1);
-    for(let i=1;i<5;i++){advance();await request();}advance();await expect(request()).rejects.toMatchObject({code:'RATE_LIMITED'});expect(deliveries).toHaveLength(5);
+    await request();await expect(request()).rejects.toMatchObject({code:'RATE_LIMITED',retryAfterSeconds:60});expect(deliveries).toHaveLength(1);
+    for(let i=1;i<5;i++){advance();await request();}advance();await expect(request()).rejects.toMatchObject({code:'RATE_LIMITED',retryAfterSeconds:3300});expect(deliveries).toHaveLength(5);
   });
   it('binds email to a freshly authenticated existing user without changing the family identity',async()=>{
     const challenge=await c.beginAppleAuth('login');
@@ -84,7 +84,9 @@ for(const sqlite of [false,true])describe(sqlite?'SQLite email codes':'memory em
   it('reauthenticates before changing an email, keeps the same user and invalidates other sessions',async()=>{
     const user=await login();advance(300_001);
     await expect(request('new@example.com','change',user.sessionToken)).rejects.toMatchObject({code:'REAUTHENTICATION_REQUIRED'});
+    expect(await c.emailCode.status(user.sessionToken)).not.toHaveProperty('reauthenticationExpiresAt');
     const reauth=await request(undefined,'reauth',user.sessionToken);await expect(verify(reauth,undefined,'reauth',user.sessionToken)).resolves.toHaveProperty('reauthenticated',true);
+    expect(await c.emailCode.status(user.sessionToken)).toHaveProperty('reauthenticationExpiresAt',new Date(now.getTime()+300000).toISOString());
     const change=await request('new@example.com','change',user.sessionToken);await verify(change,'new@example.com','change',user.sessionToken);
     expect(await repository.withTransaction(tx=>tx.findLoginIdentity('email-otp','person@example.com',EMAIL_CODE_NAMESPACE))).toBeNull();
     advance();const again=await login('new@example.com');expect(again.userId).toBe(user.userId);
