@@ -17,6 +17,7 @@ module.exports = {
     '**/application/recovery-use-cases.test.ts',
     '**/application/draft-abandon-use-cases.test.ts',
     '**/infrastructure/account-config.test.ts',
+    '**/infrastructure/account-endpoint-transport.test.ts',
     '**/application/email-code-use-cases.test.ts',
     '**/screens/email-code-screen.test.tsx',
     '**/screens/email-code-route.test.tsx',

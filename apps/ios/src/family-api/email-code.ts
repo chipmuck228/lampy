@@ -54,15 +54,16 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
       const admitted=await deps.repository.withTransaction(async tx=>{
         const userId=await bound(tx,token,input.intent,address);
         await tx.pruneEmailCodeChallenges(now.toISOString());
+        const nextUtcMidnight=Date.parse(now.toISOString().slice(0,10)+'T00:00:00.000Z')+86400_000;
         const limits=[
           {bucket:`email-code:cooldown:${mac(address)}`,windowMs:60_000,max:1},
           {bucket:`email-code:address:${mac(address)}`,windowMs:3600_000,max:5},
           {bucket:`email-code:peer:${mac(peer)}`,windowMs:3600_000,max:20},
-          {bucket:`email-code:day:${now.toISOString().slice(0,10)}`,windowMs:86400_000,max:options.dailyLimit??200},
+          {bucket:`email-code:day:${now.toISOString().slice(0,10)}`,windowMs:86400_000,max:options.dailyLimit??200,resetAt:nextUtcMidnight},
         ];
         const counters=[];let retryAfterSeconds=0;
         for(const limit of limits){const row=await tx.findRateLimit(limit.bucket);const active=row&&now.getTime()-Date.parse(row.windowStartedAt)<limit.windowMs;
-          if(active&&row.hitCount>=limit.max)retryAfterSeconds=Math.max(retryAfterSeconds,Math.ceil((Date.parse(row.windowStartedAt)+limit.windowMs-now.getTime())/1000));
+          if(active&&row.hitCount>=limit.max)retryAfterSeconds=Math.max(retryAfterSeconds,Math.ceil(((limit.resetAt??(Date.parse(row.windowStartedAt)+limit.windowMs))-now.getTime())/1000));
           counters.push({bucket:limit.bucket,windowStartedAt:active?row.windowStartedAt:now.toISOString(),hitCount:active?row.hitCount+1:1});}
         if(retryAfterSeconds)return {error:new FamilyError(FAMILY_ERROR.RATE_LIMITED,'Too many email requests. Try again later.',retryAfterSeconds)};
         for(const row of counters)await tx.saveRateLimit(row);

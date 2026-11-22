@@ -45,6 +45,25 @@ for(const sqlite of [false,true])describe(sqlite?'SQLite email codes':'memory em
     await expect(c.updateMyProfile(account.sessionToken,'另一个名字')).rejects.toMatchObject({code:'NICKNAME_LOCKED'});
     expect((await c.getMyProfile(account.sessionToken)).nickname).toBe('生活记录者');
   });
+  it('reports the next UTC midnight for a daily cap and permits sending after that reset',async()=>{
+    now=new Date('2026-11-22T23:59:00.000Z');
+    const limited=createFamilyCommands({repository,clock:{now:()=>now},apple:createMapAppleVerifier({}),emailCode:{secret:'s'.repeat(64),dailyLimit:1,sender:{async send(message){deliveries.push(message);}}}});
+    await limited.emailCode.request({email:'one@example.com',intent:'login'},undefined,'peer-one');
+    await expect(limited.emailCode.request({email:'two@example.com',intent:'login'},undefined,'peer-two')).rejects.toMatchObject({code:'RATE_LIMITED',retryAfterSeconds:60});
+    now=new Date('2026-11-22T23:59:59.500Z');
+    await expect(limited.emailCode.request({email:'two@example.com',intent:'login'},undefined,'peer-two')).rejects.toMatchObject({retryAfterSeconds:1});
+    expect(deliveries).toHaveLength(1);
+    now=new Date('2026-11-23T00:00:00.000Z');
+    await expect(limited.emailCode.request({email:'two@example.com',intent:'login'},undefined,'peer-two')).resolves.toHaveProperty('challengeId');
+    expect(deliveries).toHaveLength(2);
+  });
+  it('keeps hourly address limits in force across the UTC daily reset',async()=>{
+    now=new Date('2026-11-22T23:54:00.000Z');
+    for(let i=0;i<5;i++){await request();advance();}
+    now=new Date('2026-11-23T00:00:00.000Z');
+    await expect(request()).rejects.toMatchObject({code:'RATE_LIMITED',retryAfterSeconds:3240});
+    expect(deliveries).toHaveLength(5);
+  });
   it('stores only keyed digests and activates codes only after delivery is accepted',async()=>{
     const ticket=await request();const row=await repository.withTransaction(tx=>tx.findEmailCodeChallenge(ticket.challengeId));
     expect(row?.status).toBe('active');expect(row?.digest).toHaveLength(64);expect(row).not.toHaveProperty('code');
