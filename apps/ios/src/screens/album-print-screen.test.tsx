@@ -209,7 +209,7 @@ it('shows the finished book with its real counts before anything is bought or ge
   formal();
   mockStatus.mockResolvedValue({ owned: false, product: { id: 'app.lampy.export', name: 'Export', price: '¥18.00' } });
   const page = await render(wrap());
-  await waitFor(() => expect(page.getByText('翻一翻，这就是导出后的样子。')).toBeTruthy());
+  await waitFor(() => expect(page.getByText('纸页预览；电子册会按所选编排适应阅读器。')).toBeTruthy());
   expect(page.getByTestId('album-export-book')).toBeTruthy();
   expect(page.getAllByText('Our days').length).toBeGreaterThan(0);
   expect(page.getByText('2026年9月 — 10月 · A5 · 148×210 mm')).toBeTruthy();
@@ -250,15 +250,16 @@ it('binding shows the reported steps, then the new edition ready to save', async
   await fireEvent.press(page.getByTestId('album-export-fresh-share'));
   await waitFor(() => expect(mockShare).toHaveBeenCalledTimes(1));
 });
-it('choosing paper keeps the reading preference and binds with that paper', async () => {
+it('keeps the existing PDF paper preference without exposing it as an EPUB design', async () => {
   formal();
-  mockSave.mockResolvedValue({ manifest: { id: 'print_2', name: 'Our days', createdAt: 'x', style: 'plain', imageDpi: [], pdf: { pageCount: 3, bytes: 1, fontRunNames: [] } } });
+  mockSave.mockResolvedValue({ manifest: { id: 'print_2', name: 'Our days', createdAt: 'x', style: 'handmade', imageDpi: [], pdf: { pageCount: 3, bytes: 1, fontRunNames: [] } } });
   const page = await render(wrap());
-  await waitFor(() => expect(page.getByTestId('album-export-style-plain')).toBeTruthy());
-  await fireEvent.press(page.getByTestId('album-export-style-plain'));
-  expect(mockSaveStyle).toHaveBeenCalledWith('book', 'plain', null);
+  await waitFor(() => expect(page.getByText('已解锁导出')).toBeTruthy());
+  expect(page.queryByTestId('album-export-style-plain')).toBeNull();
+  expect(page.getByText('生活文集 · 已选')).toBeTruthy();
   await fireEvent.press(page.getByText('装订成册'));
-  await waitFor(() => expect(mockSave).toHaveBeenCalledWith('plain'));
+  await waitFor(() => expect(mockSave).toHaveBeenCalledWith('handmade'));
+  expect(mockSaveStyle).not.toHaveBeenCalled();
 });
 it('a book with unreadable moments cannot start binding', async () => {
   formal();
@@ -325,7 +326,23 @@ it('creates an independent EPUB without first generating a PDF', async () => {
   await waitFor(() => expect(view.getByText('制作电子册（含声音）')).toBeTruthy());
   await waitFor(() => expect(view.getByText('已解锁导出')).toBeTruthy());
   await fireEvent.press(view.getByText('制作电子册（含声音）'));
-  await waitFor(() => expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','handmade',expect.any(Function),expect.any(Function)));
+  await waitFor(() => expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','literary',expect.any(Function),expect.any(Function)));
   expect(mockSave).not.toHaveBeenCalled();
   expect(mockEpub).toHaveBeenCalledWith('epub_direct',expect.any(Function),expect.any(Function));
+});
+
+it('uses the selected electronic design without changing the reading paper preference', async () => {
+  process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED = '1';
+  process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED = '1';
+  process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID = 'app.lampy.export';
+  (createPersonalEpubSnapshot as jest.Mock).mockResolvedValueOnce({ id:'epub_images' });
+  mockEpub.mockResolvedValueOnce(undefined);
+  const view=await render(wrap());
+  await waitFor(()=>expect(view.getByText('已解锁导出')).toBeTruthy());
+  await fireEvent.press(view.getByText('影像小册'));
+  expect(view.getByText('影像小册 · 已选')).toBeTruthy();
+  expect(view.queryByTestId('album-export-style-plain')).toBeNull();
+  await fireEvent.press(view.getByText('制作电子册（含声音）'));
+  await waitFor(()=>expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','imagebook',expect.any(Function),expect.any(Function)));
+  expect(mockSaveStyle).not.toHaveBeenCalled();
 });

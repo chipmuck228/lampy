@@ -118,7 +118,7 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     check();
     report('PACKAGE');
     await new Promise<void>(resolve => setTimeout(resolve, 0)); check();
-    const documents = albumEpubDocuments({ input: manifest.content, assets, dates, id: `${id}-${appLanguage}`, createdAt: manifest.createdAt, style: manifest.style, language: appLanguage });
+    const documents = albumEpubDocuments({ input: manifest.content, assets, dates, id: `${id}-${appLanguage}`, createdAt: manifest.createdAt, design: 'kind' in manifest ? manifest.design : undefined, language: appLanguage });
     const entries = [...Object.entries(documents).map(([name, data]) => epubMemoryEntry(name, data)), ...mediaEntries];
     await assertSpace(entries.reduce((sum, item) => sum + item.size, 0) + RESERVE); check();
     const part = `${work}album.epub`;

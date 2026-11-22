@@ -29,3 +29,9 @@ it('rejects a changed source before publication',async()=>{
   const deps=fixture();deps.read.mockResolvedValueOnce(input).mockResolvedValueOnce({...input,album:{...input.album,name:'Changed'}});
   await expect(freezeEpubSnapshot(deps)).rejects.toThrow('SOURCE_CHANGED');expect(deps.store.commit).not.toHaveBeenCalled();
 });
+
+it('freezes the EPUB design separately from the existing reading paper preference',async()=>{
+  const deps=fixture();const snapshot=await freezeEpubSnapshot({...deps,style:'handmade',design:'imagebook'});
+  expect(snapshot.design).toBe('imagebook');expect(snapshot.style).toBe('handmade');
+  expect(deps.store.commit).toHaveBeenCalledWith(expect.objectContaining({design:'imagebook'}));
+});

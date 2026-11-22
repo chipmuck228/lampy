@@ -34,6 +34,7 @@ export function AlbumExportShowcase({
   busy,
   celebrate,
   holdAt,
+  ebookDesigns = false,
   children,
 }: {
   layout: AlbumLayout | null;
@@ -45,6 +46,7 @@ export function AlbumExportShowcase({
   busy: boolean;
   celebrate: number;
   holdAt?: number;
+  ebookDesigns?: boolean;
   children?: ReactNode;
 }) {
   const pages = useMemo(() => (layout ? styleAlbumPages(layout, style) : []), [layout, style]);
@@ -69,7 +71,7 @@ export function AlbumExportShowcase({
       ) : failed ? null : (
         <AlbumExportBookPlaceholder width={width} />
       )}
-      {layout ? <Text style={styles.caption}>{tr('翻一翻，这就是导出后的样子。')}</Text> : null}
+      {layout ? <Text style={styles.caption}>{tr(ebookDesigns ? '纸页预览；电子册会按所选编排适应阅读器。' : '翻一翻，这就是导出后的样子。')}</Text> : null}
       {failed ? <Text style={[styles.meta, styles.center]}>{tr('这一册暂时排不出来。收进的记录还在。')}</Text> : null}
       {layout && facts ? (
         <>
@@ -81,7 +83,7 @@ export function AlbumExportShowcase({
               {[span, tr('A5 · 148×210 mm')].filter(Boolean).join(' · ')}
             </Text>
           </View>
-          <StylePicker style={style} onStyle={onStyle} disabled={busy} />
+          {!ebookDesigns ? <StylePicker style={style} onStyle={onStyle} disabled={busy} /> : null}
           <EditionStats
             items={[
               { value: facts.pageCount, label: tr('页') },

@@ -4,7 +4,7 @@ import { getUseCases } from '../application/container';
 import { dateKeyAndLabel } from '../application/album-paginate';
 import { freezeEpubSnapshot, type EpubSnapshot } from '../application/album-epub-snapshot';
 import { manifestDigest } from '../application/album-print';
-import type { AlbumReadingStyle } from '../application/album-reading';
+import type { EpubDesign } from '../application/album-epub';
 import { albumExportAccess } from './album-export-purchases';
 import { dateLabel } from '../i18n';
 export function epubSnapshotRoot() {
@@ -25,7 +25,7 @@ async function prepareSnapshots() {
       await discardUnfinishedEpubSnapshot(name);
   }
 }
-export type SavedEpubSnapshot = Pick<EpubSnapshot, 'id' | 'name' | 'createdAt' | 'style'>;
+export type SavedEpubSnapshot = Pick<EpubSnapshot, 'id' | 'name' | 'createdAt' | 'style' | 'design'>;
 export async function listEpubSnapshots(albumId: string): Promise<SavedEpubSnapshot[]> {
   await prepareSnapshots(); const result: SavedEpubSnapshot[] = [];
   for (const name of await FS.readDirectoryAsync(epubSnapshotRoot())) {
@@ -37,16 +37,16 @@ export async function listEpubSnapshots(albumId: string): Promise<SavedEpubSnaps
         (await FS.getInfoAsync(`${epubSnapshotDirectory(name)}album-${language}.epub`)).exists &&
         (await FS.getInfoAsync(`${epubSnapshotDirectory(name)}album-${language}.epub.sha256`)).exists))).some(Boolean);
       if (completed && snapshot.id === name && snapshot.kind === 'epub' && snapshot.version === 1 && snapshot.albumId === albumId && digest === manifestDigest(snapshot))
-        result.push({ id: name, name: snapshot.name, createdAt: snapshot.createdAt, style: snapshot.style });
+        result.push({ id: name, name: snapshot.name, createdAt: snapshot.createdAt, style: snapshot.style, design: snapshot.design });
     } catch { /* Incomplete or corrupt editions are not presented as completed. */ }
   }
   return result.sort((a,b) => b.createdAt.localeCompare(a.createdAt));
 }
-export async function createPersonalEpubSnapshot(albumId: string, style: AlbumReadingStyle, current: () => boolean, progress?: (done: number, total: number) => void) {
+export async function createPersonalEpubSnapshot(albumId: string, design: EpubDesign, current: () => boolean, progress?: (done: number, total: number) => void) {
   const id = `epub_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
   activeSnapshots.add(id); let published = false; let retained = false;
   try {
-    const result = await freezeEpubSnapshot({ id, now: new Date().toISOString(), style, current,
+    const result = await freezeEpubSnapshot({ id, now: new Date().toISOString(), design, current,
       authorize: () => albumExportAccess.assert(current),
       read: async () => (await (await getUseCases()).readAlbumForContinuousReading(albumId, { privateUnlocked: current() })).input,
       dates(input) {

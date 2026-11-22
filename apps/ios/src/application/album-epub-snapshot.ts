@@ -1,10 +1,11 @@
+import { epubDesign, type EpubDesign } from './album-epub';
 import { albumReadingFingerprint, type AlbumReadingStyle } from './album-reading';
 import { assertPrintContent, type PrintMedia } from './album-print';
 import type { AlbumLayoutInput } from './album-layout-input';
 
 export type EpubSnapshot = {
   version: 1; kind: 'epub'; id: string; albumId: string; name: string; createdAt: string;
-  style: AlbumReadingStyle; content: AlbumLayoutInput; media: PrintMedia[];
+  style: AlbumReadingStyle; design?: EpubDesign; content: AlbumLayoutInput; media: PrintMedia[];
   dates: Record<string, { label: string; chapter: string }>;
 };
 export type EpubSnapshotStore = {
@@ -16,7 +17,7 @@ export type EpubSnapshotStore = {
 };
 /** Freeze an independent edition without fonts, Core Text pagination or PDF generation. */
 export async function freezeEpubSnapshot(deps: {
-  id: string; now: string; style: AlbumReadingStyle; current(): boolean; authorize(): Promise<void>;
+  id: string; now: string; style?: AlbumReadingStyle; design?: EpubDesign; current(): boolean; authorize(): Promise<void>;
   read(): Promise<AlbumLayoutInput>; dates(input: AlbumLayoutInput): EpubSnapshot['dates'];
   store: EpubSnapshotStore; progress?(done: number, total: number): void;
 }): Promise<EpubSnapshot> {
@@ -25,6 +26,7 @@ export async function freezeEpubSnapshot(deps: {
   try {
     check(); await deps.authorize(); check();
     const first = await deps.read(); check(); assertPrintContent(first);
+    const design = epubDesign(deps.design);
     const fingerprint = albumReadingFingerprint(first);
     const content: AlbumLayoutInput = JSON.parse(JSON.stringify(first));
     const dates = deps.dates(first);
@@ -46,7 +48,7 @@ export async function freezeEpubSnapshot(deps: {
     for (const original of originals) { await deps.store.verify(original.source, original.hash); check(); }
     await deps.authorize(); check();
     const snapshot: EpubSnapshot = { version: 1, kind: 'epub', id: deps.id, albumId: content.album.id,
-      name: content.album.name, createdAt: deps.now, style: deps.style, content, media: [...copies.values()], dates };
+      name: content.album.name, createdAt: deps.now, style: deps.style ?? 'plain', design, content, media: [...copies.values()], dates };
     await deps.store.commit(snapshot); check();
     return snapshot;
   } catch (error) {

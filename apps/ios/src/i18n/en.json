@@ -1090,5 +1090,14 @@
   "段声音": "sounds",
   "条记录": "moments",
   "《{0}》成品预览，{1}": "Preview of “{{0}}” as exported, {{1}}",
-  "读取这一册的记录": "Reading this album's moments"
+  "读取这一册的记录": "Reading this album's moments",
+  "电子册编排": "Electronic album design",
+  "生活文集": "Life anthology",
+  "影像小册": "Photo journal",
+  "生活文集 · 已选": "Life anthology · selected",
+  "影像小册 · 已选": "Photo journal · selected",
+  "以文字为线索，照片与声音自然相伴。": "Follow the words, with photos and sound alongside.",
+  "以照片为主角，完整保留文字与声音。": "Let photos lead, preserving every word and sound.",
+  "纸页预览；电子册会按所选编排适应阅读器。": "Paper preview; the electronic album adapts your chosen design to the reader.",
+  "历史电子册": "Earlier electronic edition"
 }
