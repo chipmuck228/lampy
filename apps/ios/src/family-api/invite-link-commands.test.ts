@@ -53,6 +53,7 @@ async function open(file: string, enabled = true) {
 it("is closed by default and leaves Apple and families usable", async () =>
   setup(async (s) => {
     const closed = createFamilyCommands({
+      clock: {now:()=>new Date("2026-10-08T00:00:00Z")},
       repository: createSqliteFamilyRepository(s.db),
       apple,
     });

@@ -1,3 +1,4 @@
+import {readFamilyAccount} from './family-account-scope';
 import { FamilySharePhotoError } from './family-share-photo-error';
 import { prepareFamilyShareMedia } from './prepare-family-share-media';
 import {familySafetyGeneration} from './family-safety-events';
@@ -25,7 +26,7 @@ export type HistoryReading = {
   media: { objectId: string; mimeType: string; uri: string }[];
 };
 
-type Account = { userId: string; sessionToken: string };
+type Account = { userId: string; sessionToken: string; revision?:number };
 type Personal = {
   moments: { findById(id: string): Promise<MomentRead> };
   assets: { findById(id: string): Promise<AssetRead> };
@@ -66,16 +67,11 @@ export function createFamilyHistoryUseCases(deps: {
     if (verifiedFiles.size > 128) verifiedFiles.delete(verifiedFiles.keys().next().value!);
   }
   let cacheTail: Promise<unknown> = Promise.resolve();
-  async function account(): Promise<Account> {
-    const sessionToken = await deps.session.getSessionToken();
-    const userId = await deps.session.getUserId();
-    if (!sessionToken || !userId) throw error('UNAUTHENTICATED');
-    return { userId, sessionToken };
-  }
+  async function account():Promise<Account>{return readFamilyAccount(deps.session);}
   async function check(a: Account, current: HistoryCurrent) {
     if (!current()) throw error('STALE_FAMILY_REQUEST');
     const next = await account();
-    if (!current() || a.userId !== next.userId || a.sessionToken !== next.sessionToken) throw error('STALE_FAMILY_REQUEST');
+    if (!current() || a.userId !== next.userId || a.sessionToken !== next.sessionToken || a.revision !== next.revision) throw error('STALE_FAMILY_REQUEST');
   }
   function api() {
     if (!deps.client.history || !deps.client.getHistoryPolicy) throw error('FAMILY_UPGRADE_REQUIRED');

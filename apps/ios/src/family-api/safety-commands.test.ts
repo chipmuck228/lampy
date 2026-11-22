@@ -132,6 +132,6 @@ it('migration 33 rolls back all safety tables on a failed migration marker',asyn
   await expect(applyFamilyApiSchema({...db,run:async(sql,args)=>{if(sql.includes('family_schema_migrations')&&args?.[0]===33)throw Error('disk full');return db.run(sql,args);}})).rejects.toThrow('disk full');
   expect(await db.getFirst("SELECT name FROM sqlite_master WHERE name='family_safety_reports'")).toBeNull();
   await applyFamilyApiSchema(db);await applyFamilyApiSchema(db);
-  expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:33});
+  expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:34});
  } finally {await db.close();}
 });

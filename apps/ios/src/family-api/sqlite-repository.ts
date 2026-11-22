@@ -1,3 +1,4 @@
+import { loginNamespace, validLoginIdentity } from './login-identity';
 import {sqliteSafetyTx} from './safety-repository';
 import {purgeSqliteAccount} from './account-purge-sqlite';
 import { FamilyError, FAMILY_ERROR } from './errors';
@@ -42,6 +43,8 @@ type RateLimitRow = {
 };
 
 type SessionRow = {
+  authenticated_at: string | null;
+  authenticated_identity: string | null;
   token: string;
   user_id: string;
   expires_at: string;
@@ -166,7 +169,9 @@ function rateLimitFrom(row: RateLimitRow): AuthRateLimit {
 }
 
 function sessionFrom(row: SessionRow): Session {
-  return { token: row.token, userId: row.user_id, expiresAt: row.expires_at };
+  return {
+    ...(row.authenticated_at?{authenticatedAt:row.authenticated_at}:{}),
+    ...(row.authenticated_identity?{authenticatedIdentity:row.authenticated_identity}:{}), token: row.token, userId: row.user_id, expiresAt: row.expires_at };
 }
 
 function familyFrom(row: FamilyRow): Family {
@@ -269,20 +274,42 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     async saveAppleChallenge(c) { await db.run('INSERT INTO family_apple_challenges VALUES(?,?,?,?,?,?)',[c.id,c.nonce,c.intent,c.userId,c.sessionToken,c.expiresAt]); },
     async deleteAppleChallenge(id) { await db.run('DELETE FROM family_apple_challenges WHERE id=?',[id]); },
     async pruneAppleChallenges(now) { await db.run('DELETE FROM family_apple_challenges WHERE expires_at<=?',[now]); },
-    async findLoginIdentity(provider, subject) {
-      const row = await db.getFirst<{ provider: import('./types').LoginProvider; subject: string; user_id: string; created_at: string }>('SELECT * FROM family_login_identities WHERE provider=? AND subject=?', [provider, subject]);
-      return row ? { provider: row.provider, subject: row.subject, userId: row.user_id, createdAt: row.created_at } : null;
+    async findLoginIdentity(provider, subject, namespace = 'legacy') {
+      const row = await db.getFirst<{provider:import('./types').LoginProvider;namespace:string;subject:string;user_id:string;created_at:string;verified_at:string|null}>(
+        'SELECT * FROM family_login_identities WHERE provider=? AND namespace=? AND subject=?',[provider,namespace,subject]);
+      return row ? identityFrom(row) : null;
     },
     async listLoginIdentities(userId) {
-      const rows = await db.getAll<{ provider: import('./types').LoginProvider; subject: string; user_id: string; created_at: string }>('SELECT * FROM family_login_identities WHERE user_id=? ORDER BY provider', [userId]);
-      return rows.map(row => ({ provider: row.provider, subject: row.subject, userId: row.user_id, createdAt: row.created_at }));
+      const rows = await db.getAll<Parameters<typeof identityFrom>[0]>('SELECT * FROM family_login_identities WHERE user_id=? ORDER BY provider,namespace',[userId]);
+      return rows.map(identityFrom);
     },
     async attachLoginIdentity(identity) {
-      if (!['apple', 'controlled-password'].includes(identity.provider) || !identity.subject.trim() || !(await tx.findAccountByUserId(identity.userId))) throw new FamilyStoreConstraintError('login_identity');
-      const existing = await tx.findLoginIdentity(identity.provider, identity.subject);
-      const sameProvider = (await tx.listLoginIdentities(identity.userId)).find(i => i.provider === identity.provider);
+      if (!validLoginIdentity(identity) || !(await tx.findAccountByUserId(identity.userId))) throw new FamilyStoreConstraintError('login_identity');
+      const existing = await tx.findLoginIdentity(identity.provider, identity.subject, loginNamespace(identity));
+      const sameProvider = (await tx.listLoginIdentities(identity.userId)).find(i => i.provider === identity.provider && loginNamespace(i) === loginNamespace(identity));
       if ((existing && existing.userId !== identity.userId) || (sameProvider && sameProvider.subject !== identity.subject)) throw new FamilyStoreConstraintError('login_identity');
-      if (!existing) await db.run('INSERT INTO family_login_identities(provider,subject,user_id,created_at) VALUES (?,?,?,?)', [identity.provider,identity.subject,identity.userId,identity.createdAt]);
+      if (!existing) await db.run('INSERT INTO family_login_identities(provider,namespace,subject,user_id,created_at,verified_at) VALUES (?,?,?,?,?,?)',
+        [identity.provider,loginNamespace(identity),identity.subject,identity.userId,identity.createdAt,identity.verifiedAt??null]);
+    },
+    async removeLoginIdentity(identity) {
+      await db.run('DELETE FROM family_login_identities WHERE provider=? AND namespace=? AND subject=? AND user_id=?',
+        [identity.provider,loginNamespace(identity),identity.subject,identity.userId]);
+      if (identity.provider === 'apple' && loginNamespace(identity) === 'legacy') {
+        await db.run('UPDATE family_accounts SET apple_subject=NULL WHERE user_id=? AND apple_subject=?',[identity.userId,identity.subject]);
+      }
+    },
+    async getAccountStatus(userId) {
+      const row = await db.getFirst<{status:import('./types').AccountStatus}>(
+        "SELECT COALESCE(s.status,'active') AS status FROM family_accounts a LEFT JOIN family_account_states s ON s.user_id=a.user_id WHERE a.user_id=?",[userId]);
+      return row?.status??null;
+    },
+    async setAccountStatus(userId,status) {
+      if (!['active','suspended'].includes(status) || !(await tx.findAccountByUserId(userId))) throw new FamilyStoreConstraintError('login_identity');
+      await db.run('INSERT INTO family_account_states(user_id,status) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET status=excluded.status',[userId,status]);
+      if (status === 'suspended') {
+        await tx.deleteSessionsForUser(userId);
+        await db.run('DELETE FROM family_apple_challenges WHERE user_id=?',[userId]);
+      }
     },
 
     async findProfile(userId) { return db.getFirst<import('./types').UserProfile>(
@@ -307,7 +334,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     async findAccountByAppleSubject(appleSubject) {
       if (!appleSubject) return null;
       const row = await db.getFirst<AccountRow>(
-        "SELECT a.user_id, a.apple_subject, a.email, a.created_at FROM family_accounts a JOIN family_login_identities i ON i.user_id=a.user_id WHERE i.provider='apple' AND i.subject=?",
+        "SELECT a.user_id, a.apple_subject, a.email, a.created_at FROM family_accounts a JOIN family_login_identities i ON i.user_id=a.user_id WHERE i.provider='apple' AND i.namespace='legacy' AND i.subject=?",
         [appleSubject],
       );
       return row ? accountFrom(row) : null;
@@ -331,16 +358,16 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     },
     async findSession(token) {
       const row = await db.getFirst<SessionRow>(
-        'SELECT token, user_id, expires_at FROM family_sessions WHERE token = ?',
+        'SELECT * FROM family_sessions WHERE token = ?',
         [token],
       );
       return row ? sessionFrom(row) : null;
     },
     async saveSession(session) {
       await db.run(
-        `INSERT INTO family_sessions (token, user_id, expires_at) VALUES (?, ?, ?)
-         ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, expires_at = excluded.expires_at`,
-        [session.token, session.userId, session.expiresAt],
+        `INSERT INTO family_sessions (token, user_id, expires_at, authenticated_at, authenticated_identity) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, expires_at = excluded.expires_at, authenticated_at = excluded.authenticated_at, authenticated_identity = excluded.authenticated_identity`,
+        [session.token, session.userId, session.expiresAt, session.authenticatedAt??null, session.authenticatedIdentity??null],
       );
     },
     async deleteSession(token) {
@@ -352,6 +379,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
     async deleteSessionsForUser(userId) {
       await db.run('DELETE FROM family_sessions WHERE user_id = ?', [userId]);
     },
+    async removeTestCredential(userId) {await db.run('DELETE FROM family_test_credentials WHERE user_id=?',[userId]);},
     async findTestCredentialByLogin(loginNormalized) {
       const row = await db.getFirst<TestCredentialRow>(
         `SELECT credential_id, login_normalized, user_id, password_hash, enabled, created_at, disabled_at, operator_provisioned
@@ -722,4 +750,9 @@ export function createSqliteFamilyRepository(db: FamilySql): FamilyRepository {
 type InviteLinkRow = { invitation_id: string; family_id: string; token_hash: string; status: import('./types').InvitationStatus; created_at: string; expires_at: string; accepted_by_user_id: string | null };
 function readInviteLink(r: InviteLinkRow | null): import('./types').InviteLink | null {
   return r ? { invitationId:r.invitation_id, familyId:r.family_id, tokenHash:r.token_hash, status:r.status, createdAt:r.created_at, expiresAt:r.expires_at, acceptedByUserId:r.accepted_by_user_id ?? undefined } : null;
+}
+
+function identityFrom(row: {provider:import('./types').LoginProvider;namespace:string;subject:string;user_id:string;created_at:string;verified_at:string|null}):import('./types').LoginIdentity {
+  return {provider:row.provider,subject:row.subject,userId:row.user_id,createdAt:row.created_at,
+    ...(row.namespace === 'legacy' ? {} : {namespace:row.namespace}),...(row.verified_at ? {verifiedAt:row.verified_at} : {})};
 }

@@ -1,3 +1,4 @@
+import {LOGIN_PROVIDERS} from './login-identity';
 import { FAMILY_ERROR, FamilyError, isFamilyError } from './errors';
 import type { FamilyCommands } from './commands';
 
@@ -144,6 +145,12 @@ export async function dispatchFamilyApi(
     }
     if (method === 'POST' && path === '/v2/auth/apple/complete') return {status:200,body:await commands.completeAppleAuth({challengeId:readString(body,'challengeId'),identityToken:readString(body,'identityToken')},token)};
     if (method === 'POST' && path === '/v2/me/account/delete') return {status:200,body:await commands.deleteAccount(token || '',{challengeId:readString(body,'challengeId'),identityToken:readString(body,'identityToken'),authorizationCode:readString(body,'authorizationCode'),confirmation:readString(body,'confirmation')})};
+    if (method === 'GET' && path === '/v2/me/login-methods') return {status:200,body:await commands.loginMethods.list(token||'')};
+    if (method === 'POST' && path === '/v2/me/login-methods/unlink') {
+      const provider=readString(body,'provider');
+      if (!LOGIN_PROVIDERS.includes(provider as import('./types').LoginProvider)) throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Invalid login method.');
+      return {status:200,body:await commands.loginMethods.unlink(token||'',{provider:provider as import('./types').LoginProvider,namespace:readString(body,'namespace')||undefined})};
+    }
     if (method === 'GET' && path === '/v2/me/apple') return {status:200,body:await commands.getAppleLink(token || '')};
     if (method === 'POST' && path === '/v1/auth/apple') {
       return { status: 200, body: await commands.signInWithApple(readString(body, 'identityToken')) };

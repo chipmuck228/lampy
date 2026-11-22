@@ -215,9 +215,33 @@ const MIGRATIONS = [
    CREATE TABLE family_moderation_audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, share_id TEXT NOT NULL, json TEXT NOT NULL);
    CREATE TABLE family_sharing_restrictions (user_id TEXT PRIMARY KEY NOT NULL, json TEXT NOT NULL);
    CREATE TABLE family_sharing_restriction_audit (sequence INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, json TEXT NOT NULL);`,
+
+  // Additive migration: preserve the legacy identity namespace and all existing account/session IDs.
+  `ALTER TABLE family_login_identities RENAME TO family_login_identities_legacy;
+   DROP INDEX family_login_identities_user;
+   CREATE TABLE family_login_identities (
+     provider TEXT NOT NULL CHECK(provider IN ('apple','controlled-password','wechat','google','phone-otp','email-otp')),
+     namespace TEXT NOT NULL DEFAULT 'legacy' CHECK(length(trim(namespace)) BETWEEN 1 AND 256),
+     subject TEXT NOT NULL CHECK(length(trim(subject)) BETWEEN 1 AND 1024),
+     user_id TEXT NOT NULL REFERENCES family_accounts(user_id),
+     created_at TEXT NOT NULL, verified_at TEXT,
+     CHECK(namespace != 'legacy' OR provider IN ('apple','controlled-password')),
+     PRIMARY KEY(provider,namespace,subject), UNIQUE(user_id,provider,namespace)
+   );
+   INSERT INTO family_login_identities(provider,namespace,subject,user_id,created_at)
+     SELECT provider,'legacy',subject,user_id,created_at FROM family_login_identities_legacy;
+   DROP TABLE family_login_identities_legacy;
+   CREATE INDEX family_login_identities_user ON family_login_identities(user_id);
+   CREATE TABLE family_account_states (
+     user_id TEXT PRIMARY KEY NOT NULL REFERENCES family_accounts(user_id),
+     status TEXT NOT NULL CHECK(status IN ('active','suspended'))
+   );
+   ALTER TABLE family_sessions ADD COLUMN authenticated_at TEXT;
+   ALTER TABLE family_sessions ADD COLUMN authenticated_identity TEXT;`,
+
 ];
 
-export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28] as const;
+export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28, 34] as const;
 
 export async function applyFamilyApiSchema(db: FamilySql, options?: { upTo?: number }): Promise<void> {
   const last = options?.upTo ?? MIGRATIONS.length;
@@ -259,7 +283,7 @@ export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise
     throw missingTestAccountSchemaError();
   }
   const rows = await db.getAll<{ version: number }>(
-    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16, 27, 28)',
+    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16, 27, 28, 34)',
   );
   const have = new Set(rows.map((row) => row.version));
   if (TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS.some((version) => !have.has(version))) {
@@ -269,6 +293,6 @@ export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise
 
 function missingTestAccountSchemaError() {
   return new Error(
-    'This database is missing family-api migrations 14–16, 27 and 28. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
+    'This database is missing family-api migrations 14–16, 27 and 28, plus unified-login migration 34. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
   );
 }

@@ -28,10 +28,11 @@ describe('login identity migration', () => {
     await db.run('INSERT INTO family_media_objects(object_id,owner_user_id,mime_type,byte_length,content_sha256,storage_key,created_at) VALUES (?,?,?,?,?,?,?)', ['photo','b','image/jpeg',1,'hash','unchanged-key',createdAt]);
     await db.run('INSERT INTO family_shares(share_id,family_id,author_user_id,source_moment_id,source_revision,snapshot_json,audience_json,shared_at) VALUES (?,?,?,?,?,?,?,?)', ['share','family','b','moment',1,'{"note":"原记录","media":[]}','[]',createdAt]);
     const tables = ['family_accounts','family_test_credentials','family_sessions','family_user_profiles','family_families','family_memberships','family_media_objects','family_shares'];
-    const before = await Promise.all(tables.map(t => db.getAll(`SELECT * FROM ${t}`)));
+    const rows = (t:string) => db.getAll(t === 'family_sessions' ? 'SELECT token,user_id,expires_at FROM family_sessions' : `SELECT * FROM ${t}`);
+    const before = await Promise.all(tables.map(rows));
     await applyFamilyApiSchema(db); await applyFamilyApiSchema(db);
     await expect(assertFamilyTestAccountSchemaReady(db)).resolves.toBeUndefined();
-    expect(await Promise.all(tables.map(t => db.getAll(`SELECT * FROM ${t}`)))).toEqual(before);
+    expect(await Promise.all(tables.map(rows))).toEqual(before);
     expect(await db.getAll('SELECT provider,subject,user_id FROM family_login_identities ORDER BY provider')).toEqual([
       { provider:'apple',subject:'apple-a',user_id:'a' }, { provider:'controlled-password',subject:'same@example.com',user_id:'b' },
     ]);

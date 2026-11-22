@@ -1,3 +1,4 @@
+import {loginIdentityKey} from './login-identity';
 import { createFamilyCommands } from './commands';
 import { createMapAppleVerifier, createAppleJwksVerifier } from './apple';
 import { createFamilyStore } from './store';
@@ -32,7 +33,7 @@ for(const sqlite of [false,true]) describe(sqlite?'SQLite':'Memory',()=>{
     const h=await setup();await h.repository.withTransaction(async tx=>{
       await tx.saveAccount({userId:'controlled',createdAt:'2026-10-11T12:00:00Z'});
       await tx.saveTestCredential({credentialId:'cred',userId:'controlled',loginNormalized:'test@example.com',passwordHash:'unused',enabled:true,operatorProvisioned:true,createdAt:'2026-10-11T12:00:00Z'});
-      await tx.saveSession({userId:'controlled',token:'controlled-session',expiresAt:'2026-10-12T12:00:00Z'});
+      await tx.saveSession({authenticatedAt:'2026-10-11T12:00:00Z',authenticatedIdentity:loginIdentityKey({provider:'controlled-password',subject:'test@example.com'}),userId:'controlled',token:'controlled-session',expiresAt:'2026-10-12T12:00:00Z'});
       await tx.saveProfile({userId:'controlled',nickname:'原昵称',avatar:'system',updatedAt:'2026-10-11T12:00:00Z'});
     });
     const c=await h.commands.beginAppleAuth('link','controlled-session');h.identities.new={appleSubject:'new',nonce:c.nonce};

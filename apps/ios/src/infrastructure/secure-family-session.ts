@@ -46,34 +46,43 @@ function parsePending(raw: string | null): PendingSessionRevoke | null {
   }
 }
 
-export function createSecureFamilySessionStore(
-  kv: SecureKv = {
-    getItem: (key) => SecureStore.getItemAsync(key),
-    setItem: (key, value) => SecureStore.setItemAsync(key, value),
-    deleteItem: (key) => SecureStore.deleteItemAsync(key),
-  },
-): FamilySessionStore {
+const defaultKv: SecureKv = {
+  getItem: key => SecureStore.getItemAsync(key),
+  setItem: (key,value) => SecureStore.setItemAsync(key,value),
+  deleteItem: key => SecureStore.deleteItemAsync(key),
+};
+// All stores backed by the same KV share the identity revision and write queue.
+const states = new WeakMap<SecureKv, {revision:number;listeners:Set<()=>void>;queue:Promise<unknown>}>();
+export function createSecureFamilySessionStore(kv: SecureKv = defaultKv): FamilySessionStore {
+  let shared = states.get(kv);
+  if (!shared) {shared={revision:0,listeners:new Set(),queue:Promise.resolve()};states.set(kv,shared);}
+  const state=shared;
+  function enqueue(work:()=>Promise<void>) {
+    const result=state.queue.then(work,work);
+    state.queue=result.then(()=>undefined,()=>undefined);
+    return result;
+  }
+  function mutate(work:()=>Promise<void>) {
+    // Invalidate requests immediately, even if a secure-store write is still queued.
+    state.revision++;
+    const result=enqueue(work);
+    for (const listener of state.listeners) listener();
+    return result;
+  }
+  async function read() {await state.queue;return parseStored(await kv.getItem(FAMILY_SESSION_SECURE_KEY));}
   return {
-    async getSessionToken() {
-      return parseStored(await kv.getItem(FAMILY_SESSION_SECURE_KEY))?.sessionToken ?? null;
-    },
-    async getUserId() {
-      return parseStored(await kv.getItem(FAMILY_SESSION_SECURE_KEY))?.userId ?? null;
-    },
-    async setSession(session) {
-      await kv.setItem(FAMILY_SESSION_SECURE_KEY, JSON.stringify(session));
-    },
-    async clearSession() {
-      await kv.deleteItem(FAMILY_SESSION_SECURE_KEY);
-    },
-    async getPendingRevoke() {
-      return parsePending(await kv.getItem(FAMILY_PENDING_REVOKE_SECURE_KEY));
-    },
-    async savePendingRevoke(row) {
-      await kv.setItem(FAMILY_PENDING_REVOKE_SECURE_KEY, JSON.stringify(row));
-    },
-    async clearPendingRevoke() {
+    getRevision:()=>state.revision,
+    subscribe(listener) {state.listeners.add(listener);return ()=>{state.listeners.delete(listener);};},
+    getSession:read,
+    async getSessionToken() {return (await read())?.sessionToken??null;},
+    async getUserId() {return (await read())?.userId??null;},
+    async setSession(session) {await mutate(()=>kv.setItem(FAMILY_SESSION_SECURE_KEY,JSON.stringify(session)));},
+    async clearSession() {await mutate(()=>kv.deleteItem(FAMILY_SESSION_SECURE_KEY));},
+    async getPendingRevoke() {await state.queue;return parsePending(await kv.getItem(FAMILY_PENDING_REVOKE_SECURE_KEY));},
+    async savePendingRevoke(row) {await enqueue(()=>kv.setItem(FAMILY_PENDING_REVOKE_SECURE_KEY,JSON.stringify(row)));},
+    async clearPendingRevoke(expectedToken) {await enqueue(async()=>{
+      if(expectedToken && parsePending(await kv.getItem(FAMILY_PENDING_REVOKE_SECURE_KEY))?.sessionToken!==expectedToken)return;
       await kv.deleteItem(FAMILY_PENDING_REVOKE_SECURE_KEY);
-    },
+    });},
   };
 }

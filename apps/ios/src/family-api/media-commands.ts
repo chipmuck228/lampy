@@ -1,3 +1,4 @@
+import {sessionIsCurrent} from './login-identity';
 import { photoMetadataIsClean } from './photo-metadata';
 import { FAMILY_ERROR, FamilyError } from './errors';
 import { fingerprintUploadMedia, sha256MediaBytes } from './media-validate';
@@ -43,7 +44,7 @@ async function requireUser(
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
   }
   const session = await tx.findSession(sessionToken);
-  if (!session || new Date(session.expiresAt).getTime() <= now.getTime()) {
+  if (!sessionIsCurrent(session,now)) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
   await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled);

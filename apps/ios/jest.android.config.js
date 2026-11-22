@@ -16,6 +16,8 @@ module.exports = {
     '**/application/image-use-cases.test.ts',
     '**/application/recovery-use-cases.test.ts',
     '**/application/draft-abandon-use-cases.test.ts',
+    '**/infrastructure/secure-family-session.test.ts',
+    '**/infrastructure/family-session-transport.test.ts',
     '**/infrastructure/expo-media.test.ts',
     '**/infrastructure/expo-audio.test.ts',
     '**/infrastructure/sqlite-preservation.test.ts',

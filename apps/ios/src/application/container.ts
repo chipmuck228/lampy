@@ -1,3 +1,4 @@
+import {createSessionGuardedFamilyTransport} from '../infrastructure/family-session-transport';
 import { personalRecordsOnly } from './mobile-capabilities';
 import { convertExpoImageForFamilyShare } from '../infrastructure/family-share-image';
 import { deviceTimezoneOffsetMinutes } from '../domain-adapters/calendar';
@@ -110,10 +111,11 @@ export function createIosFamilyUseCases(deps: {
 const familyLoader = createUseCaseLoader(async () => {
   const db = await openLampyDatabase();
   const repos = createSqliteRepositories(db);
+  const session = createSecureFamilySessionStore();
   return createIosFamilyUseCases({
     db,
-    client: createFamilyApiClient(createFamilyHttpTransport({ baseUrl: familyApiBaseUrl(), fetchImpl: familyXhrFetch })),
-    session: createSecureFamilySessionStore(),
+    client: createFamilyApiClient(createSessionGuardedFamilyTransport(createFamilyHttpTransport({ baseUrl: familyApiBaseUrl(), fetchImpl: familyXhrFetch }),session)),
+    session,
     personal: {
       moments: repos.moments,
       assets: repos.assets,

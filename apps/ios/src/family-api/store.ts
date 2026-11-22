@@ -34,6 +34,7 @@ export type FamilyStore = {
   directoryHistory: (import('./types').PastFamilySummary & { userId: string; status: 'left' | 'removed' | 'dissolved' })[];
   transfers: import('./types').FamilyTransfer[];
   inviteLinks: import('./types').InviteLink[];
+  accountStates: {userId:string;status:import('./types').AccountStatus}[];
   accounts: Account[];
   loginIdentities: import('./types').LoginIdentity[];
   sessions: Session[];
@@ -58,6 +59,7 @@ export function createFamilyStore(): FamilyStore {
     directoryHistory: [],
     inviteLinks: [],
     transfers: [],
+    accountStates: [],
     accounts: [],
     loginIdentities: [],
     sessions: [],

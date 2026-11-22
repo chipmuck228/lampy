@@ -18,6 +18,7 @@ import { hairline, ink, inkSoft, sage, paperDeep, clay, paper } from './life-pag
 
 function errorCopy(error: unknown) {
   if (isApplicationError(error)) {
+    if (error.code === 'REAUTHENTICATION_REQUIRED') return tr('为了保护账号，请重新登录后再关联登录方式。');
     if (error.code === 'ACCOUNT_HAS_MANAGED_FAMILY') return tr('请先转交或解散仍有其他成员的家庭，再删除账号。');
     if (error.code === 'EMAIL_ACCOUNT_EXISTS') return tr('这个账号已存在，请登录。');
     if (error.code === 'AUTH_FAILED') return tr('邮箱或密码不对。');

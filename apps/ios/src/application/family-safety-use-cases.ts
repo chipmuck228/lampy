@@ -1,3 +1,4 @@
+import {readFamilyAccount} from './family-account-scope';
 import type { FamilyApiClient } from '../infrastructure/family-http-client';
 import type { FamilySafetyApi } from '../family-api/safety-types';
 import type { FamilySessionStore } from './family-use-cases';
@@ -8,18 +9,14 @@ export function createFamilySafetyUseCases(deps: {
   session: FamilySessionStore;
   clearCache(userId: string): Promise<void>;
 }) {
-  async function account() {
-    const userId=await deps.session.getUserId(),token=await deps.session.getSessionToken();
-    if(!userId||!token)throw new ApplicationError('UNAUTHENTICATED','Sign in is required.');
-    return {userId,token};
-  }
+  async function account() {const a=await readFamilyAccount(deps.session);return {userId:a.userId,token:a.sessionToken,revision:a.revision};}
   async function request<T>(current:()=>boolean,work:(api:FamilySafetyApi,token:string)=>Promise<T>,mutation=false) {
     const before=await account();
     if(!current())throw new ApplicationError('STALE_FAMILY_REQUEST','Inactive request.');
     if(!deps.client.safety)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Upgrade required.');
     const result=await work(deps.client.safety,before.token);
     const after=await account();
-    if(after.userId!==before.userId||after.token!==before.token)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
+    if(after.userId!==before.userId||after.token!==before.token||after.revision!==before.revision)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
     if(mutation) {
       // A confirmed write may finish after blur. Always invalidate the same account,
       // but never invalidate a different account or publish a late read result.
