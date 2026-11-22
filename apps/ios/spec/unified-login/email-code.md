@@ -1,0 +1,110 @@
+# 邮箱验证码登录（B1 邮箱部分）
+
+本阶段在 PR139 的身份底座上实现 iOS/Android 共用的邮箱验证码：发送、验证、首次昵称、再次登录、绑定、重新认证、更换、退出和删除账号。手机短信、微信、Google、Android Apple 网页授权与 Android 家庭入口仍待后续实施。
+
+## 使用与身份规则
+
+“设置 → 登录与找回”仅在客户端明确开启、地址安全且服务端健康检查声明开放后可用。服务暂不可用时允许重试，不把网络错误当成未登录。iOS 家庭邀请可选择邮箱登录，完成后返回原邀请，由用户确认加入。
+
+老用户先使用原来的 Apple/受控账号登录，再关联邮箱，才能继续使用原 userId 和家庭。独立邮箱登录不按 Apple 邮箱、受控账号邮箱或昵称合并。已被另一个账号占用的邮箱会报冲突。邮箱采用去首尾空白、NFC 和小写规范化，不合并 Gmail 点号或加号别名。
+
+更换邮箱需要近期认证（5 分钟内）和新邮箱验证码；超时先验证当前邮箱。更换成功撤销其他设备会话。删除账号需要独立用途的验证码、明确确认，且必须先处理仍有其他成员的自建家庭。Apple 关联账号还需在 Apple 账号设置中停止使用 Lampy 登录。退出/删除云端账号不删除本机个人记录；登录也不自动上传或备份个人记录。
+
+验证码为随机六位数字、5 分钟有效、最多五次错误、一次使用，按用途/邮箱/会话隔离。服务端仅存 HMAC 摘要。默认每邮箱 60 秒一次、每小时五次，每来源每小时 20 次、验证每 15 分钟 50 次，全局每天 200 封。发送失败也计入预算；失败的重发保留上一个有效验证码。SMTP 接受不代表邮件已进收件箱。成功发送的新挑战才替换旧挑战。
+
+切换到邮件 App 后可继续输入；验证提交期间切后台或锁屏会隐藏内容并要求重新确认账号。不会将离开页面或切换账号后的响应提交给新账号。
+
+## 服务端配置
+
+配置只放服务端环境文件，禁止写入 EXPO_PUBLIC_*、Git 或客户端包：
+
+```sh
+LAMPY_EMAIL_CODE_ENABLED=1
+LAMPY_EMAIL_CODE_SECRET=<至少32字节的随机服务端秘密>
+LAMPY_SMTP_HOST=smtp.example.com
+LAMPY_SMTP_PORT=465
+LAMPY_SMTP_USER=<服务商用户名>
+LAMPY_SMTP_PASSWORD=<服务商密码或授权码>
+LAMPY_EMAIL_FROM=accounts@example.com
+LAMPY_EMAIL_CODE_DAILY_LIMIT=200
+```
+
+可用 `openssl rand -hex 32` 生成秘密，独立保存，服务重启时保持一致；轮换后未用验证码失效。只支持 465 隐式 TLS 或 587 强制 STARTTLS，校验证书，不开放明文 SMTP。服务商需要支持应用发信；先完成发件域验证、SPF/DKIM/DMARC 并在测试环境验证中英文投递和垃圾邮件情况。不要开启 SMTP debug 或记录验证码/授权码。
+
+服务默认按连接来源限流，不信任任意转发头。只有现有可信反向代理覆盖来源头且 API 只绑定 127.0.0.1 时才考虑 `LAMPY_EMAIL_CODE_TRUST_LOOPBACK_PROXY=1`；代理必须覆盖 `X-Lampy-Client-IP`，不能沿用客户端提供的值；部署监听设置见 `src/family-api/listen.ts`。不要为了限流打开公网直连的转发头信任。
+
+部署前备份数据库及媒体，先在测试副本运行现有 `npm run family-api:migrate`。新增迁移 35 保存验证码挑战；依赖阶段 A 的迁移 34。旧身份、账号和家庭关系不重写。首次启动先保持关闭，迁移和 SMTP 验收后再打开。请求时及现有 cleanup 命令清理过期挑战；删除/冻结清理对应绑定挑战。按维护周期清理，并非到期瞬间物理删除。旧二进制不能在未评估的情况下回退写入新 schema。
+
+接口：`POST /v2/auth/email-code/request`、`POST /v2/auth/email-code/verify`、`GET /v2/me/email-code`；健康检查新增 `emailCodeLogin`。登录请求不带既有 Bearer；其他用途必须绑定当前有效会话。
+
+## 使用 Resend
+
+Lampy 当前后端为 Node 服务，不需要引入 Next.js。Resend 官方同时支持 SDK/API 与 SMTP；本阶段沿用现有 SMTP 适配器，账号验证、限流与客户端均不变。
+
+在 Resend 验证自己的发件域名并创建允许该域发信的 API key，然后将服务端邮件配置替换为：
+
+```sh
+LAMPY_SMTP_HOST=smtp.resend.com
+LAMPY_SMTP_PORT=465
+LAMPY_SMTP_USER=resend
+LAMPY_SMTP_PASSWORD=<Resend API key>
+LAMPY_EMAIL_FROM=accounts@your-verified-domain.example
+```
+
+`LAMPY_EMAIL_CODE_ENABLED`、独立的 `LAMPY_EMAIL_CODE_SECRET` 及每日发送上限仍按前文配置；API key 不能代替验证码 HMAC secret。`LAMPY_EMAIL_FROM` 必须替换为自己已验证域名下的纯邮箱地址，不要填写带 `Lampy <...>` 的显示名（适配器会自动添加 Lampy）。也可使用端口 587，现有实现强制 STARTTLS。
+
+每日上限按 Resend 账号实际配额和其他业务用量预留，不代表服务商承诺的额度；SMTP 与 API 共用 Resend 的发送限流。首次在测试环境向自己的邮箱发码，检查 Resend Emails 列表及实际收件箱/垃圾邮件；发送被接受仍不等于最终送达。默认测试发件域不能作为正式用户登录的发件配置。配置只放后端环境文件，不放 App 或 Next.js 客户端。
+
+接入本配置不需要新增 Resend SDK。若部署服务器不允许出站 465/587，可再增加 HTTPS API 发送适配器；不能通过关闭 TLS 校验解决连接问题。当前尚未使用真实 Resend 凭证验证发送。
+
+官方文档（2026-11-22 核对）：[Next.js SDK 示例](https://resend.com/docs/send-with-nextjs)、[SMTP 参数](https://resend.com/docs/send-with-smtp)。
+
+## 客户端开发与发布
+
+示例地址必须替换成实际测试 API，并与 iOS 家庭配置指向同一后端；使用不同后端会产生不同账号库。本机调试私网 HTTP 可用，正式发行必须 HTTPS。
+
+```sh
+cd apps/ios
+export EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED=1
+export EXPO_PUBLIC_ACCOUNT_API_BASE_URL=https://your-test-api.example.com
+```
+
+Android 继续使用 `npm run android:prebuild`、`npm run android:release`（本机 JDK21 与 Android SDK）。personal 构建保留显式开启的上述两项配置，家庭/付费仍关闭。改变公共配置后重新打包 Release；旧 APK 不会自动获得入口。
+
+iOS 开发沿用现有模拟器/真机流程。现有发布脚本默认重置邮箱开关，避免开发环境误入 TestFlight。只有在服务验收后，显式设置 `LAMPY_EMAIL_CODE_RELEASE_URL=https://your-api.example.com` 再运行原来的归档命令才会开启。若归档 profile 已有家庭 API 地址，该地址必须一致，否则中止。没有修改 Bundle ID、签名、Expo 版本或原生目录结构。
+
+## 验收
+
+自动化覆盖内存/SQLite 一致性、文件数据库重启及双连接领取、SMTP 失败/延迟/乱序、限流预算、过期/错误/重放、绑定冲突与不自动合并、冻结账号、换绑、注销、跨账号异步响应、邀请回跳、锁屏和后台恢复、发布默认关闭。
+
+真实环境仍需：两端真实邮箱投递、错误/过期/重发、首次昵称、退出后同 userId 登录、老 Apple 账号绑定邮箱后跨端进入原账号、更换邮箱后旧地址不可登录原账号、重启后保留会话、邀请登录后显式确认加入，以及无网络/服务关闭的提示。Android 家庭入口未开放，跨端账号验证不等于家庭功能验收。
+
+本次开发未配置真实 SMTP、未发送真实邮件、未部署或迁移生产库，未进行设备与 TestFlight 验收。
+
+### 模拟器反馈修正
+
+身份重新验证成功后直接进入新邮箱填写页，清除旧邮箱的验证码输入；账号页区分“邮箱已验证”和限时的近期身份确认。服务端状态返回 `reauthenticationExpiresAt`，仅为界面提示，换绑仍按服务端规则强制检查。
+
+发送限流响应可携带 `retryAfterSeconds`。客户端显示实际等待时间，不把限流当作发送成功，也不虚构 60 秒后必能发送。没有成功发送的有效挑战时不显示验证码输入；失败重发仅保留此前尚未过期的验证码，并明确说明没有发出新邮件。每邮箱每小时五次等预算保持不变，密集双端测试可能触发较长等待。
+
+此修正同时涉及 API 和 App：更新服务器代码并重启（无新迁移／依赖），iOS 开发包刷新 Metro，Android Release 重新构建安装。
+
+### 首次昵称与设置显示
+
+邮箱首次登录的昵称表单预填“生活记录者”（英文界面为 Life recorder），允许在提交前修改，并明确提示保存后无法修改。已有账号不重置或自动覆盖昵称。设置页的账号入口显示服务端保存的昵称；邮箱管理页也显示昵称。邮箱账号已有非空昵称后，服务端拒绝不同昵称更新（NICKNAME_LOCKED），相同昵称重试保持幂等；旧资料页对锁定昵称只读。此限制针对邮箱验证码账号，保留原有非邮箱账号的资料兼容行为。
+
+删除账号继续要求独立验证码和明确确认，仍受相同发送预算保护。首次删除发码遇到限流时不显示验证码输入或发送成功倒计时；保留有效旧码时明确说明没有发送新邮件。
+
+### 删除完成与登录／注册文案
+
+删除成功后清空验证码、邮箱、昵称及发送／限流倒计时，返回本机设置页，不再停留在发码页面，也不走登录成功或家庭邀请回跳。保留删除成功说明；关联 Apple 的账号仍提示去 Apple 设置停止授权。失败或取消不跳转。
+
+未登录页明确提供“首次使用 Lampy？注册”与“已有 Lampy 账号？登录”的切换，两者都走邮箱验证码流程；切换不重复发信，也不丢弃有效挑战。页面说明新邮箱首次验证会创建账号，并将 Apple 等已有账号先登录再绑定的提示单独说明，避免误建第二个账号。本次仅需更新 App，无服务端变更。
+
+### 合并前边界修正
+
+HTTP 开发地址只接受本机地址或完整的数字私网 IPv4，拒绝 `10.example.com`、`192.168.example.com` 等伪私网域名；传输层在构造／发送认证请求前执行校验。HTTPS 后端继续正常使用。
+
+每日配额按 UTC 日期分桶，返回的 `retryAfterSeconds` 与下一个 UTC 午夜一致；多项限额同时命中时仍取最晚解除时间。跨日不清除邮箱/IP 的小时限额，也不增加发送预算。回归覆盖内存和 SQLite，以及客户端传输层未调用 fetch 的拒绝行为。
+
+本修正需要更新服务端的验证码命令及客户端地址校验；无新增依赖或数据库迁移，不需要清除现有限流计数。

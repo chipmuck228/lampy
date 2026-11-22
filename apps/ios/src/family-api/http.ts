@@ -38,7 +38,9 @@ function statusFor(code: string) {
     case 'PURCHASE_RATE_LIMITED': return 429;
     case 'PURCHASE_VERIFICATION_UNAVAILABLE': return 503;
     case 'FAMILY_ALBUM_EXPORT_CLOSED':
-    case 'PURCHASES_CLOSED': return 404;
+    case 'PURCHASES_CLOSED':
+    case 'EMAIL_CODE_CLOSED': return 404;
+    case 'EMAIL_DELIVERY_FAILED': return 503;
     case 'FAMILY_ALBUM_INCOMPLETE': return 409;
     case FAMILY_ERROR.UNAUTHENTICATED:
     case FAMILY_ERROR.APPLE_TOKEN_INVALID:
@@ -110,7 +112,7 @@ function statusFor(code: string) {
 
 function fail(error: unknown): FamilyHttpResponse {
   if (isFamilyError(error)) {
-    return { status: statusFor(error.code), body: { error: { code: error.code, message: error.message } } };
+    return { status: statusFor(error.code), body: { error: { code: error.code, message: error.message, ...(error.retryAfterSeconds ? {retryAfterSeconds:error.retryAfterSeconds} : {}) } } };
   }
   return {
     status: 500,
@@ -138,6 +140,9 @@ export async function dispatchFamilyApi(
       return { status: 200, body: commands.health() };
     }
 
+    if(method==='POST'&&path==='/v2/auth/email-code/request')return {status:200,body:await commands.emailCode.request({email:readString(body,'email'),intent:readString(body,'intent') as import('./email-code-types').EmailCodeIntent,language:body.language==='en'?'en':'zh'},token,request.peer)};
+    if(method==='POST'&&path==='/v2/auth/email-code/verify')return {status:200,body:await commands.emailCode.verify({email:readString(body,'email'),challengeId:readString(body,'challengeId'),code:readString(body,'code'),intent:readString(body,'intent') as import('./email-code-types').EmailCodeIntent,confirmation:readString(body,'confirmation')},token,request.peer)};
+    if(method==='GET'&&path==='/v2/me/email-code')return {status:200,body:await commands.emailCode.status(token||'')};
     if (method === 'POST' && path === '/v2/auth/apple/challenge') {
       const intent = readString(body,'intent');
       if (intent !== 'login' && intent !== 'link' && intent !== 'delete') throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Invalid Apple intent.');

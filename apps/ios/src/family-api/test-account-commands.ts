@@ -1,3 +1,4 @@
+import {EMAIL_CODE_NAMESPACE} from './email-code-types';
 import { sessionIsCurrent, assertAccountActive, loginIdentityKey, loginNamespace } from './login-identity';
 import { assertSharedTextAllowed } from './content-policy';
 import { FAMILY_ERROR, FamilyError } from './errors';
@@ -83,12 +84,12 @@ export async function assertTestAccountSessionAllowed(
   tx: FamilyTx,
   userId: string,
   enabled: boolean,
-  operatorOnly: boolean | "apple-enabled" = false,
+  operatorOnly: import('./types').SessionAccessMode = false,
 ) {
   await assertAccountActive(tx,userId);
   const credential = await tx.findTestCredentialByUserId(userId);
   if (!credential) {
-    if (operatorOnly === 'apple-enabled' && (await tx.listLoginIdentities(userId)).some(i => i.provider === 'apple' && loginNamespace(i) === 'legacy')) return;
+    if (await publicIdentityAllowed(tx,userId,operatorOnly)) return;
     if (operatorOnly) throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
     return;
   }
@@ -102,7 +103,7 @@ export async function rejectDisallowedTestAccountSession(
   sessionToken: string | undefined,
   now: Date,
   enabled: boolean,
-  operatorOnly: boolean | "apple-enabled" = false,
+  operatorOnly: import('./types').SessionAccessMode = false,
 ) {
   if (!sessionToken) return;
   const revoked = await repository.withTransaction(async (tx) => {
@@ -110,7 +111,7 @@ export async function rejectDisallowedTestAccountSession(
     if (!sessionIsCurrent(session,now)) return false;
     const credential = await tx.findTestCredentialByUserId(session.userId);
     if (!credential) {
-      if (!operatorOnly || (operatorOnly === 'apple-enabled' && (await tx.listLoginIdentities(session.userId)).some(i => i.provider === 'apple' && loginNamespace(i) === 'legacy'))) return false;
+      if (!operatorOnly || (await publicIdentityAllowed(tx,session.userId,operatorOnly))) return false;
       await tx.deleteSessionsForUser(session.userId);
       return true;
     }
@@ -282,3 +283,9 @@ export function createTestAccountCommands(deps: {
 }
 
 export type TestAccountCommands = ReturnType<typeof createTestAccountCommands>;
+
+async function publicIdentityAllowed(tx:FamilyTx,userId:string,mode:import('./types').SessionAccessMode) {
+  const identities=await tx.listLoginIdentities(userId);
+  return identities.some(i=> ((mode==='apple-enabled'||mode==='apple-email-enabled')&&i.provider==='apple'&&loginNamespace(i)==='legacy') ||
+    ((mode==='email-enabled'||mode==='apple-email-enabled')&&i.provider==='email-otp'&&i.namespace===EMAIL_CODE_NAMESPACE&&!!i.verifiedAt));
+}

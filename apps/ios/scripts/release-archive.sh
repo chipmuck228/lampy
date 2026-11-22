@@ -43,6 +43,8 @@ if [[ "$EXPLICIT_PROFILE" == 1 ]]; then
   fi
 fi
 
+source "$ROOT/scripts/email-code-release-env.sh"
+
 STASH="$(mktemp -d /tmp/lampy-dotenv-stash.XXXXXX)"
 RESTORE_DONE=0
 restore_dotenv() {

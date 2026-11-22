@@ -49,3 +49,9 @@ it('closes controlled email registration even with leftover public flags', () =>
  expect(inspectReleasePublicEnv(env).closed).toBe(false);
  expect(inspectReleasePublicEnv(applyClosedReleasePublicEnv(env))).toMatchObject({controlledEmailAccountsOpen:false,closed:true});
 });
+
+it('does not silently ship inherited email login configuration',()=>{
+ const stale={EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED:'1',EXPO_PUBLIC_ACCOUNT_API_BASE_URL:'https://accounts.example.com'};
+ expect(inspectReleasePublicEnv(stale)).toMatchObject({closed:false,emailCodeLoginRequested:true,accountApiConfigured:true});
+ expect(inspectReleasePublicEnv(applyClosedReleasePublicEnv(stale))).toMatchObject({closed:true,emailCodeLoginRequested:false,accountApiConfigured:false});
+});

@@ -1,3 +1,4 @@
+import {accountApiBaseUrl} from '../infrastructure/account-config';
 import {createSessionGuardedFamilyTransport} from '../infrastructure/family-session-transport';
 import { personalRecordsOnly } from './mobile-capabilities';
 import { convertExpoImageForFamilyShare } from '../infrastructure/family-share-image';
@@ -114,7 +115,7 @@ const familyLoader = createUseCaseLoader(async () => {
   const session = createSecureFamilySessionStore();
   return createIosFamilyUseCases({
     db,
-    client: createFamilyApiClient(createSessionGuardedFamilyTransport(createFamilyHttpTransport({ baseUrl: familyApiBaseUrl(), fetchImpl: familyXhrFetch }),session)),
+    client: createFamilyApiClient(createSessionGuardedFamilyTransport(createFamilyHttpTransport({ baseUrl: familyApiBaseUrl()||accountApiBaseUrl(), fetchImpl: familyXhrFetch }),session)),
     session,
     personal: {
       moments: repos.moments,
@@ -133,3 +134,6 @@ export function getFamilyUseCases() {
 export function resetFamilyUseCasesForTests() {
   familyLoader.reset();
 }
+
+/** Account authentication is independent of the Android family feature gate. */
+export function getAccountUseCases(){return familyLoader.getUseCases();}

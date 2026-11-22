@@ -1,3 +1,5 @@
+import {normalizeEmail} from '../family-api/email-normalize';
+import type {EmailCodeRequest,EmailCodeVerification,EmailCodeStatus} from '../family-api/email-code-types';
 import {readFamilyAccount} from './family-account-scope';
 import { prepareFamilyShareMedia } from './prepare-family-share-media';
 import {createFamilySafetyUseCases} from './family-safety-use-cases';
@@ -525,6 +527,7 @@ export function createFamilyUseCases(deps: {
   const history = createFamilyHistoryUseCases(deps);
   let directoryRequest = 0;
   let emailAuthRequest = 0;
+  const emailTickets=new Map<string,{email:string;intent:EmailCodeRequest['intent'];token:string|null;userId:string|null;revision:number|undefined}>();
   async function controlledEmailAuth(input: { email: string; password: string; nickname?: string }, register: boolean, isCurrent: () => boolean) {
     const request = ++emailAuthRequest;
     const initialToken = await deps.session.getSessionToken();
@@ -664,6 +667,58 @@ export function createFamilyUseCases(deps: {
     },
     async signInWithControlledEmail(input: { email: string; password: string }, isCurrent: () => boolean) {
       return controlledEmailAuth(input, false, isCurrent);
+    },
+    async finishEmailProfile(nickname:string,expectedUserId:string,isCurrent:()=>boolean) {
+      const owner=await requireAccount();if(owner.userId!==expectedUserId||!isCurrent())throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
+      if(!deps.client.updateMyProfile)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.updateMyProfile(owner.sessionToken,nickname);await assertSameAccount(owner);
+      if(!isCurrent())throw new ApplicationError('STALE_FAMILY_REQUEST','Page changed.');return result;
+    },
+    async signOutEmailAccount(expectedUserId:string) {
+      emailAuthRequest++;
+      const work=async()=>{const owner=await requireAccount();if(owner.userId!==expectedUserId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');return performSignOut();};
+      const next=identityCommit.then(work,work);identityCommit=next.then(()=>undefined,()=>undefined);return next;
+    },
+    async getEmailCodeAvailability(){const health=await deps.client.health();return health.emailCodeLogin===true;},
+    async getEmailCodeAccount():Promise<EmailCodeStatus & {userId?:string}> {
+      const token=await deps.session.getSessionToken();if(!token)return {signedIn:false,linked:false};
+      const owner=await requireAccount();
+      if(!deps.client.emailCodeStatus)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      try {const result=await deps.client.emailCodeStatus(owner.sessionToken);await assertSameAccount(owner);return {...result,userId:owner.userId};}
+      catch(error){await assertSameAccount(owner);const e=asApplicationError(error);if(e.code!=='UNAUTHENTICATED')throw e;
+        await deps.session.clearSession();await cache.clear();await safeIsolateAccount(owner.userId);return {signedIn:false,linked:false};}
+    },
+    async requestEmailCode(input:EmailCodeRequest,isCurrent:()=>boolean,expectedUserId?:string|null) {
+      const request=++emailAuthRequest;const revision=deps.session.getRevision?.();
+      const snapshot=deps.session.getSession?await deps.session.getSession():{userId:await deps.session.getUserId(),sessionToken:await deps.session.getSessionToken()};
+      if(expectedUserId!==undefined&&(snapshot?.userId??null)!==expectedUserId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
+      const issued={email:normalizeEmail(input.email),intent:input.intent,token:snapshot?.sessionToken??null,userId:snapshot?.userId??null,revision};
+      const check=async()=>{if(!isCurrent()||request!==emailAuthRequest||revision!==deps.session.getRevision?.()||await deps.session.getSessionToken()!==issued.token)throw new ApplicationError('STALE_FAMILY_REQUEST','Email request is inactive.');};
+      await check();if(input.intent!=='login'&&!issued.token)throw new ApplicationError('UNAUTHENTICATED','Sign in first.');
+      if(!deps.client.requestEmailCode)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const ticket=await deps.client.requestEmailCode({...input,email:issued.email},input.intent==='login'?undefined:issued.token!);
+      await check();emailTickets.clear();emailTickets.set(ticket.challengeId,issued);return ticket;
+    },
+    async verifyEmailCode(input:EmailCodeVerification,isCurrent:()=>boolean) {
+      const request=++emailAuthRequest;const issued=emailTickets.get(input.challengeId);
+      if(!issued||issued.email!==normalizeEmail(input.email)||issued.intent!==input.intent)throw new ApplicationError('EMAIL_CODE_INVALID','Request a new code.');
+      const eligible=()=>request===emailAuthRequest&&isCurrent();
+      const same=async()=>{if(issued.revision!==deps.session.getRevision?.()||await deps.session.getSessionToken()!==issued.token||await deps.session.getUserId()!==issued.userId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');};
+      await same();if(!eligible())throw new ApplicationError('STALE_FAMILY_REQUEST','Email request is inactive.');
+      if(!deps.client.verifyEmailCode)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
+      const result=await deps.client.verifyEmailCode({...input,email:issued.email},issued.intent==='login'?undefined:issued.token!);
+      emailTickets.delete(input.challengeId);
+      if('sessionToken' in result){
+        try {await same();if(!eligible())throw new ApplicationError('STALE_FAMILY_REQUEST','Email request is inactive.');await commitSignedIn(result,eligible);return {signedIn:true as const,userId:result.userId,needsProfile:result.needsProfile};}
+        catch(error){try{await deps.client.signOut(result.sessionToken);}catch{/* only discard the new session */}throw asApplicationError(error);}
+      }
+      await same();
+      if('deleted' in result){
+        const cleanup=async()=>{await same();emailAuthRequest++;await deps.session.clearSession();await cache.clear();if(issued.userId)await safeIsolateAccount(issued.userId);await deps.session.clearPendingRevoke();};
+        const next=identityCommit.then(cleanup,cleanup);identityCommit=next.then(()=>undefined,()=>undefined);await next;return result;
+      }
+      if(!eligible())throw new ApplicationError('STALE_FAMILY_REQUEST','Email request is inactive.');
+      return result;
     },
     async getMyProfile(isCurrent: () => boolean) {
       const account = await requireAccount();

@@ -26,6 +26,12 @@ import {
 } from './store';
 
 export type FamilyTx = import('./safety-types').SafetyTx & {
+  findEmailCodeChallenge(id:string):Promise<import('./email-code-types').EmailCodeChallenge|null>;
+  latestEmailCodeChallenge(scope:string):Promise<import('./email-code-types').EmailCodeChallenge|null>;
+  saveEmailCodeChallenge(row:import('./email-code-types').EmailCodeChallenge):Promise<void>;
+  deleteEmailCodeChallenge(id:string):Promise<void>;
+  activateEmailCodeChallenge(id:string,scope:string):Promise<void>;
+  pruneEmailCodeChallenges(now:string):Promise<void>;
   purgeAccount(userId:string):Promise<void>;
   isMediaStorageKeyLive(key:string):Promise<boolean>;
   enqueueAccountMediaCleanup(key:string):Promise<void>;
@@ -147,6 +153,12 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
   let chain = Promise.resolve();
   const tx: FamilyTx = {
     ...memorySafetyTx(store),
+    async findEmailCodeChallenge(id){const row=store.emailCodeChallenges.find(r=>r.id===id);return row?{...row}:null;},
+    async latestEmailCodeChallenge(scope){const row=store.emailCodeChallenges.filter(r=>r.scope===scope).sort((a,b)=>(b.sequence??0)-(a.sequence??0))[0];return row?{...row}:null;},
+    async saveEmailCodeChallenge(row){const old=store.emailCodeChallenges.find(r=>r.id===row.id);const sequence=old?.sequence??(Math.max(0,...store.emailCodeChallenges.map(r=>r.sequence??0))+1);replaceBy(store.emailCodeChallenges,r=>r.id,{...row,sequence});},
+    async deleteEmailCodeChallenge(id){store.emailCodeChallenges=store.emailCodeChallenges.filter(r=>r.id!==id);},
+    async activateEmailCodeChallenge(id,scope){store.emailCodeChallenges=store.emailCodeChallenges.filter(r=>r.scope!==scope||r.id===id).map(r=>r.id===id?{...r,status:'active' as const}:r);},
+    async pruneEmailCodeChallenges(now){store.emailCodeChallenges=store.emailCodeChallenges.filter(r=>r.expiresAt>now);},
     async purgeAccount(userId) {purgeMemoryAccount(store,userId);},
     async isMediaStorageKeyLive(key) {return store.mediaObjects.some(r=>r.storageKey===key);},
     async enqueueAccountMediaCleanup(key) {if(!store.accountMediaCleanup.includes(key))store.accountMediaCleanup.push(key);},
@@ -195,6 +207,7 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       if (status === 'suspended') {
         await tx.deleteSessionsForUser(userId);
         store.appleChallenges = store.appleChallenges.filter(c => c.userId !== userId);
+        store.emailCodeChallenges=store.emailCodeChallenges.filter(c=>c.userId!==userId);
       }
     },
     async findProfile(userId) { return store.profiles.find(p => p.userId === userId) ?? null; },

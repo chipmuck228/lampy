@@ -3,10 +3,11 @@ export type MembershipStatus = 'active' | 'left' | 'removed';
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
 export type FamilyStatus = 'active' | 'dissolved';
 
-export type UserProfile = { userId: string; nickname: string; avatar: 'system'; updatedAt: string | null };
+export type UserProfile = { userId: string; nickname: string; avatar: 'system'; updatedAt: string | null; nicknameLocked?: boolean };
 
 // A provider subject identifies a login, never a family or a local Moment owner.
 export type LoginProvider = 'apple' | 'controlled-password' | 'wechat' | 'google' | 'phone-otp' | 'email-otp';
+export type SessionAccessMode = boolean | 'apple-enabled' | 'email-enabled' | 'apple-email-enabled';
 export type AccountStatus = 'active' | 'suspended';
 export type LoginIdentity = {
   provider: LoginProvider;
@@ -129,6 +130,7 @@ export type FamilyHealth = {
   emailRegistration?: boolean;
   publicTestLogin?: boolean;
   appleLogin?: boolean;
+  emailCodeLogin?: boolean;
   accountDeletion?: boolean;
   argon2id: { t: number; m: number; p: number; dkLen: number };
 };
@@ -280,4 +282,4 @@ export type FamilyTransfer = {
 };
 
 export type DeleteAccountInput = {challengeId: string; identityToken: string; authorizationCode?: string; confirmation: string};
-export type DeleteAccountResult = {deleted: true; appleRevocation: 'revoked' | 'manual-required'; mediaCleanup: 'completed' | 'pending'};
+export type DeleteAccountResult = {deleted: true; appleRevocation: 'revoked' | 'manual-required' | 'not-linked'; mediaCleanup: 'completed' | 'pending'};

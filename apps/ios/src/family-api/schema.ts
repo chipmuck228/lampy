@@ -239,9 +239,21 @@ const MIGRATIONS = [
    ALTER TABLE family_sessions ADD COLUMN authenticated_at TEXT;
    ALTER TABLE family_sessions ADD COLUMN authenticated_identity TEXT;`,
 
+  `CREATE TABLE family_email_code_challenges (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE, email TEXT NOT NULL, scope TEXT NOT NULL,
+    intent TEXT NOT NULL CHECK(intent IN ('login','link','reauth','change','delete')),
+    digest TEXT NOT NULL, user_id TEXT REFERENCES family_accounts(user_id) ON DELETE CASCADE,
+    session_digest TEXT, created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+    attempts INTEGER NOT NULL CHECK(attempts BETWEEN 0 AND 5),
+    status TEXT NOT NULL CHECK(status IN ('pending','active'))
+   );
+   CREATE INDEX family_email_code_scope ON family_email_code_challenges(scope,sequence);
+   CREATE INDEX family_email_code_expiry ON family_email_code_challenges(expires_at);`,
+
 ];
 
-export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28, 34] as const;
+export const TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS = [14, 15, 16, 27, 28, 34, 35] as const;
 
 export async function applyFamilyApiSchema(db: FamilySql, options?: { upTo?: number }): Promise<void> {
   const last = options?.upTo ?? MIGRATIONS.length;
@@ -283,7 +295,7 @@ export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise
     throw missingTestAccountSchemaError();
   }
   const rows = await db.getAll<{ version: number }>(
-    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16, 27, 28, 34)',
+    'SELECT version FROM family_schema_migrations WHERE version IN (14, 15, 16, 27, 28, 34, 35)',
   );
   const have = new Set(rows.map((row) => row.version));
   if (TEST_ACCOUNT_REQUIRED_SCHEMA_VERSIONS.some((version) => !have.has(version))) {
@@ -293,6 +305,6 @@ export async function assertFamilyTestAccountSchemaReady(db: FamilySql): Promise
 
 function missingTestAccountSchemaError() {
   return new Error(
-    'This database is missing family-api migrations 14–16, 27 and 28, plus unified-login migration 34. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
+    'This database is missing family-api migrations 14–16, 27 and 28, plus unified-login migrations 34 and 35. Run npm run family-api:migrate on this file first. The test-account CLI does not apply schema changes.',
   );
 }

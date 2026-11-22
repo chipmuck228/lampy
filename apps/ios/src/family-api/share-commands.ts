@@ -165,7 +165,7 @@ export function createShareCommands(deps: {
   clock?: { now: () => Date };
   shareId?: () => string;
   testAccountLoginEnabled?: boolean;
-  operatorOnly?: boolean | "apple-enabled";
+  operatorOnly?: import('./types').SessionAccessMode;
   historyPolicy?: FamilyHistoryPolicy;
   historyEnabled?: boolean;
 }): ShareCommands {
