@@ -1,3 +1,5 @@
+import { AlbumEditionSwipeRow } from './album-edition-swipe-row';
+import { deleteSavedAlbumEdition } from '../infrastructure/album-edition-delete';
 import type { EpubDesign } from '../application/album-epub';
 import { createPersonalEpubSnapshot, discardUnfinishedEpubSnapshot, listEpubSnapshots, type SavedEpubSnapshot } from '../infrastructure/album-epub-snapshots';
 import { AlbumEpubFailure, shareAlbumEpub } from '../infrastructure/album-epub-files';
@@ -5,7 +7,7 @@ import { useAlbumExportUnlock } from './album-export-unlock';
 import { albumExportConfig, albumExportEntryOpen, AlbumExportAccessError } from '../application/album-export-access';
 import { unifiedPurchasesEnabled } from '../application/unified-purchases';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AppState, StyleSheet, View } from 'react-native';
+import { Alert, AppState, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   printFailureDiagnostic,
@@ -208,6 +210,28 @@ export default function AlbumPrintScreen() {
         if (active.current) setBusy(false);
       }
     }
+  }
+  function confirmDelete(editionId: string) {
+    if (busy || blocked || owner.current !== null) return;
+    const epoch = generation.current;
+    Alert.alert(tr('删除这版成品？'), tr('仅删除Lampy内这一版成品及其制作副本，不删除原记录。已保存到「文件」或「图书」的副本不会删除。') + (editionId.startsWith('print_') ? '\n\n' + tr('删除这版PDF也会删除Lampy内基于该版制作的电子册。') : ''), [
+      { text: tr('取消'), style: 'cancel' },
+      { text: tr('删除'), style: 'destructive', onPress: () => {
+        if (!current(epoch) || owner.current !== null) return;
+        void run(async valid => {
+          try {
+            await deleteSavedAlbumEdition(editionId, id, valid);
+            if (!valid()) return;
+            setSaved(items => items.filter(item => item.id !== editionId));
+            setEpubEditions(items => items.filter(item => item.id !== editionId));
+            setFresh(item => item?.id === editionId ? null : item);
+            setEpubState(item => item?.id === editionId ? null : item);
+          } catch {
+            if (valid()) Alert.alert(tr('这版成品未能删除，请再试一次。'));
+          }
+        });
+      } },
+    ]);
   }
   const epubCancelled = useRef(false);
   const [binding, setBinding] = useState(false);
@@ -417,17 +441,17 @@ export default function AlbumPrintScreen() {
             {__DEV__ && epubState?.id === 'new' && epubState.diagnostic ? <Text selectable style={styles.meta}>{`EPUB/${epubState.diagnostic}`}</Text> : null}
           </View> : null}
           {epubEditions.length ? <Text style={styles.title}>{tr('已制作的电子册')}</Text> : null}
-          {epubEditions.map(edition => <View key={edition.id} style={{ gap: 8 }}>
+          {epubEditions.map(edition => <AlbumEditionSwipeRow key={edition.id} id={edition.id} disabled={busy || blocked} onDelete={() => confirmDelete(edition.id)}><View style={{ gap: 8 }}>
             <Text style={styles.title}>{edition.name}</Text>
             <Text style={styles.meta}>{albumEditionDateLabel(edition.createdAt)} · {tr(edition.design === 'imagebook' ? '影像小册' : edition.design === 'literary' ? '生活文集' : '历史电子册')}</Text>
             <ShowcaseButton tone="quiet" label={tr('保存电子册 EPUB')} disabled={busy} onPress={() => electronic(edition)} />
             {epubState?.id === edition.id ? <Text accessibilityLiveRegion="polite" style={styles.meta}>{epubState.message}</Text> : null}
             {epubState?.id === edition.id && epubState.pending ? <ShowcaseButton tone="quiet" label={tr('取消制作电子册')} onPress={() => { epubCancelled.current = true; }} /> : null}
             {__DEV__ && epubState?.id === edition.id && epubState.diagnostic ? <Text selectable style={styles.meta}>{`EPUB/${epubState.diagnostic}`}</Text> : null}
-          </View>)}
+          </View></AlbumEditionSwipeRow>)}
           {saved.length ? <ShelfHeader /> : null}
           {saved.map((edition, index) => (
-            <View key={edition.id} style={styles.edition}>
+            <AlbumEditionSwipeRow key={edition.id} id={edition.id} disabled={busy || blocked} onDelete={() => confirmDelete(edition.id)}><View style={styles.edition}>
               <MiniBook style={edition.style} />
               <View style={styles.editionText}>
                 <Text style={styles.title}>{edition.name}</Text>
@@ -483,7 +507,7 @@ export default function AlbumPrintScreen() {
                   onPress={() => share(edition)}
                 />
               </View>
-            </View>
+            </View></AlbumEditionSwipeRow>
           ))}
         </AlbumExportShowcase>
       ) : null}

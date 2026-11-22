@@ -16,6 +16,7 @@ export function epubSnapshotDirectory(id: string, building = false) {
   return `${epubSnapshotRoot()}${building ? '.building-' : ''}${id}/`;
 }
 const activeSnapshots = new Set<string>();
+export const epubSnapshotActive = (id: string) => activeSnapshots.has(id);
 async function prepareSnapshots() {
   await FS.makeDirectoryAsync(epubSnapshotRoot(), { intermediates: true });
   for (const name of await FS.readDirectoryAsync(epubSnapshotRoot())) {

@@ -1,3 +1,4 @@
+import { deleteSavedAlbumEdition } from '../infrastructure/album-edition-delete';
 import { createPersonalEpubSnapshot } from '../infrastructure/album-epub-snapshots';
 import {
   act,
@@ -6,12 +7,13 @@ import {
   render,
   waitFor,
 } from '@testing-library/react-native';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AlbumPrintScreen from './album-print-screen';
 import { AlbumEpubFailure } from '../infrastructure/album-epub-files';
 import {AlbumPrintFailure} from '../application/album-print';
 jest.mock('../infrastructure/album-epub-snapshots', () => ({ listEpubSnapshots: async () => [], discardUnfinishedEpubSnapshot: async () => {}, createPersonalEpubSnapshot: jest.fn() }));
+jest.mock('../infrastructure/album-edition-delete',()=>({deleteSavedAlbumEdition:jest.fn(async()=>{})}));
 const mockEpub = jest.fn(async () => undefined);
 jest.mock('../infrastructure/album-epub-files', () => ({
   ...jest.requireActual('../infrastructure/album-epub-files'),
@@ -345,4 +347,32 @@ it('uses the selected electronic design without changing the reading paper prefe
   await fireEvent.press(view.getByText('制作电子册（含声音）'));
   await waitFor(()=>expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','imagebook',expect.any(Function),expect.any(Function)));
   expect(mockSaveStyle).not.toHaveBeenCalled();
+});
+
+it('requires confirmation, removes only the chosen edition and keeps cancelled deletion intact',async()=>{
+ mockList.mockResolvedValueOnce([{id:'print_delete',name:'Saved',createdAt:'2026-11-21',style:'plain',imageDpi:[],pdf:{pageCount:1,bytes:10,fontRunNames:[]}}] as never);
+ const alert=jest.spyOn(Alert,'alert');const v=await render(wrap());
+ await waitFor(()=>expect(v.getByTestId('edition-row-print_delete')).toBeTruthy());
+ await fireEvent.press(v.getByLabelText('成品操作'));await fireEvent.press(v.getByLabelText('删除这版成品'));
+ expect(deleteSavedAlbumEdition).not.toHaveBeenCalled();expect(v.getByTestId('edition-row-print_delete')).toBeTruthy();
+ const buttons=alert.mock.calls[alert.mock.calls.length-1][2]!;
+ expect(buttons[0].style).toBe('cancel');
+ await act(async()=>{buttons[1].onPress!();});
+ await waitFor(()=>expect(v.queryByTestId('edition-row-print_delete')).toBeNull());
+ expect(deleteSavedAlbumEdition).toHaveBeenCalledWith('print_delete','book',expect.any(Function));
+});
+
+it('retains the row and explains deletion failure; a stale background confirmation does nothing',async()=>{
+ mockList.mockResolvedValueOnce([{id:'print_keep',name:'Keep',createdAt:'2026-11-21',style:'plain',imageDpi:[],pdf:{pageCount:1,bytes:10,fontRunNames:[]}}] as never);
+ (deleteSavedAlbumEdition as jest.Mock).mockRejectedValueOnce(new Error('DISK_ERROR'));
+ const alert=jest.spyOn(Alert,'alert');const v=await render(wrap());
+ await waitFor(()=>expect(v.getByTestId('edition-row-print_keep')).toBeTruthy());
+ await fireEvent.press(v.getByLabelText('成品操作'));await fireEvent.press(v.getByLabelText('删除这版成品'));
+ await act(async()=>{alert.mock.calls[alert.mock.calls.length-1][2]![1].onPress!();});
+ await waitFor(()=>expect(alert).toHaveBeenCalledWith('这版成品未能删除，请再试一次。'));
+ expect(v.getByTestId('edition-row-print_keep')).toBeTruthy();
+ await fireEvent.press(v.getByLabelText('成品操作'));await fireEvent.press(v.getByLabelText('删除这版成品'));
+ const callback=alert.mock.calls[alert.mock.calls.length-1][2]![1].onPress!;
+ AppState.currentState='background';await act(async()=>callback());
+ expect(deleteSavedAlbumEdition).toHaveBeenCalledTimes(1);
 });
