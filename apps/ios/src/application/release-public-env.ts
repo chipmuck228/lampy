@@ -10,6 +10,8 @@ import { isFamilyTestDriverEnabled } from '../infrastructure/family-test-driver'
 /** Public flags that must be closed in a TestFlight / Release archive. */
 export type ReleasePublicEnvReport = {
   familyEntryOpen: boolean;
+  emailCodeLoginRequested:boolean;
+  accountApiConfigured:boolean;
   familyApiConfigured: boolean;
   familyApiBaseUrl: string;
   diagnosticsOpen: boolean;
@@ -31,14 +33,17 @@ export function inspectReleasePublicEnv(
   const diagnosticsOpen = isPersonalSettingsDiagnosticsOpen(env, isDev);
   const testDriverEnabled = Boolean(isDev) && isFamilyTestDriverEnabled(env.EXPO_PUBLIC_FAMILY_TEST_DRIVER);
   const controlledEmailAccountsOpen = isControlledEmailAccountsOpen(env.EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS);
+  const emailCodeLoginRequested=env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED==='1';
+  const accountApiConfigured=Boolean(env.EXPO_PUBLIC_ACCOUNT_API_BASE_URL?.trim());
   return {
+    emailCodeLoginRequested,accountApiConfigured,
     controlledEmailAccountsOpen,
     familyEntryOpen,
     familyApiConfigured,
     familyApiBaseUrl: familyApiBaseUrl(env.EXPO_PUBLIC_FAMILY_API_BASE_URL),
     diagnosticsOpen,
     testDriverEnabled,
-    closed: !controlledEmailAccountsOpen && !familyEntryOpen && !familyApiConfigured && !diagnosticsOpen && !testDriverEnabled,
+    closed: !emailCodeLoginRequested && !accountApiConfigured && !controlledEmailAccountsOpen && !familyEntryOpen && !familyApiConfigured && !diagnosticsOpen && !testDriverEnabled,
   };
 }
 
@@ -48,6 +53,8 @@ export function applyClosedReleasePublicEnv(
   return {
     ...env,
     EXPO_PUBLIC_APPSTORE_V1: '0',
+    EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED:'0',
+    EXPO_PUBLIC_ACCOUNT_API_BASE_URL:'',
     EXPO_PUBLIC_FAMILY_INTERNAL_TEST: '0',
     EXPO_PUBLIC_FAMILY_ALBUM_EVAL: '0',
     EXPO_PUBLIC_FAMILY_ENTRY_OPEN: '',

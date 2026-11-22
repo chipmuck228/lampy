@@ -1,0 +1,15 @@
+import {fireEvent,render} from '@testing-library/react-native';
+import FamilyInviteLoginScreen from './family-invite-login-screen';
+let mockGeneration=42;const mockBack=jest.fn(),mockDismiss=jest.fn();
+jest.mock('expo-router',()=>({useRouter:()=>({back:mockBack,canGoBack:()=>true,dismissTo:mockDismiss}),useLocalSearchParams:()=>({generation:'42',returnTo:'/family'})}));
+jest.mock('../infrastructure/family-invite-link',()=>({currentFamilyInvite:()=>({generation:mockGeneration})}));
+jest.mock('../infrastructure/account-config',()=>({emailCodeEntryOpen:()=>true}));
+jest.mock('../infrastructure/family-config',()=>({isFamilyV1ReleaseBuild:()=>true,isFamilyProductEntryOpen:()=>true,isControlledEmailAccountsOpen:()=>false,isFamilyInternalTestBuild:()=>false}));
+jest.mock('../application/personal-settings-visibility',()=>({isPersonalSettingsDiagnosticsOpen:()=>false}));
+jest.mock('./device-lock-context',()=>({useDeviceLock:()=>({snapshot:{locked:false}})}));
+jest.mock('./email-code-screen',()=>{const {Pressable,Text}=jest.requireActual('react-native');return {__esModule:true,default:({onAuthenticated}:any)=><Pressable testID="verified-email" onPress={onAuthenticated}><Text>Verified</Text></Pressable>};});
+jest.mock('./family-email-account-screen',()=>({__esModule:true,default:()=>null}));
+jest.mock('./account-screen',()=>({__esModule:true,default:()=>null}));
+beforeEach(()=>{mockGeneration=42;jest.clearAllMocks();});
+it('returns to the pending invitation after email sign-in, without accepting it',async()=>{const page=await render(<FamilyInviteLoginScreen/>);await fireEvent.press(page.getByTestId('verified-email'));expect(mockBack).toHaveBeenCalledTimes(1);expect(mockDismiss).not.toHaveBeenCalled();});
+it('does not return to a replaced invitation',async()=>{const page=await render(<FamilyInviteLoginScreen/>);mockGeneration=43;await fireEvent.press(page.getByTestId('verified-email'));expect(mockBack).not.toHaveBeenCalled();});

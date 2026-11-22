@@ -3,6 +3,8 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { ApplicationError } from '../application/errors';
 import FamilyEmailAccountScreen from './family-email-account-screen';
 const mockDelete=jest.fn(),mockAuthorization=jest.fn();let mockFormal=false;
+let mockEmailCodeOpen=false;
+jest.mock('../infrastructure/account-config',()=>({emailCodeEntryOpen:()=>mockEmailCodeOpen}));
 const mockAppleAvailable=jest.fn();const mockAppleToken=jest.fn();const mockAppleStatus=jest.fn();const mockAuthenticateApple=jest.fn();
 jest.mock('../infrastructure/expo-apple-auth',()=>({createExpoAppleIdentityTokenSource:()=>({isAvailable:mockAppleAvailable,requestIdentityToken:mockAppleToken,requestAuthorization:mockAuthorization})}));
 jest.mock('./apple-auth-button',()=>{const {Pressable,Text}=jest.requireActual('react-native');return {AppleAuthButton:({disabled,onPress}:any)=><Pressable testID="apple-auth-button" disabled={disabled} onPress={onPress}><Text>Apple</Text></Pressable>};});
@@ -241,4 +243,13 @@ it('formal deletion failure keeps profile for retry and shows creator resolution
  await fireEvent.press(page.getByTestId('account-delete'));await act(async()=>alert.mock.calls[0][2]![1].onPress!());
  expect(page.getByText('请先转交或解散仍有其他成员的家庭，再删除账号。')).toBeTruthy();expect(page.getByTestId('account-delete')).toBeTruthy();
  }finally{alert.mockRestore();}
+});
+it('an email-only formal account keeps its profile and routes deletion to email verification',async()=>{
+ mockFormal=true;mockEmailCodeOpen=true;mockOpen=false;mockDiagnostics=false;
+ mockHealth.mockResolvedValue({appleLogin:false,accountDeletion:false,emailCodeLogin:true});
+ const page=await render(<FamilyEmailAccountScreen profileMode embedded/>);
+ try {
+  await waitFor(()=>expect(page.getByTestId('email-account-nickname').props.value).toBe('原昵称'));
+  await fireEvent.press(page.getByTestId('account-delete'));expect(mockPush).toHaveBeenCalledWith('/account/email-code');expect(mockDelete).not.toHaveBeenCalled();
+ } finally {mockEmailCodeOpen=false;await page.unmount();}
 });

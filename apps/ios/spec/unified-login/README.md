@@ -1,6 +1,6 @@
 # Lampy 跨平台登录与找回
 
-状态：已确认的产品方向；本 PR 已实施阶段 A 的身份底座与会话隔离，详见 [阶段 A](stage-a.md)。新增服务端迁移 34 和默认关闭的登录管理接口；不启用新登录渠道、不开放 Android 家庭入口、不改变 TestFlight 配置。阶段 B/C 尚未实施。
+状态：阶段 A 已实施身份底座与会话隔离，详见 [阶段 A](stage-a.md)。本后续 PR 实施 B1 的邮箱验证码部分，详见 [配置与验收](email-code.md)，包含迁移 35 和默认关闭的双端入口。手机短信、B2 第三方渠道及 C Android 家庭仍未实施；真实 SMTP 与设备验收待完成。
 
 ## 产品原则
 
@@ -27,7 +27,7 @@
 
 ## 现有实现与需要补齐的边界
 
-现有 Account/userId、LoginIdentity、Membership、Apple challenge 与显式绑定可复用。当前 LoginProvider、SQL CHECK 和内存/SQLite 仓储校验只支持 apple、controlled-password，不能只加客户端按钮或只修改 TypeScript 联合类型。
+现有 Account/userId、LoginIdentity、Membership、Apple challenge 与显式绑定可复用。阶段 A 已扩展 LoginProvider、SQL CHECK 和内存/SQLite 仓储校验；渠道上线仍需完整服务端验证，不能只加客户端按钮。
 
 现有 Apple 登录禁止按邮箱自动合并账号，继续保留。现有受控邮箱密码流程不等于公开邮箱验证码登录。新的公开身份需要重新审查 session 准入：不能绕过冻结账号、受控账号禁用、删除状态等既有限制。
 

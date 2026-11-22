@@ -1,3 +1,4 @@
+import {EMAIL_CODE_NAMESPACE} from './email-code-types';
 import { FamilyError, FAMILY_ERROR } from './errors';
 import { assertRecentAuthentication, loginIdentityKey, loginNamespace, type LoginMethodRef } from './login-identity';
 import type { FamilyRepository, FamilyTx } from './repository';
@@ -9,6 +10,7 @@ export function createLoginManagement(deps: {
   clock: FamilyClock;
   enabled: boolean;
   appleEnabled: boolean;
+  emailEnabled?:boolean;
   passwordEnabled: boolean;
   requireUser: (tx: FamilyTx, token?: string) => Promise<string>;
 }) {
@@ -16,6 +18,7 @@ export function createLoginManagement(deps: {
     if (!deps.enabled) throw new FamilyError(FAMILY_ERROR.FORBIDDEN, 'Login management is not enabled.');
   }
   async function usable(tx: FamilyTx, identity: LoginIdentity): Promise<boolean> {
+    if(identity.provider==='email-otp'&&identity.namespace===EMAIL_CODE_NAMESPACE)return deps.emailEnabled===true&&!!identity.verifiedAt;
     if (loginNamespace(identity) !== 'legacy') return false;
     if (identity.provider === 'apple') return deps.appleEnabled;
     if (identity.provider === 'controlled-password' && deps.passwordEnabled) {

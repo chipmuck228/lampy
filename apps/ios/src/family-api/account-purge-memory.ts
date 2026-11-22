@@ -29,6 +29,7 @@ export function purgeMemoryAccount(s:FamilyStore,userId:string) {
  s.purchases=s.purchases.filter(r=>r.userId!==userId);s.purchaseTokens=s.purchaseTokens.filter(r=>r.userId!==userId);
  s.appleChallenges=s.appleChallenges.filter(r=>r.userId!==userId);s.sessions=s.sessions.filter(r=>r.userId!==userId);
  s.profiles=s.profiles.filter(r=>r.userId!==userId);s.testCredentials=s.testCredentials.filter(r=>r.userId!==userId);
+ s.emailCodeChallenges=s.emailCodeChallenges.filter(r=>r.userId!==userId);
  s.accountStates=s.accountStates.filter(r=>r.userId!==userId);
  s.loginIdentities=s.loginIdentities.filter(r=>r.userId!==userId);s.accounts=s.accounts.filter(r=>r.userId!==userId);
  s.mediaObjects=s.mediaObjects.filter(r=>r.ownerUserId!==userId);

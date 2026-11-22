@@ -11,7 +11,8 @@ const CLOSED = {
   EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID:'',
 };
 function personalEnv(env = process.env) {
-  return {...env, ...CLOSED, LAMPY_BUILD_PROFILE:'android-personal'};
+  const email=env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED==='1';
+  return {...env, ...CLOSED, EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED:email?'1':'0',EXPO_PUBLIC_ACCOUNT_API_BASE_URL:email?(env.EXPO_PUBLIC_ACCOUNT_API_BASE_URL||''):'',LAMPY_BUILD_PROFILE:'android-personal'};
 }
 const COMMANDS = {
   config:['config','--type','public'],

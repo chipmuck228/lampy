@@ -1,3 +1,4 @@
+import {createEmailCodeCommands,type EmailCodeOptions} from './email-code';
 import { sessionIsCurrent, assertAccountActive, loginIdentityKey } from './login-identity';
 import { createLoginManagement } from './login-management';
 import {assertSharedTextAllowed} from './content-policy';
@@ -53,6 +54,7 @@ import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = InviteLinkCommands & {
   loginMethods: ReturnType<typeof createLoginManagement>;
+  emailCode: ReturnType<typeof createEmailCodeCommands>;
   safety: import('./safety-types').FamilySafetyApi;
   purchases: import('./purchase-types').PurchaseApi;
   albums: import('./family-album-types').FamilyAlbumApi;
@@ -121,7 +123,7 @@ async function requireUser(
   sessionToken: string | undefined,
   clock: FamilyClock,
   testAccountLoginEnabled: boolean,
-  operatorOnly: boolean | "apple-enabled" = false,
+  operatorOnly: import('./types').SessionAccessMode = false,
 ) {
   if (!sessionToken) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
@@ -272,6 +274,7 @@ export function createFamilyCommands(deps: {
   inviteTtlMs?: number;
   sessionTtlMs?: number;
   loginManagementEnabled?: boolean;
+  emailCode?: EmailCodeOptions;
   mediaBlobs?: MediaBlobStore;
   passwordHasher?: PasswordHasher;
   testAccountLoginEnabled?: boolean;
@@ -287,6 +290,7 @@ export function createFamilyCommands(deps: {
   unifiedProductId?:string;
   purchaseVerifier?:import('./purchase-types').PurchaseVerifier;
 }): FamilyCommands {
+  if(deps.emailCode&&Buffer.byteLength(deps.emailCode.secret)<32)throw new Error('Email code secret must be at least 32 bytes.');
   const clock = deps.clock ?? createFamilyClock();
   const ids = deps.ids ?? createFamilyIds();
   const inviteTtlMs = deps.inviteTtlMs ?? DEFAULT_INVITE_TTL_MS;
@@ -294,7 +298,7 @@ export function createFamilyCommands(deps: {
   const store = deps.store ?? createFamilyStore();
   const repository = deps.repository ?? createMemoryFamilyRepository(store);
   const blobs = deps.mediaBlobs ?? createMemoryMediaBlobStore();
-  const operatorOnly = deps.publicTestLoginEnabled === true ? (deps.appleLoginEnabled === true ? 'apple-enabled' as const : true) : false;
+  const operatorOnly:import('./types').SessionAccessMode = deps.publicTestLoginEnabled === true ? (deps.emailCode ? (deps.appleLoginEnabled ? 'apple-email-enabled':'email-enabled') : deps.appleLoginEnabled ? 'apple-enabled':true) : false;
   const testAccountLoginEnabled = deps.testAccountLoginEnabled === true || deps.publicTestLoginEnabled === true;
   const media = createMediaCommands({
     repository,
@@ -344,7 +348,8 @@ export function createFamilyCommands(deps: {
   const purchases=createPurchaseCommands({familyExportEnabled,enabled:deps.unifiedPurchasesEnabled===true,productId:deps.unifiedProductId,verifier:deps.purchaseVerifier,clock,authed:withAuthedUser});
 
   return {
-    loginMethods:createLoginManagement({repository,clock,enabled:deps.loginManagementEnabled===true,appleEnabled:deps.appleLoginEnabled===true,passwordEnabled:testAccountLoginEnabled,requireUser:(tx,token)=>requireUser(tx,token,clock,testAccountLoginEnabled,operatorOnly)}),
+    emailCode:createEmailCodeCommands({repository,clock,ids,sessionTtlMs,options:deps.emailCode,blobs,requireUser:(tx,token)=>requireUser(tx,token,clock,testAccountLoginEnabled,operatorOnly)}),
+    loginMethods:createLoginManagement({repository,clock,enabled:deps.loginManagementEnabled===true,emailEnabled:!!deps.emailCode,appleEnabled:deps.appleLoginEnabled===true,passwordEnabled:testAccountLoginEnabled,requireUser:(tx,token)=>requireUser(tx,token,clock,testAccountLoginEnabled,operatorOnly)}),
     purchases,
     safety: createFamilySafetyCommands({clock,authed:withAuthedUser}),
     albums: createFamilyAlbumCommands({authed:withAuthedUser,clock,exportEnabled:familyExportEnabled,exportEligibility:(session,familyId)=>purchases.familyAccess(session,familyId),enabled:deps.familyAlbumsEnabled===true&&deps.historySharingEnabled===true}),
@@ -386,6 +391,7 @@ export function createFamilyCommands(deps: {
         emailRegistration: deps.publicTestLoginEnabled !== true && testAccountLoginEnabled && deps.controlledEmailAccountsEnabled === true,
         publicTestLogin: deps.publicTestLoginEnabled === true,
         appleLogin: deps.appleLoginEnabled === true,
+        emailCodeLogin: !!deps.emailCode,
         accountDeletion: deps.appleLoginEnabled === true,
         testAccountLogin: testHealth.testAccountLogin,
         testAccountLoginReason: testHealth.testAccountLoginReason,

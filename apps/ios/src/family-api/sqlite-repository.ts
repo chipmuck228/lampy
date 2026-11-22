@@ -240,6 +240,13 @@ export function mapFamilySqlConstraint(error: unknown) {
 function createSqliteTx(db: FamilySql): FamilyTx {
   const tx: FamilyTx = {
     ...sqliteSafetyTx(db),
+    async findEmailCodeChallenge(id){const row=await db.getFirst<{json:string}>("SELECT json_object('sequence',sequence,'id',id,'email',email,'scope',scope,'intent',intent,'digest',digest,'userId',user_id,'sessionDigest',session_digest,'createdAt',created_at,'expiresAt',expires_at,'attempts',attempts,'status',status) AS json FROM family_email_code_challenges WHERE id=?",[id]);return row?JSON.parse(row.json):null;},
+    async latestEmailCodeChallenge(scope){const row=await db.getFirst<{id:string}>('SELECT id FROM family_email_code_challenges WHERE scope=? ORDER BY sequence DESC LIMIT 1',[scope]);return row?tx.findEmailCodeChallenge(row.id):null;},
+    async saveEmailCodeChallenge(r){await db.run(`INSERT INTO family_email_code_challenges(id,email,scope,intent,digest,user_id,session_digest,created_at,expires_at,attempts,status)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET attempts=excluded.attempts,status=excluded.status`,[r.id,r.email,r.scope,r.intent,r.digest,r.userId,r.sessionDigest,r.createdAt,r.expiresAt,r.attempts,r.status]);},
+    async deleteEmailCodeChallenge(id){await db.run('DELETE FROM family_email_code_challenges WHERE id=?',[id]);},
+    async activateEmailCodeChallenge(id,scope){await db.run('DELETE FROM family_email_code_challenges WHERE scope=? AND id<>?',[scope,id]);await db.run("UPDATE family_email_code_challenges SET status='active' WHERE id=?",[id]);},
+    async pruneEmailCodeChallenges(now){await db.run('DELETE FROM family_email_code_challenges WHERE expires_at<=?',[now]);},
     async purgeAccount(userId) {await purgeSqliteAccount(db,userId);},
     async isMediaStorageKeyLive(key) {return Boolean(await db.getFirst('SELECT object_id FROM family_media_objects WHERE storage_key=? LIMIT 1',[key]));},
     async enqueueAccountMediaCleanup(key) {await db.run('INSERT OR IGNORE INTO family_account_media_cleanup(storage_key) VALUES(?)',[key]);},
@@ -309,6 +316,7 @@ function createSqliteTx(db: FamilySql): FamilyTx {
       if (status === 'suspended') {
         await tx.deleteSessionsForUser(userId);
         await db.run('DELETE FROM family_apple_challenges WHERE user_id=?',[userId]);
+        await db.run('DELETE FROM family_email_code_challenges WHERE user_id=?',[userId]);
       }
     },
 

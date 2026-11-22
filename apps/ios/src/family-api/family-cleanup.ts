@@ -6,6 +6,11 @@ import type { MediaBlobStore } from './media-blobs';
 export async function runFamilyCleanup(db: FamilySql, blobs: MediaBlobStore, now = new Date(), limit = 20) {
   if (!Number.isFinite(now.getTime()) || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('Invalid cleanup arguments.');
   const at = now.toISOString();
+  const emailTable=await db.getFirst("SELECT name FROM sqlite_master WHERE type='table' AND name='family_email_code_challenges'");
+  if(emailTable){
+    await db.run('DELETE FROM family_email_code_challenges WHERE expires_at<=?',[at]);
+    await db.run("DELETE FROM family_auth_rate_limits WHERE bucket LIKE 'email-code:%' AND window_started_at<?",[new Date(now.getTime()-30*86400_000).toISOString()]);
+  }
   const albumTables = await db.getFirst<{name:string}>("SELECT name FROM sqlite_master WHERE type='table' AND name='family_albums'");
   const safetyTables = await db.getFirst("SELECT name FROM sqlite_master WHERE type='table' AND name='family_safety_reports'");
   const due = await db.getAll<{ family_id: string }>(`SELECT family_id FROM family_families

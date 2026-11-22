@@ -17,6 +17,7 @@ export type IdempotentRecord = {
 };
 
 export type FamilyStore = {
+  emailCodeChallenges: import('./email-code-types').EmailCodeChallenge[];
   sharingRestrictionAudit: import('./safety-types').SharingRestriction[];
   sharingRestrictions: import('./safety-types').SharingRestriction[];
   safetyReports: import('./safety-types').SafetyReport[];
@@ -50,6 +51,7 @@ export type FamilyStore = {
 
 export function createFamilyStore(): FamilyStore {
   return {
+    emailCodeChallenges: [],
     sharingRestrictionAudit: [], sharingRestrictions: [], safetyReports: [], userBlocks: [], moderation: [], moderationAudit: [],
     accountMediaCleanup: [],
     purchaseTokens: [], purchases: [], purchaseGrants: [],

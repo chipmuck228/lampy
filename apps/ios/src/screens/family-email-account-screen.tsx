@@ -1,3 +1,4 @@
+import {emailCodeEntryOpen} from '../infrastructure/account-config';
 import { AppleAuthButton } from './apple-auth-button';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -34,8 +35,8 @@ function errorCopy(error: unknown) {
   return tr('现在没有完成，请再试一次。');
 }
 
-export default function FamilyEmailAccountScreen({ profileMode = false, embedded = false, onAuthenticated, onCancel, onOtherSignIn }: {
-  profileMode?: boolean; embedded?: boolean; onAuthenticated?: () => void; onCancel?: () => void; onOtherSignIn?: () => void;
+export default function FamilyEmailAccountScreen({ profileMode = false, embedded = false, onAuthenticated, onCancel, onOtherSignIn, onEmailCodeRequested }: {
+  profileMode?: boolean; embedded?: boolean; onAuthenticated?: () => void; onCancel?: () => void; onOtherSignIn?: () => void; onEmailCodeRequested?:()=>void;
 } = {}) {
   const router = useRouter();
   const lock = useDeviceLock();
@@ -66,7 +67,7 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
     try {
       const service = await getFamilyUseCases(); if (!current(seq)) return;
       const health = await service.getControlledEmailAvailability(); if (!current(seq)) return;
-      if (formal ? health.appleLogin !== true || health.accountDeletion !== true : !health.controlledEmailAccounts || (internal && (health.publicTestLogin !== true || health.emailRegistration !== false))) { setMessage(tr(formal ? '家庭账号服务暂不可用，请稍后再试。' : '测试账号入口暂未开放。')); return; }
+      if (formal ? !((health.appleLogin === true && health.accountDeletion === true) || (profileMode && health.emailCodeLogin === true)) : !health.controlledEmailAccounts || (internal && (health.publicTestLogin !== true || health.emailRegistration !== false))) { setMessage(tr(formal ? '家庭账号服务暂不可用，请稍后再试。' : '测试账号入口暂未开放。')); return; }
       setRegistrationAllowed(!formal && !internal && health.emailRegistration === true);
       if (profileMode) { const value = await service.getMyProfile(() => current(seq)); if (!current(seq)) return;setProfile(value);setNickname(value.nickname); }
       if(health.appleLogin===true) {
@@ -225,10 +226,11 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
         {profileMode && !profile ? (!embedded ? <Text>{tr('请先登录。')}</Text> : null) : (profileMode || !formal) ? <Pressable testID="email-account-submit" style={styles.primary} accessibilityRole="button" accessibilityState={{disabled:busy}} disabled={busy} onPress={()=>void submit()}><Text style={styles.action}>{tr(busy ? '正在处理。' : profileMode ? '保存昵称' : register ? '创建并登录' : '登录')}</Text></Pressable> : null}
         {!profileMode && registrationAllowed ? <Pressable testID="email-account-toggle" style={styles.hit} accessibilityRole="button" disabled={busy} onPress={()=>{setRegister(!register);setMessage(null);setPassword('');}}><Text style={styles.action}>{tr(register ? '已有账号，去登录' : '没有账号，创建一个')}</Text></Pressable> : null}
       </View> : !loading ? <Pressable style={styles.hit} accessibilityRole="button" onPress={()=>void load(++sequence.current)}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable> : null}
+      {!profileMode&&emailCodeEntryOpen()?<Pressable accessibilityRole="button" testID="email-code-alternative" disabled={busy} onPress={onEmailCodeRequested??(()=>router.push({pathname:'/account/email-code',params:{returnTo:'family'}}))}><Text style={styles.action}>{tr('使用邮箱验证码')}</Text></Pressable>:null}
       {!profileMode && !internal && !formal ? <Pressable style={styles.hit} accessibilityRole="button" disabled={busy} onPress={() => { if(onOtherSignIn) onOtherSignIn(); else router.push('/account-diagnostics'); }}><Text style={styles.action}>{tr('其他登录方式')}</Text></Pressable> : null}
       {profileMode && profile ? <View style={styles.profileActions}>
         <Pressable testID="email-account-sign-out" style={styles.primary} accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={confirmSignOut}><Text style={styles.action}>{tr('退出登录')}</Text></Pressable>
-        {formal ? <Pressable testID="account-delete" style={[styles.primary,styles.destructive]} accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={confirmDeletion}><Text style={[styles.action,styles.destructiveLabel]}>{tr('删除账号')}</Text></Pressable> : null}
+        {formal ? <Pressable testID="account-delete" style={[styles.primary,styles.destructive]} accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={()=>emailCodeEntryOpen()&&!appleLinked?router.push('/account/email-code'):confirmDeletion()}><Text style={[styles.action,styles.destructiveLabel]}>{tr('删除账号')}</Text></Pressable> : null}
       </View> : null}
       {formal && ready && !profileMode && !appleAvailable ? <Text>{tr('这台设备暂不能使用Apple登录。')}</Text> : null}
       {message ? <Text testID="email-account-message" style={styles.explanation}>{message}</Text> : null}

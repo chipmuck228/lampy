@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { albumLayoutNativeAvailable, albumNativePageViewAvailable } from '../../modules/lampy-album-layout';
 
-/** Android currently supports the local personal library and personal albums only. */
+/** Android keeps family/purchases closed; optional account authentication is a separate capability. */
 export function personalRecordsOnly(platform = Platform.OS): boolean {
   return platform === 'android';
 }

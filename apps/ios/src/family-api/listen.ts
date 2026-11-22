@@ -1,3 +1,4 @@
+import {emailCodeConfiguration} from './email-code-smtp';
 import {appleRevokerFromEnv} from './apple-revocation-node';
 import {drainAccountMedia} from './account-deletion';
 import {applePurchaseVerifier} from './purchase-apple-node';
@@ -70,10 +71,14 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
   const inviteOrigin=invitationOrigin(env.LAMPY_FAMILY_INVITE_ORIGIN);
   const inviteEnabled=env.LAMPY_FAMILY_INVITES_ENABLED === '1' && Boolean(inviteOrigin);
   const publicAuth = publicTestAuthPlan({ ...env, LAMPY_FAMILY_API_HOST: options?.host ?? env.LAMPY_FAMILY_API_HOST });
+  const emailCode=emailCodeConfiguration(env);
+  const trustedEmailProxy=env.LAMPY_EMAIL_CODE_TRUST_LOOPBACK_PROXY==='1';
+  if(trustedEmailProxy&&(options?.host??env.LAMPY_FAMILY_API_HOST)!=='127.0.0.1')throw new Error('Trusted email proxy requires explicit 127.0.0.1 binding.');
   const trustedAppleProxy=env.LAMPY_APPLE_TRUST_LOOPBACK_PROXY==='1';
   if(trustedAppleProxy && (options?.host ?? env.LAMPY_FAMILY_API_HOST)!=='127.0.0.1')throw new Error('Trusted Apple proxy requires explicit 127.0.0.1 binding.');
   const authOpts = {
     publicTestLoginEnabled: publicAuth.enabled,
+    emailCode,
     appleLoginEnabled: env.LAMPY_APPLE_LOGIN_ENABLED === '1',
     loginManagementEnabled: env.LAMPY_LOGIN_MANAGEMENT_ENABLED === '1',
     legacyAppleLoginEnabled: plan.mode === 'test',
@@ -142,7 +147,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
       const authRequest = isPublicAuthRequest(req.method, route);
       let peer = req.socket.remoteAddress || 'unknown';
       if (authRequest) {
-        if(publicAuth.enabled || trustedAppleProxy) {
+        if(publicAuth.enabled || trustedAppleProxy || trustedEmailProxy) {
         const trusted = publicTestPeer(req.socket.remoteAddress, req.headers['x-lampy-client-ip']);
         if (!trusted) {
           res.writeHead(403, { 'content-type': 'application/json' });

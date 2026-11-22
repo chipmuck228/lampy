@@ -119,7 +119,7 @@ export function createMediaCommands(deps: {
   objectId?: () => string;
   assertPayload: (bytes: Uint8Array | undefined, mime: string | undefined) => string;
   testAccountLoginEnabled?: boolean;
-  operatorOnly?: boolean | "apple-enabled";
+  operatorOnly?: import('./types').SessionAccessMode;
 }): MediaCommands {
   const clock = deps.clock ?? { now: () => new Date() };
   const testAccountLoginEnabled = deps.testAccountLoginEnabled === true;

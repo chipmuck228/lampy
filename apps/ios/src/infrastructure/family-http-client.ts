@@ -14,7 +14,7 @@ import type {
   SignInResult,
   FamilyHealth,
 } from '../family-api/types';
-import { isSafeFamilyApiBaseUrl } from './family-config';
+import {safeAccountEndpoint} from './account-config';
 import { consumeFamilyTestNextRequestFailure, recordFamilyTestLastRequest } from './family-test-driver';
 
 export function familyTestPathKind(method: string, path: string) {
@@ -62,6 +62,9 @@ function familyFetchBody(input: FamilyTransportRequest): BodyInit | undefined {
 }
 
 export type FamilyApiClient = {
+  requestEmailCode?(input:import('../family-api/email-code-types').EmailCodeRequest,token?:string):Promise<import('../family-api/email-code-types').EmailCodeTicket>;
+  verifyEmailCode?(input:import('../family-api/email-code-types').EmailCodeVerification,token?:string):Promise<import('../family-api/email-code-types').EmailCodeResult>;
+  emailCodeStatus?(token:string):Promise<import('../family-api/email-code-types').EmailCodeStatus>;
   safety?: import('../family-api/safety-types').FamilySafetyApi;
   purchases?: import('../family-api/purchase-types').PurchaseApi;
   albums?: import('../family-api/family-album-types').FamilyAlbumApi;
@@ -191,6 +194,9 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
     ...(sharingVersion === 1 ? { history: createFamilyApiClient(transport, 2) } : {}),
     getHistoryPolicy(sessionToken, familyId) { return send({ method: 'GET', path: `/v2/families/${familyId}/history-policy`, sessionToken }); },
     confirmHistoryPolicy(sessionToken, familyId) { return send({ method: 'POST', path: `/v2/families/${familyId}/history-policy`, sessionToken, body: { confirmation: 'new-members-can-read-active-history' } }); },
+    requestEmailCode(input,sessionToken){return send({method:'POST',path:'/v2/auth/email-code/request',body:input,sessionToken});},
+    verifyEmailCode(input,sessionToken){return send({method:'POST',path:'/v2/auth/email-code/verify',body:input,sessionToken});},
+    emailCodeStatus(sessionToken){return send({method:'GET',path:'/v2/me/email-code',sessionToken});},
     registerControlledEmail(input) { return send({method:'POST',path:'/v2/auth/email/register',body:input}); },
     signInWithControlledEmail(input) { return send({method:'POST',path:'/v2/auth/email/login',body:input}); },
     getMyProfile(sessionToken) { return send({method:'GET',path:'/v2/me/profile',sessionToken}); },
@@ -405,7 +411,7 @@ export function createFamilyHttpTransport(deps: {
       if (!baseUrl) {
         throw new ApplicationError('SERVER_UNREACHABLE', 'Family API base URL is not configured.');
       }
-      if (!isSafeFamilyApiBaseUrl(baseUrl)) {
+      if (!safeAccountEndpoint(baseUrl)) {
         throw new ApplicationError(
           'SERVER_UNREACHABLE',
           'Family API must use HTTPS except on this device\'s local network.',

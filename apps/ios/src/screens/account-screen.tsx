@@ -1,3 +1,4 @@
+import {emailCodeEntryOpen} from '../infrastructure/account-config';
 import { personalAlbumsAvailable, personalRecordsOnly } from '../application/mobile-capabilities';
 import FamilyEmailAccountScreen from './family-email-account-screen';
 import { isControlledEmailAccountsOpen, isFamilyV1ReleaseBuild, isFamilyInternalTestBuild, isFamilyProductEntryOpen } from '../infrastructure/family-config';
@@ -383,6 +384,7 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
         onBack={() => dismissSettingsToRecent(router)}
       >
         <SettingsIntro />
+        {emailCodeEntryOpen()?<SettingsGroup title={tr('账号')}><SettingsLink icon="privacy" title={tr('登录与找回')} detail={tr('邮箱验证码登录与账号保护')} testID="account-open-email-code" onPress={()=>router.push('/account/email-code')}/></SettingsGroup>:null}
         {isFamilyProductEntryOpen() && (isFamilyV1ReleaseBuild() || (isControlledEmailAccountsOpen() && (isFamilyInternalTestBuild() || diagnosticsAllowed))) ? <SettingsGroup title={tr("我的资料")}><FamilyEmailAccountScreen profileMode embedded/></SettingsGroup> : null}
         <SettingsGroup title={tr("本机")}>
           <DeviceLockSettings />

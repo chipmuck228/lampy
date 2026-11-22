@@ -1,3 +1,5 @@
+import EmailCodeScreen from './email-code-screen';
+import {emailCodeEntryOpen} from '../infrastructure/account-config';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { currentFamilyInvite } from '../infrastructure/family-invite-link';
 import { isFamilyV1ReleaseBuild, isFamilyProductEntryOpen, isControlledEmailAccountsOpen, isFamilyInternalTestBuild } from '../infrastructure/family-config';
@@ -12,6 +14,7 @@ import { useDeviceLock } from './device-lock-context';
 
 export default function FamilyInviteLoginScreen() {
   const router = useRouter();
+  const [codeMode,setCodeMode]=useState(()=>emailCodeEntryOpen());
   const [emailMode,setEmailMode] = useState(()=>isFamilyV1ReleaseBuild() || isControlledEmailAccountsOpen());
   const params = useLocalSearchParams<{returnTo?: string; generation?: string}>();
   const lock = useDeviceLock();
@@ -31,6 +34,7 @@ export default function FamilyInviteLoginScreen() {
     accessibilityLabel={tr('家庭邀请')} onBack={back}>
     <Text>{tr('请返回邀请，重新确认后继续。')}</Text>
   </SettingsPage>;
-  if (emailMode) return <FamilyEmailAccountScreen onAuthenticated={authenticated} onCancel={back} onOtherSignIn={internal ? undefined : () => setEmailMode(false)}/>;
+  if(codeMode)return <EmailCodeScreen onAuthenticated={authenticated} onCancel={back} onOtherSignIn={()=>setCodeMode(false)}/>;
+  if (emailMode) return <FamilyEmailAccountScreen onEmailCodeRequested={()=>setCodeMode(true)} onAuthenticated={authenticated} onCancel={back} onOtherSignIn={internal ? undefined : () => setEmailMode(false)}/>;
   return <AccountScreen onEmailRequested={() => setEmailMode(true)} variant="diagnostics" onAuthenticated={authenticated} onCancel={back} />;
 }
