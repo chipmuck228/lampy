@@ -1,10 +1,20 @@
-import { isSafeFamilyApiBaseUrl } from "./family-config";
+// Shared with the Node API: never import mobile feature gates or React Native here.
+function isSafeInvitationUrl(url: URL) {
+  if (url.protocol === "https:") return true;
+  if (url.protocol !== "http:") return false;
+  const host = url.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return true;
+  const ipv4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+  if (!ipv4) return false;
+  const a = Number(ipv4[1]), b = Number(ipv4[2]);
+  return a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+}
 export function invitationOrigin(
   value = process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL,
 ): string | null {
   try {
     const u = new URL(value || "");
-    return isSafeFamilyApiBaseUrl(value) &&
+    return isSafeInvitationUrl(u) &&
       u.pathname === "/" &&
       !u.search &&
       !u.hash &&

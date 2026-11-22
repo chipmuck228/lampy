@@ -27,7 +27,8 @@ jobs:
           cache: npm
           cache-dependency-path: apps/ios/package-lock.json
       - run: npm ci
+      - run: node --test scripts/family-api-startup.test.cjs
       - run: npx tsc --noEmit
-      - run: npx jest --runInBand src/family-api src/application/family src/application/test-account-use-cases.test.ts src/application/email-code-use-cases.test.ts src/application/release-public-env.test.ts src/infrastructure/secure-family-session.test.ts src/infrastructure/family-session-transport.test.ts src/infrastructure/family-http-client.test.ts src/screens/family-email-account-screen.test.tsx src/screens/email-code-screen.test.tsx src/screens/family-invite-login-screen.test.tsx src/screens/family-email-code-invite.test.tsx src/infrastructure/account-config.test.ts
+      - run: npx jest --runInBand src/family-api src/application/family src/application/test-account-use-cases.test.ts src/application/email-code-use-cases.test.ts src/application/release-public-env.test.ts src/infrastructure/secure-family-session.test.ts src/infrastructure/family-session-transport.test.ts src/infrastructure/family-http-client.test.ts src/screens/family-email-account-screen.test.tsx src/screens/email-code-screen.test.tsx src/screens/family-invite-login-screen.test.tsx src/screens/family-email-code-invite.test.tsx src/infrastructure/account-config.test.ts src/infrastructure/family-invite-link.test.ts
       - run: node --test scripts/android-personal.test.cjs scripts/email-code-release.test.cjs scripts/appstore-v1-profile.test.cjs scripts/album-export-profile.test.cjs
       - run: npm run test:android
