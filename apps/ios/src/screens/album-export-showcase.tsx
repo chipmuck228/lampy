@@ -35,6 +35,7 @@ export function AlbumExportShowcase({
   celebrate,
   holdAt,
   ebookDesigns = false,
+  actions,
   children,
 }: {
   layout: AlbumLayout | null;
@@ -47,6 +48,7 @@ export function AlbumExportShowcase({
   celebrate: number;
   holdAt?: number;
   ebookDesigns?: boolean;
+  actions?: ReactNode;
   children?: ReactNode;
 }) {
   const pages = useMemo(() => (layout ? styleAlbumPages(layout, style) : []), [layout, style]);
@@ -56,6 +58,7 @@ export function AlbumExportShowcase({
   const span = facts ? albumSpanLabel(facts.span) : null;
   return (
     <View style={styles.body}>
+      {actions}
       {layout ? (
         <AlbumExportBook
           pages={pages}
@@ -71,7 +74,7 @@ export function AlbumExportShowcase({
       ) : failed ? null : (
         <AlbumExportBookPlaceholder width={width} />
       )}
-      {layout ? <Text style={styles.caption}>{tr(ebookDesigns ? '纸页预览；电子册会按所选编排适应阅读器。' : '翻一翻，这就是导出后的样子。')}</Text> : null}
+      {layout ? <Text style={styles.caption}>{tr(ebookDesigns ? 'PDF 预览' : '翻一翻，这就是导出后的样子。')}</Text> : null}
       {failed ? <Text style={[styles.meta, styles.center]}>{tr('这一册暂时排不出来。收进的记录还在。')}</Text> : null}
       {layout && facts ? (
         <>
@@ -92,7 +95,7 @@ export function AlbumExportShowcase({
               ...(facts.soundCount ? [{ value: facts.soundCount, label: tr('段声音') }] : []),
             ]}
           />
-          <EditionPromises sounds={facts.soundCount > 0} />
+          {!ebookDesigns ? <EditionPromises sounds={facts.soundCount > 0} /> : null}
         </>
       ) : null}
       {children}
@@ -188,7 +191,7 @@ export function ShowcaseButton({
   onPress: () => void;
   disabled?: boolean;
   testID?: string;
-  tone?: 'solid' | 'quiet';
+  tone?: 'solid' | 'quiet' | 'outline';
 }) {
   return (
     <Pressable
@@ -198,7 +201,7 @@ export function ShowcaseButton({
       testID={testID}
       onPress={onPress}
       style={({ pressed }) => [
-        tone === 'solid' ? styles.solid : styles.quiet,
+        tone === 'solid' ? styles.solid : tone === 'outline' ? styles.outline : styles.quiet,
         pressed && styles.pressed,
         disabled && styles.dim,
       ]}
@@ -246,7 +249,7 @@ export function BindingPanel({
       <View style={styles.track}>
         <Animated.View style={[styles.fill, { transform: [{ scaleX: fill }] }]} />
       </View>
-      <Text style={styles.note}>{tr('正在冻结并排成PDF。')}</Text>
+      <Text style={styles.note}>{tr('正在制作PDF，请稍候。')}</Text>
       <ShowcaseButton tone="quiet" label={tr('取消')} onPress={onCancel} />
     </View>
   );
@@ -277,12 +280,12 @@ export function FreshEdition({
       <View style={styles.freshHead}>
         <LifeIcon name="sealed" size={22} color={sage} />
         <Text style={styles.freshTitle} accessibilityLiveRegion="polite">
-          {tr('这一册装订好了。')}
+          {tr('PDF已生成。')}
         </Text>
       </View>
       <Text style={styles.freshMeta}>{tr('第{0}版 · {1}页 · {2}', [number, pages, size])}</Text>
       <ShowcaseButton label={tr('保存或打印PDF')} onPress={onShare} disabled={disabled} testID="album-export-fresh-share" />
-      <Text style={styles.note}>{tr('导出会生成一份文件。它不再只待在Lampy里，Lampy也不能从别人的设备收回。')}</Text>
+      <Text style={styles.note}>{tr('已分享的副本无法收回，请选择合适的保存或分享位置。')}</Text>
     </Animated.View>
   );
 }
@@ -290,7 +293,7 @@ export function FreshEdition({
 export function ShelfHeader() {
   return (
     <View style={styles.shelfHead}>
-      <Text style={styles.shelfTitle}>{tr('已装订的版本')}</Text>
+      <Text style={styles.shelfTitle}>{tr('已保存的PDF')}</Text>
     </View>
   );
 }
@@ -357,6 +360,7 @@ const styles = StyleSheet.create({
     boxShadow: '0px 8px 18px rgba(83,96,79,0.30)',
   },
   solidLabel: { ...type.action, color: paper, fontWeight: '600', textAlign: 'center' },
+  outline: { alignSelf: 'stretch', minHeight: 48, borderWidth: 1, borderColor: sage, borderRadius: 24, paddingHorizontal: 18, paddingVertical: 10, justifyContent: 'center', alignItems: 'center' },
   quiet: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   quietLabel: { ...type.action, color: sage, textAlign: 'center' },
   pressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
