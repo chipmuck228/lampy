@@ -7,7 +7,7 @@ import { useAlbumExportUnlock } from './album-export-unlock';
 import { albumExportConfig, albumExportEntryOpen, AlbumExportAccessError } from '../application/album-export-access';
 import { unifiedPurchasesEnabled } from '../application/unified-purchases';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Alert, AppState, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   printFailureDiagnostic,
@@ -42,6 +42,7 @@ import { ink, inkSoft, readingWidth } from './life-page';
 import { usePageMetrics } from './use-page-metrics';
 import {
   AlbumExportShowcase,
+  ExportChoice,
   BindingPanel,
   FreshEdition,
   MiniBook,
@@ -83,6 +84,8 @@ export default function AlbumPrintScreen() {
   const metrics = usePageMetrics();
   const [style, setStyle] = useState<AlbumReadingStyle>('plain');
   const [epubDesign, setEpubDesign] = useState<EpubDesign>('literary');
+  const [format, setFormat] = useState<'epub' | 'pdf'>('epub');
+  const [paperPreview, setPaperPreview] = useState(false);
   const position = useRef<AlbumReadingPosition | null>(null);
   const [epubState, setEpubState] = useState<{ id: string; pending: boolean; message: string; diagnostic?: string } | null>(null);
   const [epubEditions, setEpubEditions] = useState<SavedEpubSnapshot[]>([]);
@@ -313,9 +316,32 @@ export default function AlbumPrintScreen() {
   const numbers = albumEditionNumbers(saved.map((edition) => edition.createdAt));
   const freshNumber = fresh ? numbers[saved.findIndex((edition) => edition.id === fresh.id)] ?? saved.length : 0;
   const failure = diagnostic ? albumPrintFailureKind(diagnostic.code) : 'other';
-  const pdfActions = (<>{!formal ? <Text style={styles.meta}>{tr('开发验收入口，正式导出尚未开放。')}</Text> : null}
+  const operationFeedback = (<>{error ? (
+            <ShowcaseNote live>
+              {diagnostic?.code === 'EPUB_TOO_LARGE' ? tr('电子册超过当前支持的2GB，请分成较小的册子。')
+                : diagnostic?.code === 'EPUB_UNSUPPORTED_AUDIO' ? tr('这段声音暂不支持电子册，请保留PDF并稍后再试。')
+                : formal
+                ? failure === 'changed'
+                  ? tr('内容有变化，请重新生成。')
+                  : failure === 'missing'
+                    ? tr('有记录、照片或声音现在读不到，请先在这一册里核对。')
+                    : tr('这次未能生成PDF，请重试。原记录仍然保留。')
+                : tr('本次没有生成。请核对记录、媒体和原生构建后再试。')}
+            </ShowcaseNote>
+          ) : null}
+          {error && !ready ? (
+            <ShowcaseButton tone="quiet" label={tr('再试一次')} onPress={() => setRetry((value) => value + 1)} />
+          ) : null}
+          {error && diagnostic && !formal ? (
+            <Text testID="album-print-failure-diagnostic" style={styles.meta}>
+              {[diagnostic.stage, diagnostic.code, diagnostic.reason]
+                .filter(Boolean)
+                .join(' / ')}
+            </Text>
+          ) : null}</>);
+  const pdfActions = (!formal || format === 'pdf' || !owned ? <>{!formal ? <Text style={styles.meta}>{tr('开发验收入口，正式导出尚未开放。')}</Text> : null}
           <View style={styles.cta}>
-            {formal ? <Text accessibilityRole="header" style={styles.sectionTitle}>{tr('PDF')}</Text> : null}
+            {formal && owned ? <ShowcaseNote>{tr('适合保存或打印，不含声音。')}</ShowcaseNote> : null}
             {binding ? (
               <BindingPanel
                 progress={progress}
@@ -326,6 +352,7 @@ export default function AlbumPrintScreen() {
               />
             ) : fresh ? (
               <FreshEdition
+                editorial={formal}
                 number={freshNumber}
                 pages={fresh.pdf.pageCount}
                 size={albumFileSizeLabel(fresh.pdf.bytes)}
@@ -334,14 +361,15 @@ export default function AlbumPrintScreen() {
               />
             ) : owned ? (
               <>
-                {paidGate ? <ShowcaseUnlocked /> : null}
+                {!formal && paidGate ? <ShowcaseUnlocked /> : null}
                 <ShowcaseButton
                   testID="album-export-bind"
+                  tone={formal ? 'editorial' : 'solid'}
                   label={busy ? tr('正在制作PDF，请稍候。') : tr(formal ? '生成PDF' : '生成并保存测试PDF')}
                   disabled={busy || !ready || !bindable}
                   onPress={bind}
                 />
-                {formal ? <ShowcaseNote>{tr('适合保存或打印，不含声音。')}</ShowcaseNote> : null}
+
               </>
             ) : unlock.price ? (
               <>
@@ -382,41 +410,15 @@ export default function AlbumPrintScreen() {
               <ShowcaseNote live>{tr('有内容暂时无法读取，请回到册子检查后重试。')}</ShowcaseNote>
             ) : null}
           </View>
-          {error ? (
-            <ShowcaseNote live>
-              {diagnostic?.code === 'EPUB_TOO_LARGE' ? tr('电子册超过当前支持的2GB，请分成较小的册子。')
-                : diagnostic?.code === 'EPUB_UNSUPPORTED_AUDIO' ? tr('这段声音暂不支持电子册，请保留PDF并稍后再试。')
-                : formal
-                ? failure === 'changed'
-                  ? tr('内容有变化，请重新生成。')
-                  : failure === 'missing'
-                    ? tr('有记录、照片或声音现在读不到，请先在这一册里核对。')
-                    : tr('这次未能生成PDF，请重试。原记录仍然保留。')
-                : tr('本次没有生成。请核对记录、媒体和原生构建后再试。')}
-            </ShowcaseNote>
-          ) : null}
-          {error && !ready ? (
-            <ShowcaseButton tone="quiet" label={tr('再试一次')} onPress={() => setRetry((value) => value + 1)} />
-          ) : null}
-          {error && diagnostic && !formal ? (
-            <Text testID="album-print-failure-diagnostic" style={styles.meta}>
-              {[diagnostic.stage, diagnostic.code, diagnostic.reason]
-                .filter(Boolean)
-                .join(' / ')}
-            </Text>
-          ) : null}
           {!saved.length && !busy && !formal ? (
             <Text style={styles.meta}>{tr('尚未生成测试成品。')}</Text>
-          ) : null}</>);
-  const electronicActions = (formal ? <View style={{ gap: 10 }}>
-            <Text accessibilityRole="header" style={styles.sectionTitle}>{tr('电子册')}</Text>
-            <ShowcaseNote>{tr('选择样式，留下一册可以翻阅和聆听的日子。')}</ShowcaseNote>
-            <View accessibilityLabel={tr('选择电子册样式')} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              <ShowcaseButton tone={epubDesign === 'literary' ? 'solid' : 'outline'} label={tr(epubDesign === 'literary' ? '生活文集 · 已选' : '生活文集')} disabled={busy} onPress={() => setEpubDesign('literary')} />
-              <ShowcaseButton tone={epubDesign === 'imagebook' ? 'solid' : 'outline'} label={tr(epubDesign === 'imagebook' ? '影像小册 · 已选' : '影像小册')} disabled={busy} onPress={() => setEpubDesign('imagebook')} />
+          ) : null}</> : null);
+  const electronicActions = (formal && format === 'epub' ? <View style={{ gap: 10 }}>
+            <View accessibilityRole="radiogroup" accessibilityLabel={tr('选择电子册样式')}>
+              <ExportChoice label={tr('生活文集')} detail={tr('适合文字较多的记录。')} selected={epubDesign === 'literary'} disabled={busy} onPress={() => setEpubDesign('literary')} />
+              <ExportChoice label={tr('影像小册')} detail={tr('适合照片较多的记录。')} selected={epubDesign === 'imagebook'} disabled={busy} onPress={() => setEpubDesign('imagebook')} />
             </View>
-            <ShowcaseNote>{tr(epubDesign === 'literary' ? '适合文字较多的记录。' : '适合照片较多的记录。')}</ShowcaseNote>
-            <ShowcaseButton testID="album-export-create-epub" label={tr('制作电子册')} disabled={busy || !owned || !ready} onPress={() => electronic()} />
+            <ShowcaseButton testID="album-export-create-epub" tone="editorial" label={tr('制作电子册')} disabled={busy || !owned || !ready} onPress={() => electronic()} />
             <ShowcaseNote>{tr('包含照片与声音，可在「图书」中阅读。')}</ShowcaseNote>
             {epubState?.id === 'new' ? <Text accessibilityLiveRegion="polite" style={styles.meta}>{epubState.message}</Text> : null}
             {epubState?.id === 'new' && epubState.pending ? <ShowcaseButton tone="quiet" label={tr('取消制作电子册')} onPress={() => { epubCancelled.current = true; }} /> : null}
@@ -435,24 +437,32 @@ export default function AlbumPrintScreen() {
           media={book?.media ?? {}}
           failed={bookFailed}
           ebookDesigns={formal}
-          actions={<>{electronicActions}{pdfActions}</>}
+          paperPreview={formal && format === 'pdf' && paperPreview}
+          actions={<>
+            {formal ? <View accessibilityRole="tablist" style={styles.formatRow}>
+              {(['epub','pdf'] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="tab" accessibilityLabel={tr(value === 'epub' ? '电子册' : 'PDF')} accessibilityState={{ selected: format === value, disabled: busy }} onPress={() => { setFormat(value); setPaperPreview(false); }} style={[styles.formatTab, format === value && styles.formatSelected]}><Text style={[styles.formatText, format !== value && { color: inkSoft }]}>{tr(value === 'epub' ? '电子册' : 'PDF')}</Text></Pressable>)}
+            </View> : null}
+            {electronicActions}{pdfActions}{operationFeedback}
+            {formal && format === 'pdf' ? <ShowcaseButton tone="quiet" label={tr(paperPreview ? '收起纸页' : '看看纸页')} disabled={busy} onPress={() => setPaperPreview(value => !value)} /> : null}
+            {formal && paidGate && owned ? <ShowcaseUnlocked /> : null}
+          </>}
           style={style}
           onStyle={chooseStyle}
           width={readingWidth(metrics.width, metrics.height)}
           busy={binding}
           celebrate={celebrate}
         >
-          {epubEditions.length ? <View style={styles.shelfHead}><Text accessibilityRole="header" style={styles.sectionTitle}>{tr('已保存的电子册')}</Text><ShowcaseNote>{tr('点按保存，左滑可删除。')}</ShowcaseNote></View> : null}
-          {epubEditions.map(edition => <AlbumEditionSwipeRow key={edition.id} id={edition.id} disabled={busy || blocked} onDelete={() => confirmDelete(edition.id)}><View style={{ gap: 8 }}>
+          {epubEditions.length && (!formal || format === 'epub') ? <View style={styles.shelfHead}><Text accessibilityRole="header" style={styles.sectionTitle}>{tr('已保存的电子册')}</Text><ShowcaseNote>{tr('点按保存，左滑可删除。')}</ShowcaseNote></View> : null}
+          {(!formal || format === 'epub' ? epubEditions : []).map(edition => <AlbumEditionSwipeRow key={edition.id} id={edition.id} disabled={busy || blocked} onDelete={() => confirmDelete(edition.id)}><View style={{ gap: 8 }}>
             <Text style={styles.title}>{edition.name}</Text>
             <Text style={styles.meta}>{albumEditionDateLabel(edition.createdAt)} · {tr(edition.design === 'imagebook' ? '影像小册' : edition.design === 'literary' ? '生活文集' : '电子册')}</Text>
-            <ShowcaseButton tone="outline" label={tr('保存电子册')} disabled={busy} onPress={() => electronic(edition)} />
+            <ShowcaseButton tone="editorial" label={tr('保存电子册')} disabled={busy} onPress={() => electronic(edition)} />
             {epubState?.id === edition.id ? <Text accessibilityLiveRegion="polite" style={styles.meta}>{epubState.message}</Text> : null}
             {epubState?.id === edition.id && epubState.pending ? <ShowcaseButton tone="quiet" label={tr('取消制作电子册')} onPress={() => { epubCancelled.current = true; }} /> : null}
             {__DEV__ && !formal && epubState?.id === edition.id && epubState.diagnostic ? <Text selectable style={styles.meta}>{`EPUB/${epubState.diagnostic}`}</Text> : null}
           </View></AlbumEditionSwipeRow>)}
-          {saved.length ? <ShelfHeader /> : null}
-          {saved.map((edition, index) => (
+          {saved.length && (!formal || format === 'pdf') ? <ShelfHeader /> : null}
+          {(!formal || format === 'pdf' ? saved : []).map((edition, index) => (
             <AlbumEditionSwipeRow key={edition.id} id={edition.id} disabled={busy || blocked} onDelete={() => confirmDelete(edition.id)}><View style={styles.edition}>
               <MiniBook style={edition.style} />
               <View style={styles.editionText}>
@@ -493,7 +503,7 @@ export default function AlbumPrintScreen() {
                   </Text>
                 ) : null}
                 <ShowcaseButton
-                  tone="outline"
+                  tone="editorial"
                   label={epubState?.id === edition.id && epubState.pending ? tr('正在制作电子册…') : tr('保存电子册')}
                   disabled={busy}
                   onPress={() => electronic(edition)}
@@ -503,7 +513,7 @@ export default function AlbumPrintScreen() {
                 {__DEV__ && !formal && epubState?.id === edition.id && epubState.diagnostic ? <Text selectable testID="album-epub-diagnostic" style={styles.meta}>{`EPUB/${epubState.diagnostic}`}</Text> : null}
                 <Text style={styles.meta}>{tr('可在「图书」中阅读，并播放其中的声音。')}</Text>
                 <ShowcaseButton
-                  tone="outline"
+                  tone="editorial"
                   label={tr('保存或打印PDF')}
                   disabled={busy}
                   onPress={() => share(edition)}
@@ -518,7 +528,11 @@ export default function AlbumPrintScreen() {
 }
 const styles = StyleSheet.create({
   cta: { gap: 10, paddingTop: 20 },
-  sectionTitle: { ...type.action, fontSize: 22, lineHeight: 30, color: ink },
+  sectionTitle: { ...type.action, fontSize: 18, lineHeight: 27, color: ink },
+  formatRow: { flexDirection: 'row', gap: 30, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#D7D0C4' },
+  formatTab: { minHeight: 48, justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', paddingHorizontal: 2 },
+  formatSelected: { borderBottomColor: ink },
+  formatText: { ...type.action, color: ink },
   shelfHead: { gap: 6, paddingTop: 22 },
   edition: { flexDirection: 'row', gap: 14, paddingVertical: 10, alignItems: 'flex-start' },
   editionText: { flex: 1, gap: 4, alignItems: 'flex-start' },

@@ -203,7 +203,7 @@ function formal() {
 it('exposes the formal PDF entry only under its switch and surfaces the protected entitlement denial',async()=>{
  formal();
  mockSave.mockRejectedValueOnce(new AlbumPrintFailure({stage:'AUTHORIZE_EXPORT',code:'EXPORT_PURCHASE_REQUIRED'}));
- const page=await render(wrap());await waitFor(()=>expect(page.getByText('生成PDF')).toBeTruthy());
+ const page=await render(wrap());await fireEvent.press(page.getByRole('tab',{name:'PDF'}));await waitFor(()=>expect(page.getByText('生成PDF')).toBeTruthy());
  expect(page.queryByText('开发验收入口，正式导出尚未开放。')).toBeNull();await fireEvent.press(page.getByText('生成PDF'));
  await waitFor(()=>expect(page.getByText('请先解锁导出，或恢复已有购买。')).toBeTruthy());expect(mockShare).not.toHaveBeenCalled();
 });
@@ -211,11 +211,15 @@ it('shows the finished book with its real counts before anything is bought or ge
   formal();
   mockStatus.mockResolvedValue({ owned: false, product: { id: 'app.lampy.export', name: 'Export', price: '¥18.00' } });
   const page = await render(wrap());
+  await waitFor(() => expect(page.getByText('Our days')).toBeTruthy());
+  expect(page.queryByTestId('album-export-book')).toBeNull();
+  await fireEvent.press(page.getByRole('tab',{name:'PDF'}));
+  await fireEvent.press(page.getByText('看看纸页'));
   await waitFor(() => expect(page.getByText('PDF 预览')).toBeTruthy());
   expect(page.getByTestId('album-export-book')).toBeTruthy();
   expect(page.getAllByText('Our days').length).toBeGreaterThan(0);
-  expect(page.getByText('2026年9月 — 10月 · A5 · 148×210 mm')).toBeTruthy();
-  expect(page.getByLabelText('3页，2条记录，1张照片')).toBeTruthy();
+  expect(page.getByText('2026年9月 — 10月')).toBeTruthy();
+  expect(page.getByText('2条记录 · 1张照片')).toBeTruthy();
   expect(page.getByText('封面 · 共3页')).toBeTruthy();
   expect(mockSave).not.toHaveBeenCalled();
   expect(mockPurchase).not.toHaveBeenCalled();
@@ -223,7 +227,7 @@ it('shows the finished book with its real counts before anything is bought or ge
 it('a purchase unlocks binding but never starts it', async () => {
   formal();
   mockStatus.mockResolvedValueOnce({ owned: false, product: { id: 'app.lampy.export', name: 'Export', price: '¥18.00' } });
-  const page = await render(wrap());
+  const page = await render(wrap());await fireEvent.press(page.getByRole('tab',{name:'PDF'}));
   await waitFor(() => expect(page.getByText('解锁导出 · ¥18.00')).toBeTruthy());
   expect(page.queryByText('生成PDF')).toBeNull();
   await fireEvent.press(page.getByText('解锁导出 · ¥18.00'));
@@ -236,7 +240,7 @@ it('binding shows the reported steps, then the new edition ready to save', async
   formal();
   let finish!: (value: unknown) => void;
   mockSave.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-  const page = await render(wrap());
+  const page = await render(wrap());await fireEvent.press(page.getByRole('tab',{name:'PDF'}));
   await waitFor(() => expect(page.getByText('生成PDF')).toBeTruthy());
   await fireEvent.press(page.getByText('生成PDF'));
   await waitFor(() => expect(page.getByTestId('album-export-binding')).toBeTruthy());
@@ -258,7 +262,8 @@ it('keeps the existing PDF paper preference without exposing it as an EPUB desig
   const page = await render(wrap());
   await waitFor(() => expect(page.getByText('已解锁导出')).toBeTruthy());
   expect(page.queryByTestId('album-export-style-plain')).toBeNull();
-  expect(page.getByText('生活文集 · 已选')).toBeTruthy();
+  expect(page.getByRole('radio',{name:'生活文集'}).props.accessibilityState.selected).toBe(true);
+  await fireEvent.press(page.getByRole('tab',{name:'PDF'}));
   await fireEvent.press(page.getByText('生成PDF'));
   await waitFor(() => expect(mockSave).toHaveBeenCalledWith('handmade'));
   expect(mockSaveStyle).not.toHaveBeenCalled();
@@ -266,7 +271,7 @@ it('keeps the existing PDF paper preference without exposing it as an EPUB desig
 it('a book with unreadable moments cannot start binding', async () => {
   formal();
   mockGenerate.mockResolvedValue(book('missing'));
-  const page = await render(wrap());
+  const page = await render(wrap());await fireEvent.press(page.getByRole('tab',{name:'PDF'}));
   await waitFor(() => expect(page.getByText('有内容暂时无法读取，请回到册子检查后重试。')).toBeTruthy());
   await fireEvent.press(page.getByText('生成PDF'));
   expect(mockSave).not.toHaveBeenCalled();
@@ -342,7 +347,7 @@ it('uses the selected electronic design without changing the reading paper prefe
   const view=await render(wrap());
   await waitFor(()=>expect(view.getByText('已解锁导出')).toBeTruthy());
   await fireEvent.press(view.getByText('影像小册'));
-  expect(view.getByText('影像小册 · 已选')).toBeTruthy();
+  expect(view.getByRole('radio',{name:'影像小册'}).props.accessibilityState.selected).toBe(true);
   expect(view.queryByTestId('album-export-style-plain')).toBeNull();
   await fireEvent.press(view.getByText('制作电子册'));
   await waitFor(()=>expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','imagebook',expect.any(Function),expect.any(Function)));

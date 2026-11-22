@@ -1134,5 +1134,8 @@
   "这次未能制作电子册，请重试。原记录仍然保留。": "Your electronic album could not be created. Please try again. Your records are safe.",
   "选择样式，留下一册可以翻阅和聆听的日子。": "Choose a style to read and listen to your memories.",
   "点按保存，左滑可删除。": "Tap to save. Swipe left to delete.",
-  "PDF": "PDF"
+  "PDF": "PDF",
+  "看看纸页": "Preview the pages",
+  "收起纸页": "Close the page preview",
+  "{0}条记录 · {1}张照片": "{{0}} moments · {{1}} photos"
 }
