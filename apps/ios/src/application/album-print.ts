@@ -32,6 +32,7 @@ export type PrintFailureDiagnostic = {
   reason?: string;
 };
 const PRINT_ERROR_CODES = [
+  'EPUB_TOO_LARGE', 'EPUB_UNSUPPORTED_AUDIO', 'EPUB_MISSING_CONTENT', 'EPUB_MISSING_COVER', 'EPUB_BUSY', 'EPUB_INVALID_EDITION', 'EPUB_UNSUPPORTED_MEDIA', 'EPUB_INVALID_ASSET',
   'PURCHASE_REQUIRED','PURCHASE_VERIFICATION_UNAVAILABLE','FAMILY_ALBUM_EXPORT_CLOSED','FAMILY_ALBUM_CHANGED','FAMILY_ALBUM_INCOMPLETE','FAMILY_ALBUM_CANCELLED','FORBIDDEN','NOT_IN_FAMILY','UNAUTHENTICATED',
   'EXPORT_CLOSED','EXPORT_PURCHASE_REQUIRED','EXPORT_PURCHASE_UNAVAILABLE','EXPORT_CANCELLED',
   'CANCELLED',
@@ -178,11 +179,18 @@ export function validatePrintLayout(layout: AlbumLayout) {
         throw new AlbumPrintError('INVALID_PDF');
     }
 }
-export function manifestDigest(manifest: PrintManifest) {
+export function manifestDigest(manifest: unknown) {
   return bytesToHex(sha256(utf8ToBytes(JSON.stringify(manifest))));
 }
+/** User-facing binding steps. Diagnostics keep their own stage names. */
+export type AlbumPrintProgress = {
+  step: 'authorize' | 'read' | 'prepare' | 'copy' | 'layout' | 'write' | 'verify' | 'bind';
+  done: number;
+  total: number;
+};
 export function createAlbumPrintService(deps: {
   read(): Promise<AlbumLayoutInput>;
+  progress?: (update: AlbumPrintProgress) => void;
   authorize?: () => Promise<void>;
   afterCommit?: () => Promise<void>;
   fonts(): AlbumFontDiagnosis | null;
@@ -206,18 +214,29 @@ export function createAlbumPrintService(deps: {
       const assertCurrent = () => {
         if (!deps.current()) throw new AlbumPrintError('CANCELLED');
       };
+      const report = (step: AlbumPrintProgress['step'], done = 0, total = 0) => {
+        if (!deps.current()) return;
+        try {
+          deps.progress?.({ step, done, total });
+        } catch {
+          // Progress is presentation only; it never changes the edition.
+        }
+      };
       try {
         assertCurrent();
+        report('authorize');
         stage = 'AUTHORIZE_EXPORT';
         await deps.authorize?.();
         assertCurrent();
         stage = 'READ_SOURCE';
+        report('read');
         const first = await deps.read();
         assertCurrent();
         stage = 'CHECK_INPUT';
         assertPrintContent(first);
         const fingerprint = albumReadingFingerprint(first);
         stage = 'FONT_DIAGNOSIS';
+        report('prepare');
         const fonts = deps.fonts();
         if (!fonts) throw new AlbumPrintError('UNAVAILABLE');
         id = deps.id();
@@ -231,12 +250,14 @@ export function createAlbumPrintService(deps: {
         const map: AlbumLayoutMediaMap = {};
         const sources: { uri: string; hash: string }[] = [];
         const copied = new Map<string, PrintMedia>();
+        const mediaTotal = new Set(frozen.entries.flatMap((record) => record.media.map((item) => item.assetId))).size;
         for (const record of frozen.entries)
           for (const item of record.media) {
             const source = item.uri!;
             let copy = copied.get(item.assetId);
             if (!copy) {
               stage = 'COPY_MEDIA';
+              report('copy', media.length, mediaTotal);
               const result = await deps.store.copy(
                 id,
                 item.assetId,
@@ -259,6 +280,7 @@ export function createAlbumPrintService(deps: {
             item.uri = copy.file;
           }
         stage = 'LAYOUT';
+        report('layout');
         const layout = await deps.layout(frozen, style, fonts);
         assertCurrent();
         stage = 'LAYOUT_CHECK';
@@ -283,9 +305,11 @@ export function createAlbumPrintService(deps: {
         )
           throw new AlbumPrintError('INVALID_PDF');
         stage = 'WRITE_PDF';
+        report('write');
         const pdf = await deps.store.writePdf(id, layout, map);
         assertCurrent();
         stage = 'PDF_CHECK';
+        report('verify');
         if (pdf.pageCount !== layout.pages.length)
           throw new AlbumPrintError('INVALID_PDF', 'PDF_PAGE_COUNT');
         if (pdf.bytes <= 0)
@@ -349,6 +373,7 @@ export function createAlbumPrintService(deps: {
           pdf: { ...pdf, file: 'album.pdf' },
         };
         stage = 'WRITE_MANIFEST';
+        report('bind');
         await deps.store.writeManifest(id, manifest);
         assertCurrent();
         stage = 'AUTHORIZE_EXPORT';

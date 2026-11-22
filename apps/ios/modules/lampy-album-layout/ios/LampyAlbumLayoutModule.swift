@@ -21,6 +21,9 @@ public final class LampyAlbumLayoutModule: Module {
     AsyncFunction("copyPrintMedia") { (source: String, destination: String) -> [String: Any] in
       try copyPrintMedia(source, destination)
     }
+    AsyncFunction("prepareEpubImage") { (source: String, destination: String) -> [String: Any] in
+      try prepareEpubImage(source, destination)
+    }
     AsyncFunction("printFileDigest") { (path: String) -> [String: Any] in
       try printFileDigest(path)
     }
@@ -31,7 +34,8 @@ public final class LampyAlbumLayoutModule: Module {
       DispatchQueue.main.async {
         do {
           let url = try printLocalURL(path)
-          guard FileManager.default.fileExists(atPath: url.path),
+          guard UIApplication.shared.applicationState == .active,
+                FileManager.default.fileExists(atPath: url.path),
                 var controller = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else {
             promise.reject("SHARE_UNAVAILABLE", "SHARE_UNAVAILABLE"); return
           }
@@ -59,6 +63,9 @@ public final class LampyAlbumLayoutModule: Module {
         if view.playingJson != json {
           view.playingJson = json
         }
+      }
+      Prop("renderScale") { (view: AlbumPageView, scale: Double) in
+        view.renderScale = scale
       }
     }
   }
@@ -630,6 +637,17 @@ final class AlbumPageView: ExpoView {
       DispatchQueue.main.async { [weak self] in
         self?.setNeedsDisplay()
       }
+    }
+  }
+  /// Optional on-screen scale of this 420pt page. Thumbnails draw near their
+  /// displayed pixel size instead of full size and then being minified.
+  /// Geometry and drawing are unchanged; 0 keeps the screen scale.
+  var renderScale: Double = 0 {
+    didSet {
+      guard renderScale != oldValue else { return }
+      let screen = window?.screen.scale ?? UIScreen.main.scale
+      contentScaleFactor = renderScale > 0 ? max(1, min(screen, screen * CGFloat(renderScale))) : screen
+      setNeedsDisplay()
     }
   }
 

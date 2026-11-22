@@ -1,0 +1,51 @@
+import * as FS from 'expo-file-system/legacy';
+import { strToU8, strFromU8 } from 'fflate';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import { createPersonalEpubSnapshot, listEpubSnapshots, discardUnfinishedEpubSnapshot, epubSnapshotRoot, epubSnapshotDirectory } from './album-epub-snapshots';
+import { albumPrintNative } from '../../modules/lampy-album-layout';
+jest.mock('expo-file-system/legacy', () => ({ documentDirectory:'file:///documents/',makeDirectoryAsync:jest.fn(),readDirectoryAsync:jest.fn(),readAsStringAsync:jest.fn(),writeAsStringAsync:jest.fn(),getInfoAsync:jest.fn(),moveAsync:jest.fn(),deleteAsync:jest.fn(),getFreeDiskStorageAsync:jest.fn() }));
+jest.mock('./album-export-purchases', () => ({ albumExportAccess:{ assert:async()=>{} } }));
+jest.mock('../../modules/lampy-album-layout', () => ({ albumPrintNative:jest.fn() }));
+jest.mock('../application/container', () => ({ getUseCases:async()=>({ readAlbumForContinuousReading:async()=>({input:{ album:{id:'a',name:'Year',entries:[],cover:{kind:'words'},opening:null},entries:[{momentId:'m',presence:'ready',revision:1,note:'Words',occurredAtPrecision:'unknown',media:[{assetId:'p',role:'image',availability:'available',uri:'file:///original'}]}] }}) }) }));
+let dirs:Set<string>, files:Map<string,Uint8Array>;
+const native={copyPrintMedia:jest.fn(),printFileDigest:jest.fn()};
+beforeEach(()=>{
+  jest.clearAllMocks();dirs=new Set();files=new Map([['file:///original',new Uint8Array([1,2,3])]]);
+  (albumPrintNative as jest.Mock).mockReturnValue(native);
+  (FS.makeDirectoryAsync as jest.Mock).mockImplementation(async path=>{dirs.add(path);});
+  (FS.readDirectoryAsync as jest.Mock).mockImplementation(async path=>[...dirs].filter(d=>d.startsWith(path)&&d!==path&&!d.slice(path.length).replace(/\/$/,'').includes('/')).map(d=>d.slice(path.length).replace(/\/$/,'')));
+  (FS.getFreeDiskStorageAsync as jest.Mock).mockResolvedValue(10*1024**3);
+  (FS.getInfoAsync as jest.Mock).mockImplementation(async uri=>({exists:files.has(uri)||dirs.has(uri)}));
+  (FS.readAsStringAsync as jest.Mock).mockImplementation(async uri=>strFromU8(files.get(uri)!));
+  (FS.writeAsStringAsync as jest.Mock).mockImplementation(async(uri,text)=>{files.set(uri,strToU8(text));});
+  (FS.deleteAsync as jest.Mock).mockImplementation(async path=>{const prefix=path.endsWith('/')?path:path+'/';for(const key of files.keys())if(key===path||key.startsWith(prefix))files.delete(key);for(const key of dirs)if(key===path||key.startsWith(prefix))dirs.delete(key);});
+  (FS.moveAsync as jest.Mock).mockImplementation(async({from,to})=>{for(const key of [...files.keys()])if(key.startsWith(from)){files.set(to+key.slice(from.length),files.get(key)!);files.delete(key);}dirs.delete(from);dirs.add(to);});
+  native.printFileDigest.mockImplementation(async uri=>({bytes:files.get(uri)!.length,sha256:bytesToHex(sha256(files.get(uri)!))}));
+  native.copyPrintMedia.mockImplementation(async(source,dest)=>{files.set(dest,files.get(source)!.slice());return native.printFileDigest(dest);});
+});
+it('protects an active frozen snapshot from recovery and only lists completed EPUBs',async()=>{
+  const snapshot=await createPersonalEpubSnapshot('a','literary',()=>true);
+  expect(await listEpubSnapshots('a')).toEqual([]);
+  expect(files.has(epubSnapshotDirectory(snapshot.id)+'media-0')).toBe(true);
+  files.set(epubSnapshotDirectory(snapshot.id)+'album-en.epub',new Uint8Array([1]));
+  files.set(epubSnapshotDirectory(snapshot.id)+'album-en.epub.sha256',strToU8('digest'));
+  await discardUnfinishedEpubSnapshot(snapshot.id);
+  expect(await listEpubSnapshots('a')).toEqual([expect.objectContaining({id:snapshot.id})]);
+  expect(files.has('file:///original')).toBe(true);
+});
+it('discards a cancelled new snapshot including its media copies, leaving originals intact',async()=>{
+  const snapshot=await createPersonalEpubSnapshot('a','literary',()=>true);
+  await discardUnfinishedEpubSnapshot(snapshot.id);
+  expect(dirs.has(epubSnapshotDirectory(snapshot.id))).toBe(false);
+  expect(files.has(epubSnapshotDirectory(snapshot.id)+'media-0')).toBe(false);
+  expect(files.has('file:///original')).toBe(true);
+});
+it('recovers abandoned staging and unpublished snapshot directories after a process restart',async()=>{
+  dirs.add(epubSnapshotRoot()+'.building-epub_crashed/');
+  dirs.add(epubSnapshotRoot()+'epub_unpublished/');
+  files.set(epubSnapshotRoot()+'epub_unpublished/media-0',new Uint8Array([1]));
+  await listEpubSnapshots('a');
+  expect(dirs.has(epubSnapshotRoot()+'.building-epub_crashed/')).toBe(false);
+  expect(dirs.has(epubSnapshotRoot()+'epub_unpublished/')).toBe(false);
+});

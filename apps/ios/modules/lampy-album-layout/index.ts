@@ -154,3 +154,9 @@ export function albumPrintNative(): PrintNativeModule {
   if (!module || typeof module.writePrintPdf !== 'function' || typeof module.copyPrintMedia !== 'function' || typeof module.printFileDigest !== 'function' || typeof module.sharePrintPdf !== 'function') throw new Error('PRINT_NATIVE_REBUILD_REQUIRED');
   return module;
 }
+
+export function albumEpubNative() {
+  const native = loadNative() as unknown as { prepareEpubImage?: (source: string, destination: string) => Promise<{ mime: string; extension: string; bytes: number; width: number; height: number }> } | null;
+  if (!native?.prepareEpubImage) throw new Error('EPUB_NATIVE_REBUILD_REQUIRED');
+  return { prepareImage: native.prepareEpubImage.bind(native) };
+}
