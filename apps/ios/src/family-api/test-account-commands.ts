@@ -1,3 +1,4 @@
+import { sessionIsCurrent, assertAccountActive, loginIdentityKey, loginNamespace } from './login-identity';
 import { assertSharedTextAllowed } from './content-policy';
 import { FAMILY_ERROR, FamilyError } from './errors';
 import { isPlausibleEmail, MAX_EMAIL_PASSWORD_LENGTH, normalizeEmail, passwordPolicyError } from './email-normalize';
@@ -84,9 +85,10 @@ export async function assertTestAccountSessionAllowed(
   enabled: boolean,
   operatorOnly: boolean | "apple-enabled" = false,
 ) {
+  await assertAccountActive(tx,userId);
   const credential = await tx.findTestCredentialByUserId(userId);
   if (!credential) {
-    if (operatorOnly === 'apple-enabled' && (await tx.listLoginIdentities(userId)).some(i => i.provider === 'apple')) return;
+    if (operatorOnly === 'apple-enabled' && (await tx.listLoginIdentities(userId)).some(i => i.provider === 'apple' && loginNamespace(i) === 'legacy')) return;
     if (operatorOnly) throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
     return;
   }
@@ -105,10 +107,10 @@ export async function rejectDisallowedTestAccountSession(
   if (!sessionToken) return;
   const revoked = await repository.withTransaction(async (tx) => {
     const session = await tx.findSession(sessionToken);
-    if (!session || new Date(session.expiresAt).getTime() <= now.getTime()) return false;
+    if (!sessionIsCurrent(session,now)) return false;
     const credential = await tx.findTestCredentialByUserId(session.userId);
     if (!credential) {
-      if (!operatorOnly || (operatorOnly === 'apple-enabled' && (await tx.listLoginIdentities(session.userId)).some(i => i.provider === 'apple'))) return false;
+      if (!operatorOnly || (operatorOnly === 'apple-enabled' && (await tx.listLoginIdentities(session.userId)).some(i => i.provider === 'apple' && loginNamespace(i) === 'legacy'))) return false;
       await tx.deleteSessionsForUser(session.userId);
       return true;
     }
@@ -162,7 +164,10 @@ export function createTestAccountCommands(deps: {
       if (!credential || !credential.enabled || (publicEnabled && !credential.operatorProvisioned) || !ok) {
         throw new FamilyError(FAMILY_ERROR.AUTH_FAILED, TEST_ACCOUNT_AUTH_FAILED_COPY);
       }
+      await assertAccountActive(tx,credential.userId);
       const session = {
+        authenticatedAt: iso(deps.clock.now()),
+        authenticatedIdentity: loginIdentityKey({provider:"controlled-password",subject:credential.loginNormalized}),
         token: deps.ids.sessionToken(),
         userId: credential.userId,
         expiresAt: iso(new Date(deps.clock.now().getTime() + deps.sessionTtlMs)),
@@ -201,7 +206,7 @@ export function createTestAccountCommands(deps: {
         await tx.saveAccount({ userId, createdAt });
         await tx.saveTestCredential({ credentialId: randomId('tac'), loginNormalized, userId, passwordHash, enabled: true, createdAt });
         await tx.saveProfile({ userId, nickname, avatar: 'system', updatedAt: createdAt });
-        const session = { token: deps.ids.sessionToken(), userId, expiresAt: iso(new Date(now.getTime() + deps.sessionTtlMs)) };
+        const session = { authenticatedAt:createdAt, authenticatedIdentity:loginIdentityKey({provider:"controlled-password",subject:loginNormalized}), token: deps.ids.sessionToken(), userId, expiresAt: iso(new Date(now.getTime() + deps.sessionTtlMs)) };
         await tx.saveSession(session);
         return { userId, sessionToken: session.token, expiresAt: session.expiresAt };
       });

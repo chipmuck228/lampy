@@ -1,4 +1,4 @@
-import { personalRecordsOnly } from '../application/mobile-capabilities';
+import { personalAlbumsAvailable, personalRecordsOnly } from '../application/mobile-capabilities';
 import { appLanguage, tr } from '../i18n';
 export const paper = '#F3F0E9';
 export const paperDeep = '#E8E1D5';
@@ -88,7 +88,7 @@ export function navBandItemsFor(
     { label: tr("生活册"), fontSize: NAV_BAND_LABEL_SIZE },
   ];
   if (hasFamily) items.push({ label: tr("家庭"), fontSize: NAV_BAND_LABEL_SIZE });
-  return personalRecordsOnly() ? items.slice(0, 2) : items;
+  return items.filter(item => (item.label !== tr('生活册') || personalAlbumsAvailable()) && (item.label !== tr('家庭') || !personalRecordsOnly()));
 }
 
 export function navBandOccupiedWidth(item: {

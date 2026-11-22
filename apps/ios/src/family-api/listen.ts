@@ -75,6 +75,7 @@ export async function startFamilyApiServer(options?: { port?: number; host?: str
   const authOpts = {
     publicTestLoginEnabled: publicAuth.enabled,
     appleLoginEnabled: env.LAMPY_APPLE_LOGIN_ENABLED === '1',
+    loginManagementEnabled: env.LAMPY_LOGIN_MANAGEMENT_ENABLED === '1',
     legacyAppleLoginEnabled: plan.mode === 'test',
     inviteLinksEnabled:inviteEnabled,
     historySharingEnabled:env.LAMPY_FAMILY_HISTORY_ENABLED === '1',

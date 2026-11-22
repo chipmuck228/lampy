@@ -1,3 +1,4 @@
+import { loginNamespace, validLoginIdentity, loginIdentityKey } from './login-identity';
 import {memorySafetyTx} from './safety-repository';
 import {purgeMemoryAccount} from './account-purge-memory';
 import { FamilyError, FAMILY_ERROR } from './errors';
@@ -47,10 +48,13 @@ export type FamilyTx = import('./safety-types').SafetyTx & {
   deleteAppleChallenge(id: string): Promise<void>;
   pruneAppleChallenges(now: string): Promise<void>;
 
-  findLoginIdentity(provider: import('./types').LoginProvider, subject: string): Promise<import('./types').LoginIdentity | null>;
+  findLoginIdentity(provider: import('./types').LoginProvider, subject: string, namespace?: string): Promise<import('./types').LoginIdentity | null>;
   listLoginIdentities(userId: string): Promise<import('./types').LoginIdentity[]>;
   // Internal persistence only: callers must verify credentials before attaching an identity.
   attachLoginIdentity(identity: import('./types').LoginIdentity): Promise<void>;
+  removeLoginIdentity(identity: import('./types').LoginIdentity): Promise<void>;
+  getAccountStatus(userId:string):Promise<import('./types').AccountStatus|null>;
+  setAccountStatus(userId:string,status:import('./types').AccountStatus):Promise<void>;
   findProfile(userId: string): Promise<import('./types').UserProfile | null>;
   saveProfile(profile: import('./types').UserProfile): Promise<void>;
   listPastFamilies(userId: string): Promise<import('./types').PastFamilySummary[]>;
@@ -69,6 +73,7 @@ export type FamilyTx = import('./safety-types').SafetyTx & {
   deleteSession(token: string): Promise<void>;
   deleteOtherSessions(userId: string, keepToken: string): Promise<void>;
   deleteSessionsForUser(userId: string): Promise<void>;
+  removeTestCredential(userId:string):Promise<void>;
   findTestCredentialByLogin(loginNormalized: string): Promise<TestCredential | null>;
   findTestCredentialByUserId(userId: string): Promise<TestCredential | null>;
   saveTestCredential(credential: TestCredential): Promise<void>;
@@ -163,17 +168,34 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     async saveAppleChallenge(c) { store.appleChallenges.push({...c}); },
     async deleteAppleChallenge(id) { store.appleChallenges = store.appleChallenges.filter(c => c.id !== id); },
     async pruneAppleChallenges(now) { store.appleChallenges = store.appleChallenges.filter(c => c.expiresAt > now); },
-    async findLoginIdentity(provider, subject) {
-      return store.loginIdentities.find(i => i.provider === provider && i.subject === subject) ?? null;
+    async findLoginIdentity(provider, subject, namespace = 'legacy') {
+      const row = store.loginIdentities.find(i => i.provider === provider && i.subject === subject && loginNamespace(i) === namespace);
+      return row ? {...row} : null;
     },
-    async listLoginIdentities(userId) { return store.loginIdentities.filter(i => i.userId === userId); },
+    async listLoginIdentities(userId) { return store.loginIdentities.filter(i => i.userId === userId).map(i => ({...i})); },
     async attachLoginIdentity(identity) {
-      if (!['apple', 'controlled-password'].includes(identity.provider) || !identity.subject.trim() || !store.accounts.some(a => a.userId === identity.userId)) throw new FamilyStoreConstraintError('login_identity');
-      if (store.loginIdentities.some(i => i.provider === identity.provider &&
-        ((i.subject === identity.subject && i.userId !== identity.userId) || (i.userId === identity.userId && i.subject !== identity.subject)))) {
-        throw new FamilyStoreConstraintError('login_identity');
+      if (!validLoginIdentity(identity) || !store.accounts.some(a => a.userId === identity.userId)) throw new FamilyStoreConstraintError('login_identity');
+      if (store.loginIdentities.some(i => i.provider === identity.provider && loginNamespace(i) === loginNamespace(identity) &&
+        ((i.subject === identity.subject && i.userId !== identity.userId) || (i.userId === identity.userId && i.subject !== identity.subject)))) throw new FamilyStoreConstraintError('login_identity');
+      if (!store.loginIdentities.some(i => loginIdentityKey(i) === loginIdentityKey(identity))) store.loginIdentities.push({...identity});
+    },
+    async removeLoginIdentity(identity) {
+      store.loginIdentities = store.loginIdentities.filter(i => !(i.userId === identity.userId && loginIdentityKey(i) === loginIdentityKey(identity)));
+      if (identity.provider === 'apple' && loginNamespace(identity) === 'legacy') {
+        const account = store.accounts.find(a => a.userId === identity.userId);
+        if (account?.appleSubject === identity.subject) delete account.appleSubject;
       }
-      if (!store.loginIdentities.some(i => i.provider === identity.provider && i.subject === identity.subject)) store.loginIdentities.push({ ...identity });
+    },
+    async getAccountStatus(userId) {
+      return store.accounts.some(a => a.userId === userId) ? store.accountStates.find(a => a.userId === userId)?.status ?? 'active' : null;
+    },
+    async setAccountStatus(userId,status) {
+      if (!store.accounts.some(a => a.userId === userId) || !['active','suspended'].includes(status)) throw new FamilyStoreConstraintError('login_identity');
+      replaceBy(store.accountStates,a => a.userId,{userId,status});
+      if (status === 'suspended') {
+        await tx.deleteSessionsForUser(userId);
+        store.appleChallenges = store.appleChallenges.filter(c => c.userId !== userId);
+      }
     },
     async findProfile(userId) { return store.profiles.find(p => p.userId === userId) ?? null; },
     async saveProfile(profile) { replaceBy(store.profiles,p => p.userId,profile); },
@@ -204,7 +226,7 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
       if (previous?.appleSubject && account.appleSubject !== previous.appleSubject) throw new FamilyStoreConstraintError('login_identity');
       if (account.appleSubject) {
         // Check conflicts before mutating the account (memory repository has no rollback).
-        if (store.loginIdentities.some(i => i.provider === 'apple' &&
+        if (store.loginIdentities.some(i => i.provider === 'apple' && loginNamespace(i) === 'legacy' &&
           ((i.subject === account.appleSubject && i.userId !== account.userId) || (i.userId === account.userId && i.subject !== account.appleSubject)))) throw new FamilyStoreConstraintError('login_identity');
       }
       replaceBy(store.accounts, (row) => row.userId, account);
@@ -225,6 +247,7 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
     async deleteSessionsForUser(userId) {
       store.sessions = store.sessions.filter((row) => row.userId !== userId);
     },
+    async removeTestCredential(userId) {store.testCredentials=store.testCredentials.filter(c=>c.userId!==userId);},
     async findTestCredentialByLogin(loginNormalized) {
       return store.testCredentials.find((row) => row.loginNormalized === loginNormalized) ?? null;
     },
@@ -399,7 +422,11 @@ export function createMemoryFamilyRepository(store: FamilyStore): FamilyReposito
 
   return {
     withTransaction(work) {
-      const run = chain.then(() => work(tx));
+      const run = chain.then(async () => {
+        const before = structuredClone(store);
+        try { return await work(tx); }
+        catch (error) { Object.assign(store, before); throw error; }
+      });
       chain = run.then(
         () => undefined,
         () => undefined,

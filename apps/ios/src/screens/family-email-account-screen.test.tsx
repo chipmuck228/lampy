@@ -18,6 +18,21 @@ jest.mock('../application/personal-settings-visibility',()=>({isPersonalSettings
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
 jest.mock('./life-icons',()=>({LifeIcon:()=>null}));
+
+it('explains that an old session must sign in again before binding Apple',async()=>{
+ mockHealth.mockResolvedValue({controlledEmailAccounts:true,appleLogin:true});
+ mockAppleAvailable.mockResolvedValue(true);mockAppleStatus.mockResolvedValue({linked:false});
+ mockAuthenticateApple.mockRejectedValueOnce(new ApplicationError('REAUTHENTICATION_REQUIRED','recent authentication required'));
+ const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
+ const page=await render(<FamilyEmailAccountScreen profileMode/>);
+ try {
+  await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeEnabled());
+  await fireEvent.press(page.getByTestId('apple-auth-button'));
+  await act(async()=>alert.mock.calls[0][2]![1].onPress!());
+  await waitFor(()=>expect(page.getByText('为了保护账号，请重新登录后再关联登录方式。')).toBeTruthy());
+ } finally {alert.mockRestore();await page.unmount();}
+});
+
 beforeEach(()=>{jest.clearAllMocks();jest.spyOn(AppState,'addEventListener').mockImplementation(()=>({remove:jest.fn()}));mockFormal=false;mockInternal=false;mockDiagnostics=true;mockOpen=true;mockLock.snapshot.locked=false;Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});mockHealth.mockResolvedValue({controlledEmailAccounts:true,emailRegistration:true});mockRegister.mockResolvedValue({userId:'a'});mockLogin.mockResolvedValue({userId:'a'});mockRead.mockResolvedValue({userId:'a',nickname:'原昵称',avatar:'system',updatedAt:'now'});mockUpdate.mockImplementation(async(nickname:string)=>({userId:'a',nickname,avatar:'system',updatedAt:'now'}));});
 it('closed and locked routes never read service or show identity controls',async()=>{
  mockOpen=false;const page=await render(<FamilyEmailAccountScreen/>);expect(mockHealth).not.toHaveBeenCalled();expect(page.queryByTestId('email-account-email')).toBeNull();await page.unmount();mockOpen=true;mockLock.snapshot.locked=true;await render(<FamilyEmailAccountScreen/>);expect(mockHealth).not.toHaveBeenCalled();

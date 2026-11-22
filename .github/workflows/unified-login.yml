@@ -1,0 +1,32 @@
+name: Unified login foundation
+on:
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - 'domain/**'
+      - 'projections/**'
+      - '.github/workflows/unified-login.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  identity-and-session:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/ios
+    env:
+      EXPO_NO_DOTENV: '1'
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/ios/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx jest --runInBand src/family-api src/application/family src/application/test-account-use-cases.test.ts src/infrastructure/secure-family-session.test.ts src/infrastructure/family-session-transport.test.ts src/infrastructure/family-http-client.test.ts src/screens/family-email-account-screen.test.tsx
+      - run: npm run test:android

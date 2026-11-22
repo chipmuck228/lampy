@@ -1,3 +1,4 @@
+import {readFamilyAccount} from './family-account-scope';
 import {familySafetyGeneration} from './family-safety-events';
 import { isFamilyInternalTestBuild, isFamilyV1ReleaseBuild } from '../infrastructure/family-config';
 import { ApplicationError } from './errors';
@@ -9,15 +10,12 @@ export const FAMILY_ALBUM_RENEW_MS=3000;
 export const FAMILY_ALBUM_RULE_COPY='分享到这里的记录，家人可以阅读，家庭创建者也可以收进生活册，保存或打印。' as const;
 export function familyAlbumEvaluationOpen(dev:boolean,value=process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL,internal=isFamilyInternalTestBuild(),formal=isFamilyV1ReleaseBuild()) {return (dev||internal||formal)&&value==='1';}
 export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:FamilySessionStore}) {
-  async function account() {
-    const token=await deps.session.getSessionToken();const userId=await deps.session.getUserId();
-    if(!token||!userId)throw new ApplicationError('UNAUTHENTICATED','Sign in is required.');return {token,userId};
-  }
+  async function account() {const a=await readFamilyAccount(deps.session);return {userId:a.userId,token:a.sessionToken,revision:a.revision};}
   async function request<T>(familyId:string,work:(api:FamilyAlbumApi,token:string,userId:string)=>Promise<T>,current=()=>true,preflight=true) {
     const safetyGeneration=familySafetyGeneration();
     const before=await account();const api=deps.client.albums;
     if(!api)throw new ApplicationError('FAMILY_ALBUMS_CLOSED','Family albums are not available.');
-    const check=async()=>{const after=await account();if(safetyGeneration!==familySafetyGeneration()||!current()||before.token!==after.token||before.userId!==after.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','The family request is no longer current.');};
+    const check=async()=>{const after=await account();if(safetyGeneration!==familySafetyGeneration()||!current()||before.token!==after.token||before.userId!==after.userId||before.revision!==after.revision)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','The family request is no longer current.');};
     if(preflight){const access=await api.access(before.token,familyId);await check();checkViewer(access.userId,before.userId);}
     const result=await work(api,before.token,before.userId);await check();return result;
   }
@@ -53,7 +51,7 @@ export function createFamilyAlbumUseCases(deps:{client:FamilyApiClient;session:F
       const result=await api.validate(before.token,view.familyId,view.albumId,view.validation);
       onStage?.('ACCOUNT_AFTER');
       const after=await account();
-      if(!current()||before.token!==after.token||before.userId!==after.userId)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','Account changed.');
+      if(!current()||before.token!==after.token||before.userId!==after.userId||before.revision!==after.revision)throw new ApplicationError('FAMILY_ALBUM_CANCELLED','Account changed.');
       return result;
     },
   };

@@ -1,3 +1,4 @@
+import { assertAccountActive, attachVerifiedLoginIdentity, loginIdentityKey, loginNamespace } from './login-identity';
 import { randomBytes } from 'node:crypto';
 import { FamilyError, FAMILY_ERROR } from './errors';
 import type { FamilyRepository, FamilyTx } from './repository';
@@ -43,9 +44,9 @@ export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple
         if(c.intent==='link') {
           const userId=await deps.requireUser(tx,token);
           if(userId!==c.userId || token!==c.sessionToken) throw invalid();
-          const own=(await tx.listLoginIdentities(userId)).find(i=>i.provider==='apple');
+          const own=(await tx.listLoginIdentities(userId)).find(i=>i.provider==='apple'&&loginNamespace(i)==='legacy');
           if((existing && existing.userId!==userId) || (own && own.subject!==identity.appleSubject)) throw new FamilyError(FAMILY_ERROR.CONFLICT,'This Apple identity is already linked. Accounts will not be merged.');
-          await tx.attachLoginIdentity({provider:'apple',subject:identity.appleSubject,userId,createdAt:deps.clock.now().toISOString()});
+          await attachVerifiedLoginIdentity(tx,token!,{provider:'apple',subject:identity.appleSubject,userId,createdAt:deps.clock.now().toISOString()},deps.clock.now());
           return {linked:true as const,userId};
         }
         let userId=existing?.userId;
@@ -58,7 +59,8 @@ export function createAppleAuthCommands(deps: {repository:FamilyRepository;apple
           const credential=await tx.findTestCredentialByUserId(userId);
           if(credential && !credential.enabled) throw new FamilyError(FAMILY_ERROR.AUTH_FAILED,'Account is unavailable.');
         }
-        const session={token:deps.ids.sessionToken(),userId,expiresAt:new Date(deps.clock.now().getTime()+deps.sessionTtlMs).toISOString()};
+        await assertAccountActive(tx,userId);
+        const session={authenticatedAt:deps.clock.now().toISOString(),authenticatedIdentity:loginIdentityKey({provider:'apple',subject:identity.appleSubject}),token:deps.ids.sessionToken(),userId,expiresAt:new Date(deps.clock.now().getTime()+deps.sessionTtlMs).toISOString()};
         await tx.saveSession(session);return {userId,sessionToken:session.token,expiresAt:session.expiresAt};
       });
     },

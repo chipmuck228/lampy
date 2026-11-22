@@ -11,6 +11,10 @@ import {
   resetAlbumListScrollForTests,
 } from './album-list-session';
 import LifeAlbumListScreen from './life-album-list-screen';
+jest.mock('../application/mobile-capabilities', () => ({
+  ...jest.requireActual('../application/mobile-capabilities'),
+  personalAlbumsAvailable: () => true,
+}));
 
 const mockList = jest.fn();
 const mockPush = jest.fn();

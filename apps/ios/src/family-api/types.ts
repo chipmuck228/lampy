@@ -6,9 +6,12 @@ export type FamilyStatus = 'active' | 'dissolved';
 export type UserProfile = { userId: string; nickname: string; avatar: 'system'; updatedAt: string | null };
 
 // A provider subject identifies a login, never a family or a local Moment owner.
-export type LoginProvider = 'apple' | 'controlled-password';
+export type LoginProvider = 'apple' | 'controlled-password' | 'wechat' | 'google' | 'phone-otp' | 'email-otp';
+export type AccountStatus = 'active' | 'suspended';
 export type LoginIdentity = {
   provider: LoginProvider;
+  namespace?: string;
+  verifiedAt?: string;
   subject: string;
   userId: string;
   createdAt: string;
@@ -44,6 +47,8 @@ export type TestAccountHealth = {
 };
 
 export type Session = {
+  authenticatedAt?: string;
+  authenticatedIdentity?: string;
   token: string;
   userId: string;
   expiresAt: string;

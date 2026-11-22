@@ -1,3 +1,4 @@
+import {readFamilyAccount} from './family-account-scope';
 import { prepareFamilyShareMedia } from './prepare-family-share-media';
 import {createFamilySafetyUseCases} from './family-safety-use-cases';
 import { familyReceivedMediaKey } from '../infrastructure/family-receive-cache';
@@ -105,13 +106,16 @@ export type SignOutResult =
   | { local: 'still-signed-in'; server: 'unconfirmed' };
 
 export type FamilySessionStore = {
+  getSession?():Promise<{userId:string;sessionToken:string}|null>;
+  getRevision?():number;
+  subscribe?(listener:()=>void):()=>void;
   getSessionToken(): Promise<string | null>;
   getUserId(): Promise<string | null>;
   setSession(session: { userId: string; sessionToken: string }): Promise<void>;
   clearSession(): Promise<void>;
   getPendingRevoke(): Promise<PendingSessionRevoke | null>;
   savePendingRevoke(row: PendingSessionRevoke): Promise<void>;
-  clearPendingRevoke(): Promise<void>;
+  clearPendingRevoke(expectedToken?:string): Promise<void>;
 };
 
 export type FamilyCache = {
@@ -150,7 +154,13 @@ function asApplicationError(error: unknown): ApplicationError {
 export function createMemoryFamilySessionStore(): FamilySessionStore {
   let current: { userId: string; sessionToken: string } | null = null;
   let pendingRevoke: PendingSessionRevoke | null = null;
+  let revision=0;
+  const listeners=new Set<()=>void>();
+  function changed(){revision++;for(const listener of listeners)listener();}
   return {
+    async getSession(){return current?{...current}:null;},
+    getRevision:()=>revision,
+    subscribe(listener){listeners.add(listener);return ()=>{listeners.delete(listener);};},
     async getSessionToken() {
       return current?.sessionToken ?? null;
     },
@@ -158,10 +168,12 @@ export function createMemoryFamilySessionStore(): FamilySessionStore {
       return current?.userId ?? null;
     },
     async setSession(session) {
-      current = session;
+      current = {...session};
+      changed();
     },
     async clearSession() {
       current = null;
+      changed();
     },
     async getPendingRevoke() {
       return pendingRevoke;
@@ -169,7 +181,8 @@ export function createMemoryFamilySessionStore(): FamilySessionStore {
     async savePendingRevoke(row) {
       pendingRevoke = row;
     },
-    async clearPendingRevoke() {
+    async clearPendingRevoke(expectedToken) {
+      if(expectedToken && pendingRevoke?.sessionToken!==expectedToken)return;
       pendingRevoke = null;
     },
   };
@@ -222,6 +235,11 @@ export function createFamilyUseCases(deps: {
   let selectedMediaUpload: SelectedMediaUploadState = { status: 'idle' };
   let shareConfirm: ShareConfirmState = { status: 'idle' };
   let shareRevoke: ShareRevokeState = { status: 'idle' };
+  deps.session.subscribe?.(() => {
+    selectedMediaUpload = {status:'idle'};
+    shareConfirm = {status:'idle'};
+    shareRevoke = {status:'idle'};
+  });
 
   async function safeIsolateAccount(userId: string): Promise<FamilyCacheCleanup | undefined> {
     try {
@@ -256,30 +274,24 @@ export function createFamilyUseCases(deps: {
     const row = await deps.session.getPendingRevoke();
     if (!row) return;
     if (pendingRevokeExpired(row)) {
-      await deps.session.clearPendingRevoke();
+      await deps.session.clearPendingRevoke(row.sessionToken);
       return;
     }
     try {
       await deps.client.signOut(row.sessionToken);
-      await deps.session.clearPendingRevoke();
+      await deps.session.clearPendingRevoke(row.sessionToken);
     } catch (error) {
       const appError = asApplicationError(error);
       if (isConfirmedTokenGone(appError)) {
-        await deps.session.clearPendingRevoke();
+        await deps.session.clearPendingRevoke(row.sessionToken);
       }
     }
   }
 
-  async function requireAccount() {
-    const sessionToken = await deps.session.getSessionToken();
-    const userId = await deps.session.getUserId();
-    if (!sessionToken || !userId) {
-      throw new ApplicationError('UNAUTHENTICATED', 'Sign in is required.');
-    }
-    return { sessionToken, userId };
-  }
+  async function requireAccount() {return readFamilyAccount(deps.session);}
 
   async function withPending<T>(input: {
+    expectedSessionToken: string;
     command: FamilyWriteCommand;
     operationId: string;
     requestFingerprint: string;
@@ -287,7 +299,9 @@ export function createFamilyUseCases(deps: {
     idempotencyKey?: string;
     work: (key: string) => Promise<T>;
   }): Promise<T> {
-    const { userId } = await requireAccount();
+    const owner=await requireAccount();
+    if(owner.sessionToken!==input.expectedSessionToken)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
+    const {userId}=owner;
     const existing = await pending.find(userId, input.command, input.operationId);
     if (existing && existing.requestFingerprint !== input.requestFingerprint) {
       throw new ApplicationError(
@@ -308,12 +322,14 @@ export function createFamilyUseCases(deps: {
       });
     }
     try {
+      await assertSameAccount(owner);
       const result = await input.work(existing?.idempotencyKey ?? idempotencyKey);
+      await assertSameAccount(owner);
       await pending.remove(userId, input.command, input.operationId);
       return result;
     } catch (error) {
       const appError = asApplicationError(error);
-      if (!isUnconfirmedNetwork(appError)) {
+      if (!isUnconfirmedNetwork(appError) && appError.code !== 'STALE_FAMILY_REQUEST') {
         await pending.remove(userId, input.command, input.operationId);
       }
       throw appError;
@@ -359,10 +375,11 @@ export function createFamilyUseCases(deps: {
     return media;
   }
 
-  async function resolvePersonalShareMedia(assetId: string, mediaByAsset?: Record<string, string>) {
+  async function resolvePersonalShareMedia(owner:Awaited<ReturnType<typeof requireAccount>>, assetId: string, mediaByAsset?: Record<string, string>) {
     if (!deps.personal) {
       throw new ApplicationError('MOMENT_NOT_FOUND', 'This moment is not on this device.');
     }
+    await assertSameAccount(owner);
     const mapped = mediaByAsset?.[assetId];
     if (mapped) return mapped;
     const asset = await deps.personal.assets.findById(assetId);
@@ -381,24 +398,74 @@ export function createFamilyUseCases(deps: {
     if (!bytes.byteLength) {
       throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
     }
-    const uploaded = await uploadOwnedBytes(bytes, asset.asset.metadata.mimeType || '');
+    const uploaded = await uploadOwnedBytes(owner, bytes, asset.asset.metadata.mimeType || '');
     return uploaded.objectId;
   }
 
-  async function uploadOwnedBytes(bytes: Uint8Array, mimeType: string) {
-    const { sessionToken } = await requireAccount();
+  async function uploadOwnedBytes(owner:Awaited<ReturnType<typeof requireAccount>>,bytes: Uint8Array, mimeType: string) {
+    await assertSameAccount(owner);
+    const { sessionToken } = owner;
     selectedMediaUpload = { status: 'uploading' };
     try {
       const outgoing = await prepareFamilyShareMedia(bytes, mimeType, deps.personal?.convertImageForShare);
-      if (sessionToken !== (await requireAccount()).sessionToken) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Account changed.');
+      await assertSameAccount(owner);
       const object = await deps.client.uploadMedia(sessionToken, outgoing);
+      await assertSameAccount(owner);
       selectedMediaUpload = { status: 'stored', object };
       return object;
     } catch (error) {
       const appError = asApplicationError(error);
-      selectedMediaUpload = { status: 'failed', code: appError.code, message: appError.message };
+      if (appError.code !== 'STALE_FAMILY_REQUEST') selectedMediaUpload = { status: 'failed', code: appError.code, message: appError.message };
       throw appError;
     }
+  }
+
+  async function performSignOut():Promise<SignOutResult> {
+      const token = await deps.session.getSessionToken();
+      const userId = await deps.session.getUserId();
+      if (!token || !userId) {
+        await deps.session.clearSession();
+        await cache.clear();
+        return { local: 'signed-out', server: 'revoked' };
+      }
+      const owner=await requireAccount();
+      if(owner.sessionToken!==token||owner.userId!==userId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
+      try {
+        await deps.client.signOut(token);
+        await assertSameAccount(owner);
+        await deps.session.clearSession();
+        await cache.clear();
+        await safeIsolateAccount(userId);
+        await deps.session.clearPendingRevoke();
+        selectedMediaUpload = { status: 'idle' };
+        shareConfirm = { status: 'idle' };
+        shareRevoke = { status: 'idle' };
+        return { local: 'signed-out', server: 'revoked' };
+      } catch (error) {
+        if(await deps.session.getSessionToken()!==token)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
+        const appError = asApplicationError(error);
+        if (isConfirmedTokenGone(appError)) {
+          await deps.session.clearSession();
+          await cache.clear();
+          await safeIsolateAccount(userId);
+          await deps.session.clearPendingRevoke();
+          return { local: 'signed-out', server: 'revoked' };
+        }
+        try {
+          await deps.session.savePendingRevoke({
+            userId,
+            sessionToken: token,
+            createdAt: clock.now().toISOString(),
+          });
+        } catch {
+          return { local: 'still-signed-in', server: 'unconfirmed' };
+        }
+        await deps.session.clearSession();
+        await cache.clear();
+        await safeIsolateAccount(userId);
+        return { local: 'signed-out', server: 'unconfirmed' };
+      }
+
   }
 
   let identityCommit: Promise<unknown> = Promise.resolve();
@@ -440,7 +507,8 @@ export function createFamilyUseCases(deps: {
     }
   }
 
-  async function assertSameAccount(account: { userId: string; sessionToken: string }) {
+  async function assertSameAccount(account: { userId: string; sessionToken: string; revision?: number }) {
+    if (account.revision !== undefined && account.revision !== deps.session.getRevision?.()) throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
     if (await deps.session.getSessionToken() !== account.sessionToken || await deps.session.getUserId() !== account.userId) {
       throw new ApplicationError('STALE_FAMILY_REQUEST', 'The account changed during this request.');
     }
@@ -644,7 +712,7 @@ export function createFamilyUseCases(deps: {
         return await commitSignedIn(result, () => request === emailAuthRequest);
       } catch (error) {
         if (result) { try { await deps.client.signOut(result.sessionToken); } catch { /* only discarded token */ } }
-        if (request === emailAuthRequest) await deps.session.clearSession();
+        // A failed sign-in must not clear a pre-existing or newer account session.
         throw asApplicationError(error);
       }
     },
@@ -656,7 +724,7 @@ export function createFamilyUseCases(deps: {
         return await commitSignedIn(result, () => request === emailAuthRequest);
       } catch (error) {
         if (result) { try { await deps.client.signOut(result.sessionToken); } catch { /* only discarded token */ } }
-        if (request === emailAuthRequest) await deps.session.clearSession();
+        // A failed sign-in must not clear a pre-existing or newer account session.
         throw asApplicationError(error);
       }
     },
@@ -665,8 +733,11 @@ export function createFamilyUseCases(deps: {
       await flushPendingRevoke();
       const token = await deps.session.getSessionToken();
       if (!token) return { kind: 'unauthenticated' };
+      const owner=await requireAccount();
+      if(token!==owner.sessionToken)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
       try {
         const listed = await deps.client.listMembership(token);
+        await assertSameAccount(owner);
         if (!listed.family) {
           await cache.clear();
           const userId = await deps.session.getUserId();
@@ -680,6 +751,7 @@ export function createFamilyUseCases(deps: {
           members: listed.family.members,
         };
       } catch (error) {
+        await assertSameAccount(owner);
         const appError = asApplicationError(error);
         if (appError.code === 'UNAUTHENTICATED' || appError.code === 'APPLE_TOKEN_INVALID') {
           const userId = await deps.session.getUserId();
@@ -699,6 +771,7 @@ export function createFamilyUseCases(deps: {
     async createFamily(idempotencyKey?: string) {
       const { sessionToken } = await requireAccount();
       return withPending({
+        expectedSessionToken:sessionToken,
         command: 'createFamily',
         operationId: pendingCreateFamilyOperationId(),
         requestFingerprint: fingerprintCreateFamily(),
@@ -724,6 +797,7 @@ export function createFamilyUseCases(deps: {
         operationId = nextOperationId('invite');
       }
       return withPending({
+        expectedSessionToken:sessionToken,
         command: 'inviteMember',
         operationId,
         requestFingerprint: pendingInviteFingerprint(familyId, operationId),
@@ -740,6 +814,7 @@ export function createFamilyUseCases(deps: {
         throw new ApplicationError('PENDING_NOT_FOUND', 'No pending invite operation to retry.');
       }
       return withPending({
+        expectedSessionToken:sessionToken,
         command: 'inviteMember',
         operationId,
         requestFingerprint: existing.requestFingerprint,
@@ -756,6 +831,7 @@ export function createFamilyUseCases(deps: {
     async acceptInvitation(code: string, idempotencyKey?: string) {
       const { sessionToken } = await requireAccount();
       return withPending({
+        expectedSessionToken:sessionToken,
         command: 'acceptInvitation',
         operationId: pendingAcceptOperationId(code),
         requestFingerprint: fingerprintAcceptInvitation(code),
@@ -819,46 +895,9 @@ export function createFamilyUseCases(deps: {
     },
     async signOut(): Promise<SignOutResult> {
       emailAuthRequest++;
-      const token = await deps.session.getSessionToken();
-      const userId = await deps.session.getUserId();
-      if (!token || !userId) {
-        await deps.session.clearSession();
-        await cache.clear();
-        return { local: 'signed-out', server: 'revoked' };
-      }
-      try {
-        await deps.client.signOut(token);
-        await deps.session.clearSession();
-        await cache.clear();
-        await safeIsolateAccount(userId);
-        await deps.session.clearPendingRevoke();
-        selectedMediaUpload = { status: 'idle' };
-        shareConfirm = { status: 'idle' };
-        shareRevoke = { status: 'idle' };
-        return { local: 'signed-out', server: 'revoked' };
-      } catch (error) {
-        const appError = asApplicationError(error);
-        if (isConfirmedTokenGone(appError)) {
-          await deps.session.clearSession();
-          await cache.clear();
-          await safeIsolateAccount(userId);
-          await deps.session.clearPendingRevoke();
-          return { local: 'signed-out', server: 'revoked' };
-        }
-        try {
-          await deps.session.savePendingRevoke({
-            userId,
-            sessionToken: token,
-            createdAt: clock.now().toISOString(),
-          });
-        } catch {
-          return { local: 'still-signed-in', server: 'unconfirmed' };
-        }
-        await deps.session.clearSession();
-        await cache.clear();
-        await safeIsolateAccount(userId);
-        return { local: 'signed-out', server: 'unconfirmed' };
-      }
+      const next=identityCommit.then(performSignOut,performSignOut);
+      identityCommit=next.then(()=>undefined,()=>undefined);
+      return next;
     },
 
     async hasUnconfirmedSessionRevoke() {
@@ -871,17 +910,19 @@ export function createFamilyUseCases(deps: {
     },
 
     async uploadSelectedMedia(input: { bytes: Uint8Array; mimeType: string; idempotencyKey?: string }) {
+      const owner=await requireAccount();
       selectedMediaUpload = { status: 'uploading' };
       try {
         const { sessionToken } = await requireAccount();
         const outgoing = await prepareFamilyShareMedia(input.bytes, input.mimeType, deps.personal?.convertImageForShare);
-        if (sessionToken !== (await requireAccount()).sessionToken) throw new ApplicationError('STALE_FAMILY_REQUEST', 'Account changed.');
+        await assertSameAccount(owner);
         const object = await deps.client.uploadMedia(sessionToken, { ...outgoing, idempotencyKey: input.idempotencyKey });
+        await assertSameAccount(owner);
         selectedMediaUpload = { status: 'stored', object };
         return selectedMediaUpload;
       } catch (error) {
         const appError = asApplicationError(error);
-        selectedMediaUpload = { status: 'failed', code: appError.code, message: appError.message };
+        if (appError.code !== 'STALE_FAMILY_REQUEST') selectedMediaUpload = { status: 'failed', code: appError.code, message: appError.message };
         return selectedMediaUpload;
       }
     },
@@ -901,6 +942,7 @@ export function createFamilyUseCases(deps: {
     },
 
     async prepareSharePreview(momentId: string, mediaByAsset?: Record<string, string>): Promise<SharePreview> {
+      const owner=await requireAccount();
       const membership = await this.getMembership();
       if (membership.kind === 'unauthenticated' || (membership.kind === 'unconfirmed' && membership.reason === 'unauthenticated')) {
         throw new ApplicationError('UNAUTHENTICATED', 'Sign in is required.');
@@ -910,6 +952,7 @@ export function createFamilyUseCases(deps: {
       }
       const moment = await loadPersonalMoment(momentId);
       const media = await listPersonalShareMedia(moment.assetIds, mediaByAsset);
+      await assertSameAccount(owner);
       return {
         familyId: membership.familyId,
         sourceMomentId: moment.id,
@@ -929,6 +972,7 @@ export function createFamilyUseCases(deps: {
       mediaByAsset?: Record<string, string>;
       idempotencyKey?: string;
     }) {
+      const owner=await requireAccount();
       shareConfirm = { status: 'confirming' };
       try {
         const membership = await this.getMembership();
@@ -945,13 +989,14 @@ export function createFamilyUseCases(deps: {
         const requiredAssetIds = [...moment.assetIds];
         const mediaObjectIds: string[] = [];
         for (const assetId of requiredAssetIds) {
-          const objectId = await resolvePersonalShareMedia(assetId, input.mediaByAsset);
+          const objectId = await resolvePersonalShareMedia(owner, assetId, input.mediaByAsset);
           mediaObjectIds.push(objectId);
         }
         if (mediaObjectIds.length !== requiredAssetIds.length) {
           throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
         }
-        const { sessionToken } = await requireAccount();
+        await assertSameAccount(owner);
+        const { sessionToken } = owner;
         const snapshotCanonical = canonicalizeShareSnapshot({
           note: moment.content.note,
           emotion: moment.content.emotion,
@@ -960,7 +1005,7 @@ export function createFamilyUseCases(deps: {
           mediaObjectIds,
         });
         const result = await withPending({
-          command: 'shareMoment',
+        expectedSessionToken:sessionToken,          command: 'shareMoment',
           operationId: pendingShareOperationId(moment.id, moment.revision),
           requestFingerprint: fingerprintShareMoment({
             familyId: membership.familyId,
@@ -983,11 +1028,12 @@ export function createFamilyUseCases(deps: {
               idempotencyKey: key,
             }),
         });
+        await assertSameAccount(owner);
         shareConfirm = { status: 'stored', share: result };
         return shareConfirm;
       } catch (error) {
         const appError = asApplicationError(error);
-        shareConfirm = { status: 'failed', code: appError.code, message: appError.message };
+        if (appError.code !== 'STALE_FAMILY_REQUEST') shareConfirm = { status: 'failed', code: appError.code, message: appError.message };
         return shareConfirm;
       }
     },
@@ -1028,7 +1074,9 @@ export function createFamilyUseCases(deps: {
     },
 
     async refreshFamilyInbox(): Promise<FamilyInboxView> {
+      const revision=deps.session.getRevision?.();
       const membership = await this.getMembership();
+      if(revision!==deps.session.getRevision?.())throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
       if (membership.kind !== 'ready') {
         if (membership.kind === 'none' || membership.kind === 'unauthenticated') {
           const userId = await deps.session.getUserId();
@@ -1036,9 +1084,12 @@ export function createFamilyUseCases(deps: {
         }
         return hiddenInbox(membership) ?? { kind: 'hidden', reason: 'unconfirmed' };
       }
+      const owner=await requireAccount();
+      if(owner.revision!==revision)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
       try {
-        const { sessionToken, userId } = await requireAccount();
+        const { sessionToken, userId } = owner;
         const listed = await deps.client.listVisibleShares(sessionToken, membership.familyId);
+        await assertSameAccount(owner);
         const allowed = new Set(listed.shares.map((share) => share.shareId));
         if (deps.receiveCache) {
           await deps.receiveCache.replaceVisible(userId, membership.familyId, listed.shares);
@@ -1046,12 +1097,15 @@ export function createFamilyUseCases(deps: {
         const rows = deps.receiveCache
           ? (await deps.receiveCache.list(userId, membership.familyId)).filter((row) => allowed.has(row.shareId))
           : [];
+        const items=await Promise.all(rows.map((row)=>toInboxItem(row,userId)));
+        await assertSameAccount(owner);
         return {
           kind: 'ready',
           familyId: membership.familyId,
-          items: await Promise.all(rows.map((row) => toInboxItem(row, userId))),
+          items,
         };
       } catch (error) {
+        await assertSameAccount(owner);
         const appError = asApplicationError(error);
         if (appError.code === 'UNAUTHENTICATED') {
           const userId = await deps.session.getUserId();
@@ -1068,18 +1122,23 @@ export function createFamilyUseCases(deps: {
     },
 
     async receiveShare(shareId: string) {
+      const owner=await requireAccount();
       const membership = await this.getMembership();
+      await assertSameAccount(owner);
       if (membership.kind !== 'ready') {
         throw new ApplicationError('NOT_IN_FAMILY', 'Not a member of this family.');
       }
       if (!deps.receiveCache) {
         throw new ApplicationError('SHARE_NOT_FOUND', 'Family cache is not available.');
       }
-      const { sessionToken, userId } = await requireAccount();
+      const { sessionToken, userId } = owner;
       const share = await deps.client.getShare(sessionToken, membership.familyId, shareId);
+      await assertSameAccount(owner);
       await deps.receiveCache.beginReceive(userId, share);
       try {
+        await assertSameAccount(owner);
         for (const item of share.snapshot.media) {
+          await assertSameAccount(owner);
           const existing = (await deps.receiveCache.listMedia(userId, share.familyId, share.shareId)).find(
             (row) => row.objectId === item.objectId && row.status === 'stored',
           );
@@ -1106,6 +1165,7 @@ export function createFamilyUseCases(deps: {
           ) {
             throw new ApplicationError('SHARE_MEDIA_UNAVAILABLE', 'A selected media object is not available.');
           }
+          await assertSameAccount(owner);
           await deps.receiveCache.saveStoredMedia({
             userId,
             familyId: share.familyId,
@@ -1124,10 +1184,14 @@ export function createFamilyUseCases(deps: {
         if (stored.length !== share.snapshot.media.length) {
           throw new ApplicationError('SHARE_MEDIA_INCOMPLETE', 'Confirmed media is incomplete and will not be dropped.');
         }
+        await assertSameAccount(owner);
         const received = await deps.receiveCache.markReceived(userId, share.familyId, share.shareId);
-        return { status: 'received' as const, item: await toInboxItem(received, userId) };
+        const item=await toInboxItem(received,userId);
+        await assertSameAccount(owner);
+        return { status: 'received' as const, item };
       } catch (error) {
         const appError = asApplicationError(error);
+        if (appError.code === 'STALE_FAMILY_REQUEST') {await safeIsolateShare(userId,membership.familyId,shareId);throw appError;}
         if (appError.code === 'SHARE_NOT_FOUND' || appError.code === 'FORBIDDEN') {
           await safeIsolateShare(userId, membership.familyId, shareId);
         } else {

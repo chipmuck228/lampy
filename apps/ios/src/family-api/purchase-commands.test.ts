@@ -166,7 +166,7 @@ it('migration 31 rolls back atomically and preserves older tables on failure',as
   await expect(applyFamilyApiSchema({...db,run:async(sql,params)=>{if(sql.includes('family_schema_migrations')&&params?.[0]===31)throw Error('disk full');return db.run(sql,params);}})).rejects.toThrow('disk full');
   expect(await db.getFirst("SELECT name FROM sqlite_master WHERE name='family_purchases'")).toBeNull();
   expect(await db.getAll('SELECT * FROM family_schema_migrations')).toEqual(before);
-  await applyFamilyApiSchema(db);expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:33});
+  await applyFamilyApiSchema(db);expect(await db.getFirst('SELECT MAX(version) AS version FROM family_schema_migrations')).toEqual({version:34});
  } finally {await db.close();await rm(dir,{recursive:true,force:true});}
 });
 

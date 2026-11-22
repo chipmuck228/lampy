@@ -1,4 +1,4 @@
-import { personalRecordsOnly } from '../../application/mobile-capabilities';
+import { personalAlbumsAvailable } from '../../application/mobile-capabilities';
 import { tr } from '../../i18n';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -78,7 +78,7 @@ export default function MomentDetailScreen() {
         >
           <Text style={styles.back}>{tr("返回原来的位置")}</Text>
         </Pressable>
-        {view?.kind === 'ready' && !personalRecordsOnly() ? (
+        {view?.kind === 'ready' && personalAlbumsAvailable() ? (
           <LifeIconButton
             name="more"
             label={ALBUM_COLLECT_MENU}

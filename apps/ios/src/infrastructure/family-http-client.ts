@@ -33,6 +33,7 @@ export function familyTestPathKind(method: string, path: string) {
 }
 
 export type FamilyTransportRequest = {
+  signal?: AbortSignal;
   timeoutMs?: number;
   method: string;
   path: string;
@@ -426,7 +427,10 @@ export function createFamilyHttpTransport(deps: {
       const id=trace&&metadata?`diag-${diagnosticNonce}-${++diagnosticRequestSequence}`:null;
       if(id)headers['x-lampy-request-id']=id;
       const network:FamilyNetworkDiagnostic={id,engine:(fetchImpl as typeof fetch&{polyfill?:boolean}).polyfill===true?'RN':deps.fetchImpl?'INJECTED':'OTHER',rnRequested:process.env.EXPO_PUBLIC_USE_RN_FETCH==='1'||process.env.EXPO_PUBLIC_USE_RN_FETCH==='true',phase:'HEADERS',status:null};
-      const controller=input.timeoutMs?new AbortController():null;
+      const controller=input.timeoutMs||input.signal?new AbortController():null;
+      const abort=()=>controller?.abort();
+      input.signal?.addEventListener('abort',abort,{once:true});
+      if(input.signal?.aborted)abort();
       let timer:ReturnType<typeof setTimeout>|undefined;
       const work=(async()=>{
       const response = await fetchImpl(`${baseUrl}${input.path}`, {
@@ -458,9 +462,9 @@ export function createFamilyHttpTransport(deps: {
       }
       return { status: response.status, body };
       })();
-      if(!input.timeoutMs)return work.catch(error=>{throw familyNetworkError(error,network);});
+      if(!input.timeoutMs)return work.catch(error=>{throw familyNetworkError(error,network);}).finally(()=>input.signal?.removeEventListener('abort',abort));
       const timeout=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller?.abort();reject(new ApplicationError('SERVER_UNREACHABLE','Family request timed out.'));},input.timeoutMs);});
-      try{return await Promise.race([work,timeout]);}catch(error){throw familyNetworkError(error,network);}finally{if(timer)clearTimeout(timer);}
+      try{return await Promise.race([work,timeout]);}catch(error){throw familyNetworkError(error,network);}finally{if(timer)clearTimeout(timer);input.signal?.removeEventListener('abort',abort);}
 
     },
   };

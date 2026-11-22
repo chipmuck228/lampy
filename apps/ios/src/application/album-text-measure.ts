@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import {
   ALBUM_FONTS,
   ALBUM_LAYOUT_UNAVAILABLE_COPY,
@@ -20,7 +21,7 @@ export type AlbumMeasuredLine = {
 };
 
 export type AlbumTextMeasurer = {
-  kind: 'core-text' | 'glyph-width-test-double';
+  kind: 'core-text' | 'static-layout' | 'glyph-width-test-double';
   measure(text: string, role: AlbumFontRole, widthPt: number): Promise<AlbumMeasuredLine[]>;
 };
 
@@ -78,7 +79,7 @@ export function createGlyphWidthMeasurer(): AlbumTextMeasurer {
 
 export function createNativeTextMeasurer(): AlbumTextMeasurer {
   return {
-    kind: 'core-text',
+    kind: Platform.OS === 'android' ? 'static-layout' : 'core-text',
     async measure(text, role, widthPt) {
       return measureTextNative(
         text,

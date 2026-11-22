@@ -1,3 +1,5 @@
+import { sessionIsCurrent, assertAccountActive, loginIdentityKey } from './login-identity';
+import { createLoginManagement } from './login-management';
 import {assertSharedTextAllowed} from './content-policy';
 import {createFamilySafetyCommands} from './safety-commands';
 import {createAccountDeletionCommands} from './account-deletion';
@@ -50,6 +52,7 @@ import { assertHistoryEnabled, HISTORY_CONFIRMATION } from './history-policy';
 import { assertMediaPayload } from './media-validate';
 
 export type FamilyCommands = InviteLinkCommands & {
+  loginMethods: ReturnType<typeof createLoginManagement>;
   safety: import('./safety-types').FamilySafetyApi;
   purchases: import('./purchase-types').PurchaseApi;
   albums: import('./family-album-types').FamilyAlbumApi;
@@ -124,7 +127,7 @@ async function requireUser(
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Sign in is required.');
   }
   const session = await tx.findSession(sessionToken);
-  if (!session || new Date(session.expiresAt).getTime() <= clock.now().getTime()) {
+  if (!sessionIsCurrent(session,clock.now())) {
     throw new FamilyError(FAMILY_ERROR.UNAUTHENTICATED, 'Session is missing or invalid.');
   }
   await assertTestAccountSessionAllowed(tx, session.userId, testAccountLoginEnabled, operatorOnly);
@@ -268,6 +271,7 @@ export function createFamilyCommands(deps: {
   ids?: FamilyIds;
   inviteTtlMs?: number;
   sessionTtlMs?: number;
+  loginManagementEnabled?: boolean;
   mediaBlobs?: MediaBlobStore;
   passwordHasher?: PasswordHasher;
   testAccountLoginEnabled?: boolean;
@@ -340,6 +344,7 @@ export function createFamilyCommands(deps: {
   const purchases=createPurchaseCommands({familyExportEnabled,enabled:deps.unifiedPurchasesEnabled===true,productId:deps.unifiedProductId,verifier:deps.purchaseVerifier,clock,authed:withAuthedUser});
 
   return {
+    loginMethods:createLoginManagement({repository,clock,enabled:deps.loginManagementEnabled===true,appleEnabled:deps.appleLoginEnabled===true,passwordEnabled:testAccountLoginEnabled,requireUser:(tx,token)=>requireUser(tx,token,clock,testAccountLoginEnabled,operatorOnly)}),
     purchases,
     safety: createFamilySafetyCommands({clock,authed:withAuthedUser}),
     albums: createFamilyAlbumCommands({authed:withAuthedUser,clock,exportEnabled:familyExportEnabled,exportEligibility:(session,familyId)=>purchases.familyAccess(session,familyId),enabled:deps.familyAlbumsEnabled===true&&deps.historySharingEnabled===true}),
@@ -416,7 +421,12 @@ export function createFamilyCommands(deps: {
           };
           await tx.saveAccount(account);
         }
+        await assertAccountActive(tx,account.userId);
+        const controlled = await tx.findTestCredentialByUserId(account.userId);
+        if (controlled && !controlled.enabled) throw new FamilyError(FAMILY_ERROR.AUTH_FAILED,'Account is unavailable.');
         const session = {
+          authenticatedAt: iso(clock.now()),
+          authenticatedIdentity: loginIdentityKey({provider:'apple',subject:identity.appleSubject}),
           token: ids.sessionToken(),
           userId: account.userId,
           expiresAt: iso(new Date(clock.now().getTime() + sessionTtlMs)),

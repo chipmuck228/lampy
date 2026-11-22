@@ -1,4 +1,4 @@
-import { personalRecordsOnly } from '../application/mobile-capabilities';
+import { personalAlbumsAvailable, personalRecordsOnly } from '../application/mobile-capabilities';
 import FamilyEmailAccountScreen from './family-email-account-screen';
 import { isControlledEmailAccountsOpen, isFamilyV1ReleaseBuild, isFamilyInternalTestBuild, isFamilyProductEntryOpen } from '../infrastructure/family-config';
 import { tr } from '../i18n';
@@ -393,7 +393,7 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
             testID="account-open-storage"
             onPress={() => router.push('/account/storage')}
           />
-          {!personalRecordsOnly() ? <SettingsLink
+          {personalAlbumsAvailable() ? <SettingsLink
             icon="album"
             title={tr("我的生活册")}
             detail={tr("收在这台设备上")}

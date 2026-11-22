@@ -40,8 +40,15 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run test:android
       - run: npm run android:prebuild
+      - run: ./gradlew :lampy-album-layout:testDebugUnitTest --no-daemon --max-workers=2
+        working-directory: apps/ios/android
       - run: ./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a --no-daemon
         working-directory: apps/ios/android
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lampy-android-album-native-tests
+          path: apps/ios/modules/lampy-album-layout/android/build/reports/tests/
       - uses: actions/upload-artifact@v4
         with:
           name: lampy-android-personal-debug

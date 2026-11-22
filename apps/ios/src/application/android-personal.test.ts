@@ -4,10 +4,14 @@ import { isFamilyProductEntryOpen, familyApiBaseUrl } from '../infrastructure/fa
 import { albumExportConfig } from './album-export-access';
 import { canOpenPersonalSettingsDiagnostics } from './personal-settings-visibility';
 import { navBandItemsFor } from '../screens/life-page';
+jest.mock('../../modules/lampy-album-layout', () => ({
+  albumLayoutNativeAvailable: jest.fn(() => true),
+  albumNativePageViewAvailable: jest.fn(() => true),
+}));
 
 test('protected navigator excludes family, books and payment screens', () => {
-  for (const route of ['index', 'leave', 'lookback/index', 'moment/[id]', 'account/storage']) expect(ANDROID_EXCLUDED_ROUTES).not.toContain(route);
-  for (const route of ['family', 'family-invite', 'share/[id]', 'albums/index', 'albums/[id]/read', 'account/subscribe', 'account-diagnostics']) expect(ANDROID_EXCLUDED_ROUTES).toContain(route);
+  for (const route of ['index', 'leave', 'lookback/index', 'moment/[id]', 'account/storage', 'albums/index', 'albums/new', 'albums/[id]/read', 'albums/[id]/preview']) expect(ANDROID_EXCLUDED_ROUTES).not.toContain(route);
+  for (const route of ['family', 'family-invite', 'share/[id]', 'albums/[id]/print', 'account/subscribe', 'account-diagnostics']) expect(ANDROID_EXCLUDED_ROUTES).toContain(route);
 });
 test('Android remains personal even when inherited flags request family and purchases', () => {
   const previous=Platform.OS;
@@ -21,7 +25,7 @@ test('Android remains personal even when inherited flags request family and purc
     expect(familyApiBaseUrl('https://family.yunpura.com')).toBe('');
     expect(albumExportConfig()).toEqual({enabled:false,paid:false,productId:''});
     expect(canOpenPersonalSettingsDiagnostics({EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS:'1'},true)).toBe(false);
-    expect(navBandItemsFor('recent',true)).toHaveLength(2);
+    expect(navBandItemsFor('recent',true)).toHaveLength(3);
     expect(personalRecordsOnly('ios')).toBe(false);
   } finally {
     Object.defineProperty(Platform,'OS',{value:previous,configurable:true});
