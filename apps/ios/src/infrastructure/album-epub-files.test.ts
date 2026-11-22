@@ -118,3 +118,19 @@ it('cancels during chunked archive writing, removes partial output and never ope
   expect(resultUri()).toBeUndefined(); expect(native.sharePrintPdf).not.toHaveBeenCalled();
   expect([...files.keys()].some(key => key.includes('.epub-work-'))).toBe(false);
 });
+
+it('streams the frozen design into a standalone EPUB and re-shares its immutable completed bytes', async () => {
+  const id='epub_editorial';const dir=`file:///documents/album-epub-editions/${id}/`;
+  const snapshot={...manifest(),id,kind:'epub',design:'imagebook',dates:{}};
+  files.set(dir+'manifest.json',strToU8(JSON.stringify(snapshot)));
+  files.set(dir+'manifest.sha256',strToU8(manifestDigest(snapshot)));
+  files.set(dir+'media-0',audio);
+  await shareAlbumEpub(id,()=>true);
+  const uri=dir+'album-zh-Hans.epub';
+  const output=files.get(uri) ?? files.get(dir+'album-en.epub')!;
+  expect(strFromU8(unzipSync(output)['OEBPS/cover.xhtml'])).toContain('class="imagebook"');
+  const first=output.slice();jest.clearAllMocks();
+  await shareAlbumEpub(id,()=>true);
+  expect(files.get(uri) ?? files.get(dir+'album-en.epub')).toEqual(first);
+  expect(albumExportAccess.assert).not.toHaveBeenCalled();
+});

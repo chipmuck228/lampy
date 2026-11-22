@@ -34,6 +34,9 @@ export function AlbumExportShowcase({
   busy,
   celebrate,
   holdAt,
+  ebookDesigns = false,
+  actions,
+  paperPreview = false,
   children,
 }: {
   layout: AlbumLayout | null;
@@ -45,6 +48,9 @@ export function AlbumExportShowcase({
   busy: boolean;
   celebrate: number;
   holdAt?: number;
+  ebookDesigns?: boolean;
+  actions?: ReactNode;
+  paperPreview?: boolean;
   children?: ReactNode;
 }) {
   const pages = useMemo(() => (layout ? styleAlbumPages(layout, style) : []), [layout, style]);
@@ -52,8 +58,24 @@ export function AlbumExportShowcase({
   const facts = useMemo(() => (layout ? albumEditionFacts(layout) : null), [layout]);
   const name = layout?.sourceFingerprint.name ?? '';
   const span = facts ? albumSpanLabel(facts.span) : null;
+  if (ebookDesigns) return (
+    <View style={styles.editorialBody}>
+      {name ? <View style={styles.editorialTitle}>
+        <Text accessibilityRole="header" style={styles.editorialName}>{name}</Text>
+        {span ? <Text style={styles.subtitle}>{span}</Text> : null}
+        {facts ? <Text style={styles.subtitle}>{tr('{0}条记录 · {1}张照片', [facts.recordCount, facts.photoCount])}</Text> : null}
+      </View> : null}
+      {actions}
+      {paperPreview ? <View style={{ gap: 12 }}>
+        {layout ? <AlbumExportBook pages={pages} media={media} mediaJson={mediaJson} style={style} width={width} title={name} busy={busy} celebrate={celebrate} holdAt={holdAt} /> : failed ? <ShowcaseNote>{tr('这一册暂时排不出来。收进的记录还在。')}</ShowcaseNote> : <AlbumExportBookPlaceholder width={width} />}
+        <Text style={styles.caption}>{tr('PDF 预览')}</Text>
+      </View> : null}
+      {children}
+    </View>
+  );
   return (
     <View style={styles.body}>
+      {actions}
       {layout ? (
         <AlbumExportBook
           pages={pages}
@@ -69,7 +91,7 @@ export function AlbumExportShowcase({
       ) : failed ? null : (
         <AlbumExportBookPlaceholder width={width} />
       )}
-      {layout ? <Text style={styles.caption}>{tr('翻一翻，这就是导出后的样子。')}</Text> : null}
+      {layout ? <Text style={styles.caption}>{tr(ebookDesigns ? 'PDF 预览' : '翻一翻，这就是导出后的样子。')}</Text> : null}
       {failed ? <Text style={[styles.meta, styles.center]}>{tr('这一册暂时排不出来。收进的记录还在。')}</Text> : null}
       {layout && facts ? (
         <>
@@ -81,7 +103,7 @@ export function AlbumExportShowcase({
               {[span, tr('A5 · 148×210 mm')].filter(Boolean).join(' · ')}
             </Text>
           </View>
-          <StylePicker style={style} onStyle={onStyle} disabled={busy} />
+          {!ebookDesigns ? <StylePicker style={style} onStyle={onStyle} disabled={busy} /> : null}
           <EditionStats
             items={[
               { value: facts.pageCount, label: tr('页') },
@@ -90,7 +112,7 @@ export function AlbumExportShowcase({
               ...(facts.soundCount ? [{ value: facts.soundCount, label: tr('段声音') }] : []),
             ]}
           />
-          <EditionPromises sounds={facts.soundCount > 0} />
+          {!ebookDesigns ? <EditionPromises sounds={facts.soundCount > 0} /> : null}
         </>
       ) : null}
       {children}
@@ -186,7 +208,7 @@ export function ShowcaseButton({
   onPress: () => void;
   disabled?: boolean;
   testID?: string;
-  tone?: 'solid' | 'quiet';
+  tone?: 'solid' | 'quiet' | 'outline' | 'editorial';
 }) {
   return (
     <Pressable
@@ -196,14 +218,24 @@ export function ShowcaseButton({
       testID={testID}
       onPress={onPress}
       style={({ pressed }) => [
-        tone === 'solid' ? styles.solid : styles.quiet,
+        tone === 'solid' ? styles.solid : tone === 'outline' ? styles.outline : tone === 'editorial' ? styles.editorialAction : styles.quiet,
         pressed && styles.pressed,
         disabled && styles.dim,
       ]}
     >
-      <Text style={tone === 'solid' ? styles.solidLabel : styles.quietLabel}>{label}</Text>
+      <Text style={tone === 'solid' ? styles.solidLabel : tone === 'editorial' ? styles.editorialActionText : styles.quietLabel}>{label}</Text>
+      {tone === 'editorial' ? <LifeIcon name="open" size={15} color={sage} /> : null}
     </Pressable>
   );
+}
+
+export function ExportChoice({ label, detail, selected, disabled, onPress }: {
+  label: string; detail: string; selected: boolean; disabled: boolean; onPress(): void;
+}) {
+  return <Pressable accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onPress} style={[styles.editorialChoice, disabled && styles.dim]}>
+    <View style={{ flex: 1, gap: 3 }}><Text style={[styles.editorialChoiceName, !selected && { color: inkSoft }]}>{label}</Text><Text style={styles.note}>{detail}</Text></View>
+    {selected ? <LifeIcon name="check" size={18} color={sage} /> : <View style={{ width: 18 }} />}
+  </Pressable>;
 }
 
 export function ShowcaseUnlocked() {
@@ -244,7 +276,7 @@ export function BindingPanel({
       <View style={styles.track}>
         <Animated.View style={[styles.fill, { transform: [{ scaleX: fill }] }]} />
       </View>
-      <Text style={styles.note}>{tr('正在冻结并排成PDF。')}</Text>
+      <Text style={styles.note}>{tr('正在制作PDF，请稍候。')}</Text>
       <ShowcaseButton tone="quiet" label={tr('取消')} onPress={onCancel} />
     </View>
   );
@@ -256,12 +288,14 @@ export function FreshEdition({
   size,
   onShare,
   disabled,
+  editorial = false,
 }: {
   number: number;
   pages: number;
   size: string;
   onShare: () => void;
   disabled: boolean;
+  editorial?: boolean;
 }) {
   const [rise] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -270,17 +304,17 @@ export function FreshEdition({
   return (
     <Animated.View
       testID="album-export-fresh"
-      style={[styles.fresh, { opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}
+      style={[styles.fresh, editorial && { backgroundColor: 'transparent', boxShadow: 'none', borderRadius: 0, paddingHorizontal: 0, alignItems: 'stretch' }, { opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}
     >
       <View style={styles.freshHead}>
         <LifeIcon name="sealed" size={22} color={sage} />
         <Text style={styles.freshTitle} accessibilityLiveRegion="polite">
-          {tr('这一册装订好了。')}
+          {tr('PDF已生成。')}
         </Text>
       </View>
       <Text style={styles.freshMeta}>{tr('第{0}版 · {1}页 · {2}', [number, pages, size])}</Text>
-      <ShowcaseButton label={tr('保存或打印PDF')} onPress={onShare} disabled={disabled} testID="album-export-fresh-share" />
-      <Text style={styles.note}>{tr('导出会生成一份文件。它不再只待在Lampy里，Lampy也不能从别人的设备收回。')}</Text>
+      <ShowcaseButton tone={editorial ? 'editorial' : 'solid'} label={tr('保存或打印PDF')} onPress={onShare} disabled={disabled} testID="album-export-fresh-share" />
+      <Text style={styles.note}>{tr('已分享的副本无法收回，请选择合适的保存或分享位置。')}</Text>
     </Animated.View>
   );
 }
@@ -288,7 +322,7 @@ export function FreshEdition({
 export function ShelfHeader() {
   return (
     <View style={styles.shelfHead}>
-      <Text style={styles.shelfTitle}>{tr('已装订的版本')}</Text>
+      <Text style={styles.shelfTitle}>{tr('已保存的PDF')}</Text>
     </View>
   );
 }
@@ -308,6 +342,13 @@ export function MiniBook({ style }: { style: AlbumReadingStyle }) {
 }
 
 const styles = StyleSheet.create({
+  editorialBody: { paddingTop: 12, gap: 24, alignItems: 'stretch' },
+  editorialTitle: { gap: 6, paddingVertical: 12 },
+  editorialName: { fontFamily: serif, fontSize: 29, lineHeight: 40, color: ink },
+  editorialAction: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: sage },
+  editorialActionText: { ...type.action, color: sage, flexShrink: 1 },
+  editorialChoice: { minHeight: 64, paddingVertical: 12, flexDirection: 'row', gap: 18, alignItems: 'center' },
+  editorialChoiceName: { fontFamily: serif, fontSize: 20, lineHeight: 28, color: ink },
   body: { paddingTop: 20, gap: 18, alignItems: 'stretch' },
   caption: { ...type.meta, fontSize: 13, lineHeight: 18, color: inkSoft, textAlign: 'center', marginTop: -10 },
   meta: { ...type.meta, color: inkSoft },
@@ -355,6 +396,7 @@ const styles = StyleSheet.create({
     boxShadow: '0px 8px 18px rgba(83,96,79,0.30)',
   },
   solidLabel: { ...type.action, color: paper, fontWeight: '600', textAlign: 'center' },
+  outline: { alignSelf: 'stretch', minHeight: 48, borderWidth: 1, borderColor: sage, borderRadius: 24, paddingHorizontal: 18, paddingVertical: 10, justifyContent: 'center', alignItems: 'center' },
   quiet: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   quietLabel: { ...type.action, color: sage, textAlign: 'center' },
   pressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },

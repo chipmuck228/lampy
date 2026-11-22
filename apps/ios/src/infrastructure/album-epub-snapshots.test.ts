@@ -25,7 +25,7 @@ beforeEach(()=>{
   native.copyPrintMedia.mockImplementation(async(source,dest)=>{files.set(dest,files.get(source)!.slice());return native.printFileDigest(dest);});
 });
 it('protects an active frozen snapshot from recovery and only lists completed EPUBs',async()=>{
-  const snapshot=await createPersonalEpubSnapshot('a','plain',()=>true);
+  const snapshot=await createPersonalEpubSnapshot('a','literary',()=>true);
   expect(await listEpubSnapshots('a')).toEqual([]);
   expect(files.has(epubSnapshotDirectory(snapshot.id)+'media-0')).toBe(true);
   files.set(epubSnapshotDirectory(snapshot.id)+'album-en.epub',new Uint8Array([1]));
@@ -35,7 +35,7 @@ it('protects an active frozen snapshot from recovery and only lists completed EP
   expect(files.has('file:///original')).toBe(true);
 });
 it('discards a cancelled new snapshot including its media copies, leaving originals intact',async()=>{
-  const snapshot=await createPersonalEpubSnapshot('a','plain',()=>true);
+  const snapshot=await createPersonalEpubSnapshot('a','literary',()=>true);
   await discardUnfinishedEpubSnapshot(snapshot.id);
   expect(dirs.has(epubSnapshotDirectory(snapshot.id))).toBe(false);
   expect(files.has(epubSnapshotDirectory(snapshot.id)+'media-0')).toBe(false);

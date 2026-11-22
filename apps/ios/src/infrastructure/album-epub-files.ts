@@ -1,3 +1,4 @@
+import { acquireAlbumEdition } from './album-edition-lock';
 import { epubSnapshotDirectory } from './album-epub-snapshots';
 import type { EpubSnapshot } from '../application/album-epub-snapshot';
 import { File, FileMode } from 'expo-file-system';
@@ -45,8 +46,7 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     if (__DEV__) console.info('[LampyEpub]', JSON.stringify({ event: 'STAGE', stage }));
   };
   // One owner per edition, even if two mounted screens race.
-  if (working.has(id)) throw new Error('EPUB_BUSY');
-  working.add(id);
+  const releaseEdition = acquireAlbumEdition(id);
   try {
     // No other job for this edition is active. Remove only abandoned EPUB work, never editions.
     for (const name of await FS.readDirectoryAsync(dir)) {
@@ -118,7 +118,7 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     check();
     report('PACKAGE');
     await new Promise<void>(resolve => setTimeout(resolve, 0)); check();
-    const documents = albumEpubDocuments({ input: manifest.content, assets, dates, id: `${id}-${appLanguage}`, createdAt: manifest.createdAt, style: manifest.style, language: appLanguage });
+    const documents = albumEpubDocuments({ input: manifest.content, assets, dates, id: `${id}-${appLanguage}`, createdAt: manifest.createdAt, design: 'kind' in manifest ? manifest.design : undefined, language: appLanguage });
     const entries = [...Object.entries(documents).map(([name, data]) => epubMemoryEntry(name, data)), ...mediaEntries];
     await assertSpace(entries.reduce((sum, item) => sum + item.size, 0) + RESERVE); check();
     const part = `${work}album.epub`;
@@ -159,11 +159,10 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
       if (work) temporary.push(work);
       const results = await Promise.allSettled(temporary.map(uri => FS.deleteAsync(uri, { idempotent: true })));
       cleanupFailed ||= results.some(result => result.status === 'rejected');
-    } finally { working.delete(id); }
+    } finally { releaseEdition(); }
     if (cleanupFailed) throw new AlbumEpubFailure('CLEANUP', 'EPUB_CLEANUP_FAILED');
   }
 }
-const working = new Set<string>();
 export function epubAudioFormat(bytes: Uint8Array) {
   if (bytes.length > 12 && String.fromCharCode(...bytes.slice(4, 8)) === 'ftyp') return { mime: 'audio/mp4', extension: 'm4a' };
   if (String.fromCharCode(...bytes.slice(0, 3)) === 'ID3' || (bytes[0] === 255 && (bytes[1] & 0xe0) === 0xe0 && (bytes[1] & 6) !== 0)) return { mime: 'audio/mpeg', extension: 'mp3' };

@@ -81,3 +81,42 @@ it('lets entries in the same month flow together and keeps the colophon with the
   expect(doc.querySelectorAll('article')).toHaveLength(2);
   expect(doc.querySelector('footer')).not.toBeNull();
 });
+
+it.each(['literary','imagebook'] as const)('preserves all text, audio and XML in %s independently of paper style', design => {
+  const archive = unzipSync(buildAlbumEpub({ ...options, design }));
+  const doc = new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']), { contentType:'application/xml' }).window.document;
+  expect(doc.querySelector('parsererror')).toBeNull();
+  expect(doc.body.className).toBe(design);
+  expect(doc.querySelector('.prose')!.textContent).toContain('<script>alert(1)</script>');
+  expect(doc.querySelector('audio')!.getAttribute('src')).toBe('media/asset-1.m4a');
+  expect(doc.querySelector('audio')!.hasAttribute('autoplay')).toBe(false);
+  expect(strFromU8(archive['OEBPS/style.css'])).not.toContain('.handmade');
+  expect(strFromU8(archive['OEBPS/package.opf'])).toContain('reflowable');
+});
+it('uses a single large image then compatible paired photos without losing or reordering media', () => {
+  const record = { ...input.entries[0], media: [0,1,2].map(i=>({...input.entries[0].media[0],assetId:`p${i}`,intrinsicRatio:1.2})) };
+  const photoAssets=Object.fromEntries([0,1,2].map(i=>[`p${i}`,{...assets.photo,path:`media/photo-${i}.jpg`,mime:'image/jpeg'}]));
+  for(const design of ['literary','imagebook'] as const) {
+    const archive=unzipSync(buildAlbumEpub({...options,design,input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[record]},assets:photoAssets}));
+    const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
+    expect([...doc.querySelectorAll('img')].map(x=>x.getAttribute('src'))).toEqual([0,1,2].map(i=>`media/photo-${i}.jpg`));
+    expect(doc.querySelectorAll('.photo-pair .paired')).toHaveLength(2);
+    const article=doc.querySelector('article')!;
+    expect(article.firstElementChild!.className).toBe(design==='imagebook'?'entry-lead':'entry-head');
+  }
+});
+it('keeps long text continuous and does not pair incompatible photo ratios', () => {
+  const record={...input.entries[0],note:'完整文字。'.repeat(200),media:[0,1,2].map((i)=>({...input.entries[0].media[0],assetId:`p${i}`,intrinsicRatio:i===1?0.5:1.8}))};
+  const photoAssets=Object.fromEntries([0,1,2].map(i=>[`p${i}`,{...assets.photo,path:`media/photo-${i}.jpg`,mime:'image/jpeg'}]));
+  const archive=unzipSync(buildAlbumEpub({...options,design:'imagebook',input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[record]},assets:photoAssets}));
+  const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
+  expect(doc.querySelector('.entry-lead')).toBeNull();
+  expect(doc.querySelector('.prose')!.textContent).toBe(record.note);
+  expect(doc.querySelector('.photo-pair')).toBeNull();
+  expect(doc.querySelectorAll('img')).toHaveLength(3);
+});
+it('defaults old manifests to literary and rejects unknown design values', () => {
+  const archive=files();
+  expect(strFromU8(archive['OEBPS/cover.xhtml'])).toContain('class="literary"');
+  expect(()=>buildAlbumEpub({...options,design:'other' as never})).toThrow('EPUB_INVALID_DESIGN');
+});
