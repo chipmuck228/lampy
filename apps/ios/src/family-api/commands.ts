@@ -779,13 +779,23 @@ export function createFamilyCommands(deps: {
     registerControlledEmail(input, peer) { return testAccounts.registerControlledEmail(input, peer); },
     signInWithControlledEmail(input, peer) { return testAccounts.signInWithControlledEmail(input, peer); },
     getMyProfile(sessionToken) {
-      return withAuthedUser(sessionToken, async(tx,userId) => (await tx.findProfile(userId)) ?? { userId, nickname:'', avatar:'system' as const, updatedAt:null });
+      return withAuthedUser(sessionToken, async(tx,userId) => {
+        const profile=(await tx.findProfile(userId)) ?? { userId, nickname:'', avatar:'system' as const, updatedAt:null };
+        const emailAccount=(await tx.listLoginIdentities(userId)).some(i=>i.provider==='email-otp');
+        return {...profile,...(emailAccount&&profile.nickname?{nicknameLocked:true}:{})};
+      });
     },
     async updateMyProfile(sessionToken, rawNickname) {
       const nickname = requireProfileNickname(rawNickname);
       return withAuthedUser(sessionToken, async(tx,userId) => {
+        const previous=await tx.findProfile(userId);
+        const emailAccount=(await tx.listLoginIdentities(userId)).some(i=>i.provider==='email-otp');
+        if(emailAccount&&previous?.nickname){
+          if(previous.nickname!==nickname)throw new FamilyError('NICKNAME_LOCKED','Nickname can only be set on first sign-in.');
+          return {...previous,nicknameLocked:true};
+        }
         const profile = { userId, nickname, avatar:'system' as const, updatedAt:iso(clock.now()) };
-        await tx.saveProfile(profile); return profile;
+        await tx.saveProfile(profile); return {...profile,...(emailAccount?{nicknameLocked:true}:{})};
       });
     },
     signInWithTestAccount(input) {

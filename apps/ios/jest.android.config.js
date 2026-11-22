@@ -19,6 +19,7 @@ module.exports = {
     '**/infrastructure/account-config.test.ts',
     '**/application/email-code-use-cases.test.ts',
     '**/screens/email-code-screen.test.tsx',
+    '**/screens/email-account-settings.test.tsx',
     '**/infrastructure/secure-family-session.test.ts',
     '**/infrastructure/family-session-transport.test.ts',
     '**/infrastructure/expo-media.test.ts',

@@ -41,7 +41,8 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
         const authenticated=Date.parse(session?.authenticatedAt??'');
         const recent=Number.isFinite(authenticated)&&authenticated<=deps.clock.now().getTime()&&authenticated+RECENT_AUTH_MS>deps.clock.now().getTime()&&
           (await tx.listLoginIdentities(userId)).some(i=>loginIdentityKey(i)===session?.authenticatedIdentity);
-        return {signedIn:true,linked:!!own,...(own?{maskedEmail:maskEmail(own.subject)}:{}),
+        const profile=await tx.findProfile(userId);
+        return {signedIn:true,linked:!!own,...(profile?.nickname?{nickname:profile.nickname}:{}),...(own?{maskedEmail:maskEmail(own.subject)}:{}),
           ...(recent?{reauthenticationExpiresAt:new Date(authenticated+RECENT_AUTH_MS).toISOString()}:{})};
       });
     },

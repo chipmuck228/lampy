@@ -37,6 +37,14 @@ for(const sqlite of [false,true])describe(sqlite?'SQLite email codes':'memory em
     const stored=await repository.withTransaction(tx=>tx.findLoginIdentity('email-otp','person@example.com',EMAIL_CODE_NAMESPACE));
     expect(stored?.userId).toBe(first.userId);expect(stored?.verifiedAt).toBeTruthy();
   });
+  it('sets an email account nickname once, returns it in status and rejects a later rename',async()=>{
+    const account=await login();await c.updateMyProfile(account.sessionToken,'生活记录者');
+    expect(await c.emailCode.status(account.sessionToken)).toMatchObject({nickname:'生活记录者'});
+    const first=await c.getMyProfile(account.sessionToken);expect(first.nicknameLocked).toBe(true);
+    advance();expect(await c.updateMyProfile(account.sessionToken,'生活记录者')).toEqual(first);
+    await expect(c.updateMyProfile(account.sessionToken,'另一个名字')).rejects.toMatchObject({code:'NICKNAME_LOCKED'});
+    expect((await c.getMyProfile(account.sessionToken)).nickname).toBe('生活记录者');
+  });
   it('stores only keyed digests and activates codes only after delivery is accepted',async()=>{
     const ticket=await request();const row=await repository.withTransaction(tx=>tx.findEmailCodeChallenge(ticket.challengeId));
     expect(row?.status).toBe('active');expect(row?.digest).toHaveLength(64);expect(row).not.toHaveProperty('code');

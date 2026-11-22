@@ -19,6 +19,7 @@ import { hairline, ink, inkSoft, sage, paperDeep, clay, paper } from './life-pag
 
 function errorCopy(error: unknown) {
   if (isApplicationError(error)) {
+    if (error.code === 'NICKNAME_LOCKED') return tr('昵称已保存，无法修改。');
     if (error.code === 'REAUTHENTICATION_REQUIRED') return tr('为了保护账号，请重新登录后再关联登录方式。');
     if (error.code === 'ACCOUNT_HAS_MANAGED_FAMILY') return tr('请先转交或解散仍有其他成员的家庭，再删除账号。');
     if (error.code === 'EMAIL_ACCOUNT_EXISTS') return tr('这个账号已存在，请登录。');
@@ -222,8 +223,9 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
           <TextInput testID="email-account-email" accessibilityLabel={tr('邮箱')} placeholder={tr('邮箱')} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="username" maxLength={254} editable={!busy} style={styles.input}/>
           <TextInput testID="email-account-password" accessibilityLabel={tr('密码')} placeholder={tr('密码')} value={password} onChangeText={setPassword} secureTextEntry textContentType={register ? 'newPassword' : 'password'} maxLength={128} editable={!busy} style={styles.input}/>
         </> : null}
-        {(profileMode && profile) || register ? <TextInput testID="email-account-nickname" accessibilityLabel={tr('昵称')} placeholder={tr('昵称')} value={nickname} onChangeText={setNickname} editable={!busy} style={styles.input}/> : null}
-        {profileMode && !profile ? (!embedded ? <Text>{tr('请先登录。')}</Text> : null) : (profileMode || !formal) ? <Pressable testID="email-account-submit" style={styles.primary} accessibilityRole="button" accessibilityState={{disabled:busy}} disabled={busy} onPress={()=>void submit()}><Text style={styles.action}>{tr(busy ? '正在处理。' : profileMode ? '保存昵称' : register ? '创建并登录' : '登录')}</Text></Pressable> : null}
+        {profileMode&&profile?.nicknameLocked?<><Text testID="email-account-fixed-nickname">{profile.nickname}</Text><Text style={styles.explanation}>{tr('昵称已保存，无法修改。')}</Text></>:null}
+        {(profileMode && profile && !profile.nicknameLocked) || register ? <TextInput testID="email-account-nickname" accessibilityLabel={tr('昵称')} placeholder={tr('昵称')} value={nickname} onChangeText={setNickname} editable={!busy} style={styles.input}/> : null}
+        {profileMode && !profile ? (!embedded ? <Text>{tr('请先登录。')}</Text> : null) : (profileMode || !formal) && !profile?.nicknameLocked ? <Pressable testID="email-account-submit" style={styles.primary} accessibilityRole="button" accessibilityState={{disabled:busy}} disabled={busy} onPress={()=>void submit()}><Text style={styles.action}>{tr(busy ? '正在处理。' : profileMode ? '保存昵称' : register ? '创建并登录' : '登录')}</Text></Pressable> : null}
         {!profileMode && registrationAllowed ? <Pressable testID="email-account-toggle" style={styles.hit} accessibilityRole="button" disabled={busy} onPress={()=>{setRegister(!register);setMessage(null);setPassword('');}}><Text style={styles.action}>{tr(register ? '已有账号，去登录' : '没有账号，创建一个')}</Text></Pressable> : null}
       </View> : !loading ? <Pressable style={styles.hit} accessibilityRole="button" onPress={()=>void load(++sequence.current)}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable> : null}
       {!profileMode&&emailCodeEntryOpen()?<Pressable accessibilityRole="button" testID="email-code-alternative" disabled={busy} onPress={onEmailCodeRequested??(()=>router.push({pathname:'/account/email-code',params:{returnTo:'family'}}))}><Text style={styles.action}>{tr('使用邮箱验证码')}</Text></Pressable>:null}

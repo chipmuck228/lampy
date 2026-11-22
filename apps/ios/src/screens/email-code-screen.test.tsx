@@ -128,3 +128,23 @@ it('keeps only an actually delivered, unexpired code on a failed resend and hide
   await act(async()=>jest.advanceTimersByTime(240000));expect(page.queryByTestId('email-code-value')).toBeNull();await page.unmount();
  }finally{jest.useRealTimers();}
 });
+
+it('offers an editable default nickname and explains the one-time choice before saving',async()=>{
+ mockService.verifyEmailCode.mockResolvedValue({signedIn:true,userId:'a',needsProfile:true});
+ const page=await form();await send(page);await fireEvent.changeText(page.getByTestId('email-code-value'),'123456');await fireEvent.press(page.getByTestId('email-code-verify'));
+ expect(page.getByTestId('email-code-name').props.value).toBe('生活记录者');
+ expect(page.getByText('昵称仅能在首次登录时设置，保存后无法修改。')).toBeTruthy();
+ await fireEvent.press(page.getByTestId('email-code-name-save'));expect(mockService.finishEmailProfile).toHaveBeenCalledWith('生活记录者','a',expect.any(Function));
+});
+it('never displays a code entry or fake resend countdown when deletion mail is rate limited',async()=>{
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com'});
+ mockService.requestEmailCode.mockRejectedValueOnce(new ApplicationError('RATE_LIMITED','Too many requests',1800));
+ const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
+ const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);
+ try{
+  await waitFor(()=>expect(page.getByTestId('email-code-delete')).toBeTruthy());await fireEvent.press(page.getByTestId('email-code-delete'));
+  await act(async()=>alert.mock.calls[0][2]![1].onPress!());await send(page);
+  expect(mockService.requestEmailCode).toHaveBeenCalledWith(expect.objectContaining({intent:'delete'}),expect.any(Function),'a');
+  expect(page.queryByTestId('email-code-value')).toBeNull();expect(page.getByText(/稍后重试 \(1800\)/)).toBeTruthy();expect(mockService.verifyEmailCode).not.toHaveBeenCalled();
+ }finally{alert.mockRestore();await page.unmount();}
+});

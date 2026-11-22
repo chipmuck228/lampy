@@ -253,3 +253,10 @@ it('an email-only formal account keeps its profile and routes deletion to email 
   await fireEvent.press(page.getByTestId('account-delete'));expect(mockPush).toHaveBeenCalledWith('/account/email-code');expect(mockDelete).not.toHaveBeenCalled();
  } finally {mockEmailCodeOpen=false;await page.unmount();}
 });
+
+it('shows a locked email nickname as text without an edit or save control',async()=>{
+ mockRead.mockResolvedValue({userId:'a',nickname:'生活记录者',avatar:'system',updatedAt:null,nicknameLocked:true});
+ const page=await render(<FamilyEmailAccountScreen profileMode/>);
+ await waitFor(()=>expect(page.getByTestId('email-account-fixed-nickname')).toBeTruthy());
+ expect(page.queryByTestId('email-account-nickname')).toBeNull();expect(page.queryByTestId('email-account-submit')).toBeNull();
+});

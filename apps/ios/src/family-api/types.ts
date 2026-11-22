@@ -3,7 +3,7 @@ export type MembershipStatus = 'active' | 'left' | 'removed';
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
 export type FamilyStatus = 'active' | 'dissolved';
 
-export type UserProfile = { userId: string; nickname: string; avatar: 'system'; updatedAt: string | null };
+export type UserProfile = { userId: string; nickname: string; avatar: 'system'; updatedAt: string | null; nicknameLocked?: boolean };
 
 // A provider subject identifies a login, never a family or a local Moment owner.
 export type LoginProvider = 'apple' | 'controlled-password' | 'wechat' | 'google' | 'phone-otp' | 'email-otp';
