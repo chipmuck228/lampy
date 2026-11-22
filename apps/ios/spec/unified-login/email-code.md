@@ -37,6 +37,28 @@ LAMPY_EMAIL_CODE_DAILY_LIMIT=200
 
 接口：`POST /v2/auth/email-code/request`、`POST /v2/auth/email-code/verify`、`GET /v2/me/email-code`；健康检查新增 `emailCodeLogin`。登录请求不带既有 Bearer；其他用途必须绑定当前有效会话。
 
+## 使用 Resend
+
+Lampy 当前后端为 Node 服务，不需要引入 Next.js。Resend 官方同时支持 SDK/API 与 SMTP；本阶段沿用现有 SMTP 适配器，账号验证、限流与客户端均不变。
+
+在 Resend 验证自己的发件域名并创建允许该域发信的 API key，然后将服务端邮件配置替换为：
+
+```sh
+LAMPY_SMTP_HOST=smtp.resend.com
+LAMPY_SMTP_PORT=465
+LAMPY_SMTP_USER=resend
+LAMPY_SMTP_PASSWORD=<Resend API key>
+LAMPY_EMAIL_FROM=accounts@your-verified-domain.example
+```
+
+`LAMPY_EMAIL_CODE_ENABLED`、独立的 `LAMPY_EMAIL_CODE_SECRET` 及每日发送上限仍按前文配置；API key 不能代替验证码 HMAC secret。`LAMPY_EMAIL_FROM` 必须替换为自己已验证域名下的纯邮箱地址，不要填写带 `Lampy <...>` 的显示名（适配器会自动添加 Lampy）。也可使用端口 587，现有实现强制 STARTTLS。
+
+每日上限按 Resend 账号实际配额和其他业务用量预留，不代表服务商承诺的额度；SMTP 与 API 共用 Resend 的发送限流。首次在测试环境向自己的邮箱发码，检查 Resend Emails 列表及实际收件箱/垃圾邮件；发送被接受仍不等于最终送达。默认测试发件域不能作为正式用户登录的发件配置。配置只放后端环境文件，不放 App 或 Next.js 客户端。
+
+接入本配置不需要新增 Resend SDK。若部署服务器不允许出站 465/587，可再增加 HTTPS API 发送适配器；不能通过关闭 TLS 校验解决连接问题。当前尚未使用真实 Resend 凭证验证发送。
+
+官方文档（2026-11-22 核对）：[Next.js SDK 示例](https://resend.com/docs/send-with-nextjs)、[SMTP 参数](https://resend.com/docs/send-with-smtp)。
+
 ## 客户端开发与发布
 
 示例地址必须替换成实际测试 API，并与 iOS 家庭配置指向同一后端；使用不同后端会产生不同账号库。本机调试私网 HTTP 可用，正式发行必须 HTTPS。
