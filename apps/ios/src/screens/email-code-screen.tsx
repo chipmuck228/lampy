@@ -28,10 +28,11 @@ function errorCopy(error:unknown) {
   return tr('现在没有完成，请再试一次。');
 }
 
-export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}:{onAuthenticated?:()=>void;onCancel:()=>void;onOtherSignIn?:()=>void}) {
+export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn,onDeleted}:{onAuthenticated?:()=>void;onCancel:()=>void;onOtherSignIn?:()=>void;onDeleted?:()=>void}) {
   const open=emailCodeEntryOpen();const lock=useDeviceLock();
   const [status,setStatus]=useState<EmailCodeStatus>({signedIn:false,linked:false});
   const [mode,setMode]=useState<EmailCodeIntent|'summary'|'name'>('login');
+  const [entryMode,setEntryMode]=useState<'login'|'register'>('login');
   const [needsRefresh,setNeedsRefresh]=useState(false);
   const [retry,setRetry]=useState(0);const initialRead=useRef(false);
   const [ready,setReady]=useState(false),[busy,setBusy]=useState(false),[email,setEmail]=useState(''),[code,setCode]=useState(''),[nickname,setNickname]=useState(tr('生活记录者'));
@@ -77,7 +78,12 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}
       ...(mode==='delete'?{confirmation:'delete-my-lampy-account-v1'}:{})},()=>current(n,true));
       if(!current(n,true))return;setTicket(null);setCode('');
       if('signedIn'in result){accountOwner.current=result.userId;setStatus({signedIn:true,linked:true});if(result.needsProfile)setMode('name');else if(onAuthenticated)onAuthenticated();else{setMode('summary');setMessage(tr('已登录。'));}}
-      else if('deleted'in result){accountOwner.current=null;setStatus({signedIn:false,linked:false});setMode('login');setMessage(tr(result.appleRevocation==='manual-required'?'账号已删除。请在 Apple 账号设置中停止使用 Lampy 登录。':'账号已删除，本机个人记录仍保留。'));}
+      else if('deleted'in result){
+        accountOwner.current=null;setStatus({signedIn:false,linked:false});setMode('login');setEmail('');setCode('');setTicket(null);
+        setResendAt(0);setSentTo('');setLimitedUntil(0);setLimitedAddress('');setNickname(tr('生活记录者'));setNeedsRefresh(false);setMessage(null);setBusy(false);action.current=null;
+        Alert.alert(tr('账号已删除'),tr(result.appleRevocation==='manual-required'?'账号已删除。请在 Apple 账号设置中停止使用 Lampy 登录。':'账号已删除，本机个人记录仍保留。'));
+        (onDeleted??onCancel)();
+      }
       else {const state=await service.getEmailCodeAccount();if(!current(n,true))return;setStatus(state);if('reauthenticated'in result){setBusy(false);action.current=null;choose('change');setMessage(tr('身份已确认，请输入新的邮箱地址。'));}else {setMode('summary');setMessage(tr('邮箱已关联。'));}}
     }catch(error){if(current(n,true)){setCode('');setMessage(errorCopy(error));if(isApplicationError(error)&&['STALE_FAMILY_REQUEST','UNAUTHENTICATED'].includes(error.code))setNeedsRefresh(true);if(isApplicationError(error)&&error.code==='REAUTHENTICATION_REQUIRED')setStatus(previous=>({...previous,reauthenticationExpiresAt:undefined}));}}
     finally{if(current(n)){action.current=null;setBusy(false);}}
@@ -93,7 +99,7 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}
 
   return <SettingsPage title={tr('登录与找回')} backLabel={tr('返回')} accessibilityLabel={tr('登录与找回')} onBack={onCancel} pageTestID="email-code-page">
     {!open?<Text>{tr('邮箱登录暂未开放。')}</Text>:blocked?<Text>{tr('请先解锁，再继续。')}</Text>:<View style={styles.content}>
-      <Text style={styles.title}>{tr(mode==='summary'?'你的邮箱':mode==='name'?'怎么称呼你？':mode==='login'?'用邮箱继续':mode==='delete'?'验证邮箱后删除账号':mode==='change'?'更换邮箱':mode==='reauth'?'验证当前邮箱':'关联邮箱')}</Text>
+      <Text style={styles.title}>{tr(mode==='summary'?'你的邮箱':mode==='name'?'怎么称呼你？':mode==='login'?(entryMode==='register'?'注册 Lampy':'登录 Lampy'):mode==='delete'?'验证邮箱后删除账号':mode==='change'?'更换邮箱':mode==='reauth'?'验证当前邮箱':'关联邮箱')}</Text>
       {!ready?<>{message?<Text accessibilityLiveRegion="polite">{message}</Text>:<Text>{tr('正在确认账号服务。')}</Text>}{<Action label={tr('再试一次')} onPress={()=>setRetry(value=>value+1)} disabled={false} testID={'email-code-retry'}/>}{onOtherSignIn?<Action label={tr('其他登录方式')} onPress={onOtherSignIn}/>:null}{<Action label={tr('返回')} onPress={onCancel} disabled={false} testID={'email-code-back'}/>}</>:
       mode==='summary'?<>
         {status.nickname?<Text testID="email-code-nickname">{status.nickname}</Text>:null}
@@ -109,6 +115,7 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}
         <TextInput testID="email-code-name" accessibilityLabel={tr('昵称')} value={nickname} onChangeText={setNickname} maxLength={24} editable={!busy} style={styles.input}/>
         {<Action label={tr('继续')} onPress={()=>void name()} disabled={busy||!nickname.trim()} testID={'email-code-name-save'}/>}
       </>:<>
+        {mode==='login'?<Text style={styles.body}>{tr('登录和注册都使用邮箱验证码，无需设置密码。')}</Text>:null}
         <Text style={styles.body}>{tr(mode==='delete'?'删除账号会移除家庭账号相关数据，本机个人记录保留。':mode==='reauth'?'请输入当前账号已关联的完整邮箱。':mode==='change'?'请输入新的邮箱地址，我们会向新邮箱发送验证码。':'我们会发送一封邮件，你可以切换到邮箱查看验证码，再回来继续。')}</Text>
         <TextInput testID="email-code-address" accessibilityLabel={tr('邮箱')} value={email} onChangeText={value=>{setEmail(value);setCode('');setTicket(null);}} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="emailAddress" maxLength={254} style={styles.input}/>
         {<Action label={limited?`${tr('稍后重试')} (${limited})`:remaining?`${tr('重新获取')} (${remaining})`:activeTicket?tr('重新获取'):tr('获取验证码')} onPress={()=>void send()} disabled={needsRefresh||busy||remaining>0||limited>0} testID={'email-code-send'}/>}
@@ -118,7 +125,11 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn}
           {<Action label={tr(mode==='delete'?'确认删除账号':'验证并继续')} onPress={()=>mode==='delete'?Alert.alert(tr('删除账号'),tr('这个操作无法撤销。'),[{text:tr('取消'),style:'cancel'},{text:tr('确认删除账号'),style:'destructive',onPress:()=>void verify()}]):void verify()} disabled={busy||code.length!==6} testID={'email-code-verify'}/>}
         </>:null}
         {mode==='change'&&status.linked&&!recentlyAuthenticated?<Action label={tr('先验证当前邮箱')} onPress={()=>choose('reauth')} disabled={busy}/>:null}
-        {mode==='login'?<Text style={styles.note}>{tr('如果已有 Lampy 账号，请先用原来的方式登录，再关联邮箱。')}</Text>:null}
+        {mode==='login'?<>
+          <Action testID="email-code-entry-toggle" label={tr(entryMode==='login'?'首次使用 Lampy？注册':'已有 Lampy 账号？登录')} disabled={busy} onPress={()=>setEntryMode(entryMode==='login'?'register':'login')}/>
+          <Text style={styles.note}>{tr('新邮箱首次验证后会创建账号。')}</Text>
+          <Text style={styles.note}>{tr('如果之前使用 Apple 或其他方式登录，请先使用原方式登录，再关联邮箱，以保留原账号和家庭。')}</Text>
+        </>:null}
         {onOtherSignIn?<Action label={tr('其他登录方式')} onPress={onOtherSignIn} disabled={busy} testID={'email-code-other'}/>:null}
       </>}
       {ready&&message?<Text accessibilityLiveRegion="polite" style={styles.body}>{message}</Text>:null}

@@ -1194,5 +1194,13 @@
   "验证码已过期，请重新获取。": "This code has expired. Request a new one.",
   "生活记录者": "Life recorder",
   "昵称仅能在首次登录时设置，保存后无法修改。": "Choose your nickname now. It cannot be changed after saving.",
-  "昵称已保存，无法修改。": "Your nickname is saved and cannot be changed."
+  "昵称已保存，无法修改。": "Your nickname is saved and cannot be changed.",
+  "账号已删除": "Account deleted",
+  "注册 Lampy": "Sign up for Lampy",
+  "登录 Lampy": "Sign in to Lampy",
+  "登录和注册都使用邮箱验证码，无需设置密码。": "Sign in or sign up with an email code. No password needed.",
+  "首次使用 Lampy？注册": "New to Lampy? Sign up",
+  "已有 Lampy 账号？登录": "Already have a Lampy account? Sign in",
+  "新邮箱首次验证后会创建账号。": "Verifying a new email for the first time creates an account.",
+  "如果之前使用 Apple 或其他方式登录，请先使用原方式登录，再关联邮箱，以保留原账号和家庭。": "Previously signed in with Apple or another method? Sign in that way first, then link your email to keep your account and family."
 }

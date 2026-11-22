@@ -148,3 +148,32 @@ it('never displays a code entry or fake resend countdown when deletion mail is r
   expect(page.queryByTestId('email-code-value')).toBeNull();expect(page.getByText(/稍后重试 \(1800\)/)).toBeTruthy();expect(mockService.verifyEmailCode).not.toHaveBeenCalled();
  }finally{alert.mockRestore();await page.unmount();}
 });
+
+it('clears deletion form and countdowns, then returns to settings without calling the sign-in callback',async()=>{
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com'});
+ mockService.verifyEmailCode.mockResolvedValue({deleted:true,appleRevocation:'manual-required',mediaCleanup:'completed'});
+ const deleted=jest.fn(),signedIn=jest.fn();const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
+ const page=await render(<EmailCodeScreen onCancel={jest.fn()} onDeleted={deleted} onAuthenticated={signedIn}/>);
+ try{
+  await waitFor(()=>expect(page.getByTestId('email-code-delete')).toBeTruthy());await fireEvent.press(page.getByTestId('email-code-delete'));
+  await act(async()=>alert.mock.calls[0][2]![1].onPress!());await send(page);
+  await fireEvent.changeText(page.getByTestId('email-code-value'),'123456');await fireEvent.press(page.getByTestId('email-code-verify'));
+  await act(async()=>alert.mock.calls[1][2]![1].onPress!());
+  expect(deleted).toHaveBeenCalledTimes(1);expect(signedIn).not.toHaveBeenCalled();
+  expect(page.queryByTestId('email-code-value')).toBeNull();expect(page.getByTestId('email-code-address').props.value).toBe('');
+  expect(page.getByTestId('email-code-send')).not.toBeDisabled();expect(page.queryByText(/重新获取 \(/)).toBeNull();
+  expect(alert).toHaveBeenLastCalledWith('账号已删除','账号已删除。请在 Apple 账号设置中停止使用 Lampy 登录。');
+ }finally{alert.mockRestore();await page.unmount();}
+});
+
+it('explains sign-in versus sign-up while keeping one email-code flow and preserving a sent challenge',async()=>{
+ const page=await form();expect(page.getByText('登录 Lampy')).toBeTruthy();
+ expect(page.getByText('登录和注册都使用邮箱验证码，无需设置密码。')).toBeTruthy();
+ await fireEvent.press(page.getByTestId('email-code-entry-toggle'));expect(page.getByText('注册 Lampy')).toBeTruthy();
+ expect(page.getByText('已有 Lampy 账号？登录')).toBeTruthy();expect(mockService.requestEmailCode).not.toHaveBeenCalled();
+ await send(page);await fireEvent.press(page.getByTestId('email-code-entry-toggle'));
+ expect(page.getByText('登录 Lampy')).toBeTruthy();expect(page.getByTestId('email-code-value')).toBeTruthy();
+ expect(mockService.requestEmailCode).toHaveBeenCalledTimes(1);
+ await fireEvent.changeText(page.getByTestId('email-code-value'),'123456');await fireEvent.press(page.getByTestId('email-code-verify'));
+ expect(mockService.verifyEmailCode).toHaveBeenCalledWith(expect.objectContaining({intent:'login'}),expect.any(Function));
+});

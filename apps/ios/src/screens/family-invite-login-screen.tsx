@@ -34,7 +34,7 @@ export default function FamilyInviteLoginScreen() {
     accessibilityLabel={tr('家庭邀请')} onBack={back}>
     <Text>{tr('请返回邀请，重新确认后继续。')}</Text>
   </SettingsPage>;
-  if(codeMode)return <EmailCodeScreen onAuthenticated={authenticated} onCancel={back} onOtherSignIn={()=>setCodeMode(false)}/>;
+  if(codeMode)return <EmailCodeScreen onDeleted={()=>router.dismissTo('/account')} onAuthenticated={authenticated} onCancel={back} onOtherSignIn={()=>setCodeMode(false)}/>;
   if (emailMode) return <FamilyEmailAccountScreen onEmailCodeRequested={()=>setCodeMode(true)} onAuthenticated={authenticated} onCancel={back} onOtherSignIn={internal ? undefined : () => setEmailMode(false)}/>;
   return <AccountScreen onEmailRequested={() => setEmailMode(true)} variant="diagnostics" onAuthenticated={authenticated} onCancel={back} />;
 }

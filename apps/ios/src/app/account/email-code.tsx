@@ -4,5 +4,5 @@ import {isFamilyProductEntryOpen} from '../../infrastructure/family-config';
 export default function EmailCodeRoute(){
   const router=useRouter();const params=useLocalSearchParams<{returnTo?:string}>();
   const target=params.returnTo==='family'&&isFamilyProductEntryOpen()?'/family':'/account';
-  return <EmailCodeScreen onCancel={()=>router.canGoBack()?router.back():router.dismissTo('/account')} onAuthenticated={()=>router.dismissTo(target)}/>;
+  return <EmailCodeScreen onDeleted={()=>router.dismissTo('/account')} onCancel={()=>router.canGoBack()?router.back():router.dismissTo('/account')} onAuthenticated={()=>router.dismissTo(target)}/>;
 }
