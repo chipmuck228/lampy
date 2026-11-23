@@ -35,7 +35,7 @@ function errorCopy(error:unknown) {
   return tr('现在没有完成，请再试一次。');
 }
 
-export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn,onDeleted}:{onAuthenticated?:()=>void;onCancel:()=>void;onOtherSignIn?:()=>void;onDeleted?:()=>void}) {
+export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn,onDeleted,backLabel}:{onAuthenticated?:()=>void;onCancel:()=>void;onOtherSignIn?:()=>void;onDeleted?:()=>void;backLabel?:string}) {
   const open=emailCodeEntryOpen();const lock=useDeviceLock();
   const [status,setStatus]=useState<EmailCodeStatus>({signedIn:false,linked:false});
   const [mode,setMode]=useState<EmailCodeIntent|'summary'|'name'>('login');
@@ -137,7 +137,7 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn,
   }
   const blocked=!!lock?.snapshot.locked||!foreground;
 
-  return <SettingsPage title={tr('登录与找回')} backLabel={tr('返回')} accessibilityLabel={tr('登录与找回')} onBack={onCancel} pageTestID="email-code-page">
+  return <SettingsPage title={tr('登录与找回')} backLabel={backLabel??tr('本机设置')} accessibilityLabel={tr('登录与找回')} onBack={onCancel} pageTestID="email-code-page">
     {!open?<Text>{tr('邮箱登录暂未开放。')}</Text>:blocked?<Text>{tr('请先解锁，再继续。')}</Text>:<View style={styles.content}>
       <Text style={styles.title}>{tr(mode==='summary'?'你的邮箱':mode==='name'?'怎么称呼你？':mode==='login'?(entryMode==='register'?'注册 Lampy':'登录 Lampy'):mode==='delete'?'验证邮箱后删除账号':mode==='change'?'更换邮箱':mode==='reauth'?'验证当前邮箱':'关联邮箱')}</Text>
       {!ready?<>{message?<Text accessibilityLiveRegion="polite">{message}</Text>:<Text>{tr('正在连接…')}</Text>}{<Action label={tr('再试一次')} onPress={()=>setRetry(value=>value+1)} disabled={false} testID={'email-code-retry'}/>}{onOtherSignIn?<Action label={tr('其他登录方式')} onPress={onOtherSignIn}/>:null}{<Action label={tr('返回')} onPress={onCancel} disabled={false} testID={'email-code-back'}/>}</>:

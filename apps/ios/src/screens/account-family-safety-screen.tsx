@@ -1,14 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Linking, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getFamilyUseCases } from '../application/container';
 import type { ReportReceipt, UserBlock } from '../family-api/safety-types';
 import { appLanguage, tr } from '../i18n';
 import { SettingsPage } from './settings-chrome';
 import { Text, type } from './life-text';
-import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
+import { hairline, ink, inkSoft, sage } from './life-page';
 import { useFamilyPrivateRequest } from './use-family-private-request';
 import { reportReasonLabel, reportStatusLabel } from './family-safety-actions';
+import {PageAction} from './quiet-form';
 import { familySnapshotDate } from './family-history-copy';
 
 type Block = UserBlock & { nickname: string };
@@ -19,20 +20,19 @@ function reportTime(value: string) {
 export default function AccountFamilySafetyScreen() {
  const router=useRouter();const {allowed,enter,leave,begin}=useFamilyPrivateRequest();
  const [blocks,setBlocks]=useState<Block[]>([]),[reports,setReports]=useState<ReportReceipt[]>([]);
- const [selected,setSelected]=useState<string|null>(null),[pending,setPending]=useState(false);
+ const [pending,setPending]=useState(false);
  const [restricted,setRestricted]=useState(false),[hiddenShares,setHiddenShares]=useState<string[]>([]);
  const [message,setMessage]=useState(''),[loaded,setLoaded]=useState(false);
  const busy=useRef(false),current=useRef<()=>boolean>(()=>false);
  const load=useCallback(async()=>{
-  const check=begin();current.current=check;setBlocks([]);setReports([]);setSelected(null);setRestricted(false);setHiddenShares([]);setLoaded(false);setMessage('');
+  const check=begin();current.current=check;setBlocks([]);setReports([]);setRestricted(false);setHiddenShares([]);setLoaded(false);setMessage('');
   try{const app=await getFamilyUseCases();if(!check())return;const [b,r]=await Promise.all([app.safety.blocks(check),app.safety.reports(check)]);if(check()){setBlocks(b.blocks);setReports(r.reports);setRestricted(r.sharingRestricted===true);setHiddenShares(r.restrictedShares??[]);setLoaded(true);}}
   catch(e){if(check())setMessage(tr(e&&typeof e==='object'&&'code'in e&&e.code==='UNAUTHENTICATED'?'请先登录。':'这次没有完成，请稍后再试。'));}
  },[begin]);
- useFocusEffect(useCallback(()=>{enter();if(allowed)void load();return()=>{leave();setBlocks([]);setReports([]);setSelected(null);setRestricted(false);setHiddenShares([]);setLoaded(false);};},[allowed,enter,leave,load]));
- const target=blocks.find(b=>b.targetUserId===selected);
+ useFocusEffect(useCallback(()=>{enter();if(allowed)void load();return()=>{leave();setBlocks([]);setReports([]);setRestricted(false);setHiddenShares([]);setLoaded(false);};},[allowed,enter,leave,load]));
  function unblock(person:Block){
   const check=current.current;if(!check()||busy.current)return;
-  Alert.alert(tr('解除对{0}的屏蔽？',[person.nickname||tr('家人')]),tr('只解除这位家人的屏蔽。重新联网核验后，会恢复仍可阅读的内容；已撤回或被限制的内容不会恢复。'),[
+  Alert.alert(tr('解除对{0}的屏蔽？',[person.nickname||tr('家人')]),tr('解除后，可以重新查看这位家人仍在分享的记录。'),[
    {text:tr('取消'),style:'cancel'},
    {text:tr('解除屏蔽'),onPress:()=>{void(async()=>{
     if(!check()||busy.current)return;busy.current=true;setPending(true);
@@ -42,18 +42,22 @@ export default function AccountFamilySafetyScreen() {
    })();}},
   ]);
  }
- return <SettingsPage title={tr('家庭内容')} backLabel={tr('本机设置')} accessibilityLabel={tr('家庭内容')} onBack={()=>router.dismissTo('/account')}>
-  <Text style={styles.meta}>{tr('开发者每天查看举报。如需帮助或申诉，')}</Text>
-  <View style={styles.contact}><Text style={styles.meta}>{tr('请联系：')}<Text accessibilityRole="link" style={styles.action} onPress={()=>{void Linking.openURL('mailto:dev@yunpura.com').catch(()=>setMessage(tr('请发送邮件至 dev@yunpura.com。')));}}>dev@yunpura.com</Text></Text></View>
-  {allowed?<>
-   {restricted?<Text style={styles.body}>{tr('此账号暂时不能新增家庭分享。已有记录仍可阅读，如有疑问请联系 dev@yunpura.com。')}</Text>:null}
-   {hiddenShares.length?<Text style={styles.body}>{tr('有{0}条家庭分享因内容规则被限制。如有异议，请联系 dev@yunpura.com。',[hiddenShares.length])}</Text>:null}
-   <View style={styles.heading}><Text style={styles.title}>{tr('已屏蔽的家人')}</Text><View style={styles.count}><Text style={styles.meta} testID="blocked-family-count">{loaded?blocks.length:'—'}</Text></View></View>
-   <View style={styles.chips}>{blocks.map(b=><Pressable key={b.targetUserId} testID={`blocked-family-${b.targetUserId}`} accessibilityRole="button" accessibilityLabel={tr('选择家人：{0}',[b.nickname||tr('家人')])} accessibilityState={{selected:selected===b.targetUserId,disabled:pending}} disabled={pending} onPress={()=>{if(current.current()&&!busy.current)setSelected(selected===b.targetUserId?null:b.targetUserId);}} style={[styles.chip,selected===b.targetUserId&&styles.selected]}><Text style={styles.body}>{b.nickname||tr('家人')}</Text></Pressable>)}</View>
-   {blocks.length?<Text style={styles.meta}>{tr('选择一位家人，再解除屏蔽。每次只影响所选家人。')}</Text>:null}
-   {target?<Pressable accessibilityRole="button" accessibilityState={{disabled:pending}} disabled={pending} style={styles.hit} onPress={()=>unblock(target)}><Text style={styles.action}>{tr('解除所选家人的屏蔽')}</Text></Pressable>:null}
-   {loaded&&!blocks.length?<Text style={styles.meta}>{tr('没有屏蔽任何家人。')}</Text>:null}
-   <Text style={[styles.title,{marginTop:32}]}>{tr('我的举报')}</Text>
+ return <SettingsPage title={tr('屏蔽与举报')} backLabel={tr('本机设置')} accessibilityLabel={tr('屏蔽与举报')} onBack={()=>router.dismissTo('/account')}>
+  <View style={styles.content}>
+  <Text style={styles.lead}>{tr('让家里的分享，保持自在。')}</Text>
+  {!allowed?<Text style={styles.meta}>{tr('请先解锁，再继续。')}</Text>:<>
+   {restricted?<Text style={styles.notice}>{tr('家庭分享暂不可用，已有记录仍可阅读。如有疑问，可以联系我们。')}</Text>:null}
+   {hiddenShares.length?<Text style={styles.notice}>{tr('有{0}条分享暂不可见。如需了解原因，可以联系我们。',[hiddenShares.length])}</Text>:null}
+   <View style={styles.heading}><Text style={styles.title} accessibilityRole="header">{tr('已屏蔽的家人')}</Text><Text style={styles.meta} testID="blocked-family-count">{loaded?blocks.length:'—'}</Text></View>
+   <Text style={styles.meta}>{tr('屏蔽后，不再显示对方分享的家庭记录。')}</Text>
+   {!loaded&&!message?<Text style={styles.meta}>{tr('正在读取。')}</Text>:null}
+   {blocks.map(person=><View key={person.targetUserId} style={styles.member}>
+     <Text style={styles.memberName}>{person.nickname||tr('家人')}</Text>
+     <PageAction label={tr('解除屏蔽')} accessibilityLabel={tr('解除对{0}的屏蔽？',[person.nickname||tr('家人')])} testID={`blocked-family-${person.targetUserId}`} disabled={pending} onPress={()=>unblock(person)}/>
+   </View>)}
+   {loaded&&!blocks.length?<Text style={styles.empty}>{tr('没有屏蔽任何家人。')}</Text>:null}
+   <Text style={[styles.title,styles.section]} accessibilityRole="header">{tr('我的举报')}</Text>
+   <Text style={styles.meta}>{tr('在家庭记录中选择「举报」，可以在这里查看处理进展。')}</Text>
    {reports.map(r=><View key={r.reportId} style={styles.report}>
     <Text style={styles.body}>{r.summary?tr('{0}分享的记录',[r.summary.authorNickname||tr('家人')]):tr('家庭记录（目前不可用）')}</Text>
     {r.summary?<>
@@ -64,14 +68,24 @@ export default function AccountFamilySafetyScreen() {
     <Text style={styles.meta}>{tr('举报于{0}',[reportTime(r.createdAt)])}</Text>
    </View>)}
    {loaded&&!reports.length?<Text style={styles.meta}>{tr('没有提交过举报。')}</Text>:null}
-  </>:null}
-  {message?<><Text style={styles.meta}>{message}</Text>{allowed?<Pressable accessibilityRole="button" style={styles.hit} disabled={pending} onPress={()=>{if(!busy.current)void load();}}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable>:null}</>:null}
+  </>}
+  {message?<View style={styles.feedback}><Text accessibilityLiveRegion="polite" style={styles.meta}>{message}</Text>{allowed?<PageAction label={tr('再试一次')} disabled={pending} onPress={()=>{if(!busy.current)void load();}}/>:null}</View>:null}
+  <View style={styles.support}>
+    <Text style={styles.title} accessibilityRole="header">{tr('需要帮助？')}</Text>
+    <Text style={styles.meta}>{tr('对处理结果有疑问，或需要其他帮助，欢迎联系我们。')}</Text>
+    <PageAction label={tr('联系 Lampy')} onPress={()=>{void Linking.openURL('mailto:dev@yunpura.com').catch(()=>setMessage(tr('请发送邮件至 dev@yunpura.com。')));}}/>
+    <Text style={styles.meta}>dev@yunpura.com</Text>
+  </View>
+  </View>
  </SettingsPage>;
 }
 const styles=StyleSheet.create({
+ content:{paddingTop:28,paddingBottom:28,gap:12},lead:{...type.body,color:ink,marginBottom:12},
  body:{...type.body,color:ink},meta:{...type.meta,color:inkSoft},action:{...type.action,color:sage},title:{...type.action,color:ink},
- contact:{minHeight:48,justifyContent:'center'},heading:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12,marginTop:16},
- count:{minWidth:32,minHeight:28,borderRadius:16,paddingHorizontal:10,alignItems:'center',justifyContent:'center',backgroundColor:paperDeep},
- chips:{flexDirection:'row',flexWrap:'wrap',gap:10,marginVertical:14},chip:{minHeight:48,maxWidth:'100%',paddingVertical:7,paddingHorizontal:16,borderRadius:24,borderWidth:1,borderColor:hairline,backgroundColor:paperDeep,justifyContent:'center'},selected:{borderColor:sage,borderWidth:2},
- hit:{minHeight:48,justifyContent:'center'},report:{paddingVertical:16,gap:6,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline},
+ notice:{...type.body,color:inkSoft,borderLeftWidth:2,borderLeftColor:sage,paddingLeft:14,marginBottom:12},
+ heading:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12},
+ member:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',columnGap:16,paddingVertical:8,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline},
+ memberName:{...type.body,color:ink,flexShrink:1},empty:{...type.meta,color:inkSoft,paddingVertical:16},section:{marginTop:24},
+ report:{paddingVertical:16,gap:6,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline},
+ support:{marginTop:28,paddingTop:24,gap:8,borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:hairline},feedback:{gap:8},
 });

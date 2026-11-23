@@ -69,3 +69,10 @@ open ios/Lampy.xcworkspace
 - Email-only deletion likewise uses the current verified mailbox without retyping. Server-side recipient resolution, session/purpose binding, Apple-linked deletion guards, delivery/attempt limits and cleanup remain authoritative. Old clients supplying the matching address remain supported; mismatched recipients are rejected.
 - Backend and app must both be updated for these flows; deploy the API before the app. No schema, dependencies or SMTP configuration changes are needed. The deployed PR141 API does not yet support omitting the current address.
 - Device acceptance: no Apple-link action after email login; old linked Apple sign-in still returns to the same account; change-email flow has no current-address input; new email verified once; another device's old session expires; pure-email deletion sends to the current address, returns to settings and clears countdowns; limit failures do not imply delivery. Apple-linked deletion still uses fresh Apple authentication and supports cancellation.
+
+
+## Settings navigation and safety-page follow-up
+
+Audited every settings destination: Login and recovery, Records and storage, My life albums, Blocking and reports, Subscribe and payments (when enabled), Help, About Lampy, Terms and Privacy. Titles match menu labels. Device protection remains an inline control. Existing storage/help/about/legal/subscription headers already matched and retain their existing settings return labels; the album title already uses My life albums.
+
+The account entry now consistently reads Login and recovery, with the nickname as secondary text. The email screen's visible back label is Local settings when opened there; family-invitation login retains Back to match its actual navigation. Blocking and reports now uses the same title as its menu, with separate blocked-member rows, direct per-person unblock actions with confirmation, report progress and a support action. Remove developer/process explanations and chip-selection instructions. Keep privacy gating and coarse report metadata; do not reveal report IDs, record bodies or media. No server/dependency/schema changes.

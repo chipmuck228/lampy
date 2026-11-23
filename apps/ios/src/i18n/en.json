@@ -1240,5 +1240,14 @@
   "在生活册的导出页面，可以查看价格、购买或恢复已有购买。": "Open an album’s export page to see the price, purchase or restore a previous purchase.",
   "验证码将发送到当前登录邮箱。": "We will send a code to your current sign-in email.",
   "当前邮箱：{0}": "Current email: {{0}}",
-  "当前邮箱信息已变化，请重新确认账号。": "Your email details have changed. Please confirm your account again."
+  "当前邮箱信息已变化，请重新确认账号。": "Your email details have changed. Please confirm your account again.",
+  "解除后，可以重新查看这位家人仍在分享的记录。": "You can see the records this family member is still sharing again.",
+  "让家里的分享，保持自在。": "Feel at ease with what your family shares.",
+  "家庭分享暂不可用，已有记录仍可阅读。如有疑问，可以联系我们。": "Sharing is currently unavailable. You can still read existing records. Contact us if you have questions.",
+  "有{0}条分享暂不可见。如需了解原因，可以联系我们。": "{{0}} shared records are currently hidden. Contact us to learn more.",
+  "屏蔽后，不再显示对方分享的家庭记录。": "Blocking hides the family records this person shares.",
+  "在家庭记录中选择「举报」，可以在这里查看处理进展。": "Choose Report on a family record, then check its progress here.",
+  "需要帮助？": "Need help?",
+  "对处理结果有疑问，或需要其他帮助，欢迎联系我们。": "Contact us about a report outcome or anything else you need help with.",
+  "联系 Lampy": "Contact Lampy"
 }
