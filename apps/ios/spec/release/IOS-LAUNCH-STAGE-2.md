@@ -60,3 +60,12 @@ open ios/Lampy.xcworkspace
 ```
 
 `21` is only a local example; choose a higher unused build number if archiving/uploading later. This command preserves the internal profile's closed purchase/export scope. To review the full production candidate and its purchase explanation, use stage 1's `--appstore-launch` instructions with the configured real product ID; a test-backend preview is not production or Sandbox purchase validation. There is no upload in this preparation command.
+
+
+## Device-feedback follow-up: simpler account controls
+
+- Remove proactive Apple linking from signed-in profile screens. Keep Apple sign-in and existing backend identities, including Apple reauthentication for deletion. This does not enable iCloud backup or split existing accounts.
+- Keep one “Change email” entry. If fresh authentication is required, send a code to the session's current verified mailbox; display only its masked address. Then ask for the new address and verify it. A recent login can satisfy the existing five-minute authentication requirement.
+- Email-only deletion likewise uses the current verified mailbox without retyping. Server-side recipient resolution, session/purpose binding, Apple-linked deletion guards, delivery/attempt limits and cleanup remain authoritative. Old clients supplying the matching address remain supported; mismatched recipients are rejected.
+- Backend and app must both be updated for these flows; deploy the API before the app. No schema, dependencies or SMTP configuration changes are needed. The deployed PR141 API does not yet support omitting the current address.
+- Device acceptance: no Apple-link action after email login; old linked Apple sign-in still returns to the same account; change-email flow has no current-address input; new email verified once; another device's old session expires; pure-email deletion sends to the current address, returns to settings and clears countdowns; limit failures do not imply delivery. Apple-linked deletion still uses fresh Apple authentication and supports cancellation.

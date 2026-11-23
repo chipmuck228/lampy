@@ -50,11 +50,19 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
       });
     },
     async request(input:EmailCodeRequest,token?:string,peer='unknown') {
-      const options=open();const address=email(input.email);
+      const options=open();
       if(!intents.includes(input.intent))throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Invalid verification purpose.');
       const id=randomBytes(32).toString('hex'),code=randomInt(1_000_000).toString().padStart(6,'0');
-      const now=deps.clock.now();const scope=mac(JSON.stringify(['scope',address,input.intent]));
+      const now=deps.clock.now();
       const admitted=await deps.repository.withTransaction(async tx=>{
+        // Resolve current-identity recipients from the authenticated account, never a client address.
+        const currentAddress=input.intent==='reauth'||input.intent==='delete';
+        const owner=currentAddress?await deps.requireUser(tx,token):null;
+        const own=owner?(await tx.listLoginIdentities(owner)).find(i=>i.provider==='email-otp'&&i.namespace===EMAIL_CODE_NAMESPACE):undefined;
+        if(currentAddress&&!own)throw new FamilyError('EMAIL_NOT_LINKED','No verified email is linked to this account.');
+        const address=currentAddress?own!.subject:email(input.email??'');
+        if(currentAddress&&input.email&&email(input.email)!==address)throw new FamilyError('EMAIL_NOT_LINKED','Email does not match this account.');
+        const scope=mac(JSON.stringify(['scope',address,input.intent]));
         const userId=await bound(tx,token,input.intent,address);
         await tx.pruneEmailCodeChallenges(now.toISOString());
         const nextUtcMidnight=Date.parse(now.toISOString().slice(0,10)+'T00:00:00.000Z')+86400_000;
@@ -75,7 +83,7 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
         await tx.saveEmailCodeChallenge(row);return {row};
       });
       if(admitted.error)throw admitted.error;
-      const row=admitted.row!;let timer:ReturnType<typeof setTimeout>|undefined;
+      const row=admitted.row!;const address=row.email,scope=row.scope;let timer:ReturnType<typeof setTimeout>|undefined;
       try {
         await Promise.race([options.sender.send({to:address,code,intent:input.intent,language:input.language==='en'?'en':'zh'}),
           new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('delivery timeout')),20_000);})]);
@@ -92,20 +100,22 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
       return {challengeId:id,expiresAt:row.expiresAt,resendAfterSeconds:60};
     },
     async verify(input:EmailCodeVerification,token?:string,peer='unknown'):Promise<EmailCodeResult> {
-      open();const address=email(input.email);
+      open();const currentAddress=input.intent==='reauth'||input.intent==='delete';
+      const suppliedAddress=input.email?email(input.email):currentAddress?undefined:email('');
       if(!/^[a-f0-9]{64}$/.test(input.challengeId)||!/^\d{6}$/.test(input.code)||!intents.includes(input.intent))throw invalid();
       await incrementLoginRateLimit(deps.repository,`email-code:verify:${mac(peer)}`,deps.clock.now(),{windowMs:15*60_000,max:50});
       // Commit wrong-attempt counters and successful claims before account work; rollback must never resurrect a code.
       const claim=await deps.repository.withTransaction(async tx=>{
         const row=await tx.findEmailCodeChallenge(input.challengeId);
-        if(!row||row.status!=='active'||row.email!==address||row.intent!==input.intent||Date.parse(row.expiresAt)<=deps.clock.now().getTime()||row.attempts>=5)return null;
+        if(!row||row.status!=='active'||(suppliedAddress!==undefined&&row.email!==suppliedAddress)||row.intent!==input.intent||Date.parse(row.expiresAt)<=deps.clock.now().getTime()||row.attempts>=5)return null;
         if(row.userId&&(row.sessionDigest!==mac(`session:${token}`)||await deps.requireUser(tx,token)!==row.userId))return null;
         if(!/^[a-f0-9]{64}$/.test(row.digest))return null;
-        const matches=timingSafeEqual(Buffer.from(row.digest,'hex'),Buffer.from(mac(JSON.stringify(['code',row.id,address,row.intent,input.code])),'hex'));
+        const matches=timingSafeEqual(Buffer.from(row.digest,'hex'),Buffer.from(mac(JSON.stringify(['code',row.id,row.email,row.intent,input.code])),'hex'));
         if(!matches){await tx.saveEmailCodeChallenge({...row,attempts:row.attempts+1});return null;}
         await tx.deleteEmailCodeChallenge(row.id);return row;
       });
       if(!claim)throw invalid();
+      const address=claim.email;
       if(input.intent==='delete'&&input.confirmation!==DELETE_ACCOUNT_CONFIRMATION)throw new FamilyError(FAMILY_ERROR.BAD_REQUEST,'Explicit account deletion confirmation is required.');
       const result=await deps.repository.withTransaction(async tx=>{
         if(Date.parse(claim.expiresAt)<=deps.clock.now().getTime())throw invalid();

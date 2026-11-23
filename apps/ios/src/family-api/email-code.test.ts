@@ -27,6 +27,24 @@ for(const sqlite of [false,true])describe(sqlite?'SQLite email codes':'memory em
   function verify(ticket:EmailCodeTicket,address='person@example.com',intent:EmailCodeIntent='login',token?:string,code=deliveries.at(-1)!.code){return c.emailCode.verify({challengeId:ticket.challengeId,email:address,intent,code},token,'192.0.2.1');}
   async function login(address='person@example.com') {const result=await verify(await request(address),address);if(!('sessionToken'in result))throw new Error('No session');return result;}
 
+  it('resolves current email from session and binds verification to its owner',async()=>{
+    const a=await login();advance();const b=await login('other@example.com');advance();
+    await expect(c.emailCode.request({intent:'reauth',email:'other@example.com'},a.sessionToken)).rejects.toMatchObject({code:'EMAIL_NOT_LINKED'});
+    const ticket=await c.emailCode.request({intent:'reauth'},a.sessionToken);
+    expect(deliveries.at(-1)!.to).toBe('person@example.com');
+    const proof={challengeId:ticket.challengeId,intent:'reauth' as const,code:deliveries.at(-1)!.code};
+    await expect(c.emailCode.verify(proof,b.sessionToken)).rejects.toMatchObject({code:'EMAIL_CODE_INVALID'});
+    await expect(c.emailCode.verify(proof,a.sessionToken)).resolves.toMatchObject({reauthenticated:true,userId:a.userId});
+    advance();const deletion=await c.emailCode.request({intent:'delete'},a.sessionToken);
+    expect(deliveries.at(-1)!.to).toBe('person@example.com');
+    await expect(c.emailCode.verify({challengeId:deletion.challengeId,intent:'delete',code:deliveries.at(-1)!.code,confirmation:DELETE_ACCOUNT_CONFIRMATION},a.sessionToken)).resolves.toMatchObject({deleted:true});
+  });
+  it('requires a session for current-email actions and an address for login or change',async()=>{
+    await expect(c.emailCode.request({intent:'reauth'})).rejects.toMatchObject({code:'UNAUTHENTICATED'});
+    await expect(c.emailCode.request({intent:'delete'})).rejects.toMatchObject({code:'UNAUTHENTICATED'});
+    await expect(c.emailCode.request({intent:'login'})).rejects.toMatchObject({code:'BAD_REQUEST'});
+    const a=await login();await expect(c.emailCode.request({intent:'change'},a.sessionToken)).rejects.toMatchObject({code:'BAD_REQUEST'});
+  });
   it('creates one stable identity and authenticates it without a password; public sessions can access profile/family',async()=>{
     expect(c.health().emailCodeLogin).toBe(true);
     const first=await login('Person@Example.com');expect(first.needsProfile).toBe(true);

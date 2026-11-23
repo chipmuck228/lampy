@@ -21,20 +21,6 @@ jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
 jest.mock('./life-icons',()=>({LifeIcon:()=>null}));
 
-it('explains that an old session must sign in again before binding Apple',async()=>{
- mockHealth.mockResolvedValue({controlledEmailAccounts:true,appleLogin:true});
- mockAppleAvailable.mockResolvedValue(true);mockAppleStatus.mockResolvedValue({linked:false});
- mockAuthenticateApple.mockRejectedValueOnce(new ApplicationError('REAUTHENTICATION_REQUIRED','recent authentication required'));
- const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
- const page=await render(<FamilyEmailAccountScreen profileMode/>);
- try {
-  await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeEnabled());
-  await fireEvent.press(page.getByTestId('apple-auth-button'));
-  await act(async()=>alert.mock.calls[0][2]![1].onPress!());
-  await waitFor(()=>expect(page.getByText('为了保护账号，请重新登录后再关联登录方式。')).toBeTruthy());
- } finally {alert.mockRestore();await page.unmount();}
-});
-
 beforeEach(()=>{jest.clearAllMocks();jest.spyOn(AppState,'addEventListener').mockImplementation(()=>({remove:jest.fn()}));mockFormal=false;mockInternal=false;mockDiagnostics=true;mockOpen=true;mockLock.snapshot.locked=false;Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});mockHealth.mockResolvedValue({controlledEmailAccounts:true,emailRegistration:true});mockRegister.mockResolvedValue({userId:'a'});mockLogin.mockResolvedValue({userId:'a'});mockRead.mockResolvedValue({userId:'a',nickname:'原昵称',avatar:'system',updatedAt:'now'});mockUpdate.mockImplementation(async(nickname:string)=>({userId:'a',nickname,avatar:'system',updatedAt:'now'}));});
 it('closed and locked routes never read service or show identity controls',async()=>{
  mockOpen=false;const page=await render(<FamilyEmailAccountScreen/>);expect(mockHealth).not.toHaveBeenCalled();expect(page.queryByTestId('email-account-email')).toBeNull();await page.unmount();mockOpen=true;mockLock.snapshot.locked=true;await render(<FamilyEmailAccountScreen/>);expect(mockHealth).not.toHaveBeenCalled();
@@ -119,12 +105,15 @@ it('Apple capability is server-gated and a successful login uses invitation retu
  const done=jest.fn();const page=await render(<FamilyEmailAccountScreen onAuthenticated={done}/>);await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeTruthy());
  await fireEvent.press(page.getByTestId('apple-auth-button'));expect(mockAppleToken).toHaveBeenCalledWith('server-nonce');expect(done).toHaveBeenCalledTimes(1);expect(mockRegister).not.toHaveBeenCalled();
 });
-it('profile linking requires confirmation and remains in settings',async()=>{
- mockHealth.mockResolvedValue({controlledEmailAccounts:true,appleLogin:true});mockAppleAvailable.mockResolvedValue(true);mockAppleStatus.mockResolvedValue({linked:false});
- mockAuthenticateApple.mockResolvedValue({linked:true,userId:'a'});const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
- const page=await render(<FamilyEmailAccountScreen profileMode embedded/>);await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeTruthy());
- await fireEvent.press(page.getByTestId('apple-auth-button'));expect(mockAuthenticateApple).not.toHaveBeenCalled();await act(async()=>alert.mock.calls[0][2]![1].onPress!());
- expect(mockAuthenticateApple.mock.calls[0][0]).toBe('link');expect(page.getByText('Apple账号已关联。')).toBeTruthy();expect(page.queryByTestId('apple-auth-button')).toBeNull();expect(mockDismiss).not.toHaveBeenCalled();alert.mockRestore();
+it('does not offer Apple linking for an existing account',async()=>{
+ mockHealth.mockResolvedValue({controlledEmailAccounts:true,appleLogin:true});mockAppleAvailable.mockResolvedValue(true);
+ for(const linked of [false,true]){
+  mockAppleStatus.mockResolvedValue({linked});
+  const page=await render(<FamilyEmailAccountScreen profileMode embedded/>);
+  await waitFor(()=>expect(page.getByTestId('email-account-nickname')).toBeTruthy());
+  expect(page.queryByTestId('apple-auth-button')).toBeNull();expect(page.queryByText('关联Apple账号')).toBeNull();
+  expect(mockAuthenticateApple).not.toHaveBeenCalled();await page.unmount();
+ }
 });
 it('late service acquisition cannot authorize Apple after leaving the screen',async()=>{
  mockHealth.mockResolvedValue({controlledEmailAccounts:true,appleLogin:true});mockAppleAvailable.mockResolvedValue(true);
@@ -171,25 +160,24 @@ it('Apple foreground timeout drops the old token and re-enables login without le
  } finally {await page.unmount();jest.useRealTimers();subscription.mockRestore();}
 });
 
-it('Apple timeout while protected stays concealed, then unlock permits explicit linking retry',async()=>{
+it('Apple timeout while protected stays concealed, then unlock permits explicit sign-in retry',async()=>{
  mockHealth.mockResolvedValue({controlledEmailAccounts:true,appleLogin:true});mockAppleAvailable.mockResolvedValue(true);mockAppleStatus.mockResolvedValue({linked:false});
  let resolveToken!:(v:string)=>void;mockAppleToken.mockImplementation(()=>new Promise<string>(r=>{resolveToken=r;}));
  const complete=jest.fn();mockAuthenticateApple.mockImplementation(async(_intent,authorize)=>{complete(await authorize('nonce'));});
  const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
  const subscription=jest.spyOn(AppState,'addEventListener').mockImplementation(()=>({remove:jest.fn()}));
- const page=await render(<FamilyEmailAccountScreen profileMode embedded/>);await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeTruthy());jest.useFakeTimers();
+ const page=await render(<FamilyEmailAccountScreen/>);await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeTruthy());jest.useFakeTimers();
  try {
-  await fireEvent.press(page.getByTestId('apple-auth-button'));await act(async()=>alert.mock.calls[0][2]![1].onPress!());
-  mockLock.snapshot.locked=true;await page.rerender(<FamilyEmailAccountScreen profileMode embedded/>);
+  await fireEvent.press(page.getByTestId('apple-auth-button'));
+  mockLock.snapshot.locked=true;await page.rerender(<FamilyEmailAccountScreen/>);
   await act(async()=>resolveToken('expired-native-token'));
   await act(async()=>{await jest.advanceTimersByTimeAsync(30_000);});
   expect(page.queryByTestId('apple-auth-button')).toBeNull();expect(page.queryByTestId('email-account-nickname')).toBeNull();expect(complete).not.toHaveBeenCalled();
-  mockLock.snapshot.locked=false;await page.rerender(<FamilyEmailAccountScreen profileMode embedded/>);
+  mockLock.snapshot.locked=false;await page.rerender(<FamilyEmailAccountScreen/>);
   await waitFor(()=>expect(page.getByTestId('apple-auth-button')).toBeEnabled());
-  expect(page.getByText('Apple授权等待已结束，请重新试一次。')).toBeTruthy();expect(page.getByTestId('email-account-nickname').props.editable).toBe(true);
-  mockAppleToken.mockResolvedValue('fresh-native-token');await fireEvent.press(page.getByTestId('apple-auth-button'));expect(complete).not.toHaveBeenCalled();
-  await act(async()=>alert.mock.calls[1][2]![1].onPress!());
-  expect(complete).toHaveBeenCalledWith('fresh-native-token');expect(page.getByText('Apple账号已关联。')).toBeTruthy();expect(mockDismiss).not.toHaveBeenCalled();
+  expect(page.getByText('Apple授权等待已结束，请重新试一次。')).toBeTruthy();expect(page.queryByText('关联Apple账号')).toBeNull();
+  mockAppleToken.mockResolvedValue('fresh-native-token');await fireEvent.press(page.getByTestId('apple-auth-button'));
+  expect(complete).toHaveBeenCalledWith('fresh-native-token');expect(mockDismiss).toHaveBeenCalledWith('/family');
  } finally {await page.unmount();mockLock.snapshot.locked=false;jest.useRealTimers();alert.mockRestore();subscription.mockRestore();}
 });
 

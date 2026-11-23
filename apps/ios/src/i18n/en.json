@@ -1237,5 +1237,8 @@
   "查看家庭册导出": "Family album exports",
   "用邮箱登录，管理你的账号": "Sign in with email and manage your account",
   "正在连接…": "Connecting…",
-  "在生活册的导出页面，可以查看价格、购买或恢复已有购买。": "Open an album’s export page to see the price, purchase or restore a previous purchase."
+  "在生活册的导出页面，可以查看价格、购买或恢复已有购买。": "Open an album’s export page to see the price, purchase or restore a previous purchase.",
+  "验证码将发送到当前登录邮箱。": "We will send a code to your current sign-in email.",
+  "当前邮箱：{0}": "Current email: {{0}}",
+  "当前邮箱信息已变化，请重新确认账号。": "Your email details have changed. Please confirm your account again."
 }

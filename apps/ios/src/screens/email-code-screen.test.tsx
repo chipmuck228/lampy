@@ -23,7 +23,7 @@ beforeEach(()=>{
   mockService.finishEmailProfile.mockResolvedValue({userId:'a',nickname:'小禾'});
 });
 async function form(){const page=await render(<EmailCodeScreen onCancel={jest.fn()} onAuthenticated={jest.fn()}/>);await waitFor(()=>expect(page.getByTestId('email-code-address')).toBeTruthy());return page;}
-async function send(page:Awaited<ReturnType<typeof form>>){await fireEvent.changeText(page.getByTestId('email-code-address'),' Person@Example.com ');await fireEvent.press(page.getByTestId('email-code-send'));}
+async function send(page:Awaited<ReturnType<typeof form>>){if(page.queryByTestId('email-code-address'))await fireEvent.changeText(page.getByTestId('email-code-address'),' Person@Example.com ');await fireEvent.press(page.getByTestId('email-code-send'));}
 
 it('hides controls when closed, the service is unconfigured or the device is locked',async()=>{
  mockOpen=false;const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);expect(mockService.getEmailCodeAvailability).not.toHaveBeenCalled();expect(page.queryByTestId('email-code-address')).toBeNull();await page.unmount();
@@ -67,7 +67,7 @@ it('binds an email to the displayed signed-in account instead of opening a secon
  const page=await form();await send(page);expect(mockService.requestEmailCode).toHaveBeenCalledWith(expect.objectContaining({intent:'link'}),expect.any(Function),'a');
 });
 it('changes an existing email through a distinct purpose and requires explicit deletion confirmation',async()=>{
- mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com'});
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com',reauthenticationExpiresAt:new Date(Date.now()+300000).toISOString()});
  const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);await waitFor(()=>expect(page.getByTestId('email-code-change')).toBeTruthy());
  await fireEvent.press(page.getByTestId('email-code-change'));await send(page);
  expect(mockService.requestEmailCode).toHaveBeenLastCalledWith(expect.objectContaining({intent:'change'}),expect.any(Function),'a');await page.unmount();
@@ -95,8 +95,10 @@ it('shows a verified email and does not request identity confirmation again duri
 it('moves from successful identity confirmation to a fresh new-email form without reusing the old challenge',async()=>{
  mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com'});
  mockService.verifyEmailCode.mockResolvedValue({reauthenticated:true,userId:'a'});
- const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);await waitFor(()=>expect(page.getByTestId('email-code-reauth')).toBeTruthy());
- await fireEvent.press(page.getByTestId('email-code-reauth'));await send(page);
+ const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);await waitFor(()=>expect(page.getByTestId('email-code-change')).toBeTruthy());
+ await fireEvent.press(page.getByTestId('email-code-change'));
+ expect(page.queryByTestId('email-code-address')).toBeNull();expect(page.getByText('当前邮箱：p***@example.com')).toBeTruthy();await send(page);
+ expect(mockService.requestEmailCode).toHaveBeenLastCalledWith({intent:'reauth',language:'zh'},expect.any(Function),'a');
  await fireEvent.changeText(page.getByTestId('email-code-value'),'123456');
  mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'p***@example.com',reauthenticationExpiresAt:new Date(Date.now()+300000).toISOString()});
  await fireEvent.press(page.getByTestId('email-code-verify'));
