@@ -108,6 +108,33 @@ for(const sqlite of [false,true])describe(sqlite?'SQLite email codes':'memory em
     await expect(verify(t,undefined,'link',apple.sessionToken)).resolves.toEqual({linked:true,userId:apple.userId});
     advance();const email=await login();expect(email.userId).toBe(apple.userId);expect((await c.listFamilies(email.sessionToken)).families).toHaveLength(1);
   });
+  it('revokes the linked Apple authorization when deleting from an email-authenticated session',async()=>{
+    const start=await c.beginAppleAuth('login');
+    const apple=createFamilyCommands({repository,clock:{now:()=>now},apple:createMapAppleVerifier({a:{appleSubject:'apple',nonce:start.nonce}}),appleLoginEnabled:true});
+    const first=await apple.completeAppleAuth({challengeId:start.challengeId,identityToken:'a'});if(!('sessionToken'in first))throw Error('No session');
+    await verify(await request(undefined,'link',first.sessionToken),undefined,'link',first.sessionToken);advance();
+    const email=await login();expect(email.userId).toBe(first.userId);
+    const deletion=await c.beginAppleAuth('delete',email.sessionToken);const revoke=jest.fn(async()=>{});
+    const service=createFamilyCommands({repository,clock:{now:()=>now},apple:createMapAppleVerifier({fresh:{appleSubject:'apple',nonce:deletion.nonce}}),appleLoginEnabled:true,appleRevoker:{revoke}});
+    expect(await service.deleteAccount(email.sessionToken,{challengeId:deletion.challengeId,identityToken:'fresh',authorizationCode:'one-time-code',confirmation:DELETE_ACCOUNT_CONFIRMATION})).toMatchObject({deleted:true,appleRevocation:'revoked'});
+    expect(revoke).toHaveBeenCalledWith('one-time-code','apple',deletion.nonce);
+    await expect(c.getMyProfile(first.sessionToken)).rejects.toMatchObject({code:'UNAUTHENTICATED'});
+    await expect(c.getMyProfile(email.sessionToken)).rejects.toMatchObject({code:'UNAUTHENTICATED'});
+  });
+  it('requires Apple deletion authorization for an Apple-linked email account before sending mail',async()=>{
+    const a=await login();
+    await repository.withTransaction(tx=>tx.attachLoginIdentity({provider:'apple',subject:'linked-apple',namespace:'legacy',userId:a.userId,createdAt:now.toISOString(),verifiedAt:now.toISOString()}));
+    expect(await c.emailCode.status(a.sessionToken)).toMatchObject({appleLinked:true});
+    const count=deliveries.length;advance();
+    await expect(request(undefined,'delete',a.sessionToken)).rejects.toMatchObject({code:'APPLE_DELETION_AUTH_REQUIRED'});
+    expect(deliveries).toHaveLength(count);expect(await c.getMyProfile(a.sessionToken)).toHaveProperty('userId',a.userId);
+  });
+  it('does not purge an account linked to Apple after an email deletion code was sent',async()=>{
+    const a=await login();advance();const ticket=await request(undefined,'delete',a.sessionToken);
+    await repository.withTransaction(tx=>tx.attachLoginIdentity({provider:'apple',subject:'late-apple',namespace:'legacy',userId:a.userId,createdAt:now.toISOString(),verifiedAt:now.toISOString()}));
+    await expect(c.emailCode.verify({challengeId:ticket.challengeId,email:'person@example.com',intent:'delete',code:deliveries.at(-1)!.code,confirmation:DELETE_ACCOUNT_CONFIRMATION},a.sessionToken,'192.0.2.1')).rejects.toMatchObject({code:'APPLE_DELETION_AUTH_REQUIRED'});
+    expect(await c.getMyProfile(a.sessionToken)).toHaveProperty('userId',a.userId);
+  });
   it('reauthenticates before changing an email, keeps the same user and invalidates other sessions',async()=>{
     const user=await login();advance(300_001);
     await expect(request('new@example.com','change',user.sessionToken)).rejects.toMatchObject({code:'REAUTHENTICATION_REQUIRED'});

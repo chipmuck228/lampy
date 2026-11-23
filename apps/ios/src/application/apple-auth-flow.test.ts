@@ -47,3 +47,15 @@ it('canceled or stale deletion authorization never reaches the deletion endpoint
  await expect(h.family.deleteAccount(async()=>{throw Error('cancel');},()=>true)).rejects.toThrow('cancel');
  expect(h.client.deleteAccount).not.toHaveBeenCalled();expect(await h.session.getSessionToken()).toBe('old');
 });
+
+it('deletion rejects a different displayed owner before opening an Apple challenge',async()=>{
+ const h=setup();await h.session.setSession({userId:'b',sessionToken:'b'});const authorize=jest.fn();
+ await expect(h.family.deleteAccount(authorize,()=>true,'a')).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ expect(h.begin).not.toHaveBeenCalled();expect(authorize).not.toHaveBeenCalled();expect(await h.session.getSessionToken()).toBe('b');
+});
+it('a late deletion response never clears a newer signed-in identity',async()=>{
+ const h=setup();await h.session.setSession({userId:'a',sessionToken:'old'});
+ h.client.deleteAccount=jest.fn(async()=>{await h.session.setSession({userId:'b',sessionToken:'b'});return {deleted:true as const,appleRevocation:'revoked' as const,mediaCleanup:'completed' as const};});
+ await expect(h.family.deleteAccount(async()=>({identityToken:'fresh',authorizationCode:'code'}),()=>true,'a')).rejects.toMatchObject({code:'STALE_FAMILY_REQUEST'});
+ expect(await h.session.getSessionToken()).toBe('b');
+});

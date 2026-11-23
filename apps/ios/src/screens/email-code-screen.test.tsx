@@ -4,7 +4,9 @@ import EmailCodeScreen from './email-code-screen';
 import {ApplicationError} from '../application/errors';
 
 let mockOpen=true;const mockLock={snapshot:{locked:false}};
-const mockService={getEmailCodeAvailability:jest.fn(),getEmailCodeAccount:jest.fn(),requestEmailCode:jest.fn(),verifyEmailCode:jest.fn(),finishEmailProfile:jest.fn(),signOutEmailAccount:jest.fn()};
+const mockApple={isAvailable:jest.fn(),requestAuthorization:jest.fn()};
+jest.mock('../infrastructure/expo-apple-auth',()=>({createExpoAppleIdentityTokenSource:()=>mockApple}));
+const mockService={deleteAccount:jest.fn(),getEmailCodeAvailability:jest.fn(),getEmailCodeAccount:jest.fn(),requestEmailCode:jest.fn(),verifyEmailCode:jest.fn(),finishEmailProfile:jest.fn(),signOutEmailAccount:jest.fn()};
 jest.mock('../application/container',()=>({getAccountUseCases:async()=>mockService}));
 jest.mock('../infrastructure/account-config',()=>({emailCodeEntryOpen:()=>mockOpen}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
@@ -12,7 +14,7 @@ jest.mock('expo-router',()=>({useFocusEffect:(callback:()=>unknown)=>{const Reac
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
 let changed:(state:AppStateStatus)=>void;
 beforeEach(()=>{
-  jest.clearAllMocks();mockOpen=true;mockLock.snapshot.locked=false;
+  jest.clearAllMocks();mockApple.isAvailable.mockResolvedValue(true);mockApple.requestAuthorization.mockResolvedValue({identityToken:'apple',authorizationCode:'code'});mockOpen=true;mockLock.snapshot.locked=false;
   Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});
   jest.spyOn(AppState,'addEventListener').mockImplementation((event,listener)=>{if(event==='change')changed=listener;return {remove:jest.fn()};});
   mockService.getEmailCodeAvailability.mockResolvedValue(true);mockService.getEmailCodeAccount.mockResolvedValue({signedIn:false,linked:false});
@@ -176,4 +178,40 @@ it('explains sign-in versus sign-up while keeping one email-code flow and preser
  expect(mockService.requestEmailCode).toHaveBeenCalledTimes(1);
  await fireEvent.changeText(page.getByTestId('email-code-value'),'123456');await fireEvent.press(page.getByTestId('email-code-verify'));
  expect(mockService.verifyEmailCode).toHaveBeenCalledWith(expect.objectContaining({intent:'login'}),expect.any(Function));
+});
+
+async function linkedDeletion() {
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,appleLinked:true,userId:'a',nickname:'小禾'});
+ const done=jest.fn();const page=await render(<EmailCodeScreen onCancel={jest.fn()} onDeleted={done}/>);
+ await waitFor(()=>expect(page.getByTestId('email-code-delete')).toBeTruthy());
+ const alert=jest.spyOn(Alert,'alert');await fireEvent.press(page.getByTestId('email-code-delete'));
+ const buttons=alert.mock.calls.at(-1)![2]!;await act(async()=>buttons[1].onPress?.());
+ return {page,done};
+}
+it('uses fresh Apple authorization for a linked account, without requesting a deletion email',async()=>{
+ mockService.deleteAccount.mockImplementation(async(authorize,current,owner)=>{expect(owner).toBe('a');expect(current()).toBe(true);expect(await authorize('nonce')).toEqual({identityToken:'apple',authorizationCode:'code'});return {deleted:true,appleRevocation:'revoked',mediaCleanup:'completed'};});
+ const {done}=await linkedDeletion();await waitFor(()=>expect(done).toHaveBeenCalledTimes(1));
+ expect(mockApple.requestAuthorization).toHaveBeenCalledWith('nonce');expect(mockService.requestEmailCode).not.toHaveBeenCalled();
+});
+it('retains the account when Apple authorization is cancelled',async()=>{
+ mockApple.requestAuthorization.mockRejectedValue(new ApplicationError('APPLE_SIGN_IN_CANCELLED','cancel'));
+ mockService.deleteAccount.mockImplementation(async authorize=>{await authorize('nonce');throw Error('must not delete');});
+ const {page,done}=await linkedDeletion();await waitFor(()=>expect(page.getByText('已取消验证，账号仍保留。')).toBeTruthy());expect(done).not.toHaveBeenCalled();expect(page.getByTestId('email-code-nickname')).toBeTruthy();
+});
+it('rejects a native credential returned after backgrounding',async()=>{
+ mockService.deleteAccount.mockImplementation(async authorize=>{await authorize('nonce');throw Error('must not delete');});
+ mockApple.requestAuthorization.mockImplementation(async()=>{changed('background');return {identityToken:'apple',authorizationCode:'code'};});
+ const {done}=await linkedDeletion();await act(async()=>changed('active'));expect(done).not.toHaveBeenCalled();
+});
+it('allows the brief inactive state of the Apple sheet',async()=>{
+ mockService.deleteAccount.mockImplementation(async authorize=>{await authorize('nonce');return {deleted:true,appleRevocation:'revoked',mediaCleanup:'completed'};});
+ mockApple.requestAuthorization.mockImplementation(async()=>{changed('inactive');changed('active');return {identityToken:'apple',authorizationCode:'code'};});
+ const {done}=await linkedDeletion();await waitFor(()=>expect(done).toHaveBeenCalledTimes(1));
+});
+
+it('ignores a deletion confirmation left over after leaving the screen',async()=>{
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,appleLinked:true,userId:'a'});
+ const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);await waitFor(()=>expect(page.getByTestId('email-code-delete')).toBeTruthy());
+ const alert=jest.spyOn(Alert,'alert');await fireEvent.press(page.getByTestId('email-code-delete'));const confirm=alert.mock.calls.at(-1)![2]![1];
+ await page.unmount();await act(async()=>confirm.onPress?.());expect(mockService.deleteAccount).not.toHaveBeenCalled();expect(mockApple.requestAuthorization).not.toHaveBeenCalled();
 });
