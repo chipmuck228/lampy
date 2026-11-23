@@ -44,7 +44,7 @@ it('preserves text and emoji, escapes markup and excludes private paths and sour
 it('has cover, opening, contents, ordered records, and colophon; no invented exact date', () => {
   const archive = files();
   const opf = new JSDOM(strFromU8(archive['OEBPS/package.opf']), { contentType: 'application/xml' }).window.document;
-  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','opening','record-1']);
+  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','archive','opening','record-1']);
   expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('日子未确认');
   expect(strFromU8(archive['OEBPS/style.css'])).toContain('height:auto');
 });
@@ -102,7 +102,7 @@ it('uses a single large image then compatible paired photos without losing or re
     expect([...doc.querySelectorAll('img')].map(x=>x.getAttribute('src'))).toEqual([0,1,2].map(i=>`media/photo-${i}.jpg`));
     expect(doc.querySelectorAll('.photo-pair .paired')).toHaveLength(2);
     const article=doc.querySelector('article')!;
-    expect(article.firstElementChild!.className).toBe(design==='imagebook'?'entry-lead':'entry-head');
+    expect(article.firstElementChild!.className).toBe('entry-head');
   }
 });
 it('keeps long text continuous and does not pair incompatible photo ratios', () => {
@@ -119,4 +119,33 @@ it('defaults old manifests to literary and rejects unknown design values', () =>
   const archive=files();
   expect(strFromU8(archive['OEBPS/cover.xhtml'])).toContain('class="literary"');
   expect(()=>buildAlbumEpub({...options,design:'other' as never})).toThrow('EPUB_INVALID_DESIGN');
+});
+
+it('includes a keepsake page with real counts and declares inline audio artwork in the manifest',()=>{
+ const archive=files();const doc=new JSDOM(strFromU8(archive['OEBPS/archive.xhtml']),{contentType:'application/xml'}).window.document;
+ expect([...doc.querySelectorAll('dt')].map(x=>x.textContent)).toEqual(['1','1','1']);
+ const opf=new JSDOM(strFromU8(archive['OEBPS/package.opf']),{contentType:'application/xml'}).window.document;
+ expect(opf.querySelector('item[id="record-1"]')!.getAttribute('properties')).toBe('svg');
+ expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('若无法播放，请换用支持声音的阅读器。');
+});
+it.each([[.65,1.5,1.5],[1.5,1.5],[.7,.7],[1.4,.7,1,1.6]])('composes ratios %j without omitting or reordering photographs',(...ratios)=>{
+ const media=ratios.map((r,i)=>({...input.entries[0].media[0],assetId:`p${i}`,intrinsicRatio:r}));
+ const photoAssets=Object.fromEntries(media.map((m,i)=>[m.assetId,{...assets.photo,path:`media/photo-${i}.jpg`,mime:'image/jpeg'}]));
+ const archive=unzipSync(buildAlbumEpub({...options,input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[{...input.entries[0],media}]},assets:photoAssets}));
+ const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
+ expect([...doc.querySelectorAll('img')].map(x=>x.getAttribute('src'))).toEqual(media.map((_,i)=>`media/photo-${i}.jpg`));
+ expect(doc.querySelectorAll('figcaption')).toHaveLength(media.length);
+});
+it('never groups photos across an intervening voice, and escapes long titles and attributions',()=>{
+ const record={...input.entries[0],attribution:'Dad & <script>not executable</script>',media:[input.entries[0].media[0],input.entries[0].media[1],{...input.entries[0].media[0],assetId:'b'}]};
+ const archive=unzipSync(buildAlbumEpub({...options,input:{...input,entries:[record]},assets:{...assets,b:{...assets.photo,path:'media/another.png'}}}));
+ const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
+ expect([...doc.querySelectorAll('img,audio')].map(x=>x.getAttribute('src'))).toEqual(['media/asset-0.png','media/asset-1.m4a','media/another.png']);
+ expect(doc.querySelector('script')).toBeNull();expect(doc.querySelector('.attribution')!.textContent).toBe(record.attribution);
+ expect(doc.querySelector('.photo-pair')).toBeNull();
+});
+
+it('rejects inconsistent media types instead of publishing a broken or mislabeled asset',()=>{
+ expect(()=>buildAlbumEpub({...options,assets:{...assets,photo:{...assets.photo,mime:'audio/mpeg'}}})).toThrow('EPUB_INVALID_ASSET');
+ expect(()=>buildAlbumEpub({...options,assets:{...assets,sound:{...assets.sound,path:'media/voice.wav',mime:'audio/wav'}}})).toThrow('EPUB_INVALID_ASSET');
 });

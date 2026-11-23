@@ -497,6 +497,63 @@ private func albumHexColor(_ value: String?, fallback: UIColor) -> UIColor {
                  blue: CGFloat(rgb & 255) / 255, alpha: 1)
 }
 
+
+// Print-only, frozen publication furniture. Record boxes and measured source text
+// are untouched; ornaments live in the already reserved margins.
+private func drawPublicationText(_ text: String, font: UIFont, color: UIColor, rect: CGRect, alignment: NSTextAlignment = .left, truncate: Bool = false) {
+  let paragraph = NSMutableParagraphStyle()
+  paragraph.alignment = alignment
+  paragraph.lineBreakMode = truncate ? .byTruncatingTail : .byWordWrapping
+  (text as NSString).draw(in: rect, withAttributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph])
+}
+private func drawPublication(_ publication: [String: Any], page: [String: Any], bounds: CGRect, serif: String, ui: String, in context: CGContext) -> Bool {
+  let kind = publication["kind"] as? String ?? "body"
+  let title = publication["title"] as? String ?? ""
+  let eyebrow = publication["eyebrow"] as? String ?? "LAMPY"
+  let color = albumSageColor()
+  context.saveGState()
+  defer { context.restoreGState() }
+  context.setStrokeColor(color.withAlphaComponent(0.35).cgColor)
+  context.setLineWidth(0.5)
+  if kind == "cover" {
+    context.stroke(bounds.insetBy(dx: 18, dy: 18))
+    drawPublicationText("LAMPY / A LIFE ALBUM", font: resolveFont(name: ui, size: 8), color: color, rect: CGRect(x: 36, y: 23, width: bounds.width - 72, height: 12))
+    return false
+  }
+  if kind == "archive" || kind == "chapter" {
+    drawPublicationText(eyebrow, font: resolveFont(name: ui, size: 9), color: color, rect: CGRect(x: 40, y: 64, width: bounds.width - 80, height: 32))
+    if kind == "chapter" {
+      drawPublicationText(publication["ordinal"] as? String ?? "", font: resolveFont(name: serif, size: 116), color: color.withAlphaComponent(0.25), rect: CGRect(x: 36, y: 136, width: bounds.width - 72, height: 150))
+      drawPublicationText(title, font: resolveFont(name: serif, size: 29), color: albumInkColor(), rect: CGRect(x: 40, y: 309, width: bounds.width - 80, height: 135))
+      context.move(to: CGPoint(x: 40, y: 466)); context.addLine(to: CGPoint(x: 88, y: 466)); context.strokePath()
+    } else {
+      drawPublicationText("L", font: resolveFont(name: serif, size: 38), color: color, rect: CGRect(x: 40, y: 124, width: 52, height: 52))
+      drawPublicationText(title, font: resolveFont(name: serif, size: 29), color: albumInkColor(), rect: CGRect(x: 40, y: 200, width: bounds.width - 80, height: 84))
+      drawPublicationText(publication["line"] as? String ?? "", font: resolveFont(name: serif, size: 13), color: albumInkSoftColor(), rect: CGRect(x: 40, y: 294, width: bounds.width - 80, height: 60))
+      let stats = publication["stats"] as? [[String: Any]] ?? []
+      let column = (bounds.width - 80) / CGFloat(max(1, stats.count))
+      for (index, stat) in stats.enumerated() {
+        let x = 40 + CGFloat(index) * column
+        drawPublicationText("\(stat["value"] as? Int ?? 0)", font: resolveFont(name: serif, size: 34), color: albumInkColor(), rect: CGRect(x: x, y: 386, width: column - 6, height: 52))
+        drawPublicationText(stat["label"] as? String ?? "", font: resolveFont(name: ui, size: 10), color: color, rect: CGRect(x: x, y: 440, width: column - 6, height: 36))
+      }
+      drawPublicationText(publication["made"] as? String ?? "", font: resolveFont(name: ui, size: 9), color: albumInkSoftColor(), rect: CGRect(x: 40, y: 510, width: bounds.width - 80, height: 28))
+    }
+    return true
+  }
+  if kind == "body" {
+    drawPublicationText(title, font: resolveFont(name: ui, size: 8), color: albumInkSoftColor(), rect: CGRect(x: 36, y: 15, width: bounds.width - 72, height: 13), truncate: true)
+    context.move(to: CGPoint(x: 36, y: 31)); context.addLine(to: CGPoint(x: bounds.width - 36, y: 31)); context.strokePath()
+    let folio = String(format: "%02d", (page["index"] as? Int ?? 0) + 1)
+    drawPublicationText(folio, font: resolveFont(name: serif, size: 10), color: color, rect: CGRect(x: bounds.width / 2 - 24, y: bounds.height - 30, width: 48, height: 16), alignment: .center)
+  }
+  if kind == "closing" {
+    context.stroke(CGRect(x: 36, y: 65, width: 32, height: 1))
+    drawPublicationText("LAMPY", font: resolveFont(name: ui, size: 10), color: color, rect: CGRect(x: 36, y: bounds.height - 70, width: bounds.width - 72, height: 20))
+  }
+  return false
+}
+
 func drawAlbumPage(
   page: [String: Any],
   media: [String: String],
@@ -510,6 +567,9 @@ func drawAlbumPage(
   let serifName = rendering["serif"] as? String ?? "Songti SC"
   let uiName = rendering["ui"] as? String ?? "PingFang SC"
   let copy = rendering["copy"] as? [String: String] ?? [:]
+  if let publication = page["publication"] as? [String: Any], publication["version"] as? String == "keepsake-v1" {
+    if drawPublication(publication, page: page, bounds: bounds, serif: serifName, ui: uiName, in: context) { return }
+  }
   if rendering["pageNumbers"] as? Bool == true {
     let count = rendering["pageCount"] as? Int ?? 1
     let number = (page["index"] as? Int ?? 0) + 1

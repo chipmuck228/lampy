@@ -73,6 +73,7 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     work = `${dir}.epub-work-${Date.now()}-${Math.random().toString(36).slice(2)}/`;
     await FS.makeDirectoryAsync(work); check();
     const assets: Record<string, EpubResource> = {};
+    const dimensions:Record<string,{widthPx:number;heightPx:number;intrinsicRatio:number}>={};
     const mediaEntries: EpubStreamEntry[] = [];
     const frozenById = new Map(manifest.media.map(item => [item.assetId, item]));
     const mediaTotal = new Set(manifest.content.entries.flatMap(entry => entry.media.map(media => media.assetId))).size;
@@ -92,6 +93,7 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
         prepared = `${work}image-${mediaEntries.length}`;
         const image = await albumEpubNative().prepareImage(source, prepared); check();
         mime = image.mime; extension = image.extension; size = image.bytes;
+        if(Number.isFinite(image.width)&&Number.isFinite(image.height)&&image.width>0&&image.height>0)dimensions[media.assetId]={widthPx:image.width,heightPx:image.height,intrinsicRatio:image.width/image.height};
       } else if (media.role === 'audio') {
         const handle = new File(source).open(FileMode.ReadOnly);
         let header: Uint8Array;
@@ -118,7 +120,8 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     check();
     report('PACKAGE');
     await new Promise<void>(resolve => setTimeout(resolve, 0)); check();
-    const documents = albumEpubDocuments({ input: manifest.content, assets, dates, id: `${id}-${appLanguage}`, createdAt: manifest.createdAt, design: 'kind' in manifest ? manifest.design : undefined, language: appLanguage });
+    const publicationInput={...manifest.content,entries:manifest.content.entries.map(entry=>({...entry,media:entry.media.map(media=>({...media,...dimensions[media.assetId]}))}))};
+    const documents = albumEpubDocuments({ input: publicationInput, assets, dates, id: `${id}-${appLanguage}`, createdAt: manifest.createdAt, design: 'kind' in manifest ? manifest.design : undefined, language: appLanguage });
     const entries = [...Object.entries(documents).map(([name, data]) => epubMemoryEntry(name, data)), ...mediaEntries];
     await assertSpace(entries.reduce((sum, item) => sum + item.size, 0) + RESERVE); check();
     const part = `${work}album.epub`;

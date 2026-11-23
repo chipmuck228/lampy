@@ -1,3 +1,4 @@
+import type {PublicationPage} from './album-publication';
 import { Platform } from 'react-native';
 import { appLanguage, tr, type AppLanguage } from '../i18n';
 import type { AlbumCover } from './life-album';
@@ -163,6 +164,7 @@ export type AlbumPlacedBlock = AlbumBlockBase &
   );
 
 export type AlbumPage = {
+  publication?:PublicationPage;
   index: number;
   blocks: AlbumPlacedBlock[];
   rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number; pageCount?: number; pageNumbers?: boolean };

@@ -1,3 +1,4 @@
+import {photoRatio,photoComposition,PUBLICATION_COPY,PUBLICATION_VERSION} from './album-publication';
 import { appLanguage, dateLabel, tr, feelingLabel } from '../i18n';
 import {
   calendarPartsAt,
@@ -132,7 +133,7 @@ export function fingerprintFromInput(album: LifeAlbum, input: AlbumLayoutInput):
 export async function paginateAlbumLayout(
   input: AlbumLayoutInput,
   measurer: AlbumTextMeasurer,
-  options: { generatedAt: string; timezone: HistoryClock },
+  options: { generatedAt: string; timezone: HistoryClock; publication?:boolean },
 ): Promise<AlbumLayout> {
   const pages: AlbumPage[] = [];
   let blocks: AlbumPlacedBlock[] = [];
@@ -275,6 +276,7 @@ export async function paginateAlbumLayout(
     commitPage();
   }
 
+  let publicationChapter:string|null=null,publicationOrdinal=0;
   for (const record of input.entries) {
     if (record.presence === 'missing') {
       place(
@@ -300,6 +302,15 @@ export async function paginateAlbumLayout(
     }
 
     const dated = dateKeyAndLabel(record, options.timezone);
+    if(options.publication){
+      const parts=/^[dmy]:(\d{4})(?:-(\d{1,2}))?/.exec(dated.key??'');
+      const key=parts?parts.slice(1).filter(Boolean).join('-'):'unknown';
+      if(key!==publicationChapter){
+        commitPage();y=CONTENT_TOP;publicationChapter=key;printedDateKey=null;printedDateLabel=null;
+        const title=parts?(parts[2]?dateLabel(Number(parts[1]),Number(parts[2])):tr('{0}年',[Number(parts[1])])):ALBUM_TIME_UNKNOWN;
+        pages.push({index:pages.length,blocks:[],publication:{version:PUBLICATION_VERSION,kind:'chapter',title,eyebrow:PUBLICATION_COPY[appLanguage].chapter,line:'',ordinal:String(++publicationOrdinal).padStart(2,'0')}});
+      }
+    }
     if (!dated.key) { printedDateKey = null; printedDateLabel = null; }
     const showDate = !!dated.key && dated.key !== printedDateKey;
     if (showDate && remaining() < albumDateRole.lineHeightPt + albumBodyRole.lineHeightPt * 2) commitPage();
@@ -328,7 +339,40 @@ export async function paginateAlbumLayout(
       await placeWrapped('note', record.note, { momentId: record.momentId, revision: record.revision ?? 0 });
     }
 
-    for (const image of images) {
+    if(options.publication){
+      const placePhotoGroup=(items:typeof images)=>{
+        const composition=photoComposition(items.map(photoRatio));
+        if(composition==='single'){
+          for(const image of items){
+            if(blocks.length&&remaining()<140)commitPage();
+            const size=imageSize(photoRatio(image),Math.min(remaining()-8,ALBUM_CONTENT_HEIGHT_PT*.72));
+            blocks.push({kind:'image',momentId:record.momentId,assetId:image.assetId,status:image.availability==='available'?'available':'missing',intrinsicRatio:photoRatio(image),box:{xPt:CONTENT_LEFT+(ALBUM_CONTENT_WIDTH_PT-size.widthPt)/2,yPt:y,widthPt:size.widthPt,heightPt:size.heightPt}});y+=size.heightPt+12;
+          }
+          return;
+        }
+        const gap=10,width=(ALBUM_CONTENT_WIDTH_PT-gap)/2;
+        const desired=composition==='diptych'?Math.min(width/Math.min(...items.map(m=>photoRatio(m)!)),ALBUM_CONTENT_HEIGHT_PT*.65):ALBUM_CONTENT_HEIGHT_PT*.68;
+        if(blocks.length&&remaining()<desired+12)commitPage();
+        const height=Math.min(desired,remaining()-12);
+        items.forEach((image,index)=>{
+          const left=composition==='triptych'?index===0:index%2===0;
+          const box=composition==='diptych'?{xPt:CONTENT_LEFT+index*(width+gap),yPt:y,widthPt:width,heightPt:height}:
+            composition==='triptych'?{xPt:CONTENT_LEFT+(left?0:width+gap),yPt:y+(index===2?(height+gap)/2:0),widthPt:width,heightPt:left?height:(height-gap)/2}:
+            {xPt:CONTENT_LEFT+(index%2)*(width+gap),yPt:y+Math.floor(index/2)*(height+gap)/2,widthPt:width,heightPt:(height-gap)/2};
+          blocks.push({kind:'image',momentId:record.momentId,assetId:image.assetId,status:image.availability==='available'?'available':'missing',intrinsicRatio:photoRatio(image),box});
+        });y+=height+12;
+      };
+      for(let i=0;i<record.media.length;i++){
+        const item=record.media[i];
+        if(item.role==='image'){
+          const run:typeof images=[];while(i<record.media.length&&record.media[i].role==='image'){run.push(record.media[i]);i++;}i--;
+          for(let start=0;start<run.length;start+=4)placePhotoGroup(run.slice(start,start+4));
+        }else if(item.role==='audio'){
+          const time=durationLabel(item.durationMs);place({kind:'audio',momentId:record.momentId,assetId:item.assetId,status:item.availability,durationMs:item.durationMs,printHint:tr('PDF 仅保留声音信息'),text:`${ALBUM_AUDIO_LABEL}${time?` · ${time}`:''}`,box:{xPt:CONTENT_LEFT,yPt:y,widthPt:ALBUM_CONTENT_WIDTH_PT,heightPt:48}},48);
+        }
+      }
+    }
+    for (const image of options.publication?[]:images) {
       if (blocks.length > 0 && remaining() < 80 && blocks[blocks.length - 1]?.kind !== 'day-rule') {
         commitPage();
       }
@@ -344,7 +388,7 @@ export async function paginateAlbumLayout(
       y += size.heightPt + 8;
     }
 
-    for (const audio of record.media.filter((item) => item.role === 'audio')) {
+    for (const audio of options.publication?[]:record.media.filter((item) => item.role === 'audio')) {
       const time = durationLabel(audio.durationMs);
       const missing = audio.availability !== 'available';
       place(

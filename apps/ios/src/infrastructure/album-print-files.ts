@@ -1,3 +1,4 @@
+import {decoratePrintPublication} from '../application/album-publication';
 import { acquireAlbumEdition } from './album-edition-lock';
 import {albumExportAccess} from './album-export-purchases';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -158,6 +159,7 @@ export async function layoutAlbumPrint(input: import('../application/album-layou
         },
         {
           generatedAt: new Date().toISOString(),
+          publication:true,
           timezone: {
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
           },
@@ -181,7 +183,7 @@ export async function layoutAlbumPrint(input: import('../application/album-layou
           photoBorderWidth: ALBUM_READING_STYLES[style].photoBorderWidth,
         },
       }));
-      return layout;
+      return decoratePrintPublication(layout,input);
 }
 export type SavedPrintSummary = Pick<
   PrintManifest,

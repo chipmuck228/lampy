@@ -158,22 +158,24 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
   var bounds = CGRect(x: 0, y: 0, width: width, height: height)
   guard let context = CGContext(target as CFURL, mediaBox: &bounds, nil) else { throw printFailure("PDF_CREATE_FAILED") }
   for page in pages {
-    // Fail explicitly for a copy that cannot be decoded; never silently substitute a missing photo.
-    for block in page["blocks"] as? [[String: Any]] ?? [] {
-      if ["image", "cover-image"].contains(block["kind"] as? String ?? "") {
-        guard let id = block["assetId"] as? String, let path = media[id],
-              UIImage(contentsOfFile: try printLocalURL(path).path) != nil else { context.closePDF(); throw printFailure("IMAGE_UNREADABLE") }
+    try autoreleasepool {
+      // Fail explicitly for a copy that cannot be decoded; never silently substitute a missing photo.
+      for block in page["blocks"] as? [[String: Any]] ?? [] {
+        if ["image", "cover-image"].contains(block["kind"] as? String ?? "") {
+          guard let id = block["assetId"] as? String, let path = media[id],
+                UIImage(contentsOfFile: try printLocalURL(path).path) != nil else { context.closePDF(); throw printFailure("IMAGE_UNREADABLE") }
+        }
       }
+      context.beginPDFPage(nil)
+      context.saveGState()
+      context.translateBy(x: 0, y: bounds.height)
+      context.scaleBy(x: 1, y: -1)
+      UIGraphicsPushContext(context)
+      drawAlbumPage(page: page, media: media, playing: [], in: context, bounds: bounds)
+      UIGraphicsPopContext()
+      context.restoreGState()
+      context.endPDFPage()
     }
-    context.beginPDFPage(nil)
-    context.saveGState()
-    context.translateBy(x: 0, y: bounds.height)
-    context.scaleBy(x: 1, y: -1)
-    UIGraphicsPushContext(context)
-    drawAlbumPage(page: page, media: media, playing: [], in: context, bounds: bounds)
-    UIGraphicsPopContext()
-    context.restoreGState()
-    context.endPDFPage()
   }
   context.closePDF()
   guard let pdf = CGPDFDocument(target as CFURL), let searchable = PDFDocument(url: target), searchable.pageCount == pages.count else { throw printFailure("PDF_REOPEN_FAILED") }
@@ -184,6 +186,20 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
   for (index, page) in pages.enumerated() {
     let text = compactPdfText(searchable.page(at: index)?.string ?? "")
     let rendering = page["rendering"] as? [String: Any] ?? [:]
+    if let publication = page["publication"] as? [String: Any], publication["version"] as? String == "keepsake-v1",
+       ["archive", "chapter"].contains(publication["kind"] as? String ?? "") {
+      var required = [publication["title"] as? String ?? "", publication["eyebrow"] as? String ?? "", publication["ordinal"] as? String ?? "", publication["made"] as? String ?? ""]
+      if publication["kind"] as? String == "archive" {
+        required.append(publication["line"] as? String ?? "")
+        for stat in publication["stats"] as? [[String: Any]] ?? [] {
+          required.append("\(stat["value"] as? Int ?? 0)")
+          required.append(stat["label"] as? String ?? "")
+        }
+      }
+      if required.map(compactPdfText).contains(where: { !$0.isEmpty && !text.contains($0) }) {
+        throw printFailure("PDF_PUBLICATION_TEXT")
+      }
+    }
     for (blockIndex, block) in (page["blocks"] as? [[String: Any]] ?? []).enumerated() {
       let kind = block["kind"] as? String ?? ""
       let source = block["text"] as? String ?? block["label"] as? String ?? block["value"] as? String ?? ""

@@ -10,7 +10,7 @@ func prepareEpubImage(_ source: String, _ destination: String) throws -> [String
           let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 2048,
+            kCGImageSourceThumbnailMaxPixelSize: 1600,
             kCGImageSourceShouldCacheImmediately: true
           ] as CFDictionary) else {
       throw NSError(domain: "LampyEpub", code: 1, userInfo: [NSLocalizedDescriptionKey: "EPUB_IMAGE_UNREADABLE"])

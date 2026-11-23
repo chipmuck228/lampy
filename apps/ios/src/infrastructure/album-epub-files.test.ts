@@ -134,3 +134,9 @@ it('streams the frozen design into a standalone EPUB and re-shares its immutable
   expect(files.get(uri) ?? files.get(dir+'album-en.epub')).toEqual(first);
   expect(albumExportAccess.assert).not.toHaveBeenCalled();
 });
+
+it('composes prepared image dimensions after orientation normalization without changing the frozen source',async()=>{
+ seed(true);prepareImage.mockImplementationOnce(async(_source,dest)=>{files.set(dest,new Uint8Array([255,216,255]));return {mime:'image/jpeg',extension:'jpg',bytes:3,width:900,height:1600};});
+ const frozen=files.get(root+'manifest.json')!;await shareAlbumEpub('print_test',()=>true);
+ const archive=unzipSync(files.get(resultUri())!);expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('photo portrait');expect(files.get(root+'manifest.json')).toEqual(frozen);
+});
