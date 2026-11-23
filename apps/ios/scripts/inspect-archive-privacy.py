@@ -95,7 +95,7 @@ def manifest_summary(file, app, issues):
     return result
 
 
-def inspect(archive, expected_build, podfile_lock=None):
+def inspect(archive, expected_build, podfile_lock=None, profile='appstore-v1', product_id=None):
     archive = Path(archive).resolve()
     issues, warnings = [], []
     report = {'format': 1, 'archiveName': archive.name,
@@ -121,15 +121,15 @@ def inspect(archive, expected_build, podfile_lock=None):
         for key, expected in [('CFBundleIdentifier', 'app.lampy.ios'),
                               ('CFBundleShortVersionString', '1.0.0'),
                               ('CFBundleVersion', expected_build),
-                              ('LampyBuildProfile', 'appstore-v1'),
+                              ('LampyBuildProfile', profile),
                               ('LampyFamilyAPI', 'https://family.yunpura.com')]:
             if info.get(key) != expected:
                 issues.append('PROFILE_MISMATCH:' + key)
         for key in ('LampyUnifiedPurchasesEnabled', 'LampyPaidExportEnabled', 'LampyEmailLoginEnabled'):
-            if info.get(key) is not False:
-                issues.append('CLOSED_SWITCH_NOT_FALSE:' + key)
-        if info.get('LampyExportProductID') != '':
-            issues.append('EXPORT_PRODUCT_NOT_EMPTY')
+            if info.get(key) is not (profile == 'appstore-launch'):
+                issues.append(('OPEN_SWITCH_NOT_TRUE:' if profile == 'appstore-launch' else 'CLOSED_SWITCH_NOT_FALSE:') + key)
+        if info.get('LampyExportProductID') != (product_id if profile == 'appstore-launch' else ''):
+            issues.append('EXPORT_PRODUCT_MISMATCH' if profile == 'appstore-launch' else 'EXPORT_PRODUCT_NOT_EMPTY')
         report['infoPlistSha256'] = digest(app / 'Info.plist')
         for key in PERMISSIONS:
             text = info.get(key)
@@ -194,6 +194,8 @@ def inspect(archive, expected_build, podfile_lock=None):
     expected = {'NSPrivacyCollectedDataType' + name for name in (
         'UserID', 'Contacts', 'OtherUserContent', 'PhotosorVideos',
         'AudioData', 'CustomerSupport', 'OtherDataTypes')}
+    if profile == 'appstore-launch':
+        expected.update({'NSPrivacyCollectedDataTypeEmailAddress', 'NSPrivacyCollectedDataTypePurchaseHistory'})
     first_party = next((m for m in report['privacyManifests'] if m['path'] == 'PrivacyInfo.xcprivacy'), None)
     report['firstPartyDisclosure'] = 'BLOCKED'
     if first_party:
@@ -240,13 +242,17 @@ def main():
     parser.add_argument('--expected-build', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--podfile-lock')
+    parser.add_argument('--profile', choices=['appstore-v1', 'appstore-launch'], default='appstore-v1')
+    parser.add_argument('--product-id')
     args = parser.parse_args()
     archive, output = Path(args.archive).resolve(), Path(args.output).resolve()
     if not re.fullmatch(r'[1-9]\d*', args.expected_build):
         parser.error('expected-build must be a positive build number')
     if output == archive or archive in output.parents:
         parser.error('output must be outside the signed archive')
-    report = inspect(archive, args.expected_build, args.podfile_lock)
+    if args.profile == 'appstore-launch' and not args.product_id:
+        parser.error('appstore-launch requires the configured product-id')
+    report = inspect(archive, args.expected_build, args.podfile_lock, args.profile, args.product_id)
     output.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix='.privacy-', dir=output)
     try:

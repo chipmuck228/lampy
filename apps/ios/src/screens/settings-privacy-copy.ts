@@ -1,7 +1,9 @@
+import {isAppstoreLaunchBuild} from '../infrastructure/launch-release-config';
+import {LAUNCH_PRIVACY_CHAPTERS} from './settings-launch-copy';
 import { tr } from '../i18n';
 import { isFamilyV1ReleaseBuild } from '../infrastructure/family-config';
 import { V1_PRIVACY_CHAPTERS } from './settings-v1-copy';
-export const SETTINGS_PRIVACY_UPDATED = tr(isFamilyV1ReleaseBuild() ? "2026年10月24日" : "2026年10月2日");
+export const SETTINGS_PRIVACY_UPDATED = tr(isAppstoreLaunchBuild() ? "2026年11月23日" : isFamilyV1ReleaseBuild() ? "2026年10月24日" : "2026年10月2日");
 
 const PERSONAL_PRIVACY_CHAPTERS = [
   {
@@ -66,4 +68,4 @@ const PERSONAL_PRIVACY_CHAPTERS = [
   },
 ] as const;
 
-export const SETTINGS_PRIVACY_CHAPTERS = isFamilyV1ReleaseBuild() ? V1_PRIVACY_CHAPTERS : PERSONAL_PRIVACY_CHAPTERS;
+export const SETTINGS_PRIVACY_CHAPTERS = isAppstoreLaunchBuild() ? LAUNCH_PRIVACY_CHAPTERS : isFamilyV1ReleaseBuild() ? V1_PRIVACY_CHAPTERS : PERSONAL_PRIVACY_CHAPTERS;

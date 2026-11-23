@@ -28,7 +28,10 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
     if((intent==='reauth'||intent==='delete')&&own?.subject!==address)throw new FamilyError('EMAIL_NOT_LINKED','Enter the email linked to this account.');
     if(intent==='link'&&own&&own.subject!==address)throw new FamilyError('EMAIL_ALREADY_LINKED','Use change email for an existing binding.');
     if(intent==='change'&&!own)throw new FamilyError('EMAIL_NOT_LINKED','Link an email first.');
-    if(intent==='delete')await assertDeletionFamilies(tx,userId);
+    if(intent==='delete'){
+      if((await tx.listLoginIdentities(userId)).some(i=>i.provider==='apple'))throw new FamilyError('APPLE_DELETION_AUTH_REQUIRED','Confirm the linked Apple identity to delete this account.');
+      await assertDeletionFamilies(tx,userId);
+    }
     return userId;
   }
   return {
@@ -42,7 +45,7 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
         const recent=Number.isFinite(authenticated)&&authenticated<=deps.clock.now().getTime()&&authenticated+RECENT_AUTH_MS>deps.clock.now().getTime()&&
           (await tx.listLoginIdentities(userId)).some(i=>loginIdentityKey(i)===session?.authenticatedIdentity);
         const profile=await tx.findProfile(userId);
-        return {signedIn:true,linked:!!own,...(profile?.nickname?{nickname:profile.nickname}:{}),...(own?{maskedEmail:maskEmail(own.subject)}:{}),
+        return {signedIn:true,linked:!!own,appleLinked:(await tx.listLoginIdentities(userId)).some(i=>i.provider==='apple'),...(profile?.nickname?{nickname:profile.nickname}:{}),...(own?{maskedEmail:maskEmail(own.subject)}:{}),
           ...(recent?{reauthenticationExpiresAt:new Date(authenticated+RECENT_AUTH_MS).toISOString()}:{})};
       });
     },
@@ -111,10 +114,10 @@ export function createEmailCodeCommands(deps:{repository:FamilyRepository;clock:
           const userId=await deps.requireUser(tx,token);if(userId!==claim.userId||mac(`session:${token}`)!==claim.sessionDigest)throw invalid();
           if(input.intent==='delete') {
             if(existing?.userId!==userId)throw invalid();
+            if((await tx.listLoginIdentities(userId)).some(i=>i.provider==='apple'))throw new FamilyError('APPLE_DELETION_AUTH_REQUIRED','Confirm the linked Apple identity to delete this account.');
             await assertDeletionFamilies(tx,userId);
-            const appleLinked=(await tx.listLoginIdentities(userId)).some(i=>i.provider==='apple');
             await tx.purgeAccount(userId);
-            return {deleted:true as const,appleRevocation:appleLinked?'manual-required' as const:'not-linked' as const,mediaCleanup:'pending' as const};
+            return {deleted:true as const,appleRevocation:'not-linked' as const,mediaCleanup:'pending' as const};
           }
           if(input.intent==='reauth') {
             if(existing?.userId!==userId)throw invalid();

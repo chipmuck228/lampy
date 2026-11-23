@@ -12,18 +12,18 @@ if [[ "${1:-}" == "--inspect" ]]; then
   exit $?
 fi
 
-if [[ -n "${1:-}" && "${1:-}" != "--family-internal" && "${1:-}" != "--appstore-v1" ]]; then
-  echo "usage: release-archive.sh [--family-internal|--appstore-v1 [--prepare|--inspect ARCHIVE]]" >&2
+if [[ -n "${1:-}" && "${1:-}" != "--family-internal" && "${1:-}" != "--appstore-v1" && "${1:-}" != "--appstore-launch" ]]; then
+  echo "usage: release-archive.sh [--family-internal|--appstore-v1|--appstore-launch [--prepare|--inspect ARCHIVE]]" >&2
   exit 2
 fi
-if [[ ( "${1:-}" == "--family-internal" || "${1:-}" == "--appstore-v1" ) && -n "${2:-}" && "${2:-}" != "--prepare" && "${2:-}" != "--inspect" ]]; then
+if [[ ( "${1:-}" == "--family-internal" || "${1:-}" == "--appstore-v1" || "${1:-}" == "--appstore-launch" ) && -n "${2:-}" && "${2:-}" != "--prepare" && "${2:-}" != "--inspect" ]]; then
   echo "unknown archive profile option" >&2
   exit 2
 fi
 
 EXPLICIT_PROFILE=0
 PREPARE_ONLY=0
-if [[ "${1:-}" == "--family-internal" || "${1:-}" == "--appstore-v1" ]]; then
+if [[ "${1:-}" == "--family-internal" || "${1:-}" == "--appstore-v1" || "${1:-}" == "--appstore-launch" ]]; then
   EXPLICIT_PROFILE=1
   [[ "${2:-}" != "--prepare" ]] || PREPARE_ONLY=1
 fi
@@ -31,7 +31,9 @@ fi
 # shellcheck source=./release-public-env.sh
 source "$ROOT/scripts/release-public-env.sh"
 if [[ "$EXPLICIT_PROFILE" == 1 ]]; then
-  if [[ "${1:-}" == "--appstore-v1" ]]; then
+  if [[ "${1:-}" == "--appstore-launch" ]]; then
+    source "$ROOT/scripts/appstore-launch-env.sh"
+  elif [[ "${1:-}" == "--appstore-v1" ]]; then
     source "$ROOT/scripts/appstore-v1-env.sh"
   else
     source "$ROOT/scripts/family-internal-env.sh"
@@ -43,7 +45,9 @@ if [[ "$EXPLICIT_PROFILE" == 1 ]]; then
   fi
 fi
 
-source "$ROOT/scripts/email-code-release-env.sh"
+if [[ "${LAMPY_BUILD_PROFILE:-}" != "appstore-launch" ]]; then
+  source "$ROOT/scripts/email-code-release-env.sh"
+fi
 
 STASH="$(mktemp -d /tmp/lampy-dotenv-stash.XXXXXX)"
 RESTORE_DONE=0

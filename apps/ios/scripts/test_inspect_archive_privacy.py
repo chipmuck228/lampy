@@ -53,6 +53,28 @@ class ArchivePrivacyTest(unittest.TestCase):
         with patch.object(audit.shutil, 'which', return_value=None):
             return audit.inspect(self.archive, '17')
 
+    def test_launch_checks_open_switches_product_and_email_disclosure(self):
+        self.info.update(LampyBuildProfile='appstore-launch', LampyEmailLoginEnabled=True,
+                         LampyPaidExportEnabled=True, LampyUnifiedPurchasesEnabled=True,
+                         LampyExportProductID='app.lampy.archive')
+        self.write('Info.plist', self.info)
+        self.manifest['NSPrivacyCollectedDataTypes'].append({
+            'NSPrivacyCollectedDataType': 'NSPrivacyCollectedDataTypeEmailAddress',
+            'NSPrivacyCollectedDataTypeLinked': True, 'NSPrivacyCollectedDataTypeTracking': False,
+            'NSPrivacyCollectedDataTypePurposes': ['NSPrivacyCollectedDataTypePurposeAppFunctionality']})
+        self.manifest['NSPrivacyCollectedDataTypes'].append({**self.manifest['NSPrivacyCollectedDataTypes'][-1], 'NSPrivacyCollectedDataType': 'NSPrivacyCollectedDataTypePurchaseHistory'})
+        self.write('PrivacyInfo.xcprivacy', self.manifest)
+        with patch.object(audit.shutil, 'which', return_value=None):
+            report = audit.inspect(self.archive, '17', profile='appstore-launch', product_id='app.lampy.archive')
+            self.assertEqual(report['staticChecks'], 'PASS')
+            self.assertEqual(report['releaseReady'], 'NOT_VERIFIED')
+            self.info['LampyExportProductID'] = 'wrong'
+            self.info['LampyEmailLoginEnabled'] = False
+            self.write('Info.plist', self.info)
+            report = audit.inspect(self.archive, '17', profile='appstore-launch', product_id='app.lampy.archive')
+            self.assertIn('EXPORT_PRODUCT_MISMATCH', report['issues'])
+            self.assertIn('OPEN_SWITCH_NOT_TRUE:LampyEmailLoginEnabled', report['issues'])
+
     def test_first_party_collection_must_survive_prebuild(self):
         self.assertEqual(self.inspect()['firstPartyDisclosure'], 'PASS')
         self.manifest['NSPrivacyCollectedDataTypes'] = []
