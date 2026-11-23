@@ -76,3 +76,10 @@ python3 scripts/render-publication-proof.py --samples /tmp/lampy-keepsake-sample
 ```
 
 The fixture directory must be new: existing sample/source files are not overwritten by the EPUB generator. Native PDF syntax gets a separate macOS CI check; that check does not typecheck/link the Expo app or establish visual acceptance.
+
+
+## PR143 device-test baseline after stages 1/2 merge
+
+Synchronized with main ee665c5, including the email-only development gate and accepted settings navigation. No server changes are needed for personal EPUB/native PDF design acceptance. The family-internal preparation command intentionally closes export flags and cannot be used for this test. Use explicit local StoreKit non-consumable configuration (for example app.lampy.export.design-test, a local-only fixture identifier) with enabled paid personal export, unified purchases off, family finished export off, and the test account API. This validates design and local simulated access, not real Sandbox purchases.
+
+After setting those explicit flags, run iOS prebuild, Pods, write-family-xcode-env.sh and a fresh native Release build. Use the same bundle ID and signing team and install over the existing app. Keep a copy of any custom Xcode StoreKit configuration outside generated ios/ before regeneration. In Xcode select the local StoreKit configuration for Run. Generate a new edition: intact existing editions deliberately retain their original layout. Test both literary/imagebook EPUB designs in Apple Books, and a newly generated native PDF in Files; do not substitute the synthetic EPUB print proof for native PDF acceptance. Source records must remain intact; restart and share the saved edition again. Family export and real Sandbox acceptance remain later work.

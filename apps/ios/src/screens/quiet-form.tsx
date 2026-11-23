@@ -15,8 +15,8 @@ export function QuietField({label,hint,style,onFocus,onBlur,...props}:TextInputP
     {hint?<Text style={styles.hint}>{hint}</Text>:null}
   </View>;
 }
-export function PageAction({label,onPress,disabled=false,testID,tone='quiet'}:{label:string;onPress:()=>void;disabled?:boolean;testID?:string;tone?:'primary'|'quiet'|'destructive'}) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled}} testID={testID} disabled={disabled} onPress={onPress}
+export function PageAction({label,onPress,disabled=false,testID,tone='quiet',accessibilityLabel}:{label:string;accessibilityLabel?:string;onPress:()=>void;disabled?:boolean;testID?:string;tone?:'primary'|'quiet'|'destructive'}) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel??label} accessibilityState={{disabled}} testID={testID} disabled={disabled} onPress={onPress}
     style={({pressed})=>[styles.action,tone==='primary'&&styles.primary,disabled&&styles.disabled,pressed&&!disabled&&styles.pressed]}>
     <Text style={[styles.actionLabel,tone==='primary'&&styles.primaryLabel,tone==='destructive'&&styles.destructiveLabel]}>{label}</Text>
   </Pressable>;

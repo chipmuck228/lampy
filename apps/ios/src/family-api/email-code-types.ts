@@ -2,9 +2,10 @@ import type { DeleteAccountResult, SignInResult } from './types';
 
 export const EMAIL_CODE_NAMESPACE = 'lampy-email-v1';
 export type EmailCodeIntent = 'login' | 'link' | 'reauth' | 'change' | 'delete';
-export type EmailCodeRequest = {email:string;intent:EmailCodeIntent;language?:'zh'|'en'};
+// reauth/delete resolve the current mailbox from the authenticated session; other intents require email.
+export type EmailCodeRequest = {email?:string;intent:EmailCodeIntent;language?:'zh'|'en'};
 export type EmailCodeTicket = {challengeId:string;expiresAt:string;resendAfterSeconds:number};
-export type EmailCodeVerification = {challengeId:string;email:string;code:string;intent:EmailCodeIntent;confirmation?:string};
+export type EmailCodeVerification = {challengeId:string;email?:string;code:string;intent:EmailCodeIntent;confirmation?:string};
 export type EmailCodeResult = (SignInResult & {needsProfile:boolean}) | {linked:true;userId:string} | {reauthenticated:true;userId:string} | DeleteAccountResult;
 export type EmailCodeStatus = {signedIn:boolean;linked:boolean;maskedEmail?:string;nickname?:string;appleLinked?:boolean;reauthenticationExpiresAt?:string};
 export type EmailCodeChallenge = {

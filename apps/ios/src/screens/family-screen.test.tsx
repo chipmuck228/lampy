@@ -6,6 +6,9 @@ import { ApplicationError } from '../application/errors';
 import type { FamilyInboxView } from '../application/family-use-cases';
 import FamilyScreen from './family-screen';
 import { isFamilyProductEntryOpen } from '../infrastructure/family-config';
+let mockAppleEntryOpen=true;
+jest.mock('../infrastructure/apple-login-entry',()=>({appleLoginEntryOpen:()=>mockAppleEntryOpen}));
+beforeEach(()=>{mockAppleEntryOpen=true;});
 
 const mockFamily = {
   getMembership: jest.fn(),

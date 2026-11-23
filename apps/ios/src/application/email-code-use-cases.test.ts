@@ -59,3 +59,12 @@ it('preserves actual cooldown and hourly quota waits through the server HTTP con
  await expect(service.requestEmailCode(input,()=>true)).rejects.toMatchObject({code:'RATE_LIMITED',retryAfterSeconds:3360});
  expect(h.sent).toHaveLength(5);
 });
+
+it('verifies the current mailbox through HTTP without asking the user to supply it',async()=>{
+ const h=harness(),service=h.cases();const login=await service.requestEmailCode({email:'user@example.com',intent:'login'},()=>true);
+ await service.verifyEmailCode({email:'user@example.com',intent:'login',challengeId:login.challengeId,code:h.sent[0].code},()=>true);
+ h.advance();const owner=(await h.session.getUserId())!;
+ const ticket=await service.requestEmailCode({intent:'reauth'},()=>true,owner);
+ expect(h.sent.at(-1)!.to).toBe('user@example.com');
+ await expect(service.verifyEmailCode({intent:'reauth',challengeId:ticket.challengeId,code:h.sent.at(-1)!.code},()=>true)).resolves.toMatchObject({reauthenticated:true,userId:owner});
+});
