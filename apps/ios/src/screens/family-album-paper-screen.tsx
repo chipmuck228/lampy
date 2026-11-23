@@ -31,6 +31,6 @@ export default function FamilyAlbumPaperScreen(){
   const failed=reading.error||(!!prepared&&prepared.input===failure);
   const shown=reading.view&&layout?.input===prepared?.input?layout?.result??null:null;
   return <LifeAlbumPreviewScreen key={scope} family={{albumId:scope,layout:shown,media:prepared?.media??{},style,
-    blocked:reading.blocked,loading:!failed&&!shown,error:failed?tr('家庭内容或资格已变化，请重新核对。'):null,
+    blocked:reading.blocked,loading:!failed&&!shown,error:failed?tr('这册内容已变化，请刷新后继续阅读。'):null,
     retry:reading.retry,current:reading.valid}}/>;
 }

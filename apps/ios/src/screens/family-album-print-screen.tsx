@@ -45,7 +45,7 @@ export default function FamilyAlbumPrintScreen(){
   const hit={minHeight:48,justifyContent:'center' as const};
   return <SettingsPage title={tr('导出这一册')} backLabel={tr('这一册')} accessibilityLabel={tr('导出这一册')} onBack={()=>router.back()} pageTestID="family-album-print">
     {!familyPdfEnabled()?<Text>{tr('家庭文件导出尚未开放。')}</Text>:null}
-    {reading.error?<><Text>{tr('家庭内容或资格已变化，请重新核对。')}</Text><Pressable accessibilityRole="button" style={hit} onPress={reading.retry}><Text>{tr('再试一次')}</Text></Pressable></>:null}
+    {reading.error?<><Text>{tr('这册内容已变化，请刷新后继续阅读。')}</Text><Pressable accessibilityRole="button" style={hit} onPress={reading.retry}><Text>{tr('再试一次')}</Text></Pressable></>:null}
     {familyPdfEnabled()&&!reading.blocked&&reading.view?<View style={{gap:16}}>
       <Text style={type.body}>{reading.view.name}</Text>
       <Text style={{...type.meta,color:inkSoft}}>{tr('PDF不含声音，电子册文件将在后续阶段提供。')}</Text>
@@ -60,7 +60,7 @@ export default function FamilyAlbumPrintScreen(){
       </>:null}
       {accessRequired?<Text accessibilityLiveRegion="polite">{tr('请先解锁或恢复导出权益，再点生成PDF。')}</Text>:null}
       {__DEV__&&diagnostic?<Text selectable>{diagnostic}</Text>:null}
-      {failed?<Text accessibilityLiveRegion="polite">{tr('本次没有生成。请核对记录、媒体和原生构建后再试。')}</Text>:null}
+      {failed?<Text accessibilityLiveRegion="polite">{tr('这次没有制作完成，请稍后重试。')}</Text>:null}
       {saved.length===0?<Text>{tr('还没有生成PDF。')}</Text>:null}
       {saved.map(file=><Pressable key={file.id} accessibilityRole="button" disabled={busy} style={hit} onPress={()=>void run(async valid=>{await shareSavedAlbumPrint(file,valid);})}><Text style={{...type.action,color:sage}}>{tr('保存PDF')} · {file.createdAt}</Text></Pressable>)}
     </View>:null}

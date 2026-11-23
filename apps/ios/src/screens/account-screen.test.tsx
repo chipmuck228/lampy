@@ -9,6 +9,9 @@ import AccountScreen from './account-screen';
 import { DeviceLockProvider } from './device-lock-context';
 import { familyAuthServiceReady } from '../application/account-status';
 import { isPersonalSettingsDiagnosticsOpen } from '../application/personal-settings-visibility';
+let mockAppleEntryOpen=true;
+jest.mock('../infrastructure/apple-login-entry',()=>({appleLoginEntryOpen:()=>mockAppleEntryOpen}));
+beforeEach(()=>{mockAppleEntryOpen=true;});
 
 jest.mock('../application/personal-settings-visibility', () => ({
   isPersonalSettingsDiagnosticsOpen: jest.fn(() => true),

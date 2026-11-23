@@ -8,12 +8,13 @@ jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');retur
 jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({getFamilies:mockDirectory,albums:{access:mockAccess,list:mockList}})}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
 jest.mock('./album-cover-tile',()=>({...jest.requireActual('./album-cover-tile'),AlbumCoverFace:()=>null}));
-beforeEach(()=>{jest.clearAllMocks();mockLock.snapshot.locked=false;mockListeners.length=0;
+const originalDiagnostics=process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS;
+beforeEach(()=>{process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS='1';jest.clearAllMocks();mockLock.snapshot.locked=false;mockListeners.length=0;
  Object.defineProperty(AppState,'currentState',{configurable:true,writable:true,value:'active'});
  jest.spyOn(AppState,'addEventListener').mockImplementation((_event,fn)=>{mockListeners.push(fn);return {remove:()=>{const i=mockListeners.indexOf(fn);if(i>=0)mockListeners.splice(i,1);}};});
  mockDirectory.mockResolvedValue({userId:'a',families:[{familyId:'f',name:'Home',role:'creator'}]});mockAccess.mockResolvedValue({userId:'a',rulesAcknowledged:true});mockList.mockResolvedValue({access:{userId:'a'},albums:[{albumId:'b',familyId:'f',name:'Our days',entryCount:3}]});
 });
-afterEach(()=>{jest.restoreAllMocks();jest.useRealTimers();});
+afterEach(()=>{jest.restoreAllMocks();jest.useRealTimers();if(originalDiagnostics===undefined)delete process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS;else process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS=originalDiagnostics;});
 it('shows books directly and opens the exact book without another family picker',async()=>{
  const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());expect(page.queryByText('选择这册所属的家庭')).toBeNull();
  await fireEvent.press(page.getByText('Our days'));expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-albums',params:{familyId:'f',albumId:'b',mode:'read'}});
@@ -50,9 +51,9 @@ it('retains the qualified list through a transient failure and renews without a 
 it('hides on sustained network failure at the lease boundary and automatically recovers with fresh data',async()=>{
  jest.useFakeTimers();const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());mockDirectory.mockRejectedValue({code:'SERVER_UNREACHABLE'});
  for(let i=0;i<6;i++)await act(async()=>{jest.advanceTimersByTime(3000);});
- expect(page.queryByText('Our days')).toBeNull();expect(page.getByText('正在重新核对家庭内容，请稍候。')).toBeTruthy();expect(page.queryByText('再试一次')).toBeNull();expect(page.getByTestId('family-album-library-diagnostic').props.children).toContain('SERVER_UNREACHABLE');
+ expect(page.queryByText('Our days')).toBeNull();expect(page.getByText('正在更新这册内容…')).toBeTruthy();expect(page.queryByText('再试一次')).toBeNull();expect(page.getByTestId('family-album-library-diagnostic').props.children).toContain('SERVER_UNREACHABLE');
  mockDirectory.mockResolvedValue({userId:'a',families:[{familyId:'f',name:'Home',role:'creator'}]});mockList.mockResolvedValue({access:{userId:'a'},albums:[{albumId:'new',familyId:'f',name:'Fresh book',entryCount:1}]});
- await act(async()=>{jest.advanceTimersByTime(3000);});expect(page.getByText('Fresh book')).toBeTruthy();expect(page.queryByText('Our days')).toBeNull();expect(page.queryByText('正在重新核对家庭内容，请稍候。')).toBeNull();
+ await act(async()=>{jest.advanceTimersByTime(3000);});expect(page.getByText('Fresh book')).toBeTruthy();expect(page.queryByText('Our days')).toBeNull();expect(page.queryByText('正在更新这册内容…')).toBeNull();
 });
 it('shows a safe stage diagnostic and immediately hides on an explicit access denial',async()=>{
  jest.useFakeTimers();const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('Our days')).toBeTruthy());
@@ -75,4 +76,9 @@ it('shows which directory stage is blocked when the aggregate deadline fires',as
  jest.useFakeTimers();mockDirectory.mockImplementation((_current:()=>boolean,stage:(value:string)=>void)=>{stage('DIRECTORY_CACHE');return new Promise(()=>{});});
  const page=await render(<FamilyAlbumLibrary/>);await act(async()=>{jest.advanceTimersByTime(10000);});
  expect(page.getByTestId('family-album-library-diagnostic').props.children).toMatch(/REQUEST_TIMEOUT\/SERVER_UNREACHABLE.*phase=DIRECTORY_CACHE/);
+});
+
+it('does not show a diagnostic dump on the ordinary library page',async()=>{
+ delete process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS;mockDirectory.mockRejectedValue({code:'FORBIDDEN',message:'private body'});
+ const page=await render(<FamilyAlbumLibrary/>);await waitFor(()=>expect(page.getByText('再试一次')).toBeTruthy());expect(page.queryByTestId('family-album-library-diagnostic')).toBeNull();expect(page.queryByText('private body')).toBeNull();
 });

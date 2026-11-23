@@ -692,7 +692,7 @@ export function createFamilyUseCases(deps: {
       const request=++emailAuthRequest;const revision=deps.session.getRevision?.();
       const snapshot=deps.session.getSession?await deps.session.getSession():{userId:await deps.session.getUserId(),sessionToken:await deps.session.getSessionToken()};
       if(expectedUserId!==undefined&&(snapshot?.userId??null)!==expectedUserId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');
-      const issued={email:normalizeEmail(input.email),intent:input.intent,token:snapshot?.sessionToken??null,userId:snapshot?.userId??null,revision};
+      const issued={email:normalizeEmail(input.email??''),intent:input.intent,token:snapshot?.sessionToken??null,userId:snapshot?.userId??null,revision};
       const check=async()=>{if(!isCurrent()||request!==emailAuthRequest||revision!==deps.session.getRevision?.()||await deps.session.getSessionToken()!==issued.token)throw new ApplicationError('STALE_FAMILY_REQUEST','Email request is inactive.');};
       await check();if(input.intent!=='login'&&!issued.token)throw new ApplicationError('UNAUTHENTICATED','Sign in first.');
       if(!deps.client.requestEmailCode)throw new ApplicationError('FAMILY_UPGRADE_REQUIRED','Service upgrade required.');
@@ -701,7 +701,7 @@ export function createFamilyUseCases(deps: {
     },
     async verifyEmailCode(input:EmailCodeVerification,isCurrent:()=>boolean) {
       const request=++emailAuthRequest;const issued=emailTickets.get(input.challengeId);
-      if(!issued||issued.email!==normalizeEmail(input.email)||issued.intent!==input.intent)throw new ApplicationError('EMAIL_CODE_INVALID','Request a new code.');
+      if(!issued||issued.email!==normalizeEmail(input.email??'')||issued.intent!==input.intent)throw new ApplicationError('EMAIL_CODE_INVALID','Request a new code.');
       const eligible=()=>request===emailAuthRequest&&isCurrent();
       const same=async()=>{if(issued.revision!==deps.session.getRevision?.()||await deps.session.getSessionToken()!==issued.token||await deps.session.getUserId()!==issued.userId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');};
       await same();if(!eligible())throw new ApplicationError('STALE_FAMILY_REQUEST','Email request is inactive.');

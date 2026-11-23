@@ -73,25 +73,25 @@ describe('life page measures', () => {
 
   it('picks a band layout from available width and painted label size', () => {
     const withFamily = navBandItemsFor('recent', true);
-    const two = navBandItemsFor('lookback', false);
-    expect(withFamily.map((item) => item.label)).toEqual(['最近', '回看', '家庭']);
-    expect(two.map((item) => item.label)).toEqual(['最近', '回看']);
+    const personal = navBandItemsFor('lookback', false);
+    expect(withFamily.map((item) => item.label)).toEqual(['最近', '回看', '生活册', '家庭']);
+    expect(personal.map((item) => item.label)).toEqual(['最近', '回看', '生活册']);
     expect(navBandItemMinHeight(17)).toBe(48);
     expect(chooseNavBandLayout({ windowWidth: 390, items: withFamily })).toBe('row');
-    expect(chooseNavBandLayout({ windowWidth: 390, items: two })).toBe('row');
-    expect(chooseNavBandLayout({ windowWidth: 200, items: withFamily })).toBe('row');
-    expect(chooseNavBandLayout({ windowWidth: 200, items: two })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 390, items: personal })).toBe('row');
+    expect(chooseNavBandLayout({ windowWidth: 200, items: withFamily })).toBe('grid');
+    expect(chooseNavBandLayout({ windowWidth: 200, items: personal })).toBe('row');
     expect(chooseNavBandLayout({ windowWidth: 1024, items: withFamily })).toBe('row');
     expect(
       chooseNavBandLayout({
         windowWidth: 390,
-        items: two.map((item) => ({ ...item, measuredWidth: 180 })),
+        items: personal.map((item) => ({ ...item, measuredWidth: 180 })),
       }),
     ).toBe('stack');
     expect(
       chooseNavBandLayout({
         windowWidth: 390,
-        items: two.map((item) => ({ ...item, measuredWidth: 28 })),
+        items: personal.map((item) => ({ ...item, measuredWidth: 28 })),
       }),
     ).toBe('row');
     expect(shouldStackNavBand(390, 4)).toBe(false);

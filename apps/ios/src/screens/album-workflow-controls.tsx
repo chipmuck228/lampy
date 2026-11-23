@@ -1,3 +1,4 @@
+import {QuietField,PageAction} from './quiet-form';
 import {useState} from 'react';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput, type } from './life-text';
@@ -30,11 +31,7 @@ export function AlbumCreateFields({
   prefix?: string;
   maxLength?: number;
 }) {
-  return <><Text style={styles.createLabel}>{tr('册名')}</Text><TextInput accessibilityLabel={tr('册名')} testID={`${prefix}-name`} value={name} onChangeText={onChangeName} placeholder={placeholder} editable={!busy && !locked} autoCorrect={false} autoCapitalize="none" maxLength={maxLength} style={[styles.createInput, locked && {
-      color: inkSoft
-    }]} />{error ? <Text testID={`${prefix}-error`} style={styles.hint}>{error}</Text> : null}<Pressable accessibilityRole="button" accessibilityState={{
-      disabled: busy
-    }} accessibilityLabel={submitLabel} testID={`${prefix}-save`} disabled={busy} onPress={onSubmit} style={styles.hit}><Text style={[styles.action, busy && styles.disabled]}>{busy ? busyLabel : submitLabel}</Text></Pressable></>;
+  return <View style={styles.createFields}><QuietField label={tr('册名')} accessibilityLabel={tr('册名')} testID={`${prefix}-name`} value={name} onChangeText={onChangeName} placeholder={placeholder} editable={!busy && !locked} autoCorrect={false} autoCapitalize="none" maxLength={maxLength}/>{error ? <Text testID={`${prefix}-error`} style={styles.hint}>{error}</Text> : null}<PageAction tone="primary" label={busy?busyLabel:submitLabel} testID={`${prefix}-save`} disabled={busy} onPress={onSubmit}/></View>;
 }
 export function AlbumManageToolbar({
   editing,
@@ -139,23 +136,7 @@ export function AlbumEditorFields({
   </View>;
 }
 const styles = StyleSheet.create({
-  createLabel: {
-    ...type.meta,
-    color: inkSoft,
-    marginBottom: 8,
-    marginTop: 8
-  },
-  createInput: {
-    fontSize: type.body.fontSize,
-    color: ink,
-    width: '100%',
-    minHeight: 48,
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingRight: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: sage
-  },
+  createFields:{gap:20,paddingVertical:20},
   toolbar: {
     flexDirection: 'row',
     flexWrap: 'wrap',

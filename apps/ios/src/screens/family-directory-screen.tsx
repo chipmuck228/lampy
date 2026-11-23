@@ -1,3 +1,5 @@
+import {isPersonalSettingsDiagnosticsOpen} from '../application/personal-settings-visibility';
+import {QuietField} from './quiet-form';
 import {FamilyPurchasePanel} from './family-purchase-panel';
 import {unifiedPurchasesEnabled} from '../application/unified-purchases';
 import { familyAlbumEvaluationOpen } from '../application/family-album';
@@ -10,7 +12,7 @@ import { isFamilyV1ReleaseBuild, isFamilyProductEntryOpen, isControlledEmailAcco
 import { tr, appLanguage } from '../i18n';
 import { useDeviceLock } from './device-lock-context';
 import { SettingsPage } from './settings-chrome';
-import { Text, TextInput, type } from './life-text';
+import { Text, type } from './life-text';
 import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
 import { AlbumCoverFace } from './album-cover-tile';
 import { LifeIcon } from './life-icons';
@@ -114,7 +116,7 @@ export default function FamilyDirectoryScreen() {
       {state.status === 'failed' ? <View style={styles.connection} testID="family-connection-failed">
         <Text style={styles.name}>{tr('暂时连不上，稍后再看看。')}</Text>
         <Text style={styles.meta}>{tr('你的家庭没有因此消失。')}</Text>
-        {__DEV__ ? <Text selectable testID="family-directory-diagnostic" style={styles.meta}>{familyDirectoryDiagnostic(state.error)}</Text> : null}
+        {(process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS==='1'&&isPersonalSettingsDiagnosticsOpen()) ? <Text selectable testID="family-directory-diagnostic" style={styles.meta}>{familyDirectoryDiagnostic(state.error)}</Text> : null}
         <Pressable style={styles.createHit} onPress={() => void refresh()} accessibilityRole="button"><Text style={styles.action}>{tr('再试一次')}</Text></Pressable>
       </View> : null}
 <View style={styles.rootActions}>
@@ -141,8 +143,8 @@ export default function FamilyDirectoryScreen() {
         </View>
         {formOpen || retrying ? <View style={styles.form} testID="family-create-form">
           <Text style={styles.name}>{tr('给这个家起个名字')}</Text>
-          <TextInput accessibilityLabel={tr('家庭名称')} placeholder={tr('家庭名称')} value={name} editable={!busy && !retrying}
-            onChangeText={setName} maxLength={80} style={styles.input} />
+          <QuietField label={tr('家庭名称')} accessibilityLabel={tr('家庭名称')} placeholder={tr('家庭名称')} value={name} editable={!busy && !retrying}
+            onChangeText={setName} maxLength={80} />
           <View style={styles.formActions}>
             <Pressable style={styles.createHit} testID="family-create-submit" accessibilityRole="button"
               disabled={busy || !name.trim() || (state.families.length >= 10 && !retrying)}
@@ -206,8 +208,8 @@ function familyCreatedLabel(value?: string) {
 }
 const styles = StyleSheet.create({
   statusPill: { alignSelf:'flex-start', borderRadius:12, paddingHorizontal:10, paddingVertical:3 },
-  rootActions: { flexDirection:'row', gap:12, alignItems:'stretch', marginBottom:16 },
-  rootAction: { flex:1, alignSelf:'stretch', paddingHorizontal:8, marginBottom:0 },
+  rootActions: { flexDirection:'row', flexWrap:'wrap', gap:12, alignItems:'stretch', marginBottom:16 },
+  rootAction: { flex:1, minWidth:140, alignSelf:'stretch', paddingHorizontal:8, marginBottom:0 },
   joinHit: { borderColor:inkSoft, backgroundColor:'transparent' },
   joinAction: { ...type.action, color:inkSoft, flexShrink:1, textAlign:'center' },
   inlineJoin: { paddingVertical:12, marginBottom:16 },
@@ -239,7 +241,6 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   form: { gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline, marginBottom: 16 },
   formActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
-  input: { ...type.action, minHeight: 48, color: ink, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },
   empty: { ...type.body, color: inkSoft, marginVertical: 20 },
   wall: { flexDirection: 'column', gap: 20, marginTop: 12, marginBottom: 16 },
   tile: { alignSelf: 'stretch', minHeight: 48, gap: 6, paddingBottom: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },

@@ -1,3 +1,4 @@
+import {QuietField} from './quiet-form';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -13,7 +14,7 @@ import type { InvitePreview } from "../family-api/types";
 import { tr, dateLabel } from "../i18n";
 import { useDeviceLock } from "./device-lock-context";
 import { SettingsPage } from "./settings-chrome";
-import { Text, TextInput, type } from "./life-text";
+import { Text, type } from "./life-text";
 import { inkSoft, paperDeep } from "./life-page";
 import { LifeIcon } from "./life-icons";
 import { familyInviteError } from "./family-invite-copy";
@@ -167,7 +168,7 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
           {!joined ? (
             <>
               <View style={{flexDirection:"row",alignItems:"center",gap:8}}>
-              <TextInput
+              <View style={{flex:1,minWidth:0}}><QuietField label={tr("邀请链接")}
                 accessibilityLabel={tr("邀请链接")}
                 placeholder={tr("邀请链接")}
                 value={link}
@@ -183,8 +184,7 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
                 }}
                 autoCapitalize="none"
                 autoCorrect={false}
-                style={[styles.input, {flex:1}]}
-              />
+              /></View>
               <Pressable accessibilityRole="button" accessibilityLabel={tr("清除输入")} disabled={busy || (!link && !currentFamilyInvite())}
                 style={{minHeight:48,minWidth:48,alignItems:"center",justifyContent:"center"}}
                 onPress={() => { forgetFamilyInvite(); seq.current++; owner.current=null; setLink(""); setPreview(null); setUser(null); setMessage(null); }}>
@@ -290,7 +290,6 @@ function expiry(value: string) {
 const styles = StyleSheet.create({
   title: { ...type.title, marginTop: 24 },
   body: { ...type.body, color: inkSoft, marginVertical: 16 },
-  input: { ...type.action, minHeight: 48, marginVertical: 16 },
   hit: {
     minHeight: 48,
     justifyContent: "center",

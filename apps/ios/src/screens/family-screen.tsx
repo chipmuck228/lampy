@@ -1,3 +1,4 @@
+import {appleLoginEntryOpen} from '../infrastructure/apple-login-entry';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Text, TextInput } from './life-text';
@@ -639,7 +640,7 @@ export default function FamilyScreen() {
           <Text style={styles.body}>现在连不上家庭服务，不能确认家里有谁。</Text>
         ) : null}
 
-        {configured && needsAppleSignIn(membership) && appleAvailable ? (
+        {appleLoginEntryOpen() && configured && needsAppleSignIn(membership) && appleAvailable ? (
           <>
             <Text style={styles.body}>
               {membership?.kind === 'unconfirmed'
