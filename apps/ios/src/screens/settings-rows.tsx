@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 47,
   },
-  detailBlock: { paddingTop: 49, paddingBottom: 20 },
+  detailBlock: { paddingTop: 32, paddingBottom: 20 },
   detailIcon: {
     width: 42,
     height: 42,
@@ -350,6 +350,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: hairline,
   },
-  chapterTitle: { ...type.action, color: ink, marginBottom: 10 },
-  paragraph: { ...type.body, color: inkSoft, marginBottom: 12 },
+  chapterTitle: { ...type.action, fontSize:19, lineHeight:28, color: ink, marginBottom: 12 },
+  paragraph: { ...type.body, fontSize:16, lineHeight:28, color: inkSoft, marginBottom: 12 },
 });

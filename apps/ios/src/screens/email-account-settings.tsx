@@ -18,6 +18,6 @@ export default function EmailAccountSettings({onPress}:{onPress:()=>void}){
   },[locked]));
   return <SettingsGroup title={tr('账号')}><SettingsLink icon="privacy"
     title={!locked&&nickname?nickname:tr('登录与找回')}
-    detail={tr(!locked&&nickname?'登录与找回':'邮箱验证码登录与账号保护')}
+    detail={tr(!locked&&nickname?'登录与找回':'用邮箱登录，管理你的账号')}
     testID="account-open-email-code" onPress={onPress}/></SettingsGroup>;
 }

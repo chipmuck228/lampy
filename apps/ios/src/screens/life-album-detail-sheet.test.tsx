@@ -67,7 +67,8 @@ describe('moment detail collect menu', () => {
     fireEvent.press(view.getByTestId('moment-overflow'));
     await waitFor(() => {
       expect(view.getByTestId('life-album-collect-sheet')).toBeTruthy();
-      expect(view.getByLabelText('一些日子，已在此册')).toBeTruthy();
+      expect(view.getByTestId('life-album-sheet-tile-album_1').props.accessibilityLabel).toBe('一些日子，0条，已收下');
+      expect(view.getByTestId('life-album-sheet-tile-album_1')).toBeDisabled();
     });
     fireEvent.press(view.getByTestId('life-album-sheet-cancel'));
     await waitFor(() => {

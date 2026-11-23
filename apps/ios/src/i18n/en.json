@@ -1228,5 +1228,14 @@
   "免费使用时，每段新录音最多一分钟；购买相应功能后最多三十分钟。到限会自动停止并保留草稿，已有的较长录音仍可播放。": "New recordings are limited to one minute for free use, or thirty minutes after purchasing the relevant feature. Recording stops at the limit and keeps your draft. Existing longer recordings can still be played.",
   "在「我的生活册」创建个人册、收入记录、调整顺序，再预览或阅读。家庭创建者可以整理家庭册，其他成员可以阅读。": "Create a personal album in My albums, add records, arrange them, then preview or read. Family owners can organize family albums; other members can read them.",
   "保管记录与导出文件": "Keeping your records and exported files",
-  "Lampy 不提供个人记录的云备份。卸载应用可能清除本机记录和媒体；导出的文件也请自行妥善保管。": "Lampy does not provide cloud backup for personal records. Uninstalling may remove local records and media. Please also keep your exported files safe."
+  "Lampy 不提供个人记录的云备份。卸载应用可能清除本机记录和媒体；导出的文件也请自行妥善保管。": "Lampy does not provide cloud backup for personal records. Uninstalling may remove local records and media. Please also keep your exported files safe.",
+  "这册内容已变化，请刷新后继续阅读。": "This album has changed. Refresh to continue reading.",
+  "正在更新这册内容…": "Updating this album…",
+  "这次没有制作完成，请稍后重试。": "Your file could not be created. Please try again later.",
+  "正在确认购买状态…": "Checking your purchase…",
+  "暂时无法确认购买状态，请再试一次。": "Your purchase could not be checked. Please try again.",
+  "查看家庭册导出": "Family album exports",
+  "用邮箱登录，管理你的账号": "Sign in with email and manage your account",
+  "正在连接…": "Connecting…",
+  "在生活册的导出页面，可以查看价格、购买或恢复已有购买。": "Open an album’s export page to see the price, purchase or restore a previous purchase."
 }

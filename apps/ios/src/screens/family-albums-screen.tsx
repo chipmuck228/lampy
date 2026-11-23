@@ -1,3 +1,4 @@
+import {isPersonalSettingsDiagnosticsOpen} from '../application/personal-settings-visibility';
 import {subscribeFamilySafety} from '../application/family-safety-events';
 import { familyPdfEnabled } from '../application/family-album-paper';
 import {albumManageStyles as bookStyles} from './album-manage-styles';
@@ -381,8 +382,8 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
           })} disabled={busy} />}
         </> : null}
       </View> : null}
-      {failed ? <><Text>{tr('家庭内容或资格已变化，请重新核对。')}</Text>{__DEV__ ? <Text selectable testID="family-album-diagnostic" style={{...type.meta,color:inkSoft}}>{`开发诊断：${diagnostic}`}</Text> : null}{<FamilyAlbumButton label={tr('再试一次')} onPress={() => setRetry(value => value + 1)} disabled={busy} />}</> : null}
-    </View>{checking ? <View style={{paddingTop:24,gap:16}} testID="family-album-checking"><Text>{tr('正在重新核对家庭内容，请稍候。')}</Text><FamilyAlbumButton label={tr('再试一次')} onPress={()=>setRetry(value=>value+1)} disabled={busy}/>{__DEV__?<Text style={{...type.meta,color:inkSoft}}>{diagnostic}</Text>:null}</View> : null}</> : null}
+      {failed ? <><Text>{tr('这册内容已变化，请刷新后继续阅读。')}</Text>{(process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS==='1'&&isPersonalSettingsDiagnosticsOpen()) ? <Text selectable testID="family-album-diagnostic" style={{...type.meta,color:inkSoft}}>{`开发诊断：${diagnostic}`}</Text> : null}{<FamilyAlbumButton label={tr('再试一次')} onPress={() => setRetry(value => value + 1)} disabled={busy} />}</> : null}
+    </View>{checking ? <View style={{paddingTop:24,gap:16}} testID="family-album-checking"><Text>{tr('正在更新这册内容…')}</Text><FamilyAlbumButton label={tr('再试一次')} onPress={()=>setRetry(value=>value+1)} disabled={busy}/>{(process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS==='1'&&isPersonalSettingsDiagnosticsOpen())?<Text style={{...type.meta,color:inkSoft}}>{diagnostic}</Text>:null}</View> : null}</> : null}
   </SettingsPage>;
 }
 function FamilyAlbumButton({label,onPress,disabled}:{label:string;onPress:()=>void;disabled:boolean}) {

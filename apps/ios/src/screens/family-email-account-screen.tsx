@@ -1,3 +1,4 @@
+import {QuietField} from './quiet-form';
 import {emailCodeEntryOpen} from '../infrastructure/account-config';
 import { AppleAuthButton } from './apple-auth-button';
 import { createExpoAppleIdentityTokenSource } from '../infrastructure/expo-apple-auth';
@@ -13,9 +14,9 @@ import { ApplicationError, isApplicationError } from '../application/errors';
 import { tr } from '../i18n';
 import { useDeviceLock } from './device-lock-context';
 import { SettingsPage } from './settings-chrome';
-import { Text, TextInput, type } from './life-text';
+import { Text, type } from './life-text';
 import { LifeIcon } from './life-icons';
-import { hairline, ink, inkSoft, sage, paperDeep, clay, paper } from './life-page';
+import { hairline, inkSoft, sage, paperDeep, clay } from './life-page';
 
 function errorCopy(error: unknown) {
   if (isApplicationError(error)) {
@@ -220,11 +221,11 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
           {!appleLinked ? <AppleAuthButton disabled={busy} onPress={()=>profileMode?confirmAppleLink():void runApple(sequence.current)}/> : null}
         </View> : null}
         {!profileMode && !formal ? <>
-          <TextInput testID="email-account-email" accessibilityLabel={tr('邮箱')} placeholder={tr('邮箱')} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="username" maxLength={254} editable={!busy} style={styles.input}/>
-          <TextInput testID="email-account-password" accessibilityLabel={tr('密码')} placeholder={tr('密码')} value={password} onChangeText={setPassword} secureTextEntry textContentType={register ? 'newPassword' : 'password'} maxLength={128} editable={!busy} style={styles.input}/>
+          <QuietField label={tr('邮箱')} testID="email-account-email" accessibilityLabel={tr('邮箱')} placeholder={tr('邮箱')} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="username" maxLength={254} editable={!busy} />
+          <QuietField label={tr('密码')} testID="email-account-password" accessibilityLabel={tr('密码')} placeholder={tr('密码')} value={password} onChangeText={setPassword} secureTextEntry textContentType={register ? 'newPassword' : 'password'} maxLength={128} editable={!busy} />
         </> : null}
         {profileMode&&profile?.nicknameLocked?<><Text testID="email-account-fixed-nickname">{profile.nickname}</Text><Text style={styles.explanation}>{tr('昵称已保存，无法修改。')}</Text></>:null}
-        {(profileMode && profile && !profile.nicknameLocked) || register ? <TextInput testID="email-account-nickname" accessibilityLabel={tr('昵称')} placeholder={tr('昵称')} value={nickname} onChangeText={setNickname} editable={!busy} style={styles.input}/> : null}
+        {(profileMode && profile && !profile.nicknameLocked) || register ? <QuietField label={tr('昵称')} testID="email-account-nickname" accessibilityLabel={tr('昵称')} placeholder={tr('昵称')} value={nickname} onChangeText={setNickname} editable={!busy} /> : null}
         {profileMode && !profile ? (!embedded ? <Text>{tr('请先登录。')}</Text> : null) : (profileMode || !formal) && !profile?.nicknameLocked ? <Pressable testID="email-account-submit" style={styles.primary} accessibilityRole="button" accessibilityState={{disabled:busy}} disabled={busy} onPress={()=>void submit()}><Text style={styles.action}>{tr(busy ? '正在处理。' : profileMode ? '保存昵称' : register ? '创建并登录' : '登录')}</Text></Pressable> : null}
         {!profileMode && registrationAllowed ? <Pressable testID="email-account-toggle" style={styles.hit} accessibilityRole="button" disabled={busy} onPress={()=>{setRegister(!register);setMessage(null);setPassword('');}}><Text style={styles.action}>{tr(register ? '已有账号，去登录' : '没有账号，创建一个')}</Text></Pressable> : null}
       </View> : !loading ? <Pressable style={styles.hit} accessibilityRole="button" onPress={()=>void load(++sequence.current)}><Text style={styles.action}>{tr('再试一次')}</Text></Pressable> : null}
@@ -240,4 +241,4 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
   </>;
   return embedded ? <View testID="settings-profile">{content}</View> : <SettingsPage title={title} accessibilityLabel={title} backLabel={tr('返回')} onBack={cancel} pageTestID="family-email-page">{content}</SettingsPage>;
 }
-const styles=StyleSheet.create({form:{gap:16},input:{...type.action,color:ink,minHeight:48,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:hairline,paddingVertical:12},primary:{minHeight:48,borderRadius:24,backgroundColor:paperDeep,alignItems:'center',justifyContent:'center',padding:12},profileLogin:{minWidth:160,maxWidth:'100%'},profileActions:{gap:16,marginTop:16},destructive:{backgroundColor:clay},destructiveLabel:{color:paper},hit:{minHeight:48,justifyContent:'center'},action:{...type.action,color:sage},explanation:{...type.meta,color:inkSoft,marginVertical:16},avatar:{alignItems:'center',marginVertical:24}});
+const styles=StyleSheet.create({form:{gap:16},primary:{minHeight:48,borderRadius:24,backgroundColor:paperDeep,alignItems:'center',justifyContent:'center',padding:12},profileLogin:{minWidth:160,maxWidth:'100%'},profileActions:{gap:12,marginTop:28},destructive:{backgroundColor:'transparent',borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:hairline,borderRadius:0},destructiveLabel:{color:clay},hit:{minHeight:48,justifyContent:'center'},action:{...type.action,color:sage},explanation:{...type.meta,color:inkSoft,marginVertical:16},avatar:{alignItems:'center',marginVertical:24}});

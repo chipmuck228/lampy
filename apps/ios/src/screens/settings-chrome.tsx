@@ -63,7 +63,7 @@ export function SettingsPage({
             {backLabel}
           </Text>
         </Pressable>
-        <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>
+        <Text style={styles.title} accessibilityRole="header">
           {title}
         </Text>
         <View style={styles.headerSpacer} />
@@ -110,15 +110,15 @@ const styles = StyleSheet.create({
   },
   backHit: {
     flex: 1,
-    minWidth: 70,
+    minWidth: 54,
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
   },
   back: { ...type.meta, color: sage, flexShrink: 1 },
-  title: { ...type.meta, color: ink, textAlign: 'center', flexShrink: 1, maxWidth: '42%' },
-  headerSpacer: { flex: 1, minWidth: 70, minHeight: 48 },
+  title: { ...type.meta, color: ink, textAlign: 'center', flexShrink: 1, maxWidth: '58%', paddingVertical: 14 },
+  headerSpacer: { flex: 1, minWidth: 54, minHeight: 48 },
   scroll: { flex: 1 },
   column: {
     width: '100%',

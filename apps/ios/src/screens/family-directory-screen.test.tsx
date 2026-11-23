@@ -186,16 +186,22 @@ it('shows ended families as read-only markers without counting or mounting privi
 });
 
 it('shows a bounded development error code without exposing exception messages or credentials',async()=>{
+ process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS='1';
  mockOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://secret:password@family-test.yunpura.com/private?token=hidden';
  mockFamilies.mockRejectedValue(Object.assign(new Error('private body token'),{code:'SERVER_UNREACHABLE'}));
  const page=await render(<FamilyDirectoryScreen/>);
  await waitFor(()=>expect(page.getByTestId('family-directory-diagnostic')).toBeTruthy());
  expect(page.getByTestId('family-directory-diagnostic').props.children).toBe('开发诊断：FAMILY_LIST/SERVER_UNREACHABLE/Error\nAPI: https://family-test.yunpura.com');
- expect(page.queryByText(/private body token/)).toBeNull();delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;
+ expect(page.queryByText(/private body token/)).toBeNull();delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;delete process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS;
 });
 
 it('opens collection only for the selected creator family under the evaluation gate',async()=>{
  process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL='1';mockOpen.mockReturnValue(true);
  const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByTestId('family-select-home')).toBeTruthy());await fireEvent.press(page.getByTestId('family-select-home'));await fireEvent.press(page.getByTestId('family-album-collect-home'));
  expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-albums',params:{familyId:'home',mode:'collect'}});delete process.env.EXPO_PUBLIC_FAMILY_ALBUM_EVAL;
+});
+
+it('keeps debug diagnostics out of the ordinary family page without explicit opt-in',async()=>{
+ delete process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS;mockOpen.mockReturnValue(true);mockFamilies.mockRejectedValue(new Error('private details'));
+ const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByText('再试一次')).toBeTruthy());expect(page.queryByTestId('family-directory-diagnostic')).toBeNull();expect(page.queryByText(/private details/)).toBeNull();
 });

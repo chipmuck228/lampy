@@ -1,3 +1,4 @@
+import {isPersonalSettingsDiagnosticsOpen} from '../application/personal-settings-visibility';
 import {subscribeFamilySafety} from '../application/family-safety-events';
 import {familyNetworkDiagnostic} from '../infrastructure/family-network-diagnostic';
 import {FamilyAlbumCoverPreview} from './family-album-editor';
@@ -102,8 +103,8 @@ export function FamilyAlbumLibrary(){
  if(!allowed)return null;
  return <View style={{gap:16}} testID="family-album-library">
   {status==='failed'?<><Text>{tr('家庭内容或资格已变化，请重新核对。')}</Text><Pressable accessibilityRole="button" onPress={()=>setRetry(value=>value+1)} style={{minHeight:48,justifyContent:'center'}}><Text>{tr('再试一次')}</Text></Pressable></>:null}
-  {status==='checking'?<Text>{tr('正在重新核对家庭内容，请稍候。')}</Text>:null}
-  {__DEV__&&diagnostic?<Text selectable testID="family-album-library-diagnostic" style={{...type.meta,color:inkSoft}}>{`开发诊断：${diagnostic}`}</Text>:null}
+  {status==='checking'?<Text>{tr('正在更新这册内容…')}</Text>:null}
+  {process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS==='1'&&isPersonalSettingsDiagnosticsOpen()&&diagnostic?<Text selectable testID="family-album-library-diagnostic" style={{...type.meta,color:inkSoft}}>{`开发诊断：${diagnostic}`}</Text>:null}
   {status==='ready'?<>
    {rows.length===0&&pending.length===0?<Text style={{...type.body,color:inkSoft}}>{tr('还没有家庭册，把家人的日子慢慢收在一起。')}</Text>:null}
    <View testID="family-album-cover-wall" onLayout={event=>setWallWidth(Math.round(event.nativeEvent.layout.width))} style={{flexDirection:'row',flexWrap:'wrap',alignItems:'flex-start',gap:ALBUM_COVER_WALL_GAP}}>

@@ -326,7 +326,7 @@ export default function AlbumPrintScreen() {
                   : failure === 'missing'
                     ? tr('有记录、照片或声音现在读不到，请先在这一册里核对。')
                     : tr('这次未能生成PDF，请重试。原记录仍然保留。')
-                : tr('本次没有生成。请核对记录、媒体和原生构建后再试。')}
+                : tr('这次没有制作完成，请稍后重试。')}
             </ShowcaseNote>
           ) : null}
           {error && !ready ? (
@@ -383,7 +383,7 @@ export default function AlbumPrintScreen() {
                 <ShowcaseNote>{tr('同时解锁最长30分钟的录音。')}</ShowcaseNote>
               </>
             ) : unlock.loading ? (
-              <ShowcaseNote>{tr('正在核对导出权益。')}</ShowcaseNote>
+              <ShowcaseNote>{tr('正在确认购买状态…')}</ShowcaseNote>
             ) : (
               <>
                 <ShowcaseNote>{tr('商品暂时不可用，请稍后再试。')}</ShowcaseNote>

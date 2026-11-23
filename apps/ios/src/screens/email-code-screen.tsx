@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {Alert,AppState,Pressable,StyleSheet,View} from 'react-native';
+import {Alert,AppState,StyleSheet,View} from 'react-native';
 import {useFocusEffect} from 'expo-router';
 import {getAccountUseCases} from '../application/container';
 import {ApplicationError,isApplicationError} from '../application/errors';
@@ -11,8 +11,9 @@ import type {EmailCodeIntent,EmailCodeStatus,EmailCodeTicket} from '../family-ap
 import {appLanguage,tr} from '../i18n';
 import {useDeviceLock} from './device-lock-context';
 import {SettingsPage} from './settings-chrome';
-import {Text,TextInput} from './life-text';
-import {ink,inkSoft,sage,hairline} from './life-page';
+import {QuietField,PageAction,FormSection} from './quiet-form';
+import {Text} from './life-text';
+import {ink,inkSoft} from './life-page';
 
 function errorCopy(error:unknown) {
   const code=isApplicationError(error)?error.code:'';
@@ -138,29 +139,29 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn,
   return <SettingsPage title={tr('登录与找回')} backLabel={tr('返回')} accessibilityLabel={tr('登录与找回')} onBack={onCancel} pageTestID="email-code-page">
     {!open?<Text>{tr('邮箱登录暂未开放。')}</Text>:blocked?<Text>{tr('请先解锁，再继续。')}</Text>:<View style={styles.content}>
       <Text style={styles.title}>{tr(mode==='summary'?'你的邮箱':mode==='name'?'怎么称呼你？':mode==='login'?(entryMode==='register'?'注册 Lampy':'登录 Lampy'):mode==='delete'?'验证邮箱后删除账号':mode==='change'?'更换邮箱':mode==='reauth'?'验证当前邮箱':'关联邮箱')}</Text>
-      {!ready?<>{message?<Text accessibilityLiveRegion="polite">{message}</Text>:<Text>{tr('正在确认账号服务。')}</Text>}{<Action label={tr('再试一次')} onPress={()=>setRetry(value=>value+1)} disabled={false} testID={'email-code-retry'}/>}{onOtherSignIn?<Action label={tr('其他登录方式')} onPress={onOtherSignIn}/>:null}{<Action label={tr('返回')} onPress={onCancel} disabled={false} testID={'email-code-back'}/>}</>:
+      {!ready?<>{message?<Text accessibilityLiveRegion="polite">{message}</Text>:<Text>{tr('正在连接…')}</Text>}{<Action label={tr('再试一次')} onPress={()=>setRetry(value=>value+1)} disabled={false} testID={'email-code-retry'}/>}{onOtherSignIn?<Action label={tr('其他登录方式')} onPress={onOtherSignIn}/>:null}{<Action label={tr('返回')} onPress={onCancel} disabled={false} testID={'email-code-back'}/>}</>:
       mode==='summary'?<>
         {status.nickname?<Text testID="email-code-nickname">{status.nickname}</Text>:null}
         <Text>{status.maskedEmail??tr('邮箱已关联。')}</Text>
         <Text style={styles.note}>{tr('邮箱已验证。')}</Text>
         {recentlyAuthenticated?<Text testID="email-code-identity-confirmed" style={styles.note}>{tr('身份已确认，可以更换邮箱。')}</Text>:<Action label={tr('更换邮箱前重新验证身份')} onPress={()=>choose('reauth')} disabled={busy} testID="email-code-reauth"/>}
-        {<Action label={tr('更换邮箱')} onPress={()=>choose('change')} disabled={busy} testID={'email-code-change'}/>}
-        {<Action label={tr('退出登录')} onPress={()=>void logout()} disabled={busy} testID={'email-code-logout'}/>}
-        {<Action label={tr('删除账号')} onPress={deletion} disabled={busy} testID={'email-code-delete'}/>}
+        {<Action tone="primary" label={tr('更换邮箱')} onPress={()=>choose('change')} disabled={busy} testID={'email-code-change'}/>}
+        <FormSection>{<Action label={tr('退出登录')} onPress={()=>void logout()} disabled={busy} testID={'email-code-logout'}/>}
+        {<Action tone="destructive" label={tr('删除账号')} onPress={deletion} disabled={busy} testID={'email-code-delete'}/>}</FormSection>
       </>:mode==='name'?<>
         <Text style={styles.body}>{tr('留一个家人熟悉的称呼。')}</Text>
         <Text style={styles.note}>{tr('昵称仅能在首次登录时设置，保存后无法修改。')}</Text>
-        <TextInput testID="email-code-name" accessibilityLabel={tr('昵称')} value={nickname} onChangeText={setNickname} maxLength={24} editable={!busy} style={styles.input}/>
-        {<Action label={tr('继续')} onPress={()=>void name()} disabled={busy||!nickname.trim()} testID={'email-code-name-save'}/>}
+        <QuietField label={tr('昵称')} testID="email-code-name" accessibilityLabel={tr('昵称')} value={nickname} onChangeText={setNickname} maxLength={24} editable={!busy}/>
+        {<Action tone="primary" label={tr('继续')} onPress={()=>void name()} disabled={busy||!nickname.trim()} testID={'email-code-name-save'}/>}
       </>:<>
         {mode==='login'?<Text style={styles.body}>{tr('登录和注册都使用邮箱验证码，无需设置密码。')}</Text>:null}
         <Text style={styles.body}>{tr(mode==='delete'?'删除账号会移除家庭账号相关数据，本机个人记录保留。':mode==='reauth'?'请输入当前账号已关联的完整邮箱。':mode==='change'?'请输入新的邮箱地址，我们会向新邮箱发送验证码。':'我们会发送一封邮件，你可以切换到邮箱查看验证码，再回来继续。')}</Text>
-        <TextInput testID="email-code-address" accessibilityLabel={tr('邮箱')} value={email} onChangeText={value=>{setEmail(value);setCode('');setTicket(null);}} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="emailAddress" maxLength={254} style={styles.input}/>
-        {<Action label={limited?`${tr('稍后重试')} (${limited})`:remaining?`${tr('重新获取')} (${remaining})`:activeTicket?tr('重新获取'):tr('获取验证码')} onPress={()=>void send()} disabled={needsRefresh||busy||remaining>0||limited>0} testID={'email-code-send'}/>}
+        <QuietField label={tr('邮箱')} placeholder="name@example.com" testID="email-code-address" accessibilityLabel={tr('邮箱')} value={email} onChangeText={value=>{setEmail(value);setCode('');setTicket(null);}} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="emailAddress" maxLength={254}/>
+        {<Action tone={activeTicket?'quiet':'primary'} label={limited?`${tr('稍后重试')} (${limited})`:remaining?`${tr('重新获取')} (${remaining})`:activeTicket?tr('重新获取'):tr('获取验证码')} onPress={()=>void send()} disabled={needsRefresh||busy||remaining>0||limited>0} testID={'email-code-send'}/>}
         {ticket&&!activeTicket?<Text style={styles.body}>{tr('验证码已过期，请重新获取。')}</Text>:null}
         {activeTicket?<>
-          <TextInput testID="email-code-value" accessibilityLabel={tr('六位验证码')} value={code} onChangeText={value=>setCode(value.replace(/\D/g,'').slice(0,6))} editable={!busy} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={6} style={styles.input}/>
-          {<Action label={tr(mode==='delete'?'确认删除账号':'验证并继续')} onPress={()=>mode==='delete'?Alert.alert(tr('删除账号'),tr('这个操作无法撤销。'),[{text:tr('取消'),style:'cancel'},{text:tr('确认删除账号'),style:'destructive',onPress:()=>void verify()}]):void verify()} disabled={busy||code.length!==6} testID={'email-code-verify'}/>}
+          <QuietField label={tr('六位验证码')} placeholder="000000" testID="email-code-value" accessibilityLabel={tr('六位验证码')} value={code} onChangeText={value=>setCode(value.replace(/\D/g,'').slice(0,6))} editable={!busy} keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={6}/>
+          {<Action tone="primary" label={tr(mode==='delete'?'确认删除账号':'验证并继续')} onPress={()=>mode==='delete'?Alert.alert(tr('删除账号'),tr('这个操作无法撤销。'),[{text:tr('取消'),style:'cancel'},{text:tr('确认删除账号'),style:'destructive',onPress:()=>void verify()}]):void verify()} disabled={busy||code.length!==6} testID={'email-code-verify'}/>}
         </>:null}
         {mode==='change'&&status.linked&&!recentlyAuthenticated?<Action label={tr('先验证当前邮箱')} onPress={()=>choose('reauth')} disabled={busy}/>:null}
         {mode==='login'?<>
@@ -176,6 +177,6 @@ export default function EmailCodeScreen({onAuthenticated,onCancel,onOtherSignIn,
     </View>}
   </SettingsPage>;
 }
-const styles=StyleSheet.create({content:{gap:20,paddingVertical:24},title:{fontSize:25,lineHeight:36,color:ink},body:{fontSize:16,lineHeight:26,color:inkSoft},note:{fontSize:13,lineHeight:22,color:inkSoft},input:{fontSize:18,color:ink,borderBottomWidth:StyleSheet.hairlineWidth,borderColor:hairline,paddingVertical:12},button:{alignSelf:'flex-start',paddingVertical:10,minHeight:48,justifyContent:'center'},link:{fontSize:16,color:sage}});
+const styles=StyleSheet.create({content:{gap:16,paddingTop:32,paddingBottom:24},title:{fontSize:25,lineHeight:36,color:ink},body:{fontSize:16,lineHeight:26,color:inkSoft},note:{fontSize:13,lineHeight:22,color:inkSoft}});
 
-function Action({label,onPress,disabled=false,testID}:{label:string;onPress:()=>void;disabled?:boolean;testID?:string}){return <Pressable testID={testID} accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button,disabled&&{opacity:0.4}]}><Text style={styles.link}>{label}</Text></Pressable>;}
+const Action=PageAction;

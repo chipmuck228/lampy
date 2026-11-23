@@ -16,6 +16,8 @@ import { SETTINGS_TERMS_CHAPTERS, SETTINGS_TERMS_UPDATED } from './settings-term
 import { SettingsPage, settingsEdgePad } from './settings-chrome';
 import { paper, READING_MAX } from './life-page';
 
+let mockLaunch=false;
+jest.mock('../infrastructure/launch-release-config',()=>({isAppstoreLaunchBuild:()=>mockLaunch}));
 const mockDismissTo = jest.fn();
 
 jest.mock('expo-router', () => ({
@@ -44,7 +46,7 @@ function wrap(node: ReactElement) {
 
 describe('account settings pages', () => {
   beforeEach(() => {
-    mockDismissTo.mockReset();
+    mockDismissTo.mockReset();mockLaunch=false;
   });
 
   it('states only checked storage facts and returns to the settings root', async () => {
@@ -78,6 +80,11 @@ describe('account settings pages', () => {
     expect(view.queryByText('已订阅')).toBeNull();
     fireEvent.press(view.getByLabelText('返回'));
     expect(mockDismissTo).toHaveBeenCalledWith('/account');
+  });
+
+  it('describes purchase and restore in a launch build without falsely claiming all purchases are closed',async()=>{
+    mockLaunch=true;const view=await render(wrap(<AccountSubscribeScreen/>));
+    expect(view.queryByTestId('account-subscribe-none')).toBeNull();expect(view.getByText('在生活册的导出页面，可以查看价格、购买或恢复已有购买。')).toBeTruthy();
   });
 
   it('explains current help chapters with live UI names', async () => {
