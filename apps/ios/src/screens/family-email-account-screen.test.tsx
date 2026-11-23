@@ -2,6 +2,9 @@ import { Alert, AppState } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { ApplicationError } from '../application/errors';
 import FamilyEmailAccountScreen from './family-email-account-screen';
+let mockAppleEntryOpen=true;
+jest.mock('../infrastructure/apple-login-entry',()=>({appleLoginEntryOpen:()=>mockAppleEntryOpen}));
+beforeEach(()=>{mockAppleEntryOpen=true;});
 const mockDelete=jest.fn(),mockAuthorization=jest.fn();let mockFormal=false;
 let mockEmailCodeOpen=false;
 jest.mock('../infrastructure/account-config',()=>({emailCodeEntryOpen:()=>mockEmailCodeOpen}));
@@ -247,4 +250,11 @@ it('shows a locked email nickname as text without an edit or save control',async
  const page=await render(<FamilyEmailAccountScreen profileMode/>);
  await waitFor(()=>expect(page.getByTestId('email-account-fixed-nickname')).toBeTruthy());
  expect(page.queryByTestId('email-account-nickname')).toBeNull();expect(page.queryByTestId('email-account-submit')).toBeNull();
+});
+
+it('hides Apple sign-in in the email-only development scope',async()=>{
+ mockAppleEntryOpen=false;mockHealth.mockResolvedValue({controlledEmailAccounts:true,appleLogin:true});mockAppleAvailable.mockResolvedValue(true);
+ const page=await render(<FamilyEmailAccountScreen/>);
+ await waitFor(()=>expect(page.getByTestId('email-account-email')).toBeTruthy());
+ expect(page.queryByTestId('apple-auth-button')).toBeNull();expect(mockAuthenticateApple).not.toHaveBeenCalled();
 });

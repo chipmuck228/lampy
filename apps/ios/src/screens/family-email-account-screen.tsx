@@ -1,3 +1,4 @@
+import {appleLoginEntryOpen} from '../infrastructure/apple-login-entry';
 import {QuietField} from './quiet-form';
 import {emailCodeEntryOpen} from '../infrastructure/account-config';
 import { AppleAuthButton } from './apple-auth-button';
@@ -142,7 +143,7 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
         }
   }
   async function runApple(seq:number) {
-    if(!current(seq) || !ready || !appleAvailable || owner.current!==null || profileMode) return;
+    if(!appleLoginEntryOpen() || !current(seq) || !ready || !appleAvailable || owner.current!==null || profileMode) return;
     owner.current=seq;appleRecoveryMessage.current=null;setBusy(true);setMessage(null);setPassword('');
     try {
       const service=await getFamilyUseCases();if(!current(seq)) return;
@@ -208,7 +209,7 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
       {profileMode ? (profile ? <View testID="settings-profile-avatar" style={styles.avatar}><LifeIcon name="person" size={56} color={sage}/></View> : ready && embedded ? <View style={styles.avatar}><Pressable testID="settings-profile-login" style={[styles.primary,styles.profileLogin]} accessibilityRole="button" onPress={() => router.push({pathname:'/family-email-account',params:{returnTo:'settings'}})}><Text style={styles.action}>{tr('登录')}</Text></Pressable></View> : null) : <Text style={styles.explanation}>{tr(formal ? '通过Apple登录，开始使用家庭。个人记录仍保存在本机。' : internal ? '请使用受邀测试账号登录。' : '邮箱仅用作测试账号，不会发送邮件。')}</Text>}
       {loading ? <Text>{tr('正在读取。')}</Text> : null}
       {ready ? <View style={styles.form}>
-        {appleAvailable && !register && !profileMode ? <View style={{gap:12}}>
+        {appleLoginEntryOpen() && appleAvailable && !register && !profileMode ? <View style={{gap:12}}>
           <AppleAuthButton disabled={busy} onPress={()=>void runApple(sequence.current)}/>
         </View> : null}
         {!profileMode && !formal ? <>
@@ -226,7 +227,7 @@ export default function FamilyEmailAccountScreen({ profileMode = false, embedded
         <Pressable testID="email-account-sign-out" style={styles.primary} accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={confirmSignOut}><Text style={styles.action}>{tr('退出登录')}</Text></Pressable>
         {formal ? <Pressable testID="account-delete" style={[styles.primary,styles.destructive]} accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={()=>emailCodeEntryOpen()&&!appleLinked?router.push('/account/email-code'):confirmDeletion()}><Text style={[styles.action,styles.destructiveLabel]}>{tr('删除账号')}</Text></Pressable> : null}
       </View> : null}
-      {formal && ready && !profileMode && !appleAvailable ? <Text>{tr('这台设备暂不能使用Apple登录。')}</Text> : null}
+      {appleLoginEntryOpen() && formal && ready && !profileMode && !appleAvailable ? <Text>{tr('这台设备暂不能使用Apple登录。')}</Text> : null}
       {message ? <Text testID="email-account-message" style={styles.explanation}>{message}</Text> : null}
     </>}
   </>;

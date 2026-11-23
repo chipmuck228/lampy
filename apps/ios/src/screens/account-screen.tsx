@@ -1,3 +1,4 @@
+import {appleLoginEntryOpen} from '../infrastructure/apple-login-entry';
 import EmailAccountSettings from './email-account-settings';
 import {emailCodeEntryOpen} from '../infrastructure/account-config';
 import { personalAlbumsAvailable, personalRecordsOnly } from '../application/mobile-capabilities';
@@ -368,7 +369,7 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
     }
   }
 
-  const showAppleButton = snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
+  const showAppleButton = appleLoginEntryOpen() && snapshot?.canSignIn === true && snapshot.appleAvailable && busy === 'idle';
   const showTestLoginPanel = Boolean(snapshot && snapshot.kind !== 'service-unavailable' && snapshot.kind !== 'signed-in');
   const showDiagnosticsEntry = !diagnostics && diagnosticsAllowed;
 
