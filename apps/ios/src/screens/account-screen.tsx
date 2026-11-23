@@ -386,7 +386,7 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
       >
         <SettingsIntro />
         {emailCodeEntryOpen()?<EmailAccountSettings onPress={()=>router.push('/account/email-code')}/>:null}
-        {isFamilyProductEntryOpen() && (isFamilyV1ReleaseBuild() || (isControlledEmailAccountsOpen() && (isFamilyInternalTestBuild() || diagnosticsAllowed))) ? <SettingsGroup title={tr("我的资料")}><FamilyEmailAccountScreen profileMode embedded/></SettingsGroup> : null}
+        {!emailCodeEntryOpen() && isFamilyProductEntryOpen() && (isFamilyV1ReleaseBuild() || (isControlledEmailAccountsOpen() && (isFamilyInternalTestBuild() || diagnosticsAllowed))) ? <SettingsGroup title={tr("我的资料")}><FamilyEmailAccountScreen profileMode embedded/></SettingsGroup> : null}
         <SettingsGroup title={tr("本机")}>
           <DeviceLockSettings />
           <SettingsLink
