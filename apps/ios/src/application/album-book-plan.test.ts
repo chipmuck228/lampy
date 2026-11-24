@@ -22,3 +22,8 @@ it('sorts exports by moment time, retains ties, places unknown dates last and le
  const entries=[record('late','2026-01-03'),record('early','2026-01-01'),record('tie','2026-01-01'),{...record('unknown','2025-01-01'),occurredAtPrecision:'unknown' as const}];
  const source={...options,input:{...options.input,entries}};expect(chronologicalBook(source).input.entries.map(e=>e.momentId)).toEqual(['early','tie','late','unknown']);expect(source.input.entries[0].momentId).toBe('late');
 });
+
+it('still chooses an album photo when all pictures are below the preferred cover resolution',()=>{
+ const media=[{assetId:'small',role:'image' as const,availability:'available' as const,intrinsicRatio:4/3,widthPx:800,heightPx:600,durationMs:null}];
+ const input={...options.input,entries:[{...options.input.entries[0],media}]};expect(selectBookCover({...options,input,assets:{small:{path:'media/small.jpg',mime:'image/jpeg'}}})).toBe('media/small.jpg');
+});

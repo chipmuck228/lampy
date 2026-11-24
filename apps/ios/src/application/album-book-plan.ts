@@ -20,8 +20,10 @@ export function bookDay(options:AlbumEpubOptions,index:number):{key:string;label
 export function selectBookCover(options:AlbumEpubOptions):string{
  const {input,assets}=options;
  if(input.album.cover.kind==='image')return assets[input.album.cover.assetId]?.path??'';
- const candidates=input.entries.flatMap(e=>e.media).filter(m=>m.role==='image'&&assets[m.assetId]&&m.widthPx&&m.heightPx&&Math.max(m.widthPx,m.heightPx)>=1200&&Math.min(m.widthPx,m.heightPx)>=800&&(photoRatio(m)??0)>=.65&&(photoRatio(m)??0)<=2);
- candidates.sort((a,b)=>Math.abs((photoRatio(a)??1)-4/3)-Math.abs((photoRatio(b)??1)-4/3));
+ const all=input.entries.flatMap(e=>e.media).filter(m=>m.role==='image'&&assets[m.assetId]);
+ const preferred=all.filter(m=>m.widthPx&&m.heightPx&&Math.max(m.widthPx,m.heightPx)>=1200&&Math.min(m.widthPx,m.heightPx)>=800&&(photoRatio(m)??0)>=.65&&(photoRatio(m)??0)<=2);
+ const candidates=preferred.length?preferred:all;
+ candidates.sort((a,b)=>Math.abs((photoRatio(a)??99)-4/3)-Math.abs((photoRatio(b)??99)-4/3));
  return candidates.length?assets[candidates[0].assetId].path:'';
 }
 export type BookSection={indices:number[];layout:'daily-notes'|'photo-story'|'photo-only'|'prose'};

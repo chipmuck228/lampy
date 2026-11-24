@@ -1,3 +1,4 @@
+import {chronicleCover,CHRONICLE_COVER_CSS} from './album-chronicle-cover';
 import {feelingAccentColor,isFeelingWord} from './feeling-accent';
 import {planPhotoComposition,photoFit} from './album-photo-composition';
 import type {AlbumEpubOptions} from './album-epub';
@@ -39,7 +40,7 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
  };
  const photo=(_index:number,media:typeof input.entries[number]['media'][number])=>linkedPhoto(media,0);
  const heading=escape(input.album.name);
- add('cover',input.album.name,`<div class="fixed-cover${coverPath?' has-photo':' default-cover'}">${coverPath?`<div class="cover-photo"><img src="${escape(coverPath)}" alt="${heading}"/></div>`:''}<div class="cover-shade"></div><div class="cover-type"><p class="brand">LAMPY</p><h1 style="font-size:${input.album.name.length>50?48:76}px">${heading}</h1></div>${!coverPath?'<img class="default-symbol" src="lampy-symbol.svg" alt=""/>':''}</div>`);
+ add('cover',input.album.name,chronicleCover(options,coverPath,escape));
  const opening=input.album.opening?.trim()?input.album.opening:PUBLICATION_OPENING[language];
  splitPublicationText(opening,26,12).forEach((chunk,i)=>add(i?'opening-'+(i+1):'opening',zh?'开篇':'Preface',`<div class="opening-type"><div class="fixed-prose">${escape(chunk)}</div></div>`,i===0));
  let previous='';
@@ -151,4 +152,5 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 .full-photo{background:#fff}.full-photo .reference-photo{background:transparent}
 
 .single-photo-plate{position:absolute;inset:0;background:#fff}.triptych-seam{position:absolute;top:0;bottom:0;width:8px;background:#fff;pointer-events:none}.seam-one{left:calc(33.333333% - 4px)}.seam-two{left:calc(66.666667% - 4px)}.feeling-stripe{position:absolute;left:0;top:0;bottom:0;width:5px;pointer-events:none}.photo-credit{position:absolute;bottom:42px;right:64px;max-width:700px;font:17px/1.4 Georgia,serif;color:#707575;text-align:right}
+${CHRONICLE_COVER_CSS}
 `;
