@@ -68,7 +68,7 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
   }
   if(design==='imagebook'){
     for(const leaf of imagebookPages(options,coverPath,epubEscape)){
-      page(leaf.name,leaf.title,leaf.body);
+      page(leaf.name,leaf.title,leaf.body,leaf.body.includes('<svg')?'svg':'');
       if(leaf.linear===false)spine[spine.length-1]=`<itemref idref="${leaf.name}" linear="no"/>`;
       if(leaf.nav)nav.push(`<li><a href="${leaf.name}.xhtml">${epubEscape(leaf.title)}</a></li>`);
     }
