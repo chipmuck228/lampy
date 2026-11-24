@@ -13,13 +13,16 @@ try {
  const moments=[
   {day:'2026-10-03',note:'窗边的光慢慢移过来，花还在原来的位置。今天没有特别的事，也想把这一刻留住。',media:[photo('window')]},
   {day:'2026-10-14',note:'我们坐了一会儿，咖啡凉了也没关系。',media:[photo('window'),photo('coffee'),photo('coffee')]},
+  {day:'2026-10-14',note:'回家路上，记住了风吹过树叶的声音。',media:[]},
+  {day:'2026-10-14',note:'晚饭后又一起散了步。',media:[]},
+  {day:'2026-10-20',note:'',media:[photo('flowers'),photo('coffee'),photo('window')]},
   {day:'2026-11-02',note:'那些看起来相似的日子，仔细想想，每一天都不一样。',media:[photo('coffee'),photo('flowers'),photo('window'),photo('coffee')]},
   {day:'2026-11-09',note:'想把这个下午的声音也留下来。',media:[{assetId:'voice',role:'audio',availability:'available',intrinsicRatio:null,durationMs:null}]},
   {day:'2026-11-16',note:('记得那天我们一起把花移到窗边，阳光落在叶子上。谁也没有急着说什么，只是安静地坐着。\n').repeat(16),media:[photo('flowers'),photo('window')]},
   {day:null,note:'已经不记得是哪一天，只记得那时候的心情。',media:[photo('coffee')]},
  ];
  const entries=moments.map((m,i)=>({momentId:'synthetic-'+i,collectedAt:'',sourceRevisionAtCollect:1,presence:'ready',revision:1,note:m.note,attribution:i%2?'小禾':'家人',feeling:'',occurredAt:m.day?m.day+'T12:00:00Z':undefined,occurredAtPrecision:m.day?'day':'unknown',recordedAt:'2026-11-23T00:00:00Z',media:m.media}));
- const input={album:{id:'synthetic-book',schemaVersion:1,name:'平常日子',opening:null,cover:{kind:'image',momentId:entries[1].momentId,assetId:'coffee'},entries:[],createdAt:'',updatedAt:''},entries};
+ const input={album:{id:'synthetic-book',schemaVersion:1,name:'平常日子',opening:null,cover:{kind:'words'},entries:[],createdAt:'',updatedAt:''},entries};
  const dates=Object.fromEntries(entries.map(e=>[e.momentId,{label:e.occurredAt?e.occurredAt.slice(0,10):'日子未确认',chapter:e.occurredAt?(e.occurredAt.includes('-10-')?'2026年10月':'2026年11月'):'日子未确认'}]));
  for(const design of ['literary','imagebook']){
   const options={input,assets,language:'zh-Hans',design,id:'synthetic-'+design,createdAt:'2026-11-23T00:00:00Z',dates};

@@ -25,3 +25,12 @@ it('retains the user preface unchanged, including an all-photo record and words 
  const custom={...input,album:{...input.album,opening:'原来的开篇。'},entries:[{...input.entries[0],note:'',media:[input.entries[0].media[0]]}]};
  const files=albumEpubDocuments({...options,input:custom});expect(xml(files['OEBPS/opening.xhtml']).querySelector('.fixed-prose')!.textContent).toBe('原来的开篇。');expect(xml(files['OEBPS/record-1.xhtml']).querySelectorAll('img')).toHaveLength(1);
 });
+
+it('preserves each grouped daily note and all three photographs in a planned gallery',()=>{
+ const first={...input.entries[0],momentId:'one',occurredAt:'2026-01-01T12:00:00Z',occurredAtPrecision:'day',note:'早上的记录。',media:[]};
+ const second={...first,momentId:'two',note:'晚上的记录。'};
+ const third={...first,momentId:'three',note:'',media:[input.entries[0].media[0],input.entries[0].media[2],input.entries[0].media[0]]};
+ const files=albumEpubDocuments({...options,input:{...input,entries:[first,second,third]}});
+ const day=xml(files['OEBPS/record-1.xhtml']);expect([...day.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).toEqual([first.note,second.note]);expect(files['OEBPS/record-2.xhtml']).toBeUndefined();
+ const gallery=xml(files['OEBPS/record-3.xhtml']);expect([...gallery.querySelectorAll('img')].map(n=>n.getAttribute('src'))).toEqual(['media/photo-1.jpg','media/photo-2.jpg','media/photo-1.jpg']);
+});

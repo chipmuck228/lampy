@@ -1,6 +1,7 @@
+import {selectBookCover,bookDateRange,LAMPY_PUBLICATION_SYMBOL} from './album-book-plan';
 import {imagebookPages,IMAGEBOOK_CSS} from './album-imagebook';
 import {ALBUM_PUBLICATION_CSS} from './album-publication-css';
-import {photoRatio,photoComposition,publicationSummary,PUBLICATION_COPY,PUBLICATION_OPENING} from './album-publication';
+import {photoRatio,photoComposition,PUBLICATION_COPY,PUBLICATION_OPENING} from './album-publication';
 import { strToU8, zipSync } from 'fflate';
 import type { AlbumLayoutInput } from './album-layout-input';
 import type { AlbumReadingStyle } from './album-reading';
@@ -46,7 +47,9 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
     spine.push(`<itemref idref="${name}"/>`);
   };
   const used = new Set<string>();
-  let coverPath = '';
+  let coverPath = selectBookCover(options);
+  files['OEBPS/lampy-symbol.svg']=strToU8(LAMPY_PUBLICATION_SYMBOL);
+  manifest.push('<item id="lampy-symbol" href="lampy-symbol.svg" media-type="image/svg+xml"/>');
   if (input.album.cover.kind === 'image') {
     const cover = input.album.cover;
     const record = input.entries.find(e => e.momentId === cover.momentId);
@@ -68,7 +71,7 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
       if(leaf.nav)nav.push(`<li><a href="${leaf.name}.xhtml">${epubEscape(leaf.title)}</a></li>`);
     }
   }else{
-  page('cover', input.album.name, `<section class="cover${coverPath?' with-image':''}" epub:type="cover">${coverPath ? `<figure class="cover-picture"><img src="${coverPath}" alt="${title}"/></figure>` : ''}<div class="cover-copy"><p class="cover-kicker">LAMPY</p><h1 class="cover-title">${title}</h1></div></section>`);
+  page('cover', input.album.name, `<section class="cover${coverPath?' with-image':''}" epub:type="cover">${coverPath ? `<figure class="cover-picture"><img src="${coverPath}" alt="${title}"/></figure>` : '<figure class="cover-picture default-cover-picture"><img src="lampy-symbol.svg" alt=""/></figure>'}<div class="cover-copy"><p class="cover-kicker">LAMPY</p><h1 class="cover-title">${title}</h1></div></section>`);
   const publication=PUBLICATION_COPY[language];
   const opening=input.album.opening?.trim()?input.album.opening:PUBLICATION_OPENING[language];
   page('opening', copy.opening, `<section class="opening" epub:type="preface"><div class="prose">${paragraphs(opening)}</div></section>`);
@@ -123,9 +126,8 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
     group.entries.push(`<article class="entry${kind}" id="entry-${index + 1}"><header class="entry-head"><p class="entry-meta"><span class="date">${epubEscape(date.label)}</span>${feeling}</p>${record.attribution ? `<p class="attribution">${epubEscape(record.attribution)}</p>` : ''}</header>${lead}${prose}<div class="entry-media">${mediaParts.join('')}</div></article>`);
   });
   flush();
-  const stats=publicationSummary(input,language);
-  const notes=language==='zh-Hans'?'制作记录':'Edition notes';
-  page('archive',notes,`<section class="edition-notes" epub:type="colophon"><h1>${notes}</h1><p>${title}</p><dl>${stats.map(stat=>`<div><dt>${stat.value}</dt><dd>${stat.label}</dd></div>`).join('')}</dl><p class="made">${copy.edition} ${epubEscape(options.createdAt.slice(0,10))}</p><p class="imprint">Lampy</p></section>`);
+  const notes=language==='zh-Hans'?'Lampy · 留存':'Lampy · Colophon';
+  page('archive',notes,`<section class="edition-notes" epub:type="colophon"><img class="edition-symbol" src="lampy-symbol.svg" alt="Lampy"/><p class="edition-brand">Lampy</p><p>${title}</p><p>${epubEscape(bookDateRange(options))}</p><p class="made">${language==='zh-Hans'?'珍藏于':'Kept on'} ${epubEscape(options.createdAt.slice(0,10))}</p></section>`);
   nav.push(`<li><a href="archive.xhtml">${notes}</a></li>`);
   }
   page('nav' , copy.contents, `<nav epub:type="toc" id="toc"><h1 class="section-label">${copy.contents}</h1><ol><li><a href="cover.xhtml">${title}</a></li>${nav.join('')}</ol></nav>`, 'nav');

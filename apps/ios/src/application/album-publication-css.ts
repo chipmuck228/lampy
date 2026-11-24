@@ -21,6 +21,8 @@ p{orphans:2;widows:2;overflow-wrap:anywhere}
 audio{width:100%;max-width:100%}.sound-fallback{font:.65em/1.6 sans-serif;opacity:.6;margin-top:.6em}
 .edition-notes{padding:4em 1em 1em}.edition-notes h1{font-size:1.2em;margin-bottom:1.5em}.edition-notes p{font:.8em/1.8 sans-serif;opacity:.7}
 .edition-notes dl{display:table;width:100%;margin:2em 0}.edition-notes dl>div{display:table-cell}.edition-notes dt{font:1.5em/1.5 Georgia,serif}.edition-notes dd{font:.7em/1.8 sans-serif;opacity:.6}.imprint{margin-top:1em}
+.edition-notes{text-align:center;padding-top:35vh}.edition-symbol{width:6em;height:6em;display:block;margin:0 auto}.edition-notes .edition-brand{font:1.8em/1.5 Georgia,serif;letter-spacing:.08em;opacity:1}.edition-notes .made{margin-top:1em}
+.default-cover-picture img{width:9em;height:9em}.default-cover-picture{padding:3em;background:#f4f1eb}
 nav{padding:1em}nav ol{list-style:none;padding:0}nav li{margin:.8em 0}a{color:inherit;text-decoration:none}
 @media screen and (max-width:480px){.photo-pair,.photo-row,.photo.paired,.photo-row .photo{display:block;width:auto}.photo.paired{margin:1em auto}}
 `;

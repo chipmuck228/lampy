@@ -121,9 +121,9 @@ it('defaults old manifests to literary and rejects unknown design values', () =>
   expect(()=>buildAlbumEpub({...options,design:'other' as never})).toThrow('EPUB_INVALID_DESIGN');
 });
 
-it('includes a keepsake page with real counts and declares inline audio artwork in the manifest',()=>{
+it('includes a minimal branded colophon and declares inline audio artwork in the manifest',()=>{
  const archive=files();const doc=new JSDOM(strFromU8(archive['OEBPS/archive.xhtml']),{contentType:'application/xml'}).window.document;
- expect([...doc.querySelectorAll('dt')].map(x=>x.textContent)).toEqual(['1','1','1']);
+ expect(doc.querySelector('h1,dl')).toBeNull();expect(doc.querySelector('.edition-symbol')!.getAttribute('src')).toBe('lampy-symbol.svg');expect(doc.body.textContent).toContain('珍藏于');
  const opf=new JSDOM(strFromU8(archive['OEBPS/package.opf']),{contentType:'application/xml'}).window.document;
  expect(opf.querySelector('item[id="record-1"]')!.getAttribute('properties')).toBe('svg');
  expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('若无法播放，请换用支持声音的阅读器。');
