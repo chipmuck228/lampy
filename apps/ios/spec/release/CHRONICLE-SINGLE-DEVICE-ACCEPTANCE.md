@@ -1,0 +1,62 @@
+# Chronicle 单图正式导出验收
+
+已接入 Photo journal（Chronicle）正式导出路径；不是样张专用 XHTML 替换。封面、开篇、日期构图保持定稿，日期仅更新心情色谱。App 全局心情色板、原生 PDF、Literary、家庭导出入口不在此次改动中。已有完成的 EPUB 保持原文件，需要创建新电子册才会采用新版。
+
+## 已实现
+
+- 单图无文字：足够尺寸且裁剪保留面积至少82%的横图可三联铺页；其他图片完整等比展示。
+- 单图短文：按保守字体宽度、实际行数及换行计算容量；横图上图下文，竖图左图右文。
+- 单图长文：照片独立一页，正文另页。优先保持完整段落，超长段落可续页；不缩小字号，不截字，保留 Unicode、段落和换行。只在续页开头不绘制纯换行分隔符，原文本仍在 DOM 中完整保留。
+- 16px 左侧装订色边，同一记录各文字续页保持同色；未选心情不显示色边。固定模板色谱为青绿至青黛，日期渐变使用同一色谱且仍为3px。
+- 小图在阅读页最多放大2倍；比例低于0.4或高于2.5、尺寸信息不完整或低分辨率小图采用独立完整展示，文字另页。
+- 优先使用原生转换、旋转校正后的实际尺寸，补齐或覆盖缺失/错误元数据；原生准备过程不预先放大小图。仍无尺寸时只 contain，不猜测裁剪。无法解码的图片沿用明确导出失败，不生成空白伪成功页。
+- 图片点击进入已有的完整图片页并能返回原锚点；EPUB 沿用优化后图片，未将原始高分辨率文件重复嵌入。源照片及记录保持不变。
+- 单张照片伴随声音时，声音保留在独立播放页，使用既有播放器；新的声音页视觉设计尚未收口。
+
+## 在 Mac 安装
+
+在原有真机 checkout 中执行（没有交互式 zsh 的 `#` 注释行）：
+
+```bash
+cd ~/WeChatProjects/lampy-pr141-device
+git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 fetch origin
+git switch release/album-keepsake-design
+git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 pull --ff-only origin release/album-keepsake-design
+git rev-parse --short HEAD
+cd apps/ios
+bash scripts/prepare-chronicle-device.sh
+```
+
+脚本会运行 npm ci、重置残留功能开关并明确开启个人付费导出设计测试、prebuild、同步 Pods、写入 Xcode 环境并打开 workspace。包含原生图片准备逻辑变更，必须重新编译；仅刷新 Metro 不足以验证。本地 StoreKit 产品标识是 app.lampy.export.designtest，不代表真实 Sandbox 支付。
+
+若已有自建 StoreKit 文件放在生成的 ios/ 中，运行前先复制到该目录以外保存。在 Xcode 的 Scheme → Run 选择 Release 与包含上述产品的本地 StoreKit Configuration，使用既有 Bundle ID、签名团队和 iPhone。执行 Clean Build Folder 后 Run，覆盖安装，不卸载已有 App。不要使用会关闭导出开关的家庭内测准备脚本。
+
+## 真机验收清单
+
+先把验收 EPUB 在 iPhone Books 中打开，核对视觉；再从 App 创建新电子册，验证导出链路。选择 Photo journal。测试图片包可解压后将图片存到照片，再添加到对应 moment；一条记录仍最多三张照片，此次每条只需一张。
+
+| 项目 | 操作与预期 |
+|---|---|
+| 无文字 | 横图可三联；竖图完整，不拉伸。最左侧色边比日期细线宽。 |
+| 短文 | 横图文字在图下，竖图文字在侧面；有足够底部空间，无重复日期。 |
+| 长文 | 使用至少数百字与多段文字；独立装饰页、舒适行距、段落无缺字、无多余空白页或溢出。英文和 emoji 也检查。 |
+| 心情 | 分别测试高兴、平静、感动、疲惫、难过、烦乱、说不清及未选；青绿青黛统一，同一记录各页一致，未选无色边。日期页仍是原位置细线。 |
+| 小图 | small.jpg 不铺满、不三联、不放大成模糊整页；留白可接受。 |
+| 长图 | long.png 六段内容及末尾完整保留；文字另页。全貌很细是已知限制，尚无分段细节页，原图缩放需实际 Books 检查。 |
+| 全景图 | panorama.jpg 完整横向展示，上下留白，不裁成普通横图。此文件为构造比例边界的照片裁切测试素材，导出本身不裁切。 |
+| 尺寸/旋转 | 导入 unknown.jpg 与手机拍摄竖图；不颠倒、不拉伸。内部元数据为空/错误由自动化链路测试覆盖，仅去 EXIF 不等于清空内部字段。 |
+| 原图返回 | 从三联、短文和边界图点击完整图片，再点返回，回到正确的正文图片。 |
+| 声音 | 一张图＋文字＋声音，声音独立播放页可播放，没有丢失。 |
+| 完成状态 | 导出打开 Books，再返回 Lampy，不出现 Preparation was stopped；已保存电子册仍可再次分享。 |
+| 已存文件 | 已完成旧电子册重分享保持原样；创建新电子册出现新版，源记录和照片不变。 |
+
+记录：提交号、iPhone 型号、iOS 版本、App 语言、Books 横/竖屏、失败项及截图。目前本环境完成静态和自动化验证，没有连接真实 iPhone；Xcode 原生编译、Books 字体、缩放及播放器均待以上真机验收。
+
+## 复现正式验收样册
+
+```bash
+python3 scripts/publication-edge-assets.py NEW_ASSET_DIR
+node scripts/publication-acceptance-fixture.cjs NEW_OUTPUT_DIR ASSET_DIR
+```
+
+生成器直接调用正式 albumEpubDocuments/buildAlbumEpub，不替换 HTML/CSS。中英各包含六种基本单图、四种尺寸边界及一条照片伴随声音的记录。尺寸缺失案例明确模拟“读取转换后的实际尺寸再投影”，不是在纯渲染器中解析图片。原生图像转换仍需真机测试。Pillow 仅生成开发测试素材，不是 App 依赖。

@@ -7,10 +7,18 @@ func prepareEpubImage(_ source: String, _ destination: String) throws -> [String
     let input = try printLocalURL(source)
     let output = try printLocalURL(destination)
     guard let imageSource = CGImageSourceCreateWithURL(input as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
-          let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, [
+          let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any],
+          let sourceWidth = properties[kCGImagePropertyPixelWidth] as? NSNumber,
+          let sourceHeight = properties[kCGImagePropertyPixelHeight] as? NSNumber,
+          sourceWidth.intValue > 0, sourceHeight.intValue > 0 else {
+      throw NSError(domain: "LampyEpub", code: 1, userInfo: [NSLocalizedDescriptionKey: "EPUB_IMAGE_UNREADABLE"])
+    }
+    // Never enlarge a small source before the publication can apply its size limit.
+    let maximum = min(1600, max(sourceWidth.intValue, sourceHeight.intValue))
+    guard let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 1600,
+            kCGImageSourceThumbnailMaxPixelSize: maximum,
             kCGImageSourceShouldCacheImmediately: true
           ] as CFDictionary) else {
       throw NSError(domain: "LampyEpub", code: 1, userInfo: [NSLocalizedDescriptionKey: "EPUB_IMAGE_UNREADABLE"])

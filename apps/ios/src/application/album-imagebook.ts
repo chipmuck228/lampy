@@ -1,7 +1,8 @@
+import {splitPublicationText} from './album-publication-text';
 import {chronicleDatePages,CHRONICLE_DATE_CSS} from './album-chronicle-date';
 import {chronicleOpening,CHRONICLE_OPENING_CSS} from './album-chronicle-opening';
 import {chronicleCover,CHRONICLE_COVER_CSS} from './album-chronicle-cover';
-import {feelingAccentColor,isFeelingWord} from './feeling-accent';
+import {planChronicleSingle,chronicleSingleBody,chronicleProsePages,chronicleProseBody,CHRONICLE_SINGLE_CSS} from './album-chronicle-single';
 import {planPhotoComposition,photoFit} from './album-photo-composition';
 import type {AlbumEpubOptions} from './album-epub';
 import {PUBLICATION_OPENING} from './album-publication';
@@ -9,36 +10,17 @@ import {PUBLICATION_OPENING} from './album-publication';
 import {planBookSections,bookDateRange,bookDay} from './album-book-plan';
 
 export type ImagebookPage={name:string;title:string;body:string;nav:boolean;linear?:boolean};
-/** Conservative pagination budget; leaves room for platform serif font differences.
- * Chunks preserve every source character. Never clamp, ellipsize or hide overflow.
- */
-export function splitPublicationText(text:string,columns=30,lines=14):string[]{
- const graphemes=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(text)].map(s=>s.segment):Array.from(text);
- const chunks:string[]=[];let start=0;
- while(start<graphemes.length){
-  let line=0,width=0,end=start,lastPause=-1;
-  while(end<graphemes.length){
-   const glyph=graphemes[end],newline=glyph==='\n'||glyph==='\r\n';
-   const weight=newline?0:/^[\x20-\x7e]+$/.test(glyph)?glyph===' '? .4:.65:1.2;
-   if(newline||width+weight>columns){if(line+1>=lines&&end>start)break;line++;width=0;}
-   if(!newline)width+=weight;
-   end++;if(/[\n。！？.!?;]/u.test(glyph))lastPause=end;
-  }
-  if(end<graphemes.length&&lastPause>start+(end-start)*.7)end=lastPause;
-  chunks.push(graphemes.slice(start,end).join(''));start=end;
- }
- return chunks;
-}
+export {splitPublicationText} from './album-publication-text';
 export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:(s:string)=>string):ImagebookPage[]{
  const {input,assets,dates,language}=options;const zh=language==='zh-Hans';const pages:ImagebookPage[]=[];
  const add=(name:string,title:string,body:string,nav=false)=>pages.push({name,title,body:`<main class="fixed-page">${body}</main>`,nav});
 
  const fullPages:ImagebookPage[]=[];
  let photoPage=0,readingPage='',photoCredit='';
- const linkedPhoto=(media:typeof input.entries[number]['media'][number],target:number)=>{
+ const linkedPhoto=(media:typeof input.entries[number]['media'][number],target:number,fit?:'cover'|'contain')=>{
   const n=++photoPage,full=`photo-${n}`,anchor=`view-${n}`;
   fullPages.push({name:full,title:zh?'完整图片':'Full photograph',nav:false,linear:false,body:`<main class="fixed-page"><div class="original-photo"><img src="${escape(assets[media.assetId].path)}" alt="${zh?'完整图片':'Full photograph'}"/></div><p class="photo-credit">${escape(photoCredit)}</p><a class="photo-return" href="${readingPage}.xhtml#${anchor}">${zh?'返回正文':'Back to reading'} ↩</a></main>`});
-  return `<a id="${anchor}" class="photo-link" href="${full}.xhtml" aria-label="${zh?'查看完整图片':'View full photograph'}"><img style="object-fit:${photoFit(media,target)}" src="${escape(assets[media.assetId].path)}" alt="${zh?'点击查看完整图片':'Open full photograph'}"/></a>`;
+  return `<a id="${anchor}" class="photo-link" href="${full}.xhtml" aria-label="${zh?'查看完整图片':'View full photograph'}"><img style="object-fit:${fit??photoFit(media,target)}" src="${escape(assets[media.assetId].path)}" alt="${zh?'点击查看完整图片':'Open full photograph'}"/></a>`;
  };
  const photo=(_index:number,media:typeof input.entries[number]['media'][number])=>linkedPhoto(media,0);
  const heading=escape(input.album.name);
@@ -58,12 +40,17 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(section.layout==='daily-notes'&&section.indices.length>1){
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
   }
-  if(record.media.length===1&&record.media[0].role==='image'&&!record.note.trim()){
+  const singleImages=record.media.filter(media=>media.role==='image');
+  if(singleImages.length===1&&record.media.every(media=>media.role==='image'||media.role==='audio')){
    readingPage=name();
-   const media=record.media[0],triptych=photoFit(media,4/3)==='cover';
-   const feeling=record.feeling.trim();
-   const color=feeling?feelingAccentColor({value:feeling,label:feeling,known:isFeelingWord(feeling)}):null;
-   addRecord(`<section class="single-photo-plate${triptych?' continuous-triptych':''}">${linkedPhoto(media,4/3)}${triptych?'<span class="triptych-seam seam-one" aria-hidden="true"></span><span class="triptych-seam seam-two" aria-hidden="true"></span>':''}${color?`<span class="feeling-stripe" style="background:${color}" role="img" aria-label="${escape(feeling)}"></span>`:''}</section>`,false);
+   const media=singleImages[0],plan=planChronicleSingle(media,record.note);
+   addRecord(chronicleSingleBody(record,plan,linkedPhoto(media,plan.target,plan.kind==='triptych'?'cover':'contain'),language,escape),false);
+   if(record.note.trim()&&!plan.shortText)chronicleProsePages(record.note).forEach((chunk,i)=>addRecord(chronicleProseBody(chunk,record,i,language,escape),false));
+   for(const audio of record.media.filter(media=>media.role==='audio')){
+    const sec=audio.durationMs==null?null:Math.max(0,Math.round(audio.durationMs/1000));
+    const duration=sec==null?'':`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
+    addRecord(`<aside class="voice-page"><p class="voice-label">${zh?'听听当时的声音':'Listen to this moment'}${duration?' · '+duration:''}</p><audio controls="controls" preload="none" src="${escape(assets[audio.assetId].path)}">${zh?'请使用支持声音的阅读器。':'Use an audio-capable reader.'}</audio></aside>`);
+   }
    return;
   }
   const composition=planPhotoComposition(record.media,!!record.note.trim(),index%2===1,record.note.length);
@@ -157,4 +144,5 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 ${CHRONICLE_COVER_CSS}
 ${CHRONICLE_OPENING_CSS}
 ${CHRONICLE_DATE_CSS}
+${CHRONICLE_SINGLE_CSS}
 `;

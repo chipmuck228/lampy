@@ -1,6 +1,6 @@
 import type {AlbumEpubOptions} from './album-epub';
 import {bookDay} from './album-book-plan';
-import {feelingAccentColor,isFeelingWord} from './feeling-accent';
+import {chronicleFeeling,CHRONICLE_NEUTRAL} from './album-chronicle-feeling';
 
 const MONTHS=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 const ZH_MONTHS=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
@@ -32,7 +32,7 @@ export function dateTypography(options:AlbumEpubOptions,index:number):{year:stri
 export function chronicleDatePages(options:AlbumEpubOptions,index:number,escape:(s:string)=>string):{name:string;title:string;body:string;nav:boolean}[]{
  const date=bookDay(options,index),type=dateTypography(options,index);
  let end=index;while(end<options.input.entries.length&&bookDay(options,end).key===date.key)end++;
- const colors=options.input.entries.slice(index,end).map(e=>e.feeling.trim()).map(value=>value?feelingAccentColor({value,label:value,known:isFeelingWord(value)}):'#c4d3cd');
+ const colors=options.input.entries.slice(index,end).map(e=>chronicleFeeling(e.feeling)??CHRONICLE_NEUTRAL);
  const stops=colors.map((color,i)=>`<stop offset="${colors.length===1?0:i/(colors.length-1)*100}%" stop-color="${color}"/>`).join('');
  return [{name:`date-${index+1}`,title:date.label,nav:true,body:`<section class="chronicle-date-page" lang="${options.language}"><header class="date-masthead">LAMPY<span aria-hidden="true"></span></header><h1 class="date-stack ${type.day?'is-day':type.month?'is-month':type.year?'is-year':'is-uncertain'}" aria-label="${escape(date.label)}">${type.year?`<span class="date-year-month"><span class="date-year">${escape(type.year)}</span>${type.month?`<span class="date-month">${escape(type.month)}</span>`:''}</span>${type.day?`<span class="date-day">${escape(type.day)}</span>`:''}`:`<span class="date-uncertain">${escape(type.label)}</span>`}</h1><svg xmlns="http://www.w3.org/2000/svg" class="date-axis" viewBox="0 0 3 485" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="date-gradient" x1="0" y1="0" x2="0" y2="1">${stops}</linearGradient></defs><rect width="3" height="485" fill="url(#date-gradient)"/></svg><footer class="date-imprint"><span lang="en">Chronicle</span><i aria-hidden="true"></i></footer></section>`}];
 }

@@ -140,3 +140,16 @@ it('composes prepared image dimensions after orientation normalization without c
  const frozen=files.get(root+'manifest.json')!;await shareAlbumEpub('print_test',()=>true);
  const archive=unzipSync(files.get(resultUri())!);expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('photo portrait');expect(files.get(root+'manifest.json')).toEqual(frozen);
 });
+
+it.each([[160,107,'width:320px;height:214px'],[900,1600,'width:416.25px;height:740px'],[266,1600,'height:756px']])('uses decoded %i×%i dimensions in the actual fixed export even when record dimensions are wrong',async(width,height,geometry)=>{
+ const id='epub_single',dir=`file:///documents/album-epub-editions/${id}/`;
+ const snapshot={...manifest(true),id,kind:'epub',design:'imagebook',dates:{}};
+ Object.assign(snapshot.content.entries[0].media[0],{widthPx:1400,heightPx:932,intrinsicRatio:1.5});
+ files.set(dir+'manifest.json',strToU8(JSON.stringify(snapshot)));files.set(dir+'manifest.sha256',strToU8(manifestDigest(snapshot)));files.set(dir+'media-0',new Uint8Array([255,216,255]));
+ const frozen=files.get(dir+'manifest.json')!.slice();
+ prepareImage.mockImplementationOnce(async(_source,dest)=>{files.set(dest,new Uint8Array([255,216,255]));return {mime:'image/jpeg',extension:'jpg',bytes:3,width,height};});
+ await shareAlbumEpub(id,()=>true);
+ const uri=[...files.keys()].find(k=>k.startsWith(dir)&&/album-.*\.epub$/.test(k))!;
+ const archive=unzipSync(files.get(uri)!);expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain(geometry);
+ expect(files.get(dir+'manifest.json')).toEqual(frozen);
+});
