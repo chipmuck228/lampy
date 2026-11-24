@@ -1,3 +1,4 @@
+import {chronicleDatePages,CHRONICLE_DATE_CSS} from './album-chronicle-date';
 import {chronicleOpening,CHRONICLE_OPENING_CSS} from './album-chronicle-opening';
 import {chronicleCover,CHRONICLE_COVER_CSS} from './album-chronicle-cover';
 import {feelingAccentColor,isFeelingWord} from './feeling-accent';
@@ -49,7 +50,7 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   const index=section.indices[0],record=input.entries[index];
   const date=dates[record.momentId]??{label:zh?'日子未确认':'Date uncertain',chapter:zh?'日子未确认':'Date uncertain'};
   const day=bookDay(options,index);const chapter=previous!==day.key;previous=day.key;
-  if(chapter)add(`date-${index+1}`,day.label,`<section class="date-opener"><p class="date-rule"></p><h1>${escape(day.label)}</h1></section>`,true);
+  if(chapter)for(const leaf of chronicleDatePages(options,index,escape))add(leaf.name,leaf.title,leaf.body,leaf.nav);
   const label=`<header class="fixed-meta">${chapter?`<h2>${escape(date.chapter)}</h2>`:''}<p>${escape(date.label)}${section.indices.length===1&&record.attribution?' · '+escape(record.attribution):''}${section.indices.length===1&&record.feeling?' · '+escape(record.feeling):''}</p></header>`;
   let page=0;const name=()=>`record-${index+1}${page?'-'+(page+1):''}`;
   const addRecord=(body:string,showHeader=true)=>{add(name(),date.chapter,`${showHeader?label:''}${body}`,false);page++;};
@@ -155,4 +156,5 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 .single-photo-plate{position:absolute;inset:0;background:#fff}.triptych-seam{position:absolute;top:0;bottom:0;width:8px;background:#fff;pointer-events:none}.seam-one{left:calc(33.333333% - 4px)}.seam-two{left:calc(66.666667% - 4px)}.feeling-stripe{position:absolute;left:0;top:0;bottom:0;width:5px;pointer-events:none}.photo-credit{position:absolute;bottom:42px;right:64px;max-width:700px;font:17px/1.4 Georgia,serif;color:#707575;text-align:right}
 ${CHRONICLE_COVER_CSS}
 ${CHRONICLE_OPENING_CSS}
+${CHRONICLE_DATE_CSS}
 `;

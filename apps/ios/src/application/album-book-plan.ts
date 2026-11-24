@@ -14,7 +14,7 @@ export function bookDay(options:AlbumEpubOptions,index:number):{key:string;label
  const e=options.input.entries[index],date=options.dates[e.momentId];
  if(!e.occurredAt||e.occurredAtPrecision==='unknown')return {key:'unknown',label:options.language==='zh-Hans'?'日子未确认':'Date uncertain'};
  const precision=e.occurredAtPrecision;const key=e.occurredAt.slice(0,precision==='year'?4:precision==='month'?7:10);
- return {key:date?precision+'|'+date.label:key,label:date?.label??key};
+ return {key:date?(precision==='year'?'year':precision==='month'?'month':'day')+'|'+date.label:key,label:date?.label??key};
 }
 /** Publication decisions are pure and preserve the user's entry/media order. */
 export function selectBookCover(options:AlbumEpubOptions):string{
