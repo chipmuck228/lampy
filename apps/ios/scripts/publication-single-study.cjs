@@ -8,6 +8,9 @@ Module._extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f
 try{
  const {albumEpubDocuments,epubEscape:esc}=require('../src/application/album-epub.ts');
  const {splitPublicationText}=require('../src/application/album-imagebook.ts');
+ const {FEELING_ACCENT}=require('../src/application/feeling-accent.ts');
+ const palette={高兴:'#BACDC0',感动:'#9FBAB0',平静:'#829E96',疲惫:'#718A87',难过:'#455F65',烦乱:'#526C6C',说不清:'#8D9F9A'};
+ const moods=['高兴','平静','感动','疲惫','难过','烦乱'];
  const root=path.resolve(out);fs.mkdirSync(root,{recursive:true});
  const pictures={coffee:[1400,932],window:[1200,1800]};
  const assets=Object.fromEntries(Object.keys(pictures).map(n=>[n,{path:`media/${n}.jpg`,mime:'image/jpeg',bytes:new Uint8Array(fs.readFileSync(path.join(__dirname,`../assets/first-run/${n}.jpg`)))}]));
@@ -16,20 +19,27 @@ try{
  const css=`
  .study-page{position:absolute;inset:0;background:#faf9f5;color:#303a37;font-family:"Songti SC","Noto Serif CJK SC",Baskerville,Georgia,serif}
  .study-photo{position:absolute;margin:0}.study-photo a,.study-photo img{display:block;width:100%;height:100%}.study-photo img{object-fit:contain}
- .study-stripe{position:absolute;left:0;top:0;bottom:0;width:5px;background:#6b8a7c}
+ .study-stripe{position:absolute;left:0;top:0;bottom:0;width:16px;background:var(--study-mood,#829E96)}
  .study-seam{position:absolute;top:0;bottom:0;width:8px;background:#faf9f5}.study-seam.one{left:33.333%}.study-seam.two{left:66.666%}
- .study-short{position:absolute;font-size:30px;line-height:1.85;white-space:pre-wrap;letter-spacing:.025em}.study-short>span{display:block;width:45px;border-top:2px solid #6b8a7c;margin-bottom:30px}
+ .study-short{position:absolute;font-size:30px;line-height:1.85;white-space:pre-wrap;letter-spacing:.025em}.study-short>span{display:block;width:45px;border-top:2px solid var(--study-mood,#829E96);margin-bottom:30px}
  .study-masthead{position:absolute;left:120px;right:120px;top:96px;font:17px/1.5 Georgia,serif;letter-spacing:5px;color:#105f62}.study-masthead i{position:absolute;left:140px;right:0;top:12px;border-top:1px solid #b8cac4}
  .study-prose{position:absolute;left:220px;top:215px;width:760px;margin:0;font-size:29px;line-height:1.85;letter-spacing:.025em;white-space:pre-wrap;overflow-wrap:break-word}
  .study-page:lang(en){font-family:Baskerville,"Palatino Linotype",Georgia,serif}.study-page:lang(en) .study-prose{font-size:30px;line-height:1.8;letter-spacing:0}
- .study-side{position:absolute;left:168px;top:222px;width:2px;height:64px;background:#6b8a7c}
+ .study-side{position:absolute;left:168px;top:222px;width:2px;height:64px;background:var(--study-mood,#829E96)}
  .study-footer{position:absolute;left:120px;right:120px;top:782px;border-top:1px solid #b8cac4;padding-top:22px;font:italic 21px/1.4 Baskerville,Georgia,serif;color:#687870}.study-footer b{float:right;font:19px/1.4 Georgia,serif;letter-spacing:.1em;font-weight:400}
  `;
  for(const [lang,language]of [['zh','zh-Hans'],['en','en']]){
   const cases=[['coffee','none'],['window','none'],['coffee','short'],['window','short'],['coffee','long'],['window','long']];
-  const entries=cases.map(([assetId],i)=>{const [widthPx,heightPx]=pictures[assetId];return {momentId:'study-'+i,collectedAt:'',sourceRevisionAtCollect:1,presence:'ready',revision:1,note:'',feeling:'平静',occurredAt:`2026-07-${String(i+1).padStart(2,'0')}`,occurredAtPrecision:'day',recordedAt:'',media:[{assetId,role:'image',availability:'available',widthPx,heightPx,intrinsicRatio:widthPx/heightPx,durationMs:null}]};});
+  const entries=cases.map(([assetId],i)=>{const [widthPx,heightPx]=pictures[assetId];return {momentId:'study-'+i,collectedAt:'',sourceRevisionAtCollect:1,presence:'ready',revision:1,note:'',feeling:moods[i],occurredAt:'2026-07-01',occurredAtPrecision:'day',recordedAt:'',media:[{assetId,role:'image',availability:'available',widthPx,heightPx,intrinsicRatio:widthPx/heightPx,durationMs:null}]};});
   const options={input:{album:{id:'study',schemaVersion:1,name:lang==='zh'?'慢下来的日子':'The Unhurried Days',opening:null,cover:{kind:'image',momentId:entries[0].momentId,assetId:'coffee'},entries:[],createdAt:'',updatedAt:''},entries},assets,language,design:'imagebook',id:'single-study-'+lang,createdAt:'2026-11-24',dates:Object.fromEntries(entries.map(e=>[e.momentId,{label:e.occurredAt,chapter:lang==='zh'?'2026年7月':'July 2026'}]))};
-  const docs=albumEpubDocuments(options);docs['OEBPS/style.css']=strToU8(strFromU8(docs['OEBPS/style.css'])+css);
+  const docs=albumEpubDocuments(options);
+  // Study-only palette: preserve the application palette and the approved date geometry.
+  for(const file of Object.keys(docs).filter(f=>f.endsWith('.xhtml')||f.endsWith('.css'))){
+   let value=strFromU8(docs[file]);
+   for(const [mood,color]of Object.entries(FEELING_ACCENT))value=value.replaceAll(color,palette[mood]);
+   docs[file]=strToU8(value);
+  }
+  docs['OEBPS/style.css']=strToU8(strFromU8(docs['OEBPS/style.css'])+css);
   let opf=strFromU8(docs['OEBPS/package.opf']);const proof=[];
   cases.forEach(([assetId,mode],i)=>{
    const n=i+1,name=`record-${n}`,file=`OEBPS/${name}.xhtml`,original=strFromU8(docs[file]);
@@ -43,7 +53,7 @@ try{
     body=portrait?photo(80,80,740*ratio,740)+`<div class="study-short" style="left:660px;top:330px;width:430px"><span aria-hidden="true"></span>${esc(note)}</div>`:photo((1200-900)/2,60,900,900/ratio)+`<div class="study-short" style="left:150px;top:720px;width:900px;font-size:28px">${esc(note)}</div>`;
    }else body=framed();
    body+= '<span class="study-stripe" aria-hidden="true"></span>';
-   const wrap=body=>`<main class="fixed-page"><section class="study-page" lang="${language}">${body}</section></main>`;
+   const wrap=body=>`<main class="fixed-page"><section class="study-page" lang="${language}" style="--study-mood:${palette[moods[i]]}">${body}</section></main>`;
    const document=body=>original.replace(/<body[^>]*>[\s\S]*<\/body>/,`<body class="imagebook">${wrap(body)}</body>`);
    docs[file]=strToU8(document(body));proof.push({name,label:`${lang==='zh'?(portrait?'竖图':'横图'):(portrait?'Portrait':'Landscape')} · ${mode==='none'?'无文字':mode==='short'?'短文字':'长文字照片页'}`});
    if(mode==='long'){
@@ -55,7 +65,7 @@ try{
     }
     if(chunks.join('\n\n')!==text)throw Error('Text lost');
     let items='',refs='';
-    chunks.forEach((chunk,j)=>{const next=name+'-text-'+(j+1);docs[`OEBPS/${next}.xhtml`]=strToU8(document(`<header class="study-masthead">LAMPY<i aria-hidden="true"></i></header><span class="study-side" aria-hidden="true"></span><div class="study-prose">${esc(chunk)}</div><footer class="study-footer"><span lang="en">Chronicle</span><b>${String(j+1).padStart(2,'0')}</b></footer>`));items+=`<item id="${next}" href="${next}.xhtml" media-type="application/xhtml+xml"/>`;refs+=`<itemref idref="${next}"/>`;proof.push({name:next,label:`${portrait?'竖图':'横图'} · 长文${j===0?'首页':'续页 '+j}`});});
+    chunks.forEach((chunk,j)=>{const next=name+'-text-'+(j+1);docs[`OEBPS/${next}.xhtml`]=strToU8(document(`<span class="study-stripe" aria-hidden="true"></span><header class="study-masthead">LAMPY<i aria-hidden="true"></i></header><span class="study-side" aria-hidden="true"></span><div class="study-prose">${esc(chunk)}</div><footer class="study-footer"><span lang="en">Chronicle</span><b>${String(j+1).padStart(2,'0')}</b></footer>`));items+=`<item id="${next}" href="${next}.xhtml" media-type="application/xhtml+xml"/>`;refs+=`<itemref idref="${next}"/>`;proof.push({name:next,label:`${portrait?'竖图':'横图'} · 长文${j===0?'首页':'续页 '+j}`});});
     opf=opf.replace('</manifest>',items+'</manifest>').replace(`<itemref idref="${name}"/>`,`<itemref idref="${name}"/>`+refs);
    }
   });
