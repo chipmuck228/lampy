@@ -29,7 +29,7 @@ try {
   {day:'2026-11-16',note:('记得那天我们一起把花移到窗边，阳光落在叶子上。谁也没有急着说什么，只是安静地坐着。\n').repeat(16),media:[photo('flowers'),photo('window')]},
   {day:null,note:'已经不记得是哪一天，只记得那时候的心情。',media:[photo('coffee')]},
  ];
- const entries=moments.map((m,i)=>({momentId:'synthetic-'+i,collectedAt:'',sourceRevisionAtCollect:1,presence:'ready',revision:1,note:m.note,attribution:i%2?'小禾':'家人',feeling:'',occurredAt:m.day?m.day+'T12:00:00Z':undefined,occurredAtPrecision:m.day?'day':'unknown',recordedAt:'2026-11-23T00:00:00Z',media:m.media}));
+ const entries=moments.map((m,i)=>({momentId:'synthetic-'+i,collectedAt:'',sourceRevisionAtCollect:1,presence:'ready',revision:1,note:m.note,attribution:i%2?'小禾':'家人',feeling:m.media.length===1&&!m.note?'感动':'',occurredAt:m.day?m.day+'T12:00:00Z':undefined,occurredAtPrecision:m.day?'day':'unknown',recordedAt:'2026-11-23T00:00:00Z',media:m.media}));
  const input={album:{id:'synthetic-book',schemaVersion:1,name:'平常日子',opening:null,cover:{kind:'words'},entries:[],createdAt:'',updatedAt:''},entries};
  const dates=Object.fromEntries(entries.map(e=>[e.momentId,{label:e.occurredAt?e.occurredAt.slice(0,10):'日子未确认',chapter:e.occurredAt?(e.occurredAt.includes('-10-')?'2026年10月':'2026年11月'):'日子未确认'}]));
  for(const design of ['literary','imagebook']){

@@ -62,3 +62,14 @@ it.each([1,2,3])('preserves long paragraph text and all %i photos through refere
  expect(docs.flatMap(doc=>[...doc.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).join('')).toBe(note);
  expect(docs.flatMap(doc=>[...doc.querySelectorAll('.photo-link')])).toHaveLength(count);
 });
+
+it('makes one landscape photo a continuous three-panel plate with no repeated date and a feeling stripe',()=>{
+ const record={...input.entries[0],note:'',feeling:'感动',attribution:'家人',media:[input.entries[0].media[2]]};
+ const files=albumEpubDocuments({...options,input:{...input,entries:[record]}});const doc=xml(files['OEBPS/record-1.xhtml']);
+ expect(doc.querySelectorAll('.continuous-triptych img')).toHaveLength(1);expect(doc.querySelectorAll('.triptych-seam')).toHaveLength(2);expect(doc.querySelector('.fixed-meta')).toBeNull();expect(doc.querySelector('.feeling-stripe')!.getAttribute('style')).toContain('#B0898C');
+ const full=xml(files['OEBPS/'+doc.querySelector('.photo-link')!.getAttribute('href')]);expect(full.querySelector('.photo-credit')!.textContent).toContain('家人 · 感动');expect(full.querySelector('.photo-return')!.getAttribute('href')).toContain('record-1.xhtml#view-');
+});
+it('does not force portrait photos into a heavily cropped triptych or invent a feeling',()=>{
+ const record={...input.entries[0],note:'',feeling:'',media:[input.entries[0].media[0]]};
+ const files=albumEpubDocuments({...options,input:{...input,entries:[record]}});const doc=xml(files['OEBPS/record-1.xhtml']);expect(doc.querySelector('.single-photo-plate')).not.toBeNull();expect(doc.querySelector('.triptych-seam,.feeling-stripe,.fixed-meta')).toBeNull();expect(doc.querySelector('img')!.getAttribute('style')).toContain('contain');
+});

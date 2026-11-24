@@ -30,7 +30,15 @@ it('keeps all photo and text rectangles inside a consistent safe area with no ov
   all.forEach((a,i)=>all.slice(i+1).forEach(b=>expect(Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x)<=1e-6||Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)<=1e-6).toBe(true)));
  }
 });
-it('preserves the accepted three-image prose quadrant and gives single photos real dimensions',()=>{
- expect(planPhotoComposition([photo(4/3),photo(4/3),photo(4/3)],true)!.kind).toBe('three-story');
+it('uses an aligned photo wall and a separate prose band and gives single photos real dimensions',()=>{
+ expect(planPhotoComposition([photo(4/3),photo(4/3),photo(4/3)],true)!.kind).toBe('photo-wall');
  const p=planPhotoComposition([photo(4/3)],true)!.photos[0];expect(p.width).toBeGreaterThan(600);expect(p.width/p.height).toBeCloseTo(4/3);
+});
+
+it('packs three portrait photos as a wall without three empty horizontal quadrant frames',()=>{
+ const rs=[.75,.75,.75],plan=planPhotoComposition(rs.map(photo),true,false,30)!;
+ expect(plan.kind).toBe('photo-wall');expect(plan.text).toHaveLength(1);
+ expect(plan.photos.reduce((n,p)=>n+p.width*p.height,0)).toBeGreaterThan(450000);
+ plan.photos.forEach((p,i)=>expect(p.width/p.height).toBeCloseTo(rs[i]));
+ expect(Math.max(...plan.photos.map(p=>p.y+p.height))).toBeLessThan(plan.text[0].y);
 });

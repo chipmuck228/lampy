@@ -1,3 +1,4 @@
+import {feelingAccentColor,isFeelingWord} from './feeling-accent';
 import {planPhotoComposition,photoFit} from './album-photo-composition';
 import type {AlbumEpubOptions} from './album-epub';
 import {PUBLICATION_OPENING} from './album-publication';
@@ -30,10 +31,10 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
  const add=(name:string,title:string,body:string,nav=false)=>pages.push({name,title,body:`<main class="fixed-page">${body}</main>`,nav});
 
  const fullPages:ImagebookPage[]=[];
- let photoPage=0,readingPage='';
+ let photoPage=0,readingPage='',photoCredit='';
  const linkedPhoto=(media:typeof input.entries[number]['media'][number],target:number)=>{
   const n=++photoPage,full=`photo-${n}`,anchor=`view-${n}`;
-  fullPages.push({name:full,title:zh?'完整图片':'Full photograph',nav:false,linear:false,body:`<main class="fixed-page"><div class="original-photo"><img src="${escape(assets[media.assetId].path)}" alt="${zh?'完整图片':'Full photograph'}"/></div><a class="photo-return" href="${readingPage}.xhtml#${anchor}">${zh?'返回正文':'Back to reading'} ↩</a></main>`});
+  fullPages.push({name:full,title:zh?'完整图片':'Full photograph',nav:false,linear:false,body:`<main class="fixed-page"><div class="original-photo"><img src="${escape(assets[media.assetId].path)}" alt="${zh?'完整图片':'Full photograph'}"/></div><p class="photo-credit">${escape(photoCredit)}</p><a class="photo-return" href="${readingPage}.xhtml#${anchor}">${zh?'返回正文':'Back to reading'} ↩</a></main>`});
   return `<a id="${anchor}" class="photo-link" href="${full}.xhtml" aria-label="${zh?'查看完整图片':'View full photograph'}"><img style="object-fit:${photoFit(media,target)}" src="${escape(assets[media.assetId].path)}" alt="${zh?'点击查看完整图片':'Open full photograph'}"/></a>`;
  };
  const photo=(_index:number,media:typeof input.entries[number]['media'][number])=>linkedPhoto(media,0);
@@ -49,9 +50,18 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(chapter)add(`date-${index+1}`,day.label,`<section class="date-opener"><p class="date-rule"></p><h1>${escape(day.label)}</h1></section>`,true);
   const label=`<header class="fixed-meta">${chapter?`<h2>${escape(date.chapter)}</h2>`:''}<p>${escape(date.label)}${section.indices.length===1&&record.attribution?' · '+escape(record.attribution):''}${section.indices.length===1&&record.feeling?' · '+escape(record.feeling):''}</p></header>`;
   let page=0;const name=()=>`record-${index+1}${page?'-'+(page+1):''}`;
-  const addRecord=(body:string)=>{add(name(),date.chapter,`${label}${body}`,false);page++;};
+  const addRecord=(body:string,showHeader=true)=>{add(name(),date.chapter,`${showHeader?label:''}${body}`,false);page++;};
+  photoCredit=[day.label,record.attribution,record.feeling].filter(Boolean).join(' · ');
   if(section.layout==='daily-notes'&&section.indices.length>1){
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
+  }
+  if(record.media.length===1&&record.media[0].role==='image'&&!record.note.trim()){
+   readingPage=name();
+   const media=record.media[0],triptych=photoFit(media,4/3)==='cover';
+   const feeling=record.feeling.trim();
+   const color=feeling?feelingAccentColor({value:feeling,label:feeling,known:isFeelingWord(feeling)}):null;
+   addRecord(`<section class="single-photo-plate${triptych?' continuous-triptych':''}">${linkedPhoto(media,4/3)}${triptych?'<span class="triptych-seam seam-one" aria-hidden="true"></span><span class="triptych-seam seam-two" aria-hidden="true"></span>':''}${color?`<span class="feeling-stripe" style="background:${color}" role="img" aria-label="${escape(feeling)}"></span>`:''}</section>`,false);
+   return;
   }
   const composition=planPhotoComposition(record.media,!!record.note.trim(),index%2===1,record.note.length);
   if(composition){
@@ -139,4 +149,6 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 .reference-composition{position:absolute;inset:0}.reference-photo{position:absolute;margin:0;background:transparent}.reference-text{position:absolute;display:flex;align-items:center;font-size:28px;line-height:1.65;white-space:pre-wrap;text-align:left}.reference-text>div{width:100%}.full-photo{background:#202524}.full-photo .reference-photo{background:#202524}.fixed-meta{z-index:2}.fixed-meta h2{display:none}.fixed-meta{background:rgba(255,255,255,.92);top:0;left:0;right:0;height:100px;padding:32px 45px;justify-content:flex-end}
 
 .full-photo{background:#fff}.full-photo .reference-photo{background:transparent}
+
+.single-photo-plate{position:absolute;inset:0;background:#fff}.triptych-seam{position:absolute;top:0;bottom:0;width:8px;background:#fff;pointer-events:none}.seam-one{left:calc(33.333333% - 4px)}.seam-two{left:calc(66.666667% - 4px)}.feeling-stripe{position:absolute;left:0;top:0;bottom:0;width:5px;pointer-events:none}.photo-credit{position:absolute;bottom:42px;right:64px;max-width:700px;font:17px/1.4 Georgia,serif;color:#707575;text-align:right}
 `;
