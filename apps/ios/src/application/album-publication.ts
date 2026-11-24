@@ -1,6 +1,10 @@
 import type {AlbumLayoutInput,AlbumLayoutMediaInput} from './album-layout-input';
 
-export const PUBLICATION_VERSION='keepsake-v1' as const;
+export const PUBLICATION_VERSION='keepsake-v2' as const;
+export const PUBLICATION_OPENING={
+ 'zh-Hans':'把一些平常的日子，留在这里。\n留给往后的自己，也留给一起走过这些日子的人。',
+ en:'Some ordinary days, kept here.\nFor our future selves, and for those who shared them with us.',
+} as const;
 export type PhotoComposition='single'|'diptych'|'triptych'|'contact';
 export function photoRatio(media:Pick<AlbumLayoutMediaInput,'intrinsicRatio'|'widthPx'|'heightPx'>):number|null {
   const value=media.intrinsicRatio??(media.widthPx&&media.heightPx?media.widthPx/media.heightPx:null);
@@ -16,8 +20,8 @@ export function photoComposition(ratios:readonly (number|null)[]):PhotoCompositi
   return 'single';
 }
 export const PUBLICATION_COPY={
- 'zh-Hans':{archive:'珍藏于此',line:'生活里的片刻，留给往后的自己。',records:'个瞬间',photos:'幅影像',voices:'段声音',chapter:'日子里的记录',made:'装订于',audioFallback:'若无法播放，请换用支持声音的阅读器。'},
- en:{archive:'A keepsake',line:'Ordinary moments, kept for the years ahead.',records:'moments',photos:'photographs',voices:'voices',chapter:'MOMENTS IN THESE PAGES',made:'Bound on',audioFallback:'If playback is unavailable, open this album in a reader that supports audio.'},
+ 'zh-Hans':{archive:'制作记录',line:'生活里的片刻，留给往后的自己。',records:'个瞬间',photos:'幅影像',voices:'段声音',chapter:'日子里的记录',made:'装订于',audioFallback:'若无法播放，请换用支持声音的阅读器。'},
+ en:{archive:'Edition notes',line:'Ordinary moments, kept for the years ahead.',records:'moments',photos:'photographs',voices:'voices',chapter:'MOMENTS IN THESE PAGES',made:'Bound on',audioFallback:'If playback is unavailable, open this album in a reader that supports audio.'},
 } as const;
 export function publicationSummary(input:AlbumLayoutInput,language:'zh-Hans'|'en') {
  const copy=PUBLICATION_COPY[language];const photos=input.entries.reduce((n,e)=>n+e.media.filter(m=>m.role==='image').length,0),voices=input.entries.reduce((n,e)=>n+e.media.filter(m=>m.role==='audio').length,0);
@@ -31,6 +35,6 @@ export function decoratePrintPublication(layout:import('./album-layout').AlbumLa
  const body:PublicationPage={version:PUBLICATION_VERSION,kind:'body',title:input.album.name,eyebrow:'LAMPY / A LIFE ALBUM',line:copy.line};
  const pages=layout.pages.map(page=>({...page,publication:page.publication??{...body,kind:page.blocks.some(b=>b.kind==='cover-name'||b.kind==='cover-image')?'cover':page.blocks.some(b=>b.kind==='close')?'closing':'body'}}));
  const coverEnd=pages.reduce((last,p,index)=>p.publication.kind==='cover'?index:last,-1);
- if(coverEnd>=0&&!pages.some(p=>p.publication.kind==='archive'))pages.splice(coverEnd+1,0,{index:0,blocks:[],publication:{...body,kind:'archive',title:copy.archive,stats:publicationSummary(input,language),made:`${copy.made} ${layout.generatedAt.slice(0,10)}`}});
- return {...layout,pages:pages.map((page,index)=>({...page,index,rendering:{...page.rendering!,pageCount:pages.length,pageNumbers:false,photoBorderWidth:6}}))};
+ if(coverEnd>=0&&!pages.some(p=>p.publication.kind==='archive'))pages.push({index:0,blocks:[],publication:{...body,kind:'archive',title:copy.archive,stats:publicationSummary(input,language),made:`${copy.made} ${layout.generatedAt.slice(0,10)}`}});
+ return {...layout,pages:pages.map((page,index)=>({...page,index,rendering:{...page.rendering!,pageCount:pages.length,pageNumbers:false,photoBorderWidth:0}}))};
 }

@@ -250,10 +250,11 @@ it('binding shows the reported steps, then the new edition ready to save', async
     finish({ manifest: { id: 'print_9', name: 'Our days', createdAt: '2026-11-02T10:00:00.000Z', style: 'handmade', imageDpi: [], pdf: { pageCount: 3, bytes: 2048, fontRunNames: [] } } });
   });
   await waitFor(() => expect(page.getByText('PDF已生成。')).toBeTruthy());
-  expect(page.getByText('第1版 · 3页 · 2 KB')).toBeTruthy();
+  expect(page.getByText(/第1版/)).toBeTruthy();
   expect(mockShare).not.toHaveBeenCalled();
-  await waitFor(() => expect(page.getByTestId('album-export-fresh-share').props.accessibilityState.disabled).toBe(false));
-  await fireEvent.press(page.getByTestId('album-export-fresh-share'));
+  expect(page.queryByTestId('album-export-fresh-share')).toBeNull();
+  expect(page.getAllByText('分享或打印PDF')).toHaveLength(1);
+  await fireEvent.press(page.getByText('分享或打印PDF'));
   await waitFor(() => expect(mockShare).toHaveBeenCalledTimes(1));
 });
 it('keeps the existing PDF paper preference without exposing it as an EPUB design', async () => {

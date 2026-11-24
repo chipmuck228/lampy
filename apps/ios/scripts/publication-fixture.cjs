@@ -19,7 +19,7 @@ try {
   {day:null,note:'已经不记得是哪一天，只记得那时候的心情。',media:[photo('coffee')]},
  ];
  const entries=moments.map((m,i)=>({momentId:'synthetic-'+i,collectedAt:'',sourceRevisionAtCollect:1,presence:'ready',revision:1,note:m.note,attribution:i%2?'小禾':'家人',feeling:'',occurredAt:m.day?m.day+'T12:00:00Z':undefined,occurredAtPrecision:m.day?'day':'unknown',recordedAt:'2026-11-23T00:00:00Z',media:m.media}));
- const input={album:{id:'synthetic-book',schemaVersion:1,name:'普通日子 · 设计样册',opening:'把生活写下来时，只是普通的一天。\n再翻开时，这些平常的片刻，已经成为值得珍藏的日子。',cover:{kind:'image',momentId:entries[0].momentId,assetId:'window'},entries:[],createdAt:'',updatedAt:''},entries};
+ const input={album:{id:'synthetic-book',schemaVersion:1,name:'平常日子',opening:null,cover:{kind:'image',momentId:entries[1].momentId,assetId:'coffee'},entries:[],createdAt:'',updatedAt:''},entries};
  const dates=Object.fromEntries(entries.map(e=>[e.momentId,{label:e.occurredAt?e.occurredAt.slice(0,10):'日子未确认',chapter:e.occurredAt?(e.occurredAt.includes('-10-')?'2026年10月':'2026年11月'):'日子未确认'}]));
  for(const design of ['literary','imagebook']){
   const options={input,assets,language:'zh-Hans',design,id:'synthetic-'+design,createdAt:'2026-11-23T00:00:00Z',dates};

@@ -1,5 +1,6 @@
+import {imagebookPages,IMAGEBOOK_CSS} from './album-imagebook';
 import {ALBUM_PUBLICATION_CSS} from './album-publication-css';
-import {photoRatio,photoComposition,publicationSummary,PUBLICATION_COPY} from './album-publication';
+import {photoRatio,photoComposition,publicationSummary,PUBLICATION_COPY,PUBLICATION_OPENING} from './album-publication';
 import { strToU8, zipSync } from 'fflate';
 import type { AlbumLayoutInput } from './album-layout-input';
 import type { AlbumReadingStyle } from './album-reading';
@@ -40,7 +41,7 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
   const manifest: string[] = []; const spine: string[] = []; const nav: string[] = [];
   const title = epubEscape(input.album.name);
   const page = (name: string, heading: string, body: string, properties = '') => {
-    files[`OEBPS/${name}.xhtml`] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${language}" xml:lang="${language}"><head><title>${epubEscape(heading)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body class="${design}">${body}</body></html>`);
+    files[`OEBPS/${name}.xhtml`] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${language}" xml:lang="${language}"><head><meta charset="utf-8"/>${design==='imagebook'?'<meta name="viewport" content="width=1200, height=900"/>':''}<title>${epubEscape(heading)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body class="${design}">${body}</body></html>`);
     manifest.push(`<item id="${name}" href="${name}.xhtml" media-type="application/xhtml+xml"${properties ? ` properties="${properties}"` : ''}/>`);
     spine.push(`<itemref idref="${name}"/>`);
   };
@@ -61,30 +62,27 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
     used.add(asset.path);
     manifest.push(`<item id="asset-${used.size}" href="${asset.path}" media-type="${asset.mime}"${asset.path === coverPath ? ' properties="cover-image"' : ''}/>`);
   }
-  const subtitle = language === 'zh-Hans' ? `${input.entries.length} 条生活记录` : `${input.entries.length} moments`;
-  // A short list of supplied chapter labels, not an inferred chronological range.
-  const chapterLabels=[...new Set(input.entries.map(entry=>dates[entry.momentId]?.chapter).filter((label):label is string=>!!label&&label!==copy.unknown))];
-  const range=chapterLabels.length<=2?chapterLabels.join(' · '):'';
-  page('cover', input.album.name, `<section class="cover" epub:type="cover"><p class="cover-kicker">LAMPY / ${language === 'zh-Hans' ? '生活册' : 'A LIFE ALBUM'}</p>${coverPath ? `<figure class="cover-picture"><img src="${coverPath}" alt="${title}"/></figure>` : '<div class="cover-rule"></div>'}<div class="cover-copy"><h1 class="cover-title">${title}</h1><p class="cover-subtitle">${epubEscape(range || subtitle)}</p></div></section>`);
+  if(design==='imagebook'){
+    for(const leaf of imagebookPages(options,coverPath,epubEscape)){
+      page(leaf.name,leaf.title,leaf.body);
+      if(leaf.nav)nav.push(`<li><a href="${leaf.name}.xhtml">${epubEscape(leaf.title)}</a></li>`);
+    }
+  }else{
+  page('cover', input.album.name, `<section class="cover${coverPath?' with-image':''}" epub:type="cover">${coverPath ? `<figure class="cover-picture"><img src="${coverPath}" alt="${title}"/></figure>` : ''}<div class="cover-copy"><p class="cover-kicker">LAMPY</p><h1 class="cover-title">${title}</h1></div></section>`);
   const publication=PUBLICATION_COPY[language];
-  const stats=publicationSummary(input,language);
-  page('archive',publication.archive,`<section class="archive" epub:type="titlepage"><p class="archive-kicker">LAMPY / A KEEPSAKE</p><div class="archive-seal" aria-hidden="true">L</div><h1 class="archive-title">${publication.archive}</h1><p class="archive-line">${publication.line}</p><dl class="archive-stats">${stats.map(stat=>`<div><dt>${stat.value}</dt><dd>${stat.label}</dd></div>`).join('')}</dl><p class="archive-date">${publication.made} ${epubEscape(options.createdAt.slice(0,10))}</p></section>`);
-  nav.push(`<li><a href="archive.xhtml">${publication.archive}</a></li>`);
-  if (input.album.opening) {
-    page('opening', copy.opening, `<section class="opening" epub:type="preface"><h1 class="section-label">${copy.opening}</h1><div class="prose">${paragraphs(input.album.opening)}</div></section>`);
-    nav.push(`<li><a href="opening.xhtml">${copy.opening}</a></li>`);
-  }
+  const opening=input.album.opening?.trim()?input.album.opening:PUBLICATION_OPENING[language];
+  page('opening', copy.opening, `<section class="opening" epub:type="preface"><div class="prose">${paragraphs(opening)}</div></section>`);
+  nav.push(`<li><a href="opening.xhtml">${copy.opening}</a></li>`);
   // One XHTML per consecutive month, not one forced page per record.
   // This preserves the chosen order while allowing short entries to share a page.
-  let chapterOrdinal=0;
-  let group: { name: string; heading: string; ordinal:string; entries: string[] } | null = null;
+  let group: { name: string; heading: string; entries: string[] } | null = null;
   const flush = () => {
-    if (group) page(group.name, group.heading, `<section class="chapter"><header class="chapter-head" epub:type="part"><p class="chapter-kicker">${publication.chapter}</p><p class="chapter-number" aria-hidden="true">${group.ordinal}</p><h1 class="chapter-title">${epubEscape(group.heading)}</h1><div class="chapter-ornament" aria-hidden="true"></div></header>${group.entries.join('')}</section>`,group.entries.some(entry=>entry.includes('<svg'))?'svg':'');
+    if (group) page(group.name, group.heading, `<section class="chapter"><header class="chapter-head" epub:type="part"><h1 class="chapter-title">${epubEscape(group.heading)}</h1></header>${group.entries.join('')}</section>`,group.entries.some(entry=>entry.includes('<svg'))?'svg':'');
   };
   input.entries.forEach((record, index) => {
     const date = dates[record.momentId] ?? { label: copy.unknown, chapter: copy.unknown };
     if (!group || group.heading !== date.chapter) {
-      flush(); group = { name: `record-${index + 1}`, heading: date.chapter, ordinal:String(++chapterOrdinal).padStart(2,'0'), entries: [] };
+      flush(); group = { name: `record-${index + 1}`, heading: date.chapter, entries: [] };
       nav.push(`<li><a href="${group.name}.xhtml">${epubEscape(date.chapter)}</a></li>`);
     }
     const ratio=(i:number)=>photoRatio(record.media[i]);
@@ -92,7 +90,7 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
     const figure=(i:number,paired=false)=>{
       const media=record.media[i],asset=assets[media.assetId],r=ratio(i);
       const orientation=r==null?'unknown':r<.85?'portrait':r>1.2?'landscape':'square';
-      return `<figure class="photo ${orientation}${paired?' paired':''}"><img src="${asset.path}" alt="${copy.photo} ${photoIndices.indexOf(i)+1}"/><figcaption>${String(photoIndices.indexOf(i)+1).padStart(2,'0')} / ${String(photoIndices.length).padStart(2,'0')}</figcaption></figure>`;
+      return `<figure class="photo ${orientation}${paired?' paired':''}"><img src="${asset.path}" alt="${copy.photo} ${photoIndices.indexOf(i)+1}"/></figure>`;
     };
     const threePhotos=photoIndices.length===3;
     const mediaParts:string[]=[];
@@ -117,21 +115,24 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
       }else throw new Error('EPUB_UNSUPPORTED_MEDIA');
     }
     const feeling = record.feeling ? `<span class="feeling">${epubEscape(record.feeling)}</span>` : '';
-    const end = index === input.entries.length - 1 ? `<footer class="colophon" epub:type="colophon"><p>${copy.edition} ${epubEscape(options.createdAt.slice(0,10))}<span class="imprint">Lampy</span></p></footer>` : '';
     const prose = record.note ? `<div class="prose">${paragraphs(record.note)}</div>` : '';
     // An image-led short entry may put its first image before the prose. All media
     // retain their original relative order, including audio. Long text stays continuous.
-    const lead = design === 'imagebook' && record.note.length <= 220 && record.media[0]?.role === 'image'
-      ? `<div class="entry-lead">${mediaParts.shift() ?? ''}</div>` : '';
+    const lead = '';
     const kind = threePhotos ? ' three-photos' : record.note.length > 220 ? ' long-entry' : '';
-    group.entries.push(`<article class="entry${kind}" id="entry-${index + 1}"><header class="entry-head"><p class="entry-meta"><span class="date">${epubEscape(date.label)}</span>${feeling}</p>${record.attribution ? `<p class="attribution">${epubEscape(record.attribution)}</p>` : ''}</header>${lead}${prose}<div class="entry-media">${mediaParts.join('')}</div></article>${end}`);
+    group.entries.push(`<article class="entry${kind}" id="entry-${index + 1}"><header class="entry-head"><p class="entry-meta"><span class="date">${epubEscape(date.label)}</span>${feeling}</p>${record.attribution ? `<p class="attribution">${epubEscape(record.attribution)}</p>` : ''}</header>${lead}${prose}<div class="entry-media">${mediaParts.join('')}</div></article>`);
   });
   flush();
-  page('nav', copy.contents, `<nav epub:type="toc" id="toc"><h1 class="section-label">${copy.contents}</h1><ol><li><a href="cover.xhtml">${title}</a></li>${nav.join('')}</ol></nav>`, 'nav');
+  const stats=publicationSummary(input,language);
+  const notes=language==='zh-Hans'?'制作记录':'Edition notes';
+  page('archive',notes,`<section class="edition-notes" epub:type="colophon"><h1>${notes}</h1><p>${title}</p><dl>${stats.map(stat=>`<div><dt>${stat.value}</dt><dd>${stat.label}</dd></div>`).join('')}</dl><p class="made">${copy.edition} ${epubEscape(options.createdAt.slice(0,10))}</p><p class="imprint">Lampy</p></section>`);
+  nav.push(`<li><a href="archive.xhtml">${notes}</a></li>`);
+  }
+  page('nav' , copy.contents, `<nav epub:type="toc" id="toc"><h1 class="section-label">${copy.contents}</h1><ol><li><a href="cover.xhtml">${title}</a></li>${nav.join('')}</ol></nav>`, 'nav');
   // The native Books contents menu exposes this navigation; no duplicate printed TOC page.
   spine.pop();
-  files['OEBPS/style.css'] = strToU8(ALBUM_PUBLICATION_CSS);
-  files['OEBPS/package.opf'] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="${language}"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:lampy:edition:${epubEscape(options.id)}</dc:identifier><dc:title>${title}</dc:title><dc:language>${language}</dc:language><meta property="dcterms:modified">${new Date(options.createdAt).toISOString().replace(/\.\d{3}Z$/, 'Z')}</meta><meta property="rendition:layout">reflowable</meta></metadata><manifest><item id="css" href="style.css" media-type="text/css"/>${manifest.join('')}</manifest><spine>${spine.join('')}</spine></package>`);
+  files['OEBPS/style.css'] = strToU8(design==='imagebook'?IMAGEBOOK_CSS:ALBUM_PUBLICATION_CSS);
+  files['OEBPS/package.opf'] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="${language}"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:lampy:edition:${epubEscape(options.id)}</dc:identifier><dc:title>${title}</dc:title><dc:language>${language}</dc:language><meta property="dcterms:modified">${new Date(options.createdAt).toISOString().replace(/\.\d{3}Z$/, 'Z')}</meta><meta property="rendition:layout">${design==='imagebook'?'pre-paginated':'reflowable'}</meta>${design==='imagebook'?'<meta property="rendition:spread">none</meta>':''}</metadata><manifest><item id="css" href="style.css" media-type="text/css"/>${manifest.join('')}</manifest><spine>${spine.join('')}</spine></package>`);
   files['META-INF/container.xml'] = strToU8('<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
   return { mimetype: strToU8('application/epub+zip'), ...files };
 }

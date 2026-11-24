@@ -44,7 +44,6 @@ import {
   AlbumExportShowcase,
   ExportChoice,
   BindingPanel,
-  FreshEdition,
   MiniBook,
   ShelfHeader,
   ShowcaseButton,
@@ -314,7 +313,6 @@ export default function AlbumPrintScreen() {
   const owned = !paidGate || !!unlock.status?.owned;
   const bindable = !book || albumReadyToBind(book.layout);
   const numbers = albumEditionNumbers(saved.map((edition) => edition.createdAt));
-  const freshNumber = fresh ? numbers[saved.findIndex((edition) => edition.id === fresh.id)] ?? saved.length : 0;
   const failure = diagnostic ? albumPrintFailureKind(diagnostic.code) : 'other';
   const operationFeedback = (<>{error ? (
             <ShowcaseNote live>
@@ -349,15 +347,6 @@ export default function AlbumPrintScreen() {
                   generation.current += 1;
                   setBinding(false);
                 }}
-              />
-            ) : fresh ? (
-              <FreshEdition
-                editorial={formal}
-                number={freshNumber}
-                pages={fresh.pdf.pageCount}
-                size={albumFileSizeLabel(fresh.pdf.bytes)}
-                disabled={busy}
-                onShare={() => share(fresh)}
               />
             ) : owned ? (
               <>
@@ -462,6 +451,7 @@ export default function AlbumPrintScreen() {
             {__DEV__ && !formal && epubState?.id === edition.id && epubState.diagnostic ? <Text selectable style={styles.meta}>{`EPUB/${epubState.diagnostic}`}</Text> : null}
           </View></AlbumEditionSwipeRow>)}
           {saved.length && (!formal || format === 'pdf') ? <ShelfHeader /> : null}
+          {fresh&&format==='pdf'?<Text accessibilityLiveRegion="polite" style={styles.meta}>{tr('PDF已生成。')}</Text>:null}
           {(!formal || format === 'pdf' ? saved : []).map((edition, index) => (
             <AlbumEditionSwipeRow key={edition.id} id={edition.id} disabled={busy || blocked} onDelete={() => confirmDelete(edition.id)}><View style={styles.edition}>
               <MiniBook style={edition.style} />
@@ -514,7 +504,7 @@ export default function AlbumPrintScreen() {
                 <Text style={styles.meta}>{tr('可在「图书」中阅读，并播放其中的声音。')}</Text>
                 <ShowcaseButton
                   tone="editorial"
-                  label={tr('保存或打印PDF')}
+                  label={tr('分享或打印PDF')}
                   disabled={busy}
                   onPress={() => share(edition)}
                 />

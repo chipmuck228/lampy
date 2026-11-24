@@ -80,6 +80,15 @@ The fixture directory must be new: existing sample/source files are not overwrit
 
 ## PR143 device-test baseline after stages 1/2 merge
 
-Synchronized with main ee665c5, including the email-only development gate and accepted settings navigation. No server changes are needed for personal EPUB/native PDF design acceptance. The family-internal preparation command intentionally closes export flags and cannot be used for this test. Use explicit local StoreKit non-consumable configuration (for example app.lampy.export.design-test, a local-only fixture identifier) with enabled paid personal export, unified purchases off, family finished export off, and the test account API. This validates design and local simulated access, not real Sandbox purchases.
+Synchronized with main ee665c5, including the email-only development gate and accepted settings navigation. No server changes are needed for personal EPUB/native PDF design acceptance. The family-internal preparation command intentionally closes export flags and cannot be used for this test. Use explicit local StoreKit non-consumable configuration (for example app.lampy.export.designtest, a local-only fixture identifier) with enabled paid personal export, unified purchases off, family finished export off, and the test account API. This validates design and local simulated access, not real Sandbox purchases.
 
 After setting those explicit flags, run iOS prebuild, Pods, write-family-xcode-env.sh and a fresh native Release build. Use the same bundle ID and signing team and install over the existing app. Keep a copy of any custom Xcode StoreKit configuration outside generated ios/ before regeneration. In Xcode select the local StoreKit configuration for Run. Generate a new edition: intact existing editions deliberately retain their original layout. Test both literary/imagebook EPUB designs in Apple Books, and a newly generated native PDF in Files; do not substitute the synthetic EPUB print proof for native PDF acceptance. Source records must remain intact; restart and share the saved edition again. Family export and real Sandbox acceptance remain later work.
+
+
+## 第一版横向影像册修订
+
+影像小册采用 1200×900 固定版式 EPUB：大图封面、默认或自填开篇、按月份组织的记录、书末制作记录。照片完整显示，无外框及可见图片编号；短文在图旁垂直居中、左对齐。长文按保守字符宽度预算分页，不截断正文；不同阅读器字体仍需真机验证。生活文集保持流式 EPUB，不强制阅读器横屏。
+
+iPhone App 限竖屏，iPad 保留方向支持。新生成 PDF 的分享／打印入口只保留在已生成列表中。原有导出文件不会重排，验收时请新生成一份。
+
+验证：运行 EPUB 相关回归、TypeScript、ESLint、EPUBCheck；静态 XHTML 排版检查每个固定页面为一页且内容未越界。静态证明不能替代 Apple Books 真机验收；PDF 原生排版需另行真机检查。

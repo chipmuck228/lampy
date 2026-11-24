@@ -41,6 +41,15 @@
             "UIApplicationShortcutItemTitle": "LAMPY_QUICK_SHARE",
             "UIApplicationShortcutItemIconType": "UIApplicationShortcutIconTypeShare"
           }
+        ],
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
         ]
       },
       "privacyManifests": {

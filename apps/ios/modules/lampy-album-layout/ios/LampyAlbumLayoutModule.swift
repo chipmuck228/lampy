@@ -567,7 +567,7 @@ func drawAlbumPage(
   let serifName = rendering["serif"] as? String ?? "Songti SC"
   let uiName = rendering["ui"] as? String ?? "PingFang SC"
   let copy = rendering["copy"] as? [String: String] ?? [:]
-  if let publication = page["publication"] as? [String: Any], publication["version"] as? String == "keepsake-v1" {
+  if let publication = page["publication"] as? [String: Any], ["keepsake-v1", "keepsake-v2"].contains(publication["version"] as? String ?? "") {
     if drawPublication(publication, page: page, bounds: bounds, serif: serifName, ui: uiName, in: context) { return }
   }
   if rendering["pageNumbers"] as? Bool == true {

@@ -322,7 +322,7 @@ export function FreshEdition({
 export function ShelfHeader() {
   return (
     <View style={styles.shelfHead}>
-      <Text style={styles.shelfTitle}>{tr('已保存的PDF')}</Text>
+      <Text style={styles.shelfTitle}>{tr('已生成的PDF')}</Text>
     </View>
   );
 }

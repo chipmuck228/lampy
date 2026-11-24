@@ -44,7 +44,7 @@ it('preserves text and emoji, escapes markup and excludes private paths and sour
 it('has cover, opening, contents, ordered records, and colophon; no invented exact date', () => {
   const archive = files();
   const opf = new JSDOM(strFromU8(archive['OEBPS/package.opf']), { contentType: 'application/xml' }).window.document;
-  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','archive','opening','record-1']);
+  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','opening','record-1','archive']);
   expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('日子未确认');
   expect(strFromU8(archive['OEBPS/style.css'])).toContain('height:auto');
 });
@@ -79,10 +79,10 @@ it('lets entries in the same month flow together and keeps the colophon with the
   expect(archive['OEBPS/record-2.xhtml']).toBeUndefined();
   const doc = new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
   expect(doc.querySelectorAll('article')).toHaveLength(2);
-  expect(doc.querySelector('footer')).not.toBeNull();
+  expect(doc.querySelector('footer')).toBeNull();expect(archive['OEBPS/archive.xhtml']).toBeDefined();
 });
 
-it.each(['literary','imagebook'] as const)('preserves all text, audio and XML in %s independently of paper style', design => {
+it.each(['literary'] as const)('preserves all text, audio and XML in %s independently of paper style', design => {
   const archive = unzipSync(buildAlbumEpub({ ...options, design }));
   const doc = new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']), { contentType:'application/xml' }).window.document;
   expect(doc.querySelector('parsererror')).toBeNull();
@@ -96,7 +96,7 @@ it.each(['literary','imagebook'] as const)('preserves all text, audio and XML in
 it('uses a single large image then compatible paired photos without losing or reordering media', () => {
   const record = { ...input.entries[0], media: [0,1,2].map(i=>({...input.entries[0].media[0],assetId:`p${i}`,intrinsicRatio:1.2})) };
   const photoAssets=Object.fromEntries([0,1,2].map(i=>[`p${i}`,{...assets.photo,path:`media/photo-${i}.jpg`,mime:'image/jpeg'}]));
-  for(const design of ['literary','imagebook'] as const) {
+  for(const design of ['literary'] as const) {
     const archive=unzipSync(buildAlbumEpub({...options,design,input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[record]},assets:photoAssets}));
     const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
     expect([...doc.querySelectorAll('img')].map(x=>x.getAttribute('src'))).toEqual([0,1,2].map(i=>`media/photo-${i}.jpg`));
@@ -108,7 +108,7 @@ it('uses a single large image then compatible paired photos without losing or re
 it('keeps long text continuous and does not pair incompatible photo ratios', () => {
   const record={...input.entries[0],note:'完整文字。'.repeat(200),media:[0,1,2].map((i)=>({...input.entries[0].media[0],assetId:`p${i}`,intrinsicRatio:i===1?0.5:1.8}))};
   const photoAssets=Object.fromEntries([0,1,2].map(i=>[`p${i}`,{...assets.photo,path:`media/photo-${i}.jpg`,mime:'image/jpeg'}]));
-  const archive=unzipSync(buildAlbumEpub({...options,design:'imagebook',input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[record]},assets:photoAssets}));
+  const archive=unzipSync(buildAlbumEpub({...options,design:'literary',input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[record]},assets:photoAssets}));
   const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
   expect(doc.querySelector('.entry-lead')).toBeNull();
   expect(doc.querySelector('.prose')!.textContent).toBe(record.note);
@@ -134,7 +134,7 @@ it.each([[.65,1.5,1.5],[1.5,1.5],[.7,.7],[1.4,.7,1,1.6]])('composes ratios %j wi
  const archive=unzipSync(buildAlbumEpub({...options,input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[{...input.entries[0],media}]},assets:photoAssets}));
  const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
  expect([...doc.querySelectorAll('img')].map(x=>x.getAttribute('src'))).toEqual(media.map((_,i)=>`media/photo-${i}.jpg`));
- expect(doc.querySelectorAll('figcaption')).toHaveLength(media.length);
+ expect(doc.querySelectorAll('figcaption')).toHaveLength(0);
 });
 it('never groups photos across an intervening voice, and escapes long titles and attributions',()=>{
  const record={...input.entries[0],attribution:'Dad & <script>not executable</script>',media:[input.entries[0].media[0],input.entries[0].media[1],{...input.entries[0].media[0],assetId:'b'}]};

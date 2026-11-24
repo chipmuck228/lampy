@@ -186,7 +186,7 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
   for (index, page) in pages.enumerated() {
     let text = compactPdfText(searchable.page(at: index)?.string ?? "")
     let rendering = page["rendering"] as? [String: Any] ?? [:]
-    if let publication = page["publication"] as? [String: Any], publication["version"] as? String == "keepsake-v1",
+    if let publication = page["publication"] as? [String: Any], ["keepsake-v1", "keepsake-v2"].contains(publication["version"] as? String ?? ""),
        ["archive", "chapter"].contains(publication["kind"] as? String ?? "") {
       var required = [publication["title"] as? String ?? "", publication["eyebrow"] as? String ?? "", publication["ordinal"] as? String ?? "", publication["made"] as? String ?? ""]
       if publication["kind"] as? String == "archive" {
