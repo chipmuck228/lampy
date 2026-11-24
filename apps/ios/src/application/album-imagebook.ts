@@ -53,11 +53,22 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(section.layout==='daily-notes'&&section.indices.length>1){
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
   }
-  const composition=planPhotoComposition(record.media,!!record.note);
-  if(composition&&record.note.length<=100&&!/[\r\n]/.test(record.note)){
+  const composition=planPhotoComposition(record.media,!!record.note.trim(),index%2===1);
+  if(composition){
    readingPage=name();
-   const pictures=record.media.map((m,i)=>`<figure class="slot slot-${i+1}">${linkedPhoto(m,composition.ratios[i])}</figure>`);
-   addRecord(`<section class="composed ${composition.kind}${record.note?' with-note':''}"><div class="composition-photos">${pictures.join('')}</div>${record.note?`<div class="composition-prose fixed-prose">${escape(record.note)}</div>`:''}</section>`);return;
+   const style=(b:typeof composition.photos[number])=>`left:${b.x}px;top:${b.y}px;width:${b.width}px;height:${b.height}px;`;
+   const pictures=record.media.map((m,i)=>`<figure class="reference-photo" style="${style(composition.photos[i])}">${linkedPhoto(m,composition.ratios[i])}</figure>`);
+   let remaining=record.note;
+   const prose=composition.text.map(b=>{
+    const columns=Math.max(8,Math.floor(b.width/30));const lines=Math.max(2,Math.floor(b.height/49));
+    let chunk=splitPublicationText(remaining,columns,lines)[0]??'';
+    if(chunk.length<remaining.length){const pauses=[...chunk.matchAll(/[。！？.!?;\n]/gu)];const pause=pauses.at(-1);if(pause&&pause.index>=chunk.length*.35)chunk=chunk.slice(0,pause.index+pause[0].length);}
+    remaining=remaining.slice(chunk.length);
+    return `<div class="reference-text fixed-prose" style="${style(b)}"><div>${escape(chunk)}</div></div>`;
+   }).join('');
+   addRecord(`<section class="reference-composition ${composition.kind}">${pictures.join('')}${prose}</section>`);
+   for(const chunk of splitPublicationText(remaining,30,14))addRecord(`<div class="text-only"><div class="fixed-prose">${escape(chunk)}</div></div>`);
+   return;
   }
   const first=record.media[0]?.role==='image'?record.media[0]:null;
   const chunks=splitPublicationText(record.note,first?15:30,14);
@@ -124,4 +135,6 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 .wide-story .composition-photos{max-height:600px}.triptych .composition-photos{position:relative;display:block}.triptych .slot{position:absolute;width:calc(50% - 12px);height:calc(50% - 12px);right:0}.triptych .slot-1{left:0;right:auto;top:0;height:100%}.triptych .slot-2{top:0}.triptych .slot-3{bottom:0}
 
 .composition-photos{flex:none;height:650px}.with-note .composition-photos{height:500px}.portrait-story .composition-photos,.portrait-story:not(.with-note) .composition-photos{flex:none;width:500px;max-width:500px;height:625px}.wide-story .composition-photos{max-height:none}
+
+.reference-composition{position:absolute;inset:0}.reference-photo{position:absolute;margin:0;background:transparent}.reference-text{position:absolute;display:flex;align-items:center;font-size:28px;line-height:1.65;white-space:pre-wrap;text-align:left}.reference-text>div{width:100%}.full-photo{background:#202524}.full-photo .reference-photo{background:#202524}.fixed-meta{z-index:2}.fixed-meta h2{display:none}.fixed-meta{background:rgba(255,255,255,.92);top:0;left:0;right:0;height:100px;padding:32px 45px;justify-content:flex-end}
 `;

@@ -53,3 +53,12 @@ it('links every cropped photo to a complete offline image and returns to its exa
  const opf=xml(files['OEBPS/package.opf']);expect(opf.querySelector('itemref[idref="photo-1"]')!.getAttribute('linear')).toBe('no');
  expect(full.querySelector('script')).toBeNull();
 });
+
+it.each([1,2,3])('preserves long paragraph text and all %i photos through reference layouts and continuation pages',count=>{
+ const note=('第一段不应丢失任何文字。👨‍👩‍👦\n第二段继续记录这个日子。\n').repeat(30);
+ const media=Array.from({length:count},(_,i)=>({...input.entries[0].media[0],assetId:i%2?'p2':'p1'}));
+ const files=albumEpubDocuments({...options,input:{...input,entries:[{...input.entries[0],note,media}]}});
+ const docs=Object.entries(files).filter(([path])=>/OEBPS\/record-.*xhtml$/.test(path)).map(([,bytes])=>xml(bytes));
+ expect(docs.flatMap(doc=>[...doc.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).join('')).toBe(note);
+ expect(docs.flatMap(doc=>[...doc.querySelectorAll('.photo-link')])).toHaveLength(count);
+});
