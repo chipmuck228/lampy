@@ -1,3 +1,4 @@
+import {chronicleOpening,CHRONICLE_OPENING_CSS} from './album-chronicle-opening';
 import {chronicleCover,CHRONICLE_COVER_CSS} from './album-chronicle-cover';
 import {feelingAccentColor,isFeelingWord} from './feeling-accent';
 import {planPhotoComposition,photoFit} from './album-photo-composition';
@@ -42,7 +43,7 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
  const heading=escape(input.album.name);
  add('cover',input.album.name,chronicleCover(options,coverPath,escape));
  const opening=input.album.opening?.trim()?input.album.opening:PUBLICATION_OPENING[language];
- splitPublicationText(opening,26,12).forEach((chunk,i)=>add(i?'opening-'+(i+1):'opening',zh?'开篇':'Preface',`<div class="opening-type"><div class="fixed-prose">${escape(chunk)}</div></div>`,i===0));
+ splitPublicationText(opening,27,6).forEach((chunk,i)=>add(i?'opening-'+(i+1):'opening',zh?'开篇':'Preface',chronicleOpening(options,chunk,i,escape),i===0));
  let previous='';
  planBookSections(options).forEach(section=>{
   const index=section.indices[0],record=input.entries[index];
@@ -153,4 +154,5 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 
 .single-photo-plate{position:absolute;inset:0;background:#fff}.triptych-seam{position:absolute;top:0;bottom:0;width:8px;background:#fff;pointer-events:none}.seam-one{left:calc(33.333333% - 4px)}.seam-two{left:calc(66.666667% - 4px)}.feeling-stripe{position:absolute;left:0;top:0;bottom:0;width:5px;pointer-events:none}.photo-credit{position:absolute;bottom:42px;right:64px;max-width:700px;font:17px/1.4 Georgia,serif;color:#707575;text-align:right}
 ${CHRONICLE_COVER_CSS}
+${CHRONICLE_OPENING_CSS}
 `;

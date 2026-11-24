@@ -24,3 +24,10 @@ it('provides a graphic cover for albums with no pictures and handles a long name
  const files=albumEpubDocuments({...options,input,design:'imagebook'});const doc=new JSDOM(strFromU8(files['OEBPS/cover.xhtml']),{contentType:'application/xml'}).window.document;
  expect(doc.querySelector('.graphic-cover')).not.toBeNull();expect(doc.querySelector('.chronicle-title')!.textContent).toBe(input.album.name);expect(doc.querySelector('.chronicle-symbol')).not.toBeNull();
 });
+
+it('uses English book-title typography even when the app language is Chinese',()=>{
+ const input={...options.input,album:{...options.input.album,name:'The Days We Shared'}};
+ const html=chronicleCover({...options,input},'media/photo.jpg',epubEscape);const page=new JSDOM(html).window.document;
+ expect(page.querySelector('.chronicle-title')!.getAttribute('lang')).toBe('en');
+ expect(page.querySelector('.chronicle-title')!.textContent).toBe('The Days We Shared');
+});
