@@ -1,9 +1,10 @@
+import {planPhotoComposition,photoFit} from './album-photo-composition';
 import type {AlbumEpubOptions} from './album-epub';
 import {PUBLICATION_OPENING} from './album-publication';
 
 import {planBookSections,bookDateRange,bookDay} from './album-book-plan';
 
-export type ImagebookPage={name:string;title:string;body:string;nav:boolean};
+export type ImagebookPage={name:string;title:string;body:string;nav:boolean;linear?:boolean};
 /** Conservative pagination budget; leaves room for platform serif font differences.
  * Chunks preserve every source character. Never clamp, ellipsize or hide overflow.
  */
@@ -27,7 +28,15 @@ export function splitPublicationText(text:string,columns=30,lines=14):string[]{
 export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:(s:string)=>string):ImagebookPage[]{
  const {input,assets,dates,language}=options;const zh=language==='zh-Hans';const pages:ImagebookPage[]=[];
  const add=(name:string,title:string,body:string,nav=false)=>pages.push({name,title,body:`<main class="fixed-page">${body}</main>`,nav});
- const photo=(index:number,media:typeof input.entries[number]['media'][number])=>`<img src="${escape(assets[media.assetId].path)}" alt="${zh?'记录中的照片':'Photograph'} ${index+1}"/>`;
+
+ const fullPages:ImagebookPage[]=[];
+ let photoPage=0,readingPage='';
+ const linkedPhoto=(media:typeof input.entries[number]['media'][number],target:number)=>{
+  const n=++photoPage,full=`photo-${n}`,anchor=`view-${n}`;
+  fullPages.push({name:full,title:zh?'完整图片':'Full photograph',nav:false,linear:false,body:`<main class="fixed-page"><div class="original-photo"><img src="${escape(assets[media.assetId].path)}" alt="${zh?'完整图片':'Full photograph'}"/></div><a class="photo-return" href="${readingPage}.xhtml#${anchor}">${zh?'返回正文':'Back to reading'} ↩</a></main>`});
+  return `<a id="${anchor}" class="photo-link" href="${full}.xhtml" aria-label="${zh?'查看完整图片':'View full photograph'}"><img style="object-fit:${photoFit(media,target)}" src="${escape(assets[media.assetId].path)}" alt="${zh?'点击查看完整图片':'Open full photograph'}"/></a>`;
+ };
+ const photo=(_index:number,media:typeof input.entries[number]['media'][number])=>linkedPhoto(media,0);
  const heading=escape(input.album.name);
  add('cover',input.album.name,`<div class="fixed-cover${coverPath?' has-photo':' default-cover'}">${coverPath?`<div class="cover-photo"><img src="${escape(coverPath)}" alt="${heading}"/></div>`:''}<div class="cover-shade"></div><div class="cover-type"><p class="brand">LAMPY</p><h1 style="font-size:${input.album.name.length>50?48:76}px">${heading}</h1></div>${!coverPath?'<img class="default-symbol" src="lampy-symbol.svg" alt=""/>':''}</div>`);
  const opening=input.album.opening?.trim()?input.album.opening:PUBLICATION_OPENING[language];
@@ -44,22 +53,19 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(section.layout==='daily-notes'&&section.indices.length>1){
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
   }
-  if(section.layout==='photo-only'){
-   for(let i=0;i<record.media.length;i+=4){
-    const group=record.media.slice(i,i+4),kind=group.length===1?'solo':group.length===2?'duo':'gallery';
-    const figures=group.map((m,j)=>`<figure>${photo(i+j,m)}</figure>`);
-    const composition=group.length===3?`${figures[0]}<div class="photo-column">${figures.slice(1).join('')}</div>`:group.length===4?`<div class="photo-column">${figures[0]}${figures[1]}</div><div class="photo-column">${figures[2]}${figures[3]}</div>`:figures.join('');
-    addRecord(`<div class="photo-layout ${kind}">${composition}</div>`);
-   }return;
-  }
-  if(record.note.length<=100&&!/[\r\n]/.test(record.note)&&record.media.length===2&&record.media.every(m=>m.role==='image')){
-   addRecord(`<div class="paired-story"><div class="paired-pictures">${record.media.map((m,i)=>`<figure>${photo(i,m)}</figure>`).join('')}</div><div class="fixed-prose">${escape(record.note)}</div></div>`);return;
+  const composition=planPhotoComposition(record.media,!!record.note);
+  if(composition&&record.note.length<=100&&!/[\r\n]/.test(record.note)){
+   readingPage=name();
+   const pictures=record.media.map((m,i)=>`<figure class="slot slot-${i+1}">${linkedPhoto(m,composition.ratios[i])}</figure>`);
+   addRecord(`<section class="composed ${composition.kind}${record.note?' with-note':''}"><div class="composition-photos">${pictures.join('')}</div>${record.note?`<div class="composition-prose fixed-prose">${escape(record.note)}</div>`:''}</section>`);return;
   }
   const first=record.media[0]?.role==='image'?record.media[0]:null;
   const chunks=splitPublicationText(record.note,first?15:30,14);
+  readingPage=name();
   if(first){addRecord(`<div class="photo-pane">${photo(0,first)}</div><div class="text-pane"><div class="fixed-prose">${escape(chunks.shift()??'')}</div></div>`);}
   while(chunks.length)addRecord(`<div class="text-only"><div class="fixed-prose">${escape(chunks.shift()!)}</div></div>`);
   for(let i=first?1:0;i<record.media.length;i++){
+   readingPage=name();
    const media=record.media[i];
    if(media.role==='image'){
     const next=record.media[i+1];
@@ -74,7 +80,7 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(!page)addRecord('<div class="text-only"></div>');
  });
  add('archive',zh?'Lampy · 留存':'Lampy · Colophon',`<section class="edition-notes"><img class="edition-symbol" src="lampy-symbol.svg" alt="Lampy"/><p class="edition-brand">Lampy</p><p class="edition-title">${heading}</p><p class="edition-range">${escape(bookDateRange(options))}</p><p class="made">${zh?'珍藏于':'Kept on'} ${escape(options.createdAt.slice(0,10))}</p></section>`,true);
- return pages;
+ return [...pages,...fullPages];
 }
 export const IMAGEBOOK_CSS=`
 @page{margin:0;size:1200px 900px}
@@ -111,4 +117,11 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 .paired-story{position:absolute;left:64px;right:64px;top:128px;bottom:64px;display:flex;flex-direction:column;gap:35px}.paired-pictures{display:flex;gap:28px;min-height:0;flex:1}.paired-pictures figure{flex:1;min-width:0}.paired-story>.fixed-prose{font-size:26px;max-width:880px;margin:auto}
 
 .date-opener{position:absolute;left:180px;right:180px;top:340px}.date-opener h1{font-size:68px;line-height:1.4;font-weight:400}.date-rule{width:70px;border-top:2px solid #40564a;margin-bottom:35px}
+
+.photo-link{display:block;width:100%;height:100%;color:inherit}.photo-link:focus{outline:2px solid #40564a;outline-offset:4px}.original-photo{position:absolute;inset:48px 64px 110px}.photo-return{position:absolute;bottom:38px;left:64px;font:22px/1.5 Georgia,serif;color:#40564a;text-decoration:none}
+.composed{position:absolute;left:64px;right:64px;top:128px;bottom:64px;display:flex;flex-direction:column;gap:30px}.composition-photos{flex:1;min-height:0;display:flex;gap:24px}.slot{flex:1;min-width:0;min-height:0}.composition-prose{font-size:26px;line-height:1.65;max-width:880px;margin:0 auto;flex:none}
+.portrait-story{flex-direction:row;gap:65px;align-items:center}.portrait-story .composition-photos{height:100%;flex:1}.portrait-story .composition-prose{flex:1;max-width:440px}.portrait-story:not(.with-note) .composition-photos{max-width:550px;margin:auto}
+.wide-story .composition-photos{max-height:600px}.triptych .composition-photos{position:relative;display:block}.triptych .slot{position:absolute;width:calc(50% - 12px);height:calc(50% - 12px);right:0}.triptych .slot-1{left:0;right:auto;top:0;height:100%}.triptych .slot-2{top:0}.triptych .slot-3{bottom:0}
+
+.composition-photos{flex:none;height:650px}.with-note .composition-photos{height:500px}.portrait-story .composition-photos,.portrait-story:not(.with-note) .composition-photos{flex:none;width:500px;max-width:500px;height:625px}.wide-story .composition-photos{max-height:none}
 `;

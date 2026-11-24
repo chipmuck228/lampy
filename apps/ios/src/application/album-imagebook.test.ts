@@ -13,7 +13,7 @@ it('preserves every character when conservatively paginating long Unicode text',
 });
 it('uses complete landscape pages, optional audio, default preface and final edition notes',()=>{
  const files=albumEpubDocuments(options);const opf=xml(files['OEBPS/package.opf']);expect(opf.querySelector('meta[property="rendition:layout"]')!.textContent).toBe('pre-paginated');expect(opf.querySelector('meta[property="rendition:spread"]')!.textContent).toBe('none');
- const order=[...opf.querySelectorAll('spine itemref')].map(n=>n.getAttribute('idref')!);expect(order.slice(0,2)).toEqual(['cover','opening']);expect(order.at(-1)).toBe('archive');
+ const order=[...opf.querySelectorAll('spine itemref')].map(n=>n.getAttribute('idref')!);expect(order.slice(0,2)).toEqual(['cover','opening']);expect([...opf.querySelectorAll('spine itemref:not([linear="no"])')].at(-1)!.getAttribute('idref')).toBe('archive');
  const records=order.filter(n=>n.startsWith('record-')).map(n=>xml(files['OEBPS/'+n+'.xhtml']));
  expect(records.flatMap(doc=>[...doc.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).join('')).toBe(input.entries[0].note);
  expect(records.flatMap(doc=>[...doc.querySelectorAll('img,audio')].map(n=>n.getAttribute('src')))).toEqual(['media/photo-1.jpg','media/sound.m4a','media/photo-2.jpg']);
@@ -43,4 +43,13 @@ it.each(['literary','imagebook'] as const)('places one standalone date before al
  expect(xml(files['OEBPS/'+dividers[0]+'.xhtml']).body.textContent).toContain('2026-08-03');
  const body=order.map(n=>xml(files['OEBPS/'+n+'.xhtml']).body.textContent).join('');expect(body.indexOf('最早一天第一条')).toBeLessThan(body.indexOf('最早一天第二条'));expect(body.indexOf('最早一天第二条')).toBeLessThan(body.indexOf('最后一天'));
  expect(entries[0].momentId).toBe('late');
+});
+
+it('links every cropped photo to a complete offline image and returns to its exact source page',()=>{
+ const custom={...input,entries:[{...input.entries[0],note:'短文',media:[{...input.entries[0].media[0],intrinsicRatio:.8}]}]};
+ const files=albumEpubDocuments({...options,input:custom});const source=xml(files['OEBPS/record-1.xhtml']);const link=source.querySelector('.photo-link')!;const target=link.getAttribute('href')!;const full=xml(files['OEBPS/'+target]);
+ expect(full.querySelector('.original-photo img')!.getAttribute('src')).toBe('media/photo-1.jpg');
+ const back=full.querySelector('.photo-return')!.getAttribute('href')!.split('#');expect(back[0]).toBe('record-1.xhtml');expect(source.getElementById(back[1])).toBe(link);
+ const opf=xml(files['OEBPS/package.opf']);expect(opf.querySelector('itemref[idref="photo-1"]')!.getAttribute('linear')).toBe('no');
+ expect(full.querySelector('script')).toBeNull();
 });
