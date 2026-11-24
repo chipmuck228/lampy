@@ -23,6 +23,8 @@ try {
   {day:'2026-11-08',note:'',media:[photo('coffee')]},
   {day:'2026-11-08',note:'',media:[photo('coffee'),photo('window')]},
   {day:'2026-11-08',note:'',media:[photo('flowers'),photo('window'),photo('flowers')]},
+  {day:'2026-11-08',note:'',media:[photo('window')]},
+  {day:'2026-11-08',note:'',media:[photo('flowers'),photo('window')]},
   {day:'2026-11-09',note:'想把这个下午的声音也留下来。',media:[{assetId:'voice',role:'audio',availability:'available',intrinsicRatio:null,durationMs:null}]},
   {day:'2026-11-16',note:('记得那天我们一起把花移到窗边，阳光落在叶子上。谁也没有急着说什么，只是安静地坐着。\n').repeat(16),media:[photo('flowers'),photo('window')]},
   {day:null,note:'已经不记得是哪一天，只记得那时候的心情。',media:[photo('coffee')]},

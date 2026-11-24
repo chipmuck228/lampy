@@ -53,7 +53,7 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(section.layout==='daily-notes'&&section.indices.length>1){
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
   }
-  const composition=planPhotoComposition(record.media,!!record.note.trim(),index%2===1);
+  const composition=planPhotoComposition(record.media,!!record.note.trim(),index%2===1,record.note.length);
   if(composition){
    readingPage=name();
    const style=(b:typeof composition.photos[number])=>`left:${b.x}px;top:${b.y}px;width:${b.width}px;height:${b.height}px;`;
@@ -137,4 +137,6 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 .composition-photos{flex:none;height:650px}.with-note .composition-photos{height:500px}.portrait-story .composition-photos,.portrait-story:not(.with-note) .composition-photos{flex:none;width:500px;max-width:500px;height:625px}.wide-story .composition-photos{max-height:none}
 
 .reference-composition{position:absolute;inset:0}.reference-photo{position:absolute;margin:0;background:transparent}.reference-text{position:absolute;display:flex;align-items:center;font-size:28px;line-height:1.65;white-space:pre-wrap;text-align:left}.reference-text>div{width:100%}.full-photo{background:#202524}.full-photo .reference-photo{background:#202524}.fixed-meta{z-index:2}.fixed-meta h2{display:none}.fixed-meta{background:rgba(255,255,255,.92);top:0;left:0;right:0;height:100px;padding:32px 45px;justify-content:flex-end}
+
+.full-photo{background:#fff}.full-photo .reference-photo{background:transparent}
 `;
