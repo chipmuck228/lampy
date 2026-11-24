@@ -1,6 +1,21 @@
 import type {AlbumEpubOptions} from './album-epub';
 import {photoRatio} from './album-publication';
 
+/** Export order only; never changes the saved album or its frozen snapshot. */
+export function chronologicalBook(options:AlbumEpubOptions):AlbumEpubOptions{
+ const entries=options.input.entries.map((entry,index)=>({entry,index})).sort((a,b)=>{
+  const key=(e:typeof a.entry)=>e.occurredAtPrecision==='unknown'||!e.occurredAt?Infinity:Date.parse(e.occurredAt.length===4?e.occurredAt+'-01-01':e.occurredAt.length===7?e.occurredAt+'-01':e.occurredAt);
+  const ak=key(a.entry),bk=key(b.entry);const av=Number.isNaN(ak)?Infinity:ak,bv=Number.isNaN(bk)?Infinity:bk;
+  return av===bv?a.index-b.index:av<bv?-1:1;
+ }).map(item=>item.entry);
+ return {...options,input:{...options.input,entries}};
+}
+export function bookDay(options:AlbumEpubOptions,index:number):{key:string;label:string}{
+ const e=options.input.entries[index],date=options.dates[e.momentId];
+ if(!e.occurredAt||e.occurredAtPrecision==='unknown')return {key:'unknown',label:options.language==='zh-Hans'?'日子未确认':'Date uncertain'};
+ const precision=e.occurredAtPrecision;const key=e.occurredAt.slice(0,precision==='year'?4:precision==='month'?7:10);
+ return {key:date?precision+'|'+date.label:key,label:date?.label??key};
+}
 /** Publication decisions are pure and preserve the user's entry/media order. */
 export function selectBookCover(options:AlbumEpubOptions):string{
  const {input,assets}=options;
@@ -17,7 +32,7 @@ export function planBookSections(options:AlbumEpubOptions):BookSection[]{
   const previous=result.at(-1);const day=['day','minute','second','exact'].includes(record.occurredAtPrecision)?record.occurredAt?.slice(0,10):undefined;
   if(brief&&day&&previous?.layout==='daily-notes'&&previous.indices.length<3){
    const first=entries[previous.indices[0]];
-   if(['day','minute','second','exact'].includes(first.occurredAtPrecision)&&first.occurredAt?.slice(0,10)===day){previous.indices.push(index);return;}
+   if(['day','minute','second','exact'].includes(first.occurredAtPrecision)&&first.occurredAt?.slice(0,10)===day&&bookDay(options,previous.indices[0]).key===bookDay(options,index).key){previous.indices.push(index);return;}
   }
   result.push({indices:[index],layout:brief?'daily-notes':record.media.length&&record.media.every(m=>m.role==='image')&&!record.note.trim()?'photo-only':record.media[0]?.role==='image'?'photo-story':'prose'});
  });

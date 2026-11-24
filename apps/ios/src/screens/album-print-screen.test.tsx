@@ -382,3 +382,20 @@ it('retains the row and explains deletion failure; a stale background confirmati
  AppState.currentState='background';await act(async()=>callback());
  expect(deleteSavedAlbumEdition).toHaveBeenCalledTimes(1);
 });
+
+it('keeps a published EPUB successful while Books sends the app to the background',async()=>{
+ process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED='1';process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED='1';process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID='app.lampy.export';
+ (createPersonalEpubSnapshot as jest.Mock).mockResolvedValueOnce({id:'epub_books'});
+ let finish!:()=>void;
+ mockEpub.mockImplementationOnce((...args:unknown[])=>{
+  (args[2] as (p:{stage:string;done:number;total:number})=>void)({stage:'SHARE',done:0,total:0});
+  return new Promise<undefined>(resolve=>{finish=()=>resolve(undefined);});
+ });
+ const view=await render(wrap());await waitFor(()=>expect(view.getByText('已解锁导出')).toBeTruthy());
+ await fireEvent.press(view.getByText('制作电子册'));
+ await waitFor(()=>expect(view.getByText('电子册已保存在Lampy中，可再次点击保存。')).toBeTruthy());
+ AppState.currentState='background';await act(async()=>finish());
+ AppState.currentState='active';
+ expect(view.queryByText('本次制作已停止，请重新开始。')).toBeNull();
+ expect(view.getByText('电子册已保存在Lampy中，可再次点击保存。')).toBeTruthy();
+});

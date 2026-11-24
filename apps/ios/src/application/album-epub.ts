@@ -1,4 +1,4 @@
-import {selectBookCover,bookDateRange,LAMPY_PUBLICATION_SYMBOL} from './album-book-plan';
+import {selectBookCover,bookDateRange,chronologicalBook,bookDay,LAMPY_PUBLICATION_SYMBOL} from './album-book-plan';
 import {imagebookPages,IMAGEBOOK_CSS} from './album-imagebook';
 import {ALBUM_PUBLICATION_CSS} from './album-publication-css';
 import {photoRatio,photoComposition,PUBLICATION_COPY,PUBLICATION_OPENING} from './album-publication';
@@ -34,6 +34,7 @@ export type AlbumEpubOptions = {
   dates: Record<string, { label: string; chapter: string }>;
 };
 export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Uint8Array> {
+  options=chronologicalBook(options);
   const { input, assets, language, dates } = options;
   const design = epubDesign(options.design);
   if (!input.entries.length || input.entries.some(e => e.presence !== 'ready' || e.media.some(m => m.availability !== 'available' || !assets[m.assetId]))) throw new Error('EPUB_MISSING_CONTENT');
@@ -76,17 +77,20 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
   const opening=input.album.opening?.trim()?input.album.opening:PUBLICATION_OPENING[language];
   page('opening', copy.opening, `<section class="opening" epub:type="preface"><div class="prose">${paragraphs(opening)}</div></section>`);
   nav.push(`<li><a href="opening.xhtml">${copy.opening}</a></li>`);
-  // One XHTML per consecutive month, not one forced page per record.
-  // This preserves the chosen order while allowing short entries to share a page.
+  // Date dividers are separate spine documents; each day flows naturally after its divider.
   let group: { name: string; heading: string; entries: string[] } | null = null;
+  let previousDay="";
   const flush = () => {
-    if (group) page(group.name, group.heading, `<section class="chapter"><header class="chapter-head" epub:type="part"><h1 class="chapter-title">${epubEscape(group.heading)}</h1></header>${group.entries.join('')}</section>`,group.entries.some(entry=>entry.includes('<svg'))?'svg':'');
+    if (group) page(group.name, group.heading, `<section class="chapter">${group.entries.join('')}</section>`,group.entries.some(entry=>entry.includes('<svg'))?'svg':'');
   };
   input.entries.forEach((record, index) => {
     const date = dates[record.momentId] ?? { label: copy.unknown, chapter: copy.unknown };
-    if (!group || group.heading !== date.chapter) {
-      flush(); group = { name: `record-${index + 1}`, heading: date.chapter, entries: [] };
-      nav.push(`<li><a href="${group.name}.xhtml">${epubEscape(date.chapter)}</a></li>`);
+    const day=bookDay(options,index);
+    if (!group || previousDay !== day.key) {
+      flush();previousDay=day.key;
+      page(`date-${index+1}`,day.label,`<section class="date-opener"><p class="date-rule"></p><h1>${epubEscape(day.label)}</h1></section>`);
+      group = { name: `record-${index + 1}`, heading: day.label, entries: [] };
+      nav.push(`<li><a href="date-${index+1}.xhtml">${epubEscape(day.label)}</a></li>`);
     }
     const ratio=(i:number)=>photoRatio(record.media[i]);
     const photoIndices=record.media.flatMap((m,i)=>m.role==='image'?[i]:[]);

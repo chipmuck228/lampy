@@ -34,3 +34,13 @@ it('preserves each grouped daily note and all three photographs in a planned gal
  const day=xml(files['OEBPS/record-1.xhtml']);expect([...day.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).toEqual([first.note,second.note]);expect(files['OEBPS/record-2.xhtml']).toBeUndefined();
  const gallery=xml(files['OEBPS/record-3.xhtml']);expect([...gallery.querySelectorAll('img')].map(n=>n.getAttribute('src'))).toEqual(['media/photo-1.jpg','media/photo-2.jpg','media/photo-1.jpg']);
 });
+
+it.each(['literary','imagebook'] as const)('places one standalone date before all moments that day in %s',design=>{
+ const base={...input.entries[0],note:'',media:[],occurredAtPrecision:'day'};
+ const entries=[{...base,momentId:'late',note:'最后一天',occurredAt:'2026-08-18T00:00:00Z'},{...base,momentId:'early',note:'最早一天第一条',occurredAt:'2026-08-03T00:00:00Z'},{...base,momentId:'same',note:'最早一天第二条',occurredAt:'2026-08-03T01:00:00Z'}];
+ const files=albumEpubDocuments({...options,design,input:{...input,entries}});const opf=xml(files['OEBPS/package.opf']);const order=[...opf.querySelectorAll('spine itemref')].map(n=>n.getAttribute('idref')!);
+ const dividers=order.filter(n=>n.startsWith('date-'));expect(dividers).toHaveLength(2);
+ expect(xml(files['OEBPS/'+dividers[0]+'.xhtml']).body.textContent).toContain('2026-08-03');
+ const body=order.map(n=>xml(files['OEBPS/'+n+'.xhtml']).body.textContent).join('');expect(body.indexOf('最早一天第一条')).toBeLessThan(body.indexOf('最早一天第二条'));expect(body.indexOf('最早一天第二条')).toBeLessThan(body.indexOf('最后一天'));
+ expect(entries[0].momentId).toBe('late');
+});

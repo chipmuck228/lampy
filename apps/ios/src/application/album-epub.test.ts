@@ -44,15 +44,15 @@ it('preserves text and emoji, escapes markup and excludes private paths and sour
 it('has cover, opening, contents, ordered records, and colophon; no invented exact date', () => {
   const archive = files();
   const opf = new JSDOM(strFromU8(archive['OEBPS/package.opf']), { contentType: 'application/xml' }).window.document;
-  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','opening','record-1','archive']);
+  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','opening','date-1','record-1','archive']);
   expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('日子未确认');
   expect(strFromU8(archive['OEBPS/style.css'])).toContain('height:auto');
 });
-it('retains selected order across repeated months and supports English', () => {
+it('keeps unknown dates explicitly uncertain and supports English', () => {
   const second = { ...input.entries[0], momentId: 'second' };
   const archive = unzipSync(buildAlbumEpub({ ...options, language: 'en', input: { ...input, entries: [second, input.entries[0]] }, dates: { second: { label: 'Nov 2', chapter: 'November 2026' }, 'private-record-id': { label: 'Oct 1', chapter: 'October 2026' } } }));
   const nav = strFromU8(archive['OEBPS/nav.xhtml']);
-  expect(nav.indexOf('November')).toBeLessThan(nav.indexOf('October'));
+  expect(nav).toContain('Date uncertain');
   expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('Listen to this moment');
 });
 it('fails closed for absent media, unsafe package paths and missing cover', () => {

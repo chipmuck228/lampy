@@ -244,6 +244,7 @@ export default function AlbumPrintScreen() {
       const valid = () => outerValid() && !epubCancelled.current;
       setEpubState({ id: feedbackId, pending: true, message: tr('正在制作电子册，请稍候。') });
       let createdId: string | undefined;
+      let published=false;
       try {
         let editionId = edition?.id;
         if (!editionId) {
@@ -254,12 +255,18 @@ export default function AlbumPrintScreen() {
         }
         const shared = await shareAlbumEpub(editionId, valid, update => {
           if (!valid()) return;
+          if(update.stage==='SHARE'){
+            published=true;
+            setEpubState({id:feedbackId,pending:false,message:tr('电子册已保存在Lampy中，可再次点击保存。')});
+            return;
+          }
           const message = update.total > 0 ? tr('正在制作电子册：{0}/{1}', [update.done, update.total]) : tr('正在制作电子册，请稍候。');
           setEpubState({ id: feedbackId, pending: true, message });
         });
         if (valid()) setEpubState({ id: feedbackId, pending: false, message: shared ? tr('电子册已交给所选应用。') : tr('电子册已保存在Lampy中，可再次点击保存。') });
       } catch (error) {
         if (!valid()) return;
+        if(published){setEpubState({id:feedbackId,pending:false,message:tr('电子册已保存在Lampy中，可再次点击保存。')});return;}
         const code = error instanceof AlbumEpubFailure ? error.code : 'OPERATION_FAILED';
         const message = code === 'EPUB_DISK_FULL' ? tr('本机可用空间不足，请腾出空间后重试。')
           : code === 'EPUB_NATIVE_REBUILD_REQUIRED' ? tr('请更新Lampy后再试。')
@@ -274,7 +281,7 @@ export default function AlbumPrintScreen() {
           const editions = await listEpubSnapshots(id);
           if (valid()) setEpubEditions(editions);
         }
-        if (!valid() && active.current && routeAlbum.current === id) setEpubState({ id: feedbackId, pending: false, message: tr('本次制作已停止，请重新开始。') });
+        if (!published && !valid() && active.current && routeAlbum.current === id) setEpubState({ id: feedbackId, pending: false, message: tr('本次制作已停止，请重新开始。') });
       }
     });
   }

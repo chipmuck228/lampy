@@ -1,7 +1,7 @@
 import type {AlbumEpubOptions} from './album-epub';
 import {PUBLICATION_OPENING} from './album-publication';
 
-import {planBookSections,bookDateRange} from './album-book-plan';
+import {planBookSections,bookDateRange,bookDay} from './album-book-plan';
 
 export type ImagebookPage={name:string;title:string;body:string;nav:boolean};
 /** Conservative pagination budget; leaves room for platform serif font differences.
@@ -36,10 +36,11 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
  planBookSections(options).forEach(section=>{
   const index=section.indices[0],record=input.entries[index];
   const date=dates[record.momentId]??{label:zh?'日子未确认':'Date uncertain',chapter:zh?'日子未确认':'Date uncertain'};
-  const chapter=previous!==date.chapter;previous=date.chapter;
+  const day=bookDay(options,index);const chapter=previous!==day.key;previous=day.key;
+  if(chapter)add(`date-${index+1}`,day.label,`<section class="date-opener"><p class="date-rule"></p><h1>${escape(day.label)}</h1></section>`,true);
   const label=`<header class="fixed-meta">${chapter?`<h2>${escape(date.chapter)}</h2>`:''}<p>${escape(date.label)}${section.indices.length===1&&record.attribution?' · '+escape(record.attribution):''}${section.indices.length===1&&record.feeling?' · '+escape(record.feeling):''}</p></header>`;
   let page=0;const name=()=>`record-${index+1}${page?'-'+(page+1):''}`;
-  const addRecord=(body:string)=>{add(name(),date.chapter,`${label}${body}`,chapter&&page===0);page++;};
+  const addRecord=(body:string)=>{add(name(),date.chapter,`${label}${body}`,false);page++;};
   if(section.layout==='daily-notes'&&section.indices.length>1){
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
   }
@@ -108,4 +109,6 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 .edition-notes{top:auto;bottom:110px;left:200px;right:200px;text-align:center;font-size:24px;line-height:1.8}.edition-symbol{width:145px;height:145px;margin:0 auto -5px}.edition-brand{font:42px/1.4 Georgia,serif;letter-spacing:2px;color:#40564a}.edition-title{font-size:24px;margin-top:20px}.edition-range,.made{font:17px/1.8 Georgia,serif;color:#777}.made{margin-top:12px}
 
 .paired-story{position:absolute;left:64px;right:64px;top:128px;bottom:64px;display:flex;flex-direction:column;gap:35px}.paired-pictures{display:flex;gap:28px;min-height:0;flex:1}.paired-pictures figure{flex:1;min-width:0}.paired-story>.fixed-prose{font-size:26px;max-width:880px;margin:auto}
+
+.date-opener{position:absolute;left:180px;right:180px;top:340px}.date-opener h1{font-size:68px;line-height:1.4;font-weight:400}.date-rule{width:70px;border-top:2px solid #40564a;margin-bottom:35px}
 `;
