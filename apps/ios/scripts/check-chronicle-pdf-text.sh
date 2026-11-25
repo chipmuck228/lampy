@@ -18,7 +18,7 @@ copying { print }
 copying && /^}$/ { copying=0 }
 ' modules/lampy-album-layout/ios/AlbumPrint.swift >> "$check_file"
 cat >> "$check_file" <<'SWIFT'
-func verify(_ label: String, _ expected: Bool, _ checks: [[String]], _ pdf: String) {
+private func verify(_ label: String, _ expected: Bool, _ checks: [[String]], _ pdf: String) {
   precondition(printPageTextChecksMatch(checks, in: compactPdfText(pdf)) == expected, label)
 }
 // Same cover title is observed by both the DOM inspection and source metadata.
@@ -39,27 +39,27 @@ verify("zero-width break", true, [["记忆"]], "记\u{200B}忆")
 verify("real hyphen is still required", false, [["mother-in-law"]], "motherinlaw")
 verify("missing letter is still rejected", false, [["ordinary"]], "ordinry")
 // Synthetic 13-character CJK/Latin fixture; no user's album writing is embedded.
-let mixed = "小猫和panda，各自休息"
-let letters = Array(mixed).map(String.init)
-let glyphs = letters.enumerated().map { i, value in
+private let mixed = "小猫和panda，各自休息"
+private let letters = Array(mixed).map(String.init)
+private let glyphs = letters.enumerated().map { i, value in
   ChronicleTextGlyph(text: value, rect: CGRect(x: CGFloat(40 + i * 25), y: 400, width: 24, height: 30), ordinal: i)
 }
-let stream = [3,4,5,6,7,0,1,2,8,9,10,11,12].map { glyphs[$0] }
-func spatial(_ label: String, _ expected: Bool, _ source: [ChronicleTextGlyph]) {
+private let stream = [3,4,5,6,7,0,1,2,8,9,10,11,12].map { glyphs[$0] }
+private func spatial(_ label: String, _ expected: Bool, _ source: [ChronicleTextGlyph]) {
   precondition(printPageTextChecksMatch([[mixed]], in: chronicleSpatialText(source)) == expected, label)
 }
 spatial("CJK/Latin streams reconstructed by position", true, stream)
 spatial("missing glyph still rejected", false, Array(stream.dropLast()))
-let wrong = glyphs.enumerated().map { i, g in ChronicleTextGlyph(text: g.text, rect: CGRect(x: CGFloat(i == 0 ? 65 : i == 1 ? 40 : Int(g.rect.minX)), y: 400, width: 24, height: 30), ordinal: i) }
+private let wrong = glyphs.enumerated().map { i, g in ChronicleTextGlyph(text: g.text, rect: CGRect(x: CGFloat(i == 0 ? 65 : i == 1 ? 40 : Int(g.rect.minX)), y: 400, width: 24, height: 30), ordinal: i) }
 spatial("same characters in wrong visible order rejected", false, wrong)
-let wrapped = glyphs.enumerated().map { i, g in ChronicleTextGlyph(text: g.text, rect: CGRect(x: CGFloat(40 + (i % 9) * 25), y: CGFloat(i < 9 ? 400 : 340), width: 24, height: 30), ordinal: i) }
+private let wrapped = glyphs.enumerated().map { i, g in ChronicleTextGlyph(text: g.text, rect: CGRect(x: CGFloat(40 + (i % 9) * 25), y: CGFloat(i < 9 ? 400 : 340), width: 24, height: 30), ordinal: i) }
 spatial("two horizontal lines", true, Array(wrapped.reversed()))
-let punctuation = glyphs.enumerated().map { i, g in i == 8 ? ChronicleTextGlyph(text:g.text,rect:CGRect(x:g.rect.minX,y:401,width:12,height:4),ordinal:i) : g }
+private let punctuation = glyphs.enumerated().map { i, g in i == 8 ? ChronicleTextGlyph(text:g.text,rect:CGRect(x:g.rect.minX,y:401,width:12,height:4),ordinal:i) : g }
 spatial("short punctuation stays on the same line", true, punctuation)
-let substituted = glyphs.enumerated().map { i, g in ChronicleTextGlyph(text:i == 12 ? "跑" : g.text,rect:g.rect,ordinal:i) }
+private let substituted = glyphs.enumerated().map { i, g in ChronicleTextGlyph(text:i == 12 ? "跑" : g.text,rect:g.rect,ordinal:i) }
 spatial("same-length replacement rejected", false, substituted)
 // Real PDFKit adapter checks, using CoreText to paint font runs out of stream order.
-func fixturePdf(_ last: String) -> PDFDocument {
+private func fixturePdf(_ last: String) -> PDFDocument {
   let data = NSMutableData()
   let consumer = CGDataConsumer(data: data as CFMutableData)!
   var bounds = CGRect(x:0,y:0,width:600,height:450)
@@ -73,12 +73,12 @@ func fixturePdf(_ last: String) -> PDFDocument {
   context.endPDFPage(); context.closePDF()
   return PDFDocument(data:data as Data)!
 }
-let correct = fixturePdf("，各自休息")
-let full = ChronicleTextCheck(parts:[mixed],viewportRect:CGRect(x:0,y:0,width:1200,height:900))
+private let correct = fixturePdf("，各自休息")
+private let full = ChronicleTextCheck(parts:[mixed],viewportRect:CGRect(x:0,y:0,width:1200,height:900))
 precondition(printChronicleTextCheck(full,in:correct.page(at:0)!),"real PDF mixed text")
-let missing = fixturePdf("，各自休")
+private let missing = fixturePdf("，各自休")
 precondition(!printChronicleTextCheck(full,in:missing.page(at:0)!),"real PDF missing glyph")
-let replacement = fixturePdf("，各自休跑")
+private let replacement = fixturePdf("，各自休跑")
 precondition(!printChronicleTextCheck(full,in:replacement.page(at:0)!),"real PDF replaced glyph")
 print("CHRONICLE_PDF_TEXT_CHECKS_OK: 24 production Swift/PDFKit cases")
 SWIFT
