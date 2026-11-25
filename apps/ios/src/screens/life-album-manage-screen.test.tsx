@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import {Alert} from 'react-native';
+import {Alert,Platform} from 'react-native';
 import LifeAlbumManageScreen from './life-album-manage-screen';
 
 const mockPush = jest.fn();
@@ -108,7 +108,8 @@ describe('life album overview',()=>{
   expect(page.getByTestId('life-album-date-range').props.children).toBe('2026年10月1日');
   expect(page.getByText('1条')).toBeTruthy();
   expect(page.getByTestId('life-album-preview-open')).toBeTruthy();
-  expect(page.getByTestId('life-album-export-open')).toBeTruthy();
+  if(Platform.OS==='android')expect(page.queryByTestId('life-album-export-open')).toBeNull();
+  else expect(page.getByTestId('life-album-export-open')).toBeTruthy();
   expect(page.queryByTestId('life-album-edit')).toBeNull();
   expect(page.queryByTestId('life-album-organize')).toBeNull();
   expect(page.queryByTestId('life-album-delete')).toBeNull();
@@ -118,9 +119,11 @@ describe('life album overview',()=>{
  it('opens free EPUB reading directly and leaves save/share behind the existing export gate',async()=>{
   const page=await open();
   await fireEvent.press(page.getByTestId('life-album-preview-open'));
-  expect(mockPush).toHaveBeenCalledWith('/albums/album_1/preview');
-  await fireEvent.press(page.getByTestId('life-album-export-open'));
-  expect(mockPush).toHaveBeenCalledWith('/albums/album_1/print');
+  expect(mockPush).toHaveBeenCalledWith(Platform.OS==='android'?'/albums/album_1/read':'/albums/album_1/preview');
+  if(Platform.OS!=='android'){
+   await fireEvent.press(page.getByTestId('life-album-export-open'));
+   expect(mockPush).toHaveBeenCalledWith('/albums/album_1/print');
+  }else expect(page.queryByTestId('life-album-export-open')).toBeNull();
   await fireEvent.press(page.getByTestId('life-album-entry-open-m1'));
   expect(mockPush).toHaveBeenCalledWith({pathname:'/moment/[id]',params:{id:'m1'}});
  });
