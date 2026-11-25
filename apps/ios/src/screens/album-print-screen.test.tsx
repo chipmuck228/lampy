@@ -1,18 +1,19 @@
 import { deleteSavedAlbumEdition } from '../infrastructure/album-edition-delete';
-import { createPersonalEpubSnapshot } from '../infrastructure/album-epub-snapshots';
+import { createPersonalEpubSnapshot, listEpubSnapshots } from '../infrastructure/album-epub-snapshots';
 import {
   act,
   cleanup,
   fireEvent,
   render,
   waitFor,
+  within,
 } from '@testing-library/react-native';
 import { Alert, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AlbumPrintScreen from './album-print-screen';
 import { AlbumEpubFailure } from '../infrastructure/album-epub-files';
 import {AlbumPrintFailure} from '../application/album-print';
-jest.mock('../infrastructure/album-epub-snapshots', () => ({ listEpubSnapshots: async () => [], discardUnfinishedEpubSnapshot: async () => {}, createPersonalEpubSnapshot: jest.fn() }));
+jest.mock('../infrastructure/album-epub-snapshots', () => ({ listEpubSnapshots: jest.fn(async () => []), discardUnfinishedEpubSnapshot: async () => {}, createPersonalEpubSnapshot: jest.fn() }));
 jest.mock('../infrastructure/album-edition-delete',()=>({deleteSavedAlbumEdition:jest.fn(async()=>{})}));
 const mockEpub = jest.fn(async () => undefined);
 jest.mock('../infrastructure/album-epub-files', () => ({
@@ -156,7 +157,7 @@ it('generation is explicit, uses the saved style, and does not auto-share', asyn
   expect(mockSave).toHaveBeenCalledWith('handmade');
   expect(mockShare).not.toHaveBeenCalled();
   expect(mockEpub).not.toHaveBeenCalled();
-  await fireEvent.press(view.getByText('保存电子册'));
+  await fireEvent.press(view.getByText('分享电子册'));
   await waitFor(() => expect(mockEpub).toHaveBeenCalledWith('print_1', expect.any(Function), expect.any(Function)));
   expect(view.getByText('字体嵌入尚未确认')).toBeTruthy();
   expect(view.getByText('普通文字选择已核对；请打开PDF核对emoji显示，emoji可能无法复制。')).toBeTruthy();
@@ -296,12 +297,12 @@ it('shows EPUB progress and an actionable failure beside the saved edition', asy
   await waitFor(() => expect(mockList).toHaveBeenCalled());
   await fireEvent.press(view.getByText('生成并保存测试PDF'));
   await waitFor(() => expect(view.getByText('Saved for EPUB')).toBeTruthy());
-  await fireEvent.press(view.getByText('保存电子册'));
+  await fireEvent.press(view.getByText('分享电子册'));
   await waitFor(() => expect(view.getByText('正在制作电子册…')).toBeTruthy());
   await act(async () => reject(new AlbumEpubFailure('WRITE_FILE', 'ERR_FILESYSTEM_WRITE')));
   await waitFor(() => expect(view.getByText('这次未能制作电子册，请重试。原记录仍然保留。')).toBeTruthy());
   expect(view.getByTestId('album-epub-diagnostic').props.children).toBe('EPUB/WRITE_FILE/ERR_FILESYSTEM_WRITE');
-  expect(view.getByText('保存电子册')).toBeTruthy();
+  expect(view.getByText('分享电子册')).toBeTruthy();
 });
 
 it.each(['cancel', 'leave', 'background'])('invalidates an in-flight EPUB on %s and suppresses its late result', async scenario => {
@@ -313,7 +314,7 @@ it.each(['cancel', 'leave', 'background'])('invalidates an in-flight EPUB on %s 
   await waitFor(() => expect(mockList).toHaveBeenCalled());
   await fireEvent.press(view.getByText('生成并保存测试PDF'));
   await waitFor(() => expect(view.getByText('Stop test')).toBeTruthy());
-  await fireEvent.press(view.getByText('保存电子册'));
+  await fireEvent.press(view.getByText('分享电子册'));
   await waitFor(() => expect(validity).toBeDefined());
   expect(validity!()).toBe(true);
   if (scenario === 'cancel') await fireEvent.press(view.getByText('取消制作电子册'));
@@ -393,9 +394,28 @@ it('keeps a published EPUB successful while Books sends the app to the backgroun
  });
  const view=await render(wrap());await waitFor(()=>expect(view.getByText('已解锁导出')).toBeTruthy());
  await fireEvent.press(view.getByText('制作电子册'));
- await waitFor(()=>expect(view.getByText('电子册已保存在Lampy中，可再次点击保存。')).toBeTruthy());
+ await waitFor(()=>expect(view.queryByText('取消制作电子册')).toBeNull());
  AppState.currentState='background';await act(async()=>finish());
  AppState.currentState='active';
  expect(view.queryByText('本次制作已停止，请重新开始。')).toBeNull();
- expect(view.getByText('电子册已保存在Lampy中，可再次点击保存。')).toBeTruthy();
+ expect(view.queryByText('电子册已保存在Lampy中，可再次点击保存。')).toBeNull();
+});
+it('labels created editions clearly, shares by row and marks only the new creation',async()=>{
+ process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED='1';process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED='1';process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID='app.lampy.export';
+ const old={id:'epub_old',name:'旧电子册',createdAt:'2026-01-01',style:'plain',design:'imagebook'};
+ const added={...old,id:'epub_new',name:'新电子册',createdAt:'2026-02-01'};
+ (listEpubSnapshots as jest.Mock).mockResolvedValueOnce([old]).mockResolvedValueOnce([old,added]);
+ (createPersonalEpubSnapshot as jest.Mock).mockResolvedValueOnce({id:added.id});
+ const v=await render(wrap());await waitFor(()=>expect(v.getByText('已生成的电子册')).toBeTruthy());
+ expect(v.queryByText('保存电子册')).toBeNull();expect(v.queryByText('刚刚生成')).toBeNull();
+ await fireEvent.press(v.getByText('制作电子册'));
+ await waitFor(()=>expect(v.getByText('刚刚生成')).toBeTruthy());
+ expect(within(v.getByTestId('edition-open-epub_new')).getByTestId('album-export-just-created')).toBeTruthy();
+ expect(within(v.getByTestId('edition-open-epub_old')).queryByTestId('album-export-just-created')).toBeNull();
+ expect(v.queryByText('电子册已保存在Lampy中，可再次点击保存。')).toBeNull();
+ expect(v.getAllByTestId(/^edition-open-/).map(row=>row.props.testID)).toEqual(['edition-open-epub_new','edition-open-epub_old']);
+ await fireEvent.press(v.getByTestId('edition-open-epub_old'));
+ await waitFor(()=>expect(mockEpub).toHaveBeenCalledWith('epub_old',expect.any(Function),expect.any(Function)));
+ expect(createPersonalEpubSnapshot).toHaveBeenCalledTimes(1);
+ expect(v.getByText('刚刚生成')).toBeTruthy();
 });

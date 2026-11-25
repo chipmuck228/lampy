@@ -1129,7 +1129,6 @@
   "声音在纸上留下标记与时长": "Sounds leave a mark and their length on the page",
   "正在装订": "Binding",
   "第{0}页 · 共{1}页": "Page {{0}} · {{1}} pages",
-  "电子册已保存在Lampy中，可再次点击保存。": "The electronic album is saved in Lampy. Tap again to share it.",
   "每次导出都是独立的一版，之后改了记录，这一版也不会变": "Each export is its own edition. Later edits never change it",
   "上下轻扫可翻页": "Swipe up or down to turn the page",
   "段声音": "sounds",
@@ -1252,5 +1251,9 @@
   "联系 Lampy": "Contact Lampy",
   "PDF 仅保留声音信息": "PDF keeps the voice details only",
   "分享或打印PDF": "Share or print PDF",
-  "已生成的PDF": "Generated PDFs"
+  "已生成的PDF": "Generated PDFs",
+  "已生成的电子册": "Created electronic albums",
+  "点按分享，左滑可分享或删除。": "Tap to share. Swipe left to share or delete.",
+  "分享电子册": "Share electronic album",
+  "刚刚生成": "Just created"
 }
