@@ -171,6 +171,74 @@ private func printPageTextChecksMatch(_ checks: [[String]], in text: String) -> 
   let actual = compactChroniclePdfText(text)
   return checks.allSatisfy { printSegmentsMatch($0.map(compactChroniclePdfText).filter { !$0.isEmpty }, in: actual) }
 }
+private struct ChronicleTextGlyph {
+  let text: String
+  let rect: CGRect
+  let ordinal: Int
+}
+private struct ChronicleTextCheck {
+  let parts: [String]
+  let viewportRect: CGRect?
+}
+// Reconstruct horizontal reading order from the PDF's actual glyph positions,
+// never from the expected string or an unordered character inventory.
+private func chronicleSpatialText(_ glyphs: [ChronicleTextGlyph]) -> String {
+  guard !glyphs.isEmpty else { return "" }
+  let heights = glyphs.map { $0.rect.height }.sorted()
+  let tolerance = max(2, heights[heights.count / 2] * 0.65)
+  let ordered = glyphs.sorted { $0.rect.midY == $1.rect.midY ? $0.ordinal < $1.ordinal : $0.rect.midY > $1.rect.midY }
+  var rows: [[ChronicleTextGlyph]] = []
+  for glyph in ordered {
+    let row = rows.indices.min { abs(rows[$0][0].rect.midY - glyph.rect.midY) < abs(rows[$1][0].rect.midY - glyph.rect.midY) }
+    if let row = row, abs(rows[row][0].rect.midY - glyph.rect.midY) <= tolerance { rows[row].append(glyph) }
+    else { rows.append([glyph]) }
+  }
+  return rows.map { row in
+    row.sorted { $0.rect.minX == $1.rect.minX ? $0.ordinal < $1.ordinal : $0.rect.minX < $1.rect.minX }.map { $0.text }.joined()
+  }.joined(separator: "\n")
+}
+private func chroniclePdfGlyphs(_ page: PDFPage, viewportRect: CGRect?) -> [ChronicleTextGlyph]? {
+  let text = (page.string ?? "") as NSString
+  // Fail closed if PDFKit's index space cannot be aligned with the string.
+  guard page.numberOfCharacters == text.length else { return nil }
+  let media = page.bounds(for: .mediaBox)
+  let region: CGRect?
+  if let box = viewportRect {
+    region = CGRect(x: media.minX + box.minX * media.width / 1200,
+                    y: media.minY + (900 - box.maxY) * media.height / 900,
+                    width: box.width * media.width / 1200, height: box.height * media.height / 900)
+      .insetBy(dx: -2 * media.width / 1200, dy: -2 * media.height / 900)
+  } else { region = nil }
+  var glyphs: [ChronicleTextGlyph] = []
+  var index = 0
+  while index < text.length {
+    let range = text.rangeOfComposedCharacterSequence(at: index)
+    let value = text.substring(with: range)
+    index = NSMaxRange(range)
+    if compactChroniclePdfText(value).isEmpty { continue }
+    var rect = CGRect.null
+    for offset in range.location..<NSMaxRange(range) {
+      let box = page.characterBounds(at: offset)
+      if !box.isNull && !box.isInfinite && box.width > 0 && box.height > 0 { rect = rect.union(box) }
+    }
+    guard !rect.isNull, !rect.isInfinite, rect.minX.isFinite, rect.minY.isFinite, rect.maxX.isFinite, rect.maxY.isFinite else { return nil }
+    if let region = region, !region.contains(CGPoint(x: rect.midX, y: rect.midY)) { continue }
+    glyphs.append(ChronicleTextGlyph(text: value, rect: rect, ordinal: range.location))
+  }
+  return glyphs
+}
+private func printChronicleTextCheck(_ check: ChronicleTextCheck, in page: PDFPage) -> Bool {
+  if printPageTextChecksMatch([check.parts], in: page.string ?? "") { return true }
+  guard let glyphs = chroniclePdfGlyphs(page, viewportRect: check.viewportRect) else { return false }
+  return printPageTextChecksMatch([check.parts], in: chronicleSpatialText(glyphs))
+}
+private func chronicleViewportRect(_ value: Any?) -> CGRect? {
+  guard let box = value as? [String: Any], let x = box["left"] as? Double, let y = box["top"] as? Double,
+        let width = box["width"] as? Double, let height = box["height"] as? Double,
+        x.isFinite, y.isFinite, width.isFinite, height.isFinite, width > 0, height > 0 else { return nil }
+  return CGRect(x: x, y: y, width: width, height: height)
+}
+
 func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: String) throws -> [String: Any] {
   guard let data = layoutJson.data(using: .utf8), let layout = try JSONSerialization.jsonObject(with: data) as? [String: Any],
         let pages = layout["pages"] as? [[String: Any]], !pages.isEmpty,
@@ -289,7 +357,7 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
   private var imageUseBytes = 0
   private var dpiByAsset: [String: Double] = [:]
   private var colorRanges: [[String: Int]] = []
-  private var searchableChecks: [[[String]]] = []
+  private var searchableChecks: [[ChronicleTextCheck]] = []
   private var phase = "PREPARE_HTML"
   private let bounds = CGRect(x: 0, y: 0, width: 600, height: 450)
 
@@ -369,17 +437,19 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
     let inspect = """
     await document.fonts.ready;
     for(const image of document.images){if(image.decode)await image.decode();if(!image.complete||!image.naturalWidth)throw new Error('IMAGE_UNREADABLE');}
-    const texts=[],textKinds=[],images=[];
+    const texts=[],textKinds=[],textBounds=[],images=[];
+    const box=range=>{const r=range.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height};};
     const role=el=>el.closest('.opening-copy')?'opening':el.closest('.opening-philosophy')?'philosophy':el.closest('.fixed-prose')?'writing':'imprint';
     const visible=el=>{for(let e=el;e;e=e.parentElement){const s=getComputedStyle(e);if(s.display==='none'||s.visibility==='hidden')return false;}return true;};
     const inside=r=>r.left>=-4&&r.top>=-4&&r.right<=1204&&r.bottom<=904;
     const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
-    while(walk.nextNode()){const n=walk.currentNode;if(!n.nodeValue.trim()||!visible(n.parentElement))continue;const range=document.createRange();range.selectNodeContents(n);const rects=Array.from(range.getClientRects());if(rects.some(r=>!inside(r)))throw new Error('INVALID_LAYOUT');if(rects.length&&!n.parentElement.closest('[aria-hidden="true"]')){texts.push(n.nodeValue);textKinds.push(role(n.parentElement));}}
+    while(walk.nextNode()){const n=walk.currentNode;if(!n.nodeValue.trim()||!visible(n.parentElement))continue;const range=document.createRange();range.selectNodeContents(n);const rects=Array.from(range.getClientRects());if(rects.some(r=>!inside(r)))throw new Error('INVALID_LAYOUT');if(rects.length&&!n.parentElement.closest('[aria-hidden="true"]')){texts.push(n.nodeValue);textKinds.push(role(n.parentElement));textBounds.push(box(range));}}
     for(const image of document.images){if(!visible(image))continue;const r=image.getBoundingClientRect();if(!inside(r))throw new Error('INVALID_LAYOUT');images.push({path:image.getAttribute('src'),width:image.naturalWidth,height:image.naturalHeight,w:r.width,h:r.height});}
     const notes=recordPage?Array.from(document.querySelectorAll('.fixed-prose')).map(n=>n.textContent):[];
-    return {texts,textKinds,images,notes};
+    const sourceBounds=sourceTexts.map(text=>{const node=Array.from(document.querySelectorAll('.fixed-prose,h1')).find(n=>n.textContent===text);if(!node)return null;const range=document.createRange();range.selectNodeContents(node);return box(range);});
+    return {texts,textKinds,textBounds,sourceBounds,images,notes};
     """
-    webView.callAsyncJavaScript(inspect, arguments: ["recordPage": (page["name"] as? String ?? "").hasPrefix("record-")], in: nil, in: .page) { [weak self] result in
+    webView.callAsyncJavaScript(inspect, arguments: ["recordPage": (page["name"] as? String ?? "").hasPrefix("record-"), "sourceTexts": page["expectedText"] as? [String] ?? []], in: nil, in: .page) { [weak self] result in
       guard let self = self, !self.finished else { return }
       do {
         let info = try result.get() as? [String: Any]
@@ -397,24 +467,32 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
   }
   private func append(_ data: Data, info: [String: Any], page: [String: Any]) throws {
     guard let provider = CGDataProvider(data: data as CFData), let pdf = CGPDFDocument(provider), pdf.numberOfPages == 1,
-          let source = pdf.page(at: 1), let searchable = PDFDocument(data: data), searchable.pageCount == 1, let context = context else { throw printFailure("PDF_REOPEN_FAILED") }
+          let source = pdf.page(at: 1), let searchable = PDFDocument(data: data), searchable.pageCount == 1, let textPage = searchable.page(at: 0), let context = context else { throw printFailure("PDF_REOPEN_FAILED") }
     phase = "CHECK_PAGE_TEXT"
-    let actual = compactPdfText(searchable.page(at: 0)?.string ?? "")
+    let actual = compactPdfText(textPage.string ?? "")
     let values = (info["texts"] as? [String] ?? []) + (page["expectedText"] as? [String] ?? [])
-    var pageChecks: [[String]] = []
+    let textBounds = info["textBounds"] as? [Any] ?? []
+    let sourceBounds = info["sourceBounds"] as? [Any] ?? []
+    var pageChecks: [ChronicleTextCheck] = []
     for (index, value) in values.enumerated() {
       let ranges = try printColorGlyphRanges(value, font: UIFont.systemFont(ofSize: 17))
       for range in ranges { colorRanges.append(["page": cursor, "block": index, "line": 0, "startUTF16": range.location, "endUTF16": NSMaxRange(range)]) }
       let required = printRequiredSegments(value, excluding: ranges)
-      guard printPageTextChecksMatch([required], in: actual) else {
+      let domCount = (info["texts"] as? [String] ?? []).count
+      let bounds = index < domCount ? textBounds : sourceBounds
+      let offset = index < domCount ? index : index - domCount
+      let rect = offset < bounds.count ? chronicleViewportRect(bounds[offset]) : nil
+      let check = ChronicleTextCheck(parts: required, viewportRect: rect)
+      guard printChronicleTextCheck(check, in: textPage) else {
         let kinds = info["textKinds"] as? [String] ?? []
         let role = index < kinds.count ? kinds[index] : "source"
         let kind = ["opening", "philosophy", "writing", "imprint", "source"].contains(role) ? role : "unknown"
-        NSLog("[LampyPrint] stage=CHECK_PAGE_TEXT page=%ld check=%ld kind=%@ expected=%ld extracted=%ld code=PDF_TEXT",
-              cursor + 1, index + 1, kind, required.joined().unicodeScalars.count, actual.unicodeScalars.count)
+        let sameCharacters = compactChroniclePdfText(required.joined()).unicodeScalars.map { $0.value }.sorted() == compactChroniclePdfText(actual).unicodeScalars.map { $0.value }.sorted()
+        NSLog("[LampyPrint] stage=CHECK_PAGE_TEXT page=%ld check=%ld kind=%@ expected=%ld extracted=%ld sameCharacters=%@ code=PDF_TEXT",
+              cursor + 1, index + 1, kind, required.joined().unicodeScalars.count, actual.unicodeScalars.count, sameCharacters ? "yes" : "no")
         throw printFailure("PDF_TEXT")
       }
-      pageChecks.append(required)
+      pageChecks.append(check)
     }
     searchableChecks.append(pageChecks)
     for image in info["images"] as? [[String: Any]] ?? [] {
@@ -438,7 +516,7 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
       phase = "CHECK_FINAL_TEXT"
       guard searchableChecks.count == pages.count else { throw printFailure("INVALID_LAYOUT") }
       for (index, checks) in searchableChecks.enumerated() {
-        guard printPageTextChecksMatch(checks, in: compactPdfText(text.page(at: index)?.string ?? "")) else {
+        guard let page = text.page(at: index), checks.allSatisfy({ printChronicleTextCheck($0, in: page) }) else {
           cursor = index
           throw printFailure("PDF_TEXT")
         }
