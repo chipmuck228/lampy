@@ -6,7 +6,7 @@ import {getUseCases} from '../application/container';
 import type {AlbumLayoutInput} from '../application/album-layout-input';
 import {selectBookCover} from '../application/album-book-plan';
 import {albumExportConfig} from '../application/album-export-access';
-import {personalRecordsOnly} from '../application/mobile-capabilities';
+import {purchasesSupported} from '../application/mobile-capabilities';
 import {createPersonalEpubSnapshot,discardUnfinishedEpubSnapshot,listEpubSnapshots,type SavedEpubSnapshot} from '../infrastructure/album-epub-snapshots';
 import {shareAlbumEpub} from '../infrastructure/album-epub-files';
 import {listSavedAlbumPrints,shareSavedAlbumPrint,type SavedPrintSummary} from '../infrastructure/album-print-files';
@@ -25,7 +25,7 @@ type Feedback={id:string;pending:boolean;fraction:number;message:string};
 export default function AlbumPrintScreen(){
  const router=useRouter(),id=firstSearchParam(useLocalSearchParams<{id?:string|string[]}>().id)??'',lock=useDeviceLock(),config=albumExportConfig();
  const [foreground,setForeground]=useState(AppState.currentState==='active');
- const blocked=personalRecordsOnly()||!foreground||!!lock?.snapshot.locked;
+ const blocked=!purchasesSupported()||!foreground||!!lock?.snapshot.locked;
  const denied=useRef(blocked);useLayoutEffect(()=>{denied.current=blocked;},[blocked]);
  const unlock=useAlbumExportUnlock(!blocked&&config.enabled&&config.paid);
  const owned=config.enabled&&config.paid&&!!unlock.status?.owned;

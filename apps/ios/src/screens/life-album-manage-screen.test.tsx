@@ -119,7 +119,7 @@ describe('life album overview',()=>{
  it('opens free EPUB reading directly and leaves save/share behind the existing export gate',async()=>{
   const page=await open();
   await fireEvent.press(page.getByTestId('life-album-preview-open'));
-  expect(mockPush).toHaveBeenCalledWith(Platform.OS==='android'?'/albums/album_1/read':'/albums/album_1/preview');
+  expect(mockPush).toHaveBeenCalledWith('/albums/album_1/preview');
   if(Platform.OS!=='android'){
    await fireEvent.press(page.getByTestId('life-album-export-open'));
    expect(mockPush).toHaveBeenCalledWith('/albums/album_1/print');

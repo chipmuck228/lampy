@@ -13,7 +13,7 @@ jest.mock('../application/personal-settings-visibility',()=>({isPersonalSettings
 jest.mock('./family-email-account-screen',()=>({__esModule:true,default:(props:any)=>{mockEmailProps=props;return null;}}));
 jest.mock('./account-screen',()=>({__esModule:true,default:(props:any)=>{mockProps=props;return null;}}));
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
-beforeEach(()=>{jest.clearAllMocks();mockFormal=false;mockInternal=false;mockDiagnostics=true;mockProps=null;mockEmailProps=null;mockEmailOpen=false;mockLock.snapshot.locked=false;const i=rememberFamilyInvite('a'.repeat(64));mockParams={returnTo:'/family',generation:String(i.generation)};});
+beforeEach(()=>{jest.clearAllMocks();delete process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED;mockFormal=false;mockInternal=false;mockDiagnostics=true;mockProps=null;mockEmailProps=null;mockEmailOpen=false;mockLock.snapshot.locked=false;const i=rememberFamilyInvite('a'.repeat(64));mockParams={returnTo:'/family',generation:String(i.generation)};});
 afterEach(()=>forgetFamilyInvite());
 it('returns on success without consuming the invite and cancel also preserves it',async()=>{
  const page=await render(<FamilyInviteLoginScreen/>);

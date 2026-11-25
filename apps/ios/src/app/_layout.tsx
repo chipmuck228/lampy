@@ -1,7 +1,7 @@
 import {observeExportEntitlements} from '../infrastructure/album-export-purchases';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { androidExcludedRoutes, personalRecordsOnly } from '../application/mobile-capabilities';
+import { androidExcludedRoutes, purchasesSupported } from '../application/mobile-capabilities';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -34,7 +34,7 @@ export default function RootLayout() {
             <Stack.Screen name="family-album-paper" />
             <Stack.Screen name="family-album-print" />
           </Stack.Protected>
-          {personalRecordsOnly() ? <Stack.Protected guard={false}>
+          {!purchasesSupported() ? <Stack.Protected guard={false}>
             {androidExcludedRoutes().filter(name=>!['family-album-paper','family-album-print'].includes(name)).map(name => <Stack.Screen key={name} name={name} />)}
           </Stack.Protected> : null}
         </Stack>

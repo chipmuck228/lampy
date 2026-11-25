@@ -1,3 +1,4 @@
+import {emailCodeEntryOpen} from '../infrastructure/account-config';
 import {isPersonalSettingsDiagnosticsOpen} from '../application/personal-settings-visibility';
 import {QuietField} from './quiet-form';
 import { familyAlbumEvaluationOpen } from '../application/family-album';
@@ -108,7 +109,7 @@ export default function FamilyDirectoryScreen() {
         <Text style={styles.welcomeTitle}>{tr('有些日子，想和家人一起留着。')}</Text>
         <Text style={styles.welcomeBody}>{tr('登录后，可以创建自己的家庭。')}</Text>
         <Pressable style={styles.createHit} testID="family-sign-in" accessibilityRole="button"
-          onPress={() => router.push((isFamilyV1ReleaseBuild() || isControlledEmailAccountsOpen()) ? '/family-email-account' : '/account-diagnostics')}><Text style={styles.action}>{tr('登录家庭')}</Text></Pressable>
+          onPress={() => router.push(emailCodeEntryOpen()?{pathname:'/account/email-code',params:{returnTo:'family'}}:(isFamilyV1ReleaseBuild() || isControlledEmailAccountsOpen()) ? '/family-email-account' : '/account-diagnostics')}><Text style={styles.action}>{tr('登录家庭')}</Text></Pressable>
         <Text style={styles.privacyHint}>{tr('自己的记录，仍在这台设备上。')}</Text>
       </View> : null}
       {state.status === 'failed' ? <View style={styles.connection} testID="family-connection-failed">

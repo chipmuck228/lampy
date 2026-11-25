@@ -1,7 +1,7 @@
 import {albumManageStyles} from './album-manage-styles';
 import { AlbumEntryActions, AlbumEditorFields } from './album-workflow-controls';
 import { tr } from '../i18n';
-import {personalRecordsOnly} from '../application/mobile-capabilities';
+import {purchasesSupported} from '../application/mobile-capabilities';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -198,8 +198,8 @@ export default function LifeAlbumManageScreen() {
             </View>
           </View>
           {!editing&&!organizing ? <View style={styles.primaryActions}>
-            <Pressable accessibilityRole="button" accessibilityLabel={tr('翻阅')} testID="life-album-preview-open" accessibilityState={{disabled:busy||!canOpenAlbumPreview(view.entries.length)}} disabled={busy||!canOpenAlbumPreview(view.entries.length)} onPress={()=>{setMenuOpen(false);router.push(`/albums/${albumId}/${personalRecordsOnly()?'read':'preview'}`);}} style={[styles.primaryHit,(!view.entries.length||busy)&&styles.disabled]}><LifeIcon name="lookback" size={20}/><Text style={styles.primaryLabel}>{tr('翻阅')}</Text><LifeIcon name="open" size={15}/></Pressable>
-            {!personalRecordsOnly()?<Pressable accessibilityRole="button" accessibilityLabel={tr('保存与分享')} testID="life-album-export-open" disabled={busy} onPress={()=>{setMenuOpen(false);router.push(`/albums/${albumId}/print`);}} style={[styles.primaryHit,styles.secondaryHit,busy&&styles.disabled]}><LifeIcon name="share" size={18}/><Text style={styles.secondaryLabel}>{tr('保存与分享')}</Text></Pressable>:null}
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('翻阅')} testID="life-album-preview-open" accessibilityState={{disabled:busy||!canOpenAlbumPreview(view.entries.length)}} disabled={busy||!canOpenAlbumPreview(view.entries.length)} onPress={()=>{setMenuOpen(false);router.push(`/albums/${albumId}/preview`);}} style={[styles.primaryHit,(!view.entries.length||busy)&&styles.disabled]}><LifeIcon name="lookback" size={20}/><Text style={styles.primaryLabel}>{tr('翻阅')}</Text><LifeIcon name="open" size={15}/></Pressable>
+            {purchasesSupported()?<Pressable accessibilityRole="button" accessibilityLabel={tr('保存与分享')} testID="life-album-export-open" disabled={busy} onPress={()=>{setMenuOpen(false);router.push(`/albums/${albumId}/print`);}} style={[styles.primaryHit,styles.secondaryHit,busy&&styles.disabled]}><LifeIcon name="share" size={18}/><Text style={styles.secondaryLabel}>{tr('保存与分享')}</Text></Pressable>:null}
           </View> : null}
           {!view.entries.length?<Text style={styles.hint}>{ALBUM_PREVIEW_EMPTY}</Text>:null}
           {editing ? (

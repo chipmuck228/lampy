@@ -7,6 +7,8 @@ const mockCreate = jest.fn();
 const mockPreview = jest.fn();
 const mockAccept = jest.fn();
 const mockOpen = jest.fn(() => false);
+const mockCodeOpen=jest.fn(()=>false);
+jest.mock('../infrastructure/account-config',()=>({emailCodeEntryOpen:()=>mockCodeOpen()}));
 const mockLock = { snapshot: { locked: false } };
 jest.mock('../application/container', () => ({ getFamilyUseCases: async () => ({ history:{getPolicy:async()=>({policy:'family-history-v2',family:{role:'creator'}})},getFamilies: mockFamilies,createNamedFamily:mockCreate,previewInviteLink:mockPreview,inviteLinkAccount:async()=>'a',acceptInviteLink:mockAccept }) }));
 jest.mock('../infrastructure/family-config', () => ({isFamilyV1ReleaseBuild:()=>false,isFamilyInternalTestBuild:()=>false,isControlledEmailAccountsOpen:()=>false,isFamilyProductEntryOpen: () => mockOpen()}));
@@ -16,7 +18,7 @@ jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual('react');
   return { useRouter: () => ({ dismissTo: jest.fn(),push:mockPush }),useFocusEffect: (fn: () => void | (() => void)) => useEffect(fn,[fn]) };
 });
-beforeEach(() => { Object.defineProperty(AppState,'currentState',{configurable:true,value:'active',writable:true}); jest.clearAllMocks();mockOpen.mockReturnValue(false);mockLock.snapshot.locked=false;mockFamilies.mockResolvedValue({userId:'a',limit:10,families:[{familyId:'home',name:'Our home',role:'creator',memberCount:1}]}); });
+beforeEach(() => { Object.defineProperty(AppState,'currentState',{configurable:true,value:'active',writable:true}); jest.clearAllMocks();mockCodeOpen.mockReturnValue(false);mockOpen.mockReturnValue(false);mockLock.snapshot.locked=false;mockFamilies.mockResolvedValue({userId:'a',limit:10,families:[{familyId:'home',name:'Our home',role:'creator',memberCount:1}]}); });
 it('closed entry and locked page never request private families', async () => {
   const closed=await render(<FamilyDirectoryScreen/>);
   expect(closed.getByText('敬请期待。')).toBeTruthy();
@@ -190,8 +192,9 @@ it('shows a bounded development error code without exposing exception messages o
  mockOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://secret:password@family-test.yunpura.com/private?token=hidden';
  mockFamilies.mockRejectedValue(Object.assign(new Error('private body token'),{code:'SERVER_UNREACHABLE'}));
  const page=await render(<FamilyDirectoryScreen/>);
- await waitFor(()=>expect(page.getByTestId('family-directory-diagnostic')).toBeTruthy());
- expect(page.getByTestId('family-directory-diagnostic').props.children).toBe('开发诊断：FAMILY_LIST/SERVER_UNREACHABLE/Error\nAPI: https://family-test.yunpura.com');
+ if(jest.requireActual('react-native').Platform.OS==='android'){expect(page.queryByTestId('family-directory-diagnostic')).toBeNull();}
+ else{await waitFor(()=>expect(page.getByTestId('family-directory-diagnostic')).toBeTruthy());
+ expect(page.getByTestId('family-directory-diagnostic').props.children).toBe('开发诊断：FAMILY_LIST/SERVER_UNREACHABLE/Error\nAPI: https://family-test.yunpura.com');}
  expect(page.queryByText(/private body token/)).toBeNull();delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;delete process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS;
 });
 
@@ -205,3 +208,8 @@ it('keeps debug diagnostics out of the ordinary family page without explicit opt
  delete process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS;mockOpen.mockReturnValue(true);mockFamilies.mockRejectedValue(new Error('private details'));
  const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByText('再试一次')).toBeTruthy());expect(page.queryByTestId('family-directory-diagnostic')).toBeNull();expect(page.queryByText(/private details/)).toBeNull();
 });
+
+ it('uses email verification for family sign-in when email accounts are enabled',async()=>{
+  const old=process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED;mockCodeOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED='1';process.env.EXPO_PUBLIC_ACCOUNT_API_BASE_URL='https://family-test.yunpura.com';mockOpen.mockReturnValue(true);mockFamilies.mockRejectedValue({code:'UNAUTHENTICATED'});
+  try{const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByTestId('family-sign-in')).toBeTruthy());await fireEvent.press(page.getByTestId('family-sign-in'));expect(mockPush).toHaveBeenCalledWith({pathname:'/account/email-code',params:{returnTo:'family'}});}finally{if(old===undefined)delete process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED;else process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED=old;}
+ });

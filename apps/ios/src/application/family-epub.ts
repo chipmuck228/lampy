@@ -2,9 +2,9 @@ import {ApplicationError} from './errors';
 import type {FamilyAlbumView} from '../family-api/family-album-types';
 import type {EpubSnapshot} from './album-epub-snapshot';
 import {familyPaperScope,prepareFamilyPaper,type FamilyPaperReader} from './family-album-paper';
-import {personalRecordsOnly} from './mobile-capabilities';
+import {purchasesSupported} from './mobile-capabilities';
 export function familyEpubEnabled(){
- return !personalRecordsOnly()&&process.env.EXPO_PUBLIC_FAMILY_ALBUM_EXPORT_ENABLED==='1'&&process.env.EXPO_PUBLIC_UNIFIED_PURCHASES==='1'&&process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED==='1'&&process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED==='1';
+ return purchasesSupported()&&process.env.EXPO_PUBLIC_FAMILY_ALBUM_EXPORT_ENABLED==='1'&&process.env.EXPO_PUBLIC_UNIFIED_PURCHASES==='1'&&process.env.EXPO_PUBLIC_ALBUM_EXPORT_ENABLED==='1'&&process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED==='1';
 }
 export type FamilyEpubStamp={version:1;userId:string;familyId:string;albumId:string;validation:string};
 export type FamilyEpubSnapshot=EpubSnapshot&{family:FamilyEpubStamp};

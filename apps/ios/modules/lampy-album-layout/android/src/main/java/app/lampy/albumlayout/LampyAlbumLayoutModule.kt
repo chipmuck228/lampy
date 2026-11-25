@@ -9,7 +9,16 @@ class LampyAlbumLayoutModule : Module() {
     Function("measureText") { text: String, font: String, size: Double, lineHeight: Double, width: Double ->
       AlbumTypography.measure(text, font, size, lineHeight, width)
     }
-    // Printing and purchases deliberately have no Android implementation in this milestone.
+    // Chronicle cache preparation only. No PDF/EPUB file exporter, share API or purchases.
+    Function("epubPreviewAvailable") { true }
+    AsyncFunction("prepareEpubImage") { source: String, destination: String ->
+      AndroidPhotoCopies.preparePreview(source, destination, appContext.reactContext?.cacheDir ?: error("PREVIEW_UNAVAILABLE"))
+    }
+    View(AlbumEpubView::class) {
+      Events("onReady", "onFailure", "onPageTurn")
+      Prop("rootUri") { view: AlbumEpubView, value: String -> view.setRoot(value) }
+      Prop("documentUri") { view: AlbumEpubView, value: String -> view.setDocument(value) }
+    }
     View(AlbumPageView::class) {
       Prop("pageJson") { view: AlbumPageView, value: String -> view.setPage(value) }
       Prop("mediaJson") { view: AlbumPageView, value: String -> view.setMedia(value) }
