@@ -1,6 +1,7 @@
 import CoreText
 import ExpoModulesCore
 import UIKit
+import WebKit
 
 public final class LampyAlbumLayoutModule: Module {
   public func definition() -> ModuleDefinition {
@@ -23,6 +24,21 @@ public final class LampyAlbumLayoutModule: Module {
     }
     AsyncFunction("prepareEpubImage") { (source: String, destination: String) -> [String: Any] in
       try prepareEpubImage(source, destination)
+    }
+    AsyncFunction("preparePrintImage") { (source: String, destination: String) -> [String: Any] in
+      try preparePrintImage(source, destination)
+    }
+    AsyncFunction("writeChroniclePdf") { (publication: String, media: String, destination: String, promise: Promise) in
+      DispatchQueue.main.async {
+        ChroniclePdfRenderer.start(publication, media, destination) { result in
+          switch result {
+          case .success(let value): promise.resolve(value)
+          case .failure(let error):
+            let code = (error as NSError).localizedDescription
+            promise.reject(code, code)
+          }
+        }
+      }
     }
     AsyncFunction("printFileDigest") { (path: String) -> [String: Any] in
       try printFileDigest(path)
@@ -52,6 +68,7 @@ public final class LampyAlbumLayoutModule: Module {
       }
     }
 
+    Function("epubPreviewAvailable") { true }
     View(AlbumPageView.self) {
       Prop("pageJson") { (view: AlbumPageView, json: String) in
         view.pageJson = json
@@ -67,6 +84,12 @@ public final class LampyAlbumLayoutModule: Module {
       Prop("renderScale") { (view: AlbumPageView, scale: Double) in
         view.renderScale = scale
       }
+    }
+    // Keep AlbumPageView first: Expo uses the first view as the legacy default.
+    View(AlbumEpubView.self) {
+      Events("onReady", "onFailure", "onPageTurn")
+      Prop("rootUri") { (view: AlbumEpubView, value: String) in view.rootUri = value }
+      Prop("documentUri") { (view: AlbumEpubView, value: String) in view.documentUri = value }
     }
   }
 }
@@ -93,9 +116,13 @@ private struct ResolvedAlbumFont {
 private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedAlbumFont) {
   let requestedFamily = name
   let isPingFang = name.localizedCaseInsensitiveContains("PingFang")
+  let isKaiti = name.localizedCaseInsensitiveContains("Kaiti")
   let isSongti = name.localizedCaseInsensitiveContains("Songti") || name.localizedCaseInsensitiveContains("STSong")
   var candidates: [String] = [name]
-  if isPingFang {
+  if isKaiti {
+    candidates += ["KaitiSC-Regular", "STKaiti", "Kaiti SC", "KaiTi"]
+    candidates += UIFont.familyNames.filter { $0.localizedCaseInsensitiveContains("Kaiti") }.flatMap { UIFont.fontNames(forFamilyName: $0) }
+  } else if isPingFang {
     candidates += [
       "PingFangSC-Regular",
       "PingFang SC",
@@ -124,6 +151,7 @@ private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedA
       let matched =
         normalizedFamily.localizedCaseInsensitiveContains(normalizedRequested)
         || normalizedRequested.localizedCaseInsensitiveContains(normalizedFamily)
+        || (isKaiti && family.localizedCaseInsensitiveContains("Kaiti"))
         || (isSongti && (family.localizedCaseInsensitiveContains("Songti") || family.localizedCaseInsensitiveContains("STSong")))
         || (isPingFang && family.localizedCaseInsensitiveContains("PingFang"))
       return (
@@ -137,6 +165,10 @@ private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedA
         )
       )
     }
+  }
+  if isKaiti {
+    let fallback = resolveAlbumFont(name: "Songti SC", size: size)
+    return (fallback.0, ResolvedAlbumFont(requested: requestedFamily, familyName: fallback.1.familyName, fontName: fallback.1.fontName, matchedRequestedFamily: false, usedSystemFallback: true))
   }
   if isSongti {
     let descriptor = UIFontDescriptor(fontAttributes: [
@@ -497,6 +529,63 @@ private func albumHexColor(_ value: String?, fallback: UIColor) -> UIColor {
                  blue: CGFloat(rgb & 255) / 255, alpha: 1)
 }
 
+
+// Print-only, frozen publication furniture. Record boxes and measured source text
+// are untouched; ornaments live in the already reserved margins.
+private func drawPublicationText(_ text: String, font: UIFont, color: UIColor, rect: CGRect, alignment: NSTextAlignment = .left, truncate: Bool = false) {
+  let paragraph = NSMutableParagraphStyle()
+  paragraph.alignment = alignment
+  paragraph.lineBreakMode = truncate ? .byTruncatingTail : .byWordWrapping
+  (text as NSString).draw(in: rect, withAttributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph])
+}
+private func drawPublication(_ publication: [String: Any], page: [String: Any], bounds: CGRect, serif: String, ui: String, in context: CGContext) -> Bool {
+  let kind = publication["kind"] as? String ?? "body"
+  let title = publication["title"] as? String ?? ""
+  let eyebrow = publication["eyebrow"] as? String ?? "LAMPY"
+  let color = albumSageColor()
+  context.saveGState()
+  defer { context.restoreGState() }
+  context.setStrokeColor(color.withAlphaComponent(0.35).cgColor)
+  context.setLineWidth(0.5)
+  if kind == "cover" {
+    context.stroke(bounds.insetBy(dx: 18, dy: 18))
+    drawPublicationText("LAMPY / A LIFE ALBUM", font: resolveFont(name: ui, size: 8), color: color, rect: CGRect(x: 36, y: 23, width: bounds.width - 72, height: 12))
+    return false
+  }
+  if kind == "archive" || kind == "chapter" {
+    drawPublicationText(eyebrow, font: resolveFont(name: ui, size: 9), color: color, rect: CGRect(x: 40, y: 64, width: bounds.width - 80, height: 32))
+    if kind == "chapter" {
+      drawPublicationText(publication["ordinal"] as? String ?? "", font: resolveFont(name: serif, size: 116), color: color.withAlphaComponent(0.25), rect: CGRect(x: 36, y: 136, width: bounds.width - 72, height: 150))
+      drawPublicationText(title, font: resolveFont(name: serif, size: 29), color: albumInkColor(), rect: CGRect(x: 40, y: 309, width: bounds.width - 80, height: 135))
+      context.move(to: CGPoint(x: 40, y: 466)); context.addLine(to: CGPoint(x: 88, y: 466)); context.strokePath()
+    } else {
+      drawPublicationText("L", font: resolveFont(name: serif, size: 38), color: color, rect: CGRect(x: 40, y: 124, width: 52, height: 52))
+      drawPublicationText(title, font: resolveFont(name: serif, size: 29), color: albumInkColor(), rect: CGRect(x: 40, y: 200, width: bounds.width - 80, height: 84))
+      drawPublicationText(publication["line"] as? String ?? "", font: resolveFont(name: serif, size: 13), color: albumInkSoftColor(), rect: CGRect(x: 40, y: 294, width: bounds.width - 80, height: 60))
+      let stats = publication["stats"] as? [[String: Any]] ?? []
+      let column = (bounds.width - 80) / CGFloat(max(1, stats.count))
+      for (index, stat) in stats.enumerated() {
+        let x = 40 + CGFloat(index) * column
+        drawPublicationText("\(stat["value"] as? Int ?? 0)", font: resolveFont(name: serif, size: 34), color: albumInkColor(), rect: CGRect(x: x, y: 386, width: column - 6, height: 52))
+        drawPublicationText(stat["label"] as? String ?? "", font: resolveFont(name: ui, size: 10), color: color, rect: CGRect(x: x, y: 440, width: column - 6, height: 36))
+      }
+      drawPublicationText(publication["made"] as? String ?? "", font: resolveFont(name: ui, size: 9), color: albumInkSoftColor(), rect: CGRect(x: 40, y: 510, width: bounds.width - 80, height: 28))
+    }
+    return true
+  }
+  if kind == "body" {
+    drawPublicationText(title, font: resolveFont(name: ui, size: 8), color: albumInkSoftColor(), rect: CGRect(x: 36, y: 15, width: bounds.width - 72, height: 13), truncate: true)
+    context.move(to: CGPoint(x: 36, y: 31)); context.addLine(to: CGPoint(x: bounds.width - 36, y: 31)); context.strokePath()
+    let folio = String(format: "%02d", (page["index"] as? Int ?? 0) + 1)
+    drawPublicationText(folio, font: resolveFont(name: serif, size: 10), color: color, rect: CGRect(x: bounds.width / 2 - 24, y: bounds.height - 30, width: 48, height: 16), alignment: .center)
+  }
+  if kind == "closing" {
+    context.stroke(CGRect(x: 36, y: 65, width: 32, height: 1))
+    drawPublicationText("LAMPY", font: resolveFont(name: ui, size: 10), color: color, rect: CGRect(x: 36, y: bounds.height - 70, width: bounds.width - 72, height: 20))
+  }
+  return false
+}
+
 func drawAlbumPage(
   page: [String: Any],
   media: [String: String],
@@ -508,13 +597,32 @@ func drawAlbumPage(
   albumHexColor(rendering["paper"] as? String, fallback: albumPaperColor()).setFill()
   context.fill(bounds)
   let serifName = rendering["serif"] as? String ?? "Songti SC"
+  let bodyName = rendering["bodySerif"] as? String ?? serifName
   let uiName = rendering["ui"] as? String ?? "PingFang SC"
   let copy = rendering["copy"] as? [String: String] ?? [:]
+  if let publication = page["publication"] as? [String: Any], ["keepsake-v1", "keepsake-v2"].contains(publication["version"] as? String ?? "") {
+    if drawPublication(publication, page: page, bounds: bounds, serif: serifName, ui: uiName, in: context) { return }
+  }
   if rendering["pageNumbers"] as? Bool == true {
     let count = rendering["pageCount"] as? Int ?? 1
     let number = (page["index"] as? Int ?? 0) + 1
     let font = resolveFont(name: uiName, size: 10)
     drawAlbumTextAtBaseline(text: "\(number) / \(count)", font: font, color: albumInkSoftColor(), x: bounds.width / 2 - 12, baselineY: bounds.height - 20, in: context)
+  }
+  if rendering["chroniclePrint"] as? Bool == true {
+    if let edge = rendering["bindingColor"] as? String {
+      context.setFillColor(albumHexColor(edge, fallback: albumSageColor()).cgColor)
+      context.fill(CGRect(x: 18, y: 40, width: 5, height: bounds.height - 84))
+    }
+    let prose = (page["blocks"] as? [[String: Any]] ?? []).filter { $0["kind"] as? String == "note" }
+    let hasMedia = (page["blocks"] as? [[String: Any]] ?? []).contains { ["image", "audio"].contains($0["kind"] as? String ?? "") }
+    if !prose.isEmpty && !hasMedia {
+      drawPublicationText("“", font: resolveFont(name: serifName, size: 32), color: albumSageColor().withAlphaComponent(0.4), rect: CGRect(x: 2, y: 62, width: 34, height: 44))
+      drawPublicationText("”", font: resolveFont(name: serifName, size: 32), color: albumSageColor().withAlphaComponent(0.4), rect: CGRect(x: bounds.width - 36, y: bounds.height - 100, width: 34, height: 44))
+      context.setStrokeColor(albumSageColor().withAlphaComponent(0.5).cgColor)
+      context.setLineWidth(0.6)
+      context.move(to: CGPoint(x: 36, y: bounds.height - 51)); context.addLine(to: CGPoint(x: 65, y: bounds.height - 51)); context.strokePath()
+    }
   }
   let playingAssets = Set(playing)
   let blocks = page["blocks"] as? [[String: Any]] ?? []
@@ -557,10 +665,11 @@ func drawAlbumPage(
       continue
     }
     if kind == "feeling" {
+      if rendering["chroniclePrint"] as? Bool == true { continue }
       let value = block["value"] as? String ?? ""
       albumHexColor(block["accent"] as? String, fallback: albumSageColor()).setFill()
       context.fillEllipse(in: CGRect(x: x, y: y + 7, width: 8, height: 8))
-      let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
+      let spec = albumFontForKind(kind, serif: kind == "note" ? bodyName : serifName, ui: uiName)
       let font = resolveFont(name: spec.name, size: spec.size)
       drawAlbumTextAtBaseline(
         text: value,
@@ -574,7 +683,7 @@ func drawAlbumPage(
     }
     if kind == "audio" {
       let assetId = block["assetId"] as? String ?? ""
-      let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
+      let spec = albumFontForKind(kind, serif: kind == "note" ? bodyName : serifName, ui: uiName)
       let font = resolveFont(name: spec.name, size: spec.size)
       let status = block["status"] as? String ?? ""
       if status == "available" {
@@ -594,8 +703,9 @@ func drawAlbumPage(
       )
       continue
     }
-    let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
+    let spec = albumFontForKind(kind, serif: kind == "note" ? bodyName : serifName, ui: uiName)
     let font = resolveFont(name: spec.name, size: spec.size)
+    let textColor = (kind == "note" && (rendering["chroniclePrint"] as? Bool) == true) ? albumHexColor(rendering["bodyColor"] as? String, fallback: UIColor(red: 16.0/255.0, green: 95.0/255.0, blue: 98.0/255.0, alpha: 1)) : spec.color
     if let lines = block["lines"] as? [[String: Any]], let text = block["text"] as? String, !lines.isEmpty {
       for line in lines {
         let start = Int(line["start"] as? Double ?? 0)
@@ -603,7 +713,13 @@ func drawAlbumPage(
         let lineX = CGFloat(line["xPt"] as? Double ?? x)
         let baseline = CGFloat(line["baselineYPt"] as? Double ?? Double(y) + Double(font.ascender))
         let slice = sliceAlbumScalars(text, start: start, end: end)
-        drawAlbumTextAtBaseline(text: slice, font: font, color: spec.color, x: lineX, baselineY: baseline, in: context)
+        if start == 0, let initial = block["printInitial"] as? [String: Any], let count = initial["scalars"] as? Int, count > 0, count <= end {
+          let large = resolveFont(name: bodyName, size: CGFloat(initial["sizePt"] as? Double ?? 34))
+          drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: 0, end: count), font: large, color: textColor, x: lineX, baselineY: baseline, in: context)
+          drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: count, end: end), font: font, color: textColor, x: lineX + CGFloat(initial["widthPt"] as? Double ?? 44), baselineY: baseline, in: context)
+        } else {
+          drawAlbumTextAtBaseline(text: slice, font: font, color: textColor, x: lineX, baselineY: baseline, in: context)
+        }
       }
     } else {
       let text = (block["text"] as? String)
@@ -616,7 +732,7 @@ func drawAlbumPage(
       drawAlbumTextAtBaseline(
         text: text,
         font: font,
-        color: spec.color,
+        color: textColor,
         x: x,
         baselineY: y + font.ascender,
         in: context
@@ -679,4 +795,94 @@ final class AlbumPageView: ExpoView {
     }
     drawAlbumPage(page: page, media: parseAlbumMedia(mediaJson), playing: playing, in: context, bounds: bounds)
   }
+}
+
+
+/// Offline, read-only publication surface. It never presents a share controller.
+final class AlbumEpubView: ExpoView, WKNavigationDelegate {
+  let onReady = EventDispatcher()
+  let onFailure = EventDispatcher()
+  let onPageTurn = EventDispatcher()
+  var rootUri = "" { didSet { setNeedsLayout() } }
+  var documentUri = "" { didSet { setNeedsLayout() } }
+  private let reader: WKWebView
+  private var loaded = ""
+  private var background: NSObjectProtocol?
+  required init(appContext: AppContext?) {
+    let configuration = WKWebViewConfiguration()
+    configuration.websiteDataStore = .nonPersistent()
+    // Reading must not expose an implicit Save Image / Share menu.
+    let noCallout = "document.addEventListener('contextmenu',function(e){e.preventDefault();});var s=document.createElement('style');s.textContent='*{-webkit-touch-callout:none}';document.documentElement.appendChild(s);"
+    configuration.userContentController.addUserScript(WKUserScript(source:noCallout,injectionTime:.atDocumentEnd,forMainFrameOnly:true))
+    configuration.allowsInlineMediaPlayback = true
+    configuration.mediaTypesRequiringUserActionForPlayback = .all
+    reader = WKWebView(frame: .zero, configuration: configuration)
+    super.init(appContext: appContext)
+    backgroundColor = UIColor(red:21/255.0,green:28/255.0,blue:25/255.0,alpha:1)
+    reader.isOpaque = false; reader.backgroundColor = backgroundColor
+    reader.scrollView.bounces = false; reader.allowsLinkPreview = false
+    reader.navigationDelegate = self; addSubview(reader)
+    for direction in [UISwipeGestureRecognizer.Direction.left, .right] {
+      let gesture = UISwipeGestureRecognizer(target:self,action:#selector(swipe(_:)))
+      gesture.direction = direction; gesture.cancelsTouchesInView = false
+      reader.addGestureRecognizer(gesture)
+    }
+    background = NotificationCenter.default.addObserver(forName:UIApplication.didEnterBackgroundNotification,object:nil,queue:.main) { [weak self] _ in self?.clear() }
+  }
+  deinit {
+    if let background = background { NotificationCenter.default.removeObserver(background) }
+    reader.navigationDelegate = nil; reader.stopLoading()
+  }
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    let width = min(bounds.width, bounds.height * 4 / 3)
+    let height = width * 3 / 4
+    reader.frame = CGRect(x:(bounds.width-width)/2,y:(bounds.height-height)/2,width:width,height:height)
+    loadIfReady()
+  }
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window == nil { clear() } else { setNeedsLayout() }
+  }
+  private func clear() {
+    reader.pauseAllMediaPlayback(completionHandler:nil)
+    reader.stopLoading(); loaded = ""
+    reader.loadHTMLString("",baseURL:nil)
+  }
+  private func root() -> URL? {
+    guard let url = try? printLocalURL(rootUri), url.lastPathComponent.hasPrefix("preview_"),
+          url.deletingLastPathComponent().lastPathComponent == "album-epub-preview" else { return nil }
+    return url
+  }
+  private func loadIfReady() {
+    guard window != nil, UIApplication.shared.applicationState == .active,
+          reader.bounds.width > 0, reader.bounds.height > 0, !documentUri.isEmpty, !rootUri.isEmpty,
+          documentUri != loaded else { return }
+    guard let directory = root(), let url = try? printLocalURL(documentUri),
+          url.path.hasPrefix(directory.path + "/OEBPS/"), url.pathExtension == "xhtml" else {
+      onFailure(["code":"PREVIEW_UNAVAILABLE"]); return
+    }
+    loaded = documentUri
+    reader.loadFileURL(url,allowingReadAccessTo:directory)
+  }
+  @objc private func swipe(_ gesture: UISwipeGestureRecognizer) {
+    guard reader.scrollView.zoomScale <= reader.scrollView.minimumZoomScale + 0.02 else { return }
+    reader.evaluateJavaScript("!!document.querySelector('.photo-detail.is-open')") { [weak self] value, _ in
+      guard let self = self, value as? Bool != true else { return }
+      self.onPageTurn(["direction":gesture.direction == .left ? 1 : -1])
+    }
+  }
+  func webView(_ webView:WKWebView,decidePolicyFor action:WKNavigationAction,decisionHandler:@escaping(WKNavigationActionPolicy)->Void) {
+    guard let url = action.request.url else { decisionHandler(.cancel); return }
+    if url.absoluteString == "about:blank" { decisionHandler(.allow); return }
+    guard let directory = root(), url.isFileURL, url.standardizedFileURL.path.hasPrefix(directory.path + "/OEBPS/") else { decisionHandler(.cancel); return }
+    decisionHandler(.allow)
+  }
+  func webView(_ webView:WKWebView,didFinish navigation:WKNavigation!) {
+    guard webView.url?.isFileURL == true, !loaded.isEmpty else { return }
+    onReady([:])
+  }
+  func webView(_ webView:WKWebView,didFail navigation:WKNavigation!,withError error:Error) { if !loaded.isEmpty { onFailure(["code":"PREVIEW_UNAVAILABLE"]) } }
+  func webView(_ webView:WKWebView,didFailProvisionalNavigation navigation:WKNavigation!,withError error:Error) { if !loaded.isEmpty { onFailure(["code":"PREVIEW_UNAVAILABLE"]) } }
+  func webViewWebContentProcessDidTerminate(_ webView:WKWebView) { if !loaded.isEmpty { onFailure(["code":"PREVIEW_UNAVAILABLE"]) } }
 }

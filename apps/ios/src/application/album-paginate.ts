@@ -1,3 +1,5 @@
+import {printPhotoGroups} from './album-print-photo-plan';
+import {photoRatio,PUBLICATION_COPY,PUBLICATION_VERSION} from './album-publication';
 import { appLanguage, dateLabel, tr, feelingLabel } from '../i18n';
 import {
   calendarPartsAt,
@@ -132,7 +134,7 @@ export function fingerprintFromInput(album: LifeAlbum, input: AlbumLayoutInput):
 export async function paginateAlbumLayout(
   input: AlbumLayoutInput,
   measurer: AlbumTextMeasurer,
-  options: { generatedAt: string; timezone: HistoryClock },
+  options: { generatedAt: string; timezone: HistoryClock; publication?:boolean; bodyFamily?:string },
 ): Promise<AlbumLayout> {
   const pages: AlbumPage[] = [];
   let blocks: AlbumPlacedBlock[] = [];
@@ -140,6 +142,7 @@ export async function paginateAlbumLayout(
   let printedDateKey: string | null = null;
   let printedDateLabel: string | null = null;
   const album = input.album;
+  const printBodyRole=options.bodyFamily?{...albumBodyRole,family:options.bodyFamily}:albumBodyRole;
 
   function commitPage() {
     if (!blocks.length) return;
@@ -168,12 +171,13 @@ export async function paginateAlbumLayout(
     text: string,
     extra: { albumId?: string; momentId?: string; revision?: number },
   ) {
-    const role = kind === 'cover-name' ? albumCoverRole : albumBodyRole;
-    const measured = await measurer.measure(text, role, ALBUM_CONTENT_WIDTH_PT);
+    const role = kind === 'cover-name' ? albumCoverRole : kind==='note'&&options.publication&&/\p{Script=Han}/u.test(text)?printBodyRole:albumBodyRole;
+    const decorated=options.publication&&kind==='note'&&!blocks.some(b=>b.kind==='image'||b.kind==='audio');
+    const measured = await measurer.measure(text, role, ALBUM_CONTENT_WIDTH_PT-(decorated?44:0));
     let cursor = 0;
     let firstChunk = true;
     while (cursor < measured.length) {
-      const needsContinued = kind === 'note' && !firstChunk && !!extra.momentId && !!printedDateKey;
+      const needsContinued = !options.publication && kind === 'note' && !firstChunk && !!extra.momentId && !!printedDateKey;
       const continuedHeight = needsContinued ? albumDateRole.lineHeightPt : 0;
       if (
         blocks.length > 0 &&
@@ -200,8 +204,8 @@ export async function paginateAlbumLayout(
       if (remaining() < role.lineHeightPt) {
         if (blocks.length > 0) commitPage();
       }
-      const room = Math.floor(remaining() / role.lineHeightPt);
-      let take = Math.min(Math.max(room, 0), measured.length - cursor);
+      const room = Math.floor((remaining()-(decorated?14:0)) / role.lineHeightPt);
+      let take = Math.min(Math.max(room, 0), measured.length - cursor, options.publication&&kind==='note'?9:Infinity);
       if (kind !== 'cover-name' && measured.length - cursor > 1) {
         if (take < 2 && blocks.length > 0) { commitPage(); continue; }
         if (measured.length - cursor - take === 1 && take > 2) take -= 1;
@@ -221,16 +225,20 @@ export async function paginateAlbumLayout(
         start: line.start - start,
         end: line.end - start,
         xPt: CONTENT_LEFT,
-        yPt: y + index * role.lineHeightPt,
+        yPt: y + index * role.lineHeightPt+(decorated?14:0),
         widthPt: line.widthPt,
         heightPt: line.heightPt,
-        baselineYPt: y + index * role.lineHeightPt + line.ascentPt,
+        baselineYPt: y + index * role.lineHeightPt + line.ascentPt+(decorated?14:0),
       }));
-      const height = take * role.lineHeightPt;
+      const height = take * role.lineHeightPt+(decorated?14:0);
       const box = { xPt: CONTENT_LEFT, yPt: y, widthPt: ALBUM_CONTENT_WIDTH_PT, heightPt: height };
       const range = { start, end, unit: 'unicode-scalar' as const };
       if (kind === 'note' && extra.momentId && extra.revision != null) {
-        blocks.push({ kind, box, text: slice, textRange: range, lines, momentId: extra.momentId, revision: extra.revision });
+        const glyph=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(slice)][0]?.segment:Array.from(slice)[0];
+        const initial=decorated&&glyph&&!/^\s/.test(glyph)?glyph:null;
+        const initialLines=initial?await measurer.measure(initial,{...role,sizePt:34,lineHeightPt:44},44):[];
+        const printInitial=initial&&initialLines.length===1&&initialLines[0].widthPt<=44&&Array.from(initial).length<=lines[0].end?{scalars:Array.from(initial).length,widthPt:44,sizePt:34}:undefined;
+        blocks.push({ kind, box, text: slice, textRange: range, lines, momentId: extra.momentId, revision: extra.revision,...(printInitial?{printInitial}:{}) });
       } else if (kind === 'opening' && extra.albumId) {
         blocks.push({ kind, box, text: slice, textRange: range, lines, albumId: extra.albumId });
       } else if (kind === 'cover-name' && extra.albumId) {
@@ -239,6 +247,7 @@ export async function paginateAlbumLayout(
       y += height;
       cursor += take;
       firstChunk = false;
+      if(decorated&&cursor<measured.length){commitPage();y=100;}
     }
   }
 
@@ -275,6 +284,7 @@ export async function paginateAlbumLayout(
     commitPage();
   }
 
+  let publicationChapter:string|null=null,publicationOrdinal=0;
   for (const record of input.entries) {
     if (record.presence === 'missing') {
       place(
@@ -299,7 +309,17 @@ export async function paginateAlbumLayout(
       continue;
     }
 
+    if(options.publication)commitPage();
     const dated = dateKeyAndLabel(record, options.timezone);
+    if(options.publication){
+      const parts=/^[dmy]:(\d{4})(?:-(\d{1,2}))?/.exec(dated.key??'');
+      const key=parts?parts.slice(1).filter(Boolean).join('-'):'unknown';
+      if(key!==publicationChapter){
+        commitPage();y=CONTENT_TOP;publicationChapter=key;printedDateKey=null;printedDateLabel=null;
+        const title=parts?(parts[2]?dateLabel(Number(parts[1]),Number(parts[2])):tr('{0}年',[Number(parts[1])])):ALBUM_TIME_UNKNOWN;
+        pages.push({index:pages.length,blocks:[],publication:{version:PUBLICATION_VERSION,kind:'chapter',title,eyebrow:PUBLICATION_COPY[appLanguage].chapter,line:'',ordinal:String(++publicationOrdinal).padStart(2,'0')}});
+      }
+    }
     if (!dated.key) { printedDateKey = null; printedDateLabel = null; }
     const showDate = !!dated.key && dated.key !== printedDateKey;
     if (showDate && remaining() < albumDateRole.lineHeightPt + albumBodyRole.lineHeightPt * 2) commitPage();
@@ -324,11 +344,39 @@ export async function paginateAlbumLayout(
         box:{xPt:CONTENT_LEFT,yPt:y,widthPt:ALBUM_CONTENT_WIDTH_PT,heightPt:albumMetaRole.lineHeightPt}},albumMetaRole.lineHeightPt);
     }
     const images = record.media.filter((item) => item.role === 'image');
-    if (record.note) {
+    const shortPrintNote=!!(options.publication&&record.note.trim()&&images.length&&record.media.every(m=>m.role==='image')&&(await measurer.measure(record.note,/\p{Script=Han}/u.test(record.note)?printBodyRole:albumBodyRole,ALBUM_CONTENT_WIDTH_PT-44)).length<=2);
+    if (record.note && !options.publication) {
       await placeWrapped('note', record.note, { momentId: record.momentId, revision: record.revision ?? 0 });
     }
 
-    for (const image of images) {
+    if(options.publication){
+      const placePhotoGroup=(items:typeof images)=>{
+        if(blocks.some(b=>b.kind==='image'||b.kind==='audio'))commitPage();
+        const area={xPt:CONTENT_LEFT,yPt:Math.max(100,y+18),widthPt:ALBUM_CONTENT_WIDTH_PT,heightPt:CONTENT_BOTTOM-Math.max(100,y+18)-64-(shortPrintNote?98:0)};
+        let offset=0;
+        for(const group of printPhotoGroups(items,area)){
+          if(offset)commitPage();
+          group.forEach(box=>{const image=items[offset++];blocks.push({kind:'image',momentId:record.momentId,assetId:image.assetId,status:image.availability==='available'?'available':'missing',intrinsicRatio:photoRatio(image),box});});
+          y=Math.max(...group.map(b=>b.yPt+b.heightPt))+20;
+        }
+      };
+      for(let i=0;i<record.media.length;i++){
+        const item=record.media[i];
+        if(item.role==='image'){
+          const run:typeof images=[];while(i<record.media.length&&record.media[i].role==='image'){run.push(record.media[i]);i++;}i--;
+          for(let start=0;start<run.length;start+=4)placePhotoGroup(run.slice(start,start+4));
+        }else if(item.role==='audio'){
+          const time=durationLabel(item.durationMs);place({kind:'audio',momentId:record.momentId,assetId:item.assetId,status:item.availability,durationMs:item.durationMs,printHint:tr('PDF 仅保留声音信息'),text:`${ALBUM_AUDIO_LABEL}${time?` · ${time}`:''}`,box:{xPt:CONTENT_LEFT,yPt:y,widthPt:ALBUM_CONTENT_WIDTH_PT,heightPt:48}},48);
+        }
+      }
+    }
+    if(options.publication&&record.note){
+      if(!shortPrintNote&&blocks.some(b=>b.kind==='image'||b.kind==='audio'))commitPage();
+      y=Math.max(100,y+20);
+      await placeWrapped('note',record.note,{momentId:record.momentId,revision:record.revision??0});
+    }
+
+    for (const image of options.publication?[]:images) {
       if (blocks.length > 0 && remaining() < 80 && blocks[blocks.length - 1]?.kind !== 'day-rule') {
         commitPage();
       }
@@ -344,7 +392,7 @@ export async function paginateAlbumLayout(
       y += size.heightPt + 8;
     }
 
-    for (const audio of record.media.filter((item) => item.role === 'audio')) {
+    for (const audio of options.publication?[]:record.media.filter((item) => item.role === 'audio')) {
       const time = durationLabel(audio.durationMs);
       const missing = audio.availability !== 'available';
       place(
@@ -377,7 +425,7 @@ export async function paginateAlbumLayout(
       );
     }
 
-    if (record.feeling.trim()) {
+    if (record.feeling.trim()&&!options.publication) {
       place(
         {
           kind: 'feeling',
@@ -440,7 +488,7 @@ export async function paginateAlbumLayout(
       bottomPt: ALBUM_MARGIN_BOTTOM_PT,
       leftPt: ALBUM_MARGIN_X_PT,
     },
-    fonts: ALBUM_FONTS,
+    fonts: options.publication?{...ALBUM_FONTS,body:printBodyRole}:ALBUM_FONTS,
     fontFaces: {
       serif: ALBUM_SERIF_FONT,
       ui: ALBUM_UI_FONT,

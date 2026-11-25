@@ -31,6 +31,22 @@ jobs:
       - run: npx tsc --noEmit
       - run: npx jest --runInBand src/family-api src/application/family src/application/test-account-use-cases.test.ts src/application/apple-auth-flow.test.ts src/screens/settings-launch-copy.test.ts src/application/email-code-use-cases.test.ts src/application/release-public-env.test.ts src/infrastructure/secure-family-session.test.ts src/infrastructure/family-session-transport.test.ts src/infrastructure/family-http-client.test.ts src/screens/family-email-account-screen.test.tsx src/screens/email-code-screen.test.tsx src/screens/email-code-route.test.tsx src/screens/email-account-settings.test.tsx src/screens/family-invite-login-screen.test.tsx src/screens/family-email-code-invite.test.tsx src/infrastructure/account-config.test.ts src/infrastructure/account-endpoint-transport.test.ts src/infrastructure/family-invite-link.test.ts
       - run: node --test scripts/android-personal.test.cjs scripts/email-code-release.test.cjs scripts/appstore-launch-profile.test.cjs scripts/inspect-release-archive.test.cjs scripts/appstore-v1-profile.test.cjs scripts/album-export-profile.test.cjs
-      - run: npx jest --runInBand src/screens/family-directory-screen.test.tsx src/screens/family-invite-screen.test.tsx src/screens/life-album-new-screen.test.tsx src/screens/life-album-manage-screen.test.tsx src/screens/family-album-editor.test.tsx src/screens/family-albums-screen.test.tsx src/screens/family-album-library.test.tsx src/screens/account-settings-pages.test.tsx src/screens/album-print-screen.test.tsx src/screens/life-page.test.ts src/screens/life-album-detail-sheet.test.tsx
+      - run: npx jest --runInBand src/screens/family-directory-screen.test.tsx src/screens/family-invite-screen.test.tsx src/screens/life-album-new-screen.test.tsx src/screens/life-album-manage-screen.test.tsx src/screens/family-album-editor.test.tsx src/screens/family-albums-screen.test.tsx src/screens/family-album-library.test.tsx src/screens/account-settings-pages.test.tsx src/screens/album-print-screen.test.tsx src/screens/album-edition-swipe-row.test.tsx src/screens/life-page.test.ts src/screens/life-album-detail-sheet.test.tsx
+      - run: npx jest --runInBand src/application/album-publication.test.ts src/application/album-imagebook.test.ts src/application/album-book-plan.test.ts src/application/album-photo-composition.test.ts src/application/album-chronicle-cover.test.ts src/application/album-chronicle-opening.test.ts src/application/album-chronicle-date.test.ts src/application/album-chronicle-single.test.ts src/application/album-chronicle-pair.test.ts src/application/album-epub.test.ts src/application/album-epub-snapshot.test.ts src/application/album-paginate.test.ts src/application/album-print.test.ts src/application/family-album-paper.test.ts src/infrastructure/album-epub-files.test.ts src/infrastructure/album-epub-snapshots.test.ts src/infrastructure/epub-stream.test.ts src/infrastructure/album-print-files.test.ts src/screens/family-album-print-screen.test.tsx
+      - name: Validate synthetic keepsake EPUBs
+        run: |
+          node scripts/publication-fixture.cjs "$RUNNER_TEMP/lampy-keepsake-samples"
+          curl -fLsS https://github.com/w3c/epubcheck/releases/download/v5.4.0/epubcheck-5.4.0.zip -o "$RUNNER_TEMP/epubcheck.zip"
+          printf '33350c61038e71dfb3d45a76aed04bf5481e6d5500cb780f6e98db8bbd15a28c  %s\n' "$RUNNER_TEMP/epubcheck.zip" | sha256sum --check
+          unzip -q "$RUNNER_TEMP/epubcheck.zip" -d "$RUNNER_TEMP/epubcheck"
+          java -jar "$RUNNER_TEMP/epubcheck/epubcheck-5.4.0/epubcheck.jar" "$RUNNER_TEMP/lampy-keepsake-samples/Lampy-literary-sample.epub"
+          java -jar "$RUNNER_TEMP/epubcheck/epubcheck-5.4.0/epubcheck.jar" "$RUNNER_TEMP/lampy-keepsake-samples/Lampy-imagebook-sample.epub"
       - run: npm run test:android
       - run: python3 -m unittest discover -s scripts -p test_inspect_archive_privacy.py
+  publication-swift-syntax:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      # Syntax only: device/Xcode compilation and visual acceptance are separate.
+      - run: swiftc -frontend -parse apps/ios/modules/lampy-album-layout/ios/AlbumEpub.swift apps/ios/modules/lampy-album-layout/ios/AlbumPrint.swift apps/ios/modules/lampy-album-layout/ios/LampyAlbumLayoutModule.swift

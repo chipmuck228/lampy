@@ -7,7 +7,6 @@ import type { AlbumLayoutMediaMap } from '../application/album-layout-input';
 import type { AlbumPrintProgress } from '../application/album-print';
 import {
   albumEditionFacts,
-  albumPrintProgressCopy,
   albumPrintProgressFraction,
   albumSpanLabel,
   styleAlbumPages,
@@ -255,6 +254,8 @@ export function ShowcaseNote({ children, live }: { children: ReactNode; live?: b
   );
 }
 
+export {EditionProgress} from './edition-progress';
+
 /** Binding in progress. Steps are reported by the export service, not timed. */
 export function BindingPanel({
   progress,
@@ -271,12 +272,11 @@ export function BindingPanel({
   return (
     <View style={styles.binding} testID="album-export-binding">
       <Text style={styles.bindingTitle} accessibilityLiveRegion="polite">
-        {albumPrintProgressCopy(progress)}
+        {tr('正在制作这一册…')}
       </Text>
-      <View style={styles.track}>
+      <View style={styles.track} accessible accessibilityRole="progressbar" accessibilityLabel={tr('制作进度')} accessibilityValue={{min:0,max:100,now:Math.round(fraction*100)}}>
         <Animated.View style={[styles.fill, { transform: [{ scaleX: fill }] }]} />
       </View>
-      <Text style={styles.note}>{tr('正在制作PDF，请稍候。')}</Text>
       <ShowcaseButton tone="quiet" label={tr('取消')} onPress={onCancel} />
     </View>
   );
@@ -322,7 +322,7 @@ export function FreshEdition({
 export function ShelfHeader() {
   return (
     <View style={styles.shelfHead}>
-      <Text style={styles.shelfTitle}>{tr('已保存的PDF')}</Text>
+      <Text style={styles.shelfTitle}>{tr('已生成的PDF')}</Text>
     </View>
   );
 }

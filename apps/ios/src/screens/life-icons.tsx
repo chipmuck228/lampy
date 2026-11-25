@@ -6,6 +6,8 @@ import { SymbolView } from 'expo-symbols';
 import { inkSoft, sage } from './life-page';
 
 export const LIFE_ICON_NAMES = {
+  share:'square.and.arrow.up',
+  trash:'trash',
   settings: 'gearshape',
   person: 'person.crop.circle',
   back: 'chevron.left',
@@ -42,6 +44,7 @@ export const LIFE_ICON_NAMES = {
 } as const;
 
 const ANDROID_ICON_NAMES = {
+  share:'ios_share',trash:'delete_outline',
   settings:'settings', person:'account_circle', back:'chevron_left', open:'chevron_right',
   lock:'lock', info:'info', storage:'storage', subscribe:'credit_card', help:'help',
   terms:'description', privacy:'front_hand', play:'play_arrow', pause:'pause',
@@ -113,6 +116,7 @@ export function LifeLabeledHit({
   disabled,
   accessibilityLabel,
   layoutRevision,
+  appearance,
 }: {
   icon: LifeIconName;
   label: string;
@@ -121,6 +125,7 @@ export function LifeLabeledHit({
   disabled?: boolean;
   accessibilityLabel?: string;
   layoutRevision?: number;
+  appearance?: 'capture';
 }) {
   return (
     <Pressable
@@ -130,11 +135,11 @@ export function LifeLabeledHit({
       testID={testID}
       onPress={onPress}
       disabled={disabled}
-      style={styles.labeledHit}
+      style={[styles.labeledHit,appearance==='capture'&&disabled&&styles.captureDisabled]}
     >
       <View key={`labeled-${layoutRevision ?? 1}`} style={styles.labeledRow}>
-        <LifeIcon name={icon} size={18} color={sage} decorative />
-        <Text key={`labeled-text-${layoutRevision ?? 1}`} style={styles.labeledText}>
+        <LifeIcon name={icon} size={appearance==='capture'?19:18} color={sage} decorative />
+        <Text key={`labeled-text-${layoutRevision ?? 1}`} style={[styles.labeledText,appearance==='capture'&&styles.captureLabeledText]}>
           {label}
         </Text>
       </View>
@@ -226,6 +231,8 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 48,
   },
+  captureLabeledText: { fontSize: 15, lineHeight: 24 },
+  captureDisabled: { opacity: .45 },
   labeledText: {
     ...type.action,
     color: sage,

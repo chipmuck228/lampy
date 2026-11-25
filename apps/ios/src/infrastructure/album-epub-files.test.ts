@@ -63,10 +63,10 @@ it('uses native thumbnail preparation and keeps photos on disk until streaming',
   expect(prepareImage).toHaveBeenCalledTimes(1);
   expect(unzipSync(files.get(resultUri())!)['OEBPS/media/asset-0.jpg']).toEqual(new Uint8Array([255,216,255]));
 });
-it('shares intact existing EPUB without requiring a new purchase', async () => {
+it('shares intact existing EPUB only after checking current entitlement', async () => {
   await shareAlbumEpub('print_test', () => true); jest.clearAllMocks();
   await shareAlbumEpub('print_test', () => true);
-  expect(albumExportAccess.assert).not.toHaveBeenCalled(); expect(prepareImage).not.toHaveBeenCalled();
+  expect(albumExportAccess.assert).toHaveBeenCalledTimes(1); expect(prepareImage).not.toHaveBeenCalled();
   expect(native.sharePrintPdf).toHaveBeenCalledTimes(1);
 });
 it('requires current rights and sufficient disk space', async () => {
@@ -100,7 +100,7 @@ it('retains the saved file if sharing fails, and retries without regenerating', 
   native.sharePrintPdf.mockRejectedValueOnce(new Error('SHARE_FAILED'));
   await expect(shareAlbumEpub('print_test', () => true)).rejects.toBeInstanceOf(AlbumEpubFailure);
   expect(resultUri()).toBeDefined(); jest.clearAllMocks();
-  await shareAlbumEpub('print_test', () => true); expect(albumExportAccess.assert).not.toHaveBeenCalled();
+  await shareAlbumEpub('print_test', () => true); expect(albumExportAccess.assert).toHaveBeenCalledTimes(1);
 });
 it('reports real resource and file progress; rejects unsafe IDs and unsupported audio', async () => {
   const progress = jest.fn(); await shareAlbumEpub('print_test', () => true, progress);
@@ -132,5 +132,31 @@ it('streams the frozen design into a standalone EPUB and re-shares its immutable
   const first=output.slice();jest.clearAllMocks();
   await shareAlbumEpub(id,()=>true);
   expect(files.get(uri) ?? files.get(dir+'album-en.epub')).toEqual(first);
-  expect(albumExportAccess.assert).not.toHaveBeenCalled();
+  expect(albumExportAccess.assert).toHaveBeenCalledTimes(1);
+});
+
+it('composes prepared image dimensions after orientation normalization without changing the frozen source',async()=>{
+ seed(true);prepareImage.mockImplementationOnce(async(_source,dest)=>{files.set(dest,new Uint8Array([255,216,255]));return {mime:'image/jpeg',extension:'jpg',bytes:3,width:900,height:1600};});
+ const frozen=files.get(root+'manifest.json')!;await shareAlbumEpub('print_test',()=>true);
+ const archive=unzipSync(files.get(resultUri())!);expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('photo portrait');expect(files.get(root+'manifest.json')).toEqual(frozen);
+});
+
+it.each([[160,107,'width:320px;height:214px'],[900,1600,'width:416.25px;height:740px'],[266,1600,'height:756px']])('uses decoded %i×%i dimensions in the actual fixed export even when record dimensions are wrong',async(width,height,geometry)=>{
+ const id='epub_single',dir=`file:///documents/album-epub-editions/${id}/`;
+ const snapshot={...manifest(true),id,kind:'epub',design:'imagebook',dates:{}};
+ Object.assign(snapshot.content.entries[0].media[0],{widthPx:1400,heightPx:932,intrinsicRatio:1.5});
+ files.set(dir+'manifest.json',strToU8(JSON.stringify(snapshot)));files.set(dir+'manifest.sha256',strToU8(manifestDigest(snapshot)));files.set(dir+'media-0',new Uint8Array([255,216,255]));
+ const frozen=files.get(dir+'manifest.json')!.slice();
+ prepareImage.mockImplementationOnce(async(_source,dest)=>{files.set(dest,new Uint8Array([255,216,255]));return {mime:'image/jpeg',extension:'jpg',bytes:3,width,height};});
+ await shareAlbumEpub(id,()=>true);
+ const uri=[...files.keys()].find(k=>k.startsWith(dir)&&/album-.*\.epub$/.test(k))!;
+ const archive=unzipSync(files.get(uri)!);expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain(geometry);
+ expect(files.get(dir+'manifest.json')).toEqual(frozen);
+});
+
+it('denies cached sharing after rights are revoked and preserves the existing file',async()=>{
+ await shareAlbumEpub('print_test',()=>true);const uri=resultUri(),saved=files.get(uri);jest.clearAllMocks();
+ (albumExportAccess.assert as jest.Mock).mockRejectedValueOnce(new Error('EXPORT_PURCHASE_REQUIRED'));
+ await expect(shareAlbumEpub('print_test',()=>true)).rejects.toThrow('EXPORT_PURCHASE_REQUIRED');
+ expect(files.get(uri)).toEqual(saved);expect(native.sharePrintPdf).not.toHaveBeenCalled();expect(prepareImage).not.toHaveBeenCalled();
 });

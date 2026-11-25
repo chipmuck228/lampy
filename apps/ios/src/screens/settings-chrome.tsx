@@ -19,6 +19,9 @@ export function SettingsPage({
   testID,
   pageTestID,
   onBack,
+  headerRight,
+  headerAccessory,
+  hideBackLabel = false,
   scrollEnabled = true,
   scrollRef,
   children,
@@ -29,6 +32,9 @@ export function SettingsPage({
   testID?: string;
   pageTestID?: string;
   onBack: () => void;
+  headerRight?: ReactNode;
+  headerAccessory?: ReactNode;
+  hideBackLabel?: boolean;
   scrollEnabled?: boolean;
   scrollRef?: Ref<ScrollView>;
   children: ReactNode;
@@ -54,20 +60,18 @@ export function SettingsPage({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={tr("返回")}
+          accessibilityHint={hideBackLabel ? backLabel : undefined}
           testID="account-back"
           onPress={onBack}
           style={styles.backHit}
         >
           <LifeIcon name="back" size={19} color={sage} decorative />
-          <Text style={styles.back} numberOfLines={1}>
-            {backLabel}
-          </Text>
+          {!hideBackLabel ? <Text style={styles.back} numberOfLines={1}>{backLabel}</Text> : null}
         </Pressable>
-        <Text style={styles.title} accessibilityRole="header">
-          {title}
-        </Text>
-        <View style={styles.headerSpacer} />
+        {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
+        <View style={styles.headerSpacer}>{headerRight}</View>
       </View>
+      {headerAccessory ? <View style={{paddingLeft:padLeft,paddingRight:padRight,alignItems:'center'}}><View style={[styles.reading,{maxWidth:column}]}>{headerAccessory}</View></View> : null}
       <KeyboardAvoidingView
         style={styles.scroll}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -118,7 +122,7 @@ const styles = StyleSheet.create({
   },
   back: { ...type.meta, color: sage, flexShrink: 1 },
   title: { ...type.meta, color: ink, textAlign: 'center', flexShrink: 1, maxWidth: '58%', paddingVertical: 14 },
-  headerSpacer: { flex: 1, minWidth: 54, minHeight: 48 },
+  headerSpacer: { flex: 1, minWidth: 54, minHeight: 48, alignItems: 'flex-end', justifyContent: 'center' },
   scroll: { flex: 1 },
   column: {
     width: '100%',

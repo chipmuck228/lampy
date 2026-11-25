@@ -48,7 +48,7 @@ const PRINT_ERROR_CODES = [
   'PRINT_STORAGE_UNAVAILABLE',
   'LOCAL_FILE_REQUIRED',
   'INVALID_LAYOUT',
-  'PDF_CREATE_FAILED',
+  'PDF_CREATE_FAILED', 'PRINT_PDF_TOO_LARGE', 'PDF_TEXT', 'PDF_FONT_RUNS',
   'IMAGE_UNREADABLE',
   'PDF_REOPEN_FAILED',
   'SHARE_UNAVAILABLE',
@@ -102,6 +102,7 @@ export type PrintInspection = {
   emojiVisualCheckRequired?: boolean;
   colorGlyphRanges?: { page: number; block: number; line: number; startUTF16: number; endUTF16: number }[];
   textCheckRevision?: number;
+  imageDpi?: {assetId:string;dpi:number|null}[];
   textCheckFailure?: string;
   fontRunNames: string[];
 };
@@ -129,6 +130,7 @@ export type PrintStore = {
     index: number,
   ): Promise<PrintMedia & { uri: string }>;
   verifySource(uri: string, hash: string): Promise<void>;
+  prepare?(id:string,input:AlbumLayoutInput,media:AlbumLayoutMediaMap):Promise<void>;
   writePdf(
     id: string,
     layout: AlbumLayout,
@@ -279,6 +281,7 @@ export function createAlbumPrintService(deps: {
             // Serialized snapshot uses relative copies only, never the author's original path.
             item.uri = copy.file;
           }
+        if(deps.store.prepare){stage='PREPARE_PRINT_MEDIA';report('prepare');await deps.store.prepare(id,frozen,map);assertCurrent();}
         stage = 'LAYOUT';
         report('layout');
         const layout = await deps.layout(frozen, style, fonts);
@@ -291,7 +294,7 @@ export function createAlbumPrintService(deps: {
             'INVALID_PDF',
             `LAYOUT_${integrity.reason.replace(/-/g, '_').toUpperCase()}`,
           );
-        if (
+        if (!layout.printPublication && (
           layout.pages
             .flatMap((page) => page.blocks)
             .filter((block) => block.kind === 'cover-name')
@@ -302,7 +305,7 @@ export function createAlbumPrintService(deps: {
             .filter((block) => block.kind === 'opening')
             .map((block) => ('text' in block ? block.text : ''))
             .join('') !== (frozen.album.opening ?? '')
-        )
+        ))
           throw new AlbumPrintError('INVALID_PDF');
         stage = 'WRITE_PDF';
         report('write');
@@ -349,7 +352,7 @@ export function createAlbumPrintService(deps: {
           content: frozen,
           media,
           layout,
-          imageDpi: layout.pages
+          imageDpi: layout.printPublication ? pdf.imageDpi??[] : layout.pages
             .flatMap((page) => page.blocks)
             .filter(
               (block) => block.kind === 'image' || block.kind === 'cover-image',
@@ -397,7 +400,9 @@ export function createAlbumPrintService(deps: {
             });
           }
         }
-        throw new AlbumPrintFailure(printFailureDiagnostic(error, stage));
+        const diagnostic = printFailureDiagnostic(error, stage);
+        console.info('[LampyPrint]', JSON.stringify(diagnostic));
+        throw new AlbumPrintFailure(diagnostic);
       } finally {
         busy = false;
       }

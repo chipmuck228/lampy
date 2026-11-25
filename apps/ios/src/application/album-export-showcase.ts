@@ -74,8 +74,8 @@ export function styleAlbumPages(layout: AlbumLayout, style: AlbumReadingStyle): 
     rendering: {
       ...page.rendering!,
       style,
-      paper: ALBUM_READING_STYLES[style].paper,
-      photoBorderWidth: ALBUM_READING_STYLES[style].photoBorderWidth,
+      paper: page.rendering?.chroniclePrint?'#faf9f5':ALBUM_READING_STYLES[style].paper,
+      photoBorderWidth: page.rendering?.chroniclePrint?0:ALBUM_READING_STYLES[style].photoBorderWidth,
     },
     blocks: page.blocks.map((block) =>
       block.kind === 'feeling'

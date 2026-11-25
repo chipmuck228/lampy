@@ -1,1 +1,1 @@
-export { default } from '../../../screens/life-album-preview-screen';
+export { default } from '../../../screens/album-epub-preview-screen';

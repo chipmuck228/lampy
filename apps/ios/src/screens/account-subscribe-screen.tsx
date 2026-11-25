@@ -18,7 +18,7 @@ export default function AccountSubscribeScreen() {
     >
       <SettingsDetailLead icon="subscribe" title={tr("订阅与付费")}>
         {isAppstoreLaunchBuild()?<>
-          <SettingsFact>{tr('个人生活册可以导出为 EPUB 或 PDF。需要购买的功能会在确认付款前显示 Apple 提供的价格；付款与恢复购买由 App Store 处理。')}</SettingsFact>
+          <SettingsFact>{tr('电子册可以免费全屏预览；解锁后可保存与分享 EPUB。购买前会显示 Apple 提供的价格，并可恢复已有购买。')}</SettingsFact>
           <SettingsFact>{tr('在生活册的导出页面，可以查看价格、购买或恢复已有购买。')}</SettingsFact>
         </>:<>
         <SettingsFact testID="account-subscribe-none">{tr("目前没有付费项目。")}</SettingsFact>

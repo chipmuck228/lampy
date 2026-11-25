@@ -35,6 +35,7 @@ import { createExpoDeviceAuthenticator, type DeviceAuthenticator } from '../infr
 import { setPrivateSnapshotBlocked } from '../infrastructure/screen-privacy';
 import { ink, inkSoft, paper, sage } from './life-page';
 import { SettingsSwitchRow } from './settings-rows';
+import { LifeIcon } from './life-icons';
 
 function appIsBackgrounded() {
   return AppState.currentState === 'background';
@@ -200,7 +201,7 @@ export function DeviceLockProvider({
     setMessage(null);
     logLock('auth-start', { generation, cover: true });
     try {
-      const result = await resolvedAuthenticator.authenticate(tr("验证是这台设备的持有人，才能打开 Lampy。"));
+      const result = await resolvedAuthenticator.authenticate(tr("解锁，回到你的记录。"));
       const decision = decideUnlockResult({
         appState: AppState.currentState,
         generation,
@@ -433,25 +434,26 @@ export function DeviceLockProvider({
             keyboardShouldPersistTaps="handled"
             testID="device-lock-cover-scroll"
           >
+            <LifeIcon name="lock" size={26} color={sage} />
             <Text style={styles.title} accessibilityRole="header">
-              {snapshot.setting === 'unknown' ? 'Lampy' : tr("这台设备已保护")}
+              {'Lampy'}
             </Text>
             <Text style={styles.body}>
               {snapshot.setting === 'unknown' && !message
-                ? tr("正在确认本机设置。")
+                ? tr("稍等片刻…")
                 : snapshot.setting === 'unknown'
                   ? tr("记录还在。")
-                  : tr("进入 Lampy 前，先确认是这台设备的持有人。记录还在。")}
+                  : tr("你的日子，安心留在这里。")}
             </Text>
             {snapshot.setting === 'on' || message ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={tr("再试一次")}
+                accessibilityLabel={tr(snapshot.setting === 'unknown' ? "再试一次" : "打开 Lampy")}
                 testID="device-lock-retry"
                 onPress={retryCoverAction}
                 style={styles.hit}
               >
-                <Text style={styles.action}>{tr("再试一次")}</Text>
+                <Text style={styles.action}>{tr(snapshot.setting === 'unknown' ? "再试一次" : "打开 Lampy")}</Text>
               </Pressable>
             ) : null}
             {message ? (

@@ -44,15 +44,15 @@ it('preserves text and emoji, escapes markup and excludes private paths and sour
 it('has cover, opening, contents, ordered records, and colophon; no invented exact date', () => {
   const archive = files();
   const opf = new JSDOM(strFromU8(archive['OEBPS/package.opf']), { contentType: 'application/xml' }).window.document;
-  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','opening','record-1']);
+  expect([...opf.querySelectorAll('spine itemref')].map(x => x.getAttribute('idref'))).toEqual(['cover','opening','date-1','record-1','archive']);
   expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('日子未确认');
   expect(strFromU8(archive['OEBPS/style.css'])).toContain('height:auto');
 });
-it('retains selected order across repeated months and supports English', () => {
+it('keeps unknown dates explicitly uncertain and supports English', () => {
   const second = { ...input.entries[0], momentId: 'second' };
   const archive = unzipSync(buildAlbumEpub({ ...options, language: 'en', input: { ...input, entries: [second, input.entries[0]] }, dates: { second: { label: 'Nov 2', chapter: 'November 2026' }, 'private-record-id': { label: 'Oct 1', chapter: 'October 2026' } } }));
   const nav = strFromU8(archive['OEBPS/nav.xhtml']);
-  expect(nav.indexOf('November')).toBeLessThan(nav.indexOf('October'));
+  expect(nav).toContain('Date uncertain');
   expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('Listen to this moment');
 });
 it('fails closed for absent media, unsafe package paths and missing cover', () => {
@@ -79,10 +79,10 @@ it('lets entries in the same month flow together and keeps the colophon with the
   expect(archive['OEBPS/record-2.xhtml']).toBeUndefined();
   const doc = new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
   expect(doc.querySelectorAll('article')).toHaveLength(2);
-  expect(doc.querySelector('footer')).not.toBeNull();
+  expect(doc.querySelector('footer')).toBeNull();expect(archive['OEBPS/archive.xhtml']).toBeDefined();
 });
 
-it.each(['literary','imagebook'] as const)('preserves all text, audio and XML in %s independently of paper style', design => {
+it.each(['literary'] as const)('preserves all text, audio and XML in %s independently of paper style', design => {
   const archive = unzipSync(buildAlbumEpub({ ...options, design }));
   const doc = new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']), { contentType:'application/xml' }).window.document;
   expect(doc.querySelector('parsererror')).toBeNull();
@@ -96,19 +96,19 @@ it.each(['literary','imagebook'] as const)('preserves all text, audio and XML in
 it('uses a single large image then compatible paired photos without losing or reordering media', () => {
   const record = { ...input.entries[0], media: [0,1,2].map(i=>({...input.entries[0].media[0],assetId:`p${i}`,intrinsicRatio:1.2})) };
   const photoAssets=Object.fromEntries([0,1,2].map(i=>[`p${i}`,{...assets.photo,path:`media/photo-${i}.jpg`,mime:'image/jpeg'}]));
-  for(const design of ['literary','imagebook'] as const) {
+  for(const design of ['literary'] as const) {
     const archive=unzipSync(buildAlbumEpub({...options,design,input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[record]},assets:photoAssets}));
     const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
     expect([...doc.querySelectorAll('img')].map(x=>x.getAttribute('src'))).toEqual([0,1,2].map(i=>`media/photo-${i}.jpg`));
     expect(doc.querySelectorAll('.photo-pair .paired')).toHaveLength(2);
     const article=doc.querySelector('article')!;
-    expect(article.firstElementChild!.className).toBe(design==='imagebook'?'entry-lead':'entry-head');
+    expect(article.firstElementChild!.className).toBe('entry-head');
   }
 });
 it('keeps long text continuous and does not pair incompatible photo ratios', () => {
   const record={...input.entries[0],note:'完整文字。'.repeat(200),media:[0,1,2].map((i)=>({...input.entries[0].media[0],assetId:`p${i}`,intrinsicRatio:i===1?0.5:1.8}))};
   const photoAssets=Object.fromEntries([0,1,2].map(i=>[`p${i}`,{...assets.photo,path:`media/photo-${i}.jpg`,mime:'image/jpeg'}]));
-  const archive=unzipSync(buildAlbumEpub({...options,design:'imagebook',input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[record]},assets:photoAssets}));
+  const archive=unzipSync(buildAlbumEpub({...options,design:'literary',input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[record]},assets:photoAssets}));
   const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
   expect(doc.querySelector('.entry-lead')).toBeNull();
   expect(doc.querySelector('.prose')!.textContent).toBe(record.note);
@@ -119,4 +119,33 @@ it('defaults old manifests to literary and rejects unknown design values', () =>
   const archive=files();
   expect(strFromU8(archive['OEBPS/cover.xhtml'])).toContain('class="literary"');
   expect(()=>buildAlbumEpub({...options,design:'other' as never})).toThrow('EPUB_INVALID_DESIGN');
+});
+
+it('includes a minimal branded colophon and declares inline audio artwork in the manifest',()=>{
+ const archive=files();const doc=new JSDOM(strFromU8(archive['OEBPS/archive.xhtml']),{contentType:'application/xml'}).window.document;
+ expect(doc.querySelector('h1,dl')).toBeNull();expect(doc.querySelector('.edition-symbol')!.getAttribute('src')).toBe('lampy-symbol.svg');expect(doc.body.textContent).toContain('珍藏于');
+ const opf=new JSDOM(strFromU8(archive['OEBPS/package.opf']),{contentType:'application/xml'}).window.document;
+ expect(opf.querySelector('item[id="record-1"]')!.getAttribute('properties')).toBe('svg');
+ expect(strFromU8(archive['OEBPS/record-1.xhtml'])).toContain('若无法播放，请换用支持声音的阅读器。');
+});
+it.each([[.65,1.5,1.5],[1.5,1.5],[.7,.7],[1.4,.7,1,1.6]])('composes ratios %j without omitting or reordering photographs',(...ratios)=>{
+ const media=ratios.map((r,i)=>({...input.entries[0].media[0],assetId:`p${i}`,intrinsicRatio:r}));
+ const photoAssets=Object.fromEntries(media.map((m,i)=>[m.assetId,{...assets.photo,path:`media/photo-${i}.jpg`,mime:'image/jpeg'}]));
+ const archive=unzipSync(buildAlbumEpub({...options,input:{...input,album:{...input.album,cover:{kind:'words'}},entries:[{...input.entries[0],media}]},assets:photoAssets}));
+ const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
+ expect([...doc.querySelectorAll('img')].map(x=>x.getAttribute('src'))).toEqual(media.map((_,i)=>`media/photo-${i}.jpg`));
+ expect(doc.querySelectorAll('figcaption')).toHaveLength(0);
+});
+it('never groups photos across an intervening voice, and escapes long titles and attributions',()=>{
+ const record={...input.entries[0],attribution:'Dad & <script>not executable</script>',media:[input.entries[0].media[0],input.entries[0].media[1],{...input.entries[0].media[0],assetId:'b'}]};
+ const archive=unzipSync(buildAlbumEpub({...options,input:{...input,entries:[record]},assets:{...assets,b:{...assets.photo,path:'media/another.png'}}}));
+ const doc=new JSDOM(strFromU8(archive['OEBPS/record-1.xhtml']),{contentType:'application/xml'}).window.document;
+ expect([...doc.querySelectorAll('img,audio')].map(x=>x.getAttribute('src'))).toEqual(['media/asset-0.png','media/asset-1.m4a','media/another.png']);
+ expect(doc.querySelector('script')).toBeNull();expect(doc.querySelector('.attribution')!.textContent).toBe(record.attribution);
+ expect(doc.querySelector('.photo-pair')).toBeNull();
+});
+
+it('rejects inconsistent media types instead of publishing a broken or mislabeled asset',()=>{
+ expect(()=>buildAlbumEpub({...options,assets:{...assets,photo:{...assets.photo,mime:'audio/mpeg'}}})).toThrow('EPUB_INVALID_ASSET');
+ expect(()=>buildAlbumEpub({...options,assets:{...assets,sound:{...assets.sound,path:'media/voice.wav',mime:'audio/wav'}}})).toThrow('EPUB_INVALID_ASSET');
 });

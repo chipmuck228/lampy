@@ -1,3 +1,4 @@
+import type {PublicationPage} from './album-publication';
 import { Platform } from 'react-native';
 import { appLanguage, tr, type AppLanguage } from '../i18n';
 import type { AlbumCover } from './life-album';
@@ -102,7 +103,7 @@ export type AlbumTextLine = {
 
 export type AlbumTextRange = { start: number; end: number; unit: 'unicode-scalar' };
 
-type AlbumBlockBase = { box: AlbumBox };
+type AlbumBlockBase = { box: AlbumBox; printInitial?:{scalars:number;widthPt:number;sizePt:number} };
 
 export type AlbumPlacedBlock = AlbumBlockBase &
   (
@@ -163,12 +164,15 @@ export type AlbumPlacedBlock = AlbumBlockBase &
   );
 
 export type AlbumPage = {
+  publication?:PublicationPage;
   index: number;
   blocks: AlbumPlacedBlock[];
-  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number; pageCount?: number; pageNumbers?: boolean };
+  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number; pageCount?: number; pageNumbers?: boolean; chroniclePrint?:boolean; bindingColor?:string; bodySerif?:string; bodyFontRequest?:string; bodyColor?:string };
 };
 
 export type AlbumLayout = {
+  /** Authoritative shared HTML publication for new PDF exports; blocks are legacy only. */
+  printPublication?:import('./album-chronicle-pdf').ChroniclePdfPublication;
   albumId: string;
   language?: AppLanguage;
   layoutVersion: typeof ALBUM_LAYOUT_VERSION;

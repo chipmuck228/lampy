@@ -1,5 +1,6 @@
 import {
   createExpoAlbumPrintStore,
+  layoutAlbumPrint,
   shareSavedAlbumPrint,
 } from './album-print-files';
 import type { PrintManifest } from '../application/album-print';
@@ -8,6 +9,8 @@ const mockMove = jest.fn(async (_input: unknown) => undefined);
 const mockInfo = jest.fn(async (_path: string) => ({ exists: false }));
 const mockCopy = jest.fn(async () => ({ sha256: 'hash', bytes: 10 }));
 const mockDigest = jest.fn(async () => ({ sha256: 'pdf-hash', bytes: 20 }));
+const mockPrepare = jest.fn(async (_source:string,_destination:string)=>({width:900,height:1600,bytes:120000}));
+const mockWrite = jest.fn(async ()=>({bytes:500000}));
 const mockShare = jest.fn(async () => true);
 jest.mock('expo-file-system/legacy', () => ({
   documentDirectory: 'file:///docs/',
@@ -19,6 +22,7 @@ jest.mock('expo-file-system/legacy', () => ({
   writeAsStringAsync: jest.fn(async () => undefined),
 }));
 jest.mock('../../modules/lampy-album-layout', () => ({
+  albumChroniclePrintNative: () => ({prepareImage:mockPrepare,writePdf:mockWrite}),
   albumPrintNative: () => ({
     copyPrintMedia: mockCopy,
     printFileDigest: mockDigest,
@@ -83,4 +87,30 @@ it('a modified saved PDF is not shared', async () => {
     ),
   ).rejects.toThrow('PRINT_FILE_CHANGED');
   expect(mockShare).not.toHaveBeenCalled();
+});
+
+it('prepares a bounded derivative once for repeated photos and removes it after native render failure',async()=>{
+ const store=createExpoAlbumPrintStore();
+ const image={assetId:'p',role:'image' as const,availability:'available' as const,intrinsicRatio:.5,durationMs:null,uri:'media-0'};
+ const input={entries:[{media:[image,{...image}]}]} as unknown as import('../application/album-layout-input').AlbumLayoutInput;
+ const media={p:'file:///docs/album-print-evaluation/.building-print_1/media-0'};
+ await store.prepare!('print_1',input,media);
+ expect(mockPrepare).toHaveBeenCalledTimes(1);
+ expect(mockPrepare.mock.calls[0][0]).toBe('file:///docs/album-print-evaluation/.building-print_1/media-0');
+ expect(media.p).toContain('.pdf-images/asset-0.jpg');
+ expect(image.uri).toBe('media-0');expect(image.intrinsicRatio).toBe(900/1600);
+ mockWrite.mockRejectedValueOnce(new Error('PRINT_PDF_TOO_LARGE') as never);
+ await expect(store.writePdf('print_1',{printPublication:{version:1}} as import('../application/album-layout').AlbumLayout,media)).rejects.toThrow('PRINT_PDF_TOO_LARGE');
+ expect(mockDelete).toHaveBeenCalledWith('file:///docs/album-print-evaluation/.building-print_1/.pdf-images/');
+});
+
+it.each([undefined,'app.lampy.export','app.lampy.export.designtest'])('restricts scalar diagnostics to the local design product (%s)',async product=>{
+ const previous=process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID;
+ try{
+  if(product)process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID=product;else delete process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID;
+  const input={album:{id:'b',schemaVersion:1,name:'Synthetic',opening:null,cover:{kind:'words'},entries:[],createdAt:'2026-11-25',updatedAt:'2026-11-25'},entries:[{momentId:'m',presence:'ready',revision:1,sourceRevisionAtCollect:1,collectedAt:'2026-11-25',recordedAt:'2026-11-25',occurredAtPrecision:'unknown',note:'Synthetic writing.',feeling:'',media:[]}]} as import('../application/album-layout-input').AlbumLayoutInput;
+  const fonts={serif:{fontName:'Songti SC'},ui:{fontName:'PingFang SC'}} as import('../../modules/lampy-album-layout').AlbumFontDiagnosis;
+  const layout=await layoutAlbumPrint(input,'plain',fonts);
+  expect(layout.printPublication?.diagnosticTextDiff===true).toBe(product==='app.lampy.export.designtest');
+ }finally{if(previous===undefined)delete process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID;else process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID=previous;}
 });
