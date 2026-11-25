@@ -254,14 +254,7 @@ export function ShowcaseNote({ children, live }: { children: ReactNode; live?: b
   );
 }
 
-/** Stage-based progress; no timer pretends to measure completion. */
-export function EditionProgress({fraction}:{fraction:number}){
- const percent=Math.max(0,Math.min(100,Math.round(fraction*100)));
- return <View style={styles.binding} testID="album-export-progress">
-   <Text style={styles.bindingTitle} accessibilityLiveRegion="polite">{tr('正在制作这一册…')}</Text>
-   <View style={styles.track} accessible accessibilityRole="progressbar" accessibilityLabel={tr('制作进度')} accessibilityValue={{min:0,max:100,now:percent}}><View style={[styles.fill,{width:`${percent}%`}]} /></View>
- </View>;
-}
+export {EditionProgress} from './edition-progress';
 
 /** Binding in progress. Steps are reported by the export service, not timed. */
 export function BindingPanel({

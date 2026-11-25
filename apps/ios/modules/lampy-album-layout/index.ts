@@ -45,6 +45,7 @@ export type AlbumPdfProbeResult = {
 };
 
 type NativeModule = {
+  epubPreviewAvailable?():boolean;
   measureText?(
     text: string,
     fontName: string,
@@ -165,4 +166,15 @@ export function albumChroniclePrintNative(){
  const native=loadNative() as unknown as {preparePrintImage?:(source:string,destination:string)=>Promise<{width:number;height:number;bytes:number}>;writeChroniclePdf?:(publication:string,media:string,destination:string)=>Promise<AlbumPrintNativeResult&{imageDpi:{assetId:string;dpi:number|null}[]}>}|null;
  if(!native?.preparePrintImage||!native.writeChroniclePdf)throw new Error('PRINT_NATIVE_REBUILD_REQUIRED');
  return {prepareImage:native.preparePrintImage.bind(native),writePdf:native.writeChroniclePdf.bind(native)};
+}
+
+/** Separate reader view: an older native build must never fall back to the paper renderer. */
+export function requireAlbumEpubView():unknown{
+ if(typeof process!=='undefined'&&process.env.JEST_WORKER_ID)return null;
+ if(loadNative()?.epubPreviewAvailable?.()!==true)return null;
+ try{
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const core=require('expo-modules-core') as {requireNativeViewManager?:(moduleName:string,viewName:string)=>unknown};
+  return core.requireNativeViewManager?.('LampyAlbumLayout','AlbumEpubView')??null;
+ }catch{return null;}
 }

@@ -34,7 +34,7 @@ export function useAlbumExportUnlock(enabled=true):AlbumExportUnlockState{
     try{
       let message='';let result:AlbumExportUnlockState['outcome'];
       if(restore){const restored=await albumExportAccess.restore();result=restored.owned?'restored':'not-restored';message=tr(restored.owned?'已恢复导出权益。':'没有找到可恢复的导出购买。');}
-      else {const bought=await albumExportAccess.purchase();result=bought.status==='pending'?'pending':bought.status==='cancelled'?'cancelled':'purchased';if(bought.status==='pending')message=tr('购买正在等待确认，确认后可继续导出。');else if(bought.status==='cancelled')message=tr('已取消购买。');else message=tr('导出权益已解锁，请点生成PDF继续。');}
+      else {const bought=await albumExportAccess.purchase();result=bought.status==='pending'?'pending':bought.status==='cancelled'?'cancelled':'purchased';if(bought.status==='pending')message=tr('购买正在等待确认，确认后可继续导出。');else if(bought.status==='cancelled')message=tr('已取消购买。');else message=tr('已解锁，可以导出电子册了。');}
       const next=await albumExportAccess.status();if(active.current&&ticket===sequence.current){setStatus(next);setNotice(message);setOutcome(result);setLoading(false);}
     }catch{if(active.current&&ticket===sequence.current){setNotice(tr('本次未能完成，请稍后重试或恢复购买。'));setOutcome('failed');setLoading(false);}}
     finally{owner.current=false;if(active.current)setWorking(false);}

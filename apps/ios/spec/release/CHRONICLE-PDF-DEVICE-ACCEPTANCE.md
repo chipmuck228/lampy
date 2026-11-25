@@ -1,5 +1,7 @@
 # Chronicle PDF and export polish device acceptance
 
+> Superseded: PDF creation and paper preview are closed. Use [EPUB preview acceptance](EPUB-PREVIEW-DEVICE-ACCEPTANCE.md). The historical PDF investigation below is retained for reference; do not run it as the current release gate.
+
 PR #144 / release/album-export-polish. This branch includes the prior Chronicle work; it does not require merging either draft PR first. Keep both PRs unmerged during device acceptance.
 
 ## Install from the existing Mac device checkout

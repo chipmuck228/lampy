@@ -20,4 +20,4 @@ EXPO_USE_PRECOMPILED_MODULES=0 pod install --project-directory=ios --clean-insta
 bash scripts/write-family-xcode-env.sh ios/.xcode.env.local
 open ios/Lampy.xcworkspace
 echo 'In Xcode: select your iPhone, Release Run configuration and local StoreKit design-test configuration.'
-echo 'Install over the existing Lampy app; generate a new Photo journal edition.'
+echo 'Install over the existing Lampy app; test free full-screen preview first, then paid EPUB save/share.'

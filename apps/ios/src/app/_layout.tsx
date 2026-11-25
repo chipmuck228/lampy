@@ -30,8 +30,12 @@ export default function RootLayout() {
             animation: 'fade',
           }}
         >
+          <Stack.Protected guard={false}>
+            <Stack.Screen name="family-album-paper" />
+            <Stack.Screen name="family-album-print" />
+          </Stack.Protected>
           {personalRecordsOnly() ? <Stack.Protected guard={false}>
-            {androidExcludedRoutes().map(name => <Stack.Screen key={name} name={name} />)}
+            {androidExcludedRoutes().filter(name=>!['family-album-paper','family-album-print'].includes(name)).map(name => <Stack.Screen key={name} name={name} />)}
           </Stack.Protected> : null}
         </Stack>
         <HomeScreenActionDispatch />

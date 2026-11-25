@@ -1,6 +1,7 @@
 import CoreText
 import ExpoModulesCore
 import UIKit
+import WebKit
 
 public final class LampyAlbumLayoutModule: Module {
   public func definition() -> ModuleDefinition {
@@ -67,6 +68,7 @@ public final class LampyAlbumLayoutModule: Module {
       }
     }
 
+    Function("epubPreviewAvailable") { true }
     View(AlbumPageView.self) {
       Prop("pageJson") { (view: AlbumPageView, json: String) in
         view.pageJson = json
@@ -82,6 +84,12 @@ public final class LampyAlbumLayoutModule: Module {
       Prop("renderScale") { (view: AlbumPageView, scale: Double) in
         view.renderScale = scale
       }
+    }
+    // Keep AlbumPageView first: Expo uses the first view as the legacy default.
+    View(AlbumEpubView.self) {
+      Events("onReady", "onFailure", "onPageTurn")
+      Prop("rootUri") { (view: AlbumEpubView, value: String) in view.rootUri = value }
+      Prop("documentUri") { (view: AlbumEpubView, value: String) in view.documentUri = value }
     }
   }
 }
@@ -787,4 +795,94 @@ final class AlbumPageView: ExpoView {
     }
     drawAlbumPage(page: page, media: parseAlbumMedia(mediaJson), playing: playing, in: context, bounds: bounds)
   }
+}
+
+
+/// Offline, read-only publication surface. It never presents a share controller.
+final class AlbumEpubView: ExpoView, WKNavigationDelegate {
+  let onReady = EventDispatcher()
+  let onFailure = EventDispatcher()
+  let onPageTurn = EventDispatcher()
+  var rootUri = "" { didSet { setNeedsLayout() } }
+  var documentUri = "" { didSet { setNeedsLayout() } }
+  private let reader: WKWebView
+  private var loaded = ""
+  private var background: NSObjectProtocol?
+  required init(appContext: AppContext?) {
+    let configuration = WKWebViewConfiguration()
+    configuration.websiteDataStore = .nonPersistent()
+    // Reading must not expose an implicit Save Image / Share menu.
+    let noCallout = "document.addEventListener('contextmenu',function(e){e.preventDefault();});var s=document.createElement('style');s.textContent='*{-webkit-touch-callout:none}';document.documentElement.appendChild(s);"
+    configuration.userContentController.addUserScript(WKUserScript(source:noCallout,injectionTime:.atDocumentEnd,forMainFrameOnly:true))
+    configuration.allowsInlineMediaPlayback = true
+    configuration.mediaTypesRequiringUserActionForPlayback = .all
+    reader = WKWebView(frame: .zero, configuration: configuration)
+    super.init(appContext: appContext)
+    backgroundColor = UIColor(red:21/255.0,green:28/255.0,blue:25/255.0,alpha:1)
+    reader.isOpaque = false; reader.backgroundColor = backgroundColor
+    reader.scrollView.bounces = false; reader.allowsLinkPreview = false
+    reader.navigationDelegate = self; addSubview(reader)
+    for direction in [UISwipeGestureRecognizer.Direction.left, .right] {
+      let gesture = UISwipeGestureRecognizer(target:self,action:#selector(swipe(_:)))
+      gesture.direction = direction; gesture.cancelsTouchesInView = false
+      reader.addGestureRecognizer(gesture)
+    }
+    background = NotificationCenter.default.addObserver(forName:UIApplication.didEnterBackgroundNotification,object:nil,queue:.main) { [weak self] _ in self?.clear() }
+  }
+  deinit {
+    if let background = background { NotificationCenter.default.removeObserver(background) }
+    reader.navigationDelegate = nil; reader.stopLoading()
+  }
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    let width = min(bounds.width, bounds.height * 4 / 3)
+    let height = width * 3 / 4
+    reader.frame = CGRect(x:(bounds.width-width)/2,y:(bounds.height-height)/2,width:width,height:height)
+    loadIfReady()
+  }
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window == nil { clear() } else { setNeedsLayout() }
+  }
+  private func clear() {
+    reader.pauseAllMediaPlayback(completionHandler:nil)
+    reader.stopLoading(); loaded = ""
+    reader.loadHTMLString("",baseURL:nil)
+  }
+  private func root() -> URL? {
+    guard let url = try? printLocalURL(rootUri), url.lastPathComponent.hasPrefix("preview_"),
+          url.deletingLastPathComponent().lastPathComponent == "album-epub-preview" else { return nil }
+    return url
+  }
+  private func loadIfReady() {
+    guard window != nil, UIApplication.shared.applicationState == .active,
+          reader.bounds.width > 0, reader.bounds.height > 0, !documentUri.isEmpty, !rootUri.isEmpty,
+          documentUri != loaded else { return }
+    guard let directory = root(), let url = try? printLocalURL(documentUri),
+          url.path.hasPrefix(directory.path + "/OEBPS/"), url.pathExtension == "xhtml" else {
+      onFailure(["code":"PREVIEW_UNAVAILABLE"]); return
+    }
+    loaded = documentUri
+    reader.loadFileURL(url,allowingReadAccessTo:directory)
+  }
+  @objc private func swipe(_ gesture: UISwipeGestureRecognizer) {
+    guard reader.scrollView.zoomScale <= reader.scrollView.minimumZoomScale + 0.02 else { return }
+    reader.evaluateJavaScript("!!document.querySelector('.photo-detail.is-open')") { [weak self] value, _ in
+      guard let self = self, value as? Bool != true else { return }
+      self.onPageTurn(["direction":gesture.direction == .left ? 1 : -1])
+    }
+  }
+  func webView(_ webView:WKWebView,decidePolicyFor action:WKNavigationAction,decisionHandler:@escaping(WKNavigationActionPolicy)->Void) {
+    guard let url = action.request.url else { decisionHandler(.cancel); return }
+    if url.absoluteString == "about:blank" { decisionHandler(.allow); return }
+    guard let directory = root(), url.isFileURL, url.standardizedFileURL.path.hasPrefix(directory.path + "/OEBPS/") else { decisionHandler(.cancel); return }
+    decisionHandler(.allow)
+  }
+  func webView(_ webView:WKWebView,didFinish navigation:WKNavigation!) {
+    guard webView.url?.isFileURL == true, !loaded.isEmpty else { return }
+    onReady([:])
+  }
+  func webView(_ webView:WKWebView,didFail navigation:WKNavigation!,withError error:Error) { if !loaded.isEmpty { onFailure(["code":"PREVIEW_UNAVAILABLE"]) } }
+  func webView(_ webView:WKWebView,didFailProvisionalNavigation navigation:WKNavigation!,withError error:Error) { if !loaded.isEmpty { onFailure(["code":"PREVIEW_UNAVAILABLE"]) } }
+  func webViewWebContentProcessDidTerminate(_ webView:WKWebView) { if !loaded.isEmpty { onFailure(["code":"PREVIEW_UNAVAILABLE"]) } }
 }

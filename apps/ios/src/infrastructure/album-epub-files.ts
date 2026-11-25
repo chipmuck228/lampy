@@ -1,3 +1,4 @@
+import {epubAudioFormat} from '../application/epub-audio-format';
 import { acquireAlbumEdition } from './album-edition-lock';
 import { epubSnapshotDirectory } from './album-epub-snapshots';
 import type { EpubSnapshot } from '../application/album-epub-snapshot';
@@ -61,14 +62,14 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     if (manifest.id !== id || manifest.version !== 1 || manifestDigest(manifest) !== digest) throw new Error('PRINT_FILE_CHANGED');
     const uri = `${dir}album-${appLanguage}.epub`;
     const digestUri = `${uri}.sha256`;
-    // Previously made files stay shareable; only new generation requires current export rights.
+    // Saving/sharing an EPUB always requires current export rights, including cached editions.
+    report('AUTHORIZE');
+    await albumExportAccess.assert(current); check();
     if ((await FS.getInfoAsync(uri)).exists && (await FS.getInfoAsync(digestUri)).exists) {
       const expected = await FS.readAsStringAsync(digestUri);
       if ((await albumPrintNative().printFileDigest(uri)).sha256 !== expected) throw new Error('PRINT_FILE_CHANGED');
       check(); report('SHARE'); check(); return await albumPrintNative().sharePrintPdf(uri);
     }
-    report('AUTHORIZE');
-    await albumExportAccess.assert(current); check();
     await assertSpace(RESERVE); check();
     work = `${dir}.epub-work-${Date.now()}-${Math.random().toString(36).slice(2)}/`;
     await FS.makeDirectoryAsync(work); check();
@@ -166,8 +167,4 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     if (cleanupFailed) throw new AlbumEpubFailure('CLEANUP', 'EPUB_CLEANUP_FAILED');
   }
 }
-export function epubAudioFormat(bytes: Uint8Array) {
-  if (bytes.length > 12 && String.fromCharCode(...bytes.slice(4, 8)) === 'ftyp') return { mime: 'audio/mp4', extension: 'm4a' };
-  if (String.fromCharCode(...bytes.slice(0, 3)) === 'ID3' || (bytes[0] === 255 && (bytes[1] & 0xe0) === 0xe0 && (bytes[1] & 6) !== 0)) return { mime: 'audio/mpeg', extension: 'mp3' };
-  throw new Error('EPUB_UNSUPPORTED_AUDIO');
-}
+export {epubAudioFormat} from '../application/epub-audio-format';

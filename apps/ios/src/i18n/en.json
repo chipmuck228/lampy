@@ -1261,5 +1261,22 @@
   "稍等片刻…": "One moment…",
   "你的日子，安心留在这里。": "Your days, safely kept here.",
   "打开 Lampy": "Open Lampy",
-  "解锁，回到你的记录。": "Unlock to return to your moments."
+  "解锁，回到你的记录。": "Unlock to return to your moments.",
+  "关闭预览": "Close preview",
+  "电子册预览": "Electronic album preview",
+  "请更新Lampy后使用电子册预览。": "Update Lampy to preview your electronic album.",
+  "这次未能打开预览，原记录仍然保留。": "The preview could not be opened. Your records are safe.",
+  "正在准备预览…": "Preparing your preview…",
+  "正在打开…": "Opening…",
+  "已解锁，可以导出电子册了。": "Unlocked. You can now export your electronic album.",
+  "这次未能分享，请稍后重试。": "Sharing did not finish. Please try again.",
+  "这段声音暂不支持电子册，请稍后再试。": "This sound is not supported in electronic albums yet. Please try again later.",
+  "时序 · Chronicle": "Chronicle",
+  "全屏预览": "Full-screen preview",
+  "免费翻阅整册，照片与声音都在。": "Preview the whole album for free, with photographs and sound.",
+  "保存与分享电子册": "Save and share electronic album",
+  "导出暂不可用，你仍可免费预览整册。": "Export is unavailable for now. You can still preview the whole album for free.",
+  "部分内容暂时读不到，原记录仍然保留。": "Some content is unavailable right now. Your records are safe.",
+  "历史文件": "Previous files",
+  "电子册可以免费全屏预览；解锁后可保存与分享 EPUB。购买前会显示 Apple 提供的价格，并可恢复已有购买。": "Preview your electronic album full-screen for free. Unlock export to save and share EPUB files. Apple’s price is shown before purchase, and previous purchases can be restored."
 }
