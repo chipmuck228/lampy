@@ -1,5 +1,5 @@
 import {albumManageStyles} from './album-manage-styles';
-import { AlbumManageToolbar, AlbumEntryActions, AlbumEditorFields } from './album-workflow-controls';
+import { AlbumEntryActions, AlbumEditorFields } from './album-workflow-controls';
 import { tr } from '../i18n';
 import {personalRecordsOnly} from '../application/mobile-capabilities';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -25,7 +25,6 @@ import {
   type AlbumManageView,
 } from '../application/life-album';
 import {
-  ALBUM_PREVIEW_ACTION,
   ALBUM_PREVIEW_EMPTY,
   canOpenAlbumPreview,
 } from '../application/album-layout';
@@ -35,6 +34,7 @@ import { hairline, ink, inkSoft, paperDeep, sage } from './life-page';
 import { Text, type } from './life-text';
 import { LifeIcon, LifeIconButton } from './life-icons';
 import { SettingsPage } from './settings-chrome';
+import {AlbumContentsPreview} from './album-contents-preview';
 
 export default function LifeAlbumManageScreen() {
   const router = useRouter();
@@ -147,7 +147,23 @@ export default function LifeAlbumManageScreen() {
 
   return (
     <SettingsPage
-      title={view?.album.name || tr("这一册")}
+      title=""
+      hideBackLabel
+      headerAccessory={view && menuOpen ? <View style={styles.menu} testID="life-album-menu">
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('编辑册子')} testID="life-album-edit" disabled={busy} style={styles.menuHit} onPress={()=>{setMenuOpen(false);setOrganizing(false);setEditing(true);}}><LifeIcon name="textCursor" size={18}/><Text style={styles.action}>{tr('编辑册子')}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('整理记录')} testID="life-album-organize" disabled={busy} style={styles.menuHit} onPress={()=>{setMenuOpen(false);setEditing(false);setOrganizing(true);}}><LifeIcon name="recent" size={18}/><Text style={styles.action}>{tr('整理记录')}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('连续阅读模式')} testID="life-album-continuous-open" disabled={busy||!view.entries.length} style={styles.menuHit} onPress={()=>{setMenuOpen(false);router.push(`/albums/${albumId}/read`);}}><LifeIcon name="lookback" size={18}/><Text style={[styles.action,!view.entries.length&&styles.disabled]}>{tr('连续阅读模式')}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('删除这一册')} testID="life-album-delete" disabled={busy} style={styles.menuHit} onPress={()=>{
+              if(busyRef.current)return;setMenuOpen(false);
+              Alert.alert(tr('删除这一册'),ALBUM_DELETE_CONFIRM,[
+                {text:tr('取消'),style:'cancel'},
+                {text:tr('删除这一册'),style:'destructive',onPress:()=>{if(busyRef.current)return;void run(async app=>{await app.deleteAlbum(albumId);router.dismissTo('/albums');});}},
+              ]);
+            }}><LifeIcon name="trash" size={18} color={inkSoft}/><Text style={[styles.danger,busy&&styles.disabled]}>{tr('删除这一册')}</Text></Pressable>
+          </View> : null}
+      headerRight={view ? editing || organizing ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={tr(editing ? '取消' : '完成')} testID={editing ? 'life-album-cancel-edit' : 'life-album-organize-done'} disabled={busy} style={styles.headerAction} onPress={()=>{if(editing)closeEditor();else setOrganizing(false);}}><Text style={styles.action}>{tr(editing ? '取消' : '完成')}</Text></Pressable>
+      ) : <LifeIconButton name="more" label={tr("册子菜单")} testID="life-album-manage-menu" onPress={()=>{if(!busyRef.current)setMenuOpen(value=>!value);}}/> : null}
       backLabel={tr("我的生活册")}
       accessibilityLabel={tr("这一册")}
       pageTestID="life-album-manage"
@@ -172,82 +188,20 @@ export default function LifeAlbumManageScreen() {
         <View style={styles.block}>
           <View style={styles.hero}>
             <View style={styles.heroCover} testID="life-album-manage-cover">
-              {selectedCoverUri ? (
-                <Image
-                  source={{ uri: selectedCoverUri }}
-                  style={styles.heroImage}
-                  contentFit="cover"
-                  accessibilityIgnoresInvertColors
-                />
-              ) : (
-                <Text style={styles.heroWords} numberOfLines={3}>
-                  {view.album.name}
-                </Text>
-              )}
+              {selectedCoverUri ? <Image source={{uri:selectedCoverUri}} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors/> : <View style={styles.coverQuiet}><LifeIcon name="album" size={38} color={sage}/></View>}
+              <View pointerEvents="none" style={styles.coverSpine}/>
             </View>
             <View style={styles.heroCopy}>
-              <Text style={styles.heroTitle} numberOfLines={2}>
-                {view.album.name}
-              </Text>
-              <Text style={styles.meta}>
-                {albumEntryCountLabel(view.entries.length)}
-                {dateRange ? ` · ${dateRange}` : ''}
-              </Text>
-              {canOpenAlbumPreview(view.entries.length) ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={ALBUM_PREVIEW_ACTION}
-                  testID="life-album-preview-open"
-                  onPress={() => router.push(`/albums/${albumId}/read`)}
-                  style={styles.previewHit}
-                >
-                  <Text style={styles.previewLabel}>{ALBUM_PREVIEW_ACTION}</Text>
-                </Pressable>
-              ) : (
-                <Text style={styles.hint}>{ALBUM_PREVIEW_EMPTY}</Text>
-              )}
+              <Text style={styles.heroTitle} accessibilityRole="header">{view.album.name}</Text>
+              {dateRange ? <Text style={styles.meta} testID="life-album-date-range">{dateRange}</Text> : null}
+              <Text style={styles.count}>{albumEntryCountLabel(view.entries.length)}</Text>
             </View>
-            <LifeIconButton
-              name="more"
-              label={tr("册子菜单")}
-              testID="life-album-manage-menu"
-              onPress={() => setMenuOpen((open) => !open)}
-            />
           </View>
-          {menuOpen ? (
-            <View style={styles.menu}>
-              {!personalRecordsOnly() ? <Pressable accessibilityRole="button" accessibilityLabel={tr('电子册')} style={styles.hit} onPress={() => router.push(`/albums/${albumId}/print`)}><Text style={styles.action}>{tr('电子册')}</Text></Pressable> : null}
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={tr("删除这一册")}
-                testID="life-album-delete"
-                disabled={busy}
-                onPress={() => {
-                  if (busyRef.current) return;
-                  setMenuOpen(false);
-                  Alert.alert(tr("删除这一册"), ALBUM_DELETE_CONFIRM, [
-                    { text: tr("取消"), style: 'cancel' },
-                    {
-                      text: tr("删除这一册"),
-                      style: 'destructive',
-                      onPress: () => {
-                        if (busyRef.current) return;
-                        void run(async (app) => {
-                          await app.deleteAlbum(albumId);
-                          router.dismissTo('/albums');
-                        });
-                      },
-                    },
-                  ]);
-                }}
-                style={styles.hit}
-              >
-                <Text style={[styles.danger, busy && styles.disabled]}>{tr("删除这一册")}</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <AlbumManageToolbar editing={editing} organizing={organizing} busy={busy} onEdit={()=>{if(editing)closeEditor();else {setMenuOpen(false);setEditing(true);}}} onOrganize={()=>{setMenuOpen(false);setOrganizing(value=>!value);}}/>
+          {!editing&&!organizing ? <View style={styles.primaryActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('翻阅')} testID="life-album-preview-open" accessibilityState={{disabled:busy||!canOpenAlbumPreview(view.entries.length)}} disabled={busy||!canOpenAlbumPreview(view.entries.length)} onPress={()=>{setMenuOpen(false);router.push(`/albums/${albumId}/${personalRecordsOnly()?'read':'preview'}`);}} style={[styles.primaryHit,(!view.entries.length||busy)&&styles.disabled]}><LifeIcon name="lookback" size={20}/><Text style={styles.primaryLabel}>{tr('翻阅')}</Text><LifeIcon name="open" size={15}/></Pressable>
+            {!personalRecordsOnly()?<Pressable accessibilityRole="button" accessibilityLabel={tr('保存与分享')} testID="life-album-export-open" disabled={busy} onPress={()=>{setMenuOpen(false);router.push(`/albums/${albumId}/print`);}} style={[styles.primaryHit,styles.secondaryHit,busy&&styles.disabled]}><LifeIcon name="share" size={18}/><Text style={styles.secondaryLabel}>{tr('保存与分享')}</Text></Pressable>:null}
+          </View> : null}
+          {!view.entries.length?<Text style={styles.hint}>{ALBUM_PREVIEW_EMPTY}</Text>:null}
           {editing ? (
             <View testID="life-album-editor" style={styles.edit}>
               <AlbumEditorFields name={name} opening={opening} busy={busy} onName={setName} onOpening={setOpening} onSaveName={()=>{if(!busyRef.current)void run(app=>app.updateAlbum({albumId,name}),'name');}} onSaveOpening={()=>{if(!busyRef.current)void run(app=>app.updateAlbum({albumId,opening}),'opening');}}/>
@@ -263,7 +217,7 @@ export default function LifeAlbumManageScreen() {
               />
             </View>
           ) : null}
-          {view.entries.map((entry, index) => (
+          {organizing ? view.entries.map((entry, index) => (
             <AlbumEntryRow
               key={entry.momentId}
               entry={entry}
@@ -288,7 +242,7 @@ export default function LifeAlbumManageScreen() {
                 void run((app) => app.withdrawAlbumEntry({ albumId, momentId: entry.momentId }));
               }}
             />
-          ))}
+          )) : !editing ? <AlbumContentsPreview entries={view.entries} onOpen={entry=>router.push(momentHref(entry.momentId))}/> : null}
         </View>
       ) : null}
     </SettingsPage>
@@ -452,24 +406,27 @@ function CoverChoice({
 }
 
 const styles = StyleSheet.create({
-  block: { gap: 10, paddingTop: 24 },
+  block: { gap: 20, paddingTop: 20 },
   ...albumManageStyles,
-  previewHit: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    borderRadius: 24,
-    backgroundColor: paperDeep,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: sage,
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
-  previewLabel: { ...type.action, color: ink },
-  menu: { gap: 4 },
+  hero: { gap: 18 },
+  heroCover: { width: '100%', aspectRatio: 1.85, backgroundColor: paperDeep, overflow: 'hidden' },
+  coverQuiet: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  coverSpine: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, backgroundColor: sage, opacity: .65 },
+  heroCopy: { gap: 5 },
+  heroTitle: { ...type.title, color: ink, fontWeight: '500', marginBottom: 2 },
+  count: { ...type.meta, color: inkSoft, fontSize: 13, lineHeight: 20 },
+  primaryActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 16, rowGap: 8, paddingBottom: 8 },
+  primaryHit: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 12 },
+  primaryLabel: { ...type.action, color: ink, fontWeight: '500' },
+  secondaryHit: { paddingLeft: 16, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: hairline },
+  secondaryLabel: { ...type.meta, color: sage, flexShrink: 1 },
+  headerAction: { minWidth: 54, minHeight: 48, alignItems: 'flex-end', justifyContent: 'center' },
+  menuHit: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  menu: { gap: 2, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: hairline },
   edit: { gap: 8 },
   label: { ...type.meta, color: sage, marginTop: 4 },
   hint: { ...type.meta, color: inkSoft },
-  meta: { ...type.meta, color: inkSoft },
+  meta: { ...type.meta, color: inkSoft, fontSize: 13, lineHeight: 20 },
   body: { ...type.body, color: ink },
   excerpt: { ...type.body, color: ink },
   action: { ...type.action, color: sage },

@@ -1278,5 +1278,9 @@
   "导出暂不可用，你仍可免费预览整册。": "Export is unavailable for now. You can still preview the whole album for free.",
   "部分内容暂时读不到，原记录仍然保留。": "Some content is unavailable right now. Your records are safe.",
   "历史文件": "Previous files",
-  "电子册可以免费全屏预览；解锁后可保存与分享 EPUB。购买前会显示 Apple 提供的价格，并可恢复已有购买。": "Preview your electronic album full-screen for free. Unlock export to save and share EPUB files. Apple’s price is shown before purchase, and previous purchases can be restored."
+  "电子册可以免费全屏预览；解锁后可保存与分享 EPUB。购买前会显示 Apple 提供的价格，并可恢复已有购买。": "Preview your electronic album full-screen for free. Unlock export to save and share EPUB files. Apple’s price is shown before purchase, and previous purchases can be restored.",
+  "翻阅": "Read",
+  "保存与分享": "Save & share",
+  "整理记录": "Organize moments",
+  "连续阅读模式": "Continuous reading"
 }

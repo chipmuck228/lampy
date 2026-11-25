@@ -1,6 +1,7 @@
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import {Alert} from 'react-native';
 import LifeAlbumManageScreen from './life-album-manage-screen';
 
 const mockPush = jest.fn();
@@ -91,79 +92,79 @@ function manageView() {
   };
 }
 
-describe('life album manage screen', () => {
-  afterEach(async () => {
-    await act(async () => {
-      await Promise.resolve();
-    });
-    cleanup();
-  });
-
-  beforeEach(() => {
-    cleanup();
-    mockPush.mockReset();
-    mockUpdate.mockReset();
-    mockSetCover.mockReset();
-    mockMove.mockReset();
-    mockWithdraw.mockReset();
-    mockDelete.mockReset();
-    mockGetAlbum.mockResolvedValue(manageView());
-    mockUpdate.mockResolvedValue({
-      ...manageView(),
-      album: { ...manageView().album, name: '改过的名字' },
-    });
-    mockSetCover.mockResolvedValue(manageView());
-  });
-
-  it('shows the original note excerpt, date, and media hint', async () => {
-    const view = await render(wrap());
-    await waitFor(() => {
-      expect(view.getByTestId('life-album-entry-note-m1')).toBeTruthy();
-    });
-    expect(view.getByText('门口的风')).toBeTruthy();
-    expect(view.getByText('2026年10月1日')).toBeTruthy();
-    expect(view.getByTestId('life-album-preview-open')).toBeTruthy();
-    expect(view.queryByTestId('life-album-manage-name')).toBeNull();
-    expect(view.queryByTestId('life-album-move-up-m1')).toBeNull();
-    expect(view.queryByText('删除这一册')).toBeNull();
-    expect(view.getByText('1条 · 2026年10月1日')).toBeTruthy();
-  });
-
-  it('keeps an unsaved opening after cover and rename', async () => {
-    const view = await render(wrap());
-    await waitFor(() => {
-      expect(view.getByTestId('life-album-edit')).toBeTruthy();
-    });
-    fireEvent.press(view.getByTestId('life-album-preview-open'));
-    expect(mockPush).toHaveBeenCalledWith('/albums/album_1/read');
-    fireEvent.press(view.getByTestId('life-album-entry-open-m1'));
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/moment/[id]', params: { id: 'm1' } });
-    fireEvent.press(view.getByTestId('life-album-edit'));
-    fireEvent.press(view.getByTestId('life-album-organize'));
-    await waitFor(() => {
-      expect(view.getByTestId('life-album-manage-opening')).toBeTruthy();
-      expect(view.getByTestId('life-album-cover-words')).toBeTruthy();
-      expect(view.getByTestId('life-album-move-up-m1')).toBeTruthy();
-    });
-    expect(view.getByText('这张照片现在看不到')).toBeTruthy();
-    fireEvent.press(view.getByTestId('life-album-cover-asset_missing'));
-    expect(mockSetCover).not.toHaveBeenCalled();
-    expect(view.getByTestId('life-album-move-up-m1').props.accessibilityState).toEqual(
-      expect.objectContaining({ disabled: true }),
-    );
-    fireEvent.press(view.getByTestId('life-album-move-up-m1'));
-    expect(mockMove).not.toHaveBeenCalled();
-    await act(async () => {
-      fireEvent.press(view.getByTestId('life-album-cover-words'));
-    });
-    await waitFor(() => {
-      expect(mockSetCover).toHaveBeenCalled();
-    });
-    await act(async () => {
-      fireEvent.press(view.getByTestId('life-album-manage-save-name'));
-    });
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalled();
-    });
-  });
+describe('life album overview',()=>{
+ beforeEach(async()=>{
+  await cleanup();jest.clearAllMocks();
+  mockGetAlbum.mockResolvedValue(manageView());
+  mockUpdate.mockResolvedValue({...manageView(),album:{...manageView().album,name:'改过的名字'}});
+  mockSetCover.mockResolvedValue(manageView());mockMove.mockResolvedValue(manageView());mockWithdraw.mockResolvedValue(manageView());
+ });
+ afterEach(async()=>{await cleanup();jest.restoreAllMocks();});
+ async function open(){const page=await render(wrap());await waitFor(()=>expect(page.getByText('门口的风')).toBeTruthy());return page;}
+ async function menu(page:Awaited<ReturnType<typeof open>>){await fireEvent.press(page.getByTestId('life-album-manage-menu'));}
+ it('shows one album name, quiet metadata and only two primary actions',async()=>{
+  const page=await open();
+  expect(page.getAllByText('一些日子')).toHaveLength(1);
+  expect(page.getByTestId('life-album-date-range').props.children).toBe('2026年10月1日');
+  expect(page.getByText('1条')).toBeTruthy();
+  expect(page.getByTestId('life-album-preview-open')).toBeTruthy();
+  expect(page.getByTestId('life-album-export-open')).toBeTruthy();
+  expect(page.queryByTestId('life-album-edit')).toBeNull();
+  expect(page.queryByTestId('life-album-organize')).toBeNull();
+  expect(page.queryByTestId('life-album-delete')).toBeNull();
+  expect(page.queryByTestId('life-album-move-up-m1')).toBeNull();
+  expect(page.getByTestId('life-album-entry-note-m1').props.numberOfLines).toBe(2);
+ });
+ it('opens free EPUB reading directly and leaves save/share behind the existing export gate',async()=>{
+  const page=await open();
+  await fireEvent.press(page.getByTestId('life-album-preview-open'));
+  expect(mockPush).toHaveBeenCalledWith('/albums/album_1/preview');
+  await fireEvent.press(page.getByTestId('life-album-export-open'));
+  expect(mockPush).toHaveBeenCalledWith('/albums/album_1/print');
+  await fireEvent.press(page.getByTestId('life-album-entry-open-m1'));
+  expect(mockPush).toHaveBeenCalledWith({pathname:'/moment/[id]',params:{id:'m1'}});
+ });
+ it('collects management and continuous reading under one menu',async()=>{
+  const page=await open();await menu(page);
+  for(const id of ['life-album-edit','life-album-organize','life-album-delete','life-album-continuous-open'])expect(page.getByTestId(id)).toBeTruthy();
+  await fireEvent.press(page.getByTestId('life-album-continuous-open'));
+  expect(mockPush).toHaveBeenCalledWith('/albums/album_1/read');
+  expect(page.queryByTestId('life-album-menu')).toBeNull();
+ });
+ it('keeps an unsaved opening through cover and name saves, then explicitly cancels editing',async()=>{
+  const page=await open();await menu(page);await fireEvent.press(page.getByTestId('life-album-edit'));
+  expect(page.queryByTestId('life-album-contents')).toBeNull();
+  expect(page.queryByTestId('life-album-organize')).toBeNull();
+  await fireEvent.changeText(page.getByTestId('life-album-manage-opening'),'暂未保存的开篇');
+  await fireEvent.press(page.getByTestId('life-album-cover-asset_missing'));
+  expect(mockSetCover).not.toHaveBeenCalled();
+  await fireEvent.press(page.getByTestId('life-album-cover-words'));
+  await waitFor(()=>expect(mockSetCover).toHaveBeenCalled());
+  await fireEvent.press(page.getByTestId('life-album-manage-save-name'));
+  await waitFor(()=>expect(mockUpdate).toHaveBeenCalled());
+  expect(page.getByTestId('life-album-manage-opening').props.value).toBe('暂未保存的开篇');
+  await fireEvent.press(page.getByTestId('life-album-cancel-edit'));
+  expect(page.queryByTestId('life-album-editor')).toBeNull();
+  expect(page.getByTestId('life-album-contents')).toBeTruthy();
+ });
+ it('exposes move and remove only while organizing and restores the overview on done',async()=>{
+  const page=await open();await menu(page);await fireEvent.press(page.getByTestId('life-album-organize'));
+  expect(page.queryByTestId('life-album-contents')).toBeNull();
+  expect(page.getByTestId('life-album-move-up-m1').props.accessibilityState.disabled).toBe(true);
+  await fireEvent.press(page.getByTestId('life-album-move-up-m1'));expect(mockMove).not.toHaveBeenCalled();
+  await fireEvent.press(page.getByTestId('life-album-remove-m1'));await waitFor(()=>expect(mockWithdraw).toHaveBeenCalledWith({albumId:'album_1',momentId:'m1'}));
+  await fireEvent.press(page.getByTestId('life-album-organize-done'));
+  expect(page.queryByTestId('life-album-remove-m1')).toBeNull();expect(page.getByTestId('life-album-contents')).toBeTruthy();
+ });
+ it('retains album deletion confirmation and does not delete on menu selection alone',async()=>{
+  const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
+  const page=await open();await menu(page);await fireEvent.press(page.getByTestId('life-album-delete'));
+  expect(alert).toHaveBeenCalled();expect(mockDelete).not.toHaveBeenCalled();
+ });
+ it('keeps an empty album manageable without opening an empty reader',async()=>{
+  mockGetAlbum.mockResolvedValue({...manageView(),entries:[]});
+  const page=await render(wrap());await waitFor(()=>expect(page.getByText('一些日子')).toBeTruthy());
+  expect(page.getByTestId('life-album-preview-open').props.accessibilityState.disabled).toBe(true);
+  await menu(page);await fireEvent.press(page.getByTestId('life-album-edit'));expect(page.getByTestId('life-album-editor')).toBeTruthy();
+ });
 });
