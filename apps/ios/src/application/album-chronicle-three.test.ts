@@ -33,3 +33,17 @@ it('decorates prose without changing source text and reserves native audio heigh
  const prose=xml(files['OEBPS/record-1-2.xhtml']);expect(prose.querySelectorAll('.prose-quote[aria-hidden="true"]')).toHaveLength(2);
  const css=strFromU8(files['OEBPS/style.css']);expect(css).toContain('.chronicle-prose .prose-initial');expect(css).toContain('min-height:100px');
 });
+
+it.each(['zh-Hans','en'] as const)('decorates standalone prose paths in %s without losing writing or audio',language=>{
+ const sound:AlbumLayoutMediaInput={assetId:'audio',role:'audio',availability:'available',intrinsicRatio:null,durationMs:42000};
+ const note=language==='en'?('An ordinary afternoon, with light by the window. 👨‍👩‍👦 é & < >\r\n\r\n').repeat(12):('窗边的普通日子，慢慢记下来。👨‍👩‍👦 é & < >\r\n\r\n').repeat(12);
+ for(const media of [[],[sound],[sound,image(1200,1800),image(1400,932),image(1200,1587)],[image(1200,1800),sound,image(1400,932),image(1200,1587)]]){
+  const files=albumEpubDocuments({...options(media,note),language});
+  const docs=Object.entries(files).filter(([n])=>/OEBPS\/record-.*xhtml$/.test(n)).map(([,v])=>xml(v));
+  expect(docs.flatMap(d=>[...d.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).join('')).toBe(note);
+  const prose=docs.filter(d=>d.querySelector('.fixed-prose')&&!d.querySelector('img'));
+  expect(prose.length).toBeGreaterThan(0);
+  for(const d of prose){expect(d.querySelector('.chronicle-prose-page')).not.toBeNull();expect(d.querySelector('.prose-initial')).not.toBeNull();expect(d.querySelectorAll('.prose-quote')).toHaveLength(2);expect(d.querySelector('.prose-end-rule')).not.toBeNull();expect(d.querySelector('.fixed-meta')).toBeNull();}
+  expect(docs.flatMap(d=>[...d.querySelectorAll('audio')])).toHaveLength(media.filter(m=>m.role==='audio').length);
+ }
+});

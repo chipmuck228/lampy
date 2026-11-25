@@ -102,17 +102,18 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
     let chunk=splitPublicationText(remaining,columns,lines)[0]??'';
     if(chunk.length<remaining.length){const pauses=[...chunk.matchAll(/[。！？.!?;\n]/gu)];const pause=pauses.at(-1);if(pause&&pause.index>=chunk.length*.35)chunk=chunk.slice(0,pause.index+pause[0].length);}
     remaining=remaining.slice(chunk.length);
-    return `<div class="reference-text fixed-prose" style="${style(b)}"><div>${escape(chunk)}</div></div>`;
+    return `<div class="reference-text fixed-prose" style="${style(b)}"><div>${escape(chunk).replace(/\r/g,'&#13;')}</div></div>`;
    }).join('');
    addRecord(`<section class="reference-composition ${composition.kind}">${pictures.join('')}${prose}</section>`);
-   for(const chunk of splitPublicationText(remaining,30,14))addRecord(`<div class="text-only"><div class="fixed-prose">${escape(chunk)}</div></div>`);
+   chronicleProsePages(remaining).forEach((chunk,i)=>addRecord(chronicleProseBody(chunk,record,i,language,escape),false));
    return;
   }
   const first=record.media[0]?.role==='image'?record.media[0]:null;
   const chunks=splitPublicationText(record.note,first?15:30,14);
   readingPage=name();
-  if(first){addRecord(`<div class="photo-pane">${photo(0,first)}</div><div class="text-pane"><div class="fixed-prose">${escape(chunks.shift()??'')}</div></div>`);}
-  while(chunks.length)addRecord(`<div class="text-only"><div class="fixed-prose">${escape(chunks.shift()!)}</div></div>`);
+  if(first){addRecord(`<div class="photo-pane">${photo(0,first)}</div><div class="text-pane"><div class="fixed-prose">${escape(chunks.shift()??'').replace(/\r/g,'&#13;')}</div></div>`);}
+  const remainingText=first?chunks.join(''):record.note;
+  chronicleProsePages(remainingText).forEach((chunk,i)=>addRecord(chronicleProseBody(chunk,record,i,language,escape)+(i===0&&record.attribution?`<p class="chronicle-attribution">${escape(record.attribution)}</p>`:''),false));
   for(let i=first?1:0;i<record.media.length;i++){
    readingPage=name();
    const media=record.media[i];

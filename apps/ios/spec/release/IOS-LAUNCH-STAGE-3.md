@@ -187,3 +187,8 @@ Approved three-photo wall now uses prepared dimensions to compare row, side-stac
 Long prose retains exact source text and pagination, adding a large first letter, decorative paired quotation marks outside the source text, a closing rule, masthead and folio. Audio pages reserve an explicit 100px native controls box plus 100px bottom padding; controls remain independent and non-autoplay. This addresses missing layout reservation; actual Books controls, scaling and playback require device acceptance.
 
 Reproduce production proof: `node scripts/publication-three-acceptance.cjs NEW_OUTPUT_DIR`. No HTML/CSS substitution. TypeScript and 61 focused tests pass; 19 Chinese/English production record pages render within page bounds. Keep PR draft, no merge.
+
+
+### Standalone prose routing correction (2026-11-25)
+
+Device feedback exposed incomplete routing in 2991b26: text-only moments, text-plus-audio moments and generic composition continuations still emitted legacy text-only pages. All standalone prose now uses chronicleProsePages/chronicleProseBody, including conservative paragraph budgets, enlarged grapheme, decorative quotes and closing rule. Grouped brief daily notes and inline photo captions keep their respective compositions. Regression tests cover Chinese/English, Unicode/CRLF preservation and mixed audio/image fallback paths. Actual device rendering remains unverified.
