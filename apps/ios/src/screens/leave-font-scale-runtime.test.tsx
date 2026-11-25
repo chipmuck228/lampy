@@ -90,7 +90,7 @@ async function expectFixedType(
     expect(view.getByTestId('composer-actions-mode').props.children).toBe(mode);
   });
   expect(view.getByTestId('composer-note').props.allowFontScaling).toBe(false);
-  expect((StyleSheet.flatten(view.getByTestId('composer-note').props.style) as { fontSize?: number }).fontSize).toBe(17);
+  expect((StyleSheet.flatten(view.getByTestId('composer-note').props.style) as { fontSize?: number }).fontSize).toBe(18);
 }
 
 describe('leave keeps a fixed type scale when the system type changes', () => {

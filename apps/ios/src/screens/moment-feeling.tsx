@@ -5,24 +5,28 @@ import { Text } from './life-text';
 
 import { FEELING_VOCABULARY, type FeelingView } from '../application/feeling';
 import { LifeIcon } from './life-icons';
+import {ink,inkSoft,sage} from './life-page';
 
 export function FeelingPicker({
   value,
   disabled,
   onChange,
   layoutRevision,
+  appearance,
 }: {
   value: string;
   disabled?: boolean;
   onChange: (next: string) => void;
   layoutRevision?: number;
+  appearance?: 'capture';
 }) {
+  const capture=appearance==='capture';
   const selected = value.trim();
   const [open, setOpen] = useState(false);
   const chipsVisible = !selected || open;
 
   return (
-    <View style={styles.block}>
+    <View style={[styles.block,capture&&captureStyles.block]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={selected ? tr("当时的感受，{0}", [feelingLabel(selected)]) : tr("当时的感受")}
@@ -33,7 +37,7 @@ export function FeelingPicker({
         style={styles.toggleHit}
       >
         <View style={styles.toggleRow}>
-          <Text key={`feeling-heading-${layoutRevision ?? 1}`} style={styles.heading}>
+          <Text key={`feeling-heading-${layoutRevision ?? 1}`} style={[styles.heading,capture&&captureStyles.heading]}>
             {(selected ? feelingLabel(selected) : '') || tr("当时的感受")}
           </Text>
           <LifeIcon name={chipsVisible ? 'collapse' : 'expand'} size={14} decorative />
@@ -55,9 +59,9 @@ export function FeelingPicker({
                 testID={`composer-feeling-${word}`}
                 disabled={disabled}
                 onPress={() => onChange(isSelected ? '' : word)}
-                style={[styles.chip, isSelected && styles.chipSelected]}
+                style={[styles.chip, isSelected && styles.chipSelected,capture&&captureStyles.chip,capture&&isSelected&&captureStyles.selected]}
               >
-                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{feelingLabel(word)}</Text>
+                <Text style={[styles.chipText, isSelected && styles.chipTextSelected,capture&&captureStyles.text,capture&&isSelected&&captureStyles.selectedText]}>{feelingLabel(word)}</Text>
               </Pressable>
             );
           })}
@@ -72,7 +76,7 @@ export function FeelingPicker({
           onPress={() => onChange('')}
           style={styles.clearHit}
         >
-          <Text style={styles.clear}>{tr("清除")}</Text>
+          <Text style={[styles.clear,capture&&captureStyles.clear]}>{tr("清除")}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -136,4 +140,12 @@ const styles = StyleSheet.create({
   clearHit: { minHeight: 48, justifyContent: 'center' },
   clear: { fontSize: 16, lineHeight: 22, color: '#53604F' },
   display: { fontSize: 14, color: '#5C5851' },
+});
+
+const captureStyles=StyleSheet.create({
+ block:{gap:6},heading:{fontSize:15,lineHeight:24,color:inkSoft},
+ chip:{minWidth:'22%',borderRadius:7,borderColor:'transparent',paddingHorizontal:12},
+ selected:{backgroundColor:'#E1E5D5',borderColor:'transparent'},
+ text:{color:sage},selectedText:{color:ink,fontWeight:'500',textDecorationLine:'none'},
+ clear:{fontSize:13,lineHeight:20,color:inkSoft},
 });

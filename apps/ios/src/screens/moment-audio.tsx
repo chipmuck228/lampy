@@ -289,6 +289,7 @@ export function DraftSoundBar({
   disabled,
   removeDisabled,
   layoutRevision,
+  appearance,
   onStart,
   onStop,
   onPlay,
@@ -304,6 +305,7 @@ export function DraftSoundBar({
   disabled: boolean;
   removeDisabled?: boolean;
   layoutRevision?: number;
+  appearance?: 'capture';
   onStart: () => void;
   onStop: () => void;
   onPlay: () => void;
@@ -311,15 +313,16 @@ export function DraftSoundBar({
   onRerecord: () => void;
   onRemove: () => void;
 }) {
+  const capture=appearance==='capture';
   const elapsedLabel = formatSoundDuration(elapsedMs);
 
   if (phase === 'recording') {
     return (
-      <View style={styles.block}>
+      <View style={[styles.block,capture&&styles.captureBlock]}>
         <Text
           accessibilityLiveRegion="polite"
           accessibilityLabel={tr("正在录，{0}", [elapsedLabel])}
-          style={styles.recording}
+          style={[styles.recording,capture&&styles.captureRecording]}
         >
           {tr("正在录 ·")}{' '}{elapsedLabel}
         </Text>
@@ -345,7 +348,7 @@ export function DraftSoundBar({
 
   if (audio) {
     return (
-      <View style={styles.block}>
+      <View style={[styles.block,capture&&styles.captureBlock]}>
         {phase === 'failed' ? (
           <Text style={styles.missing}>{tr("这次没有录下声音。已经写的字和照片还在。")}</Text>
         ) : null}
@@ -357,7 +360,7 @@ export function DraftSoundBar({
           onPause={onPause}
           testIDPrefix="composer-sound"
         />
-        <View style={styles.row}>
+        <View style={[styles.row,capture&&styles.captureRow]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr("重录")}
@@ -385,9 +388,10 @@ export function DraftSoundBar({
 
   if (phase === 'failed') {
     return (
-      <View style={styles.block}>
+      <View style={[styles.block,capture&&styles.captureBlock]}>
         <Text style={styles.missing}>{tr("这次没有录下声音。已经写的字和照片还在。")}</Text>
         <LifeLabeledHit
+          appearance={appearance}
           layoutRevision={layoutRevision}
           icon="record"
           label={tr("录音")}
@@ -401,6 +405,7 @@ export function DraftSoundBar({
 
   return (
     <LifeLabeledHit
+      appearance={appearance}
       layoutRevision={layoutRevision}
       icon="record"
       label={tr("录音")}
@@ -412,6 +417,9 @@ export function DraftSoundBar({
 }
 
 const styles = StyleSheet.create({
+  captureBlock: { paddingVertical: 8, gap: 12 },
+  captureRecording: { fontVariant: ['tabular-nums'], color: sage },
+  captureRow: { gap: 20, alignItems: 'center' },
   block: { gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   hit: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },

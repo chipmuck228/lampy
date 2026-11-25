@@ -4,8 +4,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import type { ImageView } from '../application/use-cases';
-import { clay } from './life-page';
+import { clay,inkSoft,paper } from './life-page';
 import { Text } from './life-text';
+import {LifeIcon} from './life-icons';
 
 export const RECENT_IMAGE_PAIR_MIN_WIDTH = 280;
 
@@ -71,14 +72,17 @@ function ImageSlot({
   onRemoveImage,
   paired,
   wrapAvailable,
+  appearance,
 }: {
   image: ImageView;
   testIDPrefix: string;
   onRemoveImage?: (assetId: string) => void;
   paired?: boolean;
   wrapAvailable?: (image: ImageView, slot: ReactNode) => ReactNode;
+  appearance?: 'capture';
 }) {
-  const ratio = momentImageAspectRatio(image);
+  const capture=appearance==='capture';
+  const ratio = capture?4/3:momentImageAspectRatio(image);
   const available = image.status === 'available' && !!image.uri;
   const frame = (
       <View
@@ -88,14 +92,14 @@ function ImageSlot({
           available ? image.label : `${image.label}。${image.unavailableLabel}`
         }
         testID={`${testIDPrefix}-frame-${image.id}`}
-        style={available ? [styles.frame, { aspectRatio: ratio }] : styles.missingFrame}
+        style={available ? [styles.frame, { aspectRatio: ratio },capture&&styles.captureFrame] : [styles.missingFrame,capture&&styles.captureFrame]}
       >
         {available ? (
           <Image
             testID={`${testIDPrefix}-${image.id}`}
             source={{ uri: image.uri }}
             style={[styles.image, { aspectRatio: ratio }]}
-            contentFit="cover"
+            contentFit={capture?'contain':'cover'}
             accessible={false}
           />
         ) : (
@@ -118,9 +122,9 @@ function ImageSlot({
           onPress={() => {
             onRemoveImage(image.id);
           }}
-          style={styles.removeHit}
+          style={[styles.removeHit,capture&&available&&styles.captureRemoveHit]}
         >
-          <Text style={styles.remove}>{tr("移除这张照片")}</Text>
+          {capture&&available?<View style={styles.captureRemoveMark}><LifeIcon name="clear" size={20} color={inkSoft} decorative/></View>:<Text style={styles.remove}>{tr("移除这张照片")}</Text>}
         </Pressable>
       ) : null}
     </View>
@@ -133,26 +137,29 @@ export function MomentImages({
   onRemoveImage,
   rhythm = false,
   wrapAvailable,
+  appearance,
 }: {
   images: ImageView[];
   testIDPrefix: string;
   onRemoveImage?: (assetId: string) => void;
   rhythm?: boolean;
   wrapAvailable?: (image: ImageView, slot: ReactNode) => ReactNode;
+  appearance?: 'capture';
 }) {
   if (images.length === 0) return null;
 
-  const bands = rhythm
+  const capture=appearance==='capture';
+  const bands = rhythm && !capture
     ? detailImageBands(images)
     : images.map((image) => ({ kind: 'solo' as const, images: [image] }));
 
   return (
-    <View style={styles.stack}>
+    <View style={[styles.stack,capture&&styles.captureStack]}>
       {bands.map((band) => (
         <View
           key={band.images.map((image) => image.id).join('-')}
           testID={band.kind === 'pair' ? `${testIDPrefix}-band-pair` : undefined}
-          style={band.kind === 'pair' ? styles.pair : undefined}
+          style={capture?styles.captureTile:band.kind === 'pair' ? styles.pair : undefined}
         >
           {band.images.map((image) => (
             <ImageSlot
@@ -162,6 +169,7 @@ export function MomentImages({
               onRemoveImage={onRemoveImage}
               paired={band.kind === 'pair'}
               wrapAvailable={wrapAvailable}
+              appearance={appearance}
             />
           ))}
         </View>
@@ -171,6 +179,11 @@ export function MomentImages({
 }
 
 const styles = StyleSheet.create({
+  captureStack: { gap: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', rowGap: 12 },
+  captureTile: { width: '48%' },
+  captureFrame: { borderRadius: 5, backgroundColor: '#E9E5DC' },
+  captureRemoveHit: { position: 'absolute', top: 0, right: 0, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  captureRemoveMark: { width: 26, height: 26, borderRadius: 13, backgroundColor: paper, alignItems: 'center', justifyContent: 'center' },
   stack: { gap: 16, width: '100%', maxWidth: '100%', minWidth: 0 },
   pair: {
     flexDirection: 'row',

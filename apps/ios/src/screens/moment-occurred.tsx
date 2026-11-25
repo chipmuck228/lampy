@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 
 import { LifeIcon } from './life-icons';
+import {inkSoft,sage} from './life-page';
 
 import {
   isCalendarDayAfter,
@@ -36,13 +37,16 @@ export function OccurredDatePicker({
   disabled,
   onChange,
   layoutRevision,
+  appearance,
 }: {
   value: OccurredChoiceView;
   today: CalendarDayParts;
   disabled?: boolean;
   onChange: (next: OccurredDraftInput) => void;
   layoutRevision?: number;
+  appearance?: 'capture';
 }) {
+  const capture=appearance==='capture';
   const selectedDay =
     value.kind !== 'unknown' && value.year && value.month && value.day
       ? { year: value.year, month: value.month, day: value.day }
@@ -86,10 +90,10 @@ export function OccurredDatePicker({
         style={styles.toggleHit}
       >
         <View style={styles.toggleRow}>
-          <View style={styles.toggleCopy}>
-            <Text key={`occurred-heading-${layoutRevision ?? 1}`} style={styles.heading}>
+          <View style={[styles.toggleCopy,capture&&captureStyles.toggleCopy]}>
+            <Text key={`occurred-heading-${layoutRevision ?? 1}`} style={[styles.heading,capture&&captureStyles.heading]}>
               {tr("发生日期")}</Text>
-            <Text key={`occurred-chosen-${layoutRevision ?? 1}`} style={styles.chosen} accessible={false}>
+            <Text key={`occurred-chosen-${layoutRevision ?? 1}`} style={[styles.chosen,capture&&captureStyles.chosen]} accessible={false}>
               {value.label}
             </Text>
           </View>
@@ -106,9 +110,9 @@ export function OccurredDatePicker({
           testID="composer-occurred-today"
           disabled={disabled}
           onPress={() => onChange({ kind: 'today' })}
-          style={[styles.chip, value.kind === 'today' && styles.chipSelected]}
+          style={[styles.chip, value.kind === 'today' && styles.chipSelected,capture&&captureStyles.chip,capture&&value.kind==='today'&&captureStyles.selected]}
         >
-          <Text style={[styles.chipText, value.kind === 'today' && styles.chipTextSelected]}>{tr("今天")}</Text>
+          <Text style={[styles.chipText, value.kind === 'today' && styles.chipTextSelected,capture&&captureStyles.text,capture&&value.kind==='today'&&captureStyles.selectedText]}>{tr("今天")}</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -119,9 +123,9 @@ export function OccurredDatePicker({
           testID="composer-occurred-unknown"
           disabled={disabled}
           onPress={() => onChange({ kind: 'unknown' })}
-          style={[styles.chip, value.kind === 'unknown' && styles.chipSelected]}
+          style={[styles.chip, value.kind === 'unknown' && styles.chipSelected,capture&&captureStyles.chip,capture&&value.kind==='unknown'&&captureStyles.selected]}
         >
-          <Text style={[styles.chipText, value.kind === 'unknown' && styles.chipTextSelected]}>
+          <Text style={[styles.chipText, value.kind === 'unknown' && styles.chipTextSelected,capture&&captureStyles.text,capture&&value.kind==='unknown'&&captureStyles.selectedText]}>
             {tr("时间不确定")}</Text>
         </Pressable>
       </View>
@@ -210,9 +214,9 @@ export function OccurredDatePicker({
                     onChange(isToday ? { kind: 'today' } : { kind: 'day', ...parts });
                     setCalendarOpen(false);
                   }}
-                  style={[styles.dayCell, selected && styles.daySelected]}
+                  style={[styles.dayCell, selected && styles.daySelected,capture&&captureStyles.day,capture&&selected&&captureStyles.selected]}
                 >
-                  <Text style={[styles.dayText, future && styles.dayFuture, selected && styles.dayTextSelected]}>
+                  <Text style={[styles.dayText, future && styles.dayFuture, selected && styles.dayTextSelected,capture&&selected&&captureStyles.selectedText]}>
                     {day}
                   </Text>
                 </Pressable>
@@ -278,4 +282,11 @@ const styles = StyleSheet.create({
   dayText: { fontSize: 16, lineHeight: 22, color: '#25231F' },
   dayTextSelected: { textDecorationLine: 'underline' },
   dayFuture: { color: '#A7A39B' },
+});
+
+const captureStyles=StyleSheet.create({
+ toggleCopy:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',columnGap:12,rowGap:4},
+ heading:{fontSize:15,lineHeight:24,color:inkSoft},chosen:{fontSize:15,lineHeight:24,color:sage,flexShrink:1},
+ chip:{borderRadius:7,borderColor:'transparent'},selected:{backgroundColor:'#E1E5D5',borderColor:'transparent'},
+ text:{color:sage},selectedText:{color:sage,fontWeight:'500',textDecorationLine:'none'},day:{borderRadius:22},
 });

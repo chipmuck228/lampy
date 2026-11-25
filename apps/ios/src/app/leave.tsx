@@ -31,7 +31,7 @@ import {
   draftPreviewStatus,
   type RecordPhase,
 } from '../screens/moment-audio';
-import { LifeLabeledHit } from '../screens/life-icons';
+import { LifeIcon, LifeLabeledHit } from '../screens/life-icons';
 import { FeelingPicker } from '../screens/moment-feeling';
 import { OccurredDatePicker } from '../screens/moment-occurred';
 import { MomentImages } from '../screens/moment-images';
@@ -43,6 +43,7 @@ import {
   isCompactHeight,
   pageGutter,
   paper,
+  paperDeep,
   placeholder,
   readingPageWidth,
   readingWidth,
@@ -900,6 +901,7 @@ export default function LeaveScreen() {
             onPress={() => router.back()}
             style={styles.backHit}
           >
+            <LifeIcon name="back" size={18} decorative/>
             <Text style={styles.back}>{fromLookback ? tr("返回原来的位置") : tr("最近")}</Text>
           </Pressable>
           {restored ? (
@@ -963,6 +965,7 @@ export default function LeaveScreen() {
             style={[styles.input, noteBoxHeight != null ? { height: noteBoxHeight } : null]}
           />
           <MomentImages
+            appearance="capture"
             images={images}
             testIDPrefix="composer-image"
             onRemoveImage={
@@ -978,6 +981,7 @@ export default function LeaveScreen() {
             </Text>
           )}
           <DraftSoundBar
+            appearance="capture"
             phase={phase}
             elapsedMs={elapsedMs}
             audio={audio}
@@ -1004,6 +1008,7 @@ export default function LeaveScreen() {
             onRemove={removeAudio}
           />
           <FeelingPicker
+            appearance="capture"
             value={emotion}
             disabled={!draftId || composerLocked}
             onChange={(next) => {
@@ -1011,6 +1016,7 @@ export default function LeaveScreen() {
             }}
           />
           <OccurredDatePicker
+            appearance="capture"
             value={occurred}
             today={todayParts}
             disabled={!draftId || composerLocked}
@@ -1089,6 +1095,7 @@ export default function LeaveScreen() {
           >
             <View style={[styles.mediaRow, appLanguage === 'en' && styles.actionsEnglish]}>
               <LifeLabeledHit
+                appearance="capture"
                 icon="camera"
                 label={tr("拍摄")}
                 testID="composer-camera"
@@ -1098,6 +1105,7 @@ export default function LeaveScreen() {
                 }}
               />
               <LifeLabeledHit
+                appearance="capture"
                 icon="photo"
                 label={tr("照片")}
                 testID="composer-library"
@@ -1115,7 +1123,7 @@ export default function LeaveScreen() {
                 void onSave();
               }}
               disabled={composerLocked}
-              style={[styles.saveHit, stackActions && styles.saveHitStacked]}
+              style={[styles.saveHit, stackActions && styles.saveHitStacked, composerLocked && styles.saveDisabled]}
             >
               <Text style={styles.save}>{saveLabel}</Text>
             </Pressable>
@@ -1134,17 +1142,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     width: '100%',
     alignSelf: 'center',
-    gap: 20,
+    gap: 24,
   },
-  backHit: { minHeight: 44, justifyContent: 'center' },
-  back: { ...type.action, color: sage },
-  restore: { ...type.action, color: inkSoft },
+  backHit: { minHeight: 44, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6 },
+  back: { ...type.meta, color: sage },
+  restore: { ...type.meta, fontSize: 13, lineHeight: 20, color: inkSoft },
   abandonHit: { minHeight: 44, justifyContent: 'center' },
-  abandon: { ...type.action, color: clay },
+  abandon: { ...type.meta, fontSize: 13, lineHeight: 20, color: inkSoft },
   confirmRow: { flexDirection: 'row', gap: 24, marginTop: 8 },
   input: {
-    minHeight: 88,
+    minHeight: 112,
     ...type.body,
+    fontSize: 18,
     color: ink,
     padding: 0,
   },
@@ -1201,7 +1210,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 20,
   },
-  saveHit: { minHeight: 48, minWidth: 48, justifyContent: 'center', marginLeft: 'auto' },
+  saveHit: { minHeight: 48, minWidth: 88, paddingHorizontal: 22, borderRadius: 8, backgroundColor: '#E1E5D5', justifyContent: 'center', alignItems: 'center', marginLeft: 'auto' },
+  saveDisabled: { opacity: .45, backgroundColor: paperDeep },
   saveHitStacked: { marginLeft: 0, alignSelf: 'flex-start' },
-  save: { ...type.action, color: ink },
+  save: { ...type.action, fontWeight: '500', color: sage },
 });
