@@ -86,3 +86,11 @@ LAMPY_PDF_PROBE_TEXT='自选的一句中英文混排文字' bash apps/ios/script
 ```
 
 Run from the repository root on a Mac desktop session. After the unchanged 28 CoreText cases, it compares three WebKit cases. The current-font case controls the final exit status; the alternatives are diagnostics only. Timeout/load failures return nonzero. Mac WebKit execution is pending; even a Mac success cannot prove identical iOS font fallback. Inspect these results before another device install. Raw probe text is printed only for the explicitly supplied/default test sentence; normal App diagnostics remain content-free.
+
+## Mac WebKit passed; capture iPhone-only scalar difference
+
+User results for --webkit: current Baskerville + STKaitiSC-Regular, Kaiti-first, and Songti-first all have exact=true, accepted=true with no normalized scalar differences. Songti's compatibility radical normalizes correctly. This does not reproduce the iPhone sameCharacters=no case. No font substitution or relaxed acceptance is justified by this evidence.
+
+The next revision adds a native PDF_TEXT_DIFF error line in the existing local StoreKit design-test product only (`app.lampy.export.designtest`). It prints up to six unordered missing/extra Unicode scalar values per side and up to eight actual PDF font resource names. Unicode values identify the differing characters; this is character-level test diagnostics, not anonymous metadata. It does not print complete writing, Album identifiers or local file paths. Ordinary/unconfigured product exports do not enable it; explicit tests cover that gate. Native error summary reports diagnostics=yes/no.
+
+Rebuild in Xcode with the existing design-test product/signing/StoreKit and export the same Album. Report [LampyPrint] PDF_TEXT_DIFF plus the stage line. Do not repeat Mac WebKit font comparisons. If diagnostics=no appears, check the local EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID configuration instead of repeatedly exporting. The export still fails safely until the actual iPhone character mismatch is understood. No rendering/font/layout acceptance change is included in this diagnostic revision.

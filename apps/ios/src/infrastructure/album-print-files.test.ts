@@ -1,5 +1,6 @@
 import {
   createExpoAlbumPrintStore,
+  layoutAlbumPrint,
   shareSavedAlbumPrint,
 } from './album-print-files';
 import type { PrintManifest } from '../application/album-print';
@@ -101,4 +102,15 @@ it('prepares a bounded derivative once for repeated photos and removes it after 
  mockWrite.mockRejectedValueOnce(new Error('PRINT_PDF_TOO_LARGE') as never);
  await expect(store.writePdf('print_1',{printPublication:{version:1}} as import('../application/album-layout').AlbumLayout,media)).rejects.toThrow('PRINT_PDF_TOO_LARGE');
  expect(mockDelete).toHaveBeenCalledWith('file:///docs/album-print-evaluation/.building-print_1/.pdf-images/');
+});
+
+it.each([undefined,'app.lampy.export','app.lampy.export.designtest'])('restricts scalar diagnostics to the local design product (%s)',async product=>{
+ const previous=process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID;
+ try{
+  if(product)process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID=product;else delete process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID;
+  const input={album:{id:'b',schemaVersion:1,name:'Synthetic',opening:null,cover:{kind:'words'},entries:[],createdAt:'2026-11-25',updatedAt:'2026-11-25'},entries:[{momentId:'m',presence:'ready',revision:1,sourceRevisionAtCollect:1,collectedAt:'2026-11-25',recordedAt:'2026-11-25',occurredAtPrecision:'unknown',note:'Synthetic writing.',feeling:'',media:[]}]} as import('../application/album-layout-input').AlbumLayoutInput;
+  const fonts={serif:{fontName:'Songti SC'},ui:{fontName:'PingFang SC'}} as import('../../modules/lampy-album-layout').AlbumFontDiagnosis;
+  const layout=await layoutAlbumPrint(input,'plain',fonts);
+  expect(layout.printPublication?.diagnosticTextDiff===true).toBe(product==='app.lampy.export.designtest');
+ }finally{if(previous===undefined)delete process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID;else process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID=previous;}
 });

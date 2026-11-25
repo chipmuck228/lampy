@@ -158,7 +158,10 @@ export async function layoutAlbumPrint(input: import('../application/album-layou
   const dates:import('../application/album-epub').AlbumEpubOptions['dates']={};
   const clock={timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'};
   for(const entry of input.entries){const date=dateKeyAndLabel(entry,clock),match=date.key&&/^([dmy]):(\d{4})(?:-(\d{1,2}))?/.exec(date.key);if(date.label&&match)dates[entry.momentId]={label:date.label,chapter:match[3]?dateLabel(Number(match[2]),Number(match[3])):match[2]};}
-  return chroniclePdfLayout(input,fonts,appLanguage,new Date().toISOString(),dates);
+  const layout=chroniclePdfLayout(input,fonts,appLanguage,new Date().toISOString(),dates);
+  // Character-level diagnostics belong only to the existing local StoreKit design test.
+  if(process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID==='app.lampy.export.designtest'&&layout.printPublication)layout.printPublication.diagnosticTextDiff=true;
+  return layout;
 }
 export type SavedPrintSummary = Pick<
   PrintManifest,

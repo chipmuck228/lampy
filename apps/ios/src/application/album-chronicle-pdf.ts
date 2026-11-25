@@ -8,7 +8,7 @@ import type {AlbumLayoutInput} from './album-layout-input';
 import type {AlbumFontDiagnosis} from '../../modules/lampy-album-layout';
 
 export type ChroniclePdfPage={name:string;html:string;notes:string[];images:string[];audio:string[];expectedText:string[]};
-export type ChroniclePdfPublication={version:1;viewport:{width:number;height:number};css:string;symbol:string;albumName:string;opening:string;assets:{assetId:string;path:string}[];pages:ChroniclePdfPage[]};
+export type ChroniclePdfPublication={version:1;diagnosticTextDiff?:boolean;viewport:{width:number;height:number};css:string;symbol:string;albumName:string;opening:string;assets:{assetId:string;path:string}[];pages:ChroniclePdfPage[]};
 const decode=(s:string)=>s.replace(/<[^>]*>/g,'').replace(/&#13;/g,'\r').replace(/&(?:amp|lt|gt|quot|apos);/g,v=>({'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&apos;':"'"}[v]!));
 function prose(body:string):string[]{return [...body.matchAll(/<div\b[^>]*class="[^"]*\bfixed-prose\b[^"]*"[^>]*>([\s\S]*?)<\/div>/g)].map(m=>decode(m[1]));}
 /** Use exactly the EPUB page composer and CSS. PDF only removes interactive controls.

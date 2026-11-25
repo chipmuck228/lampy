@@ -167,6 +167,15 @@ private func compactChroniclePdfText(_ value: String) -> String {
     !CharacterSet.whitespacesAndNewlines.contains($0) && ![0x00AD, 0x200B, 0x2060, 0xFEFF].contains($0.value)
   }.map { String($0) }.joined()
 }
+// Bounded unordered scalar differences for explicit local design-test exports only.
+private func chronicleScalarDifference(_ from: String, _ to: String) -> String {
+  var counts: [UInt32: Int] = [:]
+  for scalar in compactChroniclePdfText(from).unicodeScalars { counts[scalar.value, default: 0] += 1 }
+  for scalar in compactChroniclePdfText(to).unicodeScalars { counts[scalar.value, default: 0] -= 1 }
+  let keys = counts.keys.sorted().filter { counts[$0, default: 0] > 0 }
+  let result = keys.prefix(6).map { String(format: "U+%04X", $0) + "x\(counts[$0]!)" }.joined(separator: ",")
+  return keys.isEmpty ? "none" : result + (keys.count > 6 ? ",truncated" : "")
+}
 private func printPageTextChecksMatch(_ checks: [[String]], in text: String) -> Bool {
   let actual = compactChroniclePdfText(text)
   return checks.allSatisfy { printSegmentsMatch($0.map(compactChroniclePdfText).filter { !$0.isEmpty }, in: actual) }
@@ -552,8 +561,14 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
         let role = index < kinds.count ? kinds[index] : "source"
         let kind = ["opening", "philosophy", "writing", "imprint", "source"].contains(role) ? role : "unknown"
         let sameCharacters = compactChroniclePdfText(required.joined()).unicodeScalars.map { $0.value }.sorted() == compactChroniclePdfText(actual).unicodeScalars.map { $0.value }.sorted()
-        NSLog("[LampyPrint] stage=CHECK_PAGE_TEXT page=%ld check=%ld kind=%@ expected=%ld extracted=%ld sameCharacters=%@ code=PDF_TEXT",
-              cursor + 1, index + 1, kind, required.joined().unicodeScalars.count, actual.unicodeScalars.count, sameCharacters ? "yes" : "no")
+        let textDiagnostics = publication["diagnosticTextDiff"] as? Bool == true
+        NSLog("[LampyPrint] stage=CHECK_PAGE_TEXT page=%ld check=%ld kind=%@ expected=%ld extracted=%ld sameCharacters=%@ diagnostics=%@ code=PDF_TEXT",
+              cursor + 1, index + 1, kind, required.joined().unicodeScalars.count, actual.unicodeScalars.count, sameCharacters ? "yes" : "no", textDiagnostics ? "yes" : "no")
+        if textDiagnostics {
+          let names = Array(Set(collectPageFonts(pdf).fonts.compactMap { $0["baseFont"] as? String })).sorted().prefix(8).map { String($0.prefix(80)) }.joined(separator: ",")
+          NSLog("[LampyPrint] PDF_TEXT_DIFF page=%ld check=%ld missing=%@ extra=%@ fonts=%@",
+                cursor + 1, index + 1, chronicleScalarDifference(required.joined(), actual), chronicleScalarDifference(actual, required.joined()), names)
+        }
         throw printFailure("PDF_TEXT")
       }
       pageChecks.append(check)
