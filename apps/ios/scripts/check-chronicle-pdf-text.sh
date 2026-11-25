@@ -73,13 +73,42 @@ private func fixturePdf(_ last: String) -> PDFDocument {
   context.endPDFPage(); context.closePDF()
   return PDFDocument(data:data as Data)!
 }
+print("CHRONICLE_PDF_TEXT_UNIT_OK: 21 normalization/spatial cases")
+// Diagnostic input below is synthetic fixture content, never an Album or file.
+private func diagnoseSyntheticPdf(_ page: PDFPage) {
+  let raw = page.string ?? ""
+  let ns = raw as NSString
+  print("SYNTHETIC_PDF raw=\(String(reflecting: raw)) utf16=\(ns.length) characters=\(page.numberOfCharacters)")
+  print("SYNTHETIC_PDF expected=\(String(reflecting: mixed))")
+  print("SYNTHETIC_PDF scalars=" + raw.unicodeScalars.map { String(format:"U+%04X",$0.value) }.joined(separator:" "))
+  for index in 0..<min(page.numberOfCharacters, 32) {
+    let char = index < ns.length ? ns.substring(with:NSRange(location:index,length:1)) : "<outside-string>"
+    print("SYNTHETIC_GLYPH index=\(index) text=\(String(reflecting:char)) rect=\(page.characterBounds(at:index))")
+  }
+  if let all = chroniclePdfGlyphs(page,viewportRect:nil) {
+    print("SYNTHETIC_PDF reconstructed=\(String(reflecting:chronicleSpatialText(all))) glyphs=\(all.count)")
+  } else { print("SYNTHETIC_PDF reconstruction=unavailable") }
+  if let region = chroniclePdfGlyphs(page,viewportRect:CGRect(x:0,y:0,width:1200,height:900)) {
+    print("SYNTHETIC_PDF scoped=\(String(reflecting:chronicleSpatialText(region))) glyphs=\(region.count)")
+  } else { print("SYNTHETIC_PDF scoped=unavailable") }
+}
+private func verifyPdf(_ name:String,_ expected:Bool,_ page:PDFPage) -> Bool {
+  let check = ChronicleTextCheck(parts:[mixed],viewportRect:CGRect(x:0,y:0,width:1200,height:900))
+  let result = printChronicleTextCheck(check,in:page)
+  print("PDFKIT_CASE \(name) expected=\(expected) actual=\(result)")
+  if result != expected { diagnoseSyntheticPdf(page) }
+  return result == expected
+}
 private let correct = fixturePdf("，各自休息")
-private let full = ChronicleTextCheck(parts:[mixed],viewportRect:CGRect(x:0,y:0,width:1200,height:900))
-precondition(printChronicleTextCheck(full,in:correct.page(at:0)!),"real PDF mixed text")
 private let missing = fixturePdf("，各自休")
-precondition(!printChronicleTextCheck(full,in:missing.page(at:0)!),"real PDF missing glyph")
 private let replacement = fixturePdf("，各自休跑")
-precondition(!printChronicleTextCheck(full,in:replacement.page(at:0)!),"real PDF replaced glyph")
+private let results = [verifyPdf("mixed-text",true,correct.page(at:0)!),
+                       verifyPdf("missing-glyph",false,missing.page(at:0)!),
+                       verifyPdf("replaced-glyph",false,replacement.page(at:0)!)]
+if !results.allSatisfy({ $0 }) {
+  print("CHRONICLE_PDF_TEXT_CHECKS_FAILED: \(results.filter { !$0 }.count) PDFKit cases; report SYNTHETIC_/PDFKIT_CASE lines before another device build")
+  exit(1)
+}
 print("CHRONICLE_PDF_TEXT_CHECKS_OK: 24 production Swift/PDFKit cases")
 SWIFT
 swift "$check_file"
