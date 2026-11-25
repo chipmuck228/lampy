@@ -38,7 +38,7 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(chapter)for(const leaf of chronicleDatePages(options,index,escape))add(leaf.name,leaf.title,leaf.body,leaf.nav);
   const label=`<header class="fixed-meta">${chapter?`<h2>${escape(date.chapter)}</h2>`:''}<p>${escape(date.label)}${section.indices.length===1&&record.attribution?' · '+escape(record.attribution):''}${section.indices.length===1&&record.feeling?' · '+escape(record.feeling):''}</p></header>`;
   let page=0;const name=()=>`record-${index+1}${page?'-'+(page+1):''}`;
-  const addRecord=(body:string,showHeader=true)=>{add(name(),date.chapter,`${showHeader?label:''}${body}${(photoDetails[name()]??[]).join('')}`,false);delete photoDetails[name()];page++;};
+  const addRecord=(body:string,showHeader=true)=>{add(name(),date.chapter,`${showHeader?label:''}${body}${!showHeader&&record.attribution&&!body.includes('class="chronicle-attribution"')?`<p class="chronicle-attribution">${escape(record.attribution)}</p>`:''}${(photoDetails[name()]??[]).join('')}`,false);delete photoDetails[name()];page++;};
   photoCredit=[day.label,record.attribution,record.feeling].filter(Boolean).join(' · ');
   if(section.layout==='daily-notes'&&section.indices.length>1){
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;

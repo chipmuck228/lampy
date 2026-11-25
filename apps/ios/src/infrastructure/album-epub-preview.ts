@@ -7,18 +7,23 @@ import {albumEpubDocuments,type EpubResource} from '../application/album-epub';
 import {albumReadingFingerprint} from '../application/album-reading';
 import {dateKeyAndLabel} from '../application/album-paginate';
 import {appLanguage,dateLabel} from '../i18n';
+import type {AlbumLayoutInput} from '../application/album-layout-input';
 import {epubAudioFormat} from '../application/epub-audio-format';
 export type EpubPreview={name:string;rootUri:string;pages:{name:string;uri:string}[];dispose():Promise<void>};
 /** Free, private reader cache. Never creates a saved edition or invokes purchases/share. */
 export async function createAlbumEpubPreview(albumId:string,current:()=>boolean,progress?:(fraction:number)=>void):Promise<EpubPreview>{
+ const app=await getUseCases();
+ return createEpubPreview(()=>app.readAlbumForContinuousReading(albumId,{privateUnlocked:current()}).then(r=>r.input),current,progress);
+}
+/** Shared Chronicle renderer; the source adapter owns membership and revision validation. */
+export async function createEpubPreview(read:()=>Promise<AlbumLayoutInput>,current:()=>boolean,progress?:(fraction:number)=>void):Promise<EpubPreview>{
  if(!FS.cacheDirectory)throw Error('PREVIEW_UNAVAILABLE');
  const root=`${FS.cacheDirectory}album-epub-preview/preview_${Date.now()}_${Math.random().toString(36).slice(2)}/`;
  const check=()=>{if(!current())throw Error('CANCELLED');};
  const report=(n:number)=>{if(current())try{progress?.(n);}catch{/* Presentation must not affect reading. */}};
  const dispose=()=>FS.deleteAsync(root,{idempotent:true});
  try{
-  check();const app=await getUseCases();check();
-  const original=(await app.readAlbumForContinuousReading(albumId,{privateUnlocked:current()})).input;check();
+  check();const original=await read();check();
   const fingerprint=albumReadingFingerprint(original);
   const input=JSON.parse(JSON.stringify(original)) as typeof original;
   await FS.makeDirectoryAsync(root+'OEBPS/media/',{intermediates:true});check();
@@ -48,7 +53,7 @@ export async function createAlbumEpubPreview(albumId:string,current:()=>boolean,
   for(const entry of input.entries){const d=dateKeyAndLabel(entry,clock),m=d.key&&/^([dmy]):(\d{4})(?:-(\d{1,2}))?/.exec(d.key);if(d.label&&m)dates[entry.momentId]={label:d.label,chapter:m[3]?dateLabel(Number(m[2]),Number(m[3])):m[2]};}
   const docs=albumEpubDocuments({input,assets,dates,id:'preview',createdAt:new Date().toISOString(),design:'imagebook',language:appLanguage});
   for(const [name,bytes] of Object.entries(docs)){check();await FS.writeAsStringAsync(root+name,strFromU8(bytes));}
-  const latest=(await app.readAlbumForContinuousReading(albumId,{privateUnlocked:current()})).input;check();
+  const latest=await read();check();
   if(albumReadingFingerprint(latest)!==fingerprint)throw Error('SOURCE_CHANGED');
   const order=[...strFromU8(docs['OEBPS/package.opf']).matchAll(/<itemref idref="([^"]+)"[^>]*\/>/g)].filter(m=>!m[0].includes('linear="no"')).map(m=>m[1]);
   if(!order.length||order.at(-1)!=='archive')throw Error('PREVIEW_UNAVAILABLE');

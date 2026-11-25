@@ -21,7 +21,7 @@ it('uses the personal continuous reading page, free style choices and family pap
  await fireEvent.press(page.getByText('手作'));await waitFor(()=>expect(page.getByRole('button',{name:'手作'})).toBeSelected());
  expect(familyPaperStyle('family:["a","f","book"]')).toBe('handmade');
  await fireEvent.press(page.getByText('看纸页'));
- expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-album-paper',params:{familyId:'f',albumId:'book'}});
+ expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-album-epub-preview',params:{familyId:'f',albumId:'book'}});
  expect(mockPause).toHaveBeenCalled();expect(mockPersonal).not.toHaveBeenCalled();expect(mockPersonalSave).not.toHaveBeenCalled();
 });
 it('plays family sound using the same reading controls',async()=>{

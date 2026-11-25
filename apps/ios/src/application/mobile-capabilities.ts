@@ -22,6 +22,8 @@ export const ANDROID_EXCLUDED_ROUTES = [
   'account/subscribe',
   'albums/[id]/print',
   'family',
+  'family-album-epub',
+  'family-album-epub-preview',
   'family-album-paper',
   'family-album-print',
   'family-album-reading',
