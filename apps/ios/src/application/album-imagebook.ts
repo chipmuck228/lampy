@@ -169,7 +169,7 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 
 .date-opener{position:absolute;left:180px;right:180px;top:340px}.date-opener h1{font-size:68px;line-height:1.4;font-weight:400}.date-rule{width:70px;border-top:2px solid #40564a;margin-bottom:35px}
 
-.photo-detail{display:none;position:absolute;inset:0;z-index:20;background:#faf9f5}.photo-detail:target{display:block}.photo-detail img{object-fit:contain}
+.photo-detail{display:none;position:absolute;inset:0;z-index:20;background:#faf9f5}.photo-detail:target,.photo-detail.is-open{display:block}html.photo-viewer-ready .photo-detail:target{display:none}html.photo-viewer-ready .photo-detail.is-open{display:block}.photo-detail img{object-fit:contain}
 .photo-link{display:block;width:100%;height:100%;color:inherit}.photo-link:focus{outline:2px solid #40564a;outline-offset:4px}.original-photo{position:absolute;inset:48px 64px 110px}.photo-return{position:absolute;bottom:38px;left:64px;font:22px/1.5 Georgia,serif;color:#40564a;text-decoration:none}
 .composed{position:absolute;left:64px;right:64px;top:128px;bottom:64px;display:flex;flex-direction:column;gap:30px}.composition-photos{flex:1;min-height:0;display:flex;gap:24px}.slot{flex:1;min-width:0;min-height:0}.composition-prose{font-size:26px;line-height:1.65;max-width:880px;margin:0 auto;flex:none}
 .portrait-story{flex-direction:row;gap:65px;align-items:center}.portrait-story .composition-photos{height:100%;flex:1}.portrait-story .composition-prose{flex:1;max-width:440px}.portrait-story:not(.with-note) .composition-photos{max-width:550px;margin:auto}

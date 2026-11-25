@@ -24,6 +24,21 @@ public final class LampyAlbumLayoutModule: Module {
     AsyncFunction("prepareEpubImage") { (source: String, destination: String) -> [String: Any] in
       try prepareEpubImage(source, destination)
     }
+    AsyncFunction("preparePrintImage") { (source: String, destination: String) -> [String: Any] in
+      try preparePrintImage(source, destination)
+    }
+    AsyncFunction("writeChroniclePdf") { (publication: String, media: String, destination: String, promise: Promise) in
+      DispatchQueue.main.async {
+        ChroniclePdfRenderer.start(publication, media, destination) { result in
+          switch result {
+          case .success(let value): promise.resolve(value)
+          case .failure(let error):
+            let code = (error as NSError).localizedDescription
+            promise.reject(code, code)
+          }
+        }
+      }
+    }
     AsyncFunction("printFileDigest") { (path: String) -> [String: Any] in
       try printFileDigest(path)
     }

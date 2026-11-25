@@ -37,7 +37,7 @@ it.each(['第一段。\n\n第二段。\n\n第三段。',('原样保留 👨‍�
  const docs=Object.entries(files).filter(([name])=>/OEBPS\/record-.*xhtml$/.test(name)).map(([,v])=>xml(v));
  expect(docs.flatMap(d=>[...d.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).join('')).toBe(note);
  expect(docs.every(d=>d.querySelector('.feeling-stripe')!.getAttribute('style')!.includes('#455F65'))).toBe(true);
- expect(docs.every(d=>!d.querySelector('.fixed-meta,script'))).toBe(true);
+ expect(docs.every(d=>!d.querySelector('.fixed-meta'))).toBe(true);
 });
 it('keeps a normal paragraph together and starts each prose continuation on its own decorated page',()=>{
  const p='窗边的光慢慢移过来。'.repeat(10),text=p+'\n\n'+p;

@@ -3,6 +3,7 @@ import CoreGraphics
 import CoreText
 import PDFKit
 import UIKit
+import WebKit
 
 private func printFailure(_ reason: String) -> NSError {
   NSError(domain: "LampyAlbumPrint", code: 1, userInfo: [NSLocalizedDescriptionKey: reason])
@@ -50,6 +51,7 @@ func copyPrintMedia(_ source: String, _ destination: String) throws -> [String: 
 private final class FontCollector {
   var fonts: [[String: Any]] = []
   var hasUninspectedForm = false
+  var depth = 0
 }
 private func pdfName(_ dictionary: CGPDFDictionaryRef, _ key: String) -> String {
   var name: UnsafePointer<CChar>?
@@ -74,34 +76,42 @@ private func fontStream(_ font: CGPDFDictionaryRef) -> String {
   if pdfName(font, "Subtype") == "Type3", CGPDFDictionaryGetDictionary(font, "CharProcs", &glyphs), glyphs != nil { return "CharProcs" }
   return "unknown"
 }
+private func collectResourceFonts(_ resources: CGPDFDictionaryRef, _ result: FontCollector) {
+  guard result.depth < 12 else { result.hasUninspectedForm = true; return }
+  result.depth += 1
+  defer { result.depth -= 1 }
+  var fonts: CGPDFDictionaryRef?
+  if CGPDFDictionaryGetDictionary(resources, "Font", &fonts), let fonts = fonts {
+    CGPDFDictionaryApplyFunction(fonts, { _, object, info in
+      guard let info = info else { return }
+      let result = Unmanaged<FontCollector>.fromOpaque(info).takeUnretainedValue()
+      var font: CGPDFDictionaryRef?
+      if CGPDFObjectGetValue(object, .dictionary, &font), let font = font {
+        result.fonts.append(["baseFont": pdfName(font, "BaseFont"), "subtype": pdfName(font, "Subtype"), "embedStream": fontStream(font)])
+      }
+    }, Unmanaged.passUnretained(result).toOpaque())
+  }
+  var objects: CGPDFDictionaryRef?
+  if CGPDFDictionaryGetDictionary(resources, "XObject", &objects), let objects = objects {
+    CGPDFDictionaryApplyFunction(objects, { _, object, info in
+      guard let info = info else { return }
+      let result = Unmanaged<FontCollector>.fromOpaque(info).takeUnretainedValue()
+      var stream: CGPDFStreamRef?
+      if CGPDFObjectGetValue(object, .stream, &stream), let stream = stream,
+         let dictionary = CGPDFStreamGetDictionary(stream), pdfName(dictionary, "Subtype") == "Form" {
+        var nested: CGPDFDictionaryRef?
+        if CGPDFDictionaryGetDictionary(dictionary, "Resources", &nested), let nested = nested { collectResourceFonts(nested, result) }
+        else { result.hasUninspectedForm = true }
+      }
+    }, Unmanaged.passUnretained(result).toOpaque())
+  }
+}
 private func collectPageFonts(_ pdf: CGPDFDocument) -> FontCollector {
   let result = FontCollector()
   for index in 1...pdf.numberOfPages {
-    guard let page = pdf.page(at: index), let pageDictionary = page.dictionary else { continue }
+    guard let page = pdf.page(at: index), let dictionary = page.dictionary else { continue }
     var resources: CGPDFDictionaryRef?
-    guard CGPDFDictionaryGetDictionary(pageDictionary, "Resources", &resources), let resources = resources else { continue }
-    var fonts: CGPDFDictionaryRef?
-    if CGPDFDictionaryGetDictionary(resources, "Font", &fonts), let fonts = fonts {
-      CGPDFDictionaryApplyFunction(fonts, { _, object, info in
-        guard let info = info else { return }
-        let result = Unmanaged<FontCollector>.fromOpaque(info).takeUnretainedValue()
-        var font: CGPDFDictionaryRef?
-        if CGPDFObjectGetValue(object, .dictionary, &font), let font = font {
-          result.fonts.append(["baseFont": pdfName(font, "BaseFont"), "subtype": pdfName(font, "Subtype"), "embedStream": fontStream(font)])
-        }
-      }, Unmanaged.passUnretained(result).toOpaque())
-    }
-    var objects: CGPDFDictionaryRef?
-    if CGPDFDictionaryGetDictionary(resources, "XObject", &objects), let objects = objects {
-      CGPDFDictionaryApplyFunction(objects, { _, object, info in
-        guard let info = info else { return }
-        let result = Unmanaged<FontCollector>.fromOpaque(info).takeUnretainedValue()
-        var stream: CGPDFStreamRef?
-        if CGPDFObjectGetValue(object, .stream, &stream), let stream = stream,
-           let dictionary = CGPDFStreamGetDictionary(stream),
-           pdfName(dictionary, "Subtype") == "Form" { result.hasUninspectedForm = true }
-      }, Unmanaged.passUnretained(result).toOpaque())
-    }
+    if CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources), let resources = resources { collectResourceFonts(resources, result) }
   }
   return result
 }
@@ -242,4 +252,190 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
           "widthPt": pdf.page(at: 1)?.getBoxRect(.mediaBox).width ?? 0, "heightPt": pdf.page(at: 1)?.getBoxRect(.mediaBox).height ?? 0,
           "fontsEmbedded": embedded, "fontResources": fonts.fonts, "textSelectable": selectable && colorGlyphRanges.isEmpty, "nonColorTextSelectable": selectable,
           "colorGlyphRanges": colorGlyphRanges, "emojiVisualCheckRequired": !colorGlyphRanges.isEmpty, "textCheckRevision": 4, "textCheckFailure": textCheckFailure ?? "", "fontRunNames": runs.sorted()]
+}
+
+/// New publications use the exact offline XHTML/CSS that composes Photo journal.
+/// WebKit produces vector/text PDF pages; no full-page screenshots are used.
+final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
+  private static var jobs: [UUID: ChroniclePdfRenderer] = [:] // main queue only
+  private let id = UUID()
+  private let publication: [String: Any]
+  private let pages: [[String: Any]]
+  private let media: [String: String]
+  private let target: URL
+  private let work: URL
+  private let completion: (Result<[String: Any], Error>) -> Void
+  private var webView: WKWebView?
+  private var context: CGContext?
+  private var cursor = 0
+  private var finished = false
+  private var timeout: DispatchWorkItem?
+  private var background: NSObjectProtocol?
+  private var assetByPath: [String: String] = [:]
+  private var assetBytes: [String: Int] = [:]
+  private var imageUseBytes = 0
+  private var dpiByAsset: [String: Double] = [:]
+  private var colorRanges: [[String: Int]] = []
+  private var searchableSegments: [[String]] = []
+  private let bounds = CGRect(x: 0, y: 0, width: 600, height: 450)
+
+  static func start(_ publication: String, _ media: String, _ destination: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    do {
+      let job = try ChroniclePdfRenderer(publication, media, destination, completion)
+      jobs[job.id] = job
+      job.begin()
+    } catch { completion(.failure(error)) }
+  }
+  private init(_ raw: String, _ rawMedia: String, _ destination: String, _ complete: @escaping (Result<[String: Any], Error>) -> Void) throws {
+    guard let data = raw.data(using: .utf8), let p = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+          p["version"] as? Int == 1, let list = p["pages"] as? [[String: Any]], !list.isEmpty,
+          list.first?["name"] as? String == "cover", list.last?["name"] as? String == "archive",
+          let viewport = p["viewport"] as? [String: Int], viewport["width"] == 1200, viewport["height"] == 900,
+          let bytes = rawMedia.data(using: .utf8), let sources = try JSONSerialization.jsonObject(with: bytes) as? [String: String] else { throw printFailure("INVALID_LAYOUT") }
+    publication = p; pages = list; media = sources; completion = complete
+    target = try printLocalURL(destination)
+    work = target.deletingLastPathComponent().appendingPathComponent(".chronicle-render", isDirectory: true)
+    super.init()
+  }
+  private func begin() {
+    do {
+      guard UIApplication.shared.applicationState == .active else { throw printFailure("CANCELLED") }
+      try FileManager.default.createDirectory(at: work.appendingPathComponent("media"), withIntermediateDirectories: true)
+      guard let css = publication["css"] as? String, let symbol = publication["symbol"] as? String else { throw printFailure("INVALID_LAYOUT") }
+      try css.write(to: work.appendingPathComponent("style.css"), atomically: true, encoding: .utf8)
+      try symbol.write(to: work.appendingPathComponent("lampy-symbol.svg"), atomically: true, encoding: .utf8)
+      for asset in publication["assets"] as? [[String: String]] ?? [] {
+        guard let assetId = asset["assetId"], let path = asset["path"],
+              path.range(of: "^media/asset-[0-9]+\\.jpg$", options: .regularExpression) != nil,
+              let raw = media[assetId] else { throw printFailure("INVALID_LAYOUT") }
+        let source = try printLocalURL(raw)
+        guard source.path.hasPrefix(target.deletingLastPathComponent().path + "/") else { throw printFailure("LOCAL_FILE_REQUIRED") }
+        try FileManager.default.copyItem(at: source, to: work.appendingPathComponent(path))
+        assetByPath[path] = assetId
+        assetBytes[path] = (try printFileDigest(source.path))["bytes"] as? Int ?? 0
+      }
+      for page in pages {
+        guard let name = page["name"] as? String, name.range(of: "^[a-z0-9-]+$", options: .regularExpression) != nil,
+              let html = page["html"] as? String, !html.contains("<script") else { throw printFailure("INVALID_LAYOUT") }
+        try html.write(to: work.appendingPathComponent(name + ".xhtml"), atomically: true, encoding: .utf8)
+      }
+      var box = bounds
+      guard let output = CGContext(target as CFURL, mediaBox: &box, nil) else { throw printFailure("PDF_CREATE_FAILED") }
+      context = output
+      let configuration = WKWebViewConfiguration()
+      configuration.websiteDataStore = .nonPersistent()
+      let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 1200, height: 900), configuration: configuration)
+      view.isOpaque = false; view.scrollView.isScrollEnabled = false; view.navigationDelegate = self
+      webView = view
+      background = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in self?.finish(.failure(printFailure("CANCELLED"))) }
+      loadPage()
+    } catch { finish(.failure(error)) }
+  }
+  private func loadPage() {
+    guard !finished else { return }
+    if cursor == pages.count { completePdf(); return }
+    guard UIApplication.shared.applicationState == .active, let name = pages[cursor]["name"] as? String else { finish(.failure(printFailure("CANCELLED"))); return }
+    timeout?.cancel()
+    let deadline = DispatchWorkItem { [weak self] in self?.finish(.failure(printFailure("PDF_CREATE_FAILED"))) }
+    timeout = deadline; DispatchQueue.main.asyncAfter(deadline: .now() + 45, execute: deadline)
+    webView?.loadFileURL(work.appendingPathComponent(name + ".xhtml"), allowingReadAccessTo: work)
+  }
+  func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+    if let url = navigationAction.request.url, url.isFileURL, url.standardizedFileURL.path.hasPrefix(work.path + "/") { decisionHandler(.allow) }
+    else { decisionHandler(.cancel); finish(.failure(printFailure("INVALID_LAYOUT"))) }
+  }
+  func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(.failure(printFailure("PDF_CREATE_FAILED"))) }
+  func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish(.failure(printFailure("PDF_CREATE_FAILED"))) }
+  func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { finish(.failure(printFailure("PDF_CREATE_FAILED"))) }
+  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    guard !finished, cursor < pages.count else { return }
+    let page = pages[cursor]
+    let inspect = """
+    await document.fonts.ready;
+    for(const image of document.images){if(image.decode)await image.decode();if(!image.complete||!image.naturalWidth)throw new Error('IMAGE_UNREADABLE');}
+    const texts=[],images=[];
+    const visible=el=>{for(let e=el;e;e=e.parentElement){const s=getComputedStyle(e);if(s.display==='none'||s.visibility==='hidden')return false;}return true;};
+    const inside=r=>r.left>=-4&&r.top>=-4&&r.right<=1204&&r.bottom<=904;
+    const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    while(walk.nextNode()){const n=walk.currentNode;if(!n.nodeValue.trim()||!visible(n.parentElement))continue;const range=document.createRange();range.selectNodeContents(n);const rects=Array.from(range.getClientRects());if(rects.some(r=>!inside(r)))throw new Error('INVALID_LAYOUT');if(rects.length)texts.push(n.nodeValue);}
+    for(const image of document.images){if(!visible(image))continue;const r=image.getBoundingClientRect();if(!inside(r))throw new Error('INVALID_LAYOUT');images.push({path:image.getAttribute('src'),width:image.naturalWidth,height:image.naturalHeight,w:r.width,h:r.height});}
+    const notes=recordPage?Array.from(document.querySelectorAll('.fixed-prose')).map(n=>n.textContent):[];
+    return {texts,images,notes};
+    """
+    webView.callAsyncJavaScript(inspect, arguments: ["recordPage": (page["name"] as? String ?? "").hasPrefix("record-")], in: nil, in: .page) { [weak self] result in
+      guard let self = self, !self.finished else { return }
+      do {
+        let info = try result.get() as? [String: Any]
+        guard let info = info, let notes = info["notes"] as? [String], let expected = page["notes"] as? [String],
+              notes.map(compactPdfText) == expected.map(compactPdfText) else { throw printFailure("INVALID_LAYOUT") }
+        let configuration = WKPDFConfiguration(); configuration.rect = CGRect(x: 0, y: 0, width: 1200, height: 900)
+        webView.createPDF(configuration: configuration) { [weak self] pdf in
+          guard let self = self, !self.finished else { return }
+          do { try self.append(try pdf.get(), info: info, page: page); self.cursor += 1; self.loadPage() }
+          catch { self.finish(.failure(error)) }
+        }
+      } catch { self.finish(.failure(printFailure("INVALID_LAYOUT"))) }
+    }
+  }
+  private func append(_ data: Data, info: [String: Any], page: [String: Any]) throws {
+    guard let provider = CGDataProvider(data: data as CFData), let pdf = CGPDFDocument(provider), pdf.numberOfPages == 1,
+          let source = pdf.page(at: 1), let searchable = PDFDocument(data: data), searchable.pageCount == 1, let context = context else { throw printFailure("PDF_REOPEN_FAILED") }
+    let actual = compactPdfText(searchable.page(at: 0)?.string ?? "")
+    let values = (info["texts"] as? [String] ?? []) + (page["expectedText"] as? [String] ?? [])
+    var pageSegments: [String] = []
+    for (index, value) in values.enumerated() {
+      let ranges = try printColorGlyphRanges(value, font: UIFont.systemFont(ofSize: 17))
+      for range in ranges { colorRanges.append(["page": cursor, "block": index, "line": 0, "startUTF16": range.location, "endUTF16": NSMaxRange(range)]) }
+      let required = printRequiredSegments(value, excluding: ranges)
+      guard printSegmentsMatch(required, in: actual) else { throw printFailure("PDF_TEXT") }
+      pageSegments.append(contentsOf: required)
+    }
+    searchableSegments.append(pageSegments)
+    for image in info["images"] as? [[String: Any]] ?? [] {
+      guard let path = image["path"] as? String, let assetId = assetByPath[path],
+            let width = image["width"] as? Double, let height = image["height"] as? Double,
+            let w = image["w"] as? Double, let h = image["h"] as? Double, w > 0, h > 0 else { continue }
+      let dpi = min(width * 72 / (w * 0.5), height * 72 / (h * 0.5))
+      dpiByAsset[assetId] = min(dpiByAsset[assetId] ?? dpi, dpi)
+      imageUseBytes += assetBytes[path] ?? 0
+    }
+    context.beginPDFPage(nil)
+    context.setFillColor(CGColor(red: 250.0/255.0, green: 249.0/255.0, blue: 245.0/255.0, alpha: 1)); context.fill(bounds)
+    context.saveGState(); context.concatenate(source.getDrawingTransform(.mediaBox, rect: bounds, rotate: 0, preserveAspectRatio: true)); context.drawPDFPage(source); context.restoreGState()
+    context.endPDFPage()
+  }
+  private func completePdf() {
+    do {
+      context?.closePDF(); context = nil
+      guard let final = CGPDFDocument(target as CFURL), let text = PDFDocument(url: target), final.numberOfPages == pages.count, text.pageCount == pages.count else { throw printFailure("PDF_REOPEN_FAILED") }
+      for (index, segments) in searchableSegments.enumerated() {
+        guard printSegmentsMatch(segments, in: compactPdfText(text.page(at: index)?.string ?? "")) else { throw printFailure("PDF_TEXT") }
+      }
+      let digest = try printFileDigest(target.path), bytes = digest["bytes"] as? Int ?? 0
+      // Reject a resource explosion rather than publishing another enormous PDF.
+      let budget = min(192 * 1024 * 1024, 8 * 1024 * 1024 + imageUseBytes * 3 + pages.count * 384 * 1024)
+      guard bytes > 0, bytes <= budget else { throw printFailure("PRINT_PDF_TOO_LARGE") }
+      let fonts = collectPageFonts(final)
+      let streams = fonts.fonts.map { $0["embedStream"] as? String ?? "unknown" }
+      let embedded: Any = fonts.hasUninspectedForm || streams.isEmpty || streams.contains("unknown") ? NSNull() : !streams.contains("none")
+      let names = Array(Set(fonts.fonts.compactMap { $0["baseFont"] as? String }.filter { !$0.isEmpty })).sorted()
+      guard !names.isEmpty else { throw printFailure("PDF_FONT_RUNS") }
+      finish(.success(["pageCount": pages.count, "bytes": bytes, "sha256": digest["sha256"] ?? "", "widthPt": 600, "heightPt": 450,
+                       "fontsEmbedded": embedded, "fontResources": fonts.fonts, "fontRunNames": names,
+                       "textSelectable": colorRanges.isEmpty, "nonColorTextSelectable": true, "emojiVisualCheckRequired": !colorRanges.isEmpty,
+                       "colorGlyphRanges": colorRanges, "textCheckRevision": 4,
+                       "imageDpi": dpiByAsset.map { ["assetId": $0.key, "dpi": $0.value] }]))
+    } catch { finish(.failure(error)) }
+  }
+  private func finish(_ result: Result<[String: Any], Error>) {
+    guard !finished else { return }; finished = true
+    timeout?.cancel(); timeout = nil
+    if let background = background { NotificationCenter.default.removeObserver(background) }; background = nil
+    webView?.navigationDelegate = nil; webView?.stopLoading(); webView = nil
+    context?.closePDF(); context = nil
+    try? FileManager.default.removeItem(at: work)
+    if case .failure = result { try? FileManager.default.removeItem(at: target) }
+    ChroniclePdfRenderer.jobs.removeValue(forKey: id)
+    completion(result)
+  }
 }

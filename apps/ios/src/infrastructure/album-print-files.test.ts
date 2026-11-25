@@ -8,6 +8,8 @@ const mockMove = jest.fn(async (_input: unknown) => undefined);
 const mockInfo = jest.fn(async (_path: string) => ({ exists: false }));
 const mockCopy = jest.fn(async () => ({ sha256: 'hash', bytes: 10 }));
 const mockDigest = jest.fn(async () => ({ sha256: 'pdf-hash', bytes: 20 }));
+const mockPrepare = jest.fn(async (_source:string,_destination:string)=>({width:900,height:1600,bytes:120000}));
+const mockWrite = jest.fn(async ()=>({bytes:500000}));
 const mockShare = jest.fn(async () => true);
 jest.mock('expo-file-system/legacy', () => ({
   documentDirectory: 'file:///docs/',
@@ -19,6 +21,7 @@ jest.mock('expo-file-system/legacy', () => ({
   writeAsStringAsync: jest.fn(async () => undefined),
 }));
 jest.mock('../../modules/lampy-album-layout', () => ({
+  albumChroniclePrintNative: () => ({prepareImage:mockPrepare,writePdf:mockWrite}),
   albumPrintNative: () => ({
     copyPrintMedia: mockCopy,
     printFileDigest: mockDigest,
@@ -83,4 +86,19 @@ it('a modified saved PDF is not shared', async () => {
     ),
   ).rejects.toThrow('PRINT_FILE_CHANGED');
   expect(mockShare).not.toHaveBeenCalled();
+});
+
+it('prepares a bounded derivative once for repeated photos and removes it after native render failure',async()=>{
+ const store=createExpoAlbumPrintStore();
+ const image={assetId:'p',role:'image' as const,availability:'available' as const,intrinsicRatio:.5,durationMs:null,uri:'media-0'};
+ const input={entries:[{media:[image,{...image}]}]} as unknown as import('../application/album-layout-input').AlbumLayoutInput;
+ const media={p:'file:///docs/album-print-evaluation/.building-print_1/media-0'};
+ await store.prepare!('print_1',input,media);
+ expect(mockPrepare).toHaveBeenCalledTimes(1);
+ expect(mockPrepare.mock.calls[0][0]).toBe('file:///docs/album-print-evaluation/.building-print_1/media-0');
+ expect(media.p).toContain('.pdf-images/asset-0.jpg');
+ expect(image.uri).toBe('media-0');expect(image.intrinsicRatio).toBe(900/1600);
+ mockWrite.mockRejectedValueOnce(new Error('PRINT_PDF_TOO_LARGE') as never);
+ await expect(store.writePdf('print_1',{printPublication:{version:1}} as import('../application/album-layout').AlbumLayout,media)).rejects.toThrow('PRINT_PDF_TOO_LARGE');
+ expect(mockDelete).toHaveBeenCalledWith('file:///docs/album-print-evaluation/.building-print_1/.pdf-images/');
 });

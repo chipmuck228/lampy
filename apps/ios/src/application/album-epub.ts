@@ -1,3 +1,4 @@
+import {PHOTO_VIEWER_SCRIPT} from './album-photo-viewer';
 import {selectBookCover,bookDateRange,chronologicalBook,bookDay,LAMPY_PUBLICATION_SYMBOL} from './album-book-plan';
 import {imagebookPages,IMAGEBOOK_CSS} from './album-imagebook';
 import {ALBUM_PUBLICATION_CSS} from './album-publication-css';
@@ -43,7 +44,7 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
   const manifest: string[] = []; const spine: string[] = []; const nav: string[] = [];
   const title = epubEscape(input.album.name);
   const page = (name: string, heading: string, body: string, properties = '') => {
-    files[`OEBPS/${name}.xhtml`] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${language}" xml:lang="${language}"><head><meta charset="utf-8"/>${design==='imagebook'?'<meta name="viewport" content="width=1200, height=900"/>':''}<title>${epubEscape(heading)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body class="${design}">${body}</body></html>`);
+    files[`OEBPS/${name}.xhtml`] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${language}" xml:lang="${language}"><head><meta charset="utf-8"/>${design==='imagebook'?'<meta name="viewport" content="width=1200, height=900"/>':''}<title>${epubEscape(heading)}</title><link rel="stylesheet" type="text/css" href="style.css"/>${design==='imagebook'&&body.includes('class="photo-detail"')?'<script src="photo-viewer.js" type="text/javascript"></script>':''}</head><body class="${design}">${body}</body></html>`);
     manifest.push(`<item id="${name}" href="${name}.xhtml" media-type="application/xhtml+xml"${properties ? ` properties="${properties}"` : ''}/>`);
     spine.push(`<itemref idref="${name}"/>`);
   };
@@ -67,8 +68,10 @@ export function albumEpubDocuments(options: AlbumEpubOptions): Record<string, Ui
     manifest.push(`<item id="asset-${used.size}" href="${asset.path}" media-type="${asset.mime}"${asset.path === coverPath ? ' properties="cover-image"' : ''}/>`);
   }
   if(design==='imagebook'){
+    files['OEBPS/photo-viewer.js']=strToU8(PHOTO_VIEWER_SCRIPT);
+    manifest.push('<item id="photo-viewer" href="photo-viewer.js" media-type="text/javascript"/>');
     for(const leaf of imagebookPages(options,coverPath,epubEscape)){
-      page(leaf.name,leaf.title,leaf.body,leaf.body.includes('<svg')?'svg':'');
+      page(leaf.name,leaf.title,leaf.body,[leaf.body.includes('<svg')?'svg':'',leaf.body.includes('class="photo-detail"')?'scripted':''].filter(Boolean).join(' '));
       if(leaf.linear===false)spine[spine.length-1]=`<itemref idref="${leaf.name}" linear="no"/>`;
       if(leaf.nav)nav.push(`<li><a href="${leaf.name}.xhtml">${epubEscape(leaf.title)}</a></li>`);
     }

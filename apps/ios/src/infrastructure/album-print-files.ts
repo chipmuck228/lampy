@@ -1,11 +1,13 @@
-import {decoratePrintPublication} from '../application/album-publication';
+import {chroniclePdfLayout} from '../application/album-chronicle-pdf';
+import {appLanguage,dateLabel} from '../i18n';
+import {dateKeyAndLabel} from '../application/album-paginate';
 import { acquireAlbumEdition } from './album-edition-lock';
 import {albumExportAccess} from './album-export-purchases';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
   albumPrintNative,
+  albumChroniclePrintNative,
   diagnoseAlbumFonts,
-  measureTextNative,
 } from '../../modules/lampy-album-layout';
 import { getUseCases } from '../application/container';
 import {
@@ -15,9 +17,7 @@ import {
   type PrintManifest,
   type PrintStore,
 } from '../application/album-print';
-import { paginateAlbumLayout } from '../application/album-paginate';
 import { ALBUM_SERIF_FONT, ALBUM_UI_FONT } from '../application/album-layout';
-import { ALBUM_READING_STYLES } from '../application/album-reading';
 function root() {
   if (!FileSystem.documentDirectory)
     throw new Error('PRINT_STORAGE_UNAVAILABLE');
@@ -72,7 +72,23 @@ export function createExpoAlbumPrintStore(): PrintStore {
       if ((await albumPrintNative().printFileDigest(uri)).sha256 !== expected)
         throw new Error('SOURCE_CHANGED');
     },
+    async prepare(id,input,media){
+      const native=albumChroniclePrintNative(),dir=`${directory(id)}.pdf-images/`;
+      await FileSystem.makeDirectoryAsync(dir,{intermediates:true});
+      const prepared=new Map<string,{width:number;height:number;bytes:number;path:string}>();
+      for(const entry of input.entries)for(const item of entry.media){
+        if(item.role!=='image')continue;
+        let image=prepared.get(item.assetId);
+        if(!image){const path=dir+`asset-${prepared.size}.jpg`;image={...await native.prepareImage(media[item.assetId],path),path};prepared.set(item.assetId,image);}
+        item.widthPx=image.width;item.heightPx=image.height;item.intrinsicRatio=image.width/image.height;
+        media[item.assetId]=image.path;
+      }
+    },
     async writePdf(id, layout, media) {
+      if(layout.printPublication){
+        try{return await albumChroniclePrintNative().writePdf(JSON.stringify(layout.printPublication),JSON.stringify(media),`${directory(id)}album.pdf`);}
+        finally{await FileSystem.deleteAsync(`${directory(id)}.pdf-images/`,{idempotent:true});}
+      }
       return albumPrintNative().writePrintPdf(
         JSON.stringify(layout),
         JSON.stringify(media),
@@ -138,59 +154,11 @@ export function createExpoAlbumPrint(
     layout: layoutAlbumPrint,
   });
 }
-export async function layoutAlbumPrint(input: import('../application/album-layout-input').AlbumLayoutInput, style: import('../application/album-reading').AlbumReadingStyle, fonts: NonNullable<ReturnType<typeof diagnoseAlbumFonts>>) {
-      const chineseMoments=new Set(input.entries.filter(r=>/\p{Script=Han}/u.test(r.note)).map(r=>r.momentId));
-      const bodyRequest='Kaiti SC';
-      const bodyDiagnosis=diagnoseAlbumFonts(bodyRequest,ALBUM_UI_FONT);
-      const bodyName=bodyDiagnosis?.serif.fontName??fonts.serif.fontName;
-      const layout = await paginateAlbumLayout(
-        input,
-        {
-          kind: 'core-text',
-          async measure(text, role, width) {
-            const name =
-              role.family === 'album-serif'
-                ? fonts.serif.fontName
-                : role.family==='album-ui'?fonts.ui.fontName:role.family;
-            return measureTextNative(
-              text,
-              name,
-              role.sizePt,
-              role.lineHeightPt,
-              width,
-            );
-          },
-        },
-        {
-          generatedAt: new Date().toISOString(),
-          publication:true,
-          bodyFamily:bodyName,
-          timezone: {
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          },
-        },
-      );
-      layout.fontFaces = {
-        ...layout.fontFaces,
-        serif: fonts.serif.fontName,
-        ui: fonts.ui.fontName,
-        resolvedSerif: fonts.serif,
-        resolvedUi: fonts.ui,
-      };
-      layout.pages = layout.pages.map((page) => ({
-        ...page,
-        rendering: {
-          ...page.rendering!,
-          serif: fonts.serif.fontName,
-          bodySerif:page.blocks.some(b=>b.kind==='note'&&chineseMoments.has(b.momentId))?bodyName:fonts.serif.fontName,
-          bodyFontRequest:page.blocks.some(b=>b.kind==='note'&&chineseMoments.has(b.momentId))?bodyRequest:fonts.serif.fontName,
-          ui: fonts.ui.fontName,
-          style,
-          paper: ALBUM_READING_STYLES[style].paper,
-          photoBorderWidth: ALBUM_READING_STYLES[style].photoBorderWidth,
-        },
-      }));
-      return decoratePrintPublication(layout,input);
+export async function layoutAlbumPrint(input: import('../application/album-layout-input').AlbumLayoutInput, _style: import('../application/album-reading').AlbumReadingStyle, fonts: NonNullable<ReturnType<typeof diagnoseAlbumFonts>>) {
+  const dates:import('../application/album-epub').AlbumEpubOptions['dates']={};
+  const clock={timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'};
+  for(const entry of input.entries){const date=dateKeyAndLabel(entry,clock),match=date.key&&/^([dmy]):(\d{4})(?:-(\d{1,2}))?/.exec(date.key);if(date.label&&match)dates[entry.momentId]={label:date.label,chapter:match[3]?dateLabel(Number(match[2]),Number(match[3])):match[2]};}
+  return chroniclePdfLayout(input,fonts,appLanguage,new Date().toISOString(),dates);
 }
 export type SavedPrintSummary = Pick<
   PrintManifest,

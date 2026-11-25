@@ -17,7 +17,7 @@ it('uses complete landscape pages, optional audio, default preface and final edi
  const records=order.filter(n=>n.startsWith('record-')).map(n=>xml(files['OEBPS/'+n+'.xhtml']));
  expect(records.flatMap(doc=>[...doc.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).join('')).toBe(input.entries[0].note);
  expect(records.flatMap(doc=>[...doc.querySelectorAll('.photo-link img,audio')].map(n=>n.getAttribute('src')))).toEqual(['media/photo-1.jpg','media/sound.m4a','media/photo-2.jpg']);
- for(const name of order){const doc=xml(files['OEBPS/'+name+'.xhtml']);expect(doc.querySelector('parsererror')).toBeNull();expect(doc.querySelector('meta[name="viewport"]')!.getAttribute('content')).toBe('width=1200, height=900');expect(doc.querySelector('figcaption,script')).toBeNull();}
+ for(const name of order){const doc=xml(files['OEBPS/'+name+'.xhtml']);expect(doc.querySelector('parsererror')).toBeNull();expect(doc.querySelector('meta[name="viewport"]')!.getAttribute('content')).toBe('width=1200, height=900');expect(doc.querySelector('figcaption')).toBeNull();}
  expect(xml(files['OEBPS/opening.xhtml']).body.textContent).toContain('把一些平常的日子');
  const all=order.map(n=>strFromU8(files['OEBPS/'+n+'.xhtml'])).join('');expect(all).not.toContain('private-record');expect(all).not.toContain('Opening words');expect(all).not.toContain('MOMENTS IN THESE PAGES');expect(all).not.toContain('autoplay');
 });
@@ -97,5 +97,5 @@ it('ends the physical spine at the closing page and keeps complete images in sam
    dom.window.close();
   }
  }
- expect(source.querySelector('script')).toBeNull();
+ expect(source.querySelector('script')?.getAttribute('src')).toBe('photo-viewer.js');
 });

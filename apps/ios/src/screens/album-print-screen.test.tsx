@@ -209,20 +209,12 @@ it('exposes the formal PDF entry only under its switch and surfaces the protecte
  expect(page.queryByText('开发验收入口，正式导出尚未开放。')).toBeNull();await fireEvent.press(page.getByText('生成PDF'));
  await waitFor(()=>expect(page.getByText('请先解锁导出，或恢复已有购买。')).toBeTruthy());expect(mockShare).not.toHaveBeenCalled();
 });
-it('shows the finished book with its real counts before anything is bought or generated', async () => {
+it('does not show the obsolete A5 preview for formal PDF export', async () => {
   formal();
-  mockStatus.mockResolvedValue({ owned: false, product: { id: 'app.lampy.export', name: 'Export', price: '¥18.00' } });
   const page = await render(wrap());
-  await waitFor(() => expect(page.getByText('Our days')).toBeTruthy());
-  expect(page.queryByTestId('album-export-book')).toBeNull();
   await fireEvent.press(page.getByRole('tab',{name:'PDF'}));
-  await fireEvent.press(page.getByText('看看纸页'));
-  await waitFor(() => expect(page.getByText('PDF 预览')).toBeTruthy());
-  expect(page.getByTestId('album-export-book')).toBeTruthy();
-  expect(page.getAllByText('Our days').length).toBeGreaterThan(0);
-  expect(page.getByText('2026年9月 — 10月')).toBeTruthy();
-  expect(page.getByText('2条记录 · 1张照片')).toBeTruthy();
-  expect(page.getByText('封面 · 共3页')).toBeTruthy();
+  expect(page.queryByText('看看纸页')).toBeNull();
+  expect(page.queryByTestId('album-export-book')).toBeNull();
   expect(mockSave).not.toHaveBeenCalled();
   expect(mockPurchase).not.toHaveBeenCalled();
 });

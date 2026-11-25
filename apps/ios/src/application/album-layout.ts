@@ -171,6 +171,8 @@ export type AlbumPage = {
 };
 
 export type AlbumLayout = {
+  /** Authoritative shared HTML publication for new PDF exports; blocks are legacy only. */
+  printPublication?:import('./album-chronicle-pdf').ChroniclePdfPublication;
   albumId: string;
   language?: AppLanguage;
   layoutVersion: typeof ALBUM_LAYOUT_VERSION;

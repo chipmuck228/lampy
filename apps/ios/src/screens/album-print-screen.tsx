@@ -458,7 +458,7 @@ export default function AlbumPrintScreen() {
               {(['epub','pdf'] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="tab" accessibilityLabel={tr(value === 'epub' ? '电子册' : 'PDF')} accessibilityState={{ selected: format === value, disabled: busy }} onPress={() => { setFormat(value); setPaperPreview(false); }} style={[styles.formatTab, format === value && styles.formatSelected]}><Text style={[styles.formatText, format !== value && { color: inkSoft }]}>{tr(value === 'epub' ? '电子册' : 'PDF')}</Text></Pressable>)}
             </View> : null}
             {electronicActions}{pdfActions}{operationFeedback}
-            {formal && format === 'pdf' ? <ShowcaseButton tone="quiet" label={tr(paperPreview ? '收起纸页' : '看看纸页')} disabled={busy} onPress={() => {setPrintPreview(null);setPrintPreviewFailed(false);setPaperPreview(value => !value);}} /> : null}
+            {!formal && format === 'pdf' ? <ShowcaseButton tone="quiet" label={tr(paperPreview ? '收起纸页' : '看看纸页')} disabled={busy} onPress={() => {setPrintPreview(null);setPrintPreviewFailed(false);setPaperPreview(value => !value);}} /> : null}
             {formal && paidGate && owned ? <ShowcaseUnlocked /> : null}
           </>}
           style={style}

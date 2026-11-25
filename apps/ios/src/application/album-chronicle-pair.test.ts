@@ -26,7 +26,7 @@ it.each([[160,107],[600,3600],[1400,175],[undefined,undefined],[NaN,-1]])('separ
 it('puts short writing beside the photos without a repeated date, and omits reference icons',()=>{
  const files=albumEpubDocuments(options([image('a',1200,1800),image('b',1200,1587)],'一起走过的日子。'));
  const d=xml(files['OEBPS/record-1.xhtml']);expect(d.querySelectorAll('.chronicle-pair-photo')).toHaveLength(2);expect(d.querySelector('.chronicle-pair-copy')!.textContent).toBe('一起走过的日子。');
- expect(d.querySelector('.fixed-meta,svg,script')).toBeNull();expect(d.querySelector('.pair-frame-back')).not.toBeNull();expect(d.querySelector('.pair-frame-front')).not.toBeNull();
+ expect(d.querySelector('.fixed-meta,svg')).toBeNull();expect(d.querySelector('.pair-frame-back')).not.toBeNull();expect(d.querySelector('.pair-frame-front')).not.toBeNull();
  expect(d.querySelector('.feeling-stripe')!.getAttribute('style')).toContain('#9FBAB0');expect(d.body.textContent).toContain('妈妈 & 爸爸');
 });
 it('retains full-image return anchors on each separate photo page',()=>{

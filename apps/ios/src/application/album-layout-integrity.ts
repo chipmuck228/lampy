@@ -1,3 +1,4 @@
+import {chroniclePdfIntegrity} from './album-chronicle-pdf';
 import type { AlbumLayout, AlbumPlacedBlock } from './album-layout';
 import {
   ALBUM_CONTENT_HEIGHT_PT,
@@ -25,6 +26,7 @@ function boxInsidePage(block: AlbumPlacedBlock): boolean {
 }
 
 export function albumLayoutIntegrity(layout: AlbumLayout, input: AlbumLayoutInput) {
+  if(layout.printPublication)return chroniclePdfIntegrity(layout,input);
   const notes: Record<string, { ranges: { start: number; end: number }[]; joined: string }> = {};
   const images = new Map<string, number>();
   const audios = new Map<string, number>();

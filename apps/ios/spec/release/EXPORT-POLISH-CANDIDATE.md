@@ -1,3 +1,5 @@
+> Superseded PDF geometry: the A5 adaptation described below is historical. New production PDF uses the same 4:3 Chronicle XHTML/CSS as EPUB through native WebKit, prepared ≤1600px JPEGs and the shared Lampy ending. See CHRONICLE-PDF-DEVICE-ACCEPTANCE.md for current acceptance and evidence limits. The old A5 proof is not evidence for this renderer.
+
 # Export polish and A5 print adaptation — 2026-11-25
 
 Branch: release/album-export-polish; PR #144 targets the unmerged Chronicle branch. No merge or server deploy.

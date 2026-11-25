@@ -160,3 +160,9 @@ export function albumEpubNative() {
   if (!native?.prepareEpubImage) throw new Error('EPUB_NATIVE_REBUILD_REQUIRED');
   return { prepareImage: native.prepareEpubImage.bind(native) };
 }
+
+export function albumChroniclePrintNative(){
+ const native=loadNative() as unknown as {preparePrintImage?:(source:string,destination:string)=>Promise<{width:number;height:number;bytes:number}>;writeChroniclePdf?:(publication:string,media:string,destination:string)=>Promise<AlbumPrintNativeResult&{imageDpi:{assetId:string;dpi:number|null}[]}>}|null;
+ if(!native?.preparePrintImage||!native.writeChroniclePdf)throw new Error('PRINT_NATIVE_REBUILD_REQUIRED');
+ return {prepareImage:native.preparePrintImage.bind(native),writePdf:native.writeChroniclePdf.bind(native)};
+}
