@@ -259,7 +259,7 @@ export function EditionProgress({fraction}:{fraction:number}){
  const percent=Math.max(0,Math.min(100,Math.round(fraction*100)));
  return <View style={styles.binding} testID="album-export-progress">
    <Text style={styles.bindingTitle} accessibilityLiveRegion="polite">{tr('正在制作这一册…')}</Text>
-   <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel={tr('制作进度')} accessibilityValue={{min:0,max:100,now:percent}}><View style={[styles.fill,{width:`${percent}%`}]} /></View>
+   <View style={styles.track} accessible accessibilityRole="progressbar" accessibilityLabel={tr('制作进度')} accessibilityValue={{min:0,max:100,now:percent}}><View style={[styles.fill,{width:`${percent}%`}]} /></View>
  </View>;
 }
 
@@ -281,7 +281,7 @@ export function BindingPanel({
       <Text style={styles.bindingTitle} accessibilityLiveRegion="polite">
         {tr('正在制作这一册…')}
       </Text>
-      <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel={tr('制作进度')} accessibilityValue={{min:0,max:100,now:Math.round(fraction*100)}}>
+      <View style={styles.track} accessible accessibilityRole="progressbar" accessibilityLabel={tr('制作进度')} accessibilityValue={{min:0,max:100,now:Math.round(fraction*100)}}>
         <Animated.View style={[styles.fill, { transform: [{ scaleX: fill }] }]} />
       </View>
       <ShowcaseButton tone="quiet" label={tr('取消')} onPress={onCancel} />

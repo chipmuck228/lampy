@@ -26,6 +26,7 @@ import {
 import { getUseCases } from '../application/container';
 import {
   createExpoAlbumPrint,
+  previewAlbumPrint,
   listSavedAlbumPrints,
   shareSavedAlbumPrint,
   summarizePrint,
@@ -98,6 +99,8 @@ export default function AlbumPrintScreen() {
   const [celebrate, setCelebrate] = useState(0);
   const [book, setBook] = useState<{ layout: AlbumLayout; media: AlbumLayoutMediaMap } | null>(null);
   const [bookFailed, setBookFailed] = useState(false);
+  const [printPreview,setPrintPreview]=useState<{layout:AlbumLayout;media:AlbumLayoutMediaMap}|null>(null);
+  const [printPreviewFailed,setPrintPreviewFailed]=useState(false);
   const [diagnostic, setDiagnostic] = useState<PrintFailureDiagnostic | null>(
     null,
   );
@@ -129,6 +132,7 @@ export default function AlbumPrintScreen() {
       setDiagnostic(null);
       setReady(false);
       setBook(null);
+      setPrintPreview(null);setPrintPreviewFailed(false);
       setBookFailed(false);
       setFresh(null);
       let layoutRequest: number | null = null;
@@ -179,6 +183,13 @@ export default function AlbumPrintScreen() {
       };
     }, [blocked, id, retry]),
   );
+  useEffect(()=>{
+    if(!formal||!paperPreview||format!=='pdf'||blocked)return;
+    let cancelled=false;const epoch=generation.current;
+    const valid=()=>!cancelled&&active.current&&!locked.current&&generation.current===epoch&&AppState.currentState==='active';
+    void previewAlbumPrint(id,style,valid).then(result=>{if(valid())setPrintPreview(result);}).catch(()=>{if(valid())setPrintPreviewFailed(true);});
+    return ()=>{cancelled=true;};
+  },[formal,paperPreview,format,blocked,id,style]);
   function current(epoch: number) {
     return (
       enabled &&
@@ -324,6 +335,7 @@ export default function AlbumPrintScreen() {
   function chooseStyle(next: AlbumReadingStyle) {
     if (busy || next === style) return;
     setStyle(next);
+    setPrintPreview(null);setPrintPreviewFailed(false);
     // Same preference as continuous reading; the reading position is kept as read.
     void saveAlbumReadingState(id, next, position.current).catch(() => undefined);
   }
@@ -436,9 +448,9 @@ export default function AlbumPrintScreen() {
     >
       {!blocked ? (
         <AlbumExportShowcase
-          layout={book?.layout ?? null}
-          media={book?.media ?? {}}
-          failed={bookFailed}
+          layout={formal&&paperPreview?printPreview?.layout??null:book?.layout??null}
+          media={formal&&paperPreview?printPreview?.media??{}:book?.media??{}}
+          failed={formal&&paperPreview?printPreviewFailed:bookFailed}
           ebookDesigns={formal}
           paperPreview={formal && format === 'pdf' && paperPreview}
           actions={<>
@@ -446,7 +458,7 @@ export default function AlbumPrintScreen() {
               {(['epub','pdf'] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="tab" accessibilityLabel={tr(value === 'epub' ? '电子册' : 'PDF')} accessibilityState={{ selected: format === value, disabled: busy }} onPress={() => { setFormat(value); setPaperPreview(false); }} style={[styles.formatTab, format === value && styles.formatSelected]}><Text style={[styles.formatText, format !== value && { color: inkSoft }]}>{tr(value === 'epub' ? '电子册' : 'PDF')}</Text></Pressable>)}
             </View> : null}
             {electronicActions}{pdfActions}{operationFeedback}
-            {formal && format === 'pdf' ? <ShowcaseButton tone="quiet" label={tr(paperPreview ? '收起纸页' : '看看纸页')} disabled={busy} onPress={() => setPaperPreview(value => !value)} /> : null}
+            {formal && format === 'pdf' ? <ShowcaseButton tone="quiet" label={tr(paperPreview ? '收起纸页' : '看看纸页')} disabled={busy} onPress={() => {setPrintPreview(null);setPrintPreviewFailed(false);setPaperPreview(value => !value);}} /> : null}
             {formal && paidGate && owned ? <ShowcaseUnlocked /> : null}
           </>}
           style={style}
@@ -470,7 +482,7 @@ export default function AlbumPrintScreen() {
           {saved.length && (!formal || format === 'pdf') ? <ShelfHeader /> : null}
           {fresh&&format==='pdf'?<Text accessibilityLiveRegion="polite" style={styles.meta}>{tr('PDF已生成。')}</Text>:null}
           {(!formal || format === 'pdf' ? saved : []).map((edition, index) => (
-            <AlbumEditionSwipeRow key={edition.id} id={edition.id} disabled={busy || blocked} onDelete={() => confirmDelete(edition.id)}><View style={styles.edition}>
+            <AlbumEditionSwipeRow key={edition.id} id={edition.id} disabled={busy || blocked} onDelete={() => confirmDelete(edition.id)} onShare={formal?()=>share(edition):undefined}><View style={styles.edition}>
               <MiniBook style={edition.style} />
               <View style={styles.editionText}>
                 <Text style={styles.title}>{edition.name}</Text>
@@ -509,6 +521,7 @@ export default function AlbumPrintScreen() {
                     {tr('部分照片打印后可能不够清晰，请先检查。')}
                   </Text>
                 ) : null}
+                {!formal ? <>
                 <ShowcaseButton
                   tone="editorial"
                   label={epubState?.id === edition.id && epubState.pending ? tr('正在制作电子册…') : tr('分享电子册')}
@@ -525,6 +538,7 @@ export default function AlbumPrintScreen() {
                   disabled={busy}
                   onPress={() => share(edition)}
                 />
+                </> : null}
               </View>
             </View></AlbumEditionSwipeRow>
           ))}

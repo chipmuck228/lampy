@@ -95,6 +95,7 @@ jest.mock('../infrastructure/album-print-files', () => ({
     mockProgress.report = progress;
     return { save: mockSave };
   },
+  previewAlbumPrint: (...args: unknown[]) => mockGenerate(...args),
   shareSavedAlbumPrint: (...args: unknown[]) => mockShare(...args),
   summarizePrint: (manifest: unknown) => manifest,
 }));
@@ -254,8 +255,8 @@ it('binding shows the reported steps, then the new edition ready to save', async
   expect(page.getByText(/第1版/)).toBeTruthy();
   expect(mockShare).not.toHaveBeenCalled();
   expect(page.queryByTestId('album-export-fresh-share')).toBeNull();
-  expect(page.getAllByText('分享或打印PDF')).toHaveLength(1);
-  await fireEvent.press(page.getByText('分享或打印PDF'));
+  expect(page.queryByText('分享或打印PDF')).toBeNull();
+  await fireEvent.press(page.getByTestId('edition-open-print_9'));
   await waitFor(() => expect(mockShare).toHaveBeenCalledTimes(1));
 });
 it('keeps the existing PDF paper preference without exposing it as an EPUB design', async () => {

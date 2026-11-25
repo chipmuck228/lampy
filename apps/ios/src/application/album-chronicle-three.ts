@@ -1,9 +1,9 @@
 import type {AlbumLayoutMediaInput,AlbumLayoutRecordInput} from './album-layout-input';
 import type {PublicationBox} from './album-photo-composition';
 import {chronicleLines,chronicleBinding} from './album-chronicle-single';
-const gap=10,box=(x:number,y:number,width:number,height:number)=>({x,y,width,height});
-function wall(s:{width:number;height:number}[]):PublicationBox[]{
- const rs=s.map(p=>p.width/p.height),b=box(64,64,1072,772),candidates:PublicationBox[][]=[];
+const box=(x:number,y:number,width:number,height:number)=>({x,y,width,height});
+export function chronicleWall(s:{width:number;height:number}[],b:PublicationBox=box(64,64,1072,772),gap=10):PublicationBox[]{
+ const rs=s.map(p=>p.width/p.height),candidates:PublicationBox[][]=[];
  const rowH=Math.min(b.height,(b.width-2*gap)/rs.reduce((a,r)=>a+r,0));let x=b.x+(b.width-rowH*rs.reduce((a,r)=>a+r,0)-2*gap)/2;
  candidates.push(rs.map(r=>{const p=box(x,b.y+(b.height-rowH)/2,rowH*r,rowH);x+=p.width+gap;return p;}));
  const inv=1/rs[1]+1/rs[2],h=Math.min(b.height,(b.width-gap+gap/inv)/(rs[0]+1/inv)),left=h*rs[0],right=(h-gap)/inv;
@@ -15,7 +15,7 @@ function wall(s:{width:number;height:number}[]):PublicationBox[]{
  const score=(p:PublicationBox[])=>{const a=p.map(p=>p.width*p.height);return .5*a.reduce((a,n)=>a+n,0)+.5*Math.min(...a)*3;};
  candidates.sort((a,b)=>score(b)-score(a));const photos=candidates[0];
  for(let i=0;i<3;i++){
-  const p=photos[i];if(p.x<63.99||p.y<63.99||p.x+p.width>1136.01||p.y+p.height>836.01||Math.abs(p.width/p.height-rs[i])>1e-8||p.width/s[i].width>2.001)throw Error('Unsafe wall geometry');
+  const p=photos[i];if(p.x<b.x-.01||p.y<b.y-.01||p.x+p.width>b.x+b.width+.01||p.y+p.height>b.y+b.height+.01||Math.abs(p.width/p.height-rs[i])>1e-8||p.width/s[i].width>2.001)throw Error('Unsafe wall geometry');
  }
  return photos;
 }
@@ -24,7 +24,7 @@ export function planChronicleThree(media:AlbumLayoutMediaInput[],note:string){
  const safe=media.length===3&&media.every(m=>Number.isSafeInteger(m.widthPx)&&Number.isSafeInteger(m.heightPx)&&m.widthPx!>=600&&m.heightPx!>=600&&m.widthPx!/m.heightPx!>=.4&&m.widthPx!/m.heightPx!<=2.5);
  if(!safe)return null;
  let photos:PublicationBox[];
- try{photos=wall(media.map(m=>({width:m.widthPx!,height:m.heightPx!})));}catch{return null;}
+ try{photos=chronicleWall(media.map(m=>({width:m.widthPx!,height:m.heightPx!})));}catch{return null;}
  const mode=!note.trim()?null:chronicleLines(note,9)<=2?'circle':chronicleLines(note,16)<=4?'rect':null;
  const minX=Math.min(...photos.map(b=>b.x)),maxX=Math.max(...photos.map(b=>b.x+b.width)),minY=Math.min(...photos.map(b=>b.y)),maxY=Math.max(...photos.map(b=>b.y+b.height));
  const overlay=mode==='circle'?box(minX+(maxX-minX)*.57-150,minY+(maxY-minY)*.36-150,300,300):mode==='rect'?box(maxX-504,maxY-282,480,250):null;

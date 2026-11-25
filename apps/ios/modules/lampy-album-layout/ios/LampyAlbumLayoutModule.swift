@@ -576,6 +576,21 @@ func drawAlbumPage(
     let font = resolveFont(name: uiName, size: 10)
     drawAlbumTextAtBaseline(text: "\(number) / \(count)", font: font, color: albumInkSoftColor(), x: bounds.width / 2 - 12, baselineY: bounds.height - 20, in: context)
   }
+  if rendering["chroniclePrint"] as? Bool == true {
+    if let edge = rendering["bindingColor"] as? String {
+      context.setFillColor(albumHexColor(edge, fallback: albumSageColor()).cgColor)
+      context.fill(CGRect(x: 18, y: 40, width: 5, height: bounds.height - 84))
+    }
+    let prose = (page["blocks"] as? [[String: Any]] ?? []).filter { $0["kind"] as? String == "note" }
+    let hasMedia = (page["blocks"] as? [[String: Any]] ?? []).contains { ["image", "audio"].contains($0["kind"] as? String ?? "") }
+    if !prose.isEmpty && !hasMedia {
+      drawPublicationText("“", font: resolveFont(name: serifName, size: 32), color: albumSageColor().withAlphaComponent(0.4), rect: CGRect(x: 2, y: 62, width: 34, height: 44))
+      drawPublicationText("”", font: resolveFont(name: serifName, size: 32), color: albumSageColor().withAlphaComponent(0.4), rect: CGRect(x: bounds.width - 36, y: bounds.height - 100, width: 34, height: 44))
+      context.setStrokeColor(albumSageColor().withAlphaComponent(0.5).cgColor)
+      context.setLineWidth(0.6)
+      context.move(to: CGPoint(x: 36, y: bounds.height - 51)); context.addLine(to: CGPoint(x: 65, y: bounds.height - 51)); context.strokePath()
+    }
+  }
   let playingAssets = Set(playing)
   let blocks = page["blocks"] as? [[String: Any]] ?? []
   for block in blocks {
@@ -617,6 +632,7 @@ func drawAlbumPage(
       continue
     }
     if kind == "feeling" {
+      if rendering["chroniclePrint"] as? Bool == true { continue }
       let value = block["value"] as? String ?? ""
       albumHexColor(block["accent"] as? String, fallback: albumSageColor()).setFill()
       context.fillEllipse(in: CGRect(x: x, y: y + 7, width: 8, height: 8))
@@ -663,7 +679,13 @@ func drawAlbumPage(
         let lineX = CGFloat(line["xPt"] as? Double ?? x)
         let baseline = CGFloat(line["baselineYPt"] as? Double ?? Double(y) + Double(font.ascender))
         let slice = sliceAlbumScalars(text, start: start, end: end)
-        drawAlbumTextAtBaseline(text: slice, font: font, color: spec.color, x: lineX, baselineY: baseline, in: context)
+        if start == 0, let initial = block["printInitial"] as? [String: Any], let count = initial["scalars"] as? Int, count > 0, count <= end {
+          let large = resolveFont(name: serifName, size: CGFloat(initial["sizePt"] as? Double ?? 34))
+          drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: 0, end: count), font: large, color: albumSageColor(), x: lineX, baselineY: baseline, in: context)
+          drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: count, end: end), font: font, color: spec.color, x: lineX + CGFloat(initial["widthPt"] as? Double ?? 44), baselineY: baseline, in: context)
+        } else {
+          drawAlbumTextAtBaseline(text: slice, font: font, color: spec.color, x: lineX, baselineY: baseline, in: context)
+        }
       }
     } else {
       let text = (block["text"] as? String)

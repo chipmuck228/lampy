@@ -103,7 +103,7 @@ export type AlbumTextLine = {
 
 export type AlbumTextRange = { start: number; end: number; unit: 'unicode-scalar' };
 
-type AlbumBlockBase = { box: AlbumBox };
+type AlbumBlockBase = { box: AlbumBox; printInitial?:{scalars:number;widthPt:number;sizePt:number} };
 
 export type AlbumPlacedBlock = AlbumBlockBase &
   (
@@ -167,7 +167,7 @@ export type AlbumPage = {
   publication?:PublicationPage;
   index: number;
   blocks: AlbumPlacedBlock[];
-  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number; pageCount?: number; pageNumbers?: boolean };
+  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number; pageCount?: number; pageNumbers?: boolean; chroniclePrint?:boolean; bindingColor?:string };
 };
 
 export type AlbumLayout = {

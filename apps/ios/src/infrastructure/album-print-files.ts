@@ -238,3 +238,16 @@ export async function shareSavedAlbumPrint(
   return await albumPrintNative().sharePrintPdf(uri);
   } finally { release(); }
 }
+
+/** Preview uses the same native measured print layout as a newly made PDF. */
+export async function previewAlbumPrint(albumId:string,style:import('../application/album-reading').AlbumReadingStyle,current:()=>boolean){
+ if(!current())throw new Error('CANCELLED');
+ const app=await getUseCases();
+ const source=await app.readAlbumForContinuousReading(albumId,{privateUnlocked:current()});
+ if(!current())throw new Error('CANCELLED');
+ const fonts=diagnoseAlbumFonts(ALBUM_SERIF_FONT,ALBUM_UI_FONT);
+ if(!fonts)throw new Error('UNAVAILABLE');
+ const layout=await layoutAlbumPrint(source.input,style,fonts);
+ if(!current())throw new Error('CANCELLED');
+ return {layout,media:source.media};
+}

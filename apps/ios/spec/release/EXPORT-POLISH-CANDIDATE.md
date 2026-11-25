@@ -1,18 +1,28 @@
-# Export polish candidate — 2026-11-25
+# Export polish and A5 print adaptation — 2026-11-25
 
-Base: 058fc84. This candidate has NOT been compiled or tested: the execution environment was unavailable. Do not merge or replace the device-tested branch until validation completes.
+Branch: release/album-export-polish; PR #144 targets the unmerged Chronicle branch. No merge or server deploy.
 
-## Source changes prepared
+## Implementation
 
-- New EPUB creation always uses imagebook (Photo journal); remove the design radio choices. Legacy saved files retain their original design and sharing paths.
-- EPUB progress is driven by snapshot/media/package/write/verify/publish callbacks. Fraction is monotonic within a job and capped below completion; no timed fake progress. Existing PDF progress gets a quieter label and an accessible progress value.
-- Revealed shelf actions use transparent paper, muted ink and SF/Material share/trash symbols, preserving confirmation and disabled states.
-- Lock cover uses Lampy, a quiet lock symbol, a short private-life line and Open Lampy. Authentication/privacy state machine is unchanged.
-- Chinese/English copy and affected screen expectations updated.
+- New personal EPUBs use Photo journal only; historical literary files retain their saved bytes and sharing path.
+- Callback-driven monotonic stage progress, quieter labels and accessible progress bars.
+- Transparent share/delete icon actions; delete confirmation and disabled behaviour retained. Formal PDF rows share on tap and reveal share/delete on swipe. Developer PDF-to-EPUB controls remain only in the evaluation UI.
+- Lock cover copy simplified; authentication/privacy state machine remains unchanged.
+- Formal PDF preview reads current source and uses the same native measured layout as PDF export.
+- A5 portrait print adaptation: separate moment pages, full-aspect single-photo plates, two-photo staggered non-overlapping composition, shared Chronicle three-photo wall geometry, safe independent plates for small/extreme/unknown dimensions. This is a print adaptation, not the landscape EPUB overlap/overlay design.
+- Photos precede writing. A caption fitting at most two native measured lines stays below the photographs; long prose uses at most nine measured lines per block/page, 32pt leading, top/bottom breathing room, enlarged first grapheme, paired decorative quotes and a closing rule. Source text/ranges are unchanged; line layout reserves room for the large glyph. Larger glyph font usage is included in native font inspection.
+- New print pages use warm paper and the Chronicle feeling stripe; printed feeling labels are replaced by the stripe. Existing saved PDFs and in-app continuous pagination are unchanged.
 
-## Still outstanding
+## Validation and remaining work
 
-- TypeScript, lint, UI suites, screen snapshots and iPhone install.
-- Recheck no progress regression when stages re-enter per media, no progress on failed/cancelled job, and no success before SHARE.
-- Whole-row PDF sharing / consolidation is not changed in this candidate; legacy PDF-row actions remain.
-- PDF composition redesign is NOT implemented. It must be done with native measured text, shared photo planning and the PDF renderer/integrity checks available. Preserve A5 print margins, source writing/emoji, aspect ratios, no missing media, non-playable sound markers and immutable historical files. Do not claim the current PDF equals Chronicle EPUB.
+TypeScript, ESLint and 12 related suites / 157 tests pass in the execution environment. Automated integrity checks enforce complete text/ranges, each image/audio once, aspect ratios, printable bounds and no content-box overlap. Static proof uses an explicitly labelled glyph-width test double and a non-native PDF renderer. It does not validate iOS font resolution or native selectable-text extraction.
+
+Xcode/iPhone compilation, native PDF text/emoji checks, printing and Books controls remain device acceptance. Rebuild native code for the new initial/decoration drawing; do not validate only with a Metro reload. Create NEW PDF/EPUB editions. Keep draft until those checks complete.
+
+## Static proof
+
+`LAMPY_PRINT_PROOF_OUTPUT=/tmp/lampy-print-proof.json npx jest --runInBand src/application/album-publication.test.ts`
+
+`python3 scripts/render-chronicle-print-proof.py /tmp/lampy-print-proof.json OUTPUT_DIR`
+
+Python/WeasyPrint/PyMuPDF/Pillow are development-only proof dependencies, not app dependencies.

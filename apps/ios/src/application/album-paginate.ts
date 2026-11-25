@@ -1,4 +1,5 @@
-import {photoRatio,photoComposition,PUBLICATION_COPY,PUBLICATION_VERSION} from './album-publication';
+import {printPhotoGroups} from './album-print-photo-plan';
+import {photoRatio,PUBLICATION_COPY,PUBLICATION_VERSION} from './album-publication';
 import { appLanguage, dateLabel, tr, feelingLabel } from '../i18n';
 import {
   calendarPartsAt,
@@ -170,11 +171,12 @@ export async function paginateAlbumLayout(
     extra: { albumId?: string; momentId?: string; revision?: number },
   ) {
     const role = kind === 'cover-name' ? albumCoverRole : albumBodyRole;
-    const measured = await measurer.measure(text, role, ALBUM_CONTENT_WIDTH_PT);
+    const decorated=options.publication&&kind==='note'&&!blocks.some(b=>b.kind==='image'||b.kind==='audio');
+    const measured = await measurer.measure(text, role, ALBUM_CONTENT_WIDTH_PT-(decorated?44:0));
     let cursor = 0;
     let firstChunk = true;
     while (cursor < measured.length) {
-      const needsContinued = kind === 'note' && !firstChunk && !!extra.momentId && !!printedDateKey;
+      const needsContinued = !options.publication && kind === 'note' && !firstChunk && !!extra.momentId && !!printedDateKey;
       const continuedHeight = needsContinued ? albumDateRole.lineHeightPt : 0;
       if (
         blocks.length > 0 &&
@@ -201,8 +203,8 @@ export async function paginateAlbumLayout(
       if (remaining() < role.lineHeightPt) {
         if (blocks.length > 0) commitPage();
       }
-      const room = Math.floor(remaining() / role.lineHeightPt);
-      let take = Math.min(Math.max(room, 0), measured.length - cursor);
+      const room = Math.floor((remaining()-(decorated?14:0)) / role.lineHeightPt);
+      let take = Math.min(Math.max(room, 0), measured.length - cursor, options.publication&&kind==='note'?9:Infinity);
       if (kind !== 'cover-name' && measured.length - cursor > 1) {
         if (take < 2 && blocks.length > 0) { commitPage(); continue; }
         if (measured.length - cursor - take === 1 && take > 2) take -= 1;
@@ -222,16 +224,20 @@ export async function paginateAlbumLayout(
         start: line.start - start,
         end: line.end - start,
         xPt: CONTENT_LEFT,
-        yPt: y + index * role.lineHeightPt,
+        yPt: y + index * role.lineHeightPt+(decorated?14:0),
         widthPt: line.widthPt,
         heightPt: line.heightPt,
-        baselineYPt: y + index * role.lineHeightPt + line.ascentPt,
+        baselineYPt: y + index * role.lineHeightPt + line.ascentPt+(decorated?14:0),
       }));
-      const height = take * role.lineHeightPt;
+      const height = take * role.lineHeightPt+(decorated?14:0);
       const box = { xPt: CONTENT_LEFT, yPt: y, widthPt: ALBUM_CONTENT_WIDTH_PT, heightPt: height };
       const range = { start, end, unit: 'unicode-scalar' as const };
       if (kind === 'note' && extra.momentId && extra.revision != null) {
-        blocks.push({ kind, box, text: slice, textRange: range, lines, momentId: extra.momentId, revision: extra.revision });
+        const glyph=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(slice)][0]?.segment:Array.from(slice)[0];
+        const initial=decorated&&glyph&&!/^\s/.test(glyph)?glyph:null;
+        const initialLines=initial?await measurer.measure(initial,{...role,sizePt:34,lineHeightPt:44},44):[];
+        const printInitial=initial&&initialLines.length===1&&initialLines[0].widthPt<=44&&Array.from(initial).length<=lines[0].end?{scalars:Array.from(initial).length,widthPt:44,sizePt:34}:undefined;
+        blocks.push({ kind, box, text: slice, textRange: range, lines, momentId: extra.momentId, revision: extra.revision,...(printInitial?{printInitial}:{}) });
       } else if (kind === 'opening' && extra.albumId) {
         blocks.push({ kind, box, text: slice, textRange: range, lines, albumId: extra.albumId });
       } else if (kind === 'cover-name' && extra.albumId) {
@@ -240,6 +246,7 @@ export async function paginateAlbumLayout(
       y += height;
       cursor += take;
       firstChunk = false;
+      if(decorated&&cursor<measured.length){commitPage();y=100;}
     }
   }
 
@@ -301,6 +308,7 @@ export async function paginateAlbumLayout(
       continue;
     }
 
+    if(options.publication)commitPage();
     const dated = dateKeyAndLabel(record, options.timezone);
     if(options.publication){
       const parts=/^[dmy]:(\d{4})(?:-(\d{1,2}))?/.exec(dated.key??'');
@@ -335,32 +343,21 @@ export async function paginateAlbumLayout(
         box:{xPt:CONTENT_LEFT,yPt:y,widthPt:ALBUM_CONTENT_WIDTH_PT,heightPt:albumMetaRole.lineHeightPt}},albumMetaRole.lineHeightPt);
     }
     const images = record.media.filter((item) => item.role === 'image');
-    if (record.note) {
+    const shortPrintNote=!!(options.publication&&record.note.trim()&&images.length&&record.media.every(m=>m.role==='image')&&(await measurer.measure(record.note,albumBodyRole,ALBUM_CONTENT_WIDTH_PT-44)).length<=2);
+    if (record.note && !options.publication) {
       await placeWrapped('note', record.note, { momentId: record.momentId, revision: record.revision ?? 0 });
     }
 
     if(options.publication){
       const placePhotoGroup=(items:typeof images)=>{
-        const composition=photoComposition(items.map(photoRatio));
-        if(composition==='single'){
-          for(const image of items){
-            if(blocks.length&&remaining()<140)commitPage();
-            const size=imageSize(photoRatio(image),Math.min(remaining()-8,ALBUM_CONTENT_HEIGHT_PT*.72));
-            blocks.push({kind:'image',momentId:record.momentId,assetId:image.assetId,status:image.availability==='available'?'available':'missing',intrinsicRatio:photoRatio(image),box:{xPt:CONTENT_LEFT+(ALBUM_CONTENT_WIDTH_PT-size.widthPt)/2,yPt:y,widthPt:size.widthPt,heightPt:size.heightPt}});y+=size.heightPt+12;
-          }
-          return;
+        if(blocks.some(b=>b.kind==='image'||b.kind==='audio'))commitPage();
+        const area={xPt:CONTENT_LEFT,yPt:Math.max(100,y+18),widthPt:ALBUM_CONTENT_WIDTH_PT,heightPt:CONTENT_BOTTOM-Math.max(100,y+18)-64-(shortPrintNote?98:0)};
+        let offset=0;
+        for(const group of printPhotoGroups(items,area)){
+          if(offset)commitPage();
+          group.forEach(box=>{const image=items[offset++];blocks.push({kind:'image',momentId:record.momentId,assetId:image.assetId,status:image.availability==='available'?'available':'missing',intrinsicRatio:photoRatio(image),box});});
+          y=Math.max(...group.map(b=>b.yPt+b.heightPt))+20;
         }
-        const gap=10,width=(ALBUM_CONTENT_WIDTH_PT-gap)/2;
-        const desired=composition==='diptych'?Math.min(width/Math.min(...items.map(m=>photoRatio(m)!)),ALBUM_CONTENT_HEIGHT_PT*.65):ALBUM_CONTENT_HEIGHT_PT*.68;
-        if(blocks.length&&remaining()<desired+12)commitPage();
-        const height=Math.min(desired,remaining()-12);
-        items.forEach((image,index)=>{
-          const left=composition==='triptych'?index===0:index%2===0;
-          const box=composition==='diptych'?{xPt:CONTENT_LEFT+index*(width+gap),yPt:y,widthPt:width,heightPt:height}:
-            composition==='triptych'?{xPt:CONTENT_LEFT+(left?0:width+gap),yPt:y+(index===2?(height+gap)/2:0),widthPt:width,heightPt:left?height:(height-gap)/2}:
-            {xPt:CONTENT_LEFT+(index%2)*(width+gap),yPt:y+Math.floor(index/2)*(height+gap)/2,widthPt:width,heightPt:(height-gap)/2};
-          blocks.push({kind:'image',momentId:record.momentId,assetId:image.assetId,status:image.availability==='available'?'available':'missing',intrinsicRatio:photoRatio(image),box});
-        });y+=height+12;
       };
       for(let i=0;i<record.media.length;i++){
         const item=record.media[i];
@@ -372,6 +369,12 @@ export async function paginateAlbumLayout(
         }
       }
     }
+    if(options.publication&&record.note){
+      if(!shortPrintNote&&blocks.some(b=>b.kind==='image'||b.kind==='audio'))commitPage();
+      y=Math.max(100,y+20);
+      await placeWrapped('note',record.note,{momentId:record.momentId,revision:record.revision??0});
+    }
+
     for (const image of options.publication?[]:images) {
       if (blocks.length > 0 && remaining() < 80 && blocks[blocks.length - 1]?.kind !== 'day-rule') {
         commitPage();
@@ -421,7 +424,7 @@ export async function paginateAlbumLayout(
       );
     }
 
-    if (record.feeling.trim()) {
+    if (record.feeling.trim()&&!options.publication) {
       place(
         {
           kind: 'feeling',

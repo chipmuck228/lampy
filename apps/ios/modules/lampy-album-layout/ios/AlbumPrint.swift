@@ -227,6 +227,10 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
           }
         }
       }
+      if let initial = block["printInitial"] as? [String: Any], let count = initial["scalars"] as? Int, count > 0, count <= source.unicodeScalars.count {
+        let glyph = Array(source.unicodeScalars).prefix(count).map { String($0) }.joined()
+        for run in coreTextRunFontNames(text: glyph, font: resolveFont(name: name, size: CGFloat(initial["sizePt"] as? Double ?? 34))) { if let post = run["postScriptName"] { runs.insert(post) } }
+      }
       for run in coreTextRunFontNames(text: source + (block["printHint"] as? String ?? ""), font: font) { if let post = run["postScriptName"] { runs.insert(post) } }
     }
   }
