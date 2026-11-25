@@ -246,7 +246,7 @@ it('binding shows the reported steps, then the new edition ready to save', async
   await fireEvent.press(page.getByText('生成PDF'));
   await waitFor(() => expect(page.getByTestId('album-export-binding')).toBeTruthy());
   await act(async () => mockProgress.report?.({ step: 'copy', done: 1, total: 3 }));
-  expect(page.getByText('收好照片与声音 2/3')).toBeTruthy();
+  expect(page.getByRole('progressbar').props.accessibilityValue.now).toBeGreaterThan(0);
   await act(async () => {
     finish({ manifest: { id: 'print_9', name: 'Our days', createdAt: '2026-11-02T10:00:00.000Z', style: 'handmade', imageDpi: [], pdf: { pageCount: 3, bytes: 2048, fontRunNames: [] } } });
   });
@@ -264,7 +264,7 @@ it('keeps the existing PDF paper preference without exposing it as an EPUB desig
   const page = await render(wrap());
   await waitFor(() => expect(page.getByText('已解锁导出')).toBeTruthy());
   expect(page.queryByTestId('album-export-style-plain')).toBeNull();
-  expect(page.getByRole('radio',{name:'生活文集'}).props.accessibilityState.selected).toBe(true);
+  expect(page.queryByRole('radio',{name:'生活文集'})).toBeNull();
   await fireEvent.press(page.getByRole('tab',{name:'PDF'}));
   await fireEvent.press(page.getByText('生成PDF'));
   await waitFor(() => expect(mockSave).toHaveBeenCalledWith('handmade'));
@@ -335,7 +335,7 @@ it('creates an independent EPUB without first generating a PDF', async () => {
   await waitFor(() => expect(view.getByText('制作电子册')).toBeTruthy());
   await waitFor(() => expect(view.getByText('已解锁导出')).toBeTruthy());
   await fireEvent.press(view.getByText('制作电子册'));
-  await waitFor(() => expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','literary',expect.any(Function),expect.any(Function)));
+  await waitFor(() => expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','imagebook',expect.any(Function),expect.any(Function)));
   expect(mockSave).not.toHaveBeenCalled();
   expect(mockEpub).toHaveBeenCalledWith('epub_direct',expect.any(Function),expect.any(Function));
 });
@@ -348,8 +348,8 @@ it('uses the selected electronic design without changing the reading paper prefe
   mockEpub.mockResolvedValueOnce(undefined);
   const view=await render(wrap());
   await waitFor(()=>expect(view.getByText('已解锁导出')).toBeTruthy());
-  await fireEvent.press(view.getByText('影像小册'));
-  expect(view.getByRole('radio',{name:'影像小册'}).props.accessibilityState.selected).toBe(true);
+  expect(view.queryByRole('radio',{name:'生活文集'})).toBeNull();
+  expect(view.queryByRole('radio',{name:'影像小册'})).toBeNull();
   expect(view.queryByTestId('album-export-style-plain')).toBeNull();
   await fireEvent.press(view.getByText('制作电子册'));
   await waitFor(()=>expect(createPersonalEpubSnapshot).toHaveBeenCalledWith('book','imagebook',expect.any(Function),expect.any(Function)));

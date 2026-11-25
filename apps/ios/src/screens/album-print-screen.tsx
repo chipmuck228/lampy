@@ -1,6 +1,5 @@
 import { AlbumEditionSwipeRow } from './album-edition-swipe-row';
 import { deleteSavedAlbumEdition } from '../infrastructure/album-edition-delete';
-import type { EpubDesign } from '../application/album-epub';
 import { createPersonalEpubSnapshot, discardUnfinishedEpubSnapshot, listEpubSnapshots, type SavedEpubSnapshot } from '../infrastructure/album-epub-snapshots';
 import { AlbumEpubFailure, shareAlbumEpub } from '../infrastructure/album-epub-files';
 import { useAlbumExportUnlock } from './album-export-unlock';
@@ -42,7 +41,7 @@ import { ink, inkSoft, readingWidth } from './life-page';
 import { usePageMetrics } from './use-page-metrics';
 import {
   AlbumExportShowcase,
-  ExportChoice,
+  EditionProgress,
   BindingPanel,
   MiniBook,
   ShelfHeader,
@@ -82,11 +81,11 @@ export default function AlbumPrintScreen() {
   const unlock = useAlbumExportUnlock(paidGate && !blocked);
   const metrics = usePageMetrics();
   const [style, setStyle] = useState<AlbumReadingStyle>('plain');
-  const [epubDesign, setEpubDesign] = useState<EpubDesign>('literary');
+  const epubDesign = 'imagebook' as const;
   const [format, setFormat] = useState<'epub' | 'pdf'>('epub');
   const [paperPreview, setPaperPreview] = useState(false);
   const position = useRef<AlbumReadingPosition | null>(null);
-  const [epubState, setEpubState] = useState<{ id: string; pending: boolean; message: string; diagnostic?: string } | null>(null);
+  const [epubState, setEpubState] = useState<{ id: string; pending: boolean; message: string; fraction?: number; diagnostic?: string } | null>(null);
   const [freshEpub, setFreshEpub] = useState<{albumId:string;editionId:string}|null>(null);
   const freshEpubId=freshEpub?.albumId===id?freshEpub.editionId:null;
   const [epubEditions, setEpubEditions] = useState<SavedEpubSnapshot[]>([]);
@@ -243,16 +242,18 @@ export default function AlbumPrintScreen() {
   function electronic(edition?: { id: string }) {
     const feedbackId = edition?.id ?? 'new';
     epubCancelled.current = false;
+    let fraction = 0;
+    const advance = (next:number) => { fraction=Math.max(fraction,Math.min(.98,next));return fraction; };
     void run(async outerValid => {
       const valid = () => outerValid() && !epubCancelled.current;
-      setEpubState({ id: feedbackId, pending: true, message: tr('正在制作电子册，请稍候。') });
+      setEpubState({ id: feedbackId, pending: true, fraction:0, message: tr('正在制作这一册…') });
       let createdId: string | undefined;
       let published=false;
       try {
         let editionId = edition?.id;
         if (!editionId) {
           const snapshot = await createPersonalEpubSnapshot(id, epubDesign, valid, (done, total) => {
-            if (valid()) setEpubState({ id: feedbackId, pending: true, message: tr('正在整理内容：{0}/{1}', [done,total]) });
+            if (valid()) setEpubState({ id: feedbackId, pending: true, fraction:advance(total>0?.25*Math.min(1,done/total):.02), message: tr('正在制作这一册…') });
           });
           editionId = snapshot.id; createdId = snapshot.id;
         }
@@ -264,8 +265,10 @@ export default function AlbumPrintScreen() {
             setEpubState({id:feedbackId,pending:false,message:''});
             return;
           }
-          const message = update.total > 0 ? tr('正在制作电子册：{0}/{1}', [update.done, update.total]) : tr('正在制作电子册，请稍候。');
-          setEpubState({ id: feedbackId, pending: true, message });
+          const starts:Record<string,number>={READ_EDITION:.25,AUTHORIZE:.27,READ_MEDIA:.3,CONVERT_IMAGE:.3,PACKAGE:.65,WRITE_FILE:.72,VERIFY_FILE:.9,PUBLISH:.96};
+          const mediaFraction=update.total>0?Math.max(0,Math.min(1,update.done/update.total)):0;
+          const next=update.stage==='READ_MEDIA'||update.stage==='CONVERT_IMAGE'?.3+.34*mediaFraction:starts[update.stage]??fraction;
+          setEpubState({ id: feedbackId, pending: true, fraction:advance(next), message:tr('正在制作这一册…') });
         });
         if (valid()) {
           if(createdId)setFreshEpub({albumId:id,editionId:createdId});
@@ -417,13 +420,10 @@ export default function AlbumPrintScreen() {
             <Text style={styles.meta}>{tr('尚未生成测试成品。')}</Text>
           ) : null}</> : null);
   const electronicActions = (formal && format === 'epub' ? <View style={{ gap: 10 }}>
-            <View accessibilityRole="radiogroup" accessibilityLabel={tr('选择电子册样式')}>
-              <ExportChoice label={tr('生活文集')} detail={tr('适合文字较多的记录。')} selected={epubDesign === 'literary'} disabled={busy} onPress={() => setEpubDesign('literary')} />
-              <ExportChoice label={tr('影像小册')} detail={tr('适合照片较多的记录。')} selected={epubDesign === 'imagebook'} disabled={busy} onPress={() => setEpubDesign('imagebook')} />
-            </View>
             <ShowcaseButton testID="album-export-create-epub" tone="editorial" label={tr('制作电子册')} disabled={busy || !owned || !ready} onPress={() => electronic()} />
             <ShowcaseNote>{tr('包含照片与声音，可在「图书」中阅读。')}</ShowcaseNote>
-            {epubState?.id === 'new' && !!epubState.message ? <Text accessibilityLiveRegion="polite" style={styles.meta}>{epubState.message}</Text> : null}
+            {epubState?.id === 'new' && epubState.pending ? <EditionProgress fraction={epubState.fraction??0} /> : null}
+            {epubState?.id === 'new' && !epubState.pending && !!epubState.message ? <Text accessibilityLiveRegion="polite" style={styles.meta}>{epubState.message}</Text> : null}
             {epubState?.id === 'new' && epubState.pending ? <ShowcaseButton tone="quiet" label={tr('取消制作电子册')} onPress={() => { epubCancelled.current = true; }} /> : null}
             {__DEV__ && !formal && epubState?.id === 'new' && epubState.diagnostic ? <Text selectable style={styles.meta}>{`EPUB/${epubState.diagnostic}`}</Text> : null}
           </View> : null);
@@ -462,7 +462,8 @@ export default function AlbumPrintScreen() {
               <Text style={styles.title}>{edition.name}</Text>
               <Text style={styles.meta}>{albumEditionDateLabel(edition.createdAt)} · {tr(edition.design === 'imagebook' ? '影像小册' : edition.design === 'literary' ? '生活文集' : '电子册')}</Text>
             </View></AlbumEditionSwipeRow>
-            {epubState?.id === edition.id && !!epubState.message ? <Text accessibilityLiveRegion="polite" style={styles.meta}>{epubState.message}</Text> : null}
+            {epubState?.id === edition.id && epubState.pending ? <EditionProgress fraction={epubState.fraction??0} /> : null}
+            {epubState?.id === edition.id && !epubState.pending && !!epubState.message ? <Text accessibilityLiveRegion="polite" style={styles.meta}>{epubState.message}</Text> : null}
             {epubState?.id === edition.id && epubState.pending ? <ShowcaseButton tone="quiet" label={tr('取消制作电子册')} onPress={() => { epubCancelled.current = true; }} /> : null}
             {__DEV__ && !formal && epubState?.id === edition.id && epubState.diagnostic ? <Text selectable style={styles.meta}>{`EPUB/${epubState.diagnostic}`}</Text> : null}
           </View>)}

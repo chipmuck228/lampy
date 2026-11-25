@@ -6,6 +6,8 @@ import { SymbolView } from 'expo-symbols';
 import { inkSoft, sage } from './life-page';
 
 export const LIFE_ICON_NAMES = {
+  share:'square.and.arrow.up',
+  trash:'trash',
   settings: 'gearshape',
   person: 'person.crop.circle',
   back: 'chevron.left',
@@ -42,6 +44,7 @@ export const LIFE_ICON_NAMES = {
 } as const;
 
 const ANDROID_ICON_NAMES = {
+  share:'ios_share',trash:'delete_outline',
   settings:'settings', person:'account_circle', back:'chevron_left', open:'chevron_right',
   lock:'lock', info:'info', storage:'storage', subscribe:'credit_card', help:'help',
   terms:'description', privacy:'front_hand', play:'play_arrow', pause:'pause',

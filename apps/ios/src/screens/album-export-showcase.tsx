@@ -7,7 +7,6 @@ import type { AlbumLayoutMediaMap } from '../application/album-layout-input';
 import type { AlbumPrintProgress } from '../application/album-print';
 import {
   albumEditionFacts,
-  albumPrintProgressCopy,
   albumPrintProgressFraction,
   albumSpanLabel,
   styleAlbumPages,
@@ -255,6 +254,15 @@ export function ShowcaseNote({ children, live }: { children: ReactNode; live?: b
   );
 }
 
+/** Stage-based progress; no timer pretends to measure completion. */
+export function EditionProgress({fraction}:{fraction:number}){
+ const percent=Math.max(0,Math.min(100,Math.round(fraction*100)));
+ return <View style={styles.binding} testID="album-export-progress">
+   <Text style={styles.bindingTitle} accessibilityLiveRegion="polite">{tr('正在制作这一册…')}</Text>
+   <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel={tr('制作进度')} accessibilityValue={{min:0,max:100,now:percent}}><View style={[styles.fill,{width:`${percent}%`}]} /></View>
+ </View>;
+}
+
 /** Binding in progress. Steps are reported by the export service, not timed. */
 export function BindingPanel({
   progress,
@@ -271,12 +279,11 @@ export function BindingPanel({
   return (
     <View style={styles.binding} testID="album-export-binding">
       <Text style={styles.bindingTitle} accessibilityLiveRegion="polite">
-        {albumPrintProgressCopy(progress)}
+        {tr('正在制作这一册…')}
       </Text>
-      <View style={styles.track}>
+      <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel={tr('制作进度')} accessibilityValue={{min:0,max:100,now:Math.round(fraction*100)}}>
         <Animated.View style={[styles.fill, { transform: [{ scaleX: fill }] }]} />
       </View>
-      <Text style={styles.note}>{tr('正在制作PDF，请稍候。')}</Text>
       <ShowcaseButton tone="quiet" label={tr('取消')} onPress={onCancel} />
     </View>
   );

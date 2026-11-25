@@ -113,12 +113,12 @@ describe('device lock cover', () => {
     await waitFor(() => {
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
     });
-    expect(view.getByText('这台设备已保护').props.allowFontScaling).toBe(false);
-    expect(StyleSheet.flatten(view.getByText('这台设备已保护').props.style).fontSize).toBe(28);
+    expect(view.getByText('Lampy').props.allowFontScaling).toBe(false);
+    expect(StyleSheet.flatten(view.getByText('Lampy').props.style).fontSize).toBe(28);
     expect(
-      view.getByText('进入 Lampy 前，先确认是这台设备的持有人。记录还在。').props.allowFontScaling,
+      view.getByText('你的日子，安心留在这里。').props.allowFontScaling,
     ).toBe(false);
-    expect(view.getByText('再试一次').props.allowFontScaling).toBe(false);
+    expect(view.getByText('打开 Lampy').props.allowFontScaling).toBe(false);
     expect(StyleSheet.flatten(view.getByTestId('device-lock-cover-scroll').props.contentContainerStyle)).toEqual(
       expect.objectContaining({ paddingTop: 71, paddingBottom: 58 }),
     );
@@ -136,12 +136,12 @@ describe('device lock cover', () => {
       expect(view.getByTestId('device-lock-cover')).toBeTruthy();
     });
     await act(async () => {
-      fireEvent.press(view.getByLabelText('再试一次'));
+      fireEvent.press(view.getByTestId('device-lock-retry'));
     });
     expect(view.getByTestId('device-lock-cover')).toBeTruthy();
     result = { ok: true };
     await act(async () => {
-      fireEvent.press(view.getByLabelText('再试一次'));
+      fireEvent.press(view.getByTestId('device-lock-retry'));
     });
     await waitFor(() => {
       expect(view.queryByTestId('device-lock-cover')).toBeNull();
@@ -309,7 +309,7 @@ describe('device lock cover', () => {
     expect(view.getByText('private', { includeHiddenElements: true })).toBeTruthy();
     expect(authenticate).not.toHaveBeenCalled();
     await act(async () => {
-      fireEvent.press(view.getByLabelText('再试一次'));
+      fireEvent.press(view.getByTestId('device-lock-retry'));
     });
     await waitFor(() => {
       expect(authenticate).toHaveBeenCalledTimes(1);
@@ -338,7 +338,7 @@ describe('device lock cover', () => {
     expect(view.getByTestId('device-lock-cover')).toBeTruthy();
     (authenticate as jest.Mock).mockImplementation(async () => ({ ok: true }));
     await act(async () => {
-      fireEvent.press(view.getByLabelText('再试一次'));
+      fireEvent.press(view.getByTestId('device-lock-retry'));
     });
     await waitFor(() => {
       expect(authenticate).toHaveBeenCalledTimes(2);
@@ -591,10 +591,10 @@ describe('device lock cover', () => {
       await Promise.resolve();
     });
     expect(authenticate).toHaveBeenCalledTimes(1);
-    expect(view.getByLabelText('再试一次')).toBeTruthy();
+    expect(view.getByTestId('device-lock-retry')).toBeTruthy();
     (authenticate as jest.Mock).mockImplementation(async () => ({ ok: true }));
     await act(async () => {
-      fireEvent.press(view.getByLabelText('再试一次'));
+      fireEvent.press(view.getByTestId('device-lock-retry'));
     });
     await waitFor(() => {
       expect(authenticate).toHaveBeenCalledTimes(2);

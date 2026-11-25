@@ -2,7 +2,8 @@ import { useCallback, useLayoutEffect, useMemo, useState, type ReactNode } from 
 import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 import { tr } from '../i18n';
-import { paper } from './life-page';
+import { paper, sage, inkSoft } from './life-page';
+import { LifeIcon } from './life-icons';
 
 /** A deliberate horizontal gesture reveals a button; swiping never deletes directly. */
 export function AlbumEditionSwipeRow({ id, disabled, onDelete, onShare, children }: {
@@ -27,8 +28,8 @@ export function AlbumEditionSwipeRow({ id, disabled, onDelete, onShare, children
   }), [disabled, open, offset, settle, width]);
   return <View style={styles.container} testID={`edition-row-${id}`}>
     {open && !disabled ? <View style={[styles.actions,{width}]}>
-      {onShare?<Pressable testID={`edition-share-${id}`} style={styles.share} accessibilityRole="button" accessibilityLabel={tr('分享电子册')} onPress={()=>{settle(false);onShare();}}><Text style={styles.deleteText}>{tr('分享')}</Text></Pressable>:null}
-      <Pressable style={styles.delete} accessibilityRole="button" accessibilityLabel={tr('删除这版成品')} onPress={() => { settle(false); onDelete(); }}><Text style={styles.deleteText}>{tr('删除')}</Text></Pressable>
+      {onShare?<Pressable testID={`edition-share-${id}`} style={styles.share} accessibilityRole="button" accessibilityLabel={tr('分享')} onPress={()=>{settle(false);onShare();}}><LifeIcon name="share" size={20} color={sage} /><Text style={styles.shareText}>{tr('分享')}</Text></Pressable>:null}
+      <Pressable style={styles.delete} accessibilityRole="button" accessibilityLabel={tr('删除这版成品')} onPress={() => { settle(false); onDelete(); }}><LifeIcon name="trash" size={20} color={inkSoft} /><Text style={styles.deleteText}>{tr('删除')}</Text></Pressable>
     </View> : null}
     <Animated.View testID={`edition-pan-${id}`} {...pan.panHandlers} style={{ transform: [{ translateX: offset }], backgroundColor: paper, paddingRight: onShare ? 0 : 44 }}>
       {onShare ? <Pressable testID={`edition-open-${id}`} accessibilityRole="button" accessibilityHint={tr('分享电子册')} accessibilityState={{disabled}} disabled={disabled}
@@ -44,8 +45,9 @@ export function AlbumEditionSwipeRow({ id, disabled, onDelete, onShare, children
 const styles = StyleSheet.create({
   container: { overflow: 'hidden' },
   actions: {position:'absolute',right:0,top:0,bottom:0,flexDirection:'row'},
-  share:{width:88,backgroundColor:'#58746C',justifyContent:'center',alignItems:'center'},
-  delete: { width: 88, backgroundColor: '#9D3E34', justifyContent: 'center', alignItems: 'center' },
-  deleteText: { color: '#FFFFFF', fontSize: 15 },
+  share:{width:88,minHeight:48,gap:8,justifyContent:'center',alignItems:'center'},
+  delete: { width:88,minHeight:48,gap:8,justifyContent:'center',alignItems:'center' },
+  deleteText: { color: inkSoft, fontSize:15 },
+  shareText: { color:sage,fontSize:15 },
   more: { position: 'absolute', top: 0, right: 0, minHeight: 44, width: 44, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
 });
