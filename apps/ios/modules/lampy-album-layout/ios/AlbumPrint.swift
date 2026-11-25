@@ -176,9 +176,143 @@ private func chronicleScalarDifference(_ from: String, _ to: String) -> String {
   let result = keys.prefix(6).map { String(format: "U+%04X", $0) + "x\(counts[$0]!)" }.joined(separator: ",")
   return keys.isEmpty ? "none" : result + (keys.count > 6 ? ",truncated" : "")
 }
+// Unicode 17.0 Equivalent_Unified_Ideograph, CJK Radicals Supplement only.
+// https://www.unicode.org/Public/17.0.0/ucd/EquivalentUnifiedIdeograph.txt
+// Comparison metadata only: no source, font or PDF content is rewritten.
+private func chroniclePdfUnifiedRadical(_ value: UInt32) -> UInt32? {
+  switch value {
+  case 0x2E81: return 0x5382
+  case 0x2E82: return 0x4E5B
+  case 0x2E83: return 0x4E5A
+  case 0x2E84: return 0x4E59
+  case 0x2E85: return 0x4EBB
+  case 0x2E86: return 0x5182
+  case 0x2E87: return 0x20628
+  case 0x2E88: return 0x5200
+  case 0x2E89: return 0x5202
+  case 0x2E8A: return 0x535C
+  case 0x2E8B: return 0x353E
+  case 0x2E8C: return 0x5C0F
+  case 0x2E8D: return 0x5C0F
+  case 0x2E8E: return 0x5140
+  case 0x2E8F: return 0x5C23
+  case 0x2E90: return 0x5C22
+  case 0x2E91: return 0x21BC2
+  case 0x2E92: return 0x5DF3
+  case 0x2E93: return 0x5E7A
+  case 0x2E94: return 0x5F51
+  case 0x2E95: return 0x2B739
+  case 0x2E96: return 0x5FC4
+  case 0x2E97: return 0x5FC3
+  case 0x2E98: return 0x624C
+  case 0x2E99: return 0x6535
+  case 0x2E9B: return 0x65E1
+  case 0x2E9C: return 0x65E5
+  case 0x2E9D: return 0x6708
+  case 0x2E9E: return 0x6B7A
+  case 0x2E9F: return 0x6BCD
+  case 0x2EA0: return 0x6C11
+  case 0x2EA1: return 0x6C35
+  case 0x2EA2: return 0x6C3A
+  case 0x2EA3: return 0x706C
+  case 0x2EA4: return 0x722B
+  case 0x2EA5: return 0x722B
+  case 0x2EA6: return 0x4E2C
+  case 0x2EA7: return 0x725B
+  case 0x2EA8: return 0x72AD
+  case 0x2EA9: return 0x738B
+  case 0x2EAA: return 0x24D14
+  case 0x2EAB: return 0x76EE
+  case 0x2EAC: return 0x793A
+  case 0x2EAD: return 0x793B
+  case 0x2EAE: return 0x25AD7
+  case 0x2EAF: return 0x7CF9
+  case 0x2EB0: return 0x7E9F
+  case 0x2EB1: return 0x7F53
+  case 0x2EB2: return 0x7F52
+  case 0x2EB3: return 0x34C1
+  case 0x2EB4: return 0x5197
+  case 0x2EB5: return 0x2626B
+  case 0x2EB6: return 0x7F8A
+  case 0x2EB7: return 0x2634C
+  case 0x2EB8: return 0x2634B
+  case 0x2EB9: return 0x8002
+  case 0x2EBA: return 0x8080
+  case 0x2EBB: return 0x807F
+  case 0x2EBC: return 0x8089
+  case 0x2EBD: return 0x26951
+  case 0x2EBE: return 0x8279
+  case 0x2EBF: return 0x8279
+  case 0x2EC0: return 0x8279
+  case 0x2EC1: return 0x864E
+  case 0x2EC2: return 0x8864
+  case 0x2EC3: return 0x8980
+  case 0x2EC4: return 0x897F
+  case 0x2EC5: return 0x89C1
+  case 0x2EC6: return 0x89D2
+  case 0x2EC7: return 0x278B2
+  case 0x2EC8: return 0x8BA0
+  case 0x2EC9: return 0x8D1D
+  case 0x2ECA: return 0x27FB7
+  case 0x2ECB: return 0x8F66
+  case 0x2ECC: return 0x8FB6
+  case 0x2ECD: return 0x8FB6
+  case 0x2ECE: return 0x8FB6
+  case 0x2ECF: return 0x9091
+  case 0x2ED0: return 0x9485
+  case 0x2ED1: return 0x9577
+  case 0x2ED2: return 0x9578
+  case 0x2ED3: return 0x957F
+  case 0x2ED4: return 0x95E8
+  case 0x2ED5: return 0x28E0F
+  case 0x2ED6: return 0x961D
+  case 0x2ED7: return 0x96E8
+  case 0x2ED8: return 0x9752
+  case 0x2ED9: return 0x97E6
+  case 0x2EDA: return 0x9875
+  case 0x2EDB: return 0x98CE
+  case 0x2EDC: return 0x98DE
+  case 0x2EDD: return 0x98DF
+  case 0x2EDE: return 0x2967F
+  case 0x2EDF: return 0x98E0
+  case 0x2EE0: return 0x9963
+  case 0x2EE1: return 0x29810
+  case 0x2EE2: return 0x9A6C
+  case 0x2EE3: return 0x9AA8
+  case 0x2EE4: return 0x9B3C
+  case 0x2EE5: return 0x9C7C
+  case 0x2EE6: return 0x9E1F
+  case 0x2EE7: return 0x5364
+  case 0x2EE8: return 0x9EA6
+  case 0x2EE9: return 0x9EC4
+  case 0x2EEA: return 0x9EFE
+  case 0x2EEB: return 0x6589
+  case 0x2EEC: return 0x9F50
+  case 0x2EED: return 0x6B6F
+  case 0x2EEE: return 0x9F7F
+  case 0x2EEF: return 0x7ADC
+  case 0x2EF0: return 0x9F99
+  case 0x2EF1: return 0x9F9C
+  case 0x2EF2: return 0x4E80
+  case 0x2EF3: return 0x9F9F
+  default: return nil
+  }
+}
+private func chroniclePdfComparisonText(_ value: String, expected: String) -> String {
+  let source = Set(expected.unicodeScalars.map { $0.value })
+  return compactChroniclePdfText(value).unicodeScalars.map { scalar in
+    if let target = chroniclePdfUnifiedRadical(scalar.value),
+       source.contains(target), !source.contains(scalar.value),
+       let unified = UnicodeScalar(target) { return String(unified) }
+    return String(scalar)
+  }.joined()
+}
 private func printPageTextChecksMatch(_ checks: [[String]], in text: String) -> Bool {
-  let actual = compactChroniclePdfText(text)
-  return checks.allSatisfy { printSegmentsMatch($0.map(compactChroniclePdfText).filter { !$0.isEmpty }, in: actual) }
+  return checks.allSatisfy { parts in
+    let required = parts.map(compactChroniclePdfText).filter { !$0.isEmpty }
+    let actual = chroniclePdfComparisonText(text, expected: required.joined())
+    return printSegmentsMatch(required, in: actual)
+  }
 }
 private struct ChronicleTextGlyph {
   let text: String

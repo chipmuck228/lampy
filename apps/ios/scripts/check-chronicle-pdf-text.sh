@@ -12,7 +12,7 @@ check_file="$check_dir/check.swift"
 trap 'rm -f "$check_file"; rmdir "$check_dir"' EXIT
 printf 'import Foundation\nimport CoreGraphics\nimport CoreText\nimport PDFKit\n' > "$check_file"
 awk '
-/^private func (compactPdfText|compactChroniclePdfText|printSegmentsMatch|printPageTextChecksMatch|chronicleSpatialText|chroniclePdfGlyphs|chronicleAnchoredTextBlocks|chroniclePdfTextBlocks|printChronicleTextCheck)\(/ { copying=1 }
+/^private func (compactPdfText|compactChroniclePdfText|chroniclePdfUnifiedRadical|chroniclePdfComparisonText|printSegmentsMatch|printPageTextChecksMatch|chronicleSpatialText|chroniclePdfGlyphs|chronicleAnchoredTextBlocks|chroniclePdfTextBlocks|printChronicleTextCheck)\(/ { copying=1 }
 /^private struct (ChronicleTextGlyph|ChronicleTextCheck) \{/ { copying=1 }
 copying { print }
 copying && /^}$/ { copying=0 }
@@ -38,6 +38,16 @@ verify("soft hyphen at wrapping", true, [["ordinary"]], "ordi\u{00AD}nary")
 verify("zero-width break", true, [["记忆"]], "记\u{200B}忆")
 verify("real hyphen is still required", false, [["mother-in-law"]], "motherinlaw")
 verify("missing letter is still rejected", false, [["ordinary"]], "ordinry")
+// The observed iPhone alias is a Unicode Equivalent_Unified_Ideograph mapping.
+verify("tiger radical alias from iPhone", true, [["山虎在这里"]], "山\u{2EC1}在这里")
+verify("ordinary tiger unchanged", true, [["山虎在这里"]], "山虎在这里")
+verify("different Han character rejected", false, [["山虎在这里"]], "山猫在这里")
+verify("missing tiger rejected", false, [["山虎在这里"]], "山在这里")
+verify("repeated tiger still needs two", false, [["虎虎"]], "\u{2EC1}")
+verify("literal radical stays literal", true, [["\u{2EC1}"]], "\u{2EC1}")
+verify("literal radical is not ordinary tiger", false, [["\u{2EC1}"]], "虎")
+verify("ambiguous literal plus unified source fails closed", false, [["虎\u{2EC1}"]], "\u{2EC1}\u{2EC1}")
+verify("official moon supplement alias", true, [["月光"]], "\u{2E9D}光")
 // Synthetic 13-character CJK/Latin fixture; no user's album writing is embedded.
 private let mixed = "小猫和panda，各自休息"
 private let letters = Array(mixed).map(String.init)
@@ -100,7 +110,7 @@ private func fixturePdf(_ last: String) -> PDFDocument {
   context.endPDFPage(); context.closePDF()
   return PDFDocument(data:data as Data)!
 }
-print("CHRONICLE_PDF_TEXT_UNIT_OK: 25 normalization/spatial cases")
+print("CHRONICLE_PDF_TEXT_UNIT_OK: 34 normalization/spatial cases")
 // Diagnostic input below is synthetic fixture content, never an Album or file.
 private func diagnoseSyntheticPdf(_ page: PDFPage) {
   let raw = page.string ?? ""
@@ -139,7 +149,7 @@ if !results.allSatisfy({ $0 }) {
   print("CHRONICLE_PDF_TEXT_CHECKS_FAILED: \(results.filter { !$0 }.count) PDFKit cases; report SYNTHETIC_/PDFKIT_CASE lines before another device build")
   exit(1)
 }
-print("CHRONICLE_PDF_TEXT_CHECKS_OK: 28 production Swift/PDFKit cases")
+print("CHRONICLE_PDF_TEXT_CHECKS_OK: 37 production Swift/PDFKit cases")
 SWIFT
 if [[ "${1:-}" == "--webkit" ]]; then
   cat >> "$check_file" <<'WEBKIT_SWIFT'
