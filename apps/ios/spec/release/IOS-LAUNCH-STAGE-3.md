@@ -168,3 +168,8 @@ publication-acceptance-fixture.cjs 直接使用正式投影，不替换样张HTM
 publication-pair-assets.py 从仓库授权照片制作横横、竖竖、横竖、近方形及一大一小尺寸样本；素材裁切仅为构造比例测试，EPUB排版不裁切。publication-pair-plan.cjs 根据解码宽高比较等高并置、等宽竖排、双图下文、双图侧文、横竖混排候选，以总显示面积与最小图片面积各半评分，在保留原顺序、比例、2倍放大上限、24px间距和80/72安全边距下选型。短文容量按Chronicle字体保守行数预算；长文另页，尺寸悬殊拆图页，文字单独续页。
 publication-pair-study.cjs 生成中英各11条记录：五种组合×有短文/无文，加双图长文。沿用定稿封面、开篇、日期、暖纸、16px装订色边与青绿青黛色系；长文复用正式装饰正文页。每张图片可离线进入完整图并返回其真正来源页（含拆页的第二张图）。这是候选样张代码，没有改变App双图导出行为，等待视觉确认。
 复现：python3 scripts/publication-pair-assets.py NEW_ASSET_DIR；node scripts/publication-pair-study.cjs ASSET_DIR NEW_OUTPUT_DIR。Python仅开发素材工具，依赖Pillow。
+
+### 双图二稿：参考照片叠放，未接入正式导出
+根据用户参考图改为缩小照片的错位叠放：两竖图轻微反向倾斜，不同比例保持自身尺寸比例，第一张深青绿纸边、第二张浅纸边，适度加宽照片下沿。不加入参考图图标，不使用成排网格。无字组合在页面中居中；短文固定右侧，长文另起已定稿的装饰正文页，沿用16px装订色边与暖纸背景。
+publication-pair-collage-plan.cjs 从源宽高计算图片框尺寸、叠放偏移和整体缩放，验证旋转后的边界；用凸多边形相交计算前景照片框对后景实际图片的遮挡，候选上限10%（不等于主体识别或确保主体不遮挡）。叠放页有少量遮挡，但不裁切源图片，点击进入完整图后返回原位置。低分辨率和极端比例继续拆页，最大放大2倍。publication-pair-collage.cjs 生成中英五组有字/无字与长文样张；前一版对齐布局保留为历史对照，App双图正式排版尚未替换。
+复现：先使用publication-pair-assets.py准备素材，再 node scripts/publication-pair-collage.cjs ASSET_DIR NEW_OUTPUT_DIR。
