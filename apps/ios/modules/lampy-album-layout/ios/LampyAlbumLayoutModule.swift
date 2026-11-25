@@ -93,9 +93,13 @@ private struct ResolvedAlbumFont {
 private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedAlbumFont) {
   let requestedFamily = name
   let isPingFang = name.localizedCaseInsensitiveContains("PingFang")
+  let isKaiti = name.localizedCaseInsensitiveContains("Kaiti")
   let isSongti = name.localizedCaseInsensitiveContains("Songti") || name.localizedCaseInsensitiveContains("STSong")
   var candidates: [String] = [name]
-  if isPingFang {
+  if isKaiti {
+    candidates += ["KaitiSC-Regular", "STKaiti", "Kaiti SC", "KaiTi"]
+    candidates += UIFont.familyNames.filter { $0.localizedCaseInsensitiveContains("Kaiti") }.flatMap { UIFont.fontNames(forFamilyName: $0) }
+  } else if isPingFang {
     candidates += [
       "PingFangSC-Regular",
       "PingFang SC",
@@ -124,6 +128,7 @@ private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedA
       let matched =
         normalizedFamily.localizedCaseInsensitiveContains(normalizedRequested)
         || normalizedRequested.localizedCaseInsensitiveContains(normalizedFamily)
+        || (isKaiti && family.localizedCaseInsensitiveContains("Kaiti"))
         || (isSongti && (family.localizedCaseInsensitiveContains("Songti") || family.localizedCaseInsensitiveContains("STSong")))
         || (isPingFang && family.localizedCaseInsensitiveContains("PingFang"))
       return (
@@ -137,6 +142,10 @@ private func resolveAlbumFont(name: String, size: CGFloat) -> (UIFont, ResolvedA
         )
       )
     }
+  }
+  if isKaiti {
+    let fallback = resolveAlbumFont(name: "Songti SC", size: size)
+    return (fallback.0, ResolvedAlbumFont(requested: requestedFamily, familyName: fallback.1.familyName, fontName: fallback.1.fontName, matchedRequestedFamily: false, usedSystemFallback: true))
   }
   if isSongti {
     let descriptor = UIFontDescriptor(fontAttributes: [
@@ -565,6 +574,7 @@ func drawAlbumPage(
   albumHexColor(rendering["paper"] as? String, fallback: albumPaperColor()).setFill()
   context.fill(bounds)
   let serifName = rendering["serif"] as? String ?? "Songti SC"
+  let bodyName = rendering["bodySerif"] as? String ?? serifName
   let uiName = rendering["ui"] as? String ?? "PingFang SC"
   let copy = rendering["copy"] as? [String: String] ?? [:]
   if let publication = page["publication"] as? [String: Any], ["keepsake-v1", "keepsake-v2"].contains(publication["version"] as? String ?? "") {
@@ -636,7 +646,7 @@ func drawAlbumPage(
       let value = block["value"] as? String ?? ""
       albumHexColor(block["accent"] as? String, fallback: albumSageColor()).setFill()
       context.fillEllipse(in: CGRect(x: x, y: y + 7, width: 8, height: 8))
-      let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
+      let spec = albumFontForKind(kind, serif: kind == "note" ? bodyName : serifName, ui: uiName)
       let font = resolveFont(name: spec.name, size: spec.size)
       drawAlbumTextAtBaseline(
         text: value,
@@ -650,7 +660,7 @@ func drawAlbumPage(
     }
     if kind == "audio" {
       let assetId = block["assetId"] as? String ?? ""
-      let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
+      let spec = albumFontForKind(kind, serif: kind == "note" ? bodyName : serifName, ui: uiName)
       let font = resolveFont(name: spec.name, size: spec.size)
       let status = block["status"] as? String ?? ""
       if status == "available" {
@@ -670,7 +680,7 @@ func drawAlbumPage(
       )
       continue
     }
-    let spec = albumFontForKind(kind, serif: serifName, ui: uiName)
+    let spec = albumFontForKind(kind, serif: kind == "note" ? bodyName : serifName, ui: uiName)
     let font = resolveFont(name: spec.name, size: spec.size)
     if let lines = block["lines"] as? [[String: Any]], let text = block["text"] as? String, !lines.isEmpty {
       for line in lines {
@@ -680,7 +690,7 @@ func drawAlbumPage(
         let baseline = CGFloat(line["baselineYPt"] as? Double ?? Double(y) + Double(font.ascender))
         let slice = sliceAlbumScalars(text, start: start, end: end)
         if start == 0, let initial = block["printInitial"] as? [String: Any], let count = initial["scalars"] as? Int, count > 0, count <= end {
-          let large = resolveFont(name: serifName, size: CGFloat(initial["sizePt"] as? Double ?? 34))
+          let large = resolveFont(name: bodyName, size: CGFloat(initial["sizePt"] as? Double ?? 34))
           drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: 0, end: count), font: large, color: albumSageColor(), x: lineX, baselineY: baseline, in: context)
           drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: count, end: end), font: font, color: spec.color, x: lineX + CGFloat(initial["widthPt"] as? Double ?? 44), baselineY: baseline, in: context)
         } else {

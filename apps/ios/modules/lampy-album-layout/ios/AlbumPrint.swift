@@ -204,7 +204,7 @@ func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: Str
       let kind = block["kind"] as? String ?? ""
       let source = block["text"] as? String ?? block["label"] as? String ?? block["value"] as? String ?? ""
       let serif = ["cover-name", "note", "opening", "close"].contains(kind)
-      let name = rendering[serif ? "serif" : "ui"] as? String ?? (serif ? "Songti SC" : "PingFang SC")
+      let name = (kind == "note" ? rendering["bodySerif"] as? String : nil) ?? rendering[serif ? "serif" : "ui"] as? String ?? (serif ? "Songti SC" : "PingFang SC")
       let font = resolveFont(name: name, size: kind == "cover-name" ? 28 : serif ? 17 : 15)
       if ["cover-name", "note", "opening"].contains(kind) {
         let scalars = Array(source.unicodeScalars)

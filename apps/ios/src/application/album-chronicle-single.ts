@@ -90,6 +90,8 @@ export function chronicleProseBody(text:string,record:AlbumLayoutRecordInput,pag
  return `<section class="chronicle-prose-page" lang="${language}">${chronicleBinding(record.feeling,escape)}<header class="chronicle-masthead">LAMPY<i aria-hidden="true"></i></header><span class="chronicle-prose-side" style="background:${color}" aria-hidden="true"></span><span class="prose-quote quote-open" aria-hidden="true">“</span><span class="prose-quote quote-close" aria-hidden="true">”</span><span class="prose-end-rule" aria-hidden="true"></span><div class="chronicle-prose fixed-prose">${proseMarkup(text,escape)}</div><footer class="chronicle-prose-footer"><span lang="en">Chronicle</span><span class="chronicle-folio">${String(page+1).padStart(2,'0')}</span></footer></section>`;
 }
 export const CHRONICLE_SINGLE_CSS=`
+.chronicle-short,.chronicle-prose{font-family:Baskerville,"Palatino Linotype",Georgia,"Kaiti SC",STKaiti,KaiTi,"Songti SC","Noto Serif CJK SC",serif}
+
 .chronicle-single,.chronicle-prose-page{position:absolute;inset:0;background:#faf9f5;color:#303a37;font-family:"Songti SC","Noto Serif CJK SC",Baskerville,Georgia,serif}
 .chronicle-single:lang(en),.chronicle-prose-page:lang(en){font-family:Baskerville,"Palatino Linotype",Georgia,serif}
 .chronicle-photo{position:absolute;margin:0}.chronicle-single .triptych-seam{background:#faf9f5}.feeling-stripe{width:16px;z-index:3}

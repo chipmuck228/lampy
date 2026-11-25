@@ -83,4 +83,6 @@ export const CHRONICLE_PAIR_CSS=`
 .chronicle-pair-page{position:absolute;inset:0;background:#faf9f5;color:#303a37;font-family:"Songti SC","Noto Serif CJK SC",Baskerville,Georgia,serif}.chronicle-pair-page:lang(en){font-family:Baskerville,"Palatino Linotype",Georgia,serif}
 .chronicle-pair-photo{position:absolute;margin:0}.pair-frame-back{background:#354A41}.pair-frame-front{background:#E2E8DE}
 .chronicle-pair-copy{position:absolute;display:flex;align-items:center}.chronicle-pair-copy>div{width:100%;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2;font-size:29px;line-height:1.85;letter-spacing:.025em}
+
+.chronicle-pair-copy{font-family:Baskerville,"Palatino Linotype",Georgia,"Kaiti SC",STKaiti,KaiTi,"Songti SC","Noto Serif CJK SC",serif}
 `;

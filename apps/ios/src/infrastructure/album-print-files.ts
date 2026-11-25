@@ -139,6 +139,10 @@ export function createExpoAlbumPrint(
   });
 }
 export async function layoutAlbumPrint(input: import('../application/album-layout-input').AlbumLayoutInput, style: import('../application/album-reading').AlbumReadingStyle, fonts: NonNullable<ReturnType<typeof diagnoseAlbumFonts>>) {
+      const chineseMoments=new Set(input.entries.filter(r=>/\p{Script=Han}/u.test(r.note)).map(r=>r.momentId));
+      const bodyRequest='Kaiti SC';
+      const bodyDiagnosis=diagnoseAlbumFonts(bodyRequest,ALBUM_UI_FONT);
+      const bodyName=bodyDiagnosis?.serif.fontName??fonts.serif.fontName;
       const layout = await paginateAlbumLayout(
         input,
         {
@@ -147,7 +151,7 @@ export async function layoutAlbumPrint(input: import('../application/album-layou
             const name =
               role.family === 'album-serif'
                 ? fonts.serif.fontName
-                : fonts.ui.fontName;
+                : role.family==='album-ui'?fonts.ui.fontName:role.family;
             return measureTextNative(
               text,
               name,
@@ -160,6 +164,7 @@ export async function layoutAlbumPrint(input: import('../application/album-layou
         {
           generatedAt: new Date().toISOString(),
           publication:true,
+          bodyFamily:bodyName,
           timezone: {
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
           },
@@ -177,6 +182,8 @@ export async function layoutAlbumPrint(input: import('../application/album-layou
         rendering: {
           ...page.rendering!,
           serif: fonts.serif.fontName,
+          bodySerif:page.blocks.some(b=>b.kind==='note'&&chineseMoments.has(b.momentId))?bodyName:fonts.serif.fontName,
+          bodyFontRequest:page.blocks.some(b=>b.kind==='note'&&chineseMoments.has(b.momentId))?bodyRequest:fonts.serif.fontName,
           ui: fonts.ui.fontName,
           style,
           paper: ALBUM_READING_STYLES[style].paper,

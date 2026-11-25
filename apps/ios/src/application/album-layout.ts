@@ -167,7 +167,7 @@ export type AlbumPage = {
   publication?:PublicationPage;
   index: number;
   blocks: AlbumPlacedBlock[];
-  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number; pageCount?: number; pageNumbers?: boolean; chroniclePrint?:boolean; bindingColor?:string };
+  rendering?: { serif: string; ui: string; copy: Record<string, string>; style?: string; paper?: string; photoBorderWidth?: number; pageCount?: number; pageNumbers?: boolean; chroniclePrint?:boolean; bindingColor?:string; bodySerif?:string; bodyFontRequest?:string };
 };
 
 export type AlbumLayout = {

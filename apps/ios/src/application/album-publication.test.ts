@@ -80,3 +80,14 @@ it('keeps a measured short caption with its photos and gives long writing a sepa
  expect(layout.pages.some(p=>p.blocks.some(b=>b.kind==='note')&&p.blocks.some(b=>b.kind==='image'))).toBe(true);
  expect(albumLayoutIntegrity(layout,source)).toEqual({ok:true});
 });
+
+it('uses the resolved print body face consistently for note and enlarged-initial measurement',async()=>{
+ const calls:{family:string;size:number}[]=[],base=createGlyphWidthMeasurer();
+ const measurer={...base,measure:async(text:string,role:Parameters<typeof base.measure>[1],width:number)=>{calls.push({family:role.family,size:role.sizePt});return base.measure(text,role,width);}};
+ const source={...input,entries:[{...record('kaiti','11',[]),note:'平常的日子，也值得记住。'.repeat(20)}]};
+ const layout=await paginateAlbumLayout(source,measurer,{generatedAt:'2026-11-25',timezone:{timeZone:'UTC'},publication:true,bodyFamily:'ResolvedKaiti-Regular'});
+ expect(calls.some(c=>c.family==='ResolvedKaiti-Regular'&&c.size===17)).toBe(true);
+ expect(calls.some(c=>c.family==='ResolvedKaiti-Regular'&&c.size===34)).toBe(true);
+ expect(layout.fonts.body.family).toBe('ResolvedKaiti-Regular');
+ expect(albumLayoutIntegrity(layout,source)).toEqual({ok:true});
+});

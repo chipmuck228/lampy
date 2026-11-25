@@ -26,3 +26,9 @@ Xcode/iPhone compilation, native PDF text/emoji checks, printing and Books contr
 `python3 scripts/render-chronicle-print-proof.py /tmp/lampy-print-proof.json OUTPUT_DIR`
 
 Python/WeasyPrint/PyMuPDF/Pillow are development-only proof dependencies, not app dependencies.
+
+## Chinese moment body typography
+
+Moment prose and captions now prefer system Kaiti. EPUB body selectors keep the refined Latin font stack and add Kaiti SC / STKaiti / KaiTi before Songti for CJK fallback. Cover, opening and date typography are retained. Readers without a usable Kai face fall back; no font asset is bundled.
+
+For Chinese-containing moment notes in new PDFs (regardless of app language), native font diagnosis requests Kaiti SC and records the actual body face in rendering.bodySerif plus the request in bodyFontRequest. Native resolution searches installed Kai faces, then reports Songti/system fallback honestly. The resolved body face drives measurement, short-caption capacity, enlarged-initial drawing and PDF text/font inspection. Cover/date/UI and in-app continuous reading keep their existing font policy. Font availability, actual Books appearance and native PDF selection require a rebuilt device test.

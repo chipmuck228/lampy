@@ -134,7 +134,7 @@ export function fingerprintFromInput(album: LifeAlbum, input: AlbumLayoutInput):
 export async function paginateAlbumLayout(
   input: AlbumLayoutInput,
   measurer: AlbumTextMeasurer,
-  options: { generatedAt: string; timezone: HistoryClock; publication?:boolean },
+  options: { generatedAt: string; timezone: HistoryClock; publication?:boolean; bodyFamily?:string },
 ): Promise<AlbumLayout> {
   const pages: AlbumPage[] = [];
   let blocks: AlbumPlacedBlock[] = [];
@@ -142,6 +142,7 @@ export async function paginateAlbumLayout(
   let printedDateKey: string | null = null;
   let printedDateLabel: string | null = null;
   const album = input.album;
+  const printBodyRole=options.bodyFamily?{...albumBodyRole,family:options.bodyFamily}:albumBodyRole;
 
   function commitPage() {
     if (!blocks.length) return;
@@ -170,7 +171,7 @@ export async function paginateAlbumLayout(
     text: string,
     extra: { albumId?: string; momentId?: string; revision?: number },
   ) {
-    const role = kind === 'cover-name' ? albumCoverRole : albumBodyRole;
+    const role = kind === 'cover-name' ? albumCoverRole : kind==='note'&&options.publication&&/\p{Script=Han}/u.test(text)?printBodyRole:albumBodyRole;
     const decorated=options.publication&&kind==='note'&&!blocks.some(b=>b.kind==='image'||b.kind==='audio');
     const measured = await measurer.measure(text, role, ALBUM_CONTENT_WIDTH_PT-(decorated?44:0));
     let cursor = 0;
@@ -343,7 +344,7 @@ export async function paginateAlbumLayout(
         box:{xPt:CONTENT_LEFT,yPt:y,widthPt:ALBUM_CONTENT_WIDTH_PT,heightPt:albumMetaRole.lineHeightPt}},albumMetaRole.lineHeightPt);
     }
     const images = record.media.filter((item) => item.role === 'image');
-    const shortPrintNote=!!(options.publication&&record.note.trim()&&images.length&&record.media.every(m=>m.role==='image')&&(await measurer.measure(record.note,albumBodyRole,ALBUM_CONTENT_WIDTH_PT-44)).length<=2);
+    const shortPrintNote=!!(options.publication&&record.note.trim()&&images.length&&record.media.every(m=>m.role==='image')&&(await measurer.measure(record.note,/\p{Script=Han}/u.test(record.note)?printBodyRole:albumBodyRole,ALBUM_CONTENT_WIDTH_PT-44)).length<=2);
     if (record.note && !options.publication) {
       await placeWrapped('note', record.note, { momentId: record.momentId, revision: record.revision ?? 0 });
     }
@@ -487,7 +488,7 @@ export async function paginateAlbumLayout(
       bottomPt: ALBUM_MARGIN_BOTTOM_PT,
       leftPt: ALBUM_MARGIN_X_PT,
     },
-    fonts: ALBUM_FONTS,
+    fonts: options.publication?{...ALBUM_FONTS,body:printBodyRole}:ALBUM_FONTS,
     fontFaces: {
       serif: ALBUM_SERIF_FONT,
       ui: ALBUM_UI_FONT,
