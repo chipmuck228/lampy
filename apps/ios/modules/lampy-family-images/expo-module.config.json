@@ -1,1 +1,16 @@
-{"platforms":["apple"],"apple":{"modules":["LampyFamilyImagesModule"]}}
+{
+  "platforms": [
+    "apple",
+    "android"
+  ],
+  "apple": {
+    "modules": [
+      "LampyFamilyImagesModule"
+    ]
+  },
+  "android": {
+    "modules": [
+      "app.lampy.familyimages.LampyFamilyImagesModule"
+    ]
+  }
+}

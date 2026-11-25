@@ -88,7 +88,14 @@
     "android:release": "node ./scripts/android-personal.cjs release",
     "android:bundle": "node ./scripts/android-personal.cjs bundle",
     "android:start": "node ./scripts/android-personal.cjs start",
-    "test:android": "jest --config jest.android.config.js --runInBand"
+    "test:android": "jest --config jest.android.config.js --runInBand",
+    "android:preview:config": "node scripts/android-preview.cjs config",
+    "android:preview:prebuild": "node scripts/android-preview.cjs prebuild",
+    "android:preview": "node scripts/android-preview.cjs run",
+    "android:preview:release": "node scripts/android-preview.cjs release",
+    "android:preview:bundle": "node scripts/android-preview.cjs bundle",
+    "test:android:preview": "jest --config jest.android-preview.config.js --runInBand",
+    "android:preview:apk": "node scripts/android-preview.cjs apk"
   },
   "expo": {
     "autolinking": {

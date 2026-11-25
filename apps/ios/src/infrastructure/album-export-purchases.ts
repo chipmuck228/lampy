@@ -1,9 +1,9 @@
-import { personalRecordsOnly } from '../application/mobile-capabilities';
+import { purchasesSupported } from '../application/mobile-capabilities';
 import {createUnifiedPurchases,unifiedPurchasesEnabled} from '../application/unified-purchases';
 import {albumExportConfig,createAlbumExportAccess} from '../application/album-export-access';
 import {exportPurchasesNative} from '../../modules/lampy-export-purchases';
 export function getConfiguredPurchases(){
-  if(personalRecordsOnly())return null;
+  if(!purchasesSupported())return null;
   const native=exportPurchasesNative();if(!native)return null;
   const id=albumExportConfig().productId;
   if(unifiedPurchasesEnabled()) {
@@ -19,7 +19,7 @@ export function getConfiguredPurchases(){
 export const albumExportAccess=createAlbumExportAccess({config:albumExportConfig,dev:typeof __DEV__!=='undefined'&&__DEV__,evaluation:()=>process.env.EXPO_PUBLIC_ALBUM_PRINT_EVAL,purchases:getConfiguredPurchases});
 export function observeExportEntitlements(listener:()=>void) {
   const config=albumExportConfig();
-  if(!config.enabled||!config.paid||!config.productId)return ()=>{};
+  if(!purchasesSupported()||!config.enabled||!config.paid||!config.productId)return ()=>{};
   const sub=exportPurchasesNative()?.addListener('onEntitlementsChanged',listener);
   return ()=>sub?.remove();
 }

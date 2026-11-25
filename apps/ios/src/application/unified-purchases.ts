@@ -1,9 +1,10 @@
+import {purchasesSupported} from './mobile-capabilities';
 import type {AlbumExportPurchases} from './album-export-access';
 import {ApplicationError} from './errors';
 import type {PurchaseContext} from '../family-api/purchase-types';
 import type {ExportPurchasesNative} from '../../modules/lampy-export-purchases';
 
-export function unifiedPurchasesEnabled(){return process.env.EXPO_PUBLIC_UNIFIED_PURCHASES==='1';}
+export function unifiedPurchasesEnabled(){return purchasesSupported()&&process.env.EXPO_PUBLIC_UNIFIED_PURCHASES==='1';}
 export function createUnifiedPurchases(deps:{
   productId:string;native:ExportPurchasesNative;
   context():Promise<PurchaseContext>;

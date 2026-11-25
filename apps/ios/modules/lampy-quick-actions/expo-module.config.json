@@ -1,7 +1,19 @@
 {
-  "platforms": ["apple"],
+  "platforms": [
+    "apple",
+    "android"
+  ],
   "apple": {
-    "modules": ["LampyQuickActionsModule"],
-    "appDelegateSubscribers": ["LampyQuickActionsAppDelegate"]
+    "modules": [
+      "LampyQuickActionsModule"
+    ],
+    "appDelegateSubscribers": [
+      "LampyQuickActionsAppDelegate"
+    ]
+  },
+  "android": {
+    "modules": [
+      "app.lampy.quickactions.LampyQuickActionsModule"
+    ]
   }
 }

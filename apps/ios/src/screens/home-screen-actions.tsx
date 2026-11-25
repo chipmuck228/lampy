@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { AppState, Share } from 'react-native';
+import { AppState, Share, Platform } from 'react-native';
 import { usePathname, useRootNavigationState, useRouter } from 'expo-router';
 import { nativeQuickActions } from '../../modules/lampy-quick-actions';
 import { forgetAllHomeScreenEntries, homeScreenActions, homeScreenLeaveHref, LAMPY_PUBLIC_URL } from '../application/home-screen-actions';
@@ -51,7 +51,7 @@ export function HomeScreenActionDispatch() {
     if (!action) return;
     if (action.kind === 'share') {
       // Share only the public introduction, never a draft, album or account.
-      void Share.share({ url: LAMPY_PUBLIC_URL }).catch(() => undefined);
+      void Share.share(Platform.OS==='android'?{message:LAMPY_PUBLIC_URL}:{url:LAMPY_PUBLIC_URL}).catch(() => undefined);
       return;
     }
     const href = homeScreenLeaveHref(action.kind);

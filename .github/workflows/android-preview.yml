@@ -1,0 +1,56 @@
+name: Android Chronicle preview
+on:
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - 'domain/**'
+      - 'projections/**'
+      - '.github/workflows/android-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: apps/ios
+    env:
+      EXPO_NO_DOTENV: '1'
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/ios/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '14742923'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - run: npm ci
+      - run: node --test scripts/android-personal.test.cjs scripts/android-preview.test.cjs
+      - run: npx tsc --noEmit
+      - run: npm run test:android
+      - run: npm run test:android:preview
+      - run: npm run android:preview:bundle
+      - run: npm run android:preview:prebuild
+      - run: ./gradlew :lampy-album-layout:testDebugUnitTest :lampy-family-images:compileDebugKotlin :lampy-quick-actions:compileDebugKotlin --no-daemon --max-workers=2
+        working-directory: apps/ios/android
+      - run: npm run android:preview:apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lampy-android-chronicle-native-tests
+          path: apps/ios/modules/lampy-album-layout/android/build/reports/tests/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lampy-android-chronicle-preview-arm64
+          path: apps/ios/android/app/build/outputs/apk/release/app-release.apk

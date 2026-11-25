@@ -1,10 +1,10 @@
-import { personalRecordsOnly } from './mobile-capabilities';
+import { purchasesSupported } from './mobile-capabilities';
 
 export function canOpenPersonalSettingsDiagnostics(
   env: Record<string, string | undefined> = process.env,
   isDev: boolean = typeof __DEV__ !== 'undefined' && __DEV__,
 ): boolean {
-  if (personalRecordsOnly()) return false;
+  if (!purchasesSupported()) return false;
   if (env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS === '1') return true;
   if (env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS === '0') return false;
   return Boolean(isDev);
