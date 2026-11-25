@@ -30,3 +30,9 @@ it('keeps voice, unavailable media and missing source entries visible and tappab
  expect(page.queryByText('old date')).toBeNull();
  await fireEvent.press(page.getByTestId('life-album-entry-open-missing'));expect(open).toHaveBeenCalledWith(entries[2]);
 });
+it('keeps different days in one two-column flow instead of restarting with a half-empty row',async()=>{
+ const page=await render(<AlbumContentsPreview entries={[entry('one','第一天'),entry('two','第二天')]} onOpen={()=>undefined}/>);
+ const tiles=page.getByTestId('life-album-content-tiles');
+ expect(tiles.children).toHaveLength(2);
+ expect(page.getByText('第一天')).toBeTruthy();expect(page.getByText('第二天')).toBeTruthy();
+});

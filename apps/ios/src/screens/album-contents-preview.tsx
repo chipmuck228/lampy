@@ -18,15 +18,15 @@ export function albumContentsGroups(entries:AlbumEntryView[]){
  return groups;
 }
 export function AlbumContentsPreview({entries,onOpen}:{entries:AlbumEntryView[];onOpen:(entry:AlbumEntryView)=>void}){
+ const tiles=albumContentsGroups(entries).flatMap(group=>group.entries.map((item,i)=>({...item,date:i===0?group.date:null})));
  return <View style={styles.contents} testID="life-album-contents">
-  {albumContentsGroups(entries).map((group,groupIndex)=><View key={groupIndex} style={styles.group}>
-   {group.date?<Text accessibilityRole="header" style={styles.date} testID={`life-album-entry-date-${group.entries[0].entry.momentId}`}>{group.date}</Text>:null}
-   <View style={styles.tiles}>{group.entries.map(({entry,index},position)=>{
+   <View style={styles.tiles} testID="life-album-content-tiles">{tiles.map(({entry,index,date},position)=>{
     const ready=entry.source==='ready',hasPhoto=ready&&entry.photoCount>0;
     const duration=formatAlbumAudioDuration(entry.audioDurationMs);
     const label=ready?[entry.noteExcerpt,entry.dateLabel,entry.photoCount?tr('有{0}张照片',[entry.photoCount]):null,entry.hasAudio?(duration||tr('有声音')):null,entry.unknownCount?tr('还有一种现在打不开的媒介。'):null].filter(Boolean).join(' · '):ALBUM_MISSING_SOURCE;
     return <Pressable key={entry.momentId} accessibilityRole="button" accessibilityLabel={label||tr('第{0}条',[index+1])} testID={`life-album-entry-open-${entry.momentId}`} onPress={()=>onOpen(entry)} style={[styles.tile,position%2===1&&styles.offset]}>
      <View testID={`life-album-entry-${entry.momentId}`} style={styles.tileBody}>
+      {date?<Text accessibilityRole="header" style={styles.date} testID={`life-album-entry-date-${entry.momentId}`}>{date}</Text>:null}
       {hasPhoto?<View style={styles.photoMount}>
        {entry.photoCount>1?<View pointerEvents="none" style={styles.stack} testID={`life-album-entry-stack-${entry.momentId}`}/>:null}
        {entry.thumbnailUri?<Image source={{uri:entry.thumbnailUri}} style={[styles.photo,position%3===1&&styles.portrait]} contentFit="cover" accessibilityIgnoresInvertColors testID={`life-album-entry-thumb-${entry.momentId}`}/>:<View style={[styles.photo,styles.placeholder]}><LifeIcon name="photo" size={25}/><Text style={styles.meta}>{tr('有照片')}</Text></View>}
@@ -41,12 +41,10 @@ export function AlbumContentsPreview({entries,onOpen}:{entries:AlbumEntryView[];
      </View>
     </Pressable>;
    })}</View>
-  </View>)}
  </View>;
 }
 const styles=StyleSheet.create({
  contents:{gap:28,paddingTop:16,paddingBottom:20},
- group:{gap:14},
  date:{...type.meta,color:inkSoft,fontSize:13,lineHeight:20,letterSpacing:.3},
  tiles:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',alignItems:'flex-start',rowGap:22},
  tile:{width:'47%',minHeight:48},
