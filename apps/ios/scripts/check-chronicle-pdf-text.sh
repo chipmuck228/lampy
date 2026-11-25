@@ -141,4 +141,113 @@ if !results.allSatisfy({ $0 }) {
 }
 print("CHRONICLE_PDF_TEXT_CHECKS_OK: 28 production Swift/PDFKit cases")
 SWIFT
+if [[ "${1:-}" == "--webkit" ]]; then
+  cat >> "$check_file" <<'WEBKIT_SWIFT'
+import AppKit
+import WebKit
+
+// This probe uses inline text only. It reads no Album, images or credentials.
+private final class ChronicleWebKitProbe: NSObject, WKNavigationDelegate {
+  private let text = ProcessInfo.processInfo.environment["LAMPY_PDF_PROBE_TEXT"] ?? "小猫和panda，各自休息"
+  private let cases: [(String, String)] = [
+    ("current", ""),
+    ("kaiti-first", ".chronicle-pair-copy{font-family:'Kaiti SC',STKaiti,KaiTi,'Songti SC',Georgia,serif}"),
+    ("songti-first", ".chronicle-pair-copy{font-family:'Songti SC',STSong,Georgia,serif}")
+  ]
+  private var cursor = 0
+  private var currentPassed = false
+  private var view: WKWebView?
+  private var timeout: DispatchWorkItem?
+  private var css = ""
+  func start() {
+    do {
+      let source = try String(contentsOfFile:"src/application/album-chronicle-pair.ts",encoding:.utf8)
+      let parts = source.components(separatedBy:"export const CHRONICLE_PAIR_CSS=`")
+      guard parts.count == 2, let block = parts[1].components(separatedBy:"`;").first else { fail("CSS_SOURCE",nil); return }
+      css = block.replacingOccurrences(of:"${CHRONICLE_TEXT_COLOR}",with:"#105f62")
+      let config = WKWebViewConfiguration(); config.websiteDataStore = .nonPersistent()
+      let web = WKWebView(frame:CGRect(x:0,y:0,width:1200,height:900),configuration:config)
+      web.navigationDelegate = self; view = web
+      print("WEBKIT_PROBE input=\(String(reflecting:text)) uses=inline-text-only")
+      load()
+    } catch { fail("CSS_READ",error) }
+  }
+  private func escaped(_ value:String) -> String {
+    value.replacingOccurrences(of:"&",with:"&amp;").replacingOccurrences(of:"<",with:"&lt;").replacingOccurrences(of:">",with:"&gt;")
+  }
+  private func load() {
+    if cursor == cases.count {
+      print("CHRONICLE_WEBKIT_PROBE_COMPLETE current=\(currentPassed ? "PASS" : "FAIL")")
+      view?.navigationDelegate = nil; view?.stopLoading(); timeout?.cancel()
+      exit(currentPassed ? 0 : 1)
+    }
+    timeout?.cancel()
+    let deadline = DispatchWorkItem { [weak self] in self?.fail("TIMEOUT",nil) }
+    timeout = deadline; DispatchQueue.main.asyncAfter(deadline:.now()+30,execute:deadline)
+    let html = """
+    <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1200,height=900"><style>
+    *{box-sizing:border-box}html,body{margin:0;padding:0;width:1200px;height:900px}.fixed-page{position:relative;width:1200px;height:900px}
+    .fixed-prose{font-size:28px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;width:100%}
+    \(css)
+    \(cases[cursor].1)
+    </style></head><body><main class="fixed-page"><section class="chronicle-pair-page" lang="en"><div class="chronicle-pair-copy" style="left:800px;top:252px;width:320px;height:396px"><div class="fixed-prose">\(escaped(text))</div></div></section></main></body></html>
+    """
+    view?.loadHTMLString(html,baseURL:nil)
+  }
+  func webView(_ webView:WKWebView,didFinish navigation:WKNavigation!) {
+    webView.callAsyncJavaScript("await document.fonts.ready;return true;",arguments:[:],in:nil,in:.page) { [weak self] ready in
+      guard let self = self else { return }
+      switch ready {
+      case .failure(let error): self.fail("FONTS",error)
+      case .success:
+        let config = WKPDFConfiguration(); config.rect = CGRect(x:0,y:0,width:1200,height:900)
+        webView.createPDF(configuration:config) { [weak self] result in
+          guard let self = self else { return }
+          do { try self.inspect(try result.get()); self.cursor += 1; self.load() }
+          catch { self.fail("CREATE_PDF",error) }
+        }
+      }
+    }
+  }
+  private func inspect(_ data:Data) throws {
+    guard let document = PDFDocument(data:data), document.pageCount == 1, let page = document.page(at:0) else {
+      throw NSError(domain:"LampyProbe",code:1)
+    }
+    let raw = page.string ?? ""
+    let expected = compactChroniclePdfText(text), actual = compactChroniclePdfText(raw)
+    let check = ChronicleTextCheck(parts:[text],viewportRect:CGRect(x:800,y:252,width:320,height:396))
+    let passed = printChronicleTextCheck(check,in:page)
+    if cursor == 0 { currentPassed = passed }
+    print("WEBKIT_CASE \(cases[cursor].0) exact=\(expected == actual) accepted=\(passed) expected=\(expected.unicodeScalars.count) extracted=\(actual.unicodeScalars.count)")
+    print("WEBKIT_RAW \(String(reflecting:raw))")
+    print("WEBKIT_DIFF missing=\(delta(expected,actual)) extra=\(delta(actual,expected))")
+    var names = Set<String>()
+    if let attributed = page.attributedString {
+      attributed.enumerateAttribute(NSAttributedString.Key("NSFont"),in:NSRange(location:0,length:attributed.length),options:[]) { value,_,_ in
+        if let font = value as? NSFont { names.insert(font.fontName) }
+      }
+    }
+    print("WEBKIT_FONTS \(names.sorted().joined(separator:","))")
+  }
+  private func delta(_ from:String,_ to:String) -> String {
+    var counts: [UInt32:Int] = [:]
+    for scalar in from.unicodeScalars { counts[scalar.value,default:0] += 1 }
+    for scalar in to.unicodeScalars { counts[scalar.value,default:0] -= 1 }
+    return counts.keys.sorted().filter { counts[$0,default:0] > 0 }.map { String(format:"U+%04X",$0)+"x\(counts[$0]!)" }.joined(separator:",")
+  }
+  func webView(_ webView:WKWebView,didFail navigation:WKNavigation!,withError error:Error) { fail("LOAD",error) }
+  func webView(_ webView:WKWebView,didFailProvisionalNavigation navigation:WKNavigation!,withError error:Error) { fail("LOAD",error) }
+  func webViewWebContentProcessDidTerminate(_ webView:WKWebView) { fail("PROCESS",nil) }
+  private func fail(_ stage:String,_ error:Error?) {
+    print("WEBKIT_PROBE_ERROR stage=\(stage) code=\((error as NSError?)?.code ?? 0)")
+    exit(2)
+  }
+}
+private let application = NSApplication.shared
+application.setActivationPolicy(.prohibited)
+private let webkitProbe = ChronicleWebKitProbe()
+DispatchQueue.main.async { webkitProbe.start() }
+application.run()
+WEBKIT_SWIFT
+fi
 swift "$check_file"

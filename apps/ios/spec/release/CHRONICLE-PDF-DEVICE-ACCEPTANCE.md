@@ -74,3 +74,15 @@ Mac diagnostics show an out-of-order raw string and malformed negative stored wi
 Read stored size.width/height to reject malformed anchors. A second spatial path preserves the internal text order of whitespace-delimited extracted blocks and positions each block using only its valid positive character bounds. Every character remains in the comparison; an entirely unanchored block fails closed. Blocks are never ordered using expected text or an unordered character inventory. Both raw-page and final-merged checks use this adapter. Missing/replaced text remains rejected.
 
 The script replays the exact measured coordinates of the synthetic sample, with additional missing/replaced/unanchored negative cases. It now has 25 pure matching/spatial cases and three real CoreText/PDFKit cases. Expected final output is `CHRONICLE_PDF_TEXT_CHECKS_OK: 28 production Swift/PDFKit cases`. Mac execution of this revision and subsequent iPhone export remain required. Do not install again until the script passes; diagnostic output remains available if it fails. No original Album text is embedded in tests.
+
+## Device character-map mismatch after Mac matcher acceptance
+
+The user's Mac passed all 28 CoreText/PDFKit cases, but the iPhone WebKit export still rejects page 17 with `sameCharacters=no`, expected/extracted lengths both 13. This is not established as an ordering-only problem. The existing CoreText sample is not a WebKit rendering test. Do not weaken text equality or declare the original issue resolved.
+
+The optional `--webkit` mode of check-chronicle-pdf-text.sh now tests the actual WKWebView.createPDF API with current pair typography CSS read from source, then Kaiti-first and Songti-first diagnostic alternatives. It uses the same production matching/PDFKit adapter. It prints WEBKIT_CASE, WEBKIT_RAW, WEBKIT_DIFF (missing/extra Unicode scalar counts) and WEBKIT_FONTS for inline test text. Default text is synthetic; LAMPY_PDF_PROBE_TEXT explicitly supplies one local test sentence. It reads no Album or media. No production font change is included.
+
+```bash
+LAMPY_PDF_PROBE_TEXT='自选的一句中英文混排文字' bash apps/ios/scripts/check-chronicle-pdf-text.sh --webkit
+```
+
+Run from the repository root on a Mac desktop session. After the unchanged 28 CoreText cases, it compares three WebKit cases. The current-font case controls the final exit status; the alternatives are diagnostics only. Timeout/load failures return nonzero. Mac WebKit execution is pending; even a Mac success cannot prove identical iOS font fallback. Inspect these results before another device install. Raw probe text is printed only for the explicitly supplied/default test sentence; normal App diagnostics remain content-free.
