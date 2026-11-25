@@ -18,12 +18,12 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
  const {input,assets,dates,language}=options;const zh=language==='zh-Hans';const pages:ImagebookPage[]=[];
  const add=(name:string,title:string,body:string,nav=false)=>pages.push({name,title,body:`<main class="fixed-page">${body}</main>`,nav});
 
- const fullPages:ImagebookPage[]=[];
+ const photoDetails:Record<string,string[]>={};
  let photoPage=0,readingPage='',photoCredit='';
  const linkedPhoto=(media:typeof input.entries[number]['media'][number],target:number,fit?:'cover'|'contain')=>{
   const n=++photoPage,full=`photo-${n}`,anchor=`view-${n}`;
-  fullPages.push({name:full,title:zh?'完整图片':'Full photograph',nav:false,linear:false,body:`<main class="fixed-page"><div class="original-photo"><img src="${escape(assets[media.assetId].path)}" alt="${zh?'完整图片':'Full photograph'}"/></div><p class="photo-credit">${escape(photoCredit)}</p><a class="photo-return" href="${readingPage}.xhtml#${anchor}">${zh?'返回正文':'Back to reading'} ↩</a></main>`});
-  return `<a id="${anchor}" class="photo-link" href="${full}.xhtml" aria-label="${zh?'查看完整图片':'View full photograph'}"><img style="object-fit:${fit??photoFit(media,target)}" src="${escape(assets[media.assetId].path)}" alt="${zh?'点击查看完整图片':'Open full photograph'}"/></a>`;
+  (photoDetails[readingPage]??=[]).push(`<aside id="${full}" class="photo-detail" aria-label="${zh?'完整图片':'Full photograph'}"><div class="original-photo"><img src="${escape(assets[media.assetId].path)}" alt="${zh?'完整图片':'Full photograph'}"/></div><p class="photo-credit">${escape(photoCredit)}</p><a class="photo-return" href="#${anchor}">${zh?'返回正文':'Back to reading'} ↩</a></aside>`);
+  return `<a id="${anchor}" class="photo-link" href="#${full}" aria-label="${zh?'查看完整图片':'View full photograph'}"><img style="object-fit:${fit??photoFit(media,target)}" src="${escape(assets[media.assetId].path)}" alt="${zh?'点击查看完整图片':'Open full photograph'}"/></a>`;
  };
  const photo=(_index:number,media:typeof input.entries[number]['media'][number])=>linkedPhoto(media,0);
  const heading=escape(input.album.name);
@@ -38,7 +38,7 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(chapter)for(const leaf of chronicleDatePages(options,index,escape))add(leaf.name,leaf.title,leaf.body,leaf.nav);
   const label=`<header class="fixed-meta">${chapter?`<h2>${escape(date.chapter)}</h2>`:''}<p>${escape(date.label)}${section.indices.length===1&&record.attribution?' · '+escape(record.attribution):''}${section.indices.length===1&&record.feeling?' · '+escape(record.feeling):''}</p></header>`;
   let page=0;const name=()=>`record-${index+1}${page?'-'+(page+1):''}`;
-  const addRecord=(body:string,showHeader=true)=>{add(name(),date.chapter,`${showHeader?label:''}${body}`,false);page++;};
+  const addRecord=(body:string,showHeader=true)=>{add(name(),date.chapter,`${showHeader?label:''}${body}${(photoDetails[name()]??[]).join('')}`,false);delete photoDetails[name()];page++;};
   photoCredit=[day.label,record.attribution,record.feeling].filter(Boolean).join(' · ');
   if(section.layout==='daily-notes'&&section.indices.length>1){
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
@@ -131,7 +131,7 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
   if(!page)addRecord('<div class="text-only"></div>');
  });
  add('archive',zh?'Lampy · 留存':'Lampy · Colophon',`<section class="edition-notes"><img class="edition-symbol" src="lampy-symbol.svg" alt="Lampy"/><p class="edition-brand">Lampy</p><p class="edition-title">${heading}</p><p class="edition-range">${escape(bookDateRange(options))}</p><p class="made">${zh?'珍藏于':'Kept on'} ${escape(options.createdAt.slice(0,10))}</p></section>`,true);
- return [...pages,...fullPages];
+ return pages;
 }
 export const IMAGEBOOK_CSS=`
 @page{margin:0;size:1200px 900px}
@@ -169,6 +169,7 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 
 .date-opener{position:absolute;left:180px;right:180px;top:340px}.date-opener h1{font-size:68px;line-height:1.4;font-weight:400}.date-rule{width:70px;border-top:2px solid #40564a;margin-bottom:35px}
 
+.photo-detail{display:none;position:absolute;inset:0;z-index:20;background:#faf9f5}.photo-detail:target{display:block}.photo-detail img{object-fit:contain}
 .photo-link{display:block;width:100%;height:100%;color:inherit}.photo-link:focus{outline:2px solid #40564a;outline-offset:4px}.original-photo{position:absolute;inset:48px 64px 110px}.photo-return{position:absolute;bottom:38px;left:64px;font:22px/1.5 Georgia,serif;color:#40564a;text-decoration:none}
 .composed{position:absolute;left:64px;right:64px;top:128px;bottom:64px;display:flex;flex-direction:column;gap:30px}.composition-photos{flex:1;min-height:0;display:flex;gap:24px}.slot{flex:1;min-width:0;min-height:0}.composition-prose{font-size:26px;line-height:1.65;max-width:880px;margin:0 auto;flex:none}
 .portrait-story{flex-direction:row;gap:65px;align-items:center}.portrait-story .composition-photos{height:100%;flex:1}.portrait-story .composition-prose{flex:1;max-width:440px}.portrait-story:not(.with-note) .composition-photos{max-width:550px;margin:auto}

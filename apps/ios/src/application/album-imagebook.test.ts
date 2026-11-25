@@ -16,14 +16,14 @@ it('uses complete landscape pages, optional audio, default preface and final edi
  const order=[...opf.querySelectorAll('spine itemref')].map(n=>n.getAttribute('idref')!);expect(order.slice(0,2)).toEqual(['cover','opening']);expect([...opf.querySelectorAll('spine itemref:not([linear="no"])')].at(-1)!.getAttribute('idref')).toBe('archive');
  const records=order.filter(n=>n.startsWith('record-')).map(n=>xml(files['OEBPS/'+n+'.xhtml']));
  expect(records.flatMap(doc=>[...doc.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).join('')).toBe(input.entries[0].note);
- expect(records.flatMap(doc=>[...doc.querySelectorAll('img,audio')].map(n=>n.getAttribute('src')))).toEqual(['media/photo-1.jpg','media/sound.m4a','media/photo-2.jpg']);
+ expect(records.flatMap(doc=>[...doc.querySelectorAll('.photo-link img,audio')].map(n=>n.getAttribute('src')))).toEqual(['media/photo-1.jpg','media/sound.m4a','media/photo-2.jpg']);
  for(const name of order){const doc=xml(files['OEBPS/'+name+'.xhtml']);expect(doc.querySelector('parsererror')).toBeNull();expect(doc.querySelector('meta[name="viewport"]')!.getAttribute('content')).toBe('width=1200, height=900');expect(doc.querySelector('figcaption,script')).toBeNull();}
  expect(xml(files['OEBPS/opening.xhtml']).body.textContent).toContain('把一些平常的日子');
  const all=order.map(n=>strFromU8(files['OEBPS/'+n+'.xhtml'])).join('');expect(all).not.toContain('private-record');expect(all).not.toContain('Opening words');expect(all).not.toContain('MOMENTS IN THESE PAGES');expect(all).not.toContain('autoplay');
 });
 it('retains the user preface unchanged, including an all-photo record and words cover',()=>{
  const custom={...input,album:{...input.album,opening:'原来的开篇。'},entries:[{...input.entries[0],note:'',media:[input.entries[0].media[0]]}]};
- const files=albumEpubDocuments({...options,input:custom});expect(xml(files['OEBPS/opening.xhtml']).querySelector('.fixed-prose')!.textContent).toBe('原来的开篇。');expect(xml(files['OEBPS/record-1.xhtml']).querySelectorAll('img')).toHaveLength(1);
+ const files=albumEpubDocuments({...options,input:custom});expect(xml(files['OEBPS/opening.xhtml']).querySelector('.fixed-prose')!.textContent).toBe('原来的开篇。');expect(xml(files['OEBPS/record-1.xhtml']).querySelectorAll('.photo-link img')).toHaveLength(1);
 });
 
 it('preserves each grouped daily note and all three photographs in a planned gallery',()=>{
@@ -32,7 +32,7 @@ it('preserves each grouped daily note and all three photographs in a planned gal
  const third={...first,momentId:'three',note:'',media:[input.entries[0].media[0],input.entries[0].media[2],input.entries[0].media[0]]};
  const files=albumEpubDocuments({...options,input:{...input,entries:[first,second,third]}});
  const day=xml(files['OEBPS/record-1.xhtml']);expect([...day.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).toEqual([first.note,second.note]);expect(files['OEBPS/record-2.xhtml']).toBeUndefined();
- const gallery=xml(files['OEBPS/record-3.xhtml']);expect([...gallery.querySelectorAll('img')].map(n=>n.getAttribute('src'))).toEqual(['media/photo-1.jpg','media/photo-2.jpg','media/photo-1.jpg']);
+ const gallery=Object.entries(files).filter(([name])=>/^OEBPS\/record-3(?:-\d+)?\.xhtml$/.test(name)).map(([,v])=>xml(v));expect(gallery.flatMap(d=>[...d.querySelectorAll('.photo-link img')].map(n=>n.getAttribute('src')))).toEqual(['media/photo-1.jpg','media/photo-2.jpg','media/photo-1.jpg']);
 });
 
 it.each(['literary','imagebook'] as const)('places one standalone date before all moments that day in %s',design=>{
@@ -47,10 +47,10 @@ it.each(['literary','imagebook'] as const)('places one standalone date before al
 
 it('links every cropped photo to a complete offline image and returns to its exact source page',()=>{
  const custom={...input,entries:[{...input.entries[0],note:'短文',media:[{...input.entries[0].media[0],intrinsicRatio:.8}]}]};
- const files=albumEpubDocuments({...options,input:custom});const source=xml(files['OEBPS/record-1.xhtml']);const link=source.querySelector('.photo-link')!;const target=link.getAttribute('href')!;const full=xml(files['OEBPS/'+target]);
+ const files=albumEpubDocuments({...options,input:custom});const source=xml(files['OEBPS/record-1.xhtml']);const link=source.querySelector('.photo-link')!;const target=link.getAttribute('href')!;const full=source.getElementById(target.slice(1))!;
  expect(full.querySelector('.original-photo img')!.getAttribute('src')).toBe('media/photo-1.jpg');
- const back=full.querySelector('.photo-return')!.getAttribute('href')!.split('#');expect(back[0]).toBe('record-1.xhtml');expect(source.getElementById(back[1])).toBe(link);
- const opf=xml(files['OEBPS/package.opf']);expect(opf.querySelector('itemref[idref="photo-1"]')!.getAttribute('linear')).toBe('no');
+ const back=full.querySelector('.photo-return')!.getAttribute('href')!.split('#');expect(back[0]).toBe('');expect(source.getElementById(back[1])).toBe(link);
+ const opf=xml(files['OEBPS/package.opf']);expect(opf.querySelector('itemref[idref="photo-1"]')).toBeNull();expect([...opf.querySelectorAll('spine itemref')].at(-1)!.getAttribute('idref')).toBe('archive');
  expect(full.querySelector('script')).toBeNull();
 });
 
@@ -67,9 +67,35 @@ it('makes one landscape photo a continuous three-panel plate with no repeated da
  const record={...input.entries[0],note:'',feeling:'感动',attribution:'家人',media:[{...input.entries[0].media[2],widthPx:1400,heightPx:932}]};
  const files=albumEpubDocuments({...options,input:{...input,entries:[record]}});const doc=xml(files['OEBPS/record-1.xhtml']);
  expect(doc.querySelectorAll('.continuous-triptych img')).toHaveLength(1);expect(doc.querySelectorAll('.triptych-seam')).toHaveLength(2);expect(doc.querySelector('.fixed-meta')).toBeNull();expect(doc.querySelector('.feeling-stripe')!.getAttribute('style')).toContain('#9FBAB0');
- const full=xml(files['OEBPS/'+doc.querySelector('.photo-link')!.getAttribute('href')]);expect(full.querySelector('.photo-credit')!.textContent).toContain('家人 · 感动');expect(full.querySelector('.photo-return')!.getAttribute('href')).toContain('record-1.xhtml#view-');
+ const full=doc.getElementById(doc.querySelector('.photo-link')!.getAttribute('href')!.slice(1))!;expect(full.querySelector('.photo-credit')!.textContent).toContain('家人 · 感动');expect(full.querySelector('.photo-return')!.getAttribute('href')).toMatch(/^#view-/);
 });
 it('does not force portrait photos into a heavily cropped triptych or invent a feeling',()=>{
  const record={...input.entries[0],note:'',feeling:'',media:[input.entries[0].media[0]]};
  const files=albumEpubDocuments({...options,input:{...input,entries:[record]}});const doc=xml(files['OEBPS/record-1.xhtml']);expect(doc.querySelector('.single-photo-plate')).not.toBeNull();expect(doc.querySelector('.triptych-seam,.feeling-stripe,.fixed-meta')).toBeNull();expect(doc.querySelector('img')!.getAttribute('style')).toContain('contain');
+});
+
+it('ends the physical spine at the closing page and keeps complete images in same-page target views',()=>{
+ const record={...input.entries[0],note:'一起走过的日子。',media:[{...input.entries[0].media[0],widthPx:1200,heightPx:1800},{...input.entries[0].media[2],widthPx:1400,heightPx:932}]};
+ const files=albumEpubDocuments({...options,input:{...input,entries:[record]}}),opf=xml(files['OEBPS/package.opf']);
+ const order=[...opf.querySelectorAll('spine itemref')].map(n=>n.getAttribute('idref'));
+ expect(order.at(-1)).toBe('archive');expect(order.some(n=>n!.startsWith('photo-'))).toBe(false);
+ expect(Object.keys(files).some(n=>/^OEBPS\/photo-.*\.xhtml$/.test(n))).toBe(false);
+ const raw=strFromU8(files['OEBPS/record-1.xhtml']),source=xml(files['OEBPS/record-1.xhtml']),css=strFromU8(files['OEBPS/style.css']);
+ const links=[...source.querySelectorAll('.photo-link')];expect(links).toHaveLength(2);
+ for(const link of links){
+  const hash=link.getAttribute('href')!;expect(hash.startsWith('#')).toBe(true);
+  const viewer=source.getElementById(hash.slice(1))!;expect(viewer.classList.contains('photo-detail')).toBe(true);
+  expect(viewer.parentElement!.classList.contains('fixed-page')).toBe(true);expect(viewer.closest('.chronicle-pair-photo')).toBeNull();
+  expect(viewer.querySelector('img')!.getAttribute('src')).toBe(link.querySelector('img')!.getAttribute('src'));
+  const back=viewer.querySelector('.photo-return')!.getAttribute('href')!;expect(back).toBe('#'+link.id);
+  for(const [fragment,shown] of [['',false],[hash,true],[back,false]] as const){
+   const dom=new JSDOM(raw,{url:'https://lampy.invalid/record-1.xhtml'+fragment});
+   const style=dom.window.document.createElement('style');style.textContent=css;dom.window.document.head.appendChild(style);
+   const target=dom.window.document.getElementById(hash.slice(1))!;
+   expect(dom.window.getComputedStyle(target).display).toBe(shown?'block':'none');
+   if(shown)expect(dom.window.document.querySelectorAll('.photo-detail:target')).toHaveLength(1);
+   dom.window.close();
+  }
+ }
+ expect(source.querySelector('script')).toBeNull();
 });

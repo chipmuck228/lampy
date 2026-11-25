@@ -34,7 +34,7 @@ it('retains full-image return anchors on each separate photo page',()=>{
  for(const [i,name]of ['record-1','record-1-2'].entries()){
   const source=xml(files['OEBPS/'+name+'.xhtml']),link=source.querySelector('.photo-link')!,target=link.getAttribute('href')!;
   expect(link.querySelector('img')!.getAttribute('src')).toBe(i?'media/b.jpg':'media/a.jpg');expect(link.querySelector('img')!.getAttribute('style')).toContain('contain');
-  expect(xml(files['OEBPS/'+target]).querySelector('.photo-return')!.getAttribute('href')).toBe(name+'.xhtml#'+link.id);
+  expect(source.getElementById(target.slice(1))!.querySelector('.photo-return')!.getAttribute('href')).toBe('#'+link.id);
  }
  expect(xml(files['OEBPS/record-1-3.xhtml']).querySelector('.chronicle-prose')!.textContent).toBe('短文');
 });
@@ -50,7 +50,7 @@ it.each([{order:['sound','a','b']},{order:['a','sound','b']},{order:['a','b','so
  const images={a:image('a',1200,1800),b:image('b',1400,932),sound:{assetId:'sound',role:'audio',availability:'available',intrinsicRatio:null,durationMs:42000} as AlbumLayoutMediaInput};
  const files=albumEpubDocuments(options(order.map(id=>images[id as keyof typeof images]),'短文'));
  const docs=Object.entries(files).filter(([name])=>/OEBPS\/record-.*xhtml$/.test(name)).map(([,v])=>xml(v));
- expect(docs.flatMap(d=>[...d.querySelectorAll('img,audio')].map(n=>n.getAttribute('src')))).toEqual(order.map(id=>'media/'+(id==='sound'?'sound.m4a':id+'.jpg')));
+ expect(docs.flatMap(d=>[...d.querySelectorAll('.photo-link img,audio')].map(n=>n.getAttribute('src')))).toEqual(order.map(id=>'media/'+(id==='sound'?'sound.m4a':id+'.jpg')));
  expect(docs.filter(d=>d.querySelector('audio')).every(d=>!d.querySelector('img'))).toBe(true);
- for(const d of docs)for(const link of d.querySelectorAll('.photo-link'))expect(xml(files['OEBPS/'+link.getAttribute('href')]).querySelector('.photo-return')!.getAttribute('href')).toContain('#'+link.id);
+ for(const d of docs)for(const link of d.querySelectorAll('.photo-link'))expect(d.getElementById(link.getAttribute('href')!.slice(1))!.querySelector('.photo-return')!.getAttribute('href')).toContain('#'+link.id);
 });

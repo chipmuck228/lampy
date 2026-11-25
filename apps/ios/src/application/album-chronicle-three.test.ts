@@ -18,7 +18,7 @@ it('keeps all writing, exact full-photo returns and separate long prose',()=>{
  const docs=Object.entries(files).filter(([n])=>/OEBPS\/record-.*xhtml$/.test(n)).map(([,v])=>xml(v));
  expect(docs.flatMap(d=>[...d.querySelectorAll('.fixed-prose')].map(n=>n.textContent)).join('')).toBe(note);
  expect(docs[0].querySelectorAll('.three-photo')).toHaveLength(3);
- for(let i=1;i<=3;i++)expect(xml(files['OEBPS/photo-'+i+'.xhtml']).querySelector('.photo-return')!.getAttribute('href')).toBe('record-1.xhtml#view-'+i);
+ for(let i=1;i<=3;i++)expect(docs[0].getElementById('photo-'+i)!.querySelector('.photo-return')!.getAttribute('href')).toBe('#view-'+i);
  }
 });
 it('uses safe individual plates for tiny, unknown and extreme photos',()=>{

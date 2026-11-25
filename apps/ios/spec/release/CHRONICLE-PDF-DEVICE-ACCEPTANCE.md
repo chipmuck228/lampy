@@ -26,6 +26,7 @@ In Xcode use Lampy / your iPhone / Release and the existing StoreKit configurati
 - Short caption (<=2 measured lines) stays below its photos; long prose uses separate pages, max nine measured lines per page, initial enlargement, quotes, closing rule and breathing room. Test CJK, English, emoji, combining accents, paragraphs and long unbroken words.
 - Check PDF text selection/search and source writing completeness, all images and sound markers once, native emoji validation and 100% print size. PDF contains sound information, not playable audio.
 - Paper preview uses the same native measured layout as a new PDF. Source/style change or leaving the screen must discard stale preview work.
+- EPUB complete-image view: tap a photo to expand it on the same fixed page; Return to reading closes it. Test both photos of a staggered pair, split fallback pages and all three wall photos. The last physical reading page must be the colophon; there must be no appended original-photo pages. Books target/return behaviour needs real-device confirmation.
 - Generate NEW PDF and EPUB editions. Historical saved files remain unchanged.
 
 ## Evidence limits

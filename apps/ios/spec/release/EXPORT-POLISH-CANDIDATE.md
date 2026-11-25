@@ -37,3 +37,12 @@ For Chinese-containing moment notes in new PDFs (regardless of app language), na
 ## Shared date/moment ink
 
 Moment writing now uses the date numeral's deep teal #105f62 across Chronicle EPUB single/pair/three-photo captions, standalone prose and generic/daily-note paths. PDF rendering carries the same bodyColor for note text and enlarged initials; metadata and static proof renderer use that ink too. Date layout, cover/opening typography, feeling gradients, ornaments and the main in-app moment screen remain unchanged. New exports only.
+
+
+## Closing-page navigation correction
+
+Complete-image views now live in a hidden `aside` at the root of their originating fixed page. Photo links target a same-document fragment; CSS `:target` displays the complete image above the composition, outside rotated photo frames. The return link restores the originating photo fragment and hides the view. No scripts, additional spine documents or duplicated media resources are introduced. The physical spine now ends at archive, even in readers that previously exposed non-linear documents.
+
+The earlier `linear=no` hint could not enforce hiding auxiliary pages: EPUB 3.3 explicitly permits reading systems to show non-linear content in sequence or at the end (https://www.w3.org/TR/epub-33/). Source/return anchors, default/open/closed CSS states and the final physical spine item are regression-tested. Native Books anchor/view behaviour still needs device acceptance. Generate a NEW EPUB; historical files remain unchanged.
+
+Validation for the closing-page correction: 7 suites / 99 tests pass; TypeScript, scoped ESLint and diff checks pass. Chinese/English production fixture EPUBs pass EPUBCheck 5.4.0 with zero errors/warnings. Both physical spines end in archive; 36 photo-view links and all local fragment destinations were checked. Tests check default/open/closed computed CSS display states and ensure the view is outside transformed photo frames. These checks do not replace iPhone Books interaction acceptance.

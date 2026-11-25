@@ -49,9 +49,9 @@ it('keeps a normal paragraph together and starts each prose continuation on its 
 it('retains separate audio and exact full-image return links for a single-photo moment',()=>{
  const audio:AlbumLayoutMediaInput={assetId:'audio',role:'audio',availability:'available',intrinsicRatio:null,durationMs:42000};
  const files=albumEpubDocuments(options([image(900,1600),audio],'留下声音。'));
- const main=xml(files['OEBPS/record-1.xhtml']),full=xml(files['OEBPS/photo-1.xhtml']);
+ const main=xml(files['OEBPS/record-1.xhtml']),full=main.getElementById('photo-1')!;
  expect(main.querySelector('audio')).toBeNull();expect(xml(files['OEBPS/record-1-2.xhtml']).querySelector('audio')!.getAttribute('src')).toBe('media/audio.m4a');
- expect(full.querySelector('.photo-return')!.getAttribute('href')).toBe('record-1.xhtml#view-1');expect(main.getElementById('view-1')).not.toBeNull();
+ expect(full.querySelector('.photo-return')!.getAttribute('href')).toBe('#view-1');expect(main.getElementById('view-1')).not.toBeNull();
  expect(main.body.textContent).toContain('妈妈 & 爸爸');expect(main.querySelector('.fixed-meta')).toBeNull();
 });
 it('shares Chronicle ink colours with the date gradient, without changing the native palette',()=>{
