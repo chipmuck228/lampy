@@ -12,7 +12,7 @@ check_file="$check_dir/check.swift"
 trap 'rm -f "$check_file"; rmdir "$check_dir"' EXIT
 printf 'import Foundation\n' > "$check_file"
 awk '
-/^private func (compactPdfText|printSegmentsMatch|printPageTextChecksMatch)\(/ { copying=1 }
+/^private func (compactPdfText|compactChroniclePdfText|printSegmentsMatch|printPageTextChecksMatch)\(/ { copying=1 }
 copying { print }
 copying && /^}$/ { copying=0 }
 ' modules/lampy-album-layout/ios/AlbumPrint.swift >> "$check_file"
@@ -31,6 +31,12 @@ verify("emoji excluded ranges retain order", true, [["Before", "after"]], "Befor
 verify("segments within a single source remain ordered", false, [["Before", "after"]], "after Before")
 verify("repeated writing in one source needs both occurrences", false, [["今天今天"]], "今天")
 verify("complete repeated writing", true, [["今天今天"]], "今天今天")
-print("CHRONICLE_PDF_TEXT_CHECKS_OK: 9 production Swift cases")
+verify("presentation ligatures", true, [["office"]], "oﬃce")
+verify("fi and fl ligatures", true, [["find flowers"]], "ﬁnd ﬂowers")
+verify("soft hyphen at wrapping", true, [["ordinary"]], "ordi\u{00AD}nary")
+verify("zero-width break", true, [["记忆"]], "记\u{200B}忆")
+verify("real hyphen is still required", false, [["mother-in-law"]], "motherinlaw")
+verify("missing letter is still rejected", false, [["ordinary"]], "ordinry")
+print("CHRONICLE_PDF_TEXT_CHECKS_OK: 15 production Swift cases")
 SWIFT
 swift "$check_file"

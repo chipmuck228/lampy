@@ -160,8 +160,16 @@ private func printSegmentsMatch(_ parts: [String], in text: String) -> Bool {
 }
 // Checks describe independent observations of the same page (DOM runs and source
 // title/note). Repeated observations must not consume a second text occurrence.
+private func compactChroniclePdfText(_ value: String) -> String {
+  // PDF font shaping may expose presentation ligatures (e.g. ﬁ) and discretionary
+  // line-break marks. Normalize only the comparison; never rewrite the source/PDF.
+  value.precomposedStringWithCompatibilityMapping.unicodeScalars.filter {
+    !CharacterSet.whitespacesAndNewlines.contains($0) && ![0x00AD, 0x200B, 0x2060, 0xFEFF].contains($0.value)
+  }.map { String($0) }.joined()
+}
 private func printPageTextChecksMatch(_ checks: [[String]], in text: String) -> Bool {
-  checks.allSatisfy { printSegmentsMatch($0, in: text) }
+  let actual = compactChroniclePdfText(text)
+  return checks.allSatisfy { printSegmentsMatch($0.map(compactChroniclePdfText).filter { !$0.isEmpty }, in: actual) }
 }
 func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: String) throws -> [String: Any] {
   guard let data = layoutJson.data(using: .utf8), let layout = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -361,14 +369,15 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
     let inspect = """
     await document.fonts.ready;
     for(const image of document.images){if(image.decode)await image.decode();if(!image.complete||!image.naturalWidth)throw new Error('IMAGE_UNREADABLE');}
-    const texts=[],images=[];
+    const texts=[],textKinds=[],images=[];
+    const role=el=>el.closest('.opening-copy')?'opening':el.closest('.opening-philosophy')?'philosophy':el.closest('.fixed-prose')?'writing':'imprint';
     const visible=el=>{for(let e=el;e;e=e.parentElement){const s=getComputedStyle(e);if(s.display==='none'||s.visibility==='hidden')return false;}return true;};
     const inside=r=>r.left>=-4&&r.top>=-4&&r.right<=1204&&r.bottom<=904;
     const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
-    while(walk.nextNode()){const n=walk.currentNode;if(!n.nodeValue.trim()||!visible(n.parentElement))continue;const range=document.createRange();range.selectNodeContents(n);const rects=Array.from(range.getClientRects());if(rects.some(r=>!inside(r)))throw new Error('INVALID_LAYOUT');if(rects.length)texts.push(n.nodeValue);}
+    while(walk.nextNode()){const n=walk.currentNode;if(!n.nodeValue.trim()||!visible(n.parentElement))continue;const range=document.createRange();range.selectNodeContents(n);const rects=Array.from(range.getClientRects());if(rects.some(r=>!inside(r)))throw new Error('INVALID_LAYOUT');if(rects.length&&!n.parentElement.closest('[aria-hidden="true"]')){texts.push(n.nodeValue);textKinds.push(role(n.parentElement));}}
     for(const image of document.images){if(!visible(image))continue;const r=image.getBoundingClientRect();if(!inside(r))throw new Error('INVALID_LAYOUT');images.push({path:image.getAttribute('src'),width:image.naturalWidth,height:image.naturalHeight,w:r.width,h:r.height});}
     const notes=recordPage?Array.from(document.querySelectorAll('.fixed-prose')).map(n=>n.textContent):[];
-    return {texts,images,notes};
+    return {texts,textKinds,images,notes};
     """
     webView.callAsyncJavaScript(inspect, arguments: ["recordPage": (page["name"] as? String ?? "").hasPrefix("record-")], in: nil, in: .page) { [weak self] result in
       guard let self = self, !self.finished else { return }
@@ -397,7 +406,14 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
       let ranges = try printColorGlyphRanges(value, font: UIFont.systemFont(ofSize: 17))
       for range in ranges { colorRanges.append(["page": cursor, "block": index, "line": 0, "startUTF16": range.location, "endUTF16": NSMaxRange(range)]) }
       let required = printRequiredSegments(value, excluding: ranges)
-      guard printSegmentsMatch(required, in: actual) else { throw printFailure("PDF_TEXT") }
+      guard printPageTextChecksMatch([required], in: actual) else {
+        let kinds = info["textKinds"] as? [String] ?? []
+        let role = index < kinds.count ? kinds[index] : "source"
+        let kind = ["opening", "philosophy", "writing", "imprint", "source"].contains(role) ? role : "unknown"
+        NSLog("[LampyPrint] stage=CHECK_PAGE_TEXT page=%ld check=%ld kind=%@ expected=%ld extracted=%ld code=PDF_TEXT",
+              cursor + 1, index + 1, kind, required.joined().unicodeScalars.count, actual.unicodeScalars.count)
+        throw printFailure("PDF_TEXT")
+      }
       pageChecks.append(required)
     }
     searchableChecks.append(pageChecks)

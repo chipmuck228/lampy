@@ -45,6 +45,14 @@ On the Mac, run the actual production Foundation-only Swift matcher regression b
 bash apps/ios/scripts/check-chronicle-pdf-text.sh
 ```
 
-Expected output: `CHRONICLE_PDF_TEXT_CHECKS_OK: 9 production Swift cases`. The script extracts the actual matching functions from AlbumPrint.swift (no separate implementation). Swift/Xcode are unavailable in the Linux environment, so these native cases have not been executed there.
+Expected output: `CHRONICLE_PDF_TEXT_CHECKS_OK: 15 production Swift cases`. The script extracts the actual matching functions from AlbumPrint.swift (no separate implementation). Swift/Xcode are unavailable in the Linux environment, so these native cases have not been executed there.
 
 Rebuild in Xcode and create a new PDF. Confirm completion, text search, actual file size, same Chronicle layout/ending, then revisit EPUB open/return. If export still fails, filter Xcode logs for `[LampyPrint]`: native output reports controlled stage/page/code; the JS service reports controlled stage/code/reason. Neither includes writing, photos, album identifiers or file paths. Keep the branch draft until iPhone PDF acceptance passes.
+
+## Page-two text extraction feedback (after 6399c52)
+
+The device now identifies `CHECK_PAGE_TEXT / page=2 / PDF_TEXT`, before the final merge. The second page is the opening. This evidence identifies the failing stage but not the individual text check. Do not infer that ExtensionKit cleanup logs caused the failure.
+
+The inspection had included explicitly aria-hidden ornamental quote glyphs in searchable text checks. It now still checks their geometry, while excluding their text from search validation. User quotes inside opening words or moment writing remain required. Compatibility normalization for PDF comparison accepts presentation ligatures such as `ﬁ`/`fi` and discretionary invisible line-break marks; it never rewrites the source or PDF, drops visible hyphens, or accepts missing letters. Independent run checks and source checks remain active on both raw pages and the merged result.
+
+On another mismatch native diagnostics now add `check`, controlled `kind` (opening/philosophy/writing/imprint/source), and expected/extracted scalar counts. No text or file path is logged. Native Swift matching cases have expanded to 15; the two new DOM tests execute the exact inspection JavaScript extracted from AlbumPrint.swift. They validate semantic/decorative selection, not PDFKit extraction. Run the Mac Swift script, rebuild, and export a NEW PDF. The exact device mismatch and resulting size remain pending device verification.
