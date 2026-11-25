@@ -28,7 +28,7 @@ const visibleProse=(text:string)=>text.replace(pageLeadingBreaks,'').trimEnd();
 function proseMarkup(text:string,escape:(s:string)=>string):string{
  const leading=text.match(pageLeadingBreaks)?.[0]??'';
  const escaped=(s:string)=>escape(s).replace(/\r/g,'&#13;');
- return (leading?`<span class="chronicle-join" aria-hidden="true">${escaped(leading)}</span>`:'')+escaped(text.slice(leading.length));
+ return (leading?`<span class="chronicle-join" aria-hidden="true">${escaped(leading)}</span>`:'')+(()=>{const rest=text.slice(leading.length);const first=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(rest)][0]?.segment:Array.from(rest)[0];return first?`<span class="prose-initial">${escaped(first)}</span>${escaped(rest.slice(first.length))}`:'';})();
 }
 /** Paragraphs stay together where possible; oversized paragraphs safely continue.
  * Separators remain with the preceding paragraph. No character or grapheme is lost. */
@@ -87,7 +87,7 @@ export function chronicleSingleBody(record:AlbumLayoutRecordInput,plan:Chronicle
 }
 export function chronicleProseBody(text:string,record:AlbumLayoutRecordInput,page:number,language:string,escape:(s:string)=>string):string{
  const color=chronicleFeeling(record.feeling)??'#829E96';
- return `<section class="chronicle-prose-page" lang="${language}">${chronicleBinding(record.feeling,escape)}<header class="chronicle-masthead">LAMPY<i aria-hidden="true"></i></header><span class="chronicle-prose-side" style="background:${color}" aria-hidden="true"></span><div class="chronicle-prose fixed-prose">${proseMarkup(text,escape)}</div><footer class="chronicle-prose-footer"><span lang="en">Chronicle</span><span class="chronicle-folio">${String(page+1).padStart(2,'0')}</span></footer></section>`;
+ return `<section class="chronicle-prose-page" lang="${language}">${chronicleBinding(record.feeling,escape)}<header class="chronicle-masthead">LAMPY<i aria-hidden="true"></i></header><span class="chronicle-prose-side" style="background:${color}" aria-hidden="true"></span><span class="prose-quote quote-open" aria-hidden="true">“</span><span class="prose-quote quote-close" aria-hidden="true">”</span><span class="prose-end-rule" aria-hidden="true"></span><div class="chronicle-prose fixed-prose">${proseMarkup(text,escape)}</div><footer class="chronicle-prose-footer"><span lang="en">Chronicle</span><span class="chronicle-folio">${String(page+1).padStart(2,'0')}</span></footer></section>`;
 }
 export const CHRONICLE_SINGLE_CSS=`
 .chronicle-single,.chronicle-prose-page{position:absolute;inset:0;background:#faf9f5;color:#303a37;font-family:"Songti SC","Noto Serif CJK SC",Baskerville,Georgia,serif}
@@ -97,6 +97,8 @@ export const CHRONICLE_SINGLE_CSS=`
 .chronicle-attribution{position:absolute;right:60px;bottom:22px;font:16px/1.5 Georgia,"Songti SC",serif;color:#687870;background:#faf9f5;padding:2px 8px}
 .chronicle-masthead{position:absolute;left:120px;right:120px;top:96px;font:17px/1.5 Georgia,serif;letter-spacing:5px;color:#105f62}.chronicle-masthead i{position:absolute;left:140px;right:0;top:12px;border-top:1px solid #b8cac4}
 .chronicle-prose.fixed-prose{position:absolute;left:220px;top:215px;width:760px;font-size:29px;line-height:1.85;letter-spacing:.025em;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2}.chronicle-prose-page:lang(en) .chronicle-prose{font-size:30px;line-height:1.8;letter-spacing:0}
+.chronicle-prose .prose-initial{float:left;display:block;font-size:72px;line-height:1;width:auto;margin:4px 12px 0 0;color:#105f62}
+.prose-quote{position:absolute;font:110px/1 Baskerville,Georgia,serif;color:#829e96;opacity:.5;pointer-events:none}.quote-open{left:145px;top:172px}.quote-close{right:138px;top:654px}.prose-end-rule{position:absolute;left:220px;top:744px;width:48px;border-top:2px solid #829e96}
 .chronicle-join{display:none}
 .chronicle-prose-side{position:absolute;left:168px;top:222px;width:2px;height:64px}.chronicle-prose-footer{position:absolute;left:120px;right:120px;top:782px;border-top:1px solid #b8cac4;padding-top:22px;font:italic 21px/1.4 Baskerville,Georgia,serif;color:#687870}.chronicle-folio{float:right;font:19px/1.4 Georgia,serif;letter-spacing:.1em}
 `;

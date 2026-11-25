@@ -178,3 +178,12 @@ publication-pair-collage-plan.cjs 从源宽高计算图片框尺寸、叠放偏�
 用户确认二稿后，album-chronicle-pair.ts 已接入 imagebookPages 正式导出，替代双图默认对齐布局：按实际尺寸计算照片框、轻微倾斜、错位、纸边和整体缩放；短文在右侧，长文复用装饰正文续页；无参考图图标。旋转角点保持安全边界，凸多边形遮挡比不超过10%。小图、极端比例及无可靠尺寸仍独立contain展示，文字另页，最大放大2倍。不进行主体识别。
 两图伴随声音时保留独立声音页及原始媒体顺序；声音处于两张照片之间时强制拆图页，避免将声音挪到别处。每个完整图片入口由真实来源页生成返回锚点，拆页第二张也能准确返回。单图和三图版式、定稿封面/开篇/日期、App心情色板及原生PDF保持既有行为。
 publication-pair-acceptance.cjs 直接调用正式albumEpubDocuments/buildAlbumEpub，不替换HTML/CSS；中英各11条记录覆盖五种组合有字/无字及长文。22套212项相关测试、TypeScript/ESLint/diff检查通过；中英正式验收EPUB均EPUBCheck零错误零警告，41张阅读文档完成单页、文字边界、原文完整与原图返回链接验证；8个封面/开篇/日期/书末文档与上一提交逐字节一致。未运行实际iPhone/Books验收；继续保持PR143草稿，不合并。
+
+
+### Chronicle three-photo integration and prose/audio refinement (2026-11-25)
+
+Approved three-photo wall now uses prepared dimensions to compare row, side-stack and top-stack compositions with 10px gaps, preserving image order and ratios. Extremely small, unknown or extreme-ratio photographs use separate complete plates. Conservative line budgets select a 300px circular short caption or 480×250px softly rounded text plate; overflow continues on decorated prose pages. Warm translucent backgrounds (80% / 86% opacity) carry full-opacity Lampy ink #25231F. Overlay placement is geometric, not subject detection.
+
+Long prose retains exact source text and pagination, adding a large first letter, decorative paired quotation marks outside the source text, a closing rule, masthead and folio. Audio pages reserve an explicit 100px native controls box plus 100px bottom padding; controls remain independent and non-autoplay. This addresses missing layout reservation; actual Books controls, scaling and playback require device acceptance.
+
+Reproduce production proof: `node scripts/publication-three-acceptance.cjs NEW_OUTPUT_DIR`. No HTML/CSS substitution. TypeScript and 61 focused tests pass; 19 Chinese/English production record pages render within page bounds. Keep PR draft, no merge.

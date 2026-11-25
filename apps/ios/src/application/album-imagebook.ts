@@ -1,3 +1,4 @@
+import {planChronicleThree,chronicleThreeBody,CHRONICLE_THREE_CSS} from './album-chronicle-three';
 import {planChroniclePair,chroniclePairPhoto,chroniclePairBody,CHRONICLE_PAIR_CSS} from './album-chronicle-pair';
 import {splitPublicationText} from './album-publication-text';
 import {chronicleDatePages,CHRONICLE_DATE_CSS} from './album-chronicle-date';
@@ -42,6 +43,19 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
   }
   const singleImages=record.media.filter(media=>media.role==='image');
+  if(singleImages.length===3&&record.media.every(m=>m.role==='image')){
+   const plan=planChronicleThree(singleImages,record.note);
+   if(plan){
+    readingPage=name();
+    addRecord(chronicleThreeBody(record,plan,singleImages.map(m=>linkedPhoto(m,0,'contain')),language,escape),false);
+    if(record.note.trim()&&!plan.overlay)chronicleProsePages(record.note).forEach((chunk,i)=>addRecord(chronicleProseBody(chunk,record,i,language,escape),false));
+    return;
+   }
+   // Small/unknown/extreme images retain their complete contents on safe plates.
+   for(const m of singleImages){readingPage=name();const plan=planChronicleSingle(m,'');addRecord(chronicleSingleBody({...record,note:''},plan,linkedPhoto(m,0,'contain'),language,escape),false);}
+   if(record.note.trim())chronicleProsePages(record.note).forEach((chunk,i)=>addRecord(chronicleProseBody(chunk,record,i,language,escape),false));
+   return;
+  }
   if(singleImages.length===2&&record.media.every(media=>media.role==='image'||media.role==='audio')){
    const first=record.media.findIndex(m=>m.role==='image'),last=record.media.map(m=>m.role).lastIndexOf('image');
    const plan=planChroniclePair(singleImages,record.note,last-first>1);
@@ -140,7 +154,7 @@ h1{font-weight:400;line-height:1.4;overflow-wrap:anywhere;max-width:840px}
 .opening-type .fixed-prose{font-size:32px;line-height:1.8}
 .photo-full{position:absolute;left:64px;right:64px;top:128px;bottom:44px}
 .photo-duo{position:absolute;left:44px;right:44px;top:128px;bottom:44px;display:flex;gap:28px}.photo-duo figure{flex:1;min-width:0}
-.voice-page{position:absolute;left:220px;right:220px;top:330px}.voice-label{font-size:30px;line-height:1.6;margin-bottom:35px}audio{width:100%}
+.voice-page{position:absolute;left:180px;right:180px;top:260px;min-height:340px;padding:48px 40px 100px;overflow:visible;border-top:1px solid #b8cac4;border-bottom:1px solid #b8cac4}.voice-page audio{display:block;width:100%;height:100px;min-height:100px;margin:0;overflow:visible}.voice-label{font-size:30px;line-height:1.6;margin-bottom:35px}audio{width:100%}
 .edition-notes{position:absolute;left:185px;right:185px;top:215px;font-size:24px;line-height:1.8}.edition-notes h1{font-size:40px;margin:25px 0}.edition-notes dl{display:flex;gap:70px;margin:35px 0}.edition-notes dt{font-size:34px}.edition-notes dd,.made{font:18px/1.8 -apple-system,sans-serif;color:#747a7a}
 
 .default-cover{background:#f4f1eb}.default-cover .cover-type{top:110px;bottom:310px}.default-symbol{position:absolute;right:130px;bottom:95px;width:220px;height:220px;opacity:.65}
@@ -170,4 +184,5 @@ ${CHRONICLE_OPENING_CSS}
 ${CHRONICLE_DATE_CSS}
 ${CHRONICLE_SINGLE_CSS}
 ${CHRONICLE_PAIR_CSS}
+${CHRONICLE_THREE_CSS}
 `;
