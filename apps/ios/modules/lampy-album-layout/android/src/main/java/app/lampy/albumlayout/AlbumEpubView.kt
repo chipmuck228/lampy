@@ -34,10 +34,14 @@ class AlbumEpubView(context: Context, appContext: AppContext) : ExpoView(context
   private var document: File? = null
   private val web = WebView(context)
   private var attached = false
+  private var destroyed = false
   private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+    override fun onDown(event: MotionEvent): Boolean = true
     override fun onFling(first: MotionEvent?, last: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
       if (first == null || kotlin.math.abs(last.x - first.x) < 80 * resources.displayMetrics.density || kotlin.math.abs(last.y - first.y) > 80 * resources.displayMetrics.density) return false
-      web.evaluateJavascript("!!document.querySelector('.photo-detail.is-open')") { opened -> if (root != null && opened == "false") onPageTurn(mapOf("direction" to if (last.x < first.x) 1 else -1)) }
+      val expected = document
+      val x = first.x / maxOf(1, web.width) * 1200f; val y = first.y / maxOf(1, web.height) * 900f
+      web.evaluateJavascript("(function(){var hit=document.elementFromPoint($x,$y);return !!document.querySelector('.photo-detail.is-open')||!!(hit&&hit.closest('audio,button,input,select,.photo-return'));})()") { opened -> if (root != null && document == expected && opened == "false") onPageTurn(mapOf("direction" to if (last.x < first.x) 1 else -1)) }
       return false
     }
   })
@@ -83,7 +87,7 @@ class AlbumEpubView(context: Context, appContext: AppContext) : ExpoView(context
         if (request.isForMainFrame && root != null) onFailure(emptyMap<String, Any>())
       }
       override fun onRenderProcessGone(view: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
-        stop(); onFailure(emptyMap<String, Any>()); return true
+        root = null; document = null; destroyed = true; removeView(web); web.destroy(); onFailure(emptyMap<String, Any>()); return true
       }
     }
     web.setOnTouchListener { _, event -> gestures.onTouchEvent(event); false }
@@ -91,7 +95,7 @@ class AlbumEpubView(context: Context, appContext: AppContext) : ExpoView(context
   fun setRoot(uri: String) { if (uri != rootUri) { stop(); rootUri = uri }; load() }
   fun setDocument(uri: String) { if (uri != documentUri) { stop(); documentUri = uri }; load() }
   private fun load() {
-    if (!attached || rootUri.isEmpty() || documentUri.isEmpty()) return
+    if (destroyed || !attached || rootUri.isEmpty() || documentUri.isEmpty()) return
     try {
       val safeRoot = EpubPreviewFiles.root(context.cacheDir, rootUri)
       val page = EpubPreviewFiles.document(safeRoot, documentUri)
@@ -122,14 +126,15 @@ class AlbumEpubView(context: Context, appContext: AppContext) : ExpoView(context
     } catch (_: Exception) { denied() }
   }
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+    if (destroyed) return
     val w = minOf(width, (height * 4f / 3f).toInt()); val h = (w * 3f / 4f).toInt()
     web.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY))
     web.layout((width - w) / 2, (height - h) / 2, (width + w) / 2, (height + h) / 2)
   }
-  private fun stop() { root = null; document = null; web.stopLoading(); web.loadUrl("about:blank"); web.onPause() }
+  private fun stop() { root = null; document = null; if (!destroyed) { web.stopLoading(); web.loadUrl("about:blank"); web.onPause() } }
   override fun onAttachedToWindow() { super.onAttachedToWindow(); attached = true; appContext.reactContext?.addLifecycleEventListener(this); load() }
   override fun onDetachedFromWindow() { attached = false; appContext.reactContext?.removeLifecycleEventListener(this); stop(); super.onDetachedFromWindow() }
   override fun onHostPause() { stop() }
   override fun onHostResume() { /* JS revalidates family/account and creates a fresh preview lease. */ }
-  override fun onHostDestroy() { stop(); web.destroy() }
+  override fun onHostDestroy() { stop(); if (!destroyed) { destroyed = true; web.destroy() } }
 }

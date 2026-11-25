@@ -13,6 +13,7 @@ import java.util.UUID
 
 /** Launcher actions carry only allowlisted public IDs and an app-private capability. Never notes/paths. */
 class LampyQuickActionsModule : Module() {
+  private val mailbox = Any()
   private var pending: Map<String, String>? = null
   private fun token(context: Context): String {
     val prefs = context.getSharedPreferences("lampy-public-actions", Context.MODE_PRIVATE)
@@ -24,8 +25,9 @@ class LampyQuickActionsModule : Module() {
     val id = intent.getStringExtra("lampyPublicAction") ?: return
     intent.removeExtra("lampyPublicAction"); intent.removeExtra("lampyCapability")
     if (id !in listOf("app.lampy.write", "app.lampy.camera", "app.lampy.record", "app.lampy.share")) return
-    pending = mapOf("id" to id, "requestId" to UUID.randomUUID().toString())
-    sendEvent("onAction", pending!!)
+    val action = mapOf("id" to id, "requestId" to UUID.randomUUID().toString())
+    synchronized(mailbox) { pending = action }
+    sendEvent("onAction", action)
   }
   private fun install() {
     if (Build.VERSION.SDK_INT < 25) return
@@ -49,6 +51,6 @@ class LampyQuickActionsModule : Module() {
     OnCreate { receive(appContext.currentActivity?.intent); install() }
     OnActivityEntersForeground { receive(appContext.currentActivity?.intent); install() }
     OnNewIntent { intent -> receive(intent) }
-    Function("consumePending") { val value = pending; pending = null; value }
+    Function("consumePending") { synchronized(mailbox) { val value = pending; pending = null; value } }
   }
 }

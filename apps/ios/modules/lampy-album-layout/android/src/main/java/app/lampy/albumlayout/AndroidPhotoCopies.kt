@@ -25,7 +25,7 @@ object AndroidPhotoCopies {
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     val w = bounds.outWidth; val h = bounds.outHeight
     require(w > 0 && h > 0 && w.toLong() * h <= 120_000_000L) { "DIMENSIONS" }
-    
+
     if (Build.VERSION.SDK_INT >= 28) {
       return ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
         val orientedScale = minOf(1.0, edge.toDouble() / max(info.size.width, info.size.height))

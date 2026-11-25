@@ -4,5 +4,8 @@ plugins {
 }
 group = 'app.lampy.familyimages'
 version = '0.1.0'
-android { namespace 'app.lampy.familyimages' }
+android {
+  namespace 'app.lampy.familyimages'
+  defaultConfig { versionCode 1; versionName '0.1.0' }
+}
 dependencies { implementation project(':lampy-album-layout') }
