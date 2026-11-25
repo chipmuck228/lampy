@@ -219,7 +219,7 @@ private func chroniclePdfGlyphs(_ page: PDFPage, viewportRect: CGRect?) -> [Chro
     var rect = CGRect.null
     for offset in range.location..<NSMaxRange(range) {
       let box = page.characterBounds(at: offset)
-      if !box.isNull && !box.isInfinite && box.width > 0 && box.height > 0 { rect = rect.union(box) }
+      if !box.isNull && !box.isInfinite && box.size.width > 0 && box.size.height > 0 { rect = rect.union(box) }
     }
     guard !rect.isNull, !rect.isInfinite, rect.minX.isFinite, rect.minY.isFinite, rect.maxX.isFinite, rect.maxY.isFinite else { return nil }
     if let region = region, !region.contains(CGPoint(x: rect.midX, y: rect.midY)) { continue }
@@ -227,10 +227,74 @@ private func chroniclePdfGlyphs(_ page: PDFPage, viewportRect: CGRect?) -> [Chro
   }
   return glyphs
 }
+// Preserve each extracted text block's internal order. PDFKit may manufacture
+// negative character advances at boundaries between separately painted runs.
+// Such rectangles are not trustworthy anchors, but their text must not be lost.
+private func chronicleAnchoredTextBlocks(_ units: [ChronicleTextGlyph], region: CGRect?) -> [ChronicleTextGlyph]? {
+  var result: [ChronicleTextGlyph] = []
+  var text = ""
+  var anchor = CGRect.null
+  var ordinal = 0
+  func flush() -> Bool {
+    if text.isEmpty { return true }
+    guard !anchor.isNull else { return false } // Never guess an unanchored block.
+    if region?.contains(CGPoint(x: anchor.midX, y: anchor.midY)) ?? true {
+      result.append(ChronicleTextGlyph(text: text, rect: anchor, ordinal: ordinal))
+    }
+    text = ""; anchor = .null
+    return true
+  }
+  for unit in units {
+    if unit.text.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) {
+      guard flush() else { return nil }; continue
+    }
+    if text.isEmpty { ordinal = unit.ordinal }
+    text += unit.text
+    let box = unit.rect
+    // Inspect stored size, not CGRect.width/height (which standardize negatives).
+    if !box.isNull && !box.isInfinite && box.size.width > 0 && box.size.height > 0 &&
+        box.origin.x.isFinite && box.origin.y.isFinite && box.size.width.isFinite && box.size.height.isFinite {
+      anchor = anchor.union(box)
+    }
+  }
+  guard flush() else { return nil }
+  return result
+}
+private func chroniclePdfTextBlocks(_ page: PDFPage, viewportRect: CGRect?) -> [ChronicleTextGlyph]? {
+  let text = (page.string ?? "") as NSString
+  guard page.numberOfCharacters == text.length else { return nil }
+  var units: [ChronicleTextGlyph] = []
+  var index = 0
+  while index < text.length {
+    let range = text.rangeOfComposedCharacterSequence(at: index)
+    index = NSMaxRange(range)
+    let value = text.substring(with: range)
+    var box = CGRect.null
+    for offset in range.location..<NSMaxRange(range) {
+      let rect = page.characterBounds(at: offset)
+      if !rect.isNull && !rect.isInfinite && rect.size.width > 0 && rect.size.height > 0 &&
+          rect.origin.x.isFinite && rect.origin.y.isFinite && rect.size.width.isFinite && rect.size.height.isFinite {
+        box = box.union(rect)
+      }
+    }
+    units.append(ChronicleTextGlyph(text: value, rect: box, ordinal: range.location))
+  }
+  let media = page.bounds(for: .mediaBox)
+  let region = viewportRect.map { box in
+    CGRect(x: media.minX + box.minX * media.width / 1200,
+           y: media.minY + (900 - box.maxY) * media.height / 900,
+           width: box.width * media.width / 1200, height: box.height * media.height / 900)
+      .insetBy(dx: -2 * media.width / 1200, dy: -2 * media.height / 900)
+  }
+  return chronicleAnchoredTextBlocks(units, region: region)
+}
+
 private func printChronicleTextCheck(_ check: ChronicleTextCheck, in page: PDFPage) -> Bool {
   if printPageTextChecksMatch([check.parts], in: page.string ?? "") { return true }
-  guard let glyphs = chroniclePdfGlyphs(page, viewportRect: check.viewportRect) else { return false }
-  return printPageTextChecksMatch([check.parts], in: chronicleSpatialText(glyphs))
+  if let glyphs = chroniclePdfGlyphs(page, viewportRect: check.viewportRect),
+     printPageTextChecksMatch([check.parts], in: chronicleSpatialText(glyphs)) { return true }
+  guard let blocks = chroniclePdfTextBlocks(page, viewportRect: check.viewportRect) else { return false }
+  return printPageTextChecksMatch([check.parts], in: chronicleSpatialText(blocks))
 }
 private func chronicleViewportRect(_ value: Any?) -> CGRect? {
   guard let box = value as? [String: Any], let x = box["left"] as? Double, let y = box["top"] as? Double,

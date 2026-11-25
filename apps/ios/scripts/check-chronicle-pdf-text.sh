@@ -12,7 +12,7 @@ check_file="$check_dir/check.swift"
 trap 'rm -f "$check_file"; rmdir "$check_dir"' EXIT
 printf 'import Foundation\nimport CoreGraphics\nimport CoreText\nimport PDFKit\n' > "$check_file"
 awk '
-/^private func (compactPdfText|compactChroniclePdfText|printSegmentsMatch|printPageTextChecksMatch|chronicleSpatialText|chroniclePdfGlyphs|printChronicleTextCheck)\(/ { copying=1 }
+/^private func (compactPdfText|compactChroniclePdfText|printSegmentsMatch|printPageTextChecksMatch|chronicleSpatialText|chroniclePdfGlyphs|chronicleAnchoredTextBlocks|chroniclePdfTextBlocks|printChronicleTextCheck)\(/ { copying=1 }
 /^private struct (ChronicleTextGlyph|ChronicleTextCheck) \{/ { copying=1 }
 copying { print }
 copying && /^}$/ { copying=0 }
@@ -58,6 +58,33 @@ private let punctuation = glyphs.enumerated().map { i, g in i == 8 ? ChronicleTe
 spatial("short punctuation stays on the same line", true, punctuation)
 private let substituted = glyphs.enumerated().map { i, g in ChronicleTextGlyph(text:i == 12 ? "跑" : g.text,rect:g.rect,ordinal:i) }
 spatial("same-length replacement rejected", false, substituted)
+// Replay the measured malformed boundaries from the synthetic Mac PDF.
+private let capturedText = Array("panda 小猫和 ，各自休息").map(String.init)
+private let capturedRects: [CGRect] = [
+  CGRect(x:124.84,y:226.164,width:14.07,height:17.696),
+  CGRect(x:138.91,y:231.372,width:14.196,height:11.34),
+  CGRect(x:153.106,y:231.596,width:15.022,height:11.76),
+  CGRect(x:168.128,y:231.092,width:14.532,height:19.068),
+  CGRect(x:182.66,y:231.372,width:-62.622,height:11.34),
+  CGRect(x:271.938,y:231.372,width:-341.775,height:11.34),
+  CGRect(x:158.013,y:226.864,width:-137.6655,height:21.896),
+  CGRect(x:113.6365,y:227.284,width:-28.23275,height:22.568),
+  CGRect(x:105.95225,y:226.22,width:16.81575,height:22.876),
+  CGRect(x:122.768,y:226.22,width:78.848,height:22.876),
+  CGRect(x:201.616,y:224.82,width:14.812,height:8.064),
+  CGRect(x:216.428,y:226.976,width:39.942,height:23.576),
+  CGRect(x:256.37,y:226.22,width:21.406,height:24.724),
+  CGRect(x:277.776,y:226.164,width:32.536,height:24.052),
+  CGRect(x:310.312,y:226.976,width:23.996,height:24.248)
+]
+private let captured = capturedText.enumerated().map { i,t in ChronicleTextGlyph(text:t,rect:capturedRects[i],ordinal:i) }
+private let blocks = chronicleAnchoredTextBlocks(captured,region:nil)!
+precondition(printPageTextChecksMatch([[mixed]],in:chronicleSpatialText(blocks)),"captured PDF block order")
+private let capturedReplacement = captured.enumerated().map { i,g in ChronicleTextGlyph(text:i == 14 ? "跑" : g.text,rect:g.rect,ordinal:g.ordinal) }
+precondition(!printPageTextChecksMatch([[mixed]],in:chronicleSpatialText(chronicleAnchoredTextBlocks(capturedReplacement,region:nil)!)),"captured replacement rejected")
+precondition(!printPageTextChecksMatch([[mixed]],in:chronicleSpatialText(chronicleAnchoredTextBlocks(Array(captured.dropLast()),region:nil)!)),"captured missing glyph rejected")
+private let unanchored = captured.map { ChronicleTextGlyph(text:$0.text,rect:.null,ordinal:$0.ordinal) }
+precondition(chronicleAnchoredTextBlocks(unanchored,region:nil) == nil,"unanchored blocks rejected")
 // Real PDFKit adapter checks, using CoreText to paint font runs out of stream order.
 private func fixturePdf(_ last: String) -> PDFDocument {
   let data = NSMutableData()
@@ -73,7 +100,7 @@ private func fixturePdf(_ last: String) -> PDFDocument {
   context.endPDFPage(); context.closePDF()
   return PDFDocument(data:data as Data)!
 }
-print("CHRONICLE_PDF_TEXT_UNIT_OK: 21 normalization/spatial cases")
+print("CHRONICLE_PDF_TEXT_UNIT_OK: 25 normalization/spatial cases")
 // Diagnostic input below is synthetic fixture content, never an Album or file.
 private func diagnoseSyntheticPdf(_ page: PDFPage) {
   let raw = page.string ?? ""
@@ -88,6 +115,9 @@ private func diagnoseSyntheticPdf(_ page: PDFPage) {
   if let all = chroniclePdfGlyphs(page,viewportRect:nil) {
     print("SYNTHETIC_PDF reconstructed=\(String(reflecting:chronicleSpatialText(all))) glyphs=\(all.count)")
   } else { print("SYNTHETIC_PDF reconstruction=unavailable") }
+  if let blocks = chroniclePdfTextBlocks(page,viewportRect:nil) {
+    print("SYNTHETIC_PDF blocks=\(String(reflecting:chronicleSpatialText(blocks))) count=\(blocks.count)")
+  } else { print("SYNTHETIC_PDF blocks=unavailable") }
   if let region = chroniclePdfGlyphs(page,viewportRect:CGRect(x:0,y:0,width:1200,height:900)) {
     print("SYNTHETIC_PDF scoped=\(String(reflecting:chronicleSpatialText(region))) glyphs=\(region.count)")
   } else { print("SYNTHETIC_PDF scoped=unavailable") }
@@ -109,6 +139,6 @@ if !results.allSatisfy({ $0 }) {
   print("CHRONICLE_PDF_TEXT_CHECKS_FAILED: \(results.filter { !$0 }.count) PDFKit cases; report SYNTHETIC_/PDFKIT_CASE lines before another device build")
   exit(1)
 }
-print("CHRONICLE_PDF_TEXT_CHECKS_OK: 24 production Swift/PDFKit cases")
+print("CHRONICLE_PDF_TEXT_CHECKS_OK: 28 production Swift/PDFKit cases")
 SWIFT
 swift "$check_file"
