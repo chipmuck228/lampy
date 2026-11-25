@@ -99,3 +99,9 @@ it('ends the physical spine at the closing page and keeps complete images in sam
  }
  expect(source.querySelector('script')?.getAttribute('src')).toBe('photo-viewer.js');
 });
+
+it.each([1,2,3])('keeps family author attribution on headerless Chronicle pages with %i images',count=>{
+ const source={...input.entries[0],note:'短文字',attribution:'家人 & Friends',media:Array.from({length:count},(_,i)=>({...input.entries[0].media[0],assetId:'photo'+i}))};
+ const options={input:{...input,entries:[source]},assets:Object.fromEntries(source.media.map(m=>[m.assetId,{path:'media/'+m.assetId+'.jpg',mime:'image/jpeg'}])),dates:{},id:'test',createdAt:'2026-11-25',language:'zh-Hans' as const,design:'imagebook' as const};
+ const docs=albumEpubDocuments(options);const record=strFromU8(docs['OEBPS/record-1.xhtml']);expect(record).toContain('class="chronicle-attribution"');expect(record).toContain('家人 &amp; Friends');
+});

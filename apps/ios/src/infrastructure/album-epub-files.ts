@@ -32,11 +32,16 @@ function safeCode(error: unknown): string {
   }
   return 'OPERATION_FAILED';
 }
-/** Export from immutable edition copies, never re-read the changing personal library. */
-export async function shareAlbumEpub(id: string, current: () => boolean, onStage?: (progress: EpubProgress) => void) {
+export type EpubEditionAccess={
+ directory(id:string):string;
+ /** Additional scope/content/entitlement checks for an authorized source adapter. */
+ authorize(manifest:PrintManifest|EpubSnapshot,current:()=>boolean):Promise<void>;
+};
+/** Export from immutable edition copies, never re-read changing source media. */
+export async function shareAlbumEpub(id: string, current: () => boolean, onStage?: (progress: EpubProgress) => void, access?:EpubEditionAccess) {
   const check = () => { if (!current()) throw new Error('CANCELLED'); };
   check();
-  const dir = editionDirectory(id);
+  const dir = access?access.directory(id):editionDirectory(id);
   const temporary: string[] = [];
   let work = '';
   let output: ReturnType<File['open']> | null = null;
@@ -60,15 +65,16 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     const digest = await FS.readAsStringAsync(`${dir}manifest.sha256`);
     check();
     if (manifest.id !== id || manifest.version !== 1 || manifestDigest(manifest) !== digest) throw new Error('PRINT_FILE_CHANGED');
+    const authorize=()=>access?access.authorize(manifest,current):albumExportAccess.assert(current);
     const uri = `${dir}album-${appLanguage}.epub`;
     const digestUri = `${uri}.sha256`;
     // Saving/sharing an EPUB always requires current export rights, including cached editions.
     report('AUTHORIZE');
-    await albumExportAccess.assert(current); check();
+    await authorize(); check();
     if ((await FS.getInfoAsync(uri)).exists && (await FS.getInfoAsync(digestUri)).exists) {
       const expected = await FS.readAsStringAsync(digestUri);
       if ((await albumPrintNative().printFileDigest(uri)).sha256 !== expected) throw new Error('PRINT_FILE_CHANGED');
-      check(); report('SHARE'); check(); return await albumPrintNative().sharePrintPdf(uri);
+      if(access){await authorize();check();} report('SHARE'); check(); return await albumPrintNative().sharePrintPdf(uri);
     }
     await assertSpace(RESERVE); check();
     work = `${dir}.epub-work-${Date.now()}-${Math.random().toString(36).slice(2)}/`;
@@ -134,7 +140,7 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
     output.close(); output = null; check();
     report('VERIFY_FILE');
     if ((await albumPrintNative().printFileDigest(part)).sha256 !== result.sha256) throw new Error('PRINT_FILE_CHANGED');
-    await albumExportAccess.assert(current); check();
+    await authorize(); check();
     const hash = result.sha256;
     const digestPart = `${work}album.sha256`;
     await FS.writeAsStringAsync(digestPart, hash); check();
@@ -150,6 +156,7 @@ export async function shareAlbumEpub(id: string, current: () => boolean, onStage
       await FS.deleteAsync(digestUri, { idempotent: true });
       throw error;
     }
+    if(access){await authorize();check();}
     report('SHARE'); check();
     return await albumPrintNative().sharePrintPdf(uri);
   } catch (error) {

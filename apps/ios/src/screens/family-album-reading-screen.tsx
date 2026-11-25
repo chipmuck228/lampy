@@ -14,5 +14,5 @@ export default function FamilyAlbumReadingScreen(){
   const persist=useCallback((style:AlbumReadingStyle,position:AlbumReadingPosition|null)=>setFamilyReadingState(scope,style,position),[scope]);
   return <LifeAlbumReadingScreen key={scope} family={{albumId:scope,input:reading.prepared?.input??null,blocked:reading.blocked,error:reading.error,
     preference:familyReadingState(scope),onPersist:persist,current:reading.valid,retry:reading.retry,
-    onPaper:()=>router.push({pathname:'/family-album-paper',params:{familyId,albumId}})}}/>;
+    onPaper:()=>router.push({pathname:'/family-album-epub-preview',params:{familyId,albumId}})}}/>;
 }

@@ -124,8 +124,8 @@ it('keeps organizing summaries compact and opens the shared continuous reader',a
  mockParams={familyId:'f',albumId:'book',mode:'read'};
  const page=await render(<FamilyAlbumsScreen/>);await waitFor(()=>expect(page.getByText('Private original')).toBeTruthy());
  expect(page.getByText('Private original').props.numberOfLines).toBe(3);
- await fireEvent.press(page.getByText('看看这一册'));
- expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-album-reading',params:{familyId:'f',albumId:'book'}});
+ await fireEvent.press(page.getByText('翻阅'));
+ expect(mockPush).toHaveBeenLastCalledWith({pathname:'/family-album-epub-preview',params:{familyId:'f',albumId:'book'}});
 });
 
 it('refreshes changed content automatically, preserving unsaved editing fields',async()=>{

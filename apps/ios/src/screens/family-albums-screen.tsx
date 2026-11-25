@@ -336,7 +336,8 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
         <View style={bookStyles.heroCover}>{book.cover ? <FamilyAlbumCoverPreview key={`${book.cover.shareId}/${book.cover.objectId}`} familyId={book.familyId} cover={book.cover} compact/> : <Text style={bookStyles.heroWords} numberOfLines={3}>{book.name}</Text>}</View>
         <View style={bookStyles.heroCopy}><Text style={bookStyles.heroTitle} numberOfLines={2}>{book.name}</Text><Text style={{...type.meta,color:inkSoft}}>{albumEntryCountLabel(book.items.length)}</Text>
         <Text style={{...type.meta,color:inkSoft}}>{families.find(family=>family.familyId===book.familyId)?.name}</Text>
-        {book.items.length?<FamilyAlbumButton label={tr('看看这一册')} onPress={()=>router.push({pathname:'/family-album-reading',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>:<Text style={{...type.meta,color:inkSoft}}>{tr('先收下一条，也可以慢慢添。')}</Text>}
+        {book.items.length?<FamilyAlbumButton label={tr('翻阅')} onPress={()=>router.push({pathname:'/family-album-epub-preview',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>:<Text style={{...type.meta,color:inkSoft}}>{tr('先收下一条，也可以慢慢添。')}</Text>}
+        {book.access.canManage?<FamilyAlbumButton label={tr('保存与分享')} onPress={()=>router.push({pathname:'/family-album-epub',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>:null}
         </View></View>
 
         {book.access.canManage ? <AlbumManageToolbar prefix="family-album" editing={editing} organizing={organizing} busy={busy} onEdit={()=>{setSources([]);setSelected([]);setEditing(value=>!value);}} onOrganize={()=>{setSources([]);setSelected([]);setOrganizing(value=>!value);}}/> : null}
