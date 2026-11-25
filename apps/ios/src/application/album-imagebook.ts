@@ -1,3 +1,4 @@
+import {planChroniclePair,chroniclePairPhoto,chroniclePairBody,CHRONICLE_PAIR_CSS} from './album-chronicle-pair';
 import {splitPublicationText} from './album-publication-text';
 import {chronicleDatePages,CHRONICLE_DATE_CSS} from './album-chronicle-date';
 import {chronicleOpening,CHRONICLE_OPENING_CSS} from './album-chronicle-opening';
@@ -41,6 +42,29 @@ export function imagebookPages(options:AlbumEpubOptions,coverPath:string,escape:
    addRecord(`<div class="daily-notes">${section.indices.map(i=>{const r=input.entries[i];return `<article><p class="note-author">${escape([r.attribution,r.feeling].filter(Boolean).join(' · '))}</p><div class="fixed-prose">${escape(r.note)}</div></article>`;}).join('')}</div>`);return;
   }
   const singleImages=record.media.filter(media=>media.role==='image');
+  if(singleImages.length===2&&record.media.every(media=>media.role==='image'||media.role==='audio')){
+   const first=record.media.findIndex(m=>m.role==='image'),last=record.media.map(m=>m.role).lastIndexOf('image');
+   const plan=planChroniclePair(singleImages,record.note,last-first>1);
+   let imageIndex=0;
+   for(const media of record.media){
+    if(media.role==='image'){
+     if(plan.kind==='separate'){
+      readingPage=name();
+      addRecord(chroniclePairBody(record,plan,[chroniclePairPhoto(plan,imageIndex,linkedPhoto(media,0,'contain'))],language,escape,imageIndex===0),false);
+     }else if(imageIndex===0){
+      readingPage=name();
+      addRecord(chroniclePairBody(record,plan,singleImages.map((image,i)=>chroniclePairPhoto(plan,i,linkedPhoto(image,0,'contain'))),language,escape),false);
+     }
+     imageIndex++;
+     if(imageIndex===2&&record.note.trim()&&!plan.text)chronicleProsePages(record.note).forEach((chunk,i)=>addRecord(chronicleProseBody(chunk,record,i,language,escape),false));
+    }else{
+     const sec=media.durationMs==null?null:Math.max(0,Math.round(media.durationMs/1000));
+     const duration=sec==null?'':`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
+     addRecord(`<aside class="voice-page"><p class="voice-label">${zh?'听听当时的声音':'Listen to this moment'}${duration?' · '+duration:''}</p><audio controls="controls" preload="none" src="${escape(assets[media.assetId].path)}">${zh?'请使用支持声音的阅读器。':'Use an audio-capable reader.'}</audio></aside>`);
+    }
+   }
+   return;
+  }
   if(singleImages.length===1&&record.media.every(media=>media.role==='image'||media.role==='audio')){
    readingPage=name();
    const media=singleImages[0],plan=planChronicleSingle(media,record.note);
@@ -145,4 +169,5 @@ ${CHRONICLE_COVER_CSS}
 ${CHRONICLE_OPENING_CSS}
 ${CHRONICLE_DATE_CSS}
 ${CHRONICLE_SINGLE_CSS}
+${CHRONICLE_PAIR_CSS}
 `;
