@@ -32,3 +32,19 @@ In Xcode use Lampy / your iPhone / Release and the existing StoreKit configurati
 ## Evidence limits
 
 The shared composer and touch/click handlers have automated coverage; generated scripted EPUB passes EPUBCheck 5.4.0 with zero errors/warnings. TypeScript and scoped ESLint are checked. These checks are not Apple Books gesture tests or native WebKit/PDFKit execution. This Linux environment has no Xcode/iOS SDK: Swift compilation, real-device font/text extraction, actual PDF bytes and memory, visual comparison, and Apple Books open/return remain pending. The prior static A5 proof is historical and must not be used to accept the new shared 4:3 renderer.
+
+## Final text-validation regression (after f50e524)
+
+Device feedback: EPUB image open/return passed. PDF fails near completion; the provided ExtensionKit termination message alone does not identify the export failure stage.
+
+Code review found a deterministic final-validation bug: each page's DOM text checks and source title/note checks were flattened into one consuming search sequence. These are overlapping observations of the same printed text. A title rendered once was therefore required twice, and positioned text could be forced into DOM order even when PDF spatial extraction differed. Keep independent checks separate; preserve segment order within each individual source check and reject missing text. Single-page and final merged-PDF checks now use the same independent semantics. Do not bypass the validation.
+
+On the Mac, run the actual production Foundation-only Swift matcher regression before building:
+
+```bash
+bash apps/ios/scripts/check-chronicle-pdf-text.sh
+```
+
+Expected output: `CHRONICLE_PDF_TEXT_CHECKS_OK: 9 production Swift cases`. The script extracts the actual matching functions from AlbumPrint.swift (no separate implementation). Swift/Xcode are unavailable in the Linux environment, so these native cases have not been executed there.
+
+Rebuild in Xcode and create a new PDF. Confirm completion, text search, actual file size, same Chronicle layout/ending, then revisit EPUB open/return. If export still fails, filter Xcode logs for `[LampyPrint]`: native output reports controlled stage/page/code; the JS service reports controlled stage/code/reason. Neither includes writing, photos, album identifiers or file paths. Keep the branch draft until iPhone PDF acceptance passes.

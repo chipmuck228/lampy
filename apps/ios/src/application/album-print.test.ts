@@ -352,3 +352,16 @@ it('does not report progress after the request stops being current', async () =>
   expect(steps).not.toContain('write');
   expect(store.commit).not.toHaveBeenCalled();
 });
+
+it('logs only a safe stage/code when native final text verification fails',async()=>{
+ const log=jest.spyOn(console,'info').mockImplementation(()=>undefined);
+ try{
+  const {service,store}=setup();
+  (store.writePdf as jest.Mock).mockRejectedValueOnce(new Error('PDF_TEXT /private/author-photo.jpg private diary sentence'));
+  await expect(service.save('plain')).rejects.toMatchObject({diagnostic:{stage:'WRITE_PDF',code:'PDF_TEXT'}});
+  expect(log).toHaveBeenCalledWith('[LampyPrint]',JSON.stringify({stage:'WRITE_PDF',code:'PDF_TEXT'}));
+  expect(JSON.stringify(log.mock.calls)).not.toContain('private diary');
+  expect(JSON.stringify(log.mock.calls)).not.toContain('/private/');
+  expect(store.commit).not.toHaveBeenCalled();expect(store.discard).toHaveBeenCalledWith('print_one');
+ }finally{log.mockRestore();}
+});

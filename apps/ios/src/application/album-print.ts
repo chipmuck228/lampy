@@ -400,7 +400,9 @@ export function createAlbumPrintService(deps: {
             });
           }
         }
-        throw new AlbumPrintFailure(printFailureDiagnostic(error, stage));
+        const diagnostic = printFailureDiagnostic(error, stage);
+        console.info('[LampyPrint]', JSON.stringify(diagnostic));
+        throw new AlbumPrintFailure(diagnostic);
       } finally {
         busy = false;
       }

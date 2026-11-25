@@ -158,6 +158,11 @@ private func printSegmentsMatch(_ parts: [String], in text: String) -> Bool {
   }
   return true
 }
+// Checks describe independent observations of the same page (DOM runs and source
+// title/note). Repeated observations must not consume a second text occurrence.
+private func printPageTextChecksMatch(_ checks: [[String]], in text: String) -> Bool {
+  checks.allSatisfy { printSegmentsMatch($0, in: text) }
+}
 func writePrintPdf(_ layoutJson: String, _ mediaJson: String, _ destination: String) throws -> [String: Any] {
   guard let data = layoutJson.data(using: .utf8), let layout = try JSONSerialization.jsonObject(with: data) as? [String: Any],
         let pages = layout["pages"] as? [[String: Any]], !pages.isEmpty,
@@ -276,7 +281,8 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
   private var imageUseBytes = 0
   private var dpiByAsset: [String: Double] = [:]
   private var colorRanges: [[String: Int]] = []
-  private var searchableSegments: [[String]] = []
+  private var searchableChecks: [[[String]]] = []
+  private var phase = "PREPARE_HTML"
   private let bounds = CGRect(x: 0, y: 0, width: 600, height: 450)
 
   static func start(_ publication: String, _ media: String, _ destination: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
@@ -338,6 +344,7 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
     timeout?.cancel()
     let deadline = DispatchWorkItem { [weak self] in self?.finish(.failure(printFailure("PDF_CREATE_FAILED"))) }
     timeout = deadline; DispatchQueue.main.asyncAfter(deadline: .now() + 45, execute: deadline)
+    phase = "LOAD_PAGE"
     webView?.loadFileURL(work.appendingPathComponent(name + ".xhtml"), allowingReadAccessTo: work)
   }
   func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -349,6 +356,7 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { finish(.failure(printFailure("PDF_CREATE_FAILED"))) }
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
     guard !finished, cursor < pages.count else { return }
+    phase = "CHECK_DOM"
     let page = pages[cursor]
     let inspect = """
     await document.fonts.ready;
@@ -369,6 +377,7 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
         guard let info = info, let notes = info["notes"] as? [String], let expected = page["notes"] as? [String],
               notes.map(compactPdfText) == expected.map(compactPdfText) else { throw printFailure("INVALID_LAYOUT") }
         let configuration = WKPDFConfiguration(); configuration.rect = CGRect(x: 0, y: 0, width: 1200, height: 900)
+        self.phase = "RENDER_PAGE"
         webView.createPDF(configuration: configuration) { [weak self] pdf in
           guard let self = self, !self.finished else { return }
           do { try self.append(try pdf.get(), info: info, page: page); self.cursor += 1; self.loadPage() }
@@ -380,17 +389,18 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
   private func append(_ data: Data, info: [String: Any], page: [String: Any]) throws {
     guard let provider = CGDataProvider(data: data as CFData), let pdf = CGPDFDocument(provider), pdf.numberOfPages == 1,
           let source = pdf.page(at: 1), let searchable = PDFDocument(data: data), searchable.pageCount == 1, let context = context else { throw printFailure("PDF_REOPEN_FAILED") }
+    phase = "CHECK_PAGE_TEXT"
     let actual = compactPdfText(searchable.page(at: 0)?.string ?? "")
     let values = (info["texts"] as? [String] ?? []) + (page["expectedText"] as? [String] ?? [])
-    var pageSegments: [String] = []
+    var pageChecks: [[String]] = []
     for (index, value) in values.enumerated() {
       let ranges = try printColorGlyphRanges(value, font: UIFont.systemFont(ofSize: 17))
       for range in ranges { colorRanges.append(["page": cursor, "block": index, "line": 0, "startUTF16": range.location, "endUTF16": NSMaxRange(range)]) }
       let required = printRequiredSegments(value, excluding: ranges)
       guard printSegmentsMatch(required, in: actual) else { throw printFailure("PDF_TEXT") }
-      pageSegments.append(contentsOf: required)
+      pageChecks.append(required)
     }
-    searchableSegments.append(pageSegments)
+    searchableChecks.append(pageChecks)
     for image in info["images"] as? [[String: Any]] ?? [] {
       guard let path = image["path"] as? String, let assetId = assetByPath[path],
             let width = image["width"] as? Double, let height = image["height"] as? Double,
@@ -406,15 +416,23 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
   }
   private func completePdf() {
     do {
+      phase = "MERGE_FINAL"
       context?.closePDF(); context = nil
       guard let final = CGPDFDocument(target as CFURL), let text = PDFDocument(url: target), final.numberOfPages == pages.count, text.pageCount == pages.count else { throw printFailure("PDF_REOPEN_FAILED") }
-      for (index, segments) in searchableSegments.enumerated() {
-        guard printSegmentsMatch(segments, in: compactPdfText(text.page(at: index)?.string ?? "")) else { throw printFailure("PDF_TEXT") }
+      phase = "CHECK_FINAL_TEXT"
+      guard searchableChecks.count == pages.count else { throw printFailure("INVALID_LAYOUT") }
+      for (index, checks) in searchableChecks.enumerated() {
+        guard printPageTextChecksMatch(checks, in: compactPdfText(text.page(at: index)?.string ?? "")) else {
+          cursor = index
+          throw printFailure("PDF_TEXT")
+        }
       }
+      phase = "CHECK_SIZE"
       let digest = try printFileDigest(target.path), bytes = digest["bytes"] as? Int ?? 0
       // Reject a resource explosion rather than publishing another enormous PDF.
       let budget = min(192 * 1024 * 1024, 8 * 1024 * 1024 + imageUseBytes * 3 + pages.count * 384 * 1024)
       guard bytes > 0, bytes <= budget else { throw printFailure("PRINT_PDF_TOO_LARGE") }
+      phase = "CHECK_FONTS"
       let fonts = collectPageFonts(final)
       let streams = fonts.fonts.map { $0["embedStream"] as? String ?? "unknown" }
       let embedded: Any = fonts.hasUninspectedForm || streams.isEmpty || streams.contains("unknown") ? NSNull() : !streams.contains("none")
@@ -429,6 +447,12 @@ final class ChroniclePdfRenderer: NSObject, WKNavigationDelegate {
   }
   private func finish(_ result: Result<[String: Any], Error>) {
     guard !finished else { return }; finished = true
+    if case .failure(let error) = result {
+      let allowed = ["CANCELLED", "INVALID_LAYOUT", "LOCAL_FILE_REQUIRED", "PDF_CREATE_FAILED", "PDF_REOPEN_FAILED", "PDF_TEXT", "PRINT_PDF_TOO_LARGE", "PDF_FONT_RUNS", "IMAGE_UNREADABLE"]
+      let code = allowed.first { $0 == (error as NSError).localizedDescription } ?? "PDF_CREATE_FAILED"
+      // Deliberately exclude document text, album identifiers and local paths.
+      NSLog("[LampyPrint] stage=%@ page=%ld code=%@", phase, min(cursor + 1, pages.count), code)
+    }
     timeout?.cancel(); timeout = nil
     if let background = background { NotificationCenter.default.removeObserver(background) }; background = nil
     webView?.navigationDelegate = nil; webView?.stopLoading(); webView = nil
