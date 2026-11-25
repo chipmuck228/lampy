@@ -163,3 +163,8 @@ publication-acceptance-fixture.cjs 直接使用正式投影，不替换样张HTM
 ### 导出页电子册操作收拢
 列表标题改为“已生成的电子册 / Created electronic albums”；移除逐行“保存电子册”按钮和“电子册已保存在Lampy中，可再次点击保存。”提示。点按整行分享，左滑显露分享、删除双操作，不因滑动直接执行操作；删除继续通过原确认流程。VoiceOver支持分享、删除及显示操作，忙碌/锁定时禁用。
 本页新创建成功的一册置顶并显示“刚刚生成 / Just created”，标记绑定当前Album与新成品ID，在Books切换回来时保持，重分享历史册不会改变该标记；仅页面会话内区分，不改文件时间或持久化元数据。既有PDF/家庭列表保留原操作方式，共用组件的双操作为电子册可选能力。此次不修改任何EPUB版式；两图附文布局下一步先讨论并做样张。
+
+### 两张照片版式：计算选型样张，未接入正式导出
+publication-pair-assets.py 从仓库授权照片制作横横、竖竖、横竖、近方形及一大一小尺寸样本；素材裁切仅为构造比例测试，EPUB排版不裁切。publication-pair-plan.cjs 根据解码宽高比较等高并置、等宽竖排、双图下文、双图侧文、横竖混排候选，以总显示面积与最小图片面积各半评分，在保留原顺序、比例、2倍放大上限、24px间距和80/72安全边距下选型。短文容量按Chronicle字体保守行数预算；长文另页，尺寸悬殊拆图页，文字单独续页。
+publication-pair-study.cjs 生成中英各11条记录：五种组合×有短文/无文，加双图长文。沿用定稿封面、开篇、日期、暖纸、16px装订色边与青绿青黛色系；长文复用正式装饰正文页。每张图片可离线进入完整图并返回其真正来源页（含拆页的第二张图）。这是候选样张代码，没有改变App双图导出行为，等待视觉确认。
+复现：python3 scripts/publication-pair-assets.py NEW_ASSET_DIR；node scripts/publication-pair-study.cjs ASSET_DIR NEW_OUTPUT_DIR。Python仅开发素材工具，依赖Pillow。
