@@ -1,3 +1,4 @@
+import {CHRONICLE_TEXT_COLOR} from './album-chronicle-colors';
 import {chronicleFeeling} from './album-chronicle-feeling';
 import type {AlbumLayoutInput,AlbumLayoutMediaInput} from './album-layout-input';
 
@@ -37,10 +38,10 @@ export function decoratePrintPublication(layout:import('./album-layout').AlbumLa
  const pages=layout.pages.map(page=>({...page,publication:page.publication??{...body,kind:page.blocks.some(b=>b.kind==='cover-name'||b.kind==='cover-image')?'cover':page.blocks.some(b=>b.kind==='close')?'closing':'body'}}));
  const coverEnd=pages.reduce((last,p,index)=>p.publication.kind==='cover'?index:last,-1);
  if(coverEnd>=0&&!pages.some(p=>p.publication.kind==='archive'))pages.push({index:0,blocks:[],publication:{...body,kind:'archive',title:copy.archive,stats:publicationSummary(input,language),made:`${copy.made} ${layout.generatedAt.slice(0,10)}`}});
- return {...layout,pages:pages.map((page,index)=>{
+ return {...layout,fonts:{...layout.fonts,body:{...layout.fonts.body,color:CHRONICLE_TEXT_COLOR}},pages:pages.map((page,index)=>{
    const sourceBlock=page.blocks.find(b=>'momentId' in b&&b.momentId);
    const id=sourceBlock&&'momentId' in sourceBlock?sourceBlock.momentId:undefined;
    const feeling=input.entries.find(e=>e.momentId===id)?.feeling??'';
-   return {...page,index,rendering:{...page.rendering!,pageCount:pages.length,pageNumbers:false,photoBorderWidth:0,paper:'#faf9f5',chroniclePrint:true,bindingColor:chronicleFeeling(feeling)??undefined}};
+   return {...page,index,rendering:{...page.rendering!,pageCount:pages.length,pageNumbers:false,photoBorderWidth:0,paper:'#faf9f5',chroniclePrint:true,bodyColor:CHRONICLE_TEXT_COLOR,bindingColor:chronicleFeeling(feeling)??undefined}};
  })};
 }

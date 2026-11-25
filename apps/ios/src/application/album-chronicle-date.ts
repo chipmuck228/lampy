@@ -1,3 +1,4 @@
+import {CHRONICLE_TEXT_COLOR} from './album-chronicle-colors';
 import type {AlbumEpubOptions} from './album-epub';
 import {bookDay} from './album-book-plan';
 import {chronicleFeeling,CHRONICLE_NEUTRAL} from './album-chronicle-feeling';
@@ -38,8 +39,8 @@ export function chronicleDatePages(options:AlbumEpubOptions,index:number,escape:
 }
 export const CHRONICLE_DATE_CSS=`
 .chronicle-date-page{position:absolute;inset:0;background:#faf9f5;color:#303a37;font-family:Baskerville,"Palatino Linotype",Georgia,"Songti SC","Noto Serif CJK SC",serif}
-.date-masthead{position:absolute;left:110px;right:110px;top:94px;font:18px/1.5 Georgia,serif;letter-spacing:6px;color:#105f62}.date-masthead>span{position:absolute;left:150px;right:0;top:13px;border-top:1px solid #b8cac4}
-.date-stack{position:absolute;inset:0;margin:0;font-weight:400;color:#105f62}.date-year-month{position:absolute;left:150px;top:438px;width:485px;height:60px;line-height:60px;text-align:center;white-space:nowrap;transform:rotate(90deg);transform-origin:center center;font-size:38px;letter-spacing:.12em}.date-month{margin-left:28px}.date-day{position:absolute;left:500px;top:225px;width:590px;height:485px;display:flex;align-items:center;justify-content:center;font:260px/1 Baskerville,Georgia,serif;letter-spacing:-.03em}.date-uncertain{position:absolute;left:500px;top:370px;width:530px;font-size:44px;line-height:1.6;text-align:center}
+.date-masthead{position:absolute;left:110px;right:110px;top:94px;font:18px/1.5 Georgia,serif;letter-spacing:6px;color:${CHRONICLE_TEXT_COLOR}}.date-masthead>span{position:absolute;left:150px;right:0;top:13px;border-top:1px solid #b8cac4}
+.date-stack{position:absolute;inset:0;margin:0;font-weight:400;color:${CHRONICLE_TEXT_COLOR}}.date-year-month{position:absolute;left:150px;top:438px;width:485px;height:60px;line-height:60px;text-align:center;white-space:nowrap;transform:rotate(90deg);transform-origin:center center;font-size:38px;letter-spacing:.12em}.date-month{margin-left:28px}.date-day{position:absolute;left:500px;top:225px;width:590px;height:485px;display:flex;align-items:center;justify-content:center;font:260px/1 Baskerville,Georgia,serif;letter-spacing:-.03em}.date-uncertain{position:absolute;left:500px;top:370px;width:530px;font-size:44px;line-height:1.6;text-align:center}
 .date-axis{position:absolute;left:440px;top:225px;width:3px;height:485px}
 .date-imprint{position:absolute;left:110px;right:110px;top:770px;border-top:1px solid #b8cac4;padding-top:25px;font:italic 22px/1.4 Baskerville,Georgia,serif;color:#687870}.date-imprint>i{position:absolute;right:0;top:33px;width:38px;border-top:2px solid #105f62}
 

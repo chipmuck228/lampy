@@ -16,7 +16,7 @@ doc=fitz.open();images=[]
 def text(value,x,y,size=17,color='#25231f'):
  return f'<div style="position:absolute;left:{x}pt;top:{y-size*.95}pt;font-size:{size}pt;line-height:1;white-space:pre;color:{color}">{html.escape(value)}</div>'
 for i in selected:
- p=layout['pages'][i];w=layout['pageSize']['widthPt'];h=layout['pageSize']['heightPt'];parts=[]
+ p=layout['pages'][i];ink=p.get('rendering',{}).get('bodyColor','#105f62');w=layout['pageSize']['widthPt'];h=layout['pageSize']['heightPt'];parts=[]
  edge=p['rendering'].get('bindingColor')
  if edge:parts.append(f'<div style="position:absolute;left:18pt;top:40pt;width:5pt;height:{h-84}pt;background:{edge}"></div>')
  parts.append(text(src['source']['album']['name'],36,23,8,'#5c5851'))
@@ -33,8 +33,8 @@ for i in selected:
    for line in b['lines']:
     chars=list(b['text']);a=line['start'];z=line['end'];xx=line['xPt'];baseline=line['baselineYPt'];initial=b.get('printInitial')
     if a==0 and initial:
-     n=initial['scalars'];parts.append(text(''.join(chars[:n]),xx,baseline,initial['sizePt'],'#53604f'));parts.append(text(''.join(chars[n:z]),xx+initial['widthPt'],baseline))
-    else:parts.append(text(''.join(chars[a:z]),xx,baseline))
+     n=initial['scalars'];parts.append(text(''.join(chars[:n]),xx,baseline,initial['sizePt'],ink));parts.append(text(''.join(chars[n:z]),xx+initial['widthPt'],baseline,color=ink))
+    else:parts.append(text(''.join(chars[a:z]),xx,baseline,color=ink if kind=='note' else '#25231f'))
   else:parts.append(text(b.get('text',b.get('label','')),x,y+12,15,'#53604f'))
  parts.append(text(f'{i+1:02}',w/2-6,h-18,10,'#53604f'))
  parts.append(text('静态布局校样 · 非 iPhone 原生 PDF',36,h-5,6,'#84928c'))

@@ -1,3 +1,4 @@
+import {CHRONICLE_TEXT_COLOR} from './album-chronicle-colors';
 import {planChronicleThree,chronicleThreeBody,CHRONICLE_THREE_CSS} from './album-chronicle-three';
 import {planChroniclePair,chroniclePairPhoto,chroniclePairBody,CHRONICLE_PAIR_CSS} from './album-chronicle-pair';
 import {splitPublicationText} from './album-publication-text';
@@ -186,4 +187,5 @@ ${CHRONICLE_DATE_CSS}
 ${CHRONICLE_SINGLE_CSS}
 ${CHRONICLE_PAIR_CSS}
 ${CHRONICLE_THREE_CSS}
+.daily-notes .fixed-prose,.reference-text,.text-pane .fixed-prose,.text-only .fixed-prose{color:${CHRONICLE_TEXT_COLOR}}
 `;

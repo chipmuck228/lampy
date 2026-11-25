@@ -32,3 +32,8 @@ Python/WeasyPrint/PyMuPDF/Pillow are development-only proof dependencies, not ap
 Moment prose and captions now prefer system Kaiti. EPUB body selectors keep the refined Latin font stack and add Kaiti SC / STKaiti / KaiTi before Songti for CJK fallback. Cover, opening and date typography are retained. Readers without a usable Kai face fall back; no font asset is bundled.
 
 For Chinese-containing moment notes in new PDFs (regardless of app language), native font diagnosis requests Kaiti SC and records the actual body face in rendering.bodySerif plus the request in bodyFontRequest. Native resolution searches installed Kai faces, then reports Songti/system fallback honestly. The resolved body face drives measurement, short-caption capacity, enlarged-initial drawing and PDF text/font inspection. Cover/date/UI and in-app continuous reading keep their existing font policy. Font availability, actual Books appearance and native PDF selection require a rebuilt device test.
+
+
+## Shared date/moment ink
+
+Moment writing now uses the date numeral's deep teal #105f62 across Chronicle EPUB single/pair/three-photo captions, standalone prose and generic/daily-note paths. PDF rendering carries the same bodyColor for note text and enlarged initials; metadata and static proof renderer use that ink too. Date layout, cover/opening typography, feeling gradients, ornaments and the main in-app moment screen remain unchanged. New exports only.

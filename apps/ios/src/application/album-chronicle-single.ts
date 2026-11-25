@@ -1,3 +1,4 @@
+import {CHRONICLE_TEXT_COLOR} from './album-chronicle-colors';
 import type {AlbumLayoutMediaInput,AlbumLayoutRecordInput} from './album-layout-input';
 import type {PublicationBox} from './album-photo-composition';
 import {photoFit} from './album-photo-composition';
@@ -92,14 +93,14 @@ export function chronicleProseBody(text:string,record:AlbumLayoutRecordInput,pag
 export const CHRONICLE_SINGLE_CSS=`
 .chronicle-short,.chronicle-prose{font-family:Baskerville,"Palatino Linotype",Georgia,"Kaiti SC",STKaiti,KaiTi,"Songti SC","Noto Serif CJK SC",serif}
 
-.chronicle-single,.chronicle-prose-page{position:absolute;inset:0;background:#faf9f5;color:#303a37;font-family:"Songti SC","Noto Serif CJK SC",Baskerville,Georgia,serif}
+.chronicle-single,.chronicle-prose-page{position:absolute;inset:0;background:#faf9f5;color:${CHRONICLE_TEXT_COLOR};font-family:"Songti SC","Noto Serif CJK SC",Baskerville,Georgia,serif}
 .chronicle-single:lang(en),.chronicle-prose-page:lang(en){font-family:Baskerville,"Palatino Linotype",Georgia,serif}
 .chronicle-photo{position:absolute;margin:0}.chronicle-single .triptych-seam{background:#faf9f5}.feeling-stripe{width:16px;z-index:3}
 .chronicle-short.fixed-prose{position:absolute;width:430px;font-size:30px;line-height:1.85;letter-spacing:.025em;overflow-wrap:anywhere;white-space:pre-wrap}.short-side{left:660px;top:240px;height:420px;display:flex;flex-direction:column;justify-content:center}.short-rule{display:block;flex:none;width:45px;border-top:2px solid #829E96;margin-bottom:30px}.chronicle-short.short-below{left:150px;top:720px;width:900px;font-size:28px}
 .chronicle-attribution{position:absolute;right:60px;bottom:22px;font:16px/1.5 Georgia,"Songti SC",serif;color:#687870;background:#faf9f5;padding:2px 8px}
-.chronicle-masthead{position:absolute;left:120px;right:120px;top:96px;font:17px/1.5 Georgia,serif;letter-spacing:5px;color:#105f62}.chronicle-masthead i{position:absolute;left:140px;right:0;top:12px;border-top:1px solid #b8cac4}
+.chronicle-masthead{position:absolute;left:120px;right:120px;top:96px;font:17px/1.5 Georgia,serif;letter-spacing:5px;color:${CHRONICLE_TEXT_COLOR}}.chronicle-masthead i{position:absolute;left:140px;right:0;top:12px;border-top:1px solid #b8cac4}
 .chronicle-prose.fixed-prose{position:absolute;left:220px;top:215px;width:760px;font-size:29px;line-height:1.85;letter-spacing:.025em;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2}.chronicle-prose-page:lang(en) .chronicle-prose{font-size:30px;line-height:1.8;letter-spacing:0}
-.chronicle-prose .prose-initial{float:left;display:block;font-size:72px;line-height:1;width:auto;margin:4px 12px 0 0;color:#105f62}
+.chronicle-prose .prose-initial{float:left;display:block;font-size:72px;line-height:1;width:auto;margin:4px 12px 0 0;color:${CHRONICLE_TEXT_COLOR}}
 .prose-quote{position:absolute;font:110px/1 Baskerville,Georgia,serif;color:#829e96;opacity:.5;pointer-events:none}.quote-open{left:145px;top:172px}.quote-close{right:138px;top:654px}.prose-end-rule{position:absolute;left:220px;top:744px;width:48px;border-top:2px solid #829e96}
 .chronicle-join{display:none}
 .chronicle-prose-side{position:absolute;left:168px;top:222px;width:2px;height:64px}.chronicle-prose-footer{position:absolute;left:120px;right:120px;top:782px;border-top:1px solid #b8cac4;padding-top:22px;font:italic 21px/1.4 Baskerville,Georgia,serif;color:#687870}.chronicle-folio{float:right;font:19px/1.4 Georgia,serif;letter-spacing:.1em}

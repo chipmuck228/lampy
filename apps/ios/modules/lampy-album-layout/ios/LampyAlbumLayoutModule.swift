@@ -682,6 +682,7 @@ func drawAlbumPage(
     }
     let spec = albumFontForKind(kind, serif: kind == "note" ? bodyName : serifName, ui: uiName)
     let font = resolveFont(name: spec.name, size: spec.size)
+    let textColor = (kind == "note" && (rendering["chroniclePrint"] as? Bool) == true) ? albumHexColor(rendering["bodyColor"] as? String, fallback: UIColor(red: 16.0/255.0, green: 95.0/255.0, blue: 98.0/255.0, alpha: 1)) : spec.color
     if let lines = block["lines"] as? [[String: Any]], let text = block["text"] as? String, !lines.isEmpty {
       for line in lines {
         let start = Int(line["start"] as? Double ?? 0)
@@ -691,10 +692,10 @@ func drawAlbumPage(
         let slice = sliceAlbumScalars(text, start: start, end: end)
         if start == 0, let initial = block["printInitial"] as? [String: Any], let count = initial["scalars"] as? Int, count > 0, count <= end {
           let large = resolveFont(name: bodyName, size: CGFloat(initial["sizePt"] as? Double ?? 34))
-          drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: 0, end: count), font: large, color: albumSageColor(), x: lineX, baselineY: baseline, in: context)
-          drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: count, end: end), font: font, color: spec.color, x: lineX + CGFloat(initial["widthPt"] as? Double ?? 44), baselineY: baseline, in: context)
+          drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: 0, end: count), font: large, color: textColor, x: lineX, baselineY: baseline, in: context)
+          drawAlbumTextAtBaseline(text: sliceAlbumScalars(text, start: count, end: end), font: font, color: textColor, x: lineX + CGFloat(initial["widthPt"] as? Double ?? 44), baselineY: baseline, in: context)
         } else {
-          drawAlbumTextAtBaseline(text: slice, font: font, color: spec.color, x: lineX, baselineY: baseline, in: context)
+          drawAlbumTextAtBaseline(text: slice, font: font, color: textColor, x: lineX, baselineY: baseline, in: context)
         }
       }
     } else {
@@ -708,7 +709,7 @@ func drawAlbumPage(
       drawAlbumTextAtBaseline(
         text: text,
         font: font,
-        color: spec.color,
+        color: textColor,
         x: x,
         baselineY: y + font.ascender,
         in: context
