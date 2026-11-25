@@ -15,6 +15,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.facebook.react.bridge.LifecycleEventListener
+import com.facebook.react.bridge.ReactContext
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
@@ -132,8 +133,8 @@ class AlbumEpubView(context: Context, appContext: AppContext) : ExpoView(context
     web.layout((width - w) / 2, (height - h) / 2, (width + w) / 2, (height + h) / 2)
   }
   private fun stop() { root = null; document = null; if (!destroyed) { web.stopLoading(); web.loadUrl("about:blank"); web.onPause() } }
-  override fun onAttachedToWindow() { super.onAttachedToWindow(); attached = true; appContext.reactContext?.addLifecycleEventListener(this); load() }
-  override fun onDetachedFromWindow() { attached = false; appContext.reactContext?.removeLifecycleEventListener(this); stop(); super.onDetachedFromWindow() }
+  override fun onAttachedToWindow() { super.onAttachedToWindow(); attached = true; (appContext.reactContext as? ReactContext)?.addLifecycleEventListener(this); load() }
+  override fun onDetachedFromWindow() { attached = false; (appContext.reactContext as? ReactContext)?.removeLifecycleEventListener(this); stop(); super.onDetachedFromWindow() }
   override fun onHostPause() { stop() }
   override fun onHostResume() { /* JS revalidates family/account and creates a fresh preview lease. */ }
   override fun onHostDestroy() { stop(); if (!destroyed) { destroyed = true; web.destroy() } }
