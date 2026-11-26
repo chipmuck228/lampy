@@ -60,3 +60,12 @@ describe('LookThisHit', () => {
     expect(view.getByTestId('recent-open-label-moment_short').props.numberOfLines).toBeUndefined();
   });
 });
+
+it('uses the requested official Lucide icons with one shared stroke',async()=>{
+ const {LifeIcon,LIFE_NAVIGATION_ICONS}=jest.requireActual('./life-icons');
+ const Blocks=jest.requireActual('lucide-react-native/icons/blocks').default;const BookOpen=jest.requireActual('lucide-react-native/icons/book-open').default;const Menu=jest.requireActual('lucide-react-native/icons/menu').default;const UsersRoundCollaboration=jest.requireActual('lucide-react-native/icons/users-round-collaboration').default;
+ for(const [name,Icon] of [['lookback',Blocks],['album',BookOpen],['family',UsersRoundCollaboration],['recent',Menu]]){
+  const page=await render(<LifeIcon name={name} size={24} color="#40564A" decorative={false}/>);
+  expect(LIFE_NAVIGATION_ICONS[name]).toBe(Icon);const icon=page.getByTestId(`lucide-navigation-${name}`,{includeHiddenElements:true});expect(icon.props.width).toBe(24);expect(icon.props.stroke).toBe('#40564A');expect(icon.props.strokeWidth).toBe(1.8);await page.unmount();
+ }
+});

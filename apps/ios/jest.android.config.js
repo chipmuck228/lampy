@@ -3,6 +3,7 @@ const android = require('jest-expo/android/jest-preset');
 module.exports = {
   ...shared,
   ...android,
+  transform: shared.transform,
   modulePaths: shared.modulePaths,
   moduleNameMapper: shared.moduleNameMapper,
   transformIgnorePatterns: shared.transformIgnorePatterns,
