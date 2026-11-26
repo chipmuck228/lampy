@@ -50,7 +50,8 @@
           "UIInterfaceOrientationPortraitUpsideDown",
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
-        ]
+        ],
+        "NSPhotoLibraryAddUsageDescription": "Lampy 只在你点击保存邀请图片时，将家庭邀请二维码添加到系统相册。"
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -177,7 +178,16 @@
         }
       ],
       "./plugins/with-family-invite-links.cjs",
-      "./plugins/with-native-build-compat.cjs"
+      "./plugins/with-native-build-compat.cjs",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Lampy 只在你从相册选择已有照片留下时读取相册。",
+          "savePhotosPermission": "Lampy 只在你点击保存邀请图片时，将家庭邀请二维码添加到系统相册。",
+          "granularPermissions": [],
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

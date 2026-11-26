@@ -35,6 +35,9 @@ jobs:
       - run: npx jest --runInBand src/application/album-publication.test.ts src/application/album-imagebook.test.ts src/application/album-book-plan.test.ts src/application/album-photo-composition.test.ts src/application/album-chronicle-cover.test.ts src/application/album-chronicle-opening.test.ts src/application/album-chronicle-date.test.ts src/application/album-chronicle-single.test.ts src/application/album-chronicle-pair.test.ts src/application/album-epub.test.ts src/application/album-epub-snapshot.test.ts src/application/album-paginate.test.ts src/application/album-print.test.ts src/application/family-album-paper.test.ts src/infrastructure/album-epub-files.test.ts src/infrastructure/album-epub-snapshots.test.ts src/infrastructure/epub-stream.test.ts src/infrastructure/album-print-files.test.ts src/screens/family-album-print-screen.test.tsx
       - name: Verify account-bound purchase access and recovery
         run: npx jest --runInBand src/application/unified-purchases.test.ts src/application/album-export-access.test.ts src/screens/family-epub-screen.test.tsx src/screens/account-subscribe-screen.test.tsx
+      - run: node --test scripts/deploy-invite-web-test.test.cjs
+      - name: Verify invitation routing and explicit photo saving
+        run: npx jest --runInBand src/screens/family-invitations-screen.test.tsx src/infrastructure/save-invite-image.test.ts src/infrastructure/family-invite-routing.test.ts src/infrastructure/website-open-link.test.ts
       - name: Validate synthetic keepsake EPUBs
         run: |
           node scripts/publication-fixture.cjs "$RUNNER_TEMP/lampy-keepsake-samples"

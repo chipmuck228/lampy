@@ -1,6 +1,7 @@
+import {JSDOM} from 'jsdom';
 import { request as httpRequest } from "node:http";
 import { startFamilyApiServer } from "./listen";
-import { inviteAssociation, inviteWebJs } from "./invite-web";
+import { INVITE_WEB_HTML, inviteAssociation, inviteWebJs } from "./invite-web";
 async function request(
   port: number,
   path: string,
@@ -160,4 +161,33 @@ it("disabled service never enables public invite pages", async () => {
   } finally {
     await s.close();
   }
+});
+
+async function web(status='pending',clipboard=true){
+ const token='a'.repeat(64),dom=new JSDOM(INVITE_WEB_HTML,{url:'https://family.example/invite#'+token,runScripts:'outside-only'});
+ const fetch=jest.fn(async(_url:string,_options?:unknown)=>({ok:true,json:async()=>({name:'Our family',status,expiresAt:'2030-01-01'})}));
+ Object.defineProperty(dom.window,'fetch',{value:fetch});
+ const writeText=jest.fn(async()=>{});if(clipboard)Object.defineProperty(dom.window.navigator,'clipboard',{value:{writeText}});
+ dom.window.eval(inviteWebJs());await new Promise(resolve=>setTimeout(resolve,0));
+ return {dom,token,fetch,writeText,doc:dom.window.document};
+}
+it('offers explicit opening and copying, no fake store URL and no automatic join',async()=>{
+ const w=await web();try{
+  const open=w.doc.getElementById('open') as HTMLAnchorElement;expect(open.hidden).toBe(false);expect(open.href).toBe('lampy:///family-invite#'+w.token);
+  expect(w.doc.getElementById('download')!.hidden).toBe(true);
+  (w.doc.getElementById('copy') as HTMLButtonElement).click();await new Promise(resolve=>setTimeout(resolve,0));
+  expect(w.writeText).toHaveBeenCalledWith('https://family.example/invite#'+w.token);
+  expect(w.fetch).toHaveBeenCalledTimes(1);expect(w.fetch.mock.calls[0][0]).toBe('/v2/invitations/preview');
+ }finally{w.dom.window.close();}
+});
+it('offers selectable text when clipboard access is unavailable',async()=>{
+ const w=await web('pending',false);try{(w.doc.getElementById('copy') as HTMLButtonElement).click();await new Promise(resolve=>setTimeout(resolve,0));expect(w.doc.getElementById('invite-link')!.hidden).toBe(false);expect(w.doc.getElementById('copy-status')!.textContent).toContain('请长按');}finally{w.dom.window.close();}
+});
+it('does not offer opening or copying for an ended invitation',async()=>{
+ const w=await web('expired');try{expect(w.doc.getElementById('open')!.hidden).toBe(true);expect(w.doc.getElementById('copy')!.hidden).toBe(true);}finally{w.dom.window.close();}
+});
+it('accepts only a concrete credential-free Apple App Store destination',()=>{
+ expect(inviteWebJs('https://apps.apple.com/app/id123456')).toContain('https://apps.apple.com/app/id123456');
+ expect(inviteWebJs('https://user:secret@apps.apple.com/app/id123456')).toContain('const download=""');
+ expect(inviteWebJs('https://apps.apple.com/')).toContain('const download=""');
 });

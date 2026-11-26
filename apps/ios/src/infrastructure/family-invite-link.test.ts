@@ -20,6 +20,7 @@ it("accepts only configured origins, exact paths and fragment tokens; rejects qu
   expect(parseFamilyInviteLink(`lampy:///family-invite#${token}`)).toBe(token);
   for (const url of [
     `https://evil.example/invite#${token}`,
+    `https://u:p@family.yunpura.com/invite#${token}`,
     `https://family.yunpura.com/invite?token=${token}`,
     `https://family.yunpura.com/invite/other#${token}`,
     `lampy://evil/family-invite#${token}`,

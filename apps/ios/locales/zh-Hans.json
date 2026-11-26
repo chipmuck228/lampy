@@ -7,6 +7,7 @@
     "LAMPY_QUICK_WRITE": "写一句",
     "LAMPY_QUICK_CAMERA": "拍一张",
     "LAMPY_QUICK_RECORD": "录一段",
-    "LAMPY_QUICK_SHARE": "分享 Lampy"
+    "LAMPY_QUICK_SHARE": "分享 Lampy",
+    "NSPhotoLibraryAddUsageDescription": "Lampy 只在你点击保存邀请图片时，将家庭邀请二维码添加到系统相册。"
   }
 }
