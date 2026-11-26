@@ -679,7 +679,7 @@ export function createFamilyUseCases(deps: {
       const work=async()=>{const owner=await requireAccount();if(owner.userId!==expectedUserId)throw new ApplicationError('STALE_FAMILY_REQUEST','Account changed.');return performSignOut();};
       const next=identityCommit.then(work,work);identityCommit=next.then(()=>undefined,()=>undefined);return next;
     },
-    async getEmailCodeAvailability(){const health=await deps.client.health();return health.emailCodeLogin===true;},
+    async getEmailCodeAvailability(){const health=await deps.client.health(15000);return health.emailCodeLogin===true;},
     async getEmailCodeAccount():Promise<EmailCodeStatus & {userId?:string}> {
       const token=await deps.session.getSessionToken();if(!token)return {signedIn:false,linked:false};
       const owner=await requireAccount();

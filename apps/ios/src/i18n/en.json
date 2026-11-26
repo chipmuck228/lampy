@@ -1305,5 +1305,12 @@
   "每段新录音最多一分钟。到限会自动停止并保留草稿，已有的较长录音仍可播放。": "Each new recording can be up to one minute long. Recording stops at the limit and keeps your draft. Existing longer recordings can still be played.",
   "预览、保存与恢复购买": "Previews, saving and restoring purchases",
   "照片正在加载": "Loading photo",
-  "照片暂时无法显示": "Photo temporarily unavailable"
+  "照片暂时无法显示": "Photo temporarily unavailable",
+  "正在发送验证码…": "Sending a code…",
+  "如果你创建的家庭还有其他成员，请先完成创建者移交或解散家庭，再回来删除账号。": "If a family you created still has other members, complete the creator transfer or dissolve the family before returning to delete your account.",
+  "你仍管理着有其他成员的家庭。请先移交或解散家庭，再删除账号；本次没有发送验证码。": "You still manage a family with other members. Transfer the creator role or dissolve the family before deleting your account. No code was sent this time.",
+  "前往家庭管理": "Manage my families",
+  "暂时无法确认邮件是否发出，请稍后重新获取。账号尚未删除。": "We could not confirm whether the email was sent. Please request a new code later. Your account has not been deleted.",
+  "暂时无法确认删除结果，请重新确认账号。本机个人记录仍保留。": "We could not confirm the deletion result. Please check your account again. Personal records remain on this device.",
+  "请等待倒计时结束后，获取这次操作的验证码。": "Wait for the countdown to finish before requesting a code for this action."
 }
