@@ -1,4 +1,4 @@
-import {QuietField} from './quiet-form';
+import X from 'lucide-react-native/icons/x';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -15,8 +15,8 @@ import type { InvitePreview } from "../family-api/types";
 import { tr, dateLabel } from "../i18n";
 import { useDeviceLock } from "./device-lock-context";
 import { SettingsPage } from "./settings-chrome";
-import { Text, type } from "./life-text";
-import { inkSoft, paperDeep } from "./life-page";
+import { Text, TextInput, type } from "./life-text";
+import { hairline, ink, inkSoft, paperDeep, placeholder, sage } from "./life-page";
 import { LifeIcon } from "./life-icons";
 import { familyInviteError } from "./family-invite-copy";
 export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invite", onBusyChange }: { onBusyChange?: (busy: boolean) => void; onJoined?: () => void; onClose?: () => void; returnTo?: "/family" | "/family-invite" }) {
@@ -24,6 +24,7 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
   const lock = useDeviceLock();
   const allowed = isFamilyProductEntryOpen() && !lock?.snapshot.locked;
   const [link, setLink] = useState("");
+  const [linkFocused, setLinkFocused] = useState(false);
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [user, setUser] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -171,38 +172,54 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
         <>
           {!joined ? (
             <>
-              <View style={{flexDirection:"row",alignItems:"center",gap:8}}>
-              <View style={{flex:1,minWidth:0}}><QuietField label={tr("邀请链接")}
-                accessibilityLabel={tr("邀请链接")}
-                placeholder={tr("邀请链接")}
-                value={link}
-                editable={!busy}
-                onChangeText={value => {
-                  forgetFamilyInvite();
-                  seq.current++;
-                  owner.current = null;
-                  setPreview(null);
-                  setUser(null);
-                  setMessage(null);
-                  setLink(value);
-                }}
-                autoCapitalize="none"
-                autoCorrect={false}
-              /></View>
-              <Pressable accessibilityRole="button" accessibilityLabel={tr("清除输入")} disabled={busy || (!link && !currentFamilyInvite())}
-                style={{minHeight:48,minWidth:48,alignItems:"center",justifyContent:"center"}}
-                onPress={() => { forgetFamilyInvite(); seq.current++; owner.current=null; setLink(""); setPreview(null); setUser(null); setMessage(null); }}>
-                <LifeIcon name="clear" />
-              </Pressable>
+              <View style={styles.linkSection}>
+                <Text style={styles.linkLabel}>{tr("邀请链接")}</Text>
+                <View style={[styles.linkRow, linkFocused && styles.linkRowFocused]}>
+                  <TextInput
+                    testID="invitation-link-input"
+                    accessibilityLabel={tr("邀请链接")}
+                    placeholder={tr("粘贴邀请链接")}
+                    placeholderTextColor={placeholder}
+                    selectionColor={sage}
+                    style={[styles.linkInput, busy && styles.linkDisabled]}
+                    value={link}
+                    editable={!busy}
+                    onFocus={() => setLinkFocused(true)}
+                    onBlur={() => setLinkFocused(false)}
+                    onChangeText={value => {
+                      forgetFamilyInvite();
+                      seq.current++;
+                      owner.current = null;
+                      setPreview(null);
+                      setUser(null);
+                      setMessage(null);
+                      setLink(value);
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    clearButtonMode="never"
+                  />
+                  {link || currentFamilyInvite() ? <Pressable
+                    testID="invitation-link-clear"
+                    accessibilityRole="button"
+                    accessibilityLabel={tr("清除输入")}
+                    accessibilityState={{disabled:busy}}
+                    disabled={busy}
+                    style={({pressed})=>[styles.linkClear,busy&&styles.linkDisabled,pressed&&!busy&&styles.linkClearPressed]}
+                    onPress={() => { forgetFamilyInvite(); seq.current++; owner.current=null; setLink(""); setPreview(null); setUser(null); setMessage(null); }}>
+                    <X size={17} color={sage} strokeWidth={1.6} accessible={false}/>
+                  </Pressable> : null}
+                </View>
               </View>
               <Pressable
-                style={[styles.hit, (busy || !link.trim()) && {opacity:0.45}]}
+                style={[styles.openHit, (busy || !link.trim()) && styles.linkDisabled]}
                 accessibilityRole="button"
                 disabled={busy || !link.trim()}
                 accessibilityState={{disabled:busy || !link.trim()}}
                 onPress={open}
               >
-                <Text>{tr("查看邀请")}</Text>
+                <Text style={styles.openLabel}>{tr("查看邀请")}</Text>
+                <LifeIcon name="open" size={15} color={sage}/>
               </Pressable>
             </>
           ) : null}
@@ -292,6 +309,16 @@ function expiry(value: string) {
   return dateLabel(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 const styles = StyleSheet.create({
+  linkSection: { gap:8, paddingTop:12 },
+  linkLabel: { fontSize:13, lineHeight:20, letterSpacing:0.3, color:inkSoft },
+  linkRow: { flexDirection:"row", alignItems:"center", minHeight:54, borderBottomWidth:1, borderBottomColor:hairline },
+  linkRowFocused: { borderBottomColor:sage },
+  linkInput: { flex:1, minWidth:0, minHeight:54, fontSize:16, color:ink, paddingHorizontal:2, paddingVertical:14, backgroundColor:"transparent" },
+  linkClear: { minWidth:44, minHeight:48, alignItems:"center", justifyContent:"center" },
+  linkDisabled: { opacity:0.45 },
+  linkClearPressed: { opacity:0.6 },
+  openHit: { minHeight:48, flexDirection:"row", alignItems:"center", gap:8, alignSelf:"flex-start", paddingVertical:12, paddingHorizontal:2, marginTop:8, marginBottom:12 },
+  openLabel: { ...type.action, color:sage },
   title: { ...type.title, marginTop: 24 },
   body: { ...type.body, color: inkSoft, marginVertical: 16 },
   hit: {

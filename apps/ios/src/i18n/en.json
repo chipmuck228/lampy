@@ -1342,5 +1342,6 @@
   "生成后，可保存二维码或分享邀请链接。": "Create an invitation to save the QR image or share a link.",
   "有效期至 {0}": "Valid until {{0}}",
   "扫描二维码，或将邀请分享给家人。": "Scan the code, or share the invitation with family.",
-  "对方登录并确认后，才会加入家庭。": "They join only after signing in and confirming."
+  "对方登录并确认后，才会加入家庭。": "They join only after signing in and confirming.",
+  "粘贴邀请链接": "Paste invitation link"
 }
