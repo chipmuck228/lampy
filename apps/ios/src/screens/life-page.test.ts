@@ -74,7 +74,7 @@ describe('life page measures', () => {
   it('picks a band layout from available width and painted label size', () => {
     const withFamily = navBandItemsFor('recent', true);
     const personal = navBandItemsFor('lookback', false);
-    expect(withFamily.map((item) => item.label)).toEqual(['最近', '回看', '生活册', '家庭']);
+    expect(withFamily.map((item) => item.label)).toEqual(['最近', '回看', '家庭', '生活册']);
     expect(personal.map((item) => item.label)).toEqual(['最近', '回看', '生活册']);
     expect(navBandItemMinHeight(17)).toBe(48);
     expect(chooseNavBandLayout({ windowWidth: 390, items: withFamily })).toBe('row');

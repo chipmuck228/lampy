@@ -16,10 +16,12 @@ describe('root nav switch contract', () => {
     dismissToRootNav({ dismissTo }, 'recent');
     dismissToRootNav({ dismissTo }, 'lookback');
     dismissToRootNav({ dismissTo }, 'albums');
+    dismissToRootNav({ dismissTo }, 'family');
     expect(dismissTo.mock.calls).toEqual([
       [ROOT_NAV_HREF.recent],
       [ROOT_NAV_HREF.lookback],
       [ROOT_NAV_HREF.albums],
+      [ROOT_NAV_HREF.family],
     ]);
   });
 });

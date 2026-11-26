@@ -14,7 +14,6 @@ import {
   NAV_BAND_LABEL_SIZE,
   chooseNavBandLayout,
   hairline,
-  inkSoft,
   navBandItemMinHeight,
   navBandItemMinWidth,
   navBandItemsFor,
@@ -36,8 +35,8 @@ const BAND_DESTINATIONS: {
 }[] = [
   { id: 'recent', label: tr("最近"), icon: 'recent', goTestID: 'lookback-go-recent' },
   { id: 'lookback', label: tr("回看"), icon: 'lookback', goTestID: 'home-lookback' },
-  { id: 'albums', label: tr("生活册"), icon: 'album', goTestID: 'home-albums' },
   { id: 'family', label: tr("家庭"), icon: 'family', goTestID: 'home-family' },
+  { id: 'albums', label: tr("生活册"), icon: 'album', goTestID: 'home-albums' },
 ];
 
 export function RootNavBand({
@@ -104,14 +103,14 @@ export function RootNavBand({
 
   function renderItem(dest: (typeof BAND_DESTINATIONS)[number]) {
     const selected = dest.id === here;
-    const color = selected ? sage : inkSoft;
+    const color = sage;
     const min = itemMin(dest.id, dest.label, NAV_BAND_LABEL_SIZE);
     const inner = (
       <View style={styles.itemInner} accessible={false}>
         <LifeIcon name={dest.icon} size={NAV_BAND_ICON_SIZE} color={color} decorative />
         <Text
-          testID={selected && dest.id !== 'family' ? 'root-nav-here' : undefined}
-          style={[styles.label, { color }]}
+          testID={selected ? 'root-nav-here' : undefined}
+          style={[styles.label, { color }, selected && {fontWeight:'600'}]}
           onTextLayout={onPainted(dest.id)}
           accessible={false}
         >
@@ -120,7 +119,7 @@ export function RootNavBand({
       </View>
     );
 
-    if (selected && dest.id !== 'family') {
+    if (selected) {
       return (
         <View
           key={dest.id}
@@ -160,8 +159,8 @@ export function RootNavBand({
 
   const recentItem = renderItem(BAND_DESTINATIONS[0]);
   const lookbackItem = renderItem(BAND_DESTINATIONS[1]);
-  const albumsItem = personalAlbumsAvailable() ? renderItem(BAND_DESTINATIONS[2]) : null;
-  const familyItem = onFamily && !personalRecordsOnly() ? renderItem(BAND_DESTINATIONS[3]) : null;
+  const albumsItem = personalAlbumsAvailable() ? renderItem(BAND_DESTINATIONS[3]) : null;
+  const familyItem = onFamily && !personalRecordsOnly() ? renderItem(BAND_DESTINATIONS[2]) : null;
 
   return (
     <View
@@ -181,16 +180,16 @@ export function RootNavBand({
             {lookbackItem}
           </View>
           <View testID="root-nav-grid-row-2" style={styles.gridRow}>
-            {albumsItem}
             {familyItem}
+            {albumsItem}
           </View>
         </>
       ) : (
         <>
           {recentItem}
           {lookbackItem}
-          {albumsItem}
           {familyItem}
+          {albumsItem}
         </>
       )}
     </View>

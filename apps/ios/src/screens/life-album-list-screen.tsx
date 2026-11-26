@@ -235,7 +235,7 @@ export default function LifeAlbumListScreen() {
               dismissToRootNav(router, 'lookback');
             }
           }}
-          onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
+          onFamily={isFamilyProductEntryOpen() ? () => router.dismissTo('/family') : undefined}
         />
       }
     >

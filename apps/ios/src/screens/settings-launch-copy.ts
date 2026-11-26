@@ -1,8 +1,9 @@
 import {tr} from '../i18n';
+import {paidEpubInformationVisible} from './settings-capabilities';
 import {V1_PRIVACY_CHAPTERS,V1_HELP_CHAPTERS,V1_TERMS_CHAPTERS} from './settings-v1-copy';
 
-const account={title:tr('邮箱与 Apple 登录'),paragraphs:[
-  tr('个人记录不要求登录。使用家庭功能时，可以选择 Apple 登录或邮箱验证码。登录不会自动上传、备份个人记录或加入家庭。'),
+const account={title:tr('账号与登录'),paragraphs:[
+  tr('个人记录无需登录。使用家庭功能时，通过当前页面提供的方式登录。登录不会自动上传、备份个人记录或加入家庭。'),
   tr('邮箱验证码用于注册、登录、关联或更换邮箱，以及重新验证身份。验证码有效期为五分钟。请勿将验证码转发给他人。'),
   tr('首次使用邮箱时可设置昵称，保存后不能修改。已有 Apple 账号时，请先用 Apple 登录再关联邮箱；相同邮箱不会自动合并两个账号。'),
 ]};
@@ -11,10 +12,11 @@ const email={title:tr('邮件发送与账号数据'),paragraphs:[
   tr('验证码邮件通过 Resend 发送。收件邮箱和本次验证码会交给邮件服务用于投递；邮件服务也会处理投递所需的技术信息。'),
   tr('正式 Apple 登录不请求姓名或邮箱。Lampy 保存 Apple 提供的账号标识；删除关联账号时，重新验证取得的凭据仅用于验证与撤销授权。'),
 ]};
-const purchases={title:tr('购买与个人导出'),paragraphs:[
-  tr('个人生活册可以导出为 EPUB 或 PDF。需要购买的功能会在确认付款前显示 Apple 提供的价格；付款与恢复购买由 App Store 处理。'),
+const purchases={title:tr('电子册预览与保存'),paragraphs:[
+  tr('电子册可免费全屏预览。当前版本不提供 PDF 制作或预览。'),
+  ...(paidEpubInformationVisible()?[tr('保存与分享 EPUB 需要解锁。确认购买前会显示 Apple 提供的价格，已有购买可恢复。')]:[tr('当前平台仅提供电子册预览，不提供购买、保存或导出。')]),
   tr('Lampy 不接收你的银行卡信息。为核验和恢复购买，应用与服务器会处理商品标识、交易标识、签名交易及购买资格。'),
-  tr('个人册导出在本机生成；通过系统分享保存后，文件由你选择的应用或位置保管。Lampy 无法远程撤回这些文件。家庭册成品导出暂未开放。'),
+  tr('个人册与家庭册的电子册均在本机生成。分享后的文件由你选择的应用或位置保管，Lampy 无法远程撤回。'),
 ]};
 const deletion={title:tr('删除账号与 Apple 授权'),paragraphs:[
   tr('在设置的账号页面可以删除账号。纯邮箱账号使用验证码确认；关联过 Apple 的账号需要重新验证 Apple 身份，并尝试撤销 Apple 授权。取消验证不会删除账号。'),
@@ -23,7 +25,7 @@ const deletion={title:tr('删除账号与 Apple 授权'),paragraphs:[
   tr('如 Apple 授权未能自动撤销，页面会提示你在 Apple 账号设置中停止使用 Lampy 登录。删除账号不会自动退款；购买问题请通过 App Store 处理。'),
 ]};
 const albums={title:tr('录音与生活册'),paragraphs:[
-  tr('免费使用时，每段新录音最多一分钟；购买相应功能后最多三十分钟。到限会自动停止并保留草稿，已有的较长录音仍可播放。'),
+  paidEpubInformationVisible()?tr('免费使用时，每段新录音最多一分钟；购买相应功能后最多三十分钟。到限会自动停止并保留草稿，已有的较长录音仍可播放。'):tr('每段新录音最多一分钟。到限会自动停止并保留草稿，已有的较长录音仍可播放。'),
   tr('在「我的生活册」创建个人册、收入记录、调整顺序，再预览或阅读。家庭创建者可以整理家庭册，其他成员可以阅读。'),
   ...V1_HELP_CHAPTERS[2].paragraphs.slice(1),
 ]};

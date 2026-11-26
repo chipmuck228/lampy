@@ -1293,5 +1293,15 @@
   "在“家里的”查看已创建的家庭册。家庭创建者可以点册子列表末尾的“＋”，填写册名；管理多个家庭时，先选择所属家庭。也可以从家庭页选中一个家，点“添加到家庭册”，选择已有册子，再收入选中的分享或当前全部分享。册内可以继续收入，或点“整理”调整顺序和移出记录；普通成员可以阅读。首次使用需确认该家的说明，分享撤回后不再显示原文和媒体。家庭成员可以免费翻阅电子册；家庭创建者解锁后可以保存和分享 EPUB。": "In Family, browse existing family albums. Family creators can tap “+” at the end of the album grid and name the album; choose a family first if you manage several. You can also select a family on the Family page, choose Add to a family album, then choose an existing album and collect selected or all currently shared moments. In an album, creators can add moments or use Organize to reorder and remove them; ordinary members can read. Confirm the notice for each family on first use. Withdrawn shares no longer show original text or media. Family members can preview the electronic album for free. After unlocking, the family creator can save and share an EPUB.",
   "本家庭已解锁，可以保存和分享电子册。": "This family is unlocked. You can save and share electronic albums.",
   "本家庭已解锁，保存与分享暂不可用。": "This family is unlocked. Saving and sharing are currently unavailable.",
-  "把家人分享的日子收进一册。创建者可以添加、整理记录，选择封面并写下开篇；每位家庭成员都能在这里免费翻阅。分享撤回后，不再显示原文和媒体。": "Collect shared family moments in an album. Its creator can add and organize moments, choose a cover and write opening words. Every family member can read it here for free. Withdrawn shares no longer show their text or media."
+  "把家人分享的日子收进一册。创建者可以添加、整理记录，选择封面并写下开篇；每位家庭成员都能在这里免费翻阅。分享撤回后，不再显示原文和媒体。": "Collect shared family moments in an album. Its creator can add and organize moments, choose a cover and write opening words. Every family member can read it here for free. Withdrawn shares no longer show their text or media.",
+  "账号与登录": "Accounts and sign-in",
+  "个人记录无需登录。使用家庭功能时，通过当前页面提供的方式登录。登录不会自动上传、备份个人记录或加入家庭。": "Personal records need no sign-in. To use family features, sign in using the options shown in the app. Signing in does not upload or back up personal records or join a family automatically.",
+  "电子册预览与保存": "Electronic album previews and saving",
+  "电子册可免费全屏预览。当前版本不提供 PDF 制作或预览。": "Electronic albums can be previewed full-screen for free. This version does not offer PDF creation or preview.",
+  "个人册与家庭册的电子册均在本机生成。分享后的文件由你选择的应用或位置保管，Lampy 无法远程撤回。": "Personal and family electronic albums are generated on your device. Shared files are held by your chosen app or location, and Lampy cannot remotely recall them.",
+  "2026年11月26日": "November 26, 2026",
+  "保存与分享 EPUB 需要解锁。确认购买前会显示 Apple 提供的价格，已有购买可恢复。": "Unlock export to save and share EPUB files. Apple’s price is shown before purchase, and previous purchases can be restored.",
+  "当前平台仅提供电子册预览，不提供购买、保存或导出。": "This platform offers electronic album previews only, without purchases, saving or export.",
+  "每段新录音最多一分钟。到限会自动停止并保留草稿，已有的较长录音仍可播放。": "Each new recording can be up to one minute long. Recording stops at the limit and keeps your draft. Existing longer recordings can still be played.",
+  "预览、保存与恢复购买": "Previews, saving and restoring purchases"
 }

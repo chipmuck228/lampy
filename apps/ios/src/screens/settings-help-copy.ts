@@ -1,4 +1,4 @@
-import {isAppstoreLaunchBuild} from '../infrastructure/launch-release-config';
+import {currentSettingsCopyEnabled} from './settings-capabilities';
 import {LAUNCH_HELP_CHAPTERS} from './settings-launch-copy';
 import { tr } from '../i18n';
 import { isFamilyV1ReleaseBuild } from '../infrastructure/family-config';
@@ -57,4 +57,4 @@ const PERSONAL_HELP_CHAPTERS = [
   },
 ] as const;
 
-export const SETTINGS_HELP_CHAPTERS = isAppstoreLaunchBuild() ? [...PERSONAL_HELP_CHAPTERS,...LAUNCH_HELP_CHAPTERS] : isFamilyV1ReleaseBuild() ? [...PERSONAL_HELP_CHAPTERS, ...V1_HELP_CHAPTERS] : PERSONAL_HELP_CHAPTERS;
+export const SETTINGS_HELP_CHAPTERS = currentSettingsCopyEnabled() ? [...PERSONAL_HELP_CHAPTERS,...LAUNCH_HELP_CHAPTERS] : isFamilyV1ReleaseBuild() ? [...PERSONAL_HELP_CHAPTERS, ...V1_HELP_CHAPTERS] : PERSONAL_HELP_CHAPTERS;

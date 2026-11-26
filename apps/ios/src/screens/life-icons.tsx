@@ -57,6 +57,25 @@ const ANDROID_ICON_NAMES = {
 
 export type LifeIconName = keyof typeof LIFE_ICON_NAMES;
 
+/** Shared editorial linework: one stroke and tint on iOS and Android. */
+function NavigationIcon({name,size,color,decorative}:{name:LifeIconName;size:number;color:string;decorative:boolean}) {
+  const stroke={borderWidth:1.7,borderColor:color};
+  const square=(left:number,top:number,width:number,height=width)=>({position:'absolute' as const,left,top,width,height,...stroke,borderRadius:2.5});
+  return <View testID={`life-navigation-icon-${name}`} style={{width:size,height:size}} accessibilityElementsHidden={decorative} importantForAccessibility={decorative?'no':'auto'}>
+    <View style={{width:24,height:24,transform:[{scale:size/24}],transformOrigin:'top left'}}>
+      {name==='recent'?<>{[5,12,19].map(top=><View key={top} style={{position:'absolute',left:3,top,width:18,height:1.7,borderRadius:1,backgroundColor:color}}/>)}</>:null}
+      {name==='lookback'?<><View style={square(2,7,9,15)}/><View style={square(2,14,16,8)}/><View style={square(14,2,8)}/></>:null}
+      {name==='album'?<><View style={square(2,3,10,18)}/><View style={square(12,3,10,18)}/><View style={{position:'absolute',left:11.2,top:4,width:1.7,height:18,backgroundColor:color}}/></>:null}
+      {name==='family'?<>
+        <View style={{...square(3,2,7),borderRadius:4}}/><View style={{...square(1,10,12,8),borderRadius:7,borderBottomWidth:0}}/>
+        <View style={{...square(15,14,7),borderRadius:4}}/><View style={{...square(13,21,11,3),borderRadius:7,borderBottomWidth:0}}/>
+        <View style={{...square(14,1,9,10),borderTopRightRadius:12,borderBottomWidth:0,borderLeftWidth:0}}/>
+        <View style={{...square(1,17,9,7),borderBottomLeftRadius:12,borderTopWidth:0,borderRightWidth:0}}/>
+      </>:null}
+    </View>
+  </View>;
+}
+
 export function LifeIcon({
   name,
   size = 18,
@@ -68,6 +87,7 @@ export function LifeIcon({
   color?: string;
   decorative?: boolean;
 }) {
+  if (['recent','lookback','family','album'].includes(name)) return <NavigationIcon name={name} size={size} color={color} decorative={decorative}/>;
   return (
     <SymbolView
       name={{ ios: LIFE_ICON_NAMES[name], android: ANDROID_ICON_NAMES[name] }}

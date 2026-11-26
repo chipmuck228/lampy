@@ -151,15 +151,15 @@ function inspectArchive(archivePath, expected = expectedFromAppJson()) {
   report.team = codesignTeam(app);
   const profile = plistPrint(info, 'LampyBuildProfile');
   const api = plistPrint(info, 'LampyFamilyAPI');
-  if (['family-internal','appstore-v1','appstore-launch'].includes(expected.profile)) {
-    if (profile !== expected.profile || api !== (expected.profile !== 'family-internal' ? 'https://family.yunpura.com' : 'https://family-test.yunpura.com')) problems.push('family_profile_mismatch');
+  if (['family-internal','appstore-v1','appstore-launch','testflight-sandbox'].includes(expected.profile)) {
+    if (profile !== expected.profile || api !== (!['family-internal','testflight-sandbox'].includes(expected.profile) ? 'https://family.yunpura.com' : 'https://family-test.yunpura.com')) problems.push('family_profile_mismatch');
     if (plistPrint(info, 'LampyFamilyAlbumPreviewEnabled') !== 'true') problems.push('family_preview_marker_missing');
-    if(expected.profile==='appstore-launch'){
+    if(['appstore-launch','testflight-sandbox'].includes(expected.profile)){
       if(plistPrint(info,'LampyUnifiedPurchasesEnabled')!=='true'||plistPrint(info,'LampyPaidExportEnabled')!=='true'||plistPrint(info,'LampyEmailLoginEnabled')!=='true'||!expected.productId||plistPrint(info,'LampyExportProductID')!==expected.productId)problems.push('launch_feature_mismatch');
     } else if (plistPrint(info, 'LampyUnifiedPurchasesEnabled') !== 'false' || plistPrint(info, 'LampyPaidExportEnabled') !== 'false' || plistPrint(info, 'LampyExportProductID') !== '') problems.push('internal_paid_export_not_closed');
     if (expected.profile === 'appstore-v1' && plistPrint(info, 'LampyEmailLoginEnabled') !== 'false') problems.push('v1_email_login_not_closed');
     const entitlements = spawnSync('codesign', ['-d', '--entitlements', ':-', app], {encoding:'utf8'});
-    if (!`${entitlements.stdout || ''} ${entitlements.stderr || ''}`.includes(expected.profile !== 'family-internal' ? 'applinks:family.yunpura.com' : 'applinks:family-test.yunpura.com')) problems.push('family_associated_domain_missing');
+    if (!`${entitlements.stdout || ''} ${entitlements.stderr || ''}`.includes(!['family-internal','testflight-sandbox'].includes(expected.profile) ? 'applinks:family.yunpura.com' : 'applinks:family-test.yunpura.com')) problems.push('family_associated_domain_missing');
   } else if (profile || api) problems.push('unexpected_family_profile');
 
   if (report.bundleId !== expected.bundleId) problems.push('bundle_id_mismatch');
@@ -220,6 +220,10 @@ if (require.main === module) {
   if (process.env.LAMPY_BUILD_PROFILE === 'family-internal') {
     const internal = require('./family-internal-profile.cjs').internalProfile(process.env);
     expected.build = internal.build; expected.profile = 'family-internal';
+  }
+  if(process.env.LAMPY_BUILD_PROFILE==='testflight-sandbox'){
+    const profile=require('./testflight-sandbox-profile.cjs').launchProfile(process.env);
+    Object.assign(expected,{build:profile.build,version:profile.version,productId:profile.productId,profile:'testflight-sandbox'});
   }
   if(process.env.LAMPY_BUILD_PROFILE==='appstore-launch'){
     const launch=require('./appstore-launch-profile.cjs').launchProfile(process.env);

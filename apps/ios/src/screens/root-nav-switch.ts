@@ -19,16 +19,17 @@
  *    do not bypass authentication.
  */
 
-export type RootNavDest = 'recent' | 'lookback' | 'albums';
+export type RootNavDest = 'recent' | 'lookback' | 'albums' | 'family';
 
 export const ROOT_NAV_HREF = {
   recent: '/',
   lookback: '/lookback',
   albums: '/albums',
+  family: '/family',
 } as const;
 
 export type RootNavRouter = {
-  dismissTo: (href: '/' | '/lookback' | '/albums') => void;
+  dismissTo: (href: '/' | '/lookback' | '/albums' | '/family') => void;
 };
 
 export function shouldIgnoreRootNavPress(here: RootNavDest, dest: RootNavDest): boolean {
