@@ -111,3 +111,10 @@ it('keeps successful join feedback after background and foreground without repla
  expect(page.getByText('已加入这个家。')).toBeTruthy();
  expect(mockAccept).toHaveBeenCalledTimes(1);
 });
+it('replaces the preview when another invitation arrives while the same screen is open',async()=>{
+ rememberFamilyInvite('a'.repeat(64));mockPreview.mockImplementation(async token=>({name:token[0]==='a'?'First home':'Second home',expiresAt:'2030-01-01',status:'pending'}));
+ const page=await render(<FamilyInviteScreen/>);await waitFor(()=>expect(page.getByText('First home')).toBeTruthy());
+ await act(async()=>{rememberFamilyInvite('b'.repeat(64));});
+ await waitFor(()=>expect(page.getByText('Second home')).toBeTruthy());expect(page.queryByText('First home')).toBeNull();expect(mockAccept).not.toHaveBeenCalled();
+ await fireEvent.press(page.getByTestId('invite-confirm'));await waitFor(()=>expect(mockAccept).toHaveBeenCalledWith('b'.repeat(64),'a',expect.any(Function)));
+});

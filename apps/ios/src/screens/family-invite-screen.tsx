@@ -6,6 +6,7 @@ import { getFamilyUseCases } from "../application/container";
 import { isFamilyProductEntryOpen } from "../infrastructure/family-config";
 import {
   currentFamilyInvite,
+  subscribeIncomingFamilyInvite,
   forgetFamilyInvite,
   parseFamilyInviteLink,
   rememberFamilyInvite,
@@ -65,6 +66,10 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
       if (current()) setMessage(familyInviteError(e));
     }
   }, []);
+  useEffect(()=>subscribeIncomingFamilyInvite(()=>{
+    if(!focus.current||AppState.currentState!=='active')return;
+    seq.current++;owner.current=null;setBusy(false);void load();
+  }),[load]);
   useFocusEffect(
     useCallback(() => {
       focus.current = allowed;
@@ -159,7 +164,6 @@ export function FamilyInvitePanel({ onJoined, onClose, returnTo = "/family-invit
       return;
     }
     rememberFamilyInvite(token);
-    void load();
   }
   return (
     <>

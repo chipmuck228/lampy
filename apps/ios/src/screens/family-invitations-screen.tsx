@@ -12,6 +12,7 @@ import { inkSoft, paperDeep, sage, hairline } from './life-page';
 import { LifeIcon } from './life-icons';
 import { familyInviteError } from './family-invite-copy';
 import { readInviteShare, saveInviteShare, removeInviteShare } from '../infrastructure/secure-invite-share';
+import {inviteImageSaveSupported,saveInviteImage} from '../infrastructure/save-invite-image';
 type ShareData={link:string;qr:string};
 function expiry(value:string) { const d=new Date(value); return dateLabel(d.getFullYear(),d.getMonth()+1,d.getDate()); }
 export default function FamilyInvitationsScreen() {
@@ -24,6 +25,7 @@ export default function FamilyInvitationsScreen() {
  const [shares,setShares]=useState<Record<string,ShareData>>({});
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState<string|null>(null);
+ const [checkedAt,setCheckedAt]=useState(()=>Date.now());
  const [ready,setReady]=useState(false);
  const [loadError,setLoadError]=useState(false);
  const seq=useRef(0),owner=useRef<number|null>(null),user=useRef<string|null>(null);
@@ -46,7 +48,7 @@ export default function FamilyInvitationsScreen() {
      }
      if(n!==seq.current || await u.inviteLinkAccount()!==account)return;
      if(n!==seq.current)return;
-     user.current=account;setItems(result);setShares(cached);setReady(true);setMessage(null);
+     user.current=account;setItems(result);setShares(cached);setCheckedAt(Date.now());setReady(true);setMessage(null);
    } catch {if(n===seq.current){setLoadError(true);setMessage(tr('邀请暂时读不出来。'));}}
  },[familyId]);
  useFocusEffect(useCallback(()=>{
@@ -92,6 +94,16 @@ export default function FamilyInvitationsScreen() {
      await Share.share({message:data.link});
    } catch {if(n===seq.current)setMessage(tr('暂时无法分享，请再试一次。'));}
  }
+ async function saveImage(id:string,data:ShareData){
+   if(!allowed||!ready||owner.current!==null||AppState.currentState!=='active'||!items.some(i=>i.invitationId===id&&i.status==='pending'&&Date.parse(i.expiresAt)>Date.now()))return;
+   const n=seq.current,account=user.current;owner.current=n;setBusy(true);setMessage(null);
+   const current=()=>n===seq.current&&AppState.currentState==='active';
+   try{const app=await getFamilyUseCases();
+     const saved=await saveInviteImage(data.qr,async()=>current()&&await app.inviteLinkAccount()===account&&current());
+     if(current()&&saved)setMessage(tr('邀请图片已保存到相册。转发后，撤销邀请仍会使它失效。'));
+   }catch(error){if(current())setMessage(tr(error&&typeof error==='object'&&'code'in error&&error.code==='INVITE_IMAGE_PERMISSION'?'未获得保存图片的权限。可在系统设置中允许添加照片，或直接分享邀请链接。':'本次未能保存邀请图片，请重试或分享邀请链接。'));}
+   finally{if(owner.current===n){owner.current=null;setBusy(false);}}
+ }
  return <SettingsPage accessibilityLabel={tr('邀请家人')} title={tr('邀请家人')} backLabel={tr('家庭')} onBack={()=>router.dismissTo('/family')}>
  {allowed ? <>
  <Text style={styles.intro}>{tr('有效7天，可加入1人。')}</Text>
@@ -101,8 +113,8 @@ export default function FamilyInvitationsScreen() {
  {message?<Text accessibilityLiveRegion="polite" style={styles.intro}>{message}</Text>:null}
  {loadError?<Pressable style={styles.hit} accessibilityRole="button" onPress={()=>void load()}><Text>{tr('重新加载')}</Text></Pressable>:null}
  {items.map(i=>{
- const active=i.status==='pending',open=expanded===i.invitationId,data=shares[i.invitationId];
- const status=tr(active?'可使用':i.status==='accepted'?'已使用':i.status==='expired'?'已过期':'已撤销');
+ const active=i.status==='pending'&&Date.parse(i.expiresAt)>checkedAt,open=expanded===i.invitationId,data=shares[i.invitationId];
+ const status=tr(active?'可使用':i.status==='accepted'?'已使用':i.status==='expired'||i.status==='pending'?'已过期':'已撤销');
  return <View key={i.invitationId} style={styles.row}>
  <Pressable testID={'invite-row-'+i.invitationId} style={styles.heading} accessibilityRole="button"
  accessibilityLabel={expiry(i.expiresAt)+'，'+status} accessibilityState={{expanded:open,disabled:busy||!ready}}
@@ -113,6 +125,7 @@ export default function FamilyInvitationsScreen() {
  {open&&active&&ready?<View style={styles.detail}>
  {data?<Image testID="created-invitation" source={{uri:data.qr}} style={{width:220,height:220,maxWidth:'100%'}} accessibilityLabel={tr('家庭邀请')}/>:<Text style={styles.intro}>{tr('本机没有保存这份邀请。可撤销后另建一份。')}</Text>}
  <View style={styles.actionRow}>
+ {data&&inviteImageSaveSupported()?<Pressable testID={'invite-save-image-'+i.invitationId} style={[styles.hit,styles.rowHit]} accessibilityRole="button" disabled={busy||!ready} onPress={()=>void saveImage(i.invitationId,data)}><Text>{tr('保存到相册')}</Text></Pressable>:null}
  {data?<Pressable style={[styles.hit,styles.rowHit]} accessibilityRole="button" disabled={busy||!ready} onPress={()=>void share(data)}><Text>{tr('分享')}</Text></Pressable>:null}
  <Pressable style={[styles.hit,styles.rowHit,styles.revokeHit]} accessibilityRole="button" disabled={busy||!ready} onPress={()=>void act(i.invitationId)}><Text style={{color:inkSoft}}>{tr('撤销邀请')}</Text></Pressable>
  </View>
@@ -123,7 +136,7 @@ export default function FamilyInvitationsScreen() {
  </SettingsPage>;
 }
 const styles=StyleSheet.create({
- actionRow:{flexDirection:'row',alignItems:'center',gap:12},
+ actionRow:{flexDirection:'row',flexWrap:'wrap',alignItems:'center',gap:12},
  rowHit:{minWidth:48,flexShrink:1,marginVertical:0,paddingHorizontal:12},
  revokeHit:{backgroundColor:'transparent',borderWidth:StyleSheet.hairlineWidth,borderColor:hairline},
  intro:{...type.meta,color:inkSoft,marginVertical:12},

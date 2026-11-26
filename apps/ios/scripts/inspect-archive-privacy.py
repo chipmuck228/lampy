@@ -13,7 +13,7 @@ import tempfile
 
 PERMISSIONS = (
     'NSCameraUsageDescription', 'NSMicrophoneUsageDescription',
-    'NSPhotoLibraryUsageDescription', 'NSFaceIDUsageDescription',
+    'NSPhotoLibraryUsageDescription', 'NSPhotoLibraryAddUsageDescription', 'NSFaceIDUsageDescription',
 )
 MACHO = {'feedface', 'cefaedfe', 'feedfacf', 'cffaedfe', 'cafebabe',
          'bebafeca', 'cafebabf', 'bfbafeca'}
@@ -185,8 +185,6 @@ def inspect(archive, expected_build, podfile_lock=None, profile='appstore-v1', p
             for key in PERMISSIONS:
                 if not isinstance(localized.get(key), str) or not localized[key].strip():
                     issues.append('LOCALIZED_PURPOSE_MISSING:' + locale + ':' + key)
-            if 'NSPhotoLibraryAddUsageDescription' in localized:
-                issues.append('UNUSED_PHOTO_ADDITION_LOCALIZATION:' + locale)
         except Exception:
             issues.append('LOCALIZED_PLIST_UNREADABLE:' + locale)
     if not any(m['path'] == 'PrivacyInfo.xcprivacy' for m in report['privacyManifests']):

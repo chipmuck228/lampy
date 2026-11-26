@@ -1,16 +1,17 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { AppState, Share } from 'react-native';
 import FamilyInvitationsScreen from './family-invitations-screen';
-const mockCreate=jest.fn(),mockList=jest.fn(),mockRevoke=jest.fn(),mockRead=jest.fn(),mockSave=jest.fn();
+const mockCreate=jest.fn(),mockList=jest.fn(),mockRevoke=jest.fn(),mockRead=jest.fn(),mockSave=jest.fn(),mockSaveImage=jest.fn();
 jest.mock('../application/container',()=>({getFamilyUseCases:async()=>({inviteLinkAccount:async()=>'a',listInviteLinks:mockList,createInviteLink:mockCreate,revokeInviteLink:mockRevoke})}));
+jest.mock('../infrastructure/save-invite-image',()=>({inviteImageSaveSupported:()=>true,saveInviteImage:(...args:unknown[])=>mockSaveImage(...args)}));
 jest.mock('../infrastructure/secure-invite-share',()=>({readInviteShare:(...args:any[])=>mockRead(...args),saveInviteShare:(...args:any[])=>mockSave(...args),removeInviteShare:jest.fn()}));
 jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>true}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>({snapshot:{locked:false}})}));
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
 jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useRouter:()=>({dismissTo:jest.fn()}),useLocalSearchParams:()=>({familyId:'f'}),useFocusEffect:(fn:()=>void)=>useEffect(fn,[fn])};});
-const item={invitationId:'i',familyId:'f',status:'pending',expiresAt:'2026-10-15T00:00:00Z'};
+const item={invitationId:'i',familyId:'f',status:'pending',expiresAt:'2030-10-15T00:00:00Z'};
 const data={link:'http://127.0.0.1:8787/invite#'+'a'.repeat(64),qr:'data:image/png;base64,AA=='};
-beforeEach(()=>{jest.clearAllMocks();Object.defineProperty(AppState,'currentState',{configurable:true,value:'active',writable:true});mockList.mockResolvedValue([]);mockRead.mockResolvedValue(data);mockSave.mockResolvedValue(undefined);mockCreate.mockResolvedValue({...item,...data});mockRevoke.mockResolvedValue({});});
+beforeEach(()=>{jest.clearAllMocks();Object.defineProperty(AppState,'currentState',{configurable:true,value:'active',writable:true});mockList.mockResolvedValue([]);mockRead.mockResolvedValue(data);mockSave.mockResolvedValue(undefined);mockCreate.mockResolvedValue({...item,...data});mockRevoke.mockResolvedValue({});mockSaveImage.mockResolvedValue(true);});
 it('saves new QR securely and shares only a single message',async()=>{
  const share=jest.spyOn(Share,'share').mockResolvedValue({action:Share.sharedAction});
  const page=await render(<FamilyInvitationsScreen/>);
@@ -70,4 +71,22 @@ it('failed refresh disables stale rows without claiming a cached invitation was 
  await waitFor(()=>expect(page.getByTestId('invite-create')).toBeEnabled());
  await fireEvent.press(page.getByTestId('invite-row-i'));
  expect(page.getByTestId('created-invitation')).toBeTruthy();
+});
+
+it('saves the selected current invitation only on an explicit tap',async()=>{
+ mockList.mockResolvedValue([{...item,expiresAt:'2030-01-01T00:00:00Z'}]);const page=await render(<FamilyInvitationsScreen/>);
+ await waitFor(()=>expect(page.getByTestId('invite-row-i')).toBeTruthy());expect(mockSaveImage).not.toHaveBeenCalled();
+ await fireEvent.press(page.getByTestId('invite-row-i'));await fireEvent.press(page.getByTestId('invite-save-image-i'));
+ await waitFor(()=>expect(mockSaveImage).toHaveBeenCalledWith(data.qr,expect.any(Function)));
+ expect(await mockSaveImage.mock.calls[0][1]()).toBe(true);expect(page.getByText('邀请图片已保存到相册。转发后，撤销邀请仍会使它失效。')).toBeTruthy();
+});
+it('shows permission feedback and keeps link sharing available',async()=>{
+ mockSaveImage.mockRejectedValue({code:'INVITE_IMAGE_PERMISSION'});mockList.mockResolvedValue([{...item,expiresAt:'2030-01-01T00:00:00Z'}]);
+ const page=await render(<FamilyInvitationsScreen/>);await waitFor(()=>expect(page.getByTestId('invite-row-i')).toBeTruthy());await fireEvent.press(page.getByTestId('invite-row-i'));await fireEvent.press(page.getByTestId('invite-save-image-i'));
+ await waitFor(()=>expect(page.getByText('未获得保存图片的权限。可在系统设置中允许添加照片，或直接分享邀请链接。')).toBeTruthy());expect(page.getByText('分享')).toBeTruthy();
+});
+it('does not offer saving or sharing when a pending invitation has already expired locally',async()=>{
+ mockList.mockResolvedValue([{...item,expiresAt:'2020-01-01T00:00:00Z'}]);const page=await render(<FamilyInvitationsScreen/>);
+ await waitFor(()=>expect(page.getByTestId('invite-row-i')).toBeTruthy());await fireEvent.press(page.getByTestId('invite-row-i'));
+ expect(page.queryByTestId('invite-save-image-i')).toBeNull();expect(page.queryByText('分享')).toBeNull();expect(mockSaveImage).not.toHaveBeenCalled();
 });

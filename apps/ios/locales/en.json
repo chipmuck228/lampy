@@ -7,6 +7,7 @@
     "LAMPY_QUICK_WRITE": "Write a line",
     "LAMPY_QUICK_CAMERA": "Take a photo",
     "LAMPY_QUICK_RECORD": "Record a sound",
-    "LAMPY_QUICK_SHARE": "Share Lampy"
+    "LAMPY_QUICK_SHARE": "Share Lampy",
+    "NSPhotoLibraryAddUsageDescription": "Lampy adds a family invitation QR image to Photos only when you tap Save to Photos."
   }
 }

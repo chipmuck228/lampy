@@ -1330,5 +1330,10 @@
   "已解锁个人册导出，也可启用本人创建家庭的导出。": "Personal album export is unlocked. You can also enable export for families you create.",
   "购买与恢复由Apple完成，可能需要验证Apple账号；Lampy不会读取你的Apple密码。": "Apple handles purchases and restoration and may ask you to verify your Apple Account. Lampy does not read your Apple password.",
   "已解锁最长30分钟录音和EPUB保存与分享，无需重复购买。": "Recording up to 30 minutes and EPUB saving and sharing are unlocked. No need to purchase again.",
-  "免费录音每段1分钟；一次购买解锁最长30分钟录音和EPUB保存与分享。": "Free recordings are up to one minute each. One purchase unlocks recordings up to 30 minutes and EPUB saving and sharing."
+  "免费录音每段1分钟；一次购买解锁最长30分钟录音和EPUB保存与分享。": "Free recordings are up to one minute each. One purchase unlocks recordings up to 30 minutes and EPUB saving and sharing.",
+  "保存到相册": "Save to Photos",
+  "邀请图片已保存到相册。转发后，撤销邀请仍会使它失效。": "Invitation image saved to Photos. Revoking the invitation also invalidates shared copies.",
+  "未获得保存图片的权限。可在系统设置中允许添加照片，或直接分享邀请链接。": "Photo saving was not allowed. Allow photo additions in system settings, or share the invitation link.",
+  "本次未能保存邀请图片，请重试或分享邀请链接。": "The invitation image could not be saved. Try again or share the invitation link.",
+  "家庭邀请图片只在你点击保存时添加到系统相册；不会因此读取或上传其他相册照片。拒绝添加照片权限后仍可分享邀请链接。": "Invitation images are added to Photos only when you tap Save. This does not read or upload other photos. You can still share the invitation link if you decline photo additions."
 }

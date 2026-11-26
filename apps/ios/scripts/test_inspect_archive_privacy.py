@@ -112,12 +112,12 @@ class ArchivePrivacyTest(unittest.TestCase):
         self.assertTrue(any(i.startswith('MANIFEST_REASON_OR_PURPOSE_INVALID:') for i in report['issues']))
 
     def test_rejects_undeclared_permissions_paid_switches_and_missing_localization(self):
-        self.info.update(NSPhotoLibraryAddUsageDescription='unused',
+        self.info.update(NSCalendarsUsageDescription='unused',
                          LampyPaidExportEnabled=True, UIBackgroundModes=['audio'])
         self.write('Info.plist', self.info)
         (self.app / 'en.lproj/InfoPlist.strings').unlink()
         issues = self.inspect()['issues']
-        self.assertIn('UNEXPECTED_PERMISSION:NSPhotoLibraryAddUsageDescription', issues)
+        self.assertIn('UNEXPECTED_PERMISSION:NSCalendarsUsageDescription', issues)
         self.assertIn('CLOSED_SWITCH_NOT_FALSE:LampyPaidExportEnabled', issues)
         self.assertIn('LOCALIZED_PLIST_UNREADABLE:en', issues)
         self.assertIn('UNEXPECTED_BACKGROUND_MODES', issues)
@@ -167,7 +167,7 @@ class ArchivePrivacyTest(unittest.TestCase):
         config = json.loads((ios / 'app.json').read_text())['expo']['ios']['infoPlist']
         for value in (config, *(json.loads((ios / 'locales' / (locale + '.json')).read_text())['ios']
                                 for locale in ('en', 'zh-Hans'))):
-            self.assertNotIn('NSPhotoLibraryAddUsageDescription', value)
+            self.assertTrue(value['NSPhotoLibraryAddUsageDescription'].strip())
             for key in audit.PERMISSIONS:
                 self.assertTrue(value[key].strip())
 

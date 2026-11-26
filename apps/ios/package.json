@@ -47,7 +47,8 @@
     "fflate": "0.8.2",
     "nodemailer": "10.6.1",
     "lucide-react-native": "1.80.0",
-    "react-native-svg": "15.15.4"
+    "react-native-svg": "15.15.4",
+    "expo-media-library": "~57.0.5"
   },
   "devDependencies": {
     "@testing-library/react-native": "^14.0.1",

@@ -32,6 +32,7 @@ export function parseFamilyInviteLink(
 ): string | null {
   try {
     const u = new URL(value);
+    if(u.username||u.password)return null;
     const web = origin && u.origin === origin && u.pathname === "/invite";
     const native =
       u.protocol === "lampy:" &&
@@ -52,8 +53,11 @@ export function makeFamilyInviteLink(origin: string, token: string) {
 // A bearer survives login/navigation only in memory. No AsyncStorage/Keychain/logging.
 let pending: { token: string; generation: number } | null = null;
 let generation = 0;
+const incomingListeners=new Set<()=>void>();
+export function subscribeIncomingFamilyInvite(listener:()=>void){incomingListeners.add(listener);return()=>{incomingListeners.delete(listener);};}
 export function rememberFamilyInvite(token: string) {
   pending = { token, generation: ++generation };
+  for(const listener of incomingListeners)listener();
   return pending;
 }
 export function currentFamilyInvite() {
