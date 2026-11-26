@@ -10,9 +10,12 @@ const mockService={deleteAccount:jest.fn(),getEmailCodeAvailability:jest.fn(),ge
 jest.mock('../application/container',()=>({getAccountUseCases:async()=>mockService}));
 jest.mock('../infrastructure/account-config',()=>({emailCodeEntryOpen:()=>mockOpen}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>mockLock}));
-jest.mock('expo-router',()=>({useFocusEffect:(callback:()=>unknown)=>{const React=jest.requireActual('react');React.useEffect(callback,[callback]);}}));
+jest.mock('expo-router',()=>({useFocusEffect:(callback:()=>void|(()=>void))=>{const React=jest.requireActual('react');React.useEffect(()=>{mockFocusStart=callback;const stop=callback();mockFocusStop=typeof stop==='function'?stop:undefined;return stop;},[callback]);}}));
 jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
+let mockSendPress:()=>void=()=>{};
+jest.mock('./quiet-form',()=>{const actual=jest.requireActual('./quiet-form');const React=jest.requireActual('react');return {...actual,PageAction:(props:any)=>{if(props.testID==='email-code-send')mockSendPress=props.onPress;return React.createElement(actual.PageAction,props);}};});
 let changed:(state:AppStateStatus)=>void;
+let mockFocusStart:(()=>void|(()=>void))|undefined,mockFocusStop:(()=>void)|undefined;
 beforeEach(()=>{
   jest.clearAllMocks();mockApple.isAvailable.mockResolvedValue(true);mockApple.requestAuthorization.mockResolvedValue({identityToken:'apple',authorizationCode:'code'});mockOpen=true;mockLock.snapshot.locked=false;
   Object.defineProperty(AppState,'currentState',{configurable:true,value:'active'});
@@ -216,4 +219,48 @@ it('ignores a deletion confirmation left over after leaving the screen',async()=
  const page=await render(<EmailCodeScreen onCancel={jest.fn()}/>);await waitFor(()=>expect(page.getByTestId('email-code-delete')).toBeTruthy());
  const alert=jest.spyOn(Alert,'alert');await fireEvent.press(page.getByTestId('email-code-delete'));const confirm=alert.mock.calls.at(-1)![2]![1];
  await page.unmount();await act(async()=>confirm.onPress?.());expect(mockService.deleteAccount).not.toHaveBeenCalled();expect(mockApple.requestAuthorization).not.toHaveBeenCalled();
+});
+
+async function startEmailDeletion(onManageFamily=jest.fn()){
+ mockService.getEmailCodeAccount.mockResolvedValue({signedIn:true,linked:true,userId:'a',maskedEmail:'a***@example.com'});
+ const page=await render(<EmailCodeScreen onCancel={jest.fn()} onManageFamily={onManageFamily}/>);
+ await waitFor(()=>expect(page.getByTestId('email-code-delete')).toBeTruthy());
+ const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});await fireEvent.press(page.getByTestId('email-code-delete'));
+ await act(async()=>alert.mock.calls.at(-1)![2]![1].onPress?.());
+ return {page,alert,onManageFamily};
+}
+it('explains the managed-family block beside Send a code, without implying mail or deletion succeeded',async()=>{
+ mockService.requestEmailCode.mockRejectedValue(new ApplicationError('ACCOUNT_HAS_MANAGED_FAMILY','managed'));
+ const {page,onManageFamily}=await startEmailDeletion();await send(page);
+ expect(page.getByTestId('email-code-feedback').props.children).toContain('本次没有发送验证码');expect(page.getByTestId('email-code-feedback').props.children).toContain('移交');
+ expect(page.queryByTestId('email-code-value')).toBeNull();expect(page.getByTestId('email-code-send')).toBeDisabled();expect(mockService.verifyEmailCode).not.toHaveBeenCalled();
+ await fireEvent.press(page.getByTestId('email-code-manage-family'));expect(onManageFamily).toHaveBeenCalledTimes(1);expect(mockService.deleteAccount).not.toHaveBeenCalled();
+});
+it('checks the account again after a family block, requiring a new explicit send rather than auto-deleting',async()=>{
+ mockService.requestEmailCode.mockRejectedValueOnce(new ApplicationError('ACCOUNT_HAS_MANAGED_FAMILY','managed'));
+ const {page,alert}=await startEmailDeletion();await send(page);await fireEvent.press(page.getByTestId('email-code-refresh-account'));
+ await waitFor(()=>expect(page.getByTestId('email-code-delete')).toBeTruthy());expect(mockService.requestEmailCode).toHaveBeenCalledTimes(1);
+ await fireEvent.press(page.getByTestId('email-code-delete'));await act(async()=>alert.mock.calls.at(-1)![2]![1].onPress?.());await send(page);
+ expect(page.getByTestId('email-code-value')).toBeTruthy();expect(mockService.requestEmailCode).toHaveBeenCalledTimes(2);expect(mockService.verifyEmailCode).not.toHaveBeenCalled();
+});
+it('shows sending immediately and coalesces taps before the disabled state renders',async()=>{
+ let finish!:(value:unknown)=>void;mockService.requestEmailCode.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+ const {page}=await startEmailDeletion();const press=mockSendPress;
+ await act(async()=>{press();press();});expect(mockService.requestEmailCode).toHaveBeenCalledTimes(1);expect(page.getByText('正在发送验证码…')).toBeTruthy();expect(page.queryByTestId('email-code-value')).toBeNull();
+ await act(async()=>finish({challengeId:'challenge',expiresAt:new Date(Date.now()+300000).toISOString(),resendAfterSeconds:60}));expect(page.getByTestId('email-code-value')).toBeTruthy();
+});
+it('does not leave Send disabled after leaving an in-flight request and refocusing',async()=>{
+ let finish!:(value:unknown)=>void;mockService.requestEmailCode.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ const {page,alert}=await startEmailDeletion();await send(page);expect(page.getByText('正在发送验证码…')).toBeTruthy();
+ await act(async()=>{mockFocusStop?.();const stop=mockFocusStart?.();mockFocusStop=typeof stop==='function'?stop:undefined;});
+ await waitFor(()=>expect(page.getByTestId('email-code-delete')).toBeTruthy());await fireEvent.press(page.getByTestId('email-code-delete'));await act(async()=>alert.mock.calls.at(-1)![2]![1].onPress?.());
+ expect(page.getByTestId('email-code-send')).not.toBeDisabled();await act(async()=>finish({challengeId:'late',expiresAt:new Date(Date.now()+300000).toISOString(),resendAfterSeconds:60}));expect(page.queryByTestId('email-code-value')).toBeNull();
+ await send(page);expect(page.getByTestId('email-code-value')).toBeTruthy();
+});
+it('does not claim mail delivery after a send timeout, or claim deletion after an uncertain verification response',async()=>{
+ mockService.requestEmailCode.mockRejectedValueOnce(new ApplicationError('SERVER_UNREACHABLE','timeout'));
+ const {page,alert}=await startEmailDeletion();await send(page);expect(page.getByTestId('email-code-feedback').props.children).toContain('无法确认邮件是否发出');expect(page.queryByTestId('email-code-value')).toBeNull();
+ await send(page);await fireEvent.changeText(page.getByTestId('email-code-value'),'123456');mockService.verifyEmailCode.mockRejectedValueOnce(new ApplicationError('SERVER_UNREACHABLE','timeout'));
+ await fireEvent.press(page.getByTestId('email-code-verify'));await act(async()=>alert.mock.calls.at(-1)![2]![1].onPress?.());
+ expect(page.getByTestId('email-code-feedback').props.children).toContain('无法确认删除结果');expect(page.queryByTestId('email-code-value')).toBeNull();expect(page.getByTestId('email-code-refresh-account')).toBeTruthy();expect(page.getByTestId('email-code-send')).toBeDisabled();expect(mockService.verifyEmailCode).toHaveBeenCalledTimes(1);
 });

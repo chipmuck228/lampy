@@ -72,7 +72,7 @@ export type FamilyApiClient = {
   signInWithControlledEmail?(input: { email: string; password: string }): Promise<SignInResult>;
   getMyProfile?(sessionToken: string): Promise<import('../family-api/types').UserProfile>;
   updateMyProfile?(sessionToken: string, nickname: string): Promise<import('../family-api/types').UserProfile>;
-  health(): Promise<FamilyHealth>;
+  health(timeoutMs?:number): Promise<FamilyHealth>;
   getHistoryPolicy?(session: string, familyId: string): Promise<{ policy: 'legacy' | 'family-history-v2' }>;
   confirmHistoryPolicy?(session: string, familyId: string): Promise<{ policy: 'family-history-v2' }>;
   history?: Pick<FamilyApiClient, 'shareMoment' | 'revokeShare' | 'listVisibleShares' | 'getShare' | 'getShareMedia' | 'getShareMediaContent'>;
@@ -195,15 +195,15 @@ export function createFamilyApiClient(transport: FamilyTransport, sharingVersion
     ...(sharingVersion === 1 ? { history: createFamilyApiClient(transport, 2) } : {}),
     getHistoryPolicy(sessionToken, familyId) { return send({ method: 'GET', path: `/v2/families/${familyId}/history-policy`, sessionToken }); },
     confirmHistoryPolicy(sessionToken, familyId) { return send({ method: 'POST', path: `/v2/families/${familyId}/history-policy`, sessionToken, body: { confirmation: 'new-members-can-read-active-history' } }); },
-    requestEmailCode(input,sessionToken){return send({method:'POST',path:'/v2/auth/email-code/request',body:input,sessionToken});},
-    verifyEmailCode(input,sessionToken){return send({method:'POST',path:'/v2/auth/email-code/verify',body:input,sessionToken});},
-    emailCodeStatus(sessionToken){return send({method:'GET',path:'/v2/me/email-code',sessionToken});},
+    requestEmailCode(input,sessionToken){return send({method:'POST',path:'/v2/auth/email-code/request',body:input,sessionToken,timeoutMs:30000});},
+    verifyEmailCode(input,sessionToken){return send({method:'POST',path:'/v2/auth/email-code/verify',body:input,sessionToken,timeoutMs:input.intent==='delete'?45000:15000});},
+    emailCodeStatus(sessionToken){return send({method:'GET',path:'/v2/me/email-code',sessionToken,timeoutMs:15000});},
     registerControlledEmail(input) { return send({method:'POST',path:'/v2/auth/email/register',body:input}); },
     signInWithControlledEmail(input) { return send({method:'POST',path:'/v2/auth/email/login',body:input}); },
     getMyProfile(sessionToken) { return send({method:'GET',path:'/v2/me/profile',sessionToken}); },
     updateMyProfile(sessionToken,nickname) { return send({method:'PATCH',path:'/v2/me/profile',sessionToken,body:{nickname}}); },
-    health() {
-      return send({ method: 'GET', path: '/health' });
+    health(timeoutMs?:number) {
+      return send({ method: 'GET', path: '/health',...(timeoutMs?{timeoutMs}:{}) });
     },
     beginAppleAuth(intent,sessionToken) { return send({method:'POST',path:'/v2/auth/apple/challenge',sessionToken,body:{intent}}); },
     completeAppleAuth(input,sessionToken) { return send({method:'POST',path:'/v2/auth/apple/complete',sessionToken,body:input}); },

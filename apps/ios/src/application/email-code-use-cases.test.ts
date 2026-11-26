@@ -68,3 +68,21 @@ it('verifies the current mailbox through HTTP without asking the user to supply 
  expect(h.sent.at(-1)!.to).toBe('user@example.com');
  await expect(service.verifyEmailCode({intent:'reauth',challengeId:ticket.challengeId,code:h.sent.at(-1)!.code},()=>true)).resolves.toMatchObject({reauthenticated:true,userId:owner});
 });
+it('round-trips email-only deletion through HTTP and clears only the matching signed-in account',async()=>{
+ const h=harness(),service=h.cases();const login=await service.requestEmailCode({email:'owner@example.com',intent:'login'},()=>true);
+ await service.verifyEmailCode({email:'owner@example.com',intent:'login',challengeId:login.challengeId,code:h.sent.at(-1)!.code},()=>true);
+ h.advance();const owner=(await h.session.getUserId())!;const ticket=await service.requestEmailCode({intent:'delete'},()=>true,owner);
+ expect(h.sent.at(-1)).toMatchObject({to:'owner@example.com',intent:'delete'});
+ await expect(service.verifyEmailCode({intent:'delete',challengeId:ticket.challengeId,code:h.sent.at(-1)!.code,confirmation:'delete-my-lampy-account-v1'},()=>true)).resolves.toMatchObject({deleted:true});
+ expect(await h.session.getUserId()).toBeNull();expect(await h.repository.withTransaction(tx=>tx.findAccountByUserId(owner))).toBeNull();
+});
+it('does not send a deletion email or erase an account while its family still has other members',async()=>{
+ const h=harness(),service=h.cases();const login=await service.requestEmailCode({email:'owner@example.com',intent:'login'},()=>true);
+ await service.verifyEmailCode({email:'owner@example.com',intent:'login',challengeId:login.challengeId,code:h.sent.at(-1)!.code},()=>true);
+ const owner=(await h.session.getUserId())!,token=(await h.session.getSessionToken())!;
+ const otherTicket=await h.commands.emailCode.request({email:'other@example.com',intent:'login'});
+ const other=await h.commands.emailCode.verify({email:'other@example.com',intent:'login',challengeId:otherTicket.challengeId,code:h.sent.at(-1)!.code});if(!('sessionToken'in other))throw Error('Expected fixture sign-in');
+ const family=await h.commands.createNamedFamily(token,'Test family','family-operation');const invite=await h.commands.inviteMember(token,family.familyId,'invite-operation');await h.commands.acceptInvitation(other.sessionToken,invite.code,'accept-operation');
+ h.advance();const count=h.sent.length;await expect(service.requestEmailCode({intent:'delete'},()=>true,owner)).rejects.toMatchObject({code:'ACCOUNT_HAS_MANAGED_FAMILY'});
+ expect(h.sent).toHaveLength(count);expect(await h.session.getUserId()).toBe(owner);expect(await h.repository.withTransaction(tx=>tx.findAccountByUserId(owner))).not.toBeNull();
+});
