@@ -1,3 +1,4 @@
+import {albumExportPageStyles as styles} from './album-export-page-styles';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {Alert,AppState,StyleSheet,View} from 'react-native';
 import {Image} from 'expo-image';
@@ -18,8 +19,7 @@ import {firstSearchParam} from './lookback-origin';
 import {SettingsPage} from './settings-chrome';
 import {AlbumEditionSwipeRow} from './album-edition-swipe-row';
 import {ShowcaseButton,ShowcaseNote,ShowcaseUnlocked,EditionProgress} from './album-export-showcase';
-import {Text,type} from './life-text';
-import {paper,ink,inkSoft,sage} from './life-page';
+import {Text} from './life-text';
 import {appLanguage,tr} from '../i18n';
 type Feedback={id:string;pending:boolean;fraction:number;message:string};
 export default function AlbumPrintScreen(){
@@ -110,4 +110,3 @@ export default function AlbumPrintScreen(){
   </View>:null}
  </SettingsPage>;
 }
-const styles=StyleSheet.create({body:{gap:16},section:{gap:10,paddingTop:20},cover:{height:210,backgroundColor:'#E2E8DE',overflow:'hidden'},binding:{position:'absolute',left:0,top:0,bottom:0,width:7,backgroundColor:sage},title:{fontFamily:'Baskerville',fontSize:32,lineHeight:44,color:ink},heading:{...type.action,color:ink},meta:{...type.meta,color:inkSoft},row:{gap:6,paddingVertical:14},paper:{backgroundColor:paper}});
