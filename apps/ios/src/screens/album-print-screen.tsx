@@ -97,8 +97,8 @@ export default function AlbumPrintScreen(){
    <ShowcaseButton testID="album-export-preview" tone="editorial" label={tr('全屏预览')} disabled={!input?.entries.length||busy} onPress={()=>router.push(`/albums/${id}/preview`)}/>
    <ShowcaseNote>{tr('免费翻阅整册，照片与声音都在。')}</ShowcaseNote>
    {owned?<><ShowcaseUnlocked/><ShowcaseButton testID="album-export-create-epub" tone="editorial" label={tr('保存与分享电子册')} disabled={busy||!input?.entries.length} onPress={()=>electronic()}/></>:config.enabled&&config.paid?<View style={styles.section}>
-    {unlock.price?<><ShowcaseButton testID="album-export-purchase" label={tr('解锁导出 · {0}',[unlock.price])} disabled={busy||unlock.working} onPress={unlock.purchase}/><ShowcaseNote>{tr('一次购买，之后每一册、每一次导出都不再收费。')}</ShowcaseNote></>:unlock.loading?<ShowcaseNote>{tr('正在确认购买状态…')}</ShowcaseNote>:<><ShowcaseNote>{tr('商品暂时不可用，请稍后再试。')}</ShowcaseNote><ShowcaseButton tone="quiet" label={tr('再试一次')} onPress={unlock.retry}/></>}
-    <ShowcaseButton tone="quiet" label={tr('恢复购买')} disabled={busy||unlock.working} onPress={unlock.restore}/>
+    {!unlock.loading&&unlock.price?<><ShowcaseButton testID="album-export-purchase" label={tr('解锁导出 · {0}',[unlock.price])} disabled={busy||unlock.working} onPress={unlock.purchase}/><ShowcaseNote>{tr('同一Lampy账号一次解锁个人册及本人创建家庭的EPUB保存与分享；家庭成员仍可免费预览。')}</ShowcaseNote></>:unlock.loading?<ShowcaseNote>{tr('正在确认购买状态…')}</ShowcaseNote>:<>{!unlock.notice?<ShowcaseNote>{tr('商品暂时不可用，请稍后再试。')}</ShowcaseNote>:null}{unlock.retryable||!unlock.notice?<ShowcaseButton tone="quiet" label={tr('再试一次')} onPress={unlock.retry}/>:null}</>}
+    <ShowcaseButton tone="quiet" label={tr('恢复购买')} disabled={busy||unlock.working||unlock.loading} onPress={unlock.restore}/>
    </View>:<ShowcaseNote>{tr('导出暂不可用，你仍可免费预览整册。')}</ShowcaseNote>}
    {unlock.notice&&!unlock.loading?<ShowcaseNote live>{unlock.notice}</ShowcaseNote>:null}
    {showFeedback('new')}

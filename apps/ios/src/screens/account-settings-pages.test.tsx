@@ -21,6 +21,7 @@ jest.mock('../infrastructure/launch-release-config',()=>({isAppstoreLaunchBuild:
 const mockDismissTo = jest.fn();
 
 jest.mock('expo-router', () => ({
+  useFocusEffect:(fn:()=>unknown)=>jest.requireActual('react').useEffect(fn,[fn]),
   useRouter: () => ({ dismissTo: mockDismissTo, push: jest.fn(), back: jest.fn() }),
 }));
 
@@ -84,7 +85,7 @@ describe('account settings pages', () => {
 
   it('describes purchase and restore in a launch build without falsely claiming all purchases are closed',async()=>{
     mockLaunch=true;const view=await render(wrap(<AccountSubscribeScreen/>));
-    expect(view.queryByTestId('account-subscribe-none')).toBeNull();expect(view.getByText('在生活册的导出页面，可以查看价格、购买或恢复已有购买。')).toBeTruthy();
+    expect(view.queryByTestId('account-subscribe-none')).toBeNull();expect(view.getByText('这是一次性解锁，不是订阅。已有购买请先恢复，无需再次付款。')).toBeTruthy();expect(view.getByTestId('purchase-history-open')).toBeTruthy();
   });
 
   it('explains current help chapters with live UI names', async () => {

@@ -37,3 +37,19 @@ it('uses the same cover and edition grouping as the personal save/share page',as
  expect(page.getByTestId('family-epub-cover')).toBeTruthy();expect(page.getAllByText('Family book')).toHaveLength(1);expect(page.getByText('已生成的电子册')).toBeTruthy();expect(page.getByText('点按分享，左滑可分享或删除。')).toBeTruthy();
  expect(mockShare).not.toHaveBeenCalled();expect(mockPurchase).not.toHaveBeenCalled();
 });
+it('does not show retry or product unavailable for an already eligible family',async()=>{
+ mockAccess.mockResolvedValue({eligible:true,canExport:true});mockStatus.owned=true;
+ const page=await render(<FamilyEpubScreen/>);await waitFor(()=>expect(page.getByTestId('family-epub-save')).toBeTruthy());
+ expect(page.queryByText('再试一次')).toBeNull();expect(page.queryByText('商品暂时不可用，请稍后再试。')).toBeNull();expect(page.queryByTestId('family-epub-purchase')).toBeNull();
+});
+it('keeps verified family access when the saved-edition list fails and clears retry on recovery',async()=>{
+ mockAccess.mockResolvedValue({eligible:true,canExport:true});mockList.mockRejectedValueOnce(Error('disk'));
+ const page=await render(<FamilyEpubScreen/>);await waitFor(()=>expect(page.getByTestId('family-epub-save')).toBeTruthy());
+ expect(page.getByText('暂时读不到已生成的电子册，原记录仍然保留。')).toBeTruthy();expect(mockPurchase).not.toHaveBeenCalled();
+ await fireEvent.press(page.getByTestId('family-epub-retry'));await waitFor(()=>expect(page.queryByTestId('family-epub-retry')).toBeNull());expect(page.getByTestId('family-epub-save')).toBeTruthy();
+});
+it('does not turn a family-access verification failure into a purchase offer',async()=>{
+ mockAccess.mockRejectedValueOnce(Error('offline'));
+ const page=await render(<FamilyEpubScreen/>);await waitFor(()=>expect(page.getByText('暂时无法确认家庭导出资格；已有购买无需重复付款。')).toBeTruthy());
+ expect(page.queryByTestId('family-epub-purchase')).toBeNull();expect(page.queryByTestId('family-epub-save')).toBeNull();expect(page.getByTestId('family-epub-retry')).toBeTruthy();
+});
