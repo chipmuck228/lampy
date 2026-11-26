@@ -57,6 +57,14 @@ describe('root nav band layout', () => {
     phoneWindow();
   });
 
+it('orders the four roots consistently and marks Family as the selected root', async()=>{
+ const view=await render(wrap(<RootNavBand here="family" onGo={()=>undefined} onFamily={()=>undefined}/>));
+ expect(bandOrder(view)).toEqual(['lookback-go-recent','home-lookback','root-nav-here-wrap','home-albums']);
+ expect(view.getByTestId('root-nav-here-wrap').props.accessibilityState.selected).toBe(true);
+ expect(view.queryByTestId('home-family')).toBeNull();
+ for(const name of ['recent','lookback','family','album'])expect(view.getByTestId(`life-navigation-icon-${name}`,{includeHiddenElements:true})).toBeTruthy();
+});
+
   it('places the leave overlay above the band with the reading gutter, not over the Home Indicator twice', async () => {
     phoneWindow();
     const view = await render(
@@ -356,5 +364,6 @@ describe('root nav band layout', () => {
     });
     expect(leaveFabOverlayPadding(1024, 1366).paddingRight).toBe(pageGutter(1024, 1366));
   });
+
 
 });

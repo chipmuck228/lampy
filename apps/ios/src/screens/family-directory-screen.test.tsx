@@ -213,3 +213,12 @@ it('keeps debug diagnostics out of the ordinary family page without explicit opt
   const old=process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED;mockCodeOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED='1';process.env.EXPO_PUBLIC_ACCOUNT_API_BASE_URL='https://family-test.yunpura.com';mockOpen.mockReturnValue(true);mockFamilies.mockRejectedValue({code:'UNAUTHENTICATED'});
   try{const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByTestId('family-sign-in')).toBeTruthy());await fireEvent.press(page.getByTestId('family-sign-in'));expect(mockPush).toHaveBeenCalledWith({pathname:'/account/email-code',params:{returnTo:'family'}});}finally{if(old===undefined)delete process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED;else process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED=old;}
  });
+
+it('uses the reading-root header and navigation rather than a Recent back button',async()=>{
+ mockOpen.mockReturnValue(true);
+ const page=await render(<FamilyDirectoryScreen/>);
+ await waitFor(()=>expect(page.getByText('Our home')).toBeTruthy());
+ expect(page.getByTestId('family-root-header')).toBeTruthy();
+ expect(page.getByTestId('root-nav-here-wrap').props.accessibilityState.selected).toBe(true);
+ expect(page.queryByTestId('account-back')).toBeNull();
+});

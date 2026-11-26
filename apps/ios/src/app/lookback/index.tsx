@@ -1182,7 +1182,7 @@ export default function LookbackIndexScreen() {
       }}
       onLeave={() => router.push(leaveHref('lookback'))}
       onRecordVoice={() => { const href = leaveVoiceHref('lookback'); if (href) router.push(href); }}
-      onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
+      onFamily={isFamilyProductEntryOpen() ? () => router.dismissTo('/family') : undefined}
     >
       {error ? (
         <Pressable

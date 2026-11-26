@@ -269,7 +269,7 @@ export default function RecentScreen() {
               }
               if (dest === 'albums') dismissToRootNav(router, 'albums');
             }}
-            onFamily={isFamilyProductEntryOpen() ? () => router.push('/family') : undefined}
+            onFamily={isFamilyProductEntryOpen() ? () => router.dismissTo('/family') : undefined}
           />
         }
         overlay={

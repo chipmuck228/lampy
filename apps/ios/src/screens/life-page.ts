@@ -79,7 +79,7 @@ export function navBandItemMinHeight(fontSize: number): number {
 }
 
 export function navBandItemsFor(
-  _here: 'recent' | 'lookback' | 'albums',
+  _here: 'recent' | 'lookback' | 'albums' | 'family',
   hasFamily: boolean,
 ): { label: string; fontSize: number }[] {
   const items = [
@@ -87,7 +87,7 @@ export function navBandItemsFor(
     { label: tr("回看"), fontSize: NAV_BAND_LABEL_SIZE },
     { label: tr("生活册"), fontSize: NAV_BAND_LABEL_SIZE },
   ];
-  if (hasFamily) items.push({ label: tr("家庭"), fontSize: NAV_BAND_LABEL_SIZE });
+  if (hasFamily) items.splice(2, 0,{ label: tr("家庭"), fontSize: NAV_BAND_LABEL_SIZE });
   return items.filter(item => (item.label !== tr('生活册') || personalAlbumsAvailable()) && (item.label !== tr('家庭') || !personalRecordsOnly()));
 }
 

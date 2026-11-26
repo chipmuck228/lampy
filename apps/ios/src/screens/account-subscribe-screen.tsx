@@ -1,4 +1,4 @@
-import {isAppstoreLaunchBuild} from '../infrastructure/launch-release-config';
+import {paidEpubInformationVisible} from './settings-capabilities';
 import { tr } from '../i18n';
 import { useRouter } from 'expo-router';
 
@@ -17,7 +17,7 @@ export default function AccountSubscribeScreen() {
       onBack={() => dismissToSettingsRoot(router)}
     >
       <SettingsDetailLead icon="subscribe" title={tr("订阅与付费")}>
-        {isAppstoreLaunchBuild()?<>
+        {paidEpubInformationVisible()?<>
           <SettingsFact>{tr('电子册可以免费全屏预览；解锁后可保存与分享 EPUB。购买前会显示 Apple 提供的价格，并可恢复已有购买。')}</SettingsFact>
           <SettingsFact>{tr('在生活册的导出页面，可以查看价格、购买或恢复已有购买。')}</SettingsFact>
         </>:<>
