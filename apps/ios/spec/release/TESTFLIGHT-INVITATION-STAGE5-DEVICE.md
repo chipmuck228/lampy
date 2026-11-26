@@ -28,3 +28,12 @@
 自动测试使用合成邀请、DOM 和系统相册适配器模拟；实际 Photos/MediaStore 与微信/Safari 唤起仍需真机验证。内存服务测试保留预览不消耗邀请、明确加入才消耗的检查。没有发送真实邀请或将用户家庭数据写入测试输出。55 项邀请/路由/页面/适配器测试、12 项 Archive 隐私检查、Android personal 332 项通过；Android preview 226 项、iOS/Android Hermes 打包（约 5.2/5.5 MB）通过。TypeScript、修改范围 ESLint 零警告和 diff 检查通过。
 
 技术依据：https://docs.expo.dev/router/advanced/native-intent/；Expo 模块版本及 add-only/scoped 写入实现已按本地安装包源代码检查。AASA 的 App ID 与签名团队、associated domains 仍需在实际签名安装包与部署域名中核对。
+
+
+## 2026-11-26 真机状态与网页部署
+
+用户确认第 3、4 部分通过：iPhone 邀请图片保存与邀请打开/登录/确认加入验收通过。公网新版网页仍待测试服务部署及 Safari/微信验收，不将这部分记为已通过。
+
+新增 scripts/deploy-invite-web-test.sh：在 Ubuntu 以 root 执行 --check 或 --apply，并传入 PR151 的 invite-web.ts。固定文件 SHA-256，动态查找隔离测试服务目录，拒绝与生产共享源文件，核对 TypeScript runner，备份单文件，只重启 lampy-family-test.service，验证本机及公网三个新版标记；失败恢复旧文件并重启测试服务。不会替换后端、环境、证书、数据库或更新生产服务。脚本仅支持现有 /opt/.../apps/ios、127.0.0.1:8788 测试部署；其他布局会停止。当前执行环境 SSH 网络不可达，脚本尚未在用户服务器执行，不声称已部署。
+
+部署脚本验证：4 项模拟测试通过，覆盖预检无改动、只重启测试服务、验证失败回滚、与生产共享源文件时拒绝更新；bash -n 与 diff 检查通过。模拟测试不代表实际服务器已部署。
