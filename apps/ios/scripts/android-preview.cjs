@@ -3,9 +3,9 @@
 const {spawnSync}=require('node:child_process');
 const {personalEnv}=require('./android-personal.cjs');
 function previewEnv(env=process.env){
- const base=(env.LAMPY_ANDROID_FAMILY_API_BASE_URL||'https://family-test.yunpura.com').trim().replace(/\/+$/,'');
- // This is the tested family/account backend; no arbitrary or plaintext credential destination.
- if(base!=='https://family-test.yunpura.com')throw Error('Android preview currently requires the family test HTTPS endpoint');
+ const base=(env.LAMPY_ANDROID_FAMILY_API_BASE_URL||'https://lampy-family-api.5sparks.ai').trim().replace(/\/+$/,'');
+ // This is the configured family/account backend; no arbitrary or plaintext credential destination.
+ if(base!=='https://lampy-family-api.5sparks.ai')throw Error('Android preview currently requires the Lampy custom HTTPS endpoint');
  return {...personalEnv(env),LAMPY_BUILD_PROFILE:'android-preview',
   EXPO_PUBLIC_ANDROID_FAMILY_ENABLED:'1',EXPO_PUBLIC_FAMILY_ENTRY_OPEN:'1',
   EXPO_PUBLIC_FAMILY_API_BASE_URL:base,EXPO_PUBLIC_FAMILY_INTERNAL_TEST:'1',

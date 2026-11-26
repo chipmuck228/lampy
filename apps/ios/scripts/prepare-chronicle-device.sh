@@ -11,7 +11,7 @@ npm ci
 source scripts/release-public-env.sh
 export EXPO_NO_DOTENV=1
 export EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED=1
-export EXPO_PUBLIC_ACCOUNT_API_BASE_URL=https://family-test.yunpura.com
+export EXPO_PUBLIC_ACCOUNT_API_BASE_URL=https://lampy-family-api.5sparks.ai
 export EXPO_PUBLIC_ALBUM_EXPORT_ENABLED=1
 export EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED=1
 export EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID=app.lampy.export.designtest

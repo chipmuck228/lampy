@@ -8,7 +8,7 @@ test('v1 preserves permissions and closes native purchases',()=>{
  const base={ios:{infoPlist:{NSMicrophoneUsageDescription:'Keep'}}};const result=configureAlbumExport(configure(base,env),env);
  assert.equal(result.version,'1.0.0');assert.equal(result.ios.buildNumber,'11');assert.equal(base.version,undefined);
  for(const [key,value] of Object.entries({NSMicrophoneUsageDescription:'Keep',LampyFamilyAlbumPreviewEnabled:true,LampyEmailLoginEnabled:false,LampyPaidExportEnabled:false,LampyUnifiedPurchasesEnabled:false,LampyExportProductID:''}))assert.equal(result.ios.infoPlist[key],value);
- assert.ok(result.ios.associatedDomains.includes('applinks:family.yunpura.com'));
+ assert.ok(result.ios.associatedDomains.includes('applinks:lampy-family-api.5sparks.ai'));
 });
 test('unexpected and missing flags fail closed',()=>{
  for(const [key,value] of Object.entries(FLAGS)){

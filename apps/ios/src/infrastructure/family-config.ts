@@ -53,7 +53,7 @@ export function isFamilyInternalTestBuild(
   entry = process.env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN,
   email = process.env.EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS,
 ) {
-  return marker === '1' && base === 'https://family-test.yunpura.com' && entry === '1' && email === '1';
+  return marker === '1' && base === 'https://lampy-family-api.5sparks.ai' && entry === '1' && email === '1';
 }
 
 /** Formal release opt-in; API configuration alone must not enable release features. */
@@ -64,5 +64,5 @@ export function isFamilyV1ReleaseBuild(
   email = process.env.EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS,
   internal = process.env.EXPO_PUBLIC_FAMILY_INTERNAL_TEST,
 ) {
-  return marker === '1' && base === 'https://family.yunpura.com' && entry === '1' && email === '0' && internal === '0';
+  return marker === '1' && base === 'https://lampy-family-api.5sparks.ai' && entry === '1' && email === '0' && internal === '0';
 }

@@ -8,26 +8,29 @@ import {
 } from "./family-invite-link";
 const token = "a".repeat(64);
 it("accepts only configured origins, exact paths and fragment tokens; rejects queries and lookalikes", () => {
-  expect(makeFamilyInviteLink("https://family.yunpura.com", token)).toBe(
-    `https://family.yunpura.com/invite#${token}`,
+  expect(makeFamilyInviteLink("https://lampy-family-api.5sparks.ai", token)).toBe(
+    `https://lampy-family-api.5sparks.ai/invite#${token}`,
   );
   expect(
     parseFamilyInviteLink(
-      `https://family.yunpura.com/invite#${token}`,
-      "https://family.yunpura.com",
+      `https://lampy-family-api.5sparks.ai/invite#${token}`,
+      "https://lampy-family-api.5sparks.ai",
     ),
   ).toBe(token);
   expect(parseFamilyInviteLink(`lampy:///family-invite#${token}`)).toBe(token);
   for (const url of [
     `https://evil.example/invite#${token}`,
-    `https://u:p@family.yunpura.com/invite#${token}`,
-    `https://family.yunpura.com/invite?token=${token}`,
-    `https://family.yunpura.com/invite/other#${token}`,
+    `https://family-test.yunpura.com/invite#${token}`,
+    `https://lampy-family-staging.onrender.com/invite#${token}`,
+    `https://lampy-family-api.5sparks.ai.evil.test/invite#${token}`,
+    `https://u:p@lampy-family-api.5sparks.ai/invite#${token}`,
+    `https://lampy-family-api.5sparks.ai/invite?token=${token}`,
+    `https://lampy-family-api.5sparks.ai/invite/other#${token}`,
     `lampy://evil/family-invite#${token}`,
   ])
-    expect(parseFamilyInviteLink(url, "https://family.yunpura.com")).toBeNull();
+    expect(parseFamilyInviteLink(url, "https://lampy-family-api.5sparks.ai")).toBeNull();
   expect(invitationOrigin("http://public.example")).toBeNull();
-  expect(invitationOrigin("https://u:p@family.yunpura.com")).toBeNull();
+  expect(invitationOrigin("https://u:p@lampy-family-api.5sparks.ai")).toBeNull();
 });
 it("late cancellation cannot discard a new invite; bearer only lives in process memory", () => {
   const old = rememberFamilyInvite(token);

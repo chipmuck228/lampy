@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const {personalEnv} = require('./android-personal.cjs');
 const {configureAndroidPersonal} = require('./android-personal-profile.cjs');
 test('Android commands override inherited release, family and purchase flags',()=>{
-  const env=personalEnv({LAMPY_BUILD_PROFILE:'appstore-v1',EXPO_PUBLIC_FAMILY_ENTRY_OPEN:'1',EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED:'1',EXPO_PUBLIC_FAMILY_API_BASE_URL:'https://family.yunpura.com'});
+  const env=personalEnv({LAMPY_BUILD_PROFILE:'appstore-v1',EXPO_PUBLIC_FAMILY_ENTRY_OPEN:'1',EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED:'1',EXPO_PUBLIC_FAMILY_API_BASE_URL:'https://lampy-family-api.5sparks.ai'});
   assert.equal(env.LAMPY_BUILD_PROFILE,'android-personal');
   assert.equal(env.EXPO_NO_DOTENV,'1');
   assert.equal(env.EXPO_PUBLIC_FAMILY_ENTRY_OPEN,'0');
