@@ -1,3 +1,5 @@
+import {createUnifiedPurchases} from '../application/unified-purchases';
+import type {ExportPurchasesNative} from '../../modules/lampy-export-purchases';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -47,6 +49,18 @@ describe.each(['memory','sqlite'] as const)('unified purchase policy (%s)',kind=
     expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(2);
     await expect(f.commands.createFamily(f.a.sessionToken,'legacy')).rejects.toBeDefined();
     expect((await f.commands.listFamilies(f.a.sessionToken)).families).toHaveLength(2);
+  });
+  it('shares verified account access across devices without transferring it to a member or ignoring refunds',async()=>{
+    await f.buy(f.a.sessionToken,'100');
+    const make=(session:string)=>createUnifiedPurchases({productId:'configured.unified',
+      native:{currentPurchase:async()=>null,status:async()=>({owned:true,product:null})} as unknown as ExportPurchasesNative,
+      context:()=>f.commands.purchases.context(session),claim:id=>f.commands.purchases.claim(session,id),
+      assertAccount:async id=>{expect((await f.commands.purchases.context(session)).userId).toBe(id);},
+    });
+    expect(await make(f.a.sessionToken).hasEntitlement()).toBe(true);
+    expect(await make(f.b.sessionToken).hasEntitlement()).toBe(false);
+    f.transactions.get('100')!.revoked=true;
+    expect(await make(f.a.sessionToken).hasEntitlement()).toBe(false);
   });
   it('verified purchase records a durable family export source',async()=>{
     await f.commands.createNamedFamily(f.a.sessionToken,'Free','free');

@@ -26,6 +26,7 @@ export default function FamilyEpubScreen(){
  const enabled=familyEpubEnabled(),creator=!!view?.access.canManage;
  const unlock=useAlbumExportUnlock(!reading.blocked&&creator&&enabled);
  const [editions,setEditions]=useState<SavedFamilyEpub[]>([]),[access,setAccess]=useState<FamilyExportEligibility|null>(null),[retry,setRetry]=useState(0),[busy,setBusy]=useState(false),[fraction,setFraction]=useState(0),[message,setMessage]=useState(''),[fresh,setFresh]=useState('');
+ const [listFailed,setListFailed]=useState(false),[accessFailed,setAccessFailed]=useState(false),[accessLoading,setAccessLoading]=useState(false);
  const [loadedView,setLoadedView]=useState<typeof view>(null),[accessView,setAccessView]=useState<typeof view>(null);
  const eligible=accessView===view?access:null;
  const owner=useRef(false),cancelled=useRef(false),focus=useRef(false);
@@ -33,9 +34,9 @@ export default function FamilyEpubScreen(){
  useEffect(()=>{
   let active=true;const lease=capture(),current=()=>active&&lease();
   if(view)void (async()=>{
-   try{const list=await listFamilyEpubs(view,current);if(current()){setLoadedView(view);setEditions(list);}
-    if(creator&&enabled){const app=await getFamilyUseCases();const next=await app.familyPurchaseAccess(familyId,current);if(current()){setAccessView(view);setAccess(next);}}
-   }catch{if(current())setMessage(tr('暂时无法确认家庭册状态，请再试一次。'));}
+   setListFailed(false);setAccessFailed(false);setAccessLoading(creator&&enabled);
+   void listFamilyEpubs(view,current).then(list=>{if(current()){setLoadedView(view);setEditions(list);}},()=>{if(current())setListFailed(true);});
+   if(creator&&enabled)void getFamilyUseCases().then(app=>app.familyPurchaseAccess(familyId,current)).then(next=>{if(current()){setAccessView(view);setAccess(next);}},()=>{if(current()){setAccessView(null);setAccess(null);setAccessFailed(true);}}).finally(()=>{if(current())setAccessLoading(false);});
   })();
   return()=>{active=false;};
  },[view,capture,creator,enabled,familyId,retry,unlock.status?.owned]);
@@ -63,16 +64,19 @@ export default function FamilyEpubScreen(){
    <ShowcaseNote>{tr('免费翻阅整册，照片与声音都在。')}</ShowcaseNote>
    {creator?enabled&&view.access.canExport?<>
     {eligible?.canExport?<><ShowcaseUnlocked/><ShowcaseButton testID="family-epub-save" tone="editorial" label={tr('保存与分享电子册')} disabled={busy} onPress={()=>share()}/></>:<>
-     {unlock.status?.owned?<ShowcaseButton testID="family-epub-unlock" label={tr('使用我的购买解锁这个家庭')} disabled={busy} onPress={()=>void run(async current=>{const app=await getFamilyUseCases();const next=await app.unlockFamilyPurchase(familyId,current);if(current()){setAccessView(view);setAccess(next);}})}/>:unlock.price?<ShowcaseButton testID="family-epub-purchase" label={tr('解锁导出 · {0}',[unlock.price])} disabled={busy||unlock.working} onPress={unlock.purchase}/>:<ShowcaseNote>{tr(unlock.loading?'正在确认购买状态…':'商品暂时不可用，请稍后再试。')}</ShowcaseNote>}
-     <ShowcaseButton tone="quiet" label={tr('恢复购买')} disabled={busy||unlock.working} onPress={unlock.restore}/>
+     {accessLoading?<ShowcaseNote>{tr('正在确认家庭导出资格…')}</ShowcaseNote>:accessFailed?<ShowcaseNote>{tr('暂时无法确认家庭导出资格；已有购买无需重复付款。')}</ShowcaseNote>:unlock.status?.owned?<ShowcaseButton testID="family-epub-unlock" label={tr('使用我的购买解锁这个家庭')} disabled={busy||unlock.working} onPress={()=>void run(async current=>{const app=await getFamilyUseCases();const next=await app.unlockFamilyPurchase(familyId,current);if(current()){setAccessView(view);setAccess(next);}})}/>:!unlock.loading&&unlock.price?<ShowcaseButton testID="family-epub-purchase" label={tr('解锁导出 · {0}',[unlock.price])} disabled={busy||unlock.working} onPress={unlock.purchase}/>:unlock.notice?null:<ShowcaseNote>{tr(unlock.loading?'正在确认购买状态…':'商品暂时不可用，请稍后再试。')}</ShowcaseNote>}
+     <ShowcaseButton tone="quiet" label={tr('恢复购买')} disabled={busy||unlock.working||unlock.loading} onPress={unlock.restore}/>
     </>}
-    {unlock.notice?<ShowcaseNote>{unlock.notice}</ShowcaseNote>:null}
+    {!eligible?.canExport&&unlock.notice?<ShowcaseNote>{unlock.notice}</ShowcaseNote>:null}
+    {!eligible?.canExport?<ShowcaseNote>{tr('同一Lampy账号一次解锁个人册及本人创建家庭的EPUB保存与分享；家庭成员仍可免费预览。')}</ShowcaseNote>:null}
+    {!eligible?.canExport&&(unlock.retryable||(!unlock.loading&&!unlock.notice&&!unlock.price&&!unlock.status?.owned))?<ShowcaseButton tone="quiet" label={tr('重新检查购买状态')} disabled={unlock.working} onPress={unlock.retry}/>:null}
    </>:<ShowcaseNote>{tr('家庭电子册导出暂不可用，你仍可免费预览。')}</ShowcaseNote>:<ShowcaseNote>{tr('家庭成员可以免费预览，由家庭创建者保存与分享电子册。')}</ShowcaseNote>}
    {busy?<><EditionProgress fraction={fraction}/><ShowcaseButton tone="quiet" label={tr('取消制作电子册')} onPress={()=>{cancelled.current=true;setMessage(tr('本次制作已停止，请重新开始。'));}}/></>:null}
    {message?<ShowcaseNote live>{message}</ShowcaseNote>:null}
    {loadedView===view&&editions.length?<View style={styles.section}><Text accessibilityRole="header" style={styles.heading}>{tr('已生成的电子册')}</Text><ShowcaseNote>{tr('点按分享，左滑可分享或删除。')}</ShowcaseNote></View>:null}
    {(loadedView===view?[...editions].sort((a,b)=>Number(b.id===fresh)-Number(a.id===fresh)):[]).map(e=><AlbumEditionSwipeRow key={e.id} id={e.id} disabled={busy} onShare={()=>share(e.id)} onDelete={()=>remove(e.id)}><View style={styles.row}>{e.id===fresh?<Text style={{...type.meta,color:inkSoft}}>{tr('刚刚生成')}</Text>:null}<Text style={styles.heading}>{e.name}</Text><Text style={{...type.meta,color:inkSoft}}>{albumEditionDateLabel(e.createdAt)}</Text>{e.stale?<Text style={{...type.meta,color:inkSoft}}>{tr('家庭册内容已更新，请刷新后重新制作。')}</Text>:null}</View></AlbumEditionSwipeRow>)}
-   <ShowcaseButton tone="quiet" label={tr('再试一次')} disabled={busy} onPress={()=>{setRetry(n=>n+1);unlock.retry();reading.retry();}}/>
+   {listFailed?<ShowcaseNote>{tr('暂时读不到已生成的电子册，原记录仍然保留。')}</ShowcaseNote>:null}
+   {accessFailed||listFailed||message?<ShowcaseButton testID="family-epub-retry" tone="quiet" label={tr('再试一次')} disabled={busy} onPress={()=>{if(message)reading.retry();setMessage('');setRetry(n=>n+1);}}/>:null}
   </View>:reading.error?<><ShowcaseNote>{tr('家庭内容或资格已变化，请重新核对。')}</ShowcaseNote><ShowcaseButton tone="quiet" label={tr('再试一次')} onPress={reading.retry}/></>:null}
  </SettingsPage>;
 }

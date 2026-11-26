@@ -410,8 +410,8 @@ export default function AccountScreen({ variant = 'user', onAuthenticated, onCan
         <SettingsGroup title="Lampy">
           {purchasesSupported() && (paidEpubInformationVisible() || !isFamilyV1ReleaseBuild()) ? <SettingsLink
             icon="subscribe"
-            title={tr("订阅与付费")}
-            detail={paidEpubInformationVisible()?tr("预览、保存与恢复购买"):tr("目前没有付费项目")}
+            title={tr(paidEpubInformationVisible()?"购买与解锁":"订阅与付费")}
+            detail={paidEpubInformationVisible()?tr("解锁状态、恢复购买与Apple购买记录"):tr("目前没有付费项目")}
             testID="account-open-subscribe"
             onPress={() => router.push('/account/subscribe')}
           /> : null}
