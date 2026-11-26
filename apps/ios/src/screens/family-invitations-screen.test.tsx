@@ -7,7 +7,7 @@ jest.mock('../infrastructure/save-invite-image',()=>({inviteImageSaveSupported:(
 jest.mock('../infrastructure/secure-invite-share',()=>({readInviteShare:(...args:any[])=>mockRead(...args),saveInviteShare:(...args:any[])=>mockSave(...args),removeInviteShare:jest.fn()}));
 jest.mock('../infrastructure/family-config',()=>({isFamilyProductEntryOpen:()=>true}));
 jest.mock('./device-lock-context',()=>({useDeviceLock:()=>({snapshot:{locked:false}})}));
-jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children}:any)=><View>{children}</View>};});
+jest.mock('./settings-chrome',()=>{const {View}=jest.requireActual('react-native');return {SettingsPage:({children,headerRight}:any)=><View>{headerRight}{children}</View>};});
 jest.mock('expo-router',()=>{const {useEffect}=jest.requireActual('react');return {useRouter:()=>({dismissTo:jest.fn()}),useLocalSearchParams:()=>({familyId:'f'}),useFocusEffect:(fn:()=>void)=>useEffect(fn,[fn])};});
 const item={invitationId:'i',familyId:'f',status:'pending',expiresAt:'2030-10-15T00:00:00Z'};
 const data={link:'http://127.0.0.1:8787/invite#'+'a'.repeat(64),qr:'data:image/png;base64,AA=='};
@@ -40,7 +40,7 @@ it('used rows have no share or revoke even when expanded and retain accessible s
  await waitFor(()=>expect(page.getByTestId('invite-row-i')).toBeTruthy());
  await fireEvent.press(page.getByTestId('invite-row-i'));
  expect(page.queryByText('撤销邀请')).toBeNull();expect(page.queryByText('分享')).toBeNull();
- expect(page.queryByText('已使用')).toBeNull();
+ expect(page.getByText('已使用')).toBeTruthy();
  expect(page.getByTestId('invite-row-i').props.accessibilityLabel).toContain('已使用');
 });
 it('old unsaved invitations do not fabricate QR and list failure has reload',async()=>{

@@ -1335,5 +1335,12 @@
   "邀请图片已保存到相册。转发后，撤销邀请仍会使它失效。": "Invitation image saved to Photos. Revoking the invitation also invalidates shared copies.",
   "未获得保存图片的权限。可在系统设置中允许添加照片，或直接分享邀请链接。": "Photo saving was not allowed. Allow photo additions in system settings, or share the invitation link.",
   "本次未能保存邀请图片，请重试或分享邀请链接。": "The invitation image could not be saved. Try again or share the invitation link.",
-  "家庭邀请图片只在你点击保存时添加到系统相册；不会因此读取或上传其他相册照片。拒绝添加照片权限后仍可分享邀请链接。": "Invitation images are added to Photos only when you tap Save. This does not read or upload other photos. You can still share the invitation link if you decline photo additions."
+  "家庭邀请图片只在你点击保存时添加到系统相册；不会因此读取或上传其他相册照片。拒绝添加照片权限后仍可分享邀请链接。": "Invitation images are added to Photos only when you tap Save. This does not read or upload other photos. You can still share the invitation link if you decline photo additions.",
+  "给家人的邀请": "A FAMILY INVITATION",
+  "一起，留下日常。": "Keep our days, together.",
+  "正在读取邀请…": "Loading invitations…",
+  "生成后，可保存二维码或分享邀请链接。": "Create an invitation to save the QR image or share a link.",
+  "有效期至 {0}": "Valid until {{0}}",
+  "扫描二维码，或将邀请分享给家人。": "Scan the code, or share the invitation with family.",
+  "对方登录并确认后，才会加入家庭。": "They join only after signing in and confirming."
 }
