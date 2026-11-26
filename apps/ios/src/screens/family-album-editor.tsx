@@ -1,15 +1,16 @@
+import {LifeIcon} from './life-icons';
 import {familySafetyGeneration,subscribeFamilySafety} from '../application/family-safety-events';
 import {AlbumCoverFace} from './album-cover-tile';
 import { AlbumEditorFields } from './album-workflow-controls';
 import {normalizeAlbumName} from '../application/life-album';
 import {useCallback,useEffect,useState} from 'react';
-import {Pressable,View} from 'react-native';
+import {Pressable,StyleSheet,View} from 'react-native';
 import {Image} from 'expo-image';
 import {useFocusEffect} from 'expo-router';
 import {getFamilyUseCases} from '../application/container';
 import type {FamilyAlbumCover,FamilyAlbumMutation,FamilyAlbumView} from '../family-api/family-album-types';
 import {Text,type} from './life-text';
-import {ink,inkSoft,sage,hairline} from './life-page';
+import {ink,sage,hairline} from './life-page';
 import {tr} from '../i18n';
 export function FamilyAlbumEditor({book,busy,onSave}:{book:FamilyAlbumView;busy:boolean;onSave:(change:FamilyAlbumMutation)=>void}){
  const [name,setName]=useState(book.name),[opening,setOpening]=useState(book.opening??'');
@@ -21,11 +22,11 @@ export function FamilyAlbumEditor({book,busy,onSave}:{book:FamilyAlbumView;busy:
   <Text style={{...type.action,color:ink}}>{tr('封面')}</Text>
   {preview?<FamilyAlbumCoverPreview key={`${preview.shareId}/${preview.objectId}`} familyId={book.familyId} cover={preview}/>:null}
   <Pressable accessibilityRole="button" accessibilityState={{selected:choice===null,disabled:busy}} disabled={busy} onPress={()=>{setChoice(null);onSave({kind:'edit',name:book.name,opening:book.opening,coverChoice:null});}} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.action,color:sage}}>{choice===null?'✓ ':''}{tr('自动封面')}</Text></Pressable>
-  {candidates.map(candidate=><Pressable key={`${candidate.shareId}/${candidate.objectId}`} accessibilityRole="button" accessibilityLabel={`${tr('选这张照片做封面')} · ${candidate.label}`} accessibilityState={{selected:choice?.shareId===candidate.shareId&&choice.objectId===candidate.objectId,disabled:busy}} disabled={busy} onPress={()=>{const coverChoice={shareId:candidate.shareId,objectId:candidate.objectId};setChoice(coverChoice);onSave({kind:'edit',name:book.name,opening:book.opening,coverChoice});}} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.action,color:inkSoft}}>{choice?.shareId===candidate.shareId&&choice.objectId===candidate.objectId?'✓ ':''}{candidate.label}</Text></Pressable>)}
+  <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{candidates.map(candidate=><Pressable key={`${candidate.shareId}/${candidate.objectId}`} accessibilityRole="button" accessibilityLabel={`${tr('选这张照片做封面')} · ${candidate.label}`} accessibilityState={{selected:choice?.shareId===candidate.shareId&&choice.objectId===candidate.objectId,disabled:busy}} disabled={busy} onPress={()=>{const coverChoice={shareId:candidate.shareId,objectId:candidate.objectId};setChoice(coverChoice);onSave({kind:'edit',name:book.name,opening:book.opening,coverChoice});}} style={{width:72,height:72,overflow:'hidden',borderRadius:6,borderWidth:choice?.shareId===candidate.shareId&&choice.objectId===candidate.objectId?2:0,borderColor:sage}}><FamilyAlbumCoverPreview familyId={book.familyId} cover={candidate} fill/>{choice?.shareId===candidate.shareId&&choice.objectId===candidate.objectId?<View style={{position:'absolute',right:2,bottom:2,backgroundColor:'#FAF9F5',borderRadius:12}}><LifeIcon name="check" size={20}/></View>:null}</Pressable>)}</View>
  </View>;
 }
 // The parent hides this preview on expiry and unmounts it on withdrawal or loss of access.
-export function FamilyAlbumCoverPreview({familyId,cover,compact=false,tile}:{familyId:string;cover:FamilyAlbumCover;compact?:boolean;tile?:{name:string;width:number;height:number}}){
+export function FamilyAlbumCoverPreview({familyId,cover,compact=false,tile,fill=false}:{familyId:string;cover:FamilyAlbumCover;compact?:boolean;fill?:boolean;tile?:{name:string;width:number;height:number}}){
  const [uri,setUri]=useState<string|null>(null);
  const [safety,setSafety]=useState(familySafetyGeneration);
  useEffect(()=>subscribeFamilySafety(()=>{setUri(null);setSafety(familySafetyGeneration());}),[]);
@@ -35,5 +36,6 @@ export function FamilyAlbumCoverPreview({familyId,cover,compact=false,tile}:{fam
   return()=>{current=false;setUri(null);};
  },[familyId,cover.shareId,cover.objectId,safety]));
  if(tile)return <AlbumCoverFace name={tile.name} coverUri={uri} width={tile.width} height={tile.height} privateMedia showWordsFallback={false}/>;
- return uri?<Image accessibilityLabel={tr('家庭照片')} source={{uri}} cachePolicy="none" contentFit={compact?'cover':'contain'} style={compact?{width:72,height:96}:{width:'100%',height:180}}/>:null;
+ if(fill&&!uri)return <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center'}]}><LifeIcon name="photo" size={25}/></View>;
+ return uri?<Image accessibilityLabel={tr('家庭照片')} source={{uri}} cachePolicy="none" contentFit={compact||fill?'cover':'contain'} style={fill?StyleSheet.absoluteFill:compact?{width:72,height:96}:{width:'100%',height:180}}/>:null;
 }

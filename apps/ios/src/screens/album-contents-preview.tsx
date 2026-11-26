@@ -1,3 +1,4 @@
+import type {ReactNode} from 'react';
 import {Pressable,StyleSheet,View} from 'react-native';
 import {Image} from 'expo-image';
 import {tr} from '../i18n';
@@ -17,27 +18,28 @@ export function albumContentsGroups(entries:AlbumEntryView[]){
  });
  return groups;
 }
-export function AlbumContentsPreview({entries,onOpen}:{entries:AlbumEntryView[];onOpen:(entry:AlbumEntryView)=>void}){
+export function AlbumContentsPreview({entries,onOpen,prefix='life-album',renderPhoto,attribution,missingLabel,disabled=false,disableMissing=false}:{entries:AlbumEntryView[];onOpen:(entry:AlbumEntryView)=>void;prefix?:string;renderPhoto?:(entry:AlbumEntryView)=>ReactNode;attribution?:(entry:AlbumEntryView)=>string|undefined;missingLabel?:string;disabled?:boolean;disableMissing?:boolean}){
  const tiles=albumContentsGroups(entries).flatMap(group=>group.entries.map((item,i)=>({...item,date:i===0?group.date:null})));
- return <View style={styles.contents} testID="life-album-contents">
-   <View style={styles.tiles} testID="life-album-content-tiles">{tiles.map(({entry,index,date},position)=>{
+ return <View style={styles.contents} testID={`${prefix}-contents`}>
+   <View style={styles.tiles} testID={`${prefix}-content-tiles`}>{tiles.map(({entry,index,date},position)=>{
     const ready=entry.source==='ready',hasPhoto=ready&&entry.photoCount>0;
     const duration=formatAlbumAudioDuration(entry.audioDurationMs);
-    const label=ready?[entry.noteExcerpt,entry.dateLabel,entry.photoCount?tr('有{0}张照片',[entry.photoCount]):null,entry.hasAudio?(duration||tr('有声音')):null,entry.unknownCount?tr('还有一种现在打不开的媒介。'):null].filter(Boolean).join(' · '):ALBUM_MISSING_SOURCE;
-    return <Pressable key={entry.momentId} accessibilityRole="button" accessibilityLabel={label||tr('第{0}条',[index+1])} testID={`life-album-entry-open-${entry.momentId}`} onPress={()=>onOpen(entry)} style={[styles.tile,position%2===1&&styles.offset]}>
-     <View testID={`life-album-entry-${entry.momentId}`} style={styles.tileBody}>
-      {date?<Text accessibilityRole="header" style={styles.date} testID={`life-album-entry-date-${entry.momentId}`}>{date}</Text>:null}
+    const label=ready?[attribution?.(entry),entry.noteExcerpt,entry.dateLabel,entry.photoCount?tr('有{0}张照片',[entry.photoCount]):null,entry.hasAudio?(duration||tr('有声音')):null,entry.unknownCount?tr('还有一种现在打不开的媒介。'):null].filter(Boolean).join(' · '):missingLabel??ALBUM_MISSING_SOURCE;
+    return <Pressable key={entry.momentId} accessibilityRole="button" accessibilityLabel={label||tr('第{0}条',[index+1])} testID={`${prefix}-entry-open-${entry.momentId}`} disabled={disabled||(disableMissing&&!ready)} accessibilityState={{disabled:disabled||(disableMissing&&!ready)}} onPress={()=>onOpen(entry)} style={[styles.tile,position%2===1&&styles.offset]}>
+     <View testID={`${prefix}-entry-${entry.momentId}`} style={styles.tileBody}>
+      {date?<Text accessibilityRole="header" style={styles.date} testID={`${prefix}-entry-date-${entry.momentId}`}>{date}</Text>:null}
       {hasPhoto?<View style={styles.photoMount}>
-       {entry.photoCount>1?<View pointerEvents="none" style={styles.stack} testID={`life-album-entry-stack-${entry.momentId}`}/>:null}
-       {entry.thumbnailUri?<Image source={{uri:entry.thumbnailUri}} style={[styles.photo,position%3===1&&styles.portrait]} contentFit="cover" accessibilityIgnoresInvertColors testID={`life-album-entry-thumb-${entry.momentId}`}/>:<View style={[styles.photo,styles.placeholder]}><LifeIcon name="photo" size={25}/><Text style={styles.meta}>{tr('有照片')}</Text></View>}
+       {entry.photoCount>1?<View pointerEvents="none" style={styles.stack} testID={`${prefix}-entry-stack-${entry.momentId}`}/>:null}
+       {renderPhoto?<View style={[styles.photo,position%3===1&&styles.portrait,{overflow:'hidden'}]}>{renderPhoto(entry)}</View>:entry.thumbnailUri?<Image source={{uri:entry.thumbnailUri}} style={[styles.photo,position%3===1&&styles.portrait]} contentFit="cover" accessibilityIgnoresInvertColors testID={`${prefix}-entry-thumb-${entry.momentId}`}/>:<View style={[styles.photo,styles.placeholder]}><LifeIcon name="photo" size={25}/><Text style={styles.meta}>{tr('有照片')}</Text></View>}
       </View>:null}
       {ready?<View style={[styles.copy,!hasPhoto&&styles.words]}>
+       {attribution?.(entry)?<Text style={styles.meta} numberOfLines={1}>{attribution(entry)}</Text>:null}
        {!hasPhoto&&entry.noteExcerpt?<Text accessible={false} importantForAccessibility="no" style={styles.quote}>“</Text>:null}
-       {entry.noteExcerpt?<Text testID={`life-album-entry-note-${entry.momentId}`} numberOfLines={hasPhoto?2:4} style={styles.excerpt}>{entry.noteExcerpt}</Text>:null}
-       {entry.hasAudio?<View style={styles.sound} testID={`life-album-entry-audio-${entry.momentId}`}><LifeIcon name="waveform" size={20}/><Text style={styles.meta}>{duration||tr('有声音')}</Text></View>:null}
-       {entry.unknownCount>0?<Text style={styles.meta} numberOfLines={2} testID={`life-album-entry-unknown-${entry.momentId}`}>{tr('还有一种现在打不开的媒介。')}</Text>:null}
+       {entry.noteExcerpt?<Text testID={`${prefix}-entry-note-${entry.momentId}`} numberOfLines={hasPhoto?2:4} style={styles.excerpt}>{entry.noteExcerpt}</Text>:null}
+       {entry.hasAudio?<View style={styles.sound} testID={`${prefix}-entry-audio-${entry.momentId}`}><LifeIcon name="waveform" size={20}/><Text style={styles.meta}>{duration||tr('有声音')}</Text></View>:null}
+       {entry.unknownCount>0?<Text style={styles.meta} numberOfLines={2} testID={`${prefix}-entry-unknown-${entry.momentId}`}>{tr('还有一种现在打不开的媒介。')}</Text>:null}
        {!hasPhoto&&!entry.noteExcerpt&&!entry.hasAudio&&!entry.unknownCount?<Text style={styles.meta}>{tr('第{0}条',[index+1])}</Text>:null}
-      </View>:<View style={styles.words}><Text style={styles.meta}>{ALBUM_MISSING_SOURCE}</Text></View>}
+      </View>:<View style={styles.words}><Text style={styles.meta}>{missingLabel??ALBUM_MISSING_SOURCE}</Text></View>}
      </View>
     </Pressable>;
    })}</View>

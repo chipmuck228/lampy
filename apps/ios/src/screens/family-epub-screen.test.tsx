@@ -31,3 +31,9 @@ it('uses an existing family grant even without a new personal purchase and ignor
  await act(async()=>{mockCurrent=false;finish('epub_late');});expect(mockList).toHaveBeenCalledTimes(calls);expect(page.queryByText('刚刚生成')).toBeNull();expect(mockPurchase).not.toHaveBeenCalled();
  await page.rerender(<View/>);
 });
+it('uses the same cover and edition grouping as the personal save/share page',async()=>{
+ mockList.mockResolvedValue([{id:'old',name:'Earlier book',createdAt:'2026-11-01T12:00:00Z'}]);
+ const page=await render(<FamilyEpubScreen/>);await waitFor(()=>expect(page.getByText('Earlier book')).toBeTruthy());
+ expect(page.getByTestId('family-epub-cover')).toBeTruthy();expect(page.getAllByText('Family book')).toHaveLength(1);expect(page.getByText('已生成的电子册')).toBeTruthy();expect(page.getByText('点按分享，左滑可分享或删除。')).toBeTruthy();
+ expect(mockShare).not.toHaveBeenCalled();expect(mockPurchase).not.toHaveBeenCalled();
+});

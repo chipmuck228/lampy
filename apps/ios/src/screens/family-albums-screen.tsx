@@ -1,9 +1,14 @@
+import {albumOverviewStyles as overview} from './album-overview-styles';
+import {FamilyAlbumContents,familyAlbumContentsEntries} from './family-album-contents';
+import {LifeIcon,LifeIconButton} from './life-icons';
+import {AlbumCoverFace,AlbumCoverMeta} from './album-cover-tile';
+import {albumCoverWallLayout,ALBUM_COVER_WALL_GAP} from './album-cover-wall';
 import {purchasesSupported} from '../application/mobile-capabilities';
 import {isPersonalSettingsDiagnosticsOpen} from '../application/personal-settings-visibility';
 import {subscribeFamilySafety} from '../application/family-safety-events';
 import {albumManageStyles as bookStyles} from './album-manage-styles';
-import { AlbumCreateFields, AlbumManageToolbar, AlbumEntryActions } from './album-workflow-controls';
-import { DEFAULT_ALBUM_NAME, normalizeAlbumName, albumEntryCountLabel } from '../application/life-album';
+import { AlbumCreateFields, AlbumEntryActions } from './album-workflow-controls';
+import { DEFAULT_ALBUM_NAME, normalizeAlbumName, albumEntryCountLabel, albumDateRangeLabel } from '../application/life-album';
 import { moveAlbumReference } from '../application/album-entry-order';
 import { FamilyAlbumEditor, FamilyAlbumCoverPreview } from './family-album-editor';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -43,6 +48,10 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   const [sources, setSources] = useState<ShareView[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
+  const [menuOpen,setMenuOpen]=useState(false);
+  const [collecting,setCollecting]=useState(false);
+  const [wallWidth,setWallWidth]=useState<number|null>(null);
+  const wall=albumCoverWallLayout(wallWidth);
   const [name, setName] = useState(DEFAULT_ALBUM_NAME);
   const [organizing, setOrganizing] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -76,6 +85,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
     session.current?.invalidate();
     setBook(null);
     setEditing(false);
+    setMenuOpen(false);setCollecting(false);
     setOrganizing(false);
     setAccess(null);
     setAlbums([]);
@@ -292,21 +302,37 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   }
   async function show(api:FamilyAlbumUseCases,albumId:string,current:()=>boolean,preserve=false) {
     const reading=createFamilyAlbumReadSession({client:api,onInvalidate:()=>{if(focusedRef.current)pauseForegroundAudio();}});
-    if(!preserve){session.current?.invalidate();session.current=reading;setBook(null);setEditing(false);setOrganizing(false);setSources([]);setSelected([]);}
+    if(!preserve){session.current?.invalidate();session.current=reading;setBook(null);setEditing(false);setOrganizing(false);setSources([]);setSelected([]);setMenuOpen(false);setCollecting(false);}
     await reading.load(familyId!,albumId);
     if(current()){
       if(preserve){session.current?.invalidate();session.current=reading;}
       setChecking(false);setBook(reading.snapshot());setAccess(reading.snapshot()?.access??null);
-      if(mode==='collect'&&!preserve&&reading.snapshot()?.access.canManage){const result=await api.sources(familyId!);if(current()&&reading.snapshot())setSources(result.shares);}
+      if(mode==='collect'&&!preserve&&reading.snapshot()?.access.canManage){const result=await api.sources(familyId!);if(current()&&reading.snapshot()){setSources(result.shares);setCollecting(true);}}
     }else reading.invalidate();
   }
-  return <SettingsPage title={mode === 'new' ? tr('新建家庭册') : mode === 'collect' ? tr('添加到家庭册') : allowed && focused && !checking && !failed && book ? book.name : tr('这一册')} backLabel={tr(routeAlbum ? '我的生活册' : '返回')} accessibilityLabel={tr('家里的生活册')} onBack={() => router.back()}>
+  const visibleBook=allowed&&focused&&!checking&&!failed?book:null;
+  const dateRange=visibleBook?albumDateRangeLabel(familyAlbumContentsEntries(visibleBook.items)):null;
+  const hasContent=!!book?.items.some(item=>item.status==='active');
+  const closeTools=()=>{setEditing(false);setOrganizing(false);setCollecting(false);setSources([]);setSelected([]);};
+  const collect=()=>{setMenuOpen(false);setEditing(false);setOrganizing(false);void run(async(api,current)=>{const result=await api.sources(familyId!);if(current()){setSources(result.shares);setSelected([]);setCollecting(true);}});};
+  return <SettingsPage title={visibleBook?'':mode==='new'?tr('新建家庭册'):mode==='collect'?tr('添加到家庭册'):tr('家里的生活册')}
+    hideBackLabel={!!visibleBook} backLabel={tr(routeAlbum?'我的生活册':'返回')} accessibilityLabel={tr('家里的生活册')} onBack={()=>router.back()}
+    headerRight={visibleBook?editing||organizing||collecting?<Pressable accessibilityRole="button" testID="family-album-tools-done" disabled={busy} style={overview.headerAction} onPress={closeTools}><Text style={{...type.action,color:sage}}>{tr(editing?'取消':'完成')}</Text></Pressable>:<LifeIconButton name="more" label={tr('册子菜单')} testID="family-album-manage-menu" onPress={()=>{if(!owner.current)setMenuOpen(value=>!value);}}/>:null}
+    headerAccessory={visibleBook&&menuOpen?<View style={overview.menu} testID="family-album-menu">
+      {visibleBook.access.canManage?<>
+        <Pressable accessibilityRole="button" testID="family-album-edit" disabled={busy} style={overview.menuHit} onPress={()=>{closeTools();setMenuOpen(false);setEditing(true);}}><LifeIcon name="textCursor"/><Text style={{...type.action,color:sage}}>{tr('编辑册子')}</Text></Pressable>
+        <Pressable accessibilityRole="button" testID="family-album-organize" disabled={busy} style={overview.menuHit} onPress={()=>{closeTools();setMenuOpen(false);setOrganizing(true);}}><LifeIcon name="recent"/><Text style={{...type.action,color:sage}}>{tr('整理记录')}</Text></Pressable>
+        <Pressable accessibilityRole="button" testID="family-album-collect" disabled={busy} style={overview.menuHit} onPress={collect}><LifeIcon name="plus"/><Text style={{...type.action,color:sage}}>{tr('收入记录')}</Text></Pressable>
+      </>:null}
+      <Pressable accessibilityRole="button" testID="family-album-continuous-open" disabled={busy||!hasContent} style={overview.menuHit} onPress={()=>{setMenuOpen(false);router.push({pathname:'/family-album-reading',params:{familyId:book!.familyId,albumId:book!.albumId}});}}><LifeIcon name="lookback"/><Text style={{...type.action,color:sage}}>{tr('连续阅读模式')}</Text></Pressable>
+    </View>:null}>
+
     {allowed && focused ? <><View accessibilityElementsHidden={checking} importantForAccessibility={checking?'no-hide-descendants':'auto'} pointerEvents={checking?'none':'auto'} style={{
       paddingTop: 24,
       gap: 10,
       display:checking?'none':'flex'
     }}>
-      {!familyId ? <Text style={{...type.body,color:inkSoft}}>{tr('选择这册所属的家庭')}</Text> : <Text style={{...type.meta,color:inkSoft}}>{families.find(family=>family.familyId===familyId)?.name}</Text>}
+      {!familyId ? <Text style={{...type.body,color:inkSoft}}>{tr('选择这册所属的家庭')}</Text> : !book?<Text style={{...type.meta,color:inkSoft}}>{families.find(family=>family.familyId===familyId)?.name}</Text>:null}
       {mode === 'collect' && !book ? <Text style={{...type.body,color:inkSoft}}>{tr('选择已有家庭册，再收入这个家的分享。')}</Text> : null}
       {!familyId ? families.filter(family=>mode !== 'new' || family.role === 'creator').map(family => <View key={family.familyId}>{<FamilyAlbumButton label={family.name} onPress={() => {
           epoch.current++;
@@ -322,7 +348,10 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
           if (current()) setRetry(value => value + 1);
         })} disabled={busy} />}</> : null}
       {access?.rulesAcknowledged ? <>
-        {mode !== 'new' && !book ? albums.map(album => <View key={album.albumId}>{<FamilyAlbumButton label={`${album.name} · ${album.entryCount}`} onPress={() => void run((api, current) => show(api, album.albumId, current))} disabled={busy} />}</View>) : null}
+        {mode !== 'new' && !book ? <View testID="family-album-list-covers" onLayout={event=>setWallWidth(Math.round(event.nativeEvent.layout.width))} style={{flexDirection:'row',flexWrap:'wrap',gap:ALBUM_COVER_WALL_GAP}}>{albums.map(album=><Pressable key={album.albumId} accessibilityRole="button" accessibilityLabel={`${album.name} · ${album.entryCount}`} disabled={busy} onPress={()=>void run((api,current)=>show(api,album.albumId,current))} style={{width:wall.tileWidth,gap:6}}>
+          {album.cover?<FamilyAlbumCoverPreview familyId={familyId!} cover={album.cover} tile={{name:album.name,width:wall.tileWidth,height:wall.tileHeight}}/>:<AlbumCoverFace name={album.name} coverUri={null} width={wall.tileWidth} height={wall.tileHeight}/>}
+          <AlbumCoverMeta name={album.name} entryCount={album.entryCount}/>
+        </Pressable>)}</View> : null}
         {mode !== 'new' && !book && albums.length===0 ? <Text style={{...type.body,color:inkSoft}}>{tr('这个家还没有家庭册。')}</Text> : null}
         {access.canManage && mode === 'new' ? <AlbumCreateFields name={name} onChangeName={value=>{setName(value);requestId.current=null;}} placeholder={DEFAULT_ALBUM_NAME} maxLength={200} busy={busy} prefix="family-album-new" submitLabel={tr('创建这一册')} busyLabel={tr('正在记下')} onSubmit={()=>void run(async(api,current)=>{
           const operation=requestId.current??`album_${Date.now()}_${Math.random().toString(36).slice(2,10)}`;requestId.current=operation;
@@ -331,21 +360,28 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
         })}/> : null}
         {access.canManage && mode === 'collect' && !book ? <FamilyAlbumButton label={tr('新建家庭册')} onPress={()=>router.push({pathname:'/family-albums',params:{familyId:familyId!,mode:'new'}})} disabled={busy}/> : null}
       </> : null}
-      {book ? <View style={{
-        gap: 12
-      }}><View style={bookStyles.hero} testID="family-album-manage-hero">
-        <View style={bookStyles.heroCover}>{book.cover ? <FamilyAlbumCoverPreview key={`${book.cover.shareId}/${book.cover.objectId}`} familyId={book.familyId} cover={book.cover} compact/> : <Text style={bookStyles.heroWords} numberOfLines={3}>{book.name}</Text>}</View>
-        <View style={bookStyles.heroCopy}><Text style={bookStyles.heroTitle} numberOfLines={2}>{book.name}</Text><Text style={{...type.meta,color:inkSoft}}>{albumEntryCountLabel(book.items.length)}</Text>
-        <Text style={{...type.meta,color:inkSoft}}>{families.find(family=>family.familyId===book.familyId)?.name}</Text>
-        {book.items.length?<FamilyAlbumButton label={tr('翻阅')} onPress={()=>router.push({pathname:'/family-album-epub-preview',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>:<Text style={{...type.meta,color:inkSoft}}>{tr('先收下一条，也可以慢慢添。')}</Text>}
-        {purchasesSupported()&&book.access.canManage?<FamilyAlbumButton label={tr('保存与分享')} onPress={()=>router.push({pathname:'/family-album-epub',params:{familyId:book.familyId,albumId:book.albumId}})} disabled={busy}/>:null}
-        </View></View>
-
-        {book.access.canManage ? <AlbumManageToolbar prefix="family-album" editing={editing} organizing={organizing} busy={busy} onEdit={()=>{setSources([]);setSelected([]);setEditing(value=>!value);}} onOrganize={()=>{setSources([]);setSelected([]);setOrganizing(value=>!value);}}/> : null}
+      {book ? <View style={{gap:20}}>
+        <View style={overview.hero} testID="family-album-manage-hero">
+          <View style={overview.heroCover} testID="family-album-manage-cover">
+            <View style={overview.coverQuiet}><LifeIcon name="album" size={38}/></View>
+            {book.cover?<FamilyAlbumCoverPreview key={`${book.cover.shareId}/${book.cover.objectId}`} familyId={book.familyId} cover={book.cover} fill/>:null}
+            <View pointerEvents="none" style={overview.coverSpine}/>
+          </View>
+          <View style={overview.heroCopy}><Text style={overview.heroTitle} accessibilityRole="header">{book.name}</Text>
+            {dateRange?<Text style={overview.count} testID="family-album-date-range">{dateRange}</Text>:null}
+            <Text style={overview.count}>{albumEntryCountLabel(book.items.length)}</Text>
+            <Text style={overview.count}>{families.find(family=>family.familyId===book.familyId)?.name}</Text>
+          </View>
+        </View>
+        {!editing&&!organizing&&!collecting?<View style={overview.primaryActions}>
+          <Pressable accessibilityRole="button" testID="family-album-preview-open" disabled={busy||!hasContent} accessibilityState={{disabled:busy||!hasContent}} style={[overview.primaryHit,(!hasContent||busy)&&{opacity:.45}]} onPress={()=>router.push({pathname:'/family-album-epub-preview',params:{familyId:book.familyId,albumId:book.albumId}})}><LifeIcon name="lookback" size={20}/><Text style={overview.primaryLabel}>{tr('翻阅')}</Text><LifeIcon name="open" size={15}/></Pressable>
+          {purchasesSupported()&&book.access.canManage?<Pressable accessibilityRole="button" testID="family-album-export-open" disabled={busy} style={[overview.primaryHit,overview.secondaryHit]} onPress={()=>router.push({pathname:'/family-album-epub',params:{familyId:book.familyId,albumId:book.albumId}})}><LifeIcon name="share"/><Text style={overview.secondaryLabel}>{tr('保存与分享')}</Text></Pressable>:null}
+        </View>:null}
+        {!hasContent?<Text style={{...type.meta,color:inkSoft}}>{tr('先收下一条，也可以慢慢添。')}</Text>:null}
         {editing && book.access.canManage ? <FamilyAlbumEditor book={book} busy={busy} onSave={change=>void run(async(api,current)=>{
           await api.mutate(familyId!,book,change);if(current())await show(api,book.albumId,current,true);
         })}/> : null}
-        {book.items.map((item,index) => <View key={item.shareId} style={bookStyles.entry} testID={`family-album-entry-${item.shareId}`}>
+        {organizing?book.items.map((item,index) => <View key={item.shareId} style={bookStyles.entry} testID={`family-album-entry-${item.shareId}`}>
           {item.status === 'active' ? <Pressable accessibilityRole="button" accessibilityLabel={item.share.snapshot.note||tr('第{0}条',[index+1])} disabled={busy||organizing} onPress={()=>router.push({pathname:'/family-record/[id]',params:{id:item.shareId,familyId:familyId!}})} style={bookStyles.entryHit}>
           {item.share.snapshot.media.find(media=>media.mimeType.startsWith('image/'))?<FamilyAlbumCoverPreview familyId={book.familyId} cover={{shareId:item.shareId,objectId:item.share.snapshot.media.find(media=>media.mimeType.startsWith('image/'))!.objectId}} tile={{name:'',width:56,height:56}}/>:null}
           <View style={bookStyles.entryCopy}>
@@ -357,15 +393,8 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
           </View>:null}
           </View></Pressable>:<Text style={{...type.body,color:ink}}>{tr('这条分享已不可用。')}</Text>}
           {book.access.canManage && organizing ? <AlbumEntryActions prefix="family-album" id={item.shareId} first={index===0} last={index===book.items.length-1} busy={busy} onMoveUp={()=>void moveEntry(book,item.shareId,'up')} onMoveDown={()=>void moveEntry(book,item.shareId,'down')} onRemove={()=>void run(async(api,current)=>{await api.mutate(familyId!,book,{kind:'remove',shareId:item.shareId});if(current())await show(api,book.albumId,current,true);})}/> : null}
-        </View>)}
-        {book.access.canManage && !editing && !organizing ? <>
-          {<FamilyAlbumButton label={tr('收入记录')} onPress={() => void run(async (api, current) => {
-            const result = await api.sources(familyId!);
-            if (current()) {
-              setSources(result.shares);
-              setSelected([]);
-            }
-          })} disabled={busy} />}
+        </View>):!editing&&!collecting?<FamilyAlbumContents book={book} disabled={busy} onOpen={shareId=>router.push({pathname:'/family-record/[id]',params:{id:shareId,familyId:familyId!}})}/>:null}
+        {book.access.canManage && collecting && !editing && !organizing ? <>
           {sources.map(share => <View key={share.shareId}>{<FamilyAlbumButton label={`${selected.includes(share.shareId) ? '✓ ' : ''}${share.authorNickname || tr('家人')} · ${share.snapshot.note.slice(0, 60)}`} onPress={() => setSelected(previous => previous.includes(share.shareId) ? previous.filter(id => id !== share.shareId) : [...previous, share.shareId])} disabled={busy} />}</View>)}
           {selected.length ? <FamilyAlbumButton label={tr('收入选中的分享')} onPress={() => void run(async (api, current) => {
             await api.mutate(familyId!, book, {
