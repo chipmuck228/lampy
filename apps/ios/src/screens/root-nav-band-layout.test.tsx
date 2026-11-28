@@ -5,7 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LeaveFab, LEAVE_FAB_GAP_ABOVE_NAV, leaveFabOverlayPadding, leaveFabScrollReserve } from './leave-fab';
 import { LIFE_ICON_NAMES } from './life-icons';
-import { NAV_BAND_HIT, pageGutter } from './life-page';
+import { NAV_BAND_HIT, pageColumnWidth, pageGutter } from './life-page';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 
 function collectTestIds(node: unknown, found: string[] = []): string[] {
@@ -223,7 +223,7 @@ it('orders the four roots consistently and marks Family as the selected root', a
     await grid.unmount();
   });
 
-  it('lets the iPad reading pane shrink beside a fixed 112pt rail', async () => {
+  it('keeps the iPad reading pane full-width above a compact centered bottom band', async () => {
     Dimensions.set({
       window: { width: 1024, height: 1366, scale: 2, fontScale: 1 },
       screen: { width: 1024, height: 1366, scale: 2, fontScale: 1 },
@@ -245,12 +245,15 @@ it('orders the four roots consistently and marks Family as the selected root', a
       ),
     );
     expect(StyleSheet.flatten(view.getByTestId('root-nav-band').props.style)).toEqual(
-      expect.objectContaining({ width: 112, flexShrink: 0, flexGrow: 0, flexDirection: 'column' }),
+      expect.objectContaining({ width: '100%', maxWidth: 560, alignSelf: 'center', flexShrink: 0, flexDirection: 'row' }),
     );
     expect(StyleSheet.flatten(view.getByTestId('tablet-scroll').props.style)).toEqual(
       expect.objectContaining({ flex: 1, minWidth: 0 }),
     );
     expect(StyleSheet.flatten(view.getByTestId('tablet-scroll').props.style).width).toBeUndefined();
+    const ids = collectTestIds(view.toJSON());
+    expect(ids.indexOf('root-nav-band')).toBeGreaterThan(ids.indexOf('tablet-scroll'));
+    expect(view.getByTestId('root-nav-selection-rule')).toBeTruthy();
     await view.unmount();
   });
 
@@ -308,6 +311,62 @@ it('orders the four roots consistently and marks Family as the selected root', a
     await view.unmount();
   });
 
+  it('preserves mounted content through iPad rotation and narrow split view', async () => {
+    let mounts = 0;
+    function Content() {
+      useEffect(() => { mounts += 1; }, []);
+      return <Text testID="rotation-content">kept</Text>;
+    }
+    const view = await render(wrap(
+      <RootReadingLayout scrollTestID="rotation-scroll"
+        band={<RootNavBand here="recent" onGo={() => undefined} onFamily={() => undefined} />}>
+        <Content />
+      </RootReadingLayout>,
+    ));
+    for (const [width, height] of [[1024, 1366], [1366, 1024], [600, 900], [390, 844]]) {
+      await act(async () => {
+        Dimensions.set({
+          window: { width, height, scale: 2, fontScale: 1 },
+          screen: { width, height, scale: 2, fontScale: 1 },
+        });
+      });
+      expect(mounts).toBe(1);
+      expect(view.getByTestId('rotation-content')).toBeTruthy();
+      expect(bandOrder(view)).toEqual(['root-nav-here-wrap', 'home-lookback', 'home-family', 'home-albums']);
+      const ids = collectTestIds(view.toJSON());
+      expect(ids.indexOf('root-nav-band')).toBeGreaterThan(ids.indexOf('rotation-scroll'));
+      expect(view.queryByTestId('root-nav-selection-rule') !== null).toBe(width >= 768);
+      expect(StyleSheet.flatten(view.getByTestId('root-nav-band').props.style).flexDirection).toBe('row');
+    }
+  });
+
+  it('retains iPad root actions and a quiet Capture button above the band', async () => {
+    Dimensions.set({
+      window: { width: 1366, height: 1024, scale: 2, fontScale: 1 },
+      screen: { width: 1366, height: 1024, scale: 2, fontScale: 1 },
+    });
+    const onGo = jest.fn(), onFamily = jest.fn(), onCapture = jest.fn();
+    const view = await render(wrap(
+      <RootReadingLayout scrollTestID="ipad-action-scroll"
+        band={<RootNavBand here="recent" onGo={onGo} onFamily={onFamily} />}
+        overlay={<LeaveFab testID="ipad-capture" onPress={onCapture} available
+          opacity={new Animated.Value(1)} shift={new Animated.Value(0)} />}>
+        <Text>records</Text>
+      </RootReadingLayout>,
+    ));
+    fireEvent.press(view.getByTestId('home-family'));
+    expect(onFamily).toHaveBeenCalledTimes(1);
+    fireEvent.press(view.getByTestId('home-albums'));
+    expect(onGo).toHaveBeenCalledWith('albums');
+    fireEvent.press(view.getByTestId('ipad-capture'));
+    expect(onCapture).toHaveBeenCalledTimes(1);
+    expect(StyleSheet.flatten(view.getByTestId('ipad-capture').props.style)).toEqual(
+      expect.objectContaining({ minHeight: 48, borderRadius: 10 }),
+    );
+    const ids = collectTestIds(view.toJSON());
+    expect(ids.indexOf('ipad-capture')).toBeLessThan(ids.indexOf('root-nav-band'));
+  });
+
   it('keeps 最近 / 回看 / 生活册 order on the recent root', async () => {
     const recent = await render(wrap(<RootNavBand here="recent" onGo={() => undefined} />));
     expect(bandOrder(recent)).toEqual(['root-nav-here-wrap', 'home-lookback', 'home-albums']);
@@ -362,7 +421,7 @@ it('orders the four roots consistently and marks Family as the selected root', a
       paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
       paddingRight: pageGutter(390, 844),
     });
-    expect(leaveFabOverlayPadding(1024, 1366).paddingRight).toBe(pageGutter(1024, 1366));
+    expect(leaveFabOverlayPadding(1024, 1366).paddingRight).toBe((1024 - pageColumnWidth(1024, 1366)) / 2 + pageGutter(1024, 1366));
   });
 
 

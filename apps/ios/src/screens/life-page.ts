@@ -54,9 +54,12 @@ export function isCompactHeight(windowHeight: number): boolean {
   return windowHeight < COMPACT_HEIGHT;
 }
 
-export function shouldUseNavRail(windowWidth: number, windowHeight: number): boolean {
-  return isRegularWidth(windowWidth, windowHeight);
+/** Root navigation stays below the reading pane, including on iPad. */
+export function shouldUseNavRail(_windowWidth: number, _windowHeight: number): boolean {
+  return false;
 }
+
+export const ROOT_NAV_MAX_WIDTH = 560;
 
 export const NAV_BAND_PAD_X = 32;
 export const NAV_BAND_HIT = 48;

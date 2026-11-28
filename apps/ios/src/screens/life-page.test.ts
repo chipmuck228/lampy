@@ -65,8 +65,10 @@ describe('life page measures', () => {
     expect(recentImageColumnWidth(768, 1024, 200, 200)).toBeLessThan(280);
   });
 
-  it('uses a left rail on tablet width, not on a phone', () => {
-    expect(shouldUseNavRail(1024, 1366)).toBe(true);
+  it('keeps root navigation below the content at every window width', () => {
+    expect(shouldUseNavRail(1024, 1366)).toBe(false);
+    expect(shouldUseNavRail(1366, 1024)).toBe(false);
+    expect(shouldUseNavRail(600, 900)).toBe(false);
     expect(shouldUseNavRail(390, 844)).toBe(false);
     expect(shouldUseNavRail(852, 393)).toBe(false);
   });
