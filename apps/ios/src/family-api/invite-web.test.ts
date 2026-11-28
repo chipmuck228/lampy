@@ -137,7 +137,7 @@ it("does not invent a download URL and configures AASA only for safe HTTPS", () 
   expect(inviteWebJs()).toContain('const download=""');
   expect(inviteAssociation("http://127.0.0.1")).toBeNull();
   expect(
-    inviteAssociation("https://lampy-family-api.5sparks.ai")?.applinks.details[0].appIDs,
+    inviteAssociation("https://lampy-api.5sparks.ai")?.applinks.details[0].appIDs,
   ).toEqual(["B283NY984J.app.lampy.ios"]);
 });
 it("disabled service never enables public invite pages", async () => {

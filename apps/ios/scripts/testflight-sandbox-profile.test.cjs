@@ -7,9 +7,9 @@ const env={...FLAGS,LAMPY_BUILD_PROFILE:'testflight-sandbox',LAMPY_BUILD_NUMBER:
 test('sandbox archive matches accepted features without altering base config',()=>{
  const base=require('../app.json').expo;const before=JSON.stringify(base);const result=configureAlbumExport(configure(base,env),env);
  assert.equal(JSON.stringify(base),before);assert.equal(result.version,'1.0.0');assert.equal(result.ios.buildNumber,'17');
- assert.equal(result.ios.infoPlist.LampyBuildProfile,'testflight-sandbox');assert.equal(result.ios.infoPlist.LampyFamilyAPI,'https://lampy-family-api.5sparks.ai');
+ assert.equal(result.ios.infoPlist.LampyBuildProfile,'testflight-sandbox');assert.equal(result.ios.infoPlist.LampyFamilyAPI,'https://lampy-api.5sparks.ai');
  for(const key of ['LampyEmailLoginEnabled','LampyUnifiedPurchasesEnabled','LampyPaidExportEnabled','LampyFamilyAlbumPreviewEnabled'])assert.equal(result.ios.infoPlist[key],true);
- assert.equal(result.ios.infoPlist.LampyExportProductID,'lampyepubexport');assert.ok(result.ios.associatedDomains.includes('applinks:lampy-family-api.5sparks.ai'));
+ assert.equal(result.ios.infoPlist.LampyExportProductID,'lampyepubexport');assert.ok(result.ios.associatedDomains.includes('applinks:lampy-api.5sparks.ai'));
  assert.equal(FLAGS.EXPO_PUBLIC_FAMILY_ALBUM_EXPORT_ENABLED,'1');assert.equal(FLAGS.EXPO_PUBLIC_ALBUM_PRINT_EVAL,'0');
 });
 test('missing and contaminated flags or product cannot build',()=>{
@@ -23,6 +23,6 @@ test('fresh Xcode shell preserves sandbox configuration and no unrelated credent
  execFileSync('bash',['-c','source scripts/release-public-env.sh; source scripts/testflight-sandbox-env.sh; bash scripts/write-family-xcode-env.sh "$1"','prepare',output],{cwd,env:{...process.env,LAMPY_BUILD_NUMBER:'17',LAMPY_SMTP_PASSWORD:'must-not-copy'}});
  assert.ok(!fs.readFileSync(output,'utf8').includes('must-not-copy'));
  const value=execFileSync('bash',['-c',`source "$1"; "$NODE_BINARY" -e 'console.log(JSON.stringify(require("./scripts/testflight-sandbox-profile.cjs").launchProfile(process.env)))'`,'xcode',output],{cwd,env:{PATH:process.env.PATH,HOME:process.env.HOME},encoding:'utf8'});
- assert.deepEqual(JSON.parse(value),{api:'https://lampy-family-api.5sparks.ai',version:'1.0.0',build:'17',productId:'lampyepubexport'});
+ assert.deepEqual(JSON.parse(value),{api:'https://lampy-api.5sparks.ai',version:'1.0.0',build:'17',productId:'lampyepubexport'});
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

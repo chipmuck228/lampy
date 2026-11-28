@@ -25,7 +25,7 @@ class ArchivePrivacyTest(unittest.TestCase):
         self.info = {'CFBundleIdentifier': 'app.lampy.ios',
                      'CFBundleShortVersionString': '1.0.0', 'CFBundleVersion': '17',
                      'LampyBuildProfile': 'appstore-v1',
-                     'LampyFamilyAPI': 'https://lampy-family-api.5sparks.ai',
+                     'LampyFamilyAPI': 'https://lampy-api.5sparks.ai',
                      'LampyUnifiedPurchasesEnabled': False, 'LampyPaidExportEnabled': False,
                      'LampyEmailLoginEnabled': False, 'LampyExportProductID': '',
                      **{k: 'Purpose ' + k for k in audit.PERMISSIONS}}

@@ -101,13 +101,13 @@ describe('family API URL safety', () => {
 });
 
 it('requires explicit internal profile and approved HTTPS origin',()=>{
- expect(isFamilyInternalTestBuild('1','https://lampy-family-api.5sparks.ai','1','1')).toBe(true);
- for(const url of ['https://family-test.yunpura.com','https://lampy-family-staging.onrender.com','http://lampy-family-api.5sparks.ai','https://lampy-family-api.5sparks.ai.evil.test','http://127.0.0.1:8787','https://lampy-family-api.5sparks.ai/path']) expect(isFamilyInternalTestBuild('1',url,'1','1')).toBe(false);
- expect(isFamilyInternalTestBuild('0','https://lampy-family-api.5sparks.ai','1','1')).toBe(false);
+ expect(isFamilyInternalTestBuild('1','https://lampy-api.5sparks.ai','1','1')).toBe(true);
+ for(const url of ['https://family-test.yunpura.com','https://lampy-family-api.5sparks.ai','https://lampy-family-staging.onrender.com','http://lampy-api.5sparks.ai','https://lampy-api.5sparks.ai.evil.test','http://127.0.0.1:8787','https://lampy-api.5sparks.ai/path']) expect(isFamilyInternalTestBuild('1',url,'1','1')).toBe(false);
+ expect(isFamilyInternalTestBuild('0','https://lampy-api.5sparks.ai','1','1')).toBe(false);
 });
 
 test('formal release requires production origin and no test identity',()=>{
  const {isFamilyV1ReleaseBuild}=require('./family-config');
- expect(isFamilyV1ReleaseBuild('1','https://lampy-family-api.5sparks.ai','1','0','0')).toBe(true);
- for(const args of [['0','https://lampy-family-api.5sparks.ai','1','0','0'],['1','https://family-test.yunpura.com','1','0','0'],['1','https://lampy-family-api.5sparks.ai','1','1','0'],['1','https://lampy-family-api.5sparks.ai','1','0','1']])expect(isFamilyV1ReleaseBuild(...args)).toBe(false);
+ expect(isFamilyV1ReleaseBuild('1','https://lampy-api.5sparks.ai','1','0','0')).toBe(true);
+ for(const args of [['0','https://lampy-api.5sparks.ai','1','0','0'],['1','https://family-test.yunpura.com','1','0','0'],['1','https://lampy-api.5sparks.ai','1','1','0'],['1','https://lampy-api.5sparks.ai','1','0','1']])expect(isFamilyV1ReleaseBuild(...args)).toBe(false);
 });
