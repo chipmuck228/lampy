@@ -50,7 +50,6 @@ import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
 import {
   clay,
   paper,
-  isCompactHeight,
   isRegularWidth,
   pageGutter,
   recentColumnWidth,
@@ -66,7 +65,6 @@ export default function RecentScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
-  const compact = isCompactHeight(height);
   const editorial = isRegularWidth(width, height);
   const frame = pageFrame(width, height);
   const columnWidth = recentColumnWidth(width, height);
