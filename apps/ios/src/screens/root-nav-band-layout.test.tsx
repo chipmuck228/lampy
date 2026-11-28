@@ -354,11 +354,11 @@ it('orders the four roots consistently and marks Family as the selected root', a
         <Text>records</Text>
       </RootReadingLayout>,
     ));
-    fireEvent.press(view.getByTestId('home-family'));
+    await fireEvent.press(view.getByTestId('home-family'));
     expect(onFamily).toHaveBeenCalledTimes(1);
-    fireEvent.press(view.getByTestId('home-albums'));
+    await fireEvent.press(view.getByTestId('home-albums'));
     expect(onGo).toHaveBeenCalledWith('albums');
-    fireEvent.press(view.getByTestId('ipad-capture'));
+    await fireEvent.press(view.getByTestId('ipad-capture'));
     expect(onCapture).toHaveBeenCalledTimes(1);
     expect(StyleSheet.flatten(view.getByTestId('ipad-capture').props.style)).toEqual(
       expect.objectContaining({ minHeight: 48, borderRadius: 10 }),
@@ -398,11 +398,11 @@ it('orders the four roots consistently and marks Family as the selected root', a
     phoneWindow();
     const onGo = jest.fn();
     const recent = await render(wrap(<RootNavBand here="recent" onGo={onGo} />));
-    fireEvent.press(recent.getByTestId('root-nav-here-wrap'));
+    await fireEvent.press(recent.getByTestId('root-nav-here-wrap'));
     expect(onGo).not.toHaveBeenCalled();
-    fireEvent.press(recent.getByTestId('home-lookback'));
+    await fireEvent.press(recent.getByTestId('home-lookback'));
     expect(onGo).toHaveBeenCalledWith('lookback');
-    fireEvent.press(recent.getByTestId('home-albums'));
+    await fireEvent.press(recent.getByTestId('home-albums'));
     expect(onGo).toHaveBeenCalledWith('albums');
     expect(recent.getByTestId('home-lookback').props.accessibilityRole).toBe('tab');
     expect(recent.getByTestId('home-albums').props.accessibilityRole).toBe('tab');
