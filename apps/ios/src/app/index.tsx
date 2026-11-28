@@ -50,6 +50,7 @@ import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
 import {
   clay,
   isCompactHeight,
+  isRegularWidth,
   pageGutter,
   recentColumnWidth,
   recentImageColumnWidth,
@@ -64,6 +65,7 @@ export default function RecentScreen() {
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
+  const editorial = isRegularWidth(width, height);
   const columnWidth = recentColumnWidth(width, height);
   const pairImages = shouldPairRecentImages(
     recentImageColumnWidth(width, height, insets.left, insets.right),
@@ -220,6 +222,7 @@ export default function RecentScreen() {
         accessibilityLabel={tr("刚刚留下的生活")}
         scrollTestID="recent-scroll"
         canvas={recentPaper}
+        overlayColumnWidth={columnWidth}
         onScroll={onRecentScroll}
         onScrollBeginDrag={onRecentScrollBeginDrag}
         header={
@@ -227,18 +230,19 @@ export default function RecentScreen() {
             testID="recent-header"
             style={[
               styles.hero,
+              editorial && styles.editorialHero,
               {
                 maxWidth: columnWidth,
                 paddingHorizontal: gutter,
-                paddingTop: compact ? 12 : 20,
+                paddingTop: editorial ? 28 : compact ? 12 : 20,
               },
             ]}
           >
             <View style={styles.heroCopy}>
-              <Text style={styles.eyebrow} testID="recent-eyebrow">
-                {tr("LAMPY · 生活记录")}</Text>
-              <Text style={styles.wordmark} accessibilityRole="header" testID="recent-wordmark">
-                {tr("刚刚留下的生活")}</Text>
+              {!editorial ? <Text style={styles.eyebrow} testID="recent-eyebrow">
+                {tr("LAMPY · 生活记录")}</Text> : null}
+              <Text style={[styles.wordmark, editorial && styles.editorialWordmark]} accessibilityRole="header" testID="recent-wordmark">
+                {editorial ? tr("最近") : tr("刚刚留下的生活")}</Text>
             </View>
             <LifeIconButton
               name="settings"
@@ -256,7 +260,7 @@ export default function RecentScreen() {
             maxWidth: columnWidth,
             paddingHorizontal: gutter,
             paddingTop: 4,
-            paddingBottom: leaveFabScrollReserve(),
+            paddingBottom: editorial ? 24 : leaveFabScrollReserve(),
           },
         ]}
         band={
@@ -312,7 +316,7 @@ export default function RecentScreen() {
               day.items.length,
             )}
           >
-            <RecentDayHeading dayKey={day.key} label={day.label} />
+            <RecentDayHeading dayKey={day.key} label={day.label} editorial={editorial} />
             <View style={styles.dayItems}>
               {day.items.map((item, index) => (
                 <View key={item.id}>
@@ -322,6 +326,8 @@ export default function RecentScreen() {
                   <RecentMoment
                     item={item}
                     pairImages={pairImages}
+                    editorial={editorial}
+                    imageMaxHeight={Math.min(340, height * 0.4)}
                     echoOpacity={echoOpacity}
                     echoing={echoId === item.id}
                     expanded={expandedIds.includes(item.id)}
@@ -371,13 +377,13 @@ export default function RecentScreen() {
   );
 }
 
-function RecentDayHeading({ dayKey, label }: { dayKey: string; label: string }) {
+function RecentDayHeading({ dayKey, label, editorial }: { dayKey: string; label: string; editorial: boolean }) {
   const heading = recentDayHeading(dayKey, label, new Date().getFullYear());
   return (
-    <View style={styles.sectionHeading}>
+    <View style={[styles.sectionHeading, editorial && styles.editorialHeading]}>
       <View style={styles.sectionCopy}>
         <View style={styles.sectionDateRow}>
-          <Text style={styles.sectionDate} accessibilityRole="header">
+          <Text style={[styles.sectionDate, editorial && styles.editorialDate]} accessibilityRole="header">
             {heading.date}
           </Text>
           {heading.weekday ? <Text style={styles.sectionDot}>·</Text> : null}
@@ -408,6 +414,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
+  editorialHero: { paddingBottom: 24 },
+  editorialWordmark: { fontSize: 42, lineHeight: 56, fontWeight: '500', marginTop: 0, letterSpacing: 1.2 },
+  editorialHeading: { borderTopWidth: 0, paddingTop: 8, marginTop: 0, marginBottom: 8 },
+  editorialDate: { fontSize: 16, lineHeight: 24, letterSpacing: 1.6 },
   eyebrow: { ...recentType.kicker, color: recentKicker },
   wordmark: { ...recentType.title, color: recentInk, marginTop: 10, letterSpacing: 1.2 },
   empty: { gap: 16, paddingTop: 28, paddingBottom: 8 },

@@ -363,6 +363,7 @@ it('orders the four roots consistently and marks Family as the selected root', a
     expect(StyleSheet.flatten(view.getByTestId('ipad-capture').props.style)).toEqual(
       expect.objectContaining({ minHeight: 48, borderRadius: 10 }),
     );
+    expect(StyleSheet.flatten(view.getByTestId('root-leave-overlay').props.style).position).toBeUndefined();
     const ids = collectTestIds(view.toJSON());
     expect(ids.indexOf('ipad-capture')).toBeLessThan(ids.indexOf('root-nav-band'));
   });

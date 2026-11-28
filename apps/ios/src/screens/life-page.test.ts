@@ -52,12 +52,13 @@ describe('life page measures', () => {
     expect(shouldStackRecentDay(1024, 1366)).toBe(false);
     expect(shouldStackRecentDay(390, 844)).toBe(true);
     expect(shouldStackRecentDay(852, 393)).toBe(true);
-    expect(recentColumnWidth(1024, 1366)).toBe(768);
+    expect(recentColumnWidth(1024, 1366)).toBe(1024);
+    expect(recentColumnWidth(1366, 1024)).toBe(1120);
     expect(recentColumnWidth(390, 844)).toBe(390);
   });
 
   it('measures the image column after gutters and safe edges', () => {
-    expect(recentImageColumnWidth(1024, 1366)).toBe(672);
+    expect(recentImageColumnWidth(1024, 1366)).toBe(928);
     expect(recentImageColumnWidth(390, 844)).toBe(342);
     expect(recentImageColumnWidth(320, 700)).toBe(272);
     expect(recentImageColumnWidth(768, 1024, 200, 200)).toBe(272);

@@ -210,6 +210,7 @@ export function RootReadingLayout({
   onContentSizeChange,
   onScrollLayout,
   overlay,
+  overlayColumnWidth,
   header,
   canvas = paper,
   cover,
@@ -225,12 +226,14 @@ export function RootReadingLayout({
   onContentSizeChange?: (contentWidth: number, contentHeight: number) => void;
   onScrollLayout?: (event: LayoutChangeEvent) => void;
   overlay?: ReactNode;
+  overlayColumnWidth?: number;
   header?: ReactNode;
   canvas?: string;
   cover?: ReactNode;
 }) {
   const { width, height } = usePageMetrics();
-  const overlayPad = leaveFabOverlayPadding(width, height);
+  const overlayPad = leaveFabOverlayPadding(width, height, overlayColumnWidth);
+  const docked = isRegularWidth(width, height);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: canvas }]} accessibilityLabel={accessibilityLabel}>
@@ -255,7 +258,7 @@ export function RootReadingLayout({
           </ScrollView>
           {cover}
           {overlay ? (
-            <View testID="root-leave-overlay" pointerEvents="box-none" style={[styles.overlay, overlayPad]}>
+            <View testID="root-leave-overlay" pointerEvents="box-none" style={[docked ? styles.captureDock : styles.overlay, overlayPad]}>
               {overlay}
             </View>
           ) : null}
@@ -280,6 +283,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
   },
+  captureDock: { flexShrink: 0, alignItems: 'flex-end', paddingTop: 8 },
   band: {
     alignSelf: 'stretch',
     flexShrink: 0,

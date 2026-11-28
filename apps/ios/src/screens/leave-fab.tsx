@@ -17,11 +17,11 @@ export function leaveFabScrollReserve(): number {
   return LEAVE_FAB_HIT + LEAVE_FAB_GAP_ABOVE_NAV + LEAVE_FAB_TRAIL;
 }
 
-export function leaveFabOverlayPadding(windowWidth: number, windowHeight: number) {
+export function leaveFabOverlayPadding(windowWidth: number, windowHeight: number, columnWidth = pageColumnWidth(windowWidth, windowHeight)) {
   return {
     paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
     paddingRight: isRegularWidth(windowWidth, windowHeight)
-      ? Math.max(pageGutter(windowWidth, windowHeight), (windowWidth - pageColumnWidth(windowWidth, windowHeight)) / 2 + pageGutter(windowWidth, windowHeight))
+      ? Math.max(pageGutter(windowWidth, windowHeight), (windowWidth - columnWidth) / 2 + pageGutter(windowWidth, windowHeight))
       : pageGutter(windowWidth, windowHeight),
   };
 }

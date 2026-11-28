@@ -133,6 +133,7 @@ export function shouldStackRecentDay(windowWidth: number, windowHeight: number):
 }
 
 export function recentColumnWidth(windowWidth: number, windowHeight: number): number {
+  if (isRegularWidth(windowWidth, windowHeight)) return Math.min(windowWidth, 1120);
   return pageColumnWidth(windowWidth, windowHeight);
 }
 

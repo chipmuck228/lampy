@@ -73,6 +73,7 @@ function ImageSlot({
   paired,
   wrapAvailable,
   appearance,
+  frameSize,
 }: {
   image: ImageView;
   testIDPrefix: string;
@@ -80,6 +81,7 @@ function ImageSlot({
   paired?: boolean;
   wrapAvailable?: (image: ImageView, slot: ReactNode) => ReactNode;
   appearance?: 'capture';
+  frameSize?: { width: number; height: number };
 }) {
   const capture=appearance==='capture';
   const ratio = capture?4/3:momentImageAspectRatio(image);
@@ -92,14 +94,14 @@ function ImageSlot({
           available ? image.label : `${image.label}。${image.unavailableLabel}`
         }
         testID={`${testIDPrefix}-frame-${image.id}`}
-        style={available ? [styles.frame, { aspectRatio: ratio },capture&&styles.captureFrame] : [styles.missingFrame,capture&&styles.captureFrame]}
+        style={available ? [styles.frame, frameSize ?? { aspectRatio: ratio },frameSize&&styles.boundedFrame,capture&&styles.captureFrame] : [styles.missingFrame,capture&&styles.captureFrame]}
       >
         {available ? (
           <Image
             testID={`${testIDPrefix}-${image.id}`}
             source={{ uri: image.uri }}
-            style={[styles.image, { aspectRatio: ratio }]}
-            contentFit={capture?'contain':'cover'}
+            style={[styles.image, frameSize ? { height: '100%' } : { aspectRatio: ratio }]}
+            contentFit={capture || frameSize ? 'contain' : 'cover'}
             accessible={false}
           />
         ) : (
@@ -138,6 +140,7 @@ export function MomentImages({
   rhythm = false,
   wrapAvailable,
   appearance,
+  frameSize,
 }: {
   images: ImageView[];
   testIDPrefix: string;
@@ -145,6 +148,8 @@ export function MomentImages({
   rhythm?: boolean;
   wrapAvailable?: (image: ImageView, slot: ReactNode) => ReactNode;
   appearance?: 'capture';
+  /** A bounded, full-image frame for editorial previews. Other scenes keep their sizing. */
+  frameSize?: { width: number; height: number };
 }) {
   if (images.length === 0) return null;
 
@@ -170,6 +175,7 @@ export function MomentImages({
               paired={band.kind === 'pair'}
               wrapAvailable={wrapAvailable}
               appearance={appearance}
+              frameSize={frameSize}
             />
           ))}
         </View>
@@ -179,6 +185,7 @@ export function MomentImages({
 }
 
 const styles = StyleSheet.create({
+  boundedFrame: { alignSelf: 'center' },
   captureStack: { gap: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', rowGap: 12 },
   captureTile: { width: '48%' },
   captureFrame: { borderRadius: 5, backgroundColor: '#E9E5DC' },
