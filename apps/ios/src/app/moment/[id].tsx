@@ -27,13 +27,15 @@ import { ALBUM_COLLECT_MENU } from '../../application/life-album';
 import { LifeAlbumCollectSheet } from '../../screens/life-album-collect-sheet';
 import { LifeIconButton } from '../../screens/life-icons';
 import { useSoundPlayer } from '../../screens/use-sound-player';
+import { pageFrame } from '../../screens/page-frame';
 import { usePageMetrics } from '../../screens/use-page-metrics';
 
 export default function MomentDetailScreen() {
   const router = useRouter();
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
-  const pageWidth = readingPageWidth(width, height);
+  const frame = pageFrame(width, height);
+  const pageWidth = frame.regular ? frame.column : readingPageWidth(width, height);
   const compact = isCompactHeight(height);
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -66,7 +68,7 @@ export default function MomentDetailScreen() {
           {
             maxWidth: pageWidth,
             paddingHorizontal: gutter,
-            paddingTop: compact ? 4 : 8,
+            paddingTop: frame.regular ? frame.top : compact ? 4 : 8,
           },
         ]}
       >
@@ -142,7 +144,7 @@ export default function MomentDetailScreen() {
               ) : null}
             </View>
             {view.note ? (
-              <Text testID="detail-note" style={styles.note}>
+              <Text testID="detail-note" style={[styles.note, frame.regular && {maxWidth:frame.reading}]}>
                 {view.note}
               </Text>
             ) : null}

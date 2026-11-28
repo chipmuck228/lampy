@@ -58,6 +58,7 @@ import {
 } from '../infrastructure/family-test-driver';
 import { finishLeaveToRecent, leaveOpenedFromLookback } from '../screens/lookback-origin';
 import { writeJustSavedMomentId } from '../screens/recent-save-echo';
+import { pageFrame } from '../screens/page-frame';
 import { usePageMetrics } from '../screens/use-page-metrics';
 
 import { useDeviceLock } from '../screens/device-lock-context';
@@ -93,7 +94,8 @@ export default function LeaveScreen() {
   const insets = useSafeAreaInsets();
   const reading = readingWidth(width, height);
   const gutter = pageGutter(width, height);
-  const pageWidth = readingPageWidth(width, height);
+  const frame = pageFrame(width, height);
+  const pageWidth = frame.regular ? frame.column : readingPageWidth(width, height);
   const compact = isCompactHeight(height);
   const stackActions = (appLanguage !== 'en' && (compact || reading < 320)) || shouldStackLeaveActions(reading);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -886,7 +888,7 @@ export default function LeaveScreen() {
             {
               maxWidth: pageWidth,
               paddingHorizontal: gutter,
-              paddingTop: compact ? 4 : 8,
+              paddingTop: frame.regular ? frame.top : compact ? 4 : 8,
               paddingBottom: 24,
             },
           ]}
@@ -962,7 +964,7 @@ export default function LeaveScreen() {
             placeholderTextColor={placeholder}
             multiline
             textAlignVertical="top"
-            style={[styles.input, noteBoxHeight != null ? { height: noteBoxHeight } : null]}
+            style={[styles.input, frame.regular && {maxWidth: frame.reading}, noteBoxHeight != null ? { height: noteBoxHeight } : null]}
           />
           <MomentImages
             appearance="capture"
@@ -1053,6 +1055,7 @@ export default function LeaveScreen() {
           testID="composer-action-band"
           style={[
             styles.band,
+            ...(frame.regular ? [{width:'100%' as const,maxWidth:frame.column,alignSelf:'center' as const}] : []),
             {
               paddingHorizontal: gutter,
               paddingTop: compact || stackActions ? 8 : 12,
@@ -1061,7 +1064,7 @@ export default function LeaveScreen() {
           ]}
         >
           {message ? (
-            <View testID="composer-feedback-row" style={[styles.feedbackRow, { maxWidth: reading }]}>
+            <View testID="composer-feedback-row" style={[styles.feedbackRow, { maxWidth: frame.regular ? frame.content : reading }]}>
               <Text
                 testID="composer-feedback"
                 accessibilityRole="alert"

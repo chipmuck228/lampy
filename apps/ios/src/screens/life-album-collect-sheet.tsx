@@ -258,7 +258,7 @@ export function LifeAlbumCollectSheet({
 
         {/* Outer lift: soft shadow. Inner clip: continuous radius + paper fill. */}
         <View
-          style={styles.sheetLift}
+          style={[styles.sheetLift,{width:'100%',maxWidth:640,alignSelf:'center'}]}
           testID="life-album-sheet-lift"
           pointerEvents="box-none"
         >

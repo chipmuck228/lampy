@@ -8,9 +8,10 @@ describe('lookback layout for adapt surfaces', () => {
     expect(layout.verticalTime).toBe(false);
   });
 
-  it('caps an iPad page at the book reading width', () => {
+  it('shares the regular iPad page frame', () => {
     const layout = lookbackLayoutFor(1024, 1366);
-    expect(layout.readingWidth).toBe(720);
+    expect(layout.readingWidth).toBe(1024);
+    expect(layout.gutter).toBe(48);
     expect(layout.shortHeight).toBe(false);
     expect(layout.verticalTime).toBe(false);
   });

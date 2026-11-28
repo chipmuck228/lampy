@@ -249,7 +249,7 @@ export default function LifeAlbumNewScreen() {
     : tr("正在记下");
 
   return (
-    <SettingsPage
+    <SettingsPage wide
       title={tr("新建一册")}
       backLabel={collectMode ? tr("返回") : tr("我的生活册")}
       accessibilityLabel={tr("新建一册")}

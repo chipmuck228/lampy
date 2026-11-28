@@ -49,6 +49,7 @@ import {
 import { useRecentClipPlayback } from '../screens/use-recent-clip-playback';
 import {
   clay,
+  paper,
   isCompactHeight,
   isRegularWidth,
   pageGutter,
@@ -57,6 +58,7 @@ import {
   shouldShowSameDayRule,
 } from '../screens/life-page';
 import { StartupBrandLayer } from '../screens/startup-brand-layer';
+import { pageFrame, tabletRootTitle } from '../screens/page-frame';
 import { usePageMetrics } from '../screens/use-page-metrics';
 
 export default function RecentScreen() {
@@ -66,6 +68,7 @@ export default function RecentScreen() {
   const gutter = pageGutter(width, height);
   const compact = isCompactHeight(height);
   const editorial = isRegularWidth(width, height);
+  const frame = pageFrame(width, height);
   const columnWidth = recentColumnWidth(width, height);
   const pairImages = shouldPairRecentImages(
     recentImageColumnWidth(width, height, insets.left, insets.right),
@@ -221,7 +224,7 @@ export default function RecentScreen() {
       <RootReadingLayout
         accessibilityLabel={tr("刚刚留下的生活")}
         scrollTestID="recent-scroll"
-        canvas={recentPaper}
+        canvas={editorial ? paper : recentPaper}
         overlayColumnWidth={columnWidth}
         onScroll={onRecentScroll}
         onScrollBeginDrag={onRecentScrollBeginDrag}
@@ -234,7 +237,7 @@ export default function RecentScreen() {
               {
                 maxWidth: columnWidth,
                 paddingHorizontal: gutter,
-                paddingTop: editorial ? 28 : compact ? 12 : 20,
+                paddingTop: frame.top,
               },
             ]}
           >
@@ -415,7 +418,7 @@ const styles = StyleSheet.create({
   },
   heroCopy: { flex: 1, flexShrink: 1, minWidth: 0 },
   editorialHero: { paddingBottom: 24 },
-  editorialWordmark: { fontSize: 42, lineHeight: 56, fontWeight: '500', marginTop: 0, letterSpacing: 1.2 },
+  editorialWordmark: tabletRootTitle,
   editorialHeading: { borderTopWidth: 0, paddingTop: 8, marginTop: 0, marginBottom: 8 },
   editorialDate: { fontSize: 16, lineHeight: 24, letterSpacing: 1.6 },
   eyebrow: { ...recentType.kicker, color: recentKicker },

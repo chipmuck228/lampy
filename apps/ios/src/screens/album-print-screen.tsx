@@ -91,7 +91,7 @@ export default function AlbumPrintScreen(){
  const freshId=fresh?.albumId===id?fresh.id:null;
  const pending=feedback?.pending??false;
  const showFeedback=(editionId:string)=>feedback?.id===editionId?<View>{pending?<><EditionProgress fraction={feedback.fraction}/><ShowcaseButton tone="quiet" label={tr('取消制作电子册')} onPress={()=>{cancelled.current=true;setFeedback({id:editionId,pending:false,fraction:0,message:tr('本次制作已停止，请重新开始。')});}}/></>:feedback.message?<ShowcaseNote live>{feedback.message}</ShowcaseNote>:null}</View>:null;
- return <SettingsPage title={tr('电子册')} backLabel={tr('这一册')} accessibilityLabel={tr('电子册')} onBack={()=>router.back()}>
+ return <SettingsPage wide title={tr('电子册')} backLabel={tr('这一册')} accessibilityLabel={tr('电子册')} onBack={()=>router.back()}>
   {!blocked?<View style={styles.body}>
    {input?<><View style={styles.cover}>{cover?<Image source={{uri:cover}} style={StyleSheet.absoluteFill} contentFit="cover"/>:null}<View style={styles.binding}/></View><Text accessibilityRole="header" style={styles.title}>{input.album.name}</Text><Text style={styles.meta}>{tr('时序 · Chronicle')}</Text></>:null}
    <ShowcaseButton testID="album-export-preview" tone="editorial" label={tr('全屏预览')} disabled={!input?.entries.length||busy} onPress={()=>router.push(`/albums/${id}/preview`)}/>

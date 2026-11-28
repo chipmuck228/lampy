@@ -10,6 +10,7 @@ export const sound = '#4F626D';
 export const hairline = 'rgba(37,35,31,0.16)';
 export const placeholder = '#777168';
 
+export const TABLET_PAGE_MAX = 1120;
 export const READING_MAX = 520;
 export const DATE_RAIL_WIDTH = 120;
 export const DATE_RAIL_GAP = 32;
@@ -133,7 +134,7 @@ export function shouldStackRecentDay(windowWidth: number, windowHeight: number):
 }
 
 export function recentColumnWidth(windowWidth: number, windowHeight: number): number {
-  if (isRegularWidth(windowWidth, windowHeight)) return Math.min(windowWidth, 1120);
+  if (isRegularWidth(windowWidth, windowHeight)) return Math.min(windowWidth, TABLET_PAGE_MAX);
   return pageColumnWidth(windowWidth, windowHeight);
 }
 

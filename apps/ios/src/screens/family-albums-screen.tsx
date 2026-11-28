@@ -315,7 +315,7 @@ function FamilyAlbumFlow({routeFamily,routeAlbum,mode}:{routeFamily:string|null;
   const hasContent=!!book?.items.some(item=>item.status==='active');
   const closeTools=()=>{setEditing(false);setOrganizing(false);setCollecting(false);setSources([]);setSelected([]);};
   const collect=()=>{setMenuOpen(false);setEditing(false);setOrganizing(false);void run(async(api,current)=>{const result=await api.sources(familyId!);if(current()){setSources(result.shares);setSelected([]);setCollecting(true);}});};
-  return <SettingsPage title={visibleBook?'':mode==='new'?tr('新建家庭册'):mode==='collect'?tr('添加到家庭册'):tr('家里的生活册')}
+  return <SettingsPage wide title={visibleBook?'':mode==='new'?tr('新建家庭册'):mode==='collect'?tr('添加到家庭册'):tr('家里的生活册')}
     hideBackLabel={!!visibleBook} backLabel={tr(routeAlbum?'我的生活册':'返回')} accessibilityLabel={tr('家里的生活册')} onBack={()=>router.back()}
     headerRight={visibleBook?editing||organizing||collecting?<Pressable accessibilityRole="button" testID="family-album-tools-done" disabled={busy} style={overview.headerAction} onPress={closeTools}><Text style={{...type.action,color:sage}}>{tr(editing?'取消':'完成')}</Text></Pressable>:<LifeIconButton name="more" label={tr('册子菜单')} testID="family-album-manage-menu" onPress={()=>{if(!owner.current)setMenuOpen(value=>!value);}}/>:null}
     headerAccessory={visibleBook&&menuOpen?<View style={overview.menu} testID="family-album-menu">

@@ -150,10 +150,10 @@ export default function LookbackIndexScreen() {
   const lookbackParams = useLocalSearchParams<{ o?: string | string[]; collect?: string | string[] }>();
   const originToken = firstSearchParam(lookbackParams.o);
   const collectAlbumId = personalAlbumsAvailable() ? collectAlbumIdFromParam(lookbackParams.collect) : null;
-  const { readingWidth } = useLookbackLayout();
+  const { readingWidth, gutter } = useLookbackLayout();
   const insets = useSafeAreaInsets();
   const { width, height } = usePageMetrics();
-  const pairImages = shouldPairRecentImages(Math.max(0, readingWidth - 48));
+  const pairImages = shouldPairRecentImages(Math.max(0, readingWidth - gutter * 2));
   const [view, setView] = useState<LookbackBookView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
