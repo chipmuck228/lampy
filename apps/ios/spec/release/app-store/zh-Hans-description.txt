@@ -22,6 +22,6 @@
 • 请自行保管本机记录；Lampy 不提供私人记录云备份或异常恢复服务。
 • 1.0.0 不提供购买、PDF／内容包导出或打印。
 
-隐私政策：https://yunpura.com/zh-cn/privacy
-服务条款：https://yunpura.com/zh-cn/terms
-支持与联系：https://yunpura.com/zh-cn/contact
+隐私政策：https://lampy.5sparks.ai/zh-cn/privacy
+服务条款：https://lampy.5sparks.ai/zh-cn/terms
+支持与联系：https://lampy.5sparks.ai/zh-cn/contact

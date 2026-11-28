@@ -1,6 +1,6 @@
 export type HomeScreenAction = 'write' | 'camera' | 'record' | 'share';
 export type PendingHomeScreenAction = { kind: HomeScreenAction; requestId: string };
-export const LAMPY_PUBLIC_URL = 'https://yunpura.com';
+export const LAMPY_PUBLIC_URL = 'https://lampy.5sparks.ai';
 
 export function createHomeScreenActionQueue() {
   let pending: PendingHomeScreenAction | null = null;

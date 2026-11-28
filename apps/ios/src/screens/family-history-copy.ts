@@ -9,7 +9,7 @@ export function familyHistoryError(error: unknown) {
   }
   if (code === 'FAMILY_READ_LEASE_EXPIRED') return tr('暂时无法确认阅读资格，请再试一次。');
   if (code === 'CONTENT_NOT_ALLOWED') return tr('这段内容暂时不能分享，请调整文字；本机原记录保留。');
-  if (code === 'SHARING_RESTRICTED') return tr('此账号暂时不能新增家庭分享。已有记录仍可阅读，如有疑问请联系 dev@yunpura.com。');
+  if (code === 'SHARING_RESTRICTED') return tr('此账号暂时不能新增家庭分享。已有记录仍可阅读，如有疑问请联系 support@5sparks.ai。');
   if (code === 'FAMILY_DISSOLVED') return tr('这个家庭已解散，个人记录还在。');
   if (code === 'UNAUTHENTICATED') return tr('登录后，才能和家人一起看。');
   if (code === 'NOT_IN_FAMILY') return tr('现在无法访问这个家庭，个人记录还在。');
