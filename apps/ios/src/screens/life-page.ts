@@ -60,6 +60,7 @@ export function shouldUseNavRail(_windowWidth: number, _windowHeight: number): b
 }
 
 export const ROOT_NAV_MAX_WIDTH = 560;
+export const ROOT_NAV_REGULAR_HEIGHT = 80;
 
 export const NAV_BAND_PAD_X = 32;
 export const NAV_BAND_HIT = 48;

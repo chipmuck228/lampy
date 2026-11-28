@@ -22,6 +22,7 @@ import {
   sage,
   isRegularWidth,
   ROOT_NAV_MAX_WIDTH,
+  ROOT_NAV_REGULAR_HEIGHT,
 } from './life-page';
 import { usePageMetrics } from './use-page-metrics';
 import { shouldIgnoreRootNavPress, type RootNavDest } from './root-nav-switch';
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: 'transparent',
   },
-  compactItem: { minHeight: 64 },
+  compactItem: { minHeight: ROOT_NAV_REGULAR_HEIGHT - 16 },
   compactInner: { paddingBottom: 8 },
   selectionRule: {
     position: 'absolute',

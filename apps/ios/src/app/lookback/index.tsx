@@ -78,7 +78,7 @@ import {
 } from '../../screens/lookback-chrome';
 import { lookbackCatalogChromeHeight, lookbackCatalogMaxHeight } from '../../screens/lookback-catalog';
 import { LifeAlbumCollectAction, LifeAlbumCollectBanner } from '../../screens/life-album-collect';
-import { shouldUseNavRail } from '../../screens/life-page';
+import { isRegularWidth, ROOT_NAV_REGULAR_HEIGHT } from '../../screens/life-page';
 import { usePageMetrics } from '../../screens/use-page-metrics';
 import {
   lookbackCollectIsReady,
@@ -978,7 +978,7 @@ export default function LookbackIndexScreen() {
     insetTop: insets.top,
     insetBottom: insets.bottom,
     headerHeight: lookbackCatalogChromeHeight(height < 500),
-    rail: shouldUseNavRail(width, height),
+    navHeight: isRegularWidth(width, height) ? ROOT_NAV_REGULAR_HEIGHT + 1 : undefined,
   });
   const catalog = catalogOpen ? (
     <LookbackCatalogOverlay
