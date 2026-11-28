@@ -1092,7 +1092,7 @@ export default function LeaveScreen() {
             style={[
               styles.actions,
               appLanguage === 'en' && styles.actionsEnglish,
-              { maxWidth: reading },
+              { maxWidth: frame.regular ? frame.content : reading },
               stackActions && styles.actionsStacked,
             ]}
           >
