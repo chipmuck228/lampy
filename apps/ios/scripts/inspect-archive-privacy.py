@@ -122,7 +122,7 @@ def inspect(archive, expected_build, podfile_lock=None, profile='appstore-v1', p
                               ('CFBundleShortVersionString', '1.0.0'),
                               ('CFBundleVersion', expected_build),
                               ('LampyBuildProfile', profile),
-                              ('LampyFamilyAPI', 'https://family.yunpura.com')]:
+                              ('LampyFamilyAPI', 'https://lampy-api.5sparks.ai')]:
             if info.get(key) != expected:
                 issues.append('PROFILE_MISMATCH:' + key)
         for key in ('LampyUnifiedPurchasesEnabled', 'LampyPaidExportEnabled', 'LampyEmailLoginEnabled'):

@@ -10,7 +10,7 @@ test('launch profile aligns native flags, production domains and email privacy w
  assert.equal(JSON.stringify(base),before);assert.equal(result.ios.infoPlist.LampyBuildProfile,'appstore-launch');
  for(const key of ['LampyEmailLoginEnabled','LampyUnifiedPurchasesEnabled','LampyPaidExportEnabled'])assert.equal(result.ios.infoPlist[key],true);
  assert.equal(result.ios.infoPlist.LampyExportProductID,env.LAMPY_RELEASE_PRODUCT_ID);
- assert.equal(result.ios.buildNumber,'20');assert.ok(result.ios.associatedDomains.includes('applinks:family.yunpura.com'));
+ assert.equal(result.ios.buildNumber,'20');assert.ok(result.ios.associatedDomains.includes('applinks:lampy-api.5sparks.ai'));
  const data=result.ios.privacyManifests.NSPrivacyCollectedDataTypes;
  assert.equal(data.length,base.ios.privacyManifests.NSPrivacyCollectedDataTypes.length+2);
  assert.ok(data.some(row=>row.NSPrivacyCollectedDataType==='NSPrivacyCollectedDataTypePurchaseHistory'));

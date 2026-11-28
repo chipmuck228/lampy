@@ -24,7 +24,7 @@ test('Android remains personal even when inherited flags request family and purc
     process.env.EXPO_PUBLIC_ALBUM_PAID_EXPORT_ENABLED='1';
     expect(personalRecordsOnly()).toBe(true);
     expect(isFamilyProductEntryOpen('1')).toBe(false);
-    expect(familyApiBaseUrl('https://family.yunpura.com')).toBe('');
+    expect(familyApiBaseUrl('https://lampy-api.5sparks.ai')).toBe('');
     expect(albumExportConfig()).toEqual({enabled:false,paid:false,productId:''});
     expect(canOpenPersonalSettingsDiagnostics({EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS:'1'},true)).toBe(false);
     expect(navBandItemsFor('recent',true)).toHaveLength(3);

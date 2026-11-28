@@ -5,7 +5,7 @@ function load(formal:boolean,language='zh-CN') {
  const keys=['EXPO_PUBLIC_APPSTORE_V1','EXPO_PUBLIC_FAMILY_API_BASE_URL','EXPO_PUBLIC_FAMILY_ENTRY_OPEN','EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS','EXPO_PUBLIC_FAMILY_INTERNAL_TEST'];
  const before=keys.map(key=>process.env[key]);let result!:{help:Chapters;privacy:Chapters;terms:Chapters;date:string};
  try {
-  [formal?'1':'0','https://family.yunpura.com','1','0','0'].forEach((value,index)=>{process.env[keys[index]]=value;});
+  [formal?'1':'0','https://lampy-api.5sparks.ai','1','0','0'].forEach((value,index)=>{process.env[keys[index]]=value;});
   jest.isolateModules(()=>{
    jest.doMock('expo-localization',()=>({getLocales:()=>[{languageTag:language}]}));
    result={help:require('./settings-help-copy').SETTINGS_HELP_CHAPTERS,privacy:require('./settings-privacy-copy').SETTINGS_PRIVACY_CHAPTERS,terms:require('./settings-terms-copy').SETTINGS_TERMS_CHAPTERS,date:require('./settings-privacy-copy').SETTINGS_PRIVACY_UPDATED};

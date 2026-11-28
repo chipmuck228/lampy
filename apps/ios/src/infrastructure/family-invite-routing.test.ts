@@ -2,10 +2,10 @@ import {redirectSystemPath} from '../app/+native-intent';
 import {currentFamilyInvite,forgetFamilyInvite,rememberFamilyInvite} from './family-invite-link';
 let mockOpen=true;
 jest.mock('./family-config',()=>({isFamilyProductEntryOpen:()=>mockOpen}));
-beforeEach(()=>{mockOpen=true;process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://family.example';forgetFamilyInvite();});
+beforeEach(()=>{mockOpen=true;process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://lampy-api.5sparks.ai';forgetFamilyInvite();});
 afterEach(()=>{delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;forgetFamilyInvite();});
 it.each([true,false])('carries the invitation in memory for cold/warm routing (initial=%s)',initial=>{
- for(const path of ['lampy:///family-invite#','https://family.example/invite#','/family-invite#','/invite#']){
+ for(const path of ['lampy:///family-invite#','https://lampy-api.5sparks.ai/invite#','/family-invite#','/invite#']){
   expect(redirectSystemPath({path:path+'a'.repeat(64),initial})).toBe('/family-invite');expect(currentFamilyInvite()?.token).toBe('a'.repeat(64));
  }
 });

@@ -1,5 +1,5 @@
 'use strict';
-const API='https://family-test.yunpura.com';
+const API='https://lampy-api.5sparks.ai';
 const FLAGS={
   EXPO_PUBLIC_APPSTORE_V1:'0',EXPO_PUBLIC_FAMILY_INTERNAL_TEST:'1',EXPO_PUBLIC_FAMILY_ENTRY_OPEN:'1',
   EXPO_PUBLIC_FAMILY_ALBUM_EVAL:'1',EXPO_PUBLIC_FAMILY_API_BASE_URL:API,
@@ -26,7 +26,7 @@ function configureLaunch(config,env){
       ...(config.ios?.privacyManifests?.NSPrivacyCollectedDataTypes||[]).filter(row=>!['NSPrivacyCollectedDataTypeEmailAddress','NSPrivacyCollectedDataTypePurchaseHistory'].includes(row.NSPrivacyCollectedDataType)),
       ...['EmailAddress','PurchaseHistory'].map(name=>({NSPrivacyCollectedDataType:'NSPrivacyCollectedDataType'+name,NSPrivacyCollectedDataTypeLinked:true,NSPrivacyCollectedDataTypeTracking:false,NSPrivacyCollectedDataTypePurposes:['NSPrivacyCollectedDataTypePurposeAppFunctionality']})),
     ]},
-    associatedDomains:[...new Set([...(config.ios?.associatedDomains||[]),'applinks:family-test.yunpura.com'])],
+    associatedDomains:[...new Set([...(config.ios?.associatedDomains||[]),'applinks:lampy-api.5sparks.ai'])],
     infoPlist:{...config.ios?.infoPlist,LampyBuildProfile:'testflight-sandbox',LampyFamilyAPI:API,
       LampyFamilyAlbumPreviewEnabled:true,LampyEmailLoginEnabled:true}}};
 }

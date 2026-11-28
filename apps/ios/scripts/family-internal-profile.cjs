@@ -1,5 +1,5 @@
 'use strict';
-const API = 'https://family-test.yunpura.com';
+const API = 'https://lampy-api.5sparks.ai';
 function internalProfile(env) {
   if (env.LAMPY_BUILD_PROFILE !== 'family-internal') throw new Error('Explicit family-internal profile required');
   if (!/^[1-9]\d*$/.test(env.LAMPY_BUILD_NUMBER || '')) throw new Error('LAMPY_BUILD_NUMBER must be a new positive App Store Connect build number');
@@ -17,6 +17,6 @@ function configure(config, env) {
   if (env.LAMPY_BUILD_PROFILE === 'appstore-launch') return require('./appstore-launch-profile.cjs').configureLaunch(config, env);
   if (env.LAMPY_BUILD_PROFILE === 'appstore-v1') return require('./appstore-v1-profile.cjs').configureAppstoreV1(config, env);
   const profile = internalProfile(env);
-  return {...config, ios:{...config.ios, buildNumber:profile.build, infoPlist:{...config.ios.infoPlist, LampyFamilyAlbumPreviewEnabled:true, LampyBuildProfile:'family-internal', LampyFamilyAPI:profile.api}}};
+  return {...config, ios:{...config.ios, associatedDomains:[...new Set([...(config.ios?.associatedDomains || []), 'applinks:lampy-api.5sparks.ai'])], buildNumber:profile.build, infoPlist:{...config.ios.infoPlist, LampyFamilyAlbumPreviewEnabled:true, LampyBuildProfile:'family-internal', LampyFamilyAPI:profile.api}}};
 }
 module.exports={API,internalProfile,configure};

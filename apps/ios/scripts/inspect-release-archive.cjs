@@ -152,14 +152,14 @@ function inspectArchive(archivePath, expected = expectedFromAppJson()) {
   const profile = plistPrint(info, 'LampyBuildProfile');
   const api = plistPrint(info, 'LampyFamilyAPI');
   if (['family-internal','appstore-v1','appstore-launch','testflight-sandbox'].includes(expected.profile)) {
-    if (profile !== expected.profile || api !== (!['family-internal','testflight-sandbox'].includes(expected.profile) ? 'https://family.yunpura.com' : 'https://family-test.yunpura.com')) problems.push('family_profile_mismatch');
+    if (profile !== expected.profile || api !== 'https://lampy-api.5sparks.ai') problems.push('family_profile_mismatch');
     if (plistPrint(info, 'LampyFamilyAlbumPreviewEnabled') !== 'true') problems.push('family_preview_marker_missing');
     if(['appstore-launch','testflight-sandbox'].includes(expected.profile)){
       if(plistPrint(info,'LampyUnifiedPurchasesEnabled')!=='true'||plistPrint(info,'LampyPaidExportEnabled')!=='true'||plistPrint(info,'LampyEmailLoginEnabled')!=='true'||!expected.productId||plistPrint(info,'LampyExportProductID')!==expected.productId)problems.push('launch_feature_mismatch');
     } else if (plistPrint(info, 'LampyUnifiedPurchasesEnabled') !== 'false' || plistPrint(info, 'LampyPaidExportEnabled') !== 'false' || plistPrint(info, 'LampyExportProductID') !== '') problems.push('internal_paid_export_not_closed');
     if (expected.profile === 'appstore-v1' && plistPrint(info, 'LampyEmailLoginEnabled') !== 'false') problems.push('v1_email_login_not_closed');
     const entitlements = spawnSync('codesign', ['-d', '--entitlements', ':-', app], {encoding:'utf8'});
-    if (!`${entitlements.stdout || ''} ${entitlements.stderr || ''}`.includes(!['family-internal','testflight-sandbox'].includes(expected.profile) ? 'applinks:family.yunpura.com' : 'applinks:family-test.yunpura.com')) problems.push('family_associated_domain_missing');
+    if (!`${entitlements.stdout || ''} ${entitlements.stderr || ''}`.includes('applinks:lampy-api.5sparks.ai')) problems.push('family_associated_domain_missing');
   } else if (profile || api) problems.push('unexpected_family_profile');
 
   if (report.bundleId !== expected.bundleId) problems.push('bundle_id_mismatch');

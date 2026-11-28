@@ -87,7 +87,7 @@ it('release preview requires the exact internal marker, origin and product gates
  const keys=['EXPO_PUBLIC_FAMILY_INTERNAL_TEST','EXPO_PUBLIC_FAMILY_API_BASE_URL','EXPO_PUBLIC_FAMILY_ENTRY_OPEN','EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS','EXPO_PUBLIC_FAMILY_ALBUM_EVAL'] as const;
  const before=keys.map(key=>testEnv[key]);
  try {
-  const values=['1','https://family-test.yunpura.com','1','1','1'];
+  const values=['1','https://lampy-api.5sparks.ai','1','1','1'];
   keys.forEach((key,index)=>{testEnv[key]=values[index];});
   expect(familyAlbumEvaluationOpen(false)).toBe(true);
   for(const key of keys){const value=testEnv[key];testEnv[key]='';expect(familyAlbumEvaluationOpen(false)).toBe(false);testEnv[key]=value;}

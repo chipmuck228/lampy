@@ -1,5 +1,5 @@
 'use strict';
-const API = 'https://family.yunpura.com';
+const API = 'https://lampy-api.5sparks.ai';
 const FLAGS = {
   EXPO_PUBLIC_APPSTORE_V1: '1',
   EXPO_PUBLIC_FAMILY_INTERNAL_TEST: '0',
@@ -30,7 +30,7 @@ function configureAppstoreV1(config, env) {
   const profile = appstoreV1Profile(env);
   return {...config, version: profile.version, ios: {...config.ios,
     buildNumber: profile.build,
-    associatedDomains: [...new Set([...(config.ios?.associatedDomains || []), 'applinks:family.yunpura.com'])],
+    associatedDomains: [...new Set([...(config.ios?.associatedDomains || []), 'applinks:lampy-api.5sparks.ai'])],
     infoPlist: {...config.ios?.infoPlist, LampyBuildProfile: 'appstore-v1',
       LampyFamilyAPI: profile.api, LampyFamilyAlbumPreviewEnabled: true,
       LampyEmailLoginEnabled: false}}};

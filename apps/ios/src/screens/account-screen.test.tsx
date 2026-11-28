@@ -609,7 +609,7 @@ test('formal v1 settings keeps help and hides the paid menu', async () => {
  const keys=['EXPO_PUBLIC_APPSTORE_V1','EXPO_PUBLIC_FAMILY_API_BASE_URL','EXPO_PUBLIC_FAMILY_ENTRY_OPEN','EXPO_PUBLIC_CONTROLLED_EMAIL_ACCOUNTS','EXPO_PUBLIC_FAMILY_INTERNAL_TEST'];
  const previous=keys.map(key=>process.env[key]);
  try {
-  ['1','https://family.yunpura.com','1','0','0'].forEach((value,index)=>{process.env[keys[index]]=value;});
+  ['1','https://lampy-api.5sparks.ai','1','0','0'].forEach((value,index)=>{process.env[keys[index]]=value;});
   const view=await render(wrap(<AccountScreen />));
   expect(view.queryByTestId('account-open-subscribe')).toBeNull();
   expect(view.getByTestId('account-open-help')).toBeTruthy();

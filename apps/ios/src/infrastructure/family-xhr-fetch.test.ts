@@ -15,7 +15,7 @@ it('uses XHR independently of the global fetch and propagates cancellation', asy
   globalThis.fetch=globalFetch;
   globalThis.XMLHttpRequest=FakeXhr as unknown as typeof XMLHttpRequest;
   const controller=new AbortController();
-  const result=familyXhrFetch('https://family-test.yunpura.com/health',{signal:controller.signal});
+  const result=familyXhrFetch('https://lampy-api.5sparks.ai/health',{signal:controller.signal});
   const rejected=expect(result).rejects.toMatchObject({name:'AbortError'});
   expect(globalFetch).not.toHaveBeenCalled();
   expect(xhr).toBeDefined();
@@ -42,7 +42,7 @@ it.each([200,403,204])('reads JSON as XHR text without Blob reads and preserves 
  Object.defineProperty(globalThis,'FileReader',{configurable:true,writable:true,value:class {readAsText=blobRead;}});
  try {
   globalThis.XMLHttpRequest=FakeJsonXhr as unknown as typeof XMLHttpRequest;
-  const response=await familyXhrFetch('https://family-test.yunpura.com/v2/me/families',{headers:{accept:'application/json',authorization:'Bearer test-only'}});
+  const response=await familyXhrFetch('https://lampy-api.5sparks.ai/v2/me/families',{headers:{accept:'application/json',authorization:'Bearer test-only'}});
   expect(instance!.responseType).toBe('text');
   expect(instance!.setRequestHeader).toHaveBeenCalledWith('authorization','Bearer test-only');
   expect(response.status).toBe(status);expect(response.headers.get('content-type')).toBe('application/json');
@@ -60,7 +60,7 @@ it('cancels the JSON XHR when its existing deadline aborts',async()=>{
  try {
   globalThis.XMLHttpRequest=PendingXhr as unknown as typeof XMLHttpRequest;
   const controller=new AbortController();
-  const work=familyXhrFetch('https://family-test.yunpura.com/v2/me/families',{headers:{accept:'application/json'},signal:controller.signal});
+  const work=familyXhrFetch('https://lampy-api.5sparks.ai/v2/me/families',{headers:{accept:'application/json'},signal:controller.signal});
   const rejected=expect(work).rejects.toMatchObject({name:'AbortError'});controller.abort();await rejected;
   expect(abort).toHaveBeenCalledTimes(1);
  }finally{globalThis.XMLHttpRequest=previousXhr;}
@@ -71,7 +71,7 @@ it('routes binary downloads through native Expo fetch with original authorizatio
  const response={status:200,arrayBuffer:async()=>buffer} as Response;
  jest.mocked(mediaFetch).mockResolvedValueOnce(response as Awaited<ReturnType<typeof mediaFetch>>);
  const headers={accept:'*/*',authorization:'Bearer test-only'};
- const result=await familyXhrFetch('https://family-test.yunpura.com/v2/families/f/shares/s/media/m/content',{method:'GET',headers,signal:controller.signal});
+ const result=await familyXhrFetch('https://lampy-api.5sparks.ai/v2/families/f/shares/s/media/m/content',{method:'GET',headers,signal:controller.signal});
  expect(result).toBe(response);await expect(result.arrayBuffer()).resolves.toBe(buffer);
  expect(mediaFetch).toHaveBeenLastCalledWith(expect.any(String),{method:'GET',headers,signal:controller.signal});
 });
@@ -89,8 +89,8 @@ it('finishes JSON renewal while a binary native body is still pending, without B
  try {
   Object.defineProperty(globalThis,'FileReader',{configurable:true,writable:true,value:class {constructor(){throw Error('must not use FileReader');}}});
   globalThis.XMLHttpRequest=JsonXhr as unknown as typeof XMLHttpRequest;
-  const download=familyXhrFetch('https://family-test.yunpura.com/v2/families/f/shares/s/media/m/content',{headers:{accept:'*/*',authorization:'Bearer test-only'}}).then(r=>r.arrayBuffer()).then(()=>{finished=true;});
-  const renewal=await familyXhrFetch('https://family-test.yunpura.com/v2/families/f/shares',{headers:{accept:'application/json',authorization:'Bearer test-only'}});
+  const download=familyXhrFetch('https://lampy-api.5sparks.ai/v2/families/f/shares/s/media/m/content',{headers:{accept:'*/*',authorization:'Bearer test-only'}}).then(r=>r.arrayBuffer()).then(()=>{finished=true;});
+  const renewal=await familyXhrFetch('https://lampy-api.5sparks.ai/v2/families/f/shares',{headers:{accept:'application/json',authorization:'Bearer test-only'}});
   await expect(renewal.text()).resolves.toBe('{"shares":[]}');expect(finished).toBe(false);
   finish(new Uint8Array([1]).buffer);await download;expect(finished).toBe(true);
  }finally{globalThis.XMLHttpRequest=previousXhr;if(reader)Object.defineProperty(globalThis,'FileReader',reader);else Reflect.deleteProperty(globalThis,'FileReader');}
@@ -101,7 +101,7 @@ it('does not silently fall back to RN networking after a native media cancellati
  const xhr=jest.fn();globalThis.XMLHttpRequest=xhr as unknown as typeof XMLHttpRequest;
  try {
   jest.mocked(mediaFetch).mockRejectedValueOnce(Object.assign(new Error('cancelled'),{name:'AbortError'}));
-  await expect(familyXhrFetch('https://family-test.yunpura.com/v2/families/f/shares/s/media/m/content',{headers:{accept:'*/*'}})).rejects.toMatchObject({name:'AbortError'});
+  await expect(familyXhrFetch('https://lampy-api.5sparks.ai/v2/families/f/shares/s/media/m/content',{headers:{accept:'*/*'}})).rejects.toMatchObject({name:'AbortError'});
   expect(xhr).not.toHaveBeenCalled();
  }finally{globalThis.XMLHttpRequest=previousXhr;}
 });

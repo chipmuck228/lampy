@@ -189,12 +189,12 @@ it('shows ended families as read-only markers without counting or mounting privi
 
 it('shows a bounded development error code without exposing exception messages or credentials',async()=>{
  process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS='1';
- mockOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://secret:password@family-test.yunpura.com/private?token=hidden';
+ mockOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL='https://secret:password@lampy-api.5sparks.ai/private?token=hidden';
  mockFamilies.mockRejectedValue(Object.assign(new Error('private body token'),{code:'SERVER_UNREACHABLE'}));
  const page=await render(<FamilyDirectoryScreen/>);
  if(jest.requireActual('react-native').Platform.OS==='android'){expect(page.queryByTestId('family-directory-diagnostic')).toBeNull();}
  else{await waitFor(()=>expect(page.getByTestId('family-directory-diagnostic')).toBeTruthy());
- expect(page.getByTestId('family-directory-diagnostic').props.children).toBe('开发诊断：FAMILY_LIST/SERVER_UNREACHABLE/Error\nAPI: https://family-test.yunpura.com');}
+ expect(page.getByTestId('family-directory-diagnostic').props.children).toBe('开发诊断：FAMILY_LIST/SERVER_UNREACHABLE/Error\nAPI: https://lampy-api.5sparks.ai');}
  expect(page.queryByText(/private body token/)).toBeNull();delete process.env.EXPO_PUBLIC_FAMILY_API_BASE_URL;delete process.env.EXPO_PUBLIC_ACCOUNT_DIAGNOSTICS;
 });
 
@@ -210,7 +210,7 @@ it('keeps debug diagnostics out of the ordinary family page without explicit opt
 });
 
  it('uses email verification for family sign-in when email accounts are enabled',async()=>{
-  const old=process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED;mockCodeOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED='1';process.env.EXPO_PUBLIC_ACCOUNT_API_BASE_URL='https://family-test.yunpura.com';mockOpen.mockReturnValue(true);mockFamilies.mockRejectedValue({code:'UNAUTHENTICATED'});
+  const old=process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED;mockCodeOpen.mockReturnValue(true);process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED='1';process.env.EXPO_PUBLIC_ACCOUNT_API_BASE_URL='https://lampy-api.5sparks.ai';mockOpen.mockReturnValue(true);mockFamilies.mockRejectedValue({code:'UNAUTHENTICATED'});
   try{const page=await render(<FamilyDirectoryScreen/>);await waitFor(()=>expect(page.getByTestId('family-sign-in')).toBeTruthy());await fireEvent.press(page.getByTestId('family-sign-in'));expect(mockPush).toHaveBeenCalledWith({pathname:'/account/email-code',params:{returnTo:'family'}});}finally{if(old===undefined)delete process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED;else process.env.EXPO_PUBLIC_EMAIL_CODE_LOGIN_ENABLED=old;}
  });
 
