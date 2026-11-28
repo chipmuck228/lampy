@@ -1,4 +1,4 @@
-import { tr, appLanguage, weekdayLabel, dateLabel } from '../i18n';
+import { tr, appLanguage, weekdayLabel, dateLabel, monthLabel } from '../i18n';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
@@ -53,6 +53,8 @@ export function OccurredDatePicker({
       : today;
   const [open, setOpen] = useState(value.kind !== 'today');
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMode, setCalendarMode] = useState<'day' | 'year' | 'month'>('day');
+  const [yearEnd, setYearEnd] = useState(today.year);
   const [visibleMonth, setVisibleMonth] = useState<CalendarDayParts>({
     year: selectedDay.year,
     month: selectedDay.month,
@@ -61,7 +63,14 @@ export function OccurredDatePicker({
 
   function openCalendar() {
     setVisibleMonth({ year: selectedDay.year, month: selectedDay.month, day: 1 });
+    setCalendarMode('day');
     setCalendarOpen(true);
+  }
+
+  function openYears() {
+    // Keep the currently browsed year on the first page, even for an old draft.
+    setYearEnd(Math.min(today.year, visibleMonth.year + 5));
+    setCalendarMode('year');
   }
 
   const leading = mondayFirstIndex(visibleMonth.year, visibleMonth.month);
@@ -145,6 +154,7 @@ export function OccurredDatePicker({
       </Pressable>
       {calendarOpen ? (
         <View testID="composer-occurred-calendar" style={styles.calendar}>
+          {calendarMode === 'day' ? <>
           <View style={styles.monthRow}>
             <Pressable
               accessibilityRole="button"
@@ -156,8 +166,13 @@ export function OccurredDatePicker({
             >
               <Text style={styles.monthNav}>{tr("上个月")}</Text>
             </Pressable>
-            <Text style={styles.monthTitle}>
-              {dateLabel(visibleMonth.year, visibleMonth.month)}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('选择年份')}
+              accessibilityHint={dateLabel(visibleMonth.year, visibleMonth.month)}
+              testID="composer-occurred-choose-year" disabled={disabled}
+              onPress={openYears} style={styles.monthPickerHit}>
+              <Text style={styles.monthTitle}>{dateLabel(visibleMonth.year, visibleMonth.month)}</Text>
+              <LifeIcon name="expand" size={14} decorative />
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={tr("下个月")}
@@ -223,6 +238,59 @@ export function OccurredDatePicker({
               );
             })}
           </View>
+          </> : <View testID="composer-occurred-period-picker" style={styles.calendar}>
+            <View style={styles.monthRow}>
+              <Pressable accessibilityRole="button" accessibilityLabel={tr('返回日期')}
+                testID="composer-occurred-back-days" disabled={disabled}
+                onPress={() => setCalendarMode('day')} style={styles.monthHit}>
+                <Text style={styles.monthNav}>{tr('返回日期')}</Text>
+              </Pressable>
+              <Text style={styles.monthTitle}>{calendarMode === 'year' ? tr('选择年份') : tr('选择月份')}</Text>
+            </View>
+            {calendarMode === 'year' ? <>
+              <View style={styles.monthRow}>
+                <Pressable accessibilityRole="button" accessibilityLabel={tr('更早的年份')}
+                  testID="composer-occurred-earlier-years" disabled={disabled || yearEnd <= 12}
+                  onPress={() => setYearEnd(Math.max(1, yearEnd - 12))} style={styles.monthHit}>
+                  <Text style={[styles.monthNav, yearEnd <= 12 && styles.monthNavDisabled]}>{tr('更早的年份')}</Text>
+                </Pressable>
+                <Text style={styles.yearRange}>{Math.max(1, yearEnd - 11)}–{yearEnd}</Text>
+                <Pressable accessibilityRole="button" accessibilityLabel={tr('更近的年份')}
+                  testID="composer-occurred-later-years" disabled={disabled || yearEnd >= today.year}
+                  onPress={() => setYearEnd(Math.min(today.year, yearEnd + 12))} style={styles.monthHit}>
+                  <Text style={[styles.monthNav, yearEnd >= today.year && styles.monthNavDisabled]}>{tr('更近的年份')}</Text>
+                </Pressable>
+              </View>
+              <View style={styles.periodGrid}>
+                {Array.from({length: Math.min(12, yearEnd)}, (_, index) => yearEnd - index).map(year =>
+                  <Pressable key={year} accessibilityRole="button" accessibilityLabel={tr('{0}年', [year])}
+                    accessibilityState={{selected: year === visibleMonth.year, disabled: !!disabled}}
+                    testID={`composer-occurred-year-${year}`} disabled={disabled}
+                    style={[styles.periodCell, year === visibleMonth.year && styles.periodSelected]}
+                    onPress={() => {
+                      setVisibleMonth({year, month: year === today.year ? Math.min(visibleMonth.month, today.month) : visibleMonth.month, day: 1});
+                      setCalendarMode('month');
+                    }}><Text style={styles.monthNav}>{year}</Text></Pressable>)}
+              </View>
+            </> : <>
+              <Pressable accessibilityRole="button" accessibilityLabel={tr('选择年份')}
+                testID="composer-occurred-change-year" disabled={disabled} onPress={openYears} style={styles.monthHit}>
+                <Text style={styles.monthNav}>{tr('{0}年', [visibleMonth.year])}</Text>
+              </Pressable>
+              <View style={styles.periodGrid}>
+                {Array.from({length: 12}, (_, index) => index + 1).map(month => {
+                  const future = visibleMonth.year === today.year && month > today.month;
+                  return <Pressable key={month} accessibilityRole="button" accessibilityLabel={monthLabel(month)}
+                    accessibilityState={{disabled: !!disabled || future, selected: month === visibleMonth.month}}
+                    testID={`composer-occurred-month-${month}`} disabled={disabled || future}
+                    style={[styles.periodCell, month === visibleMonth.month && styles.periodSelected]}
+                    onPress={() => {setVisibleMonth({...visibleMonth, month, day: 1}); setCalendarMode('day');}}>
+                    <Text style={[styles.monthNav, future && styles.monthNavDisabled]}>{monthLabel(month, true)}</Text>
+                  </Pressable>;
+                })}
+              </View>
+            </>}
+          </View>}
         </View>
       ) : null}
         </View>
@@ -263,6 +331,11 @@ const styles = StyleSheet.create({
   monthNav: { fontSize: 16, lineHeight: 22, color: '#53604F' },
   monthNavDisabled: { color: '#A7A39B' },
   monthTitle: { fontSize: 16, lineHeight: 22, color: '#25231F' },
+  monthPickerHit: { minHeight: 44, flexShrink: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  yearRange: { fontSize: 14, lineHeight: 22, color: inkSoft, flexShrink: 1, textAlign: 'center' },
+  periodGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 4 },
+  periodCell: { width: '33.3333%', minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
+  periodSelected: { backgroundColor: '#E1E5D5' },
   weekRow: { flexDirection: 'row' },
   weekday: {
     flex: 1,
