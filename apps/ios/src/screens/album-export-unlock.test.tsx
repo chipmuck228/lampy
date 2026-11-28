@@ -1,8 +1,12 @@
 import {act,cleanup,fireEvent,render,waitFor} from '@testing-library/react-native';
-import {AppState} from 'react-native';
+import {AppState,StyleSheet} from 'react-native';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
+import AccountSubscribeScreen from './account-subscribe-screen';
+import {ShowcaseButton} from './album-export-showcase';
 import {AlbumExportUnlock} from './album-export-unlock';
 let mockFocusStart:(()=>unknown)|undefined,mockFocusStop:(()=>void)|undefined;
-jest.mock('expo-router',()=>({useFocusEffect:(fn:()=>unknown)=>jest.requireActual('react').useEffect(()=>{mockFocusStart=fn;const stop=fn();mockFocusStop=typeof stop==='function'?stop as ()=>void:undefined;return stop;},[fn])}));
+jest.mock('expo-router',()=>({useRouter:()=>({back:jest.fn(),dismissTo:jest.fn()}),useFocusEffect:(fn:()=>unknown)=>jest.requireActual('react').useEffect(()=>{mockFocusStart=fn;const stop=fn();mockFocusStop=typeof stop==='function'?stop as ()=>void:undefined;return stop;},[fn])}));
+jest.mock('./settings-capabilities',()=>({paidEpubInformationVisible:()=>true}));
 let mockEntitlementListener:(()=>void)|undefined;
 const mockStatus=jest.fn(),mockPurchase=jest.fn(),mockRestore=jest.fn();
 jest.mock('../infrastructure/album-export-purchases',()=>({albumExportAccess:{status:()=>mockStatus(),purchase:()=>mockPurchase(),restore:()=>mockRestore()},observeExportEntitlements:(listener:()=>void)=>{mockEntitlementListener=listener;return()=>{mockEntitlementListener=undefined;};}}));
@@ -11,6 +15,23 @@ afterEach(async()=>{delete process.env.EXPO_PUBLIC_ALBUM_EXPORT_PRODUCT_ID;await
 it('shows the actual matching StoreKit price and never purchases on entry',async()=>{
  const page=await render(<AlbumExportUnlock/>);await waitFor(()=>expect(page.getByText('解锁导出 · ¥18.00')).toBeTruthy());expect(mockPurchase).not.toHaveBeenCalled();
  await fireEvent.press(page.getByText('解锁导出 · ¥18.00'));await waitFor(()=>expect(page.getByText('已取消购买。')).toBeTruthy());expect(mockPurchase).toHaveBeenCalledTimes(1);
+});
+it('uses the Electronic album button and shared purchase flow from Settings',async()=>{
+ const locked={owned:false,product:{id:'app.lampy.export',name:'Export',price:'US$6.99'}};
+ mockStatus.mockResolvedValueOnce(locked).mockResolvedValue({owned:true,product:locked.product});
+ mockPurchase.mockResolvedValue({status:'purchased'});
+ const page=await render(<SafeAreaProvider initialMetrics={{frame:{x:0,y:0,width:390,height:844},insets:{top:47,left:0,right:0,bottom:34}}}>
+   <AccountSubscribeScreen/>
+   <ShowcaseButton testID="electronic-album-button-reference" label="Reference" onPress={()=>undefined}/>
+ </SafeAreaProvider>);
+ await waitFor(()=>expect(page.getByText('解锁导出 · US$6.99')).toBeTruthy());
+ expect(mockPurchase).not.toHaveBeenCalled();
+ expect(StyleSheet.flatten(page.getByTestId('album-export-unlock-purchase').props.style))
+   .toEqual(StyleSheet.flatten(page.getByTestId('electronic-album-button-reference').props.style));
+ await fireEvent.press(page.getByTestId('album-export-unlock-purchase'));
+ await waitFor(()=>expect(page.queryByTestId('album-export-unlock-purchase')).toBeNull());
+ expect(mockPurchase).toHaveBeenCalledTimes(1);
+ expect(page.getByText('已解锁最长30分钟录音和EPUB保存与分享，无需重复购买。')).toBeTruthy();
 });
 it('does not show a fake or mismatched product and restores only on an explicit tap',async()=>{
  mockStatus.mockResolvedValue({owned:false,product:null});const page=await render(<AlbumExportUnlock/>);await waitFor(()=>expect(page.getByText('商品暂时不可用，请稍后再试。')).toBeTruthy());expect(mockRestore).not.toHaveBeenCalled();expect(page.queryByText(/解锁导出 ·/)).toBeNull();

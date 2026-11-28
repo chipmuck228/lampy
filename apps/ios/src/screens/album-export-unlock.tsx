@@ -10,6 +10,7 @@ import {inkSoft,sage} from './life-page';
 import {tr} from '../i18n';
 import {subscribeFamilySafety} from '../application/family-safety-events';
 import {useDeviceLock} from './device-lock-context';
+import {ShowcaseButton} from './album-export-showcase';
 export type AlbumExportUnlockState={
   status:ExportPurchaseStatus|null;loading:boolean;working:boolean;notice:string;retryable:boolean;
   /** Matching StoreKit product and its localized price, or null; never a hard-coded price. */
@@ -80,7 +81,7 @@ export function AlbumExportUnlock(){
     <Text style={{...type.meta,color:inkSoft}}>{tr(status?.owned?'已解锁最长30分钟录音和EPUB保存与分享，无需重复购买。':'免费录音每段1分钟；一次购买解锁最长30分钟录音和EPUB保存与分享。')}</Text>
     {unified?<Text style={{...type.meta,color:inkSoft}}>{tr('购买将关联当前Lampy账号，不随家庭转交。')}</Text>:null}
     <Text style={{...type.meta,color:inkSoft}}>{tr('同一Lampy账号一次解锁个人册及本人创建家庭的EPUB保存与分享；家庭成员仍可免费预览。')}</Text>
-    {!status?.owned&&price?<Pressable accessibilityRole="button" disabled={working} accessibilityState={{disabled:working}} onPress={purchase} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.action,color:sage}}>{tr('解锁导出 · {0}',[price])}</Text></Pressable>:null}
+    {!status?.owned&&price?<ShowcaseButton testID="album-export-unlock-purchase" label={tr('解锁导出 · {0}',[price])} disabled={working} onPress={purchase}/>:null}
     {loading?<Text style={{...type.meta,color:inkSoft}}>{tr('正在核对导出权益。')}</Text>:null}
     {!loading&&!notice&&!status?.owned&&!price?<Text style={{...type.meta,color:inkSoft}}>{tr('商品暂时不可用，请稍后再试。')}</Text>:null}
     <Pressable accessibilityRole="button" disabled={working||loading} accessibilityState={{disabled:working||loading}} onPress={restore} style={{minHeight:48,justifyContent:'center'}}><Text style={{...type.action,color:sage}}>{tr('恢复购买')}</Text></Pressable>
