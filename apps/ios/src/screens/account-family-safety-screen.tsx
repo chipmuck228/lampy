@@ -73,8 +73,8 @@ export default function AccountFamilySafetyScreen() {
   <View style={styles.support}>
     <Text style={styles.title} accessibilityRole="header">{tr('需要帮助？')}</Text>
     <Text style={styles.meta}>{tr('对处理结果有疑问，或需要其他帮助，欢迎联系我们。')}</Text>
-    <PageAction label={tr('联系 Lampy')} onPress={()=>{void Linking.openURL('mailto:dev@yunpura.com').catch(()=>setMessage(tr('请发送邮件至 dev@yunpura.com。')));}}/>
-    <Text style={styles.meta}>dev@yunpura.com</Text>
+    <PageAction label={tr('联系 Lampy')} onPress={()=>{void Linking.openURL('mailto:support@5sparks.ai').catch(()=>setMessage(tr('请发送邮件至 support@5sparks.ai。')));}}/>
+    <Text style={styles.meta}>support@5sparks.ai</Text>
   </View>
   </View>
  </SettingsPage>;

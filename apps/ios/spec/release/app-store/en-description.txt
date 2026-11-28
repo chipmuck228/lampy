@@ -22,6 +22,6 @@ PLEASE NOTE
 • Keep your on-device records safe. Lampy does not provide cloud backup or a recovery service for private records.
 • Version 1.0.0 does not offer purchases, PDF/content-package export or printing.
 
-Privacy: https://yunpura.com/en/privacy
-Terms: https://yunpura.com/en/terms
-Support: https://yunpura.com/en/contact
+Privacy: https://lampy.5sparks.ai/en/privacy
+Terms: https://lampy.5sparks.ai/en/terms
+Support: https://lampy.5sparks.ai/en/contact

@@ -23,7 +23,7 @@ it('shows author notices and the confirmed support address without reporter deta
  mockReports.mockResolvedValue({reports:[],sharingRestricted:true,restrictedShares:['share_hidden']});
  const page=await render(<AccountFamilySafetyScreen/>);
  await waitFor(()=>expect(page.getByText(/有1条分享暂不可见/)).toBeTruthy());expect(page.queryByText('share_hidden')).toBeNull();
- expect(page.getByText('dev@yunpura.com')).toBeTruthy();
+ expect(page.getByText('support@5sparks.ai')).toBeTruthy();
  expect(page.getByText(/家庭分享暂不可用/)).toBeTruthy();
 });
 
