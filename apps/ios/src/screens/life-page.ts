@@ -10,6 +10,7 @@ export const sound = '#4F626D';
 export const hairline = 'rgba(37,35,31,0.16)';
 export const placeholder = '#777168';
 
+export const TABLET_PAGE_MAX = 1120;
 export const READING_MAX = 520;
 export const DATE_RAIL_WIDTH = 120;
 export const DATE_RAIL_GAP = 32;
@@ -54,9 +55,13 @@ export function isCompactHeight(windowHeight: number): boolean {
   return windowHeight < COMPACT_HEIGHT;
 }
 
-export function shouldUseNavRail(windowWidth: number, windowHeight: number): boolean {
-  return isRegularWidth(windowWidth, windowHeight);
+/** Root navigation stays below the reading pane, including on iPad. */
+export function shouldUseNavRail(_windowWidth: number, _windowHeight: number): boolean {
+  return false;
 }
+
+export const ROOT_NAV_MAX_WIDTH = 560;
+export const ROOT_NAV_REGULAR_HEIGHT = 80;
 
 export const NAV_BAND_PAD_X = 32;
 export const NAV_BAND_HIT = 48;
@@ -129,6 +134,7 @@ export function shouldStackRecentDay(windowWidth: number, windowHeight: number):
 }
 
 export function recentColumnWidth(windowWidth: number, windowHeight: number): number {
+  if (isRegularWidth(windowWidth, windowHeight)) return Math.min(windowWidth, TABLET_PAGE_MAX);
   return pageColumnWidth(windowWidth, windowHeight);
 }
 

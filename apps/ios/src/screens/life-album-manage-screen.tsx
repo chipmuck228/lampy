@@ -147,7 +147,7 @@ export default function LifeAlbumManageScreen() {
   const dateRange = view ? albumDateRangeLabel(view.entries) : null;
 
   return (
-    <SettingsPage
+    <SettingsPage wide
       title=""
       hideBackLabel
       headerAccessory={view && menuOpen ? <View style={styles.menu} testID="life-album-menu">

@@ -20,7 +20,9 @@ import {
   navBandOccupiedWidth,
   paper,
   sage,
-  shouldUseNavRail,
+  isRegularWidth,
+  ROOT_NAV_MAX_WIDTH,
+  ROOT_NAV_REGULAR_HEIGHT,
 } from './life-page';
 import { usePageMetrics } from './use-page-metrics';
 import { shouldIgnoreRootNavPress, type RootNavDest } from './root-nav-switch';
@@ -56,11 +58,9 @@ export function RootNavBand({
     id: destinations[index]?.id ?? item.label,
   }));
   const paintedReady = items.every((item) => painted[item.id]);
-  const rail = shouldUseNavRail(width, height);
-  const layout = rail
-    ? 'rail'
-    : chooseNavBandLayout({
-        windowWidth: width,
+  const compact = isRegularWidth(width, height);
+  const layout = chooseNavBandLayout({
+        windowWidth: compact ? ROOT_NAV_MAX_WIDTH : width,
         items: items.map((item) => ({
           ...item,
           measuredWidth: paintedReady ? painted[item.id]?.width : undefined,
@@ -98,7 +98,7 @@ export function RootNavBand({
 
   const itemStyle = [
     styles.item,
-    layout === 'rail' ? styles.railItem : layout === 'stack' ? styles.stackItem : styles.columnItem,
+    layout === 'stack' ? styles.stackItem : styles.columnItem,
   ];
 
   function renderItem(dest: (typeof BAND_DESTINATIONS)[number]) {
@@ -106,7 +106,7 @@ export function RootNavBand({
     const color = sage;
     const min = itemMin(dest.id, dest.label, NAV_BAND_LABEL_SIZE);
     const inner = (
-      <View style={styles.itemInner} accessible={false}>
+      <View style={[styles.itemInner, compact && styles.compactInner]} accessible={false}>
         <LifeIcon name={dest.icon} size={NAV_BAND_ICON_SIZE} color={color} decorative />
         <Text
           testID={selected ? 'root-nav-here' : undefined}
@@ -116,6 +116,7 @@ export function RootNavBand({
         >
           {dest.label}
         </Text>
+        {compact && selected ? <View testID="root-nav-selection-rule" style={styles.selectionRule} accessible={false} /> : null}
       </View>
     );
 
@@ -128,7 +129,7 @@ export function RootNavBand({
           accessibilityRole="tab"
           accessibilityLabel={dest.label}
           accessibilityState={{ selected: true }}
-          style={[itemStyle, min]}
+          style={[itemStyle, min, compact && styles.compactItem]}
         >
           {inner}
         </View>
@@ -150,7 +151,7 @@ export function RootNavBand({
           if (shouldIgnoreRootNavPress(here, dest.id)) return;
           onGo(dest.id);
         }}
-        style={[itemStyle, min]}
+        style={[itemStyle, min, compact && styles.compactItem]}
       >
         {inner}
       </Pressable>
@@ -167,7 +168,8 @@ export function RootNavBand({
       testID="root-nav-band"
       style={[
         styles.band,
-        layout === 'rail' ? styles.rail : styles.phoneBand,
+        styles.phoneBand,
+        compact && styles.compactBand,
         layout === 'stack' && styles.stacked,
         layout === 'grid' && styles.grid,
       ]}
@@ -208,6 +210,7 @@ export function RootReadingLayout({
   onContentSizeChange,
   onScrollLayout,
   overlay,
+  overlayColumnWidth,
   header,
   canvas = paper,
   cover,
@@ -223,18 +226,18 @@ export function RootReadingLayout({
   onContentSizeChange?: (contentWidth: number, contentHeight: number) => void;
   onScrollLayout?: (event: LayoutChangeEvent) => void;
   overlay?: ReactNode;
+  overlayColumnWidth?: number;
   header?: ReactNode;
   canvas?: string;
   cover?: ReactNode;
 }) {
   const { width, height } = usePageMetrics();
-  const rail = shouldUseNavRail(width, height);
-  const overlayPad = leaveFabOverlayPadding(width, height);
+  const overlayPad = leaveFabOverlayPadding(width, height, overlayColumnWidth);
+  const docked = isRegularWidth(width, height);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: canvas }]} accessibilityLabel={accessibilityLabel}>
-      <View style={rail ? styles.row : styles.column}>
-        {rail ? band : null}
+      <View style={styles.column}>
         <View style={styles.scroll}>
           {header ? (
             <View style={[styles.header, { backgroundColor: canvas }]}>{header}</View>
@@ -255,12 +258,12 @@ export function RootReadingLayout({
           </ScrollView>
           {cover}
           {overlay ? (
-            <View testID="root-leave-overlay" pointerEvents="box-none" style={[styles.overlay, overlayPad]}>
+            <View testID="root-leave-overlay" pointerEvents="box-none" style={[docked ? styles.captureDock : styles.overlay, overlayPad]}>
               {overlay}
             </View>
           ) : null}
         </View>
-        {rail ? null : band}
+        {band}
       </View>
     </SafeAreaView>
   );
@@ -269,7 +272,6 @@ export function RootReadingLayout({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: paper },
   column: { flex: 1 },
-  row: { flex: 1, flexDirection: 'row' },
   scroll: { flex: 1, minWidth: 0 },
   header: {
     flexShrink: 0,
@@ -281,6 +283,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
   },
+  captureDock: { flexShrink: 0, alignItems: 'flex-end', paddingTop: 8 },
   band: {
     alignSelf: 'stretch',
     flexShrink: 0,
@@ -295,14 +298,22 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: hairline,
   },
-  rail: {
-    width: 112,
-    flexGrow: 0,
-    flexShrink: 0,
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingTop: 22,
+  compactBand: {
+    width: '100%',
+    maxWidth: ROOT_NAV_MAX_WIDTH,
+    alignSelf: 'center',
+    paddingTop: 8,
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
+  },
+  compactItem: { minHeight: ROOT_NAV_REGULAR_HEIGHT - 16 },
+  compactInner: { paddingBottom: 8 },
+  selectionRule: {
+    position: 'absolute',
+    bottom: 0,
+    width: 24,
+    height: 2,
+    backgroundColor: sage,
   },
   stacked: {
     flexDirection: 'column',
@@ -342,12 +353,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignSelf: 'stretch',
     alignItems: 'center',
-  },
-  railItem: {
-    flexGrow: 0,
-    flexShrink: 0,
-    alignItems: 'center',
-    alignSelf: 'stretch',
   },
   label: {
     fontSize: NAV_BAND_LABEL_SIZE,

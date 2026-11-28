@@ -12,6 +12,7 @@ import { tr, appLanguage } from '../i18n';
 import { useDeviceLock } from './device-lock-context';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 import { dismissToRootNav } from './root-nav-switch';
+import { pageFrame, tabletRootTitle } from './page-frame';
 import { usePageMetrics } from './use-page-metrics';
 import { recentType, recentKicker, recentInk } from './recent-visual';
 import { Text, type } from './life-text';
@@ -26,6 +27,7 @@ export default function FamilyDirectoryScreen() {
   const router = useRouter();
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
+  const frame = pageFrame(width, height);
   const lock = useDeviceLock();
   const allowed = isFamilyProductEntryOpen() && !lock?.snapshot.locked;
   const [directory] = useState(createFamilyDirectory);
@@ -106,13 +108,13 @@ export default function FamilyDirectoryScreen() {
   }
   const joined = useCallback((feedback?: string) => { if (feedback) setMessage(feedback); void refresh(); }, [refresh]);
   return <RootReadingLayout accessibilityLabel={tr('家庭')} scrollTestID="family-root-scroll"
-    contentContainerStyle={{paddingHorizontal:gutter,paddingBottom:32,alignItems:'center'}}
-    header={<View style={{paddingHorizontal:gutter,paddingTop:height<500?12:20,paddingBottom:20}} testID="family-root-header">
-      <Text style={{...recentType.kicker,color:recentKicker}}>LAMPY</Text>
-      <Text accessibilityRole="header" style={{...recentType.title,color:recentInk,marginTop:10,letterSpacing:1.2}}>{tr('家庭')}</Text>
+    contentContainerStyle={{paddingHorizontal:gutter,paddingBottom:24,...(frame.regular?{width:'100%',maxWidth:frame.column,alignSelf:'center'}:null)}}
+    header={<View style={{paddingHorizontal:gutter,paddingTop:frame.top,paddingBottom:frame.regular?24:20,...(frame.regular?{width:'100%' as const,maxWidth:frame.column,alignSelf:'center' as const}:null)}} testID="family-root-header">
+      {!frame.regular ? <Text style={{...recentType.kicker,color:recentKicker}}>LAMPY</Text> : null}
+      <Text accessibilityRole="header" style={[{...recentType.title,color:recentInk,marginTop:10,letterSpacing:1.2},frame.regular&&tabletRootTitle]}>{tr('家庭')}</Text>
     </View>}
     band={<RootNavBand here="family" onGo={dest=>dismissToRootNav(router,dest)} onFamily={()=>undefined}/>}
-  ><View style={{width:'100%',maxWidth:readingWidth(width,height)}}>
+  ><View style={{width:'100%',maxWidth:frame.regular?frame.content:readingWidth(width,height)}}>
     {!isFamilyProductEntryOpen() ? <Text>{tr('敬请期待。')}</Text> : allowed ? <>
       {state.status !== 'signed-out' ? <Text style={styles.intro}>{tr('给重要的人，留一个位置。')}</Text> : null}
       {state.status === 'loading' ? <Text>{tr('正在读取家庭。')}</Text> : null}

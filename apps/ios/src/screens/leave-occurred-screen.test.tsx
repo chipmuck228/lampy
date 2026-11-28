@@ -77,6 +77,27 @@ describe('leave occurred date picker', () => {
     mockSaveTextMoment.mockResolvedValue({ id: 'moment_draft' });
   });
 
+  it('persists the final day selected through the year and month picker', async () => {
+    mockUpdateDraftOccurred.mockImplementation(async (_id, input) => ({
+      ...todayDraft, occurred: {...input, label: '1998年12月25日'},
+    }));
+    const view = await render(wrap());
+    await waitFor(() => expect(view.getByTestId('composer-note').props.editable).toBe(true));
+    await fireEvent.press(view.getByTestId('composer-occurred-toggle'));
+    await fireEvent.press(view.getByTestId('composer-occurred-pick'));
+    await fireEvent.press(view.getByTestId('composer-occurred-choose-year'));
+    await fireEvent.press(view.getByTestId('composer-occurred-earlier-years'));
+    await fireEvent.press(view.getByTestId('composer-occurred-earlier-years'));
+    await fireEvent.press(view.getByTestId('composer-occurred-year-1998'));
+    await fireEvent.press(view.getByTestId('composer-occurred-month-12'));
+    expect(mockUpdateDraftOccurred).not.toHaveBeenCalled();
+    await fireEvent.press(view.getByTestId('composer-occurred-day-1998-12-25'));
+    await waitFor(() => expect(mockUpdateDraftOccurred).toHaveBeenCalledWith('moment_draft', {
+      kind:'day',year:1998,month:12,day:25,
+    }));
+    expect(view.getByText('1998年12月25日')).toBeTruthy();
+  });
+
   it('confirms today on a new draft', async () => {
     mockRestore.mockResolvedValue({
       ...todayDraft,

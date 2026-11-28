@@ -1,13 +1,14 @@
 import { tr } from '../i18n';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 
-import type { RecentLifeItem } from '../application/use-cases';
+import type { ImageView, RecentLifeItem } from '../application/use-cases';
 import type { PlaybackStatus } from '../infrastructure/media';
 import { LookThisHit } from './life-icons';
 import { MomentAudio, MomentUnknownMedia } from './moment-audio';
 import { MomentImages } from './moment-images';
+import { RecentEditorialPhotos } from './recent-editorial-photos';
 import { RecentFeeling } from './recent-feeling';
 import { RecentPhotoReveal } from './recent-photo-reveal-view';
 import {
@@ -28,6 +29,8 @@ import {
 export function RecentMoment({
   item,
   pairImages,
+  editorial = false,
+  imageMaxHeight = 340,
   echoOpacity,
   echoing = false,
   expanded = false,
@@ -40,6 +43,8 @@ export function RecentMoment({
 }: {
   item: RecentLifeItem;
   pairImages: boolean;
+  editorial?: boolean;
+  imageMaxHeight?: number;
   echoOpacity: Animated.Value;
   echoing?: boolean;
   expanded?: boolean;
@@ -58,6 +63,13 @@ export function RecentMoment({
   );
   const clock = recentRecordedClock(item.recordedAt);
   const hasStill = item.images.length > 0 || (item.unknownMedia?.length ?? 0) > 0;
+  const split = editorial && hasStill && !!item.note;
+  const wrapPhoto = (image: ImageView, slot: ReactNode) => (
+    <RecentPhotoReveal photoId={image.id} reduceMotion={reduceMotion}
+      testID={`recent-image-${item.id}-reveal-${image.id}`}>
+      {slot}
+    </RecentPhotoReveal>
+  );
   return (
     <View
       style={styles.shell}
@@ -69,7 +81,7 @@ export function RecentMoment({
         style={{ opacity: echoing ? echoOpacity : 1 }}
         collapsable={false}
       >
-      <View style={[styles.moment, mixed && styles.momentMixed]} testID={`recent-item-${item.id}`}>
+      <View style={[styles.moment, mixed && styles.momentMixed, editorial && styles.editorialMoment]} testID={`recent-item-${item.id}`}>
         {clock ? (
           <View style={styles.meta}>
             <Text style={styles.time} testID={`recent-clock-${item.id}`}>
@@ -77,11 +89,11 @@ export function RecentMoment({
             </Text>
           </View>
         ) : null}
-        <View style={styles.momentBody}>
+        <View style={[styles.momentBody, split && styles.editorialBody]} testID={`recent-body-${item.id}`}>
           {item.note ? (
-            <>
+            <View style={[editorial && styles.editorialCopy, split && styles.splitCopy]}>
               <Text
-                style={[styles.note, styles.measure]}
+                style={[styles.note, editorial && styles.editorialNote, styles.measure]}
                 testID={`recent-note-measure-${item.id}`}
                 onTextLayout={(event) => setLineCount(event.nativeEvent.lines.length)}
                 accessibilityElementsHidden
@@ -90,7 +102,7 @@ export function RecentMoment({
                 {item.note}
               </Text>
               <Text
-                style={styles.note}
+                style={[styles.note, editorial && styles.editorialNote]}
                 testID={`recent-note-${item.id}`}
                 numberOfLines={expanded ? undefined : recentNoteVisibleLineLimit(lineCount)}
               >
@@ -108,27 +120,23 @@ export function RecentMoment({
                   <Text style={styles.expand}>{expanded ? tr("收起正文") : tr("展开正文")}</Text>
                 </Pressable>
               ) : null}
-            </>
+              {split && item.feeling ? <RecentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} /> : null}
+            </View>
           ) : null}
           {hasStill ? (
             <View
               testID={item.note ? `recent-image-pause-${item.id}` : undefined}
-              style={item.note ? styles.imagePause : undefined}
+              style={editorial ? (split ? styles.editorialMedia : styles.editorialMediaOnly) : item.note ? styles.imagePause : undefined}
             >
+              {editorial ? <RecentEditorialPhotos images={item.images}
+                maxHeight={imageMaxHeight} testIDPrefix={`recent-image-${item.id}`}
+                wrapAvailable={wrapPhoto} /> : (
               <MomentImages
                 images={item.images}
                 testIDPrefix={`recent-image-${item.id}`}
                 rhythm={pairImages}
-                wrapAvailable={(image, slot) => (
-                  <RecentPhotoReveal
-                    photoId={image.id}
-                    reduceMotion={reduceMotion}
-                    testID={`recent-image-${item.id}-reveal-${image.id}`}
-                  >
-                    {slot}
-                  </RecentPhotoReveal>
-                )}
-              />
+                wrapAvailable={wrapPhoto}
+              />)}
               <MomentUnknownMedia items={item.unknownMedia ?? []} testIDPrefix={`recent-unknown-${item.id}`} />
             </View>
           ) : null}
@@ -146,8 +154,8 @@ export function RecentMoment({
           progressWhenHeard
           chrome="row"
         />
-        <View style={styles.foot}>
-          {item.feeling ? (
+        <View style={[styles.foot, editorial && styles.editorialFoot]}>
+          {item.feeling && !split ? (
             <View style={styles.footFeeling}>
               <RecentFeeling feeling={item.feeling} testID={`recent-feeling-${item.id}`} />
             </View>
@@ -176,6 +184,14 @@ const styles = StyleSheet.create({
   // Keep overflow off the native-driver fade. Face ID in/out can black the window
   // if Animated.View is asked to clip-visible while compositing opacity.
   shell: { overflow: 'visible' },
+  editorialMoment: { paddingTop: 12, paddingBottom: 20 },
+  editorialBody: { flexDirection: 'row-reverse', alignItems: 'center', gap: 36 },
+  editorialCopy: { maxWidth: 640, minWidth: 0, gap: 16 },
+  splitCopy: { flex: 1 },
+  editorialMedia: { flex: 1.2, minWidth: 0 },
+  editorialMediaOnly: { width: '100%', minWidth: 0 },
+  editorialNote: { fontSize: 23, lineHeight: 40, letterSpacing: 0.4 },
+  editorialFoot: { marginTop: 8 },
   moment: { gap: 0, minHeight: 48, overflow: 'visible', paddingTop: 22, paddingBottom: 16 },
   momentMixed: { gap: 0 },
   meta: {

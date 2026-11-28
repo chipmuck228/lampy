@@ -1,4 +1,8 @@
 {
+  "选择年份": "Choose a year",
+  "返回日期": "Back to dates",
+  "更早的年份": "Earlier years",
+  "更近的年份": "Later years",
   "这次验证没有完成，请先重新确认账号。": "Verification did not finish. Please check your account status again.",
   "重新确认账号": "Check account status",
   "登录与找回": "Sign in and recovery",

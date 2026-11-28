@@ -55,7 +55,7 @@ export default function FamilyEpubScreen(){
  });}
  function remove(id:string){if(!view||busy)return;const book=view,lease=capture();Alert.alert(tr('删除这版成品？'),tr('仅删除Lampy内这一版成品及其制作副本，不删除原记录。已保存到「文件」或「图书」的副本不会删除。'),[{text:tr('取消'),style:'cancel'},{text:tr('删除'),style:'destructive',onPress:()=>{if(!lease())return;void run(async current=>{await deleteFamilyEpub(book,id,current);if(current())setEditions(list=>list.filter(e=>e.id!==id));});}}]);}
  const visible=!reading.blocked&&view&&reading.valid();
- return <SettingsPage title={tr('电子册')} backLabel={tr('这一册')} accessibilityLabel={tr('家庭电子册')} onBack={()=>router.back()}>
+ return <SettingsPage wide title={tr('电子册')} backLabel={tr('这一册')} accessibilityLabel={tr('家庭电子册')} onBack={()=>router.back()}>
   {visible?<View style={styles.body}>
    <View style={styles.cover} testID="family-epub-cover"><View style={{flex:1,alignItems:'center',justifyContent:'center'}}><LifeIcon name="album" size={38}/></View>{view.cover?<FamilyAlbumCoverPreview familyId={view.familyId} cover={view.cover} fill/>:null}<View pointerEvents="none" style={styles.binding}/></View>
    <Text accessibilityRole="header" style={styles.title}>{view.name}</Text>

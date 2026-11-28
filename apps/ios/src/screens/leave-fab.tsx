@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from './life-text';
 import { LifeIcon } from './life-icons';
-import { hairline, ink, pageGutter, paperDeep, sage } from './life-page';
+import { hairline, ink, isRegularWidth, pageColumnWidth, pageGutter, paper, paperDeep, sage } from './life-page';
+import { usePageMetrics } from './use-page-metrics';
 import { createRecentLeaveFabScroll, recentFabMotion } from './recent-leave-fab';
 
 export const LEAVE_FAB_HIT = 48;
@@ -16,10 +17,12 @@ export function leaveFabScrollReserve(): number {
   return LEAVE_FAB_HIT + LEAVE_FAB_GAP_ABOVE_NAV + LEAVE_FAB_TRAIL;
 }
 
-export function leaveFabOverlayPadding(windowWidth: number, windowHeight: number) {
+export function leaveFabOverlayPadding(windowWidth: number, windowHeight: number, columnWidth = pageColumnWidth(windowWidth, windowHeight)) {
   return {
     paddingBottom: LEAVE_FAB_GAP_ABOVE_NAV,
-    paddingRight: pageGutter(windowWidth, windowHeight),
+    paddingRight: isRegularWidth(windowWidth, windowHeight)
+      ? Math.max(pageGutter(windowWidth, windowHeight), (windowWidth - columnWidth) / 2 + pageGutter(windowWidth, windowHeight))
+      : pageGutter(windowWidth, windowHeight),
   };
 }
 
@@ -126,6 +129,8 @@ export function LeaveFab({
   opacity: Animated.Value;
   shift: Animated.Value;
 }) {
+  const { width, height } = usePageMetrics();
+  const compact = isRegularWidth(width, height);
   const interactive = available && !forcedHidden;
   const longPressed = useRef(false);
   return (
@@ -149,7 +154,7 @@ export function LeaveFab({
         accessibilityElementsHidden={!interactive}
         importantForAccessibility={interactive ? 'yes' : 'no-hide-descendants'}
       >
-        <View style={styles.shadow} pointerEvents="box-none" accessible={false}>
+        <View style={[styles.shadow, compact && styles.quietShadow]} pointerEvents="box-none" accessible={false}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={tr("留下")}
@@ -172,7 +177,7 @@ export function LeaveFab({
             onAccessibilityAction={(event) => {
               if (interactive && event.nativeEvent.actionName === 'recordVoice') onRecordVoice?.();
             }}
-            style={styles.fab}
+            style={[styles.fab, compact && styles.tabletFab]}
           >
             <LifeIcon name="plus" size={16} color={sage} decorative />
             <Text style={styles.label}>{tr("留下")}</Text>
@@ -208,6 +213,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  quietShadow: { shadowOpacity: 0, elevation: 0 },
+  tabletFab: { backgroundColor: paper, borderRadius: 10 },
   label: {
     fontFamily: recentSans,
     fontSize: 14,

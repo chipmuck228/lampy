@@ -19,6 +19,7 @@ import { LeaveFab, leaveFabScrollReserve, useLeaveFabMotion } from './leave-fab'
 import { lookbackCatalogToggleLabel } from './lookback-catalog';
 import { recentInk, recentKicker, recentRule, recentType } from './recent-visual';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
+import { pageFrame, tabletRootTitle } from './page-frame';
 import { usePageMetrics } from './use-page-metrics';
 
 import type { FeelingView } from '../application/feeling';
@@ -216,11 +217,15 @@ export function LookbackCatalogOverlay({
 }
 
 export function lookbackLayoutFor(width: number, height: number) {
+  const frame = pageFrame(width, height);
   return {
-    readingWidth: Math.min(width, 720),
+    readingWidth: frame.regular ? frame.column : Math.min(width, 720),
+    gutter: frame.regular ? frame.gutter : LOOKBACK_PAGE_GUTTER,
+    regular: frame.regular,
+    top: frame.top,
     verticalTime: width < 600,
     shortHeight: height < 500,
-    maxBar: Math.min(width, 720) - 48,
+    maxBar: (frame.regular ? frame.column - frame.gutter * 2 : Math.min(width, 720) - 48),
   };
 }
 
@@ -293,7 +298,7 @@ export function LookbackScaffold({
   onFamily?: () => void;
 }) {
   const router = useRouter();
-  const { readingWidth, shortHeight } = useLookbackLayout();
+  const { readingWidth, shortHeight, gutter, regular, top } = useLookbackLayout();
   const leaveFab = useLeaveFabMotion();
   const scrollRef = useRef<ScrollView>(null);
   const restoreOnce = useRef(false);
@@ -348,25 +353,25 @@ export function LookbackScaffold({
   });
 
   const pinHeader = !!(root && onGoRecent);
-  const heroPadTop = shortHeight ? 12 : 20;
+  const heroPadTop = regular ? top : shortHeight ? 12 : 20;
   const pageHeader = (
     <View
       style={[
         styles.headerWrap,
-        { maxWidth: readingWidth, paddingHorizontal: LOOKBACK_PAGE_GUTTER },
+        { maxWidth: readingWidth, paddingHorizontal: root ? gutter : 0 },
       ]}
     >
       <View
-        style={[styles.hero, { paddingTop: heroPadTop }]}
+        style={[styles.hero, { paddingTop: heroPadTop, paddingBottom: regular ? 24 : 17 }]}
         testID="lookback-header"
       >
         <View style={styles.heroCopy}>
-          {kicker ? (
+          {kicker && !regular ? (
             <Text style={styles.kicker} testID="lookback-kicker">
               {kicker}
             </Text>
           ) : null}
-          <Text style={styles.title} accessibilityRole="header" testID="lookback-wordmark">
+          <Text style={[styles.title, regular && tabletRootTitle]} accessibilityRole="header" testID="lookback-wordmark">
             {title}
           </Text>
         </View>
@@ -447,13 +452,15 @@ export function LookbackScaffold({
     root && onGoRecent ? (
       <RootReadingLayout
         scrollTestID="lookback-scroll"
+        overlayColumnWidth={readingWidth}
         scrollRef={scrollRef}
         contentContainerStyle={[
           styles.column,
           {
             maxWidth: readingWidth,
+            paddingHorizontal: gutter,
             paddingTop: 4,
-            paddingBottom: onLeave ? leaveFabScrollReserve() : 8,
+            paddingBottom: regular ? 24 : onLeave ? leaveFabScrollReserve() : 8,
           },
         ]}
         header={pageHeader}
@@ -495,7 +502,7 @@ export function LookbackScaffold({
           style={styles.scroll}
           contentContainerStyle={[
             styles.column,
-            { maxWidth: readingWidth, paddingTop: heroPadTop },
+            { maxWidth: readingWidth, paddingHorizontal: gutter, paddingTop: heroPadTop },
           ]}
           onContentSizeChange={scrollProps.onContentSizeChange}
           onScroll={scrollProps.onScroll}

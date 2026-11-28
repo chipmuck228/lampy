@@ -231,7 +231,7 @@ export default function LifeAlbumPreviewScreen({family}:{family?:FamilyPaperPres
     ) ?? [];
 
   return (
-    <SettingsPage
+    <SettingsPage wide
       title={ALBUM_PREVIEW_ACTION}
       backLabel={tr("这一册")}
       accessibilityLabel={tr("看看这一册")}

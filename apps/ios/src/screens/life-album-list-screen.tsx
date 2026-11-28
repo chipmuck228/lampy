@@ -37,6 +37,7 @@ import { hairline, ink, inkSoft, pageGutter, paper, paperDeep, sage } from './li
 import { Text, type } from './life-text';
 import { RootNavBand, RootReadingLayout } from './root-nav-band';
 import { dismissToRootNav } from './root-nav-switch';
+import { pageFrame, tabletRootTitle } from './page-frame';
 import { usePageMetrics } from './use-page-metrics';
 import { recentType, recentInk, recentKicker } from './recent-visual';
 
@@ -46,6 +47,7 @@ export default function LifeAlbumListScreen() {
   const router = useRouter();
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
+  const frame = pageFrame(width, height);
   const [wallWidth, setWallWidth] = useState<number | null>(null);
   const wallLayout = albumCoverWallLayout(wallWidth);
 
@@ -167,6 +169,7 @@ export default function LifeAlbumListScreen() {
         styles.column,
         {
           paddingHorizontal: gutter,
+          ...(frame.regular ? { maxWidth: frame.column, alignSelf: 'center' as const } : null),
           paddingTop: 4,
           paddingBottom: 24,
         },
@@ -203,10 +206,10 @@ export default function LifeAlbumListScreen() {
         tryRestoreScroll();
       }}
       header={
-        <View style={[styles.header, { paddingHorizontal: gutter, paddingTop: height < 500 ? 12 : 20 }]} testID="life-album-list-header">
+        <View style={[styles.header, { paddingHorizontal: gutter, paddingTop: frame.top, ...(frame.regular ? {width:'100%' as const,maxWidth:frame.column,alignSelf:'center' as const,paddingBottom:24}:null) }]} testID="life-album-list-header">
           <View style={styles.headerCopy}>
-            <Text style={styles.kicker}>{tr("LAMPY · 生活册")}</Text>
-            <Text style={styles.title} accessibilityRole="header">{ALBUM_MY_ALBUMS}</Text>
+            {!frame.regular ? <Text style={styles.kicker}>{tr("LAMPY · 生活册")}</Text> : null}
+            <Text style={[styles.title, frame.regular && tabletRootTitle]} accessibilityRole="header">{frame.regular ? tr("生活册") : ALBUM_MY_ALBUMS}</Text>
           </View>
           {guideReady && !guideOpen ? (
             <Pressable accessibilityRole="button" accessibilityLabel={ALBUM_GUIDE_REOPEN}

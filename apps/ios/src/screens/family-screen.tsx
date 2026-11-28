@@ -24,6 +24,7 @@ import {
   recordFamilyTestLastRequest,
   storeFamilyTestInviteCode,
 } from '../infrastructure/family-test-driver';
+import { pageFrame } from './page-frame';
 import { createFamilyRefreshGate } from './family-refresh';
 
 function errorText(error: unknown) {
@@ -74,8 +75,9 @@ function refreshMessage(result: 'ok' | 'invites-failed' | 'revoke-unconfirmed') 
 export default function FamilyScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ td?: string | string[]; n?: string | string[] }>();
-  const { width } = useWindowDimensions();
-  const readingWidth = Math.min(width, 720);
+  const { width, height } = useWindowDimensions();
+  const frame = pageFrame(width, height);
+  const readingWidth = frame.regular ? frame.column : Math.min(width, 720);
   const configured = isFamilyProductEntryOpen();
   const testDriver = isFamilyTestDriverEnabled();
   const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
@@ -423,7 +425,7 @@ export default function FamilyScreen() {
 
   return (
     <SafeAreaView style={styles.safe} accessibilityLabel="家庭">
-      <ScrollView contentContainerStyle={[styles.column, { maxWidth: readingWidth }]}>
+      <ScrollView contentContainerStyle={[styles.column, { maxWidth: readingWidth, ...(frame.regular ? {paddingHorizontal:frame.gutter,paddingTop:frame.top}:null) }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="返回"

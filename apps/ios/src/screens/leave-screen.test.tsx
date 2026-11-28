@@ -1,4 +1,5 @@
-import { render, waitFor } from '@testing-library/react-native';
+import { act, render, waitFor } from '@testing-library/react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LeaveScreen from '../app/leave';
@@ -56,6 +57,44 @@ jest.mock('../application/container', () => ({
 }));
 
 describe('leave screen', () => {
+  it.each([[1366, 1024], [1024, 1366], [600, 900], [390, 844], [852, 393]])(
+    'aligns Capture actions with the content frame at %sx%s', async (width, height) => {
+      const originalWindow = Dimensions.get('window');
+      const originalScreen = Dimensions.get('screen');
+      await act(async () => { Dimensions.set({
+        window: { width, height, scale: 2, fontScale: 1 },
+        screen: { width, height, scale: 2, fontScale: 1 },
+      }); });
+      const view = await render(<SafeAreaProvider initialMetrics={{
+        frame: { x: 0, y: 0, width, height },
+        insets: { top: 24, left: 0, right: 0, bottom: 20 },
+      }}><LeaveScreen /></SafeAreaProvider>);
+      try {
+        await waitFor(() => expect(view.getByTestId('composer-note').props.value).toBe('还没留下的一句'));
+        const content = StyleSheet.flatten(view.getByTestId('composer-scroll').props.contentContainerStyle);
+        const band = StyleSheet.flatten(view.getByTestId('composer-action-band').props.style);
+        const actions = StyleSheet.flatten(view.getByTestId('composer-actions').props.style);
+        const regular = width >= 768 && height >= 500;
+        const inner = content.maxWidth - content.paddingHorizontal * 2;
+        expect(actions.maxWidth).toBe(inner);
+        expect(band.paddingHorizontal).toBe(content.paddingHorizontal);
+        if (regular) {
+          expect(band.maxWidth).toBe(content.maxWidth);
+          expect(band.alignSelf).toBe('center');
+        } else {
+          expect(band.maxWidth).toBeUndefined();
+          expect(actions.maxWidth).toBeLessThanOrEqual(520);
+        }
+        expect(view.getByTestId('composer-camera')).toBeEnabled();
+        expect(view.getByTestId('composer-library')).toBeEnabled();
+        expect(view.getByTestId('composer-save')).toBeEnabled();
+      } finally {
+        await view.unmount();
+        await act(async () => { Dimensions.set({ window: originalWindow, screen: originalScreen }); });
+      }
+    },
+  );
+
   it('restores the unfinished draft instead of starting a new one', async () => {
     const view = await render(
       <SafeAreaProvider

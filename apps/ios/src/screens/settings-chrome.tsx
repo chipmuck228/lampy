@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hairline, ink, pageGutter, paper, readingWidth, sage } from './life-page';
 import { LifeIcon } from './life-icons';
 import { Text, type } from './life-text';
+import { pageFrame } from './page-frame';
 import { usePageMetrics } from './use-page-metrics';
 
 export function settingsEdgePad(inset: number, gutter: number): number {
@@ -23,6 +24,7 @@ export function SettingsPage({
   headerAccessory,
   hideBackLabel = false,
   scrollEnabled = true,
+  wide = false,
   scrollRef,
   children,
 }: {
@@ -36,22 +38,26 @@ export function SettingsPage({
   headerAccessory?: ReactNode;
   hideBackLabel?: boolean;
   scrollEnabled?: boolean;
+  /** Gallery/album tools use the full shared page; prose/forms keep a reading measure. */
+  wide?: boolean;
   scrollRef?: Ref<ScrollView>;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const { width, height } = usePageMetrics();
   const gutter = pageGutter(width, height);
-  const column = readingWidth(width, height);
+  const frame = pageFrame(width, height);
+  const column = frame.regular ? (wide ? frame.content : frame.reading) : readingWidth(width, height);
   const padLeft = settingsEdgePad(insets.left, gutter);
   const padRight = settingsEdgePad(insets.right, gutter);
   return (
     <View style={styles.safe} accessibilityLabel={accessibilityLabel} testID={pageTestID}>
       <View
+        testID="account-header"
         style={[
           styles.header,
           {
-            paddingTop: insets.top,
+            ...(frame.regular ? { width: '100%' as const, maxWidth: frame.column, alignSelf: 'center' as const, paddingTop: insets.top + frame.top, paddingBottom: 12 } : {paddingTop: insets.top}),
             paddingLeft: padLeft,
             paddingRight: padRight,
           },
@@ -71,7 +77,7 @@ export function SettingsPage({
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         <View style={styles.headerSpacer}>{headerRight}</View>
       </View>
-      {headerAccessory ? <View style={{paddingLeft:padLeft,paddingRight:padRight,alignItems:'center'}}><View style={[styles.reading,{maxWidth:column}]}>{headerAccessory}</View></View> : null}
+      {headerAccessory ? <View style={{paddingLeft:padLeft,paddingRight:padRight,alignItems:frame.regular?'flex-start':'center',width:'100%',...(frame.regular?{maxWidth:frame.column,alignSelf:'center'}:null)}}><View style={[styles.reading,{maxWidth:column}]}>{headerAccessory}</View></View> : null}
       <KeyboardAvoidingView
         style={styles.scroll}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -88,6 +94,7 @@ export function SettingsPage({
           contentContainerStyle={[
             styles.column,
             {
+              ...(frame.regular ? {maxWidth:frame.column,alignSelf:'center' as const,alignItems:'flex-start' as const,paddingTop:24}:null),
               paddingLeft: padLeft,
               paddingRight: padRight,
               paddingBottom: Math.max(insets.bottom, 44),
@@ -95,7 +102,7 @@ export function SettingsPage({
             },
           ]}
         >
-          <View style={[styles.reading, { maxWidth: column }]}>{children}</View>
+          <View testID="account-reading-column" style={[styles.reading, { maxWidth: column }]}>{children}</View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

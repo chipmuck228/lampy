@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { resetStartupBrandForTests, setBrandReadyTimeoutForTests } from '../application/startup-brand';
@@ -167,7 +168,7 @@ describe('recent life page', () => {
     });
     expect(view.getByLabelText('刚刚留下的生活')).toBeTruthy();
     expect(view.queryByTestId(/recent-item-/)).toBeNull();
-    fireEvent.press(view.getByTestId('startup-brand-skip'));
+    await fireEvent.press(view.getByTestId('startup-brand-skip'));
     await waitFor(() => {
       expect(view.queryByTestId('startup-brand-layer')).toBeNull();
     });
@@ -186,11 +187,11 @@ describe('recent life page', () => {
     });
     expect(view.getByLabelText('刚刚留下的生活')).toBeTruthy();
     expect(view.queryByTestId(/recent-item-/)).toBeNull();
-    view.unmount();
+    await view.unmount();
     const resumed = await render(wrap(<RecentScreen />));
     expect(resumed.queryByTestId('startup-brand-layer')).toBeNull();
     expect(resumed.getByLabelText('刚刚留下的生活')).toBeTruthy();
-    resumed.unmount();
+    await resumed.unmount();
   });
 
   it('still paints recent life after the brand layer has timed out', async () => {
@@ -206,12 +207,40 @@ describe('recent life page', () => {
       expect(view.queryByTestId('startup-brand-layer')).toBeNull();
     });
     expect(view.queryByText('门口的风')).toBeNull();
-    finishRead(
+    await act(async () => { finishRead(
       life([item('moment_late', '门口的风', '9月27日', new Date(2026, 8, 27, 10).toISOString(), '2026-09-27')]),
-    );
+    ); });
     await waitFor(() => {
       expect(view.getByText('门口的风')).toBeTruthy();
     });
     expect(view.queryByTestId('startup-brand-layer')).toBeNull();
   });
+});
+
+
+it('renders the actual iPad Recent screen with an editorial body and a separate Capture dock', async () => {
+  mockGetRecentLife.mockReset();
+  resetStartupBrandForTests();
+  resetJustSavedMomentIdForTests();
+  const original = Dimensions.get('window');
+  const originalScreen = Dimensions.get('screen');
+  await act(async () => { Dimensions.set({
+    window: { width: 1366, height: 1024, scale: 2, fontScale: 1 },
+    screen: { width: 1366, height: 1024, scale: 2, fontScale: 1 },
+  }); });
+  const entry = { ...item('leaf', '在这场比赛中他们将获得冠军', '9月30日', '2026-09-30T20:45:00.000Z', '2026-09-30'),
+    images: [{ id: 'leaf-photo', status: 'available', uri: 'memory://leaf.jpg', width: 1600, height: 1000, label: '树叶' }] };
+  mockGetRecentLife.mockResolvedValue({ isFirstUse: false, items: [entry], days: [{ key: entry.dayKey, label: entry.dateLabel, items: [entry] }] });
+  const view = await render(wrap(<RecentScreen />));
+  try {
+    await waitFor(() => expect(view.getByTestId('recent-body-leaf')).toBeTruthy());
+    expect(view.getByTestId('recent-wordmark').props.children).toBe('最近');
+    expect(StyleSheet.flatten(view.getByTestId('recent-header').props.style).maxWidth).toBe(1120);
+    expect(StyleSheet.flatten(view.getByTestId('recent-body-leaf').props.style).flexDirection).toBe('row-reverse');
+    expect(StyleSheet.flatten(view.getByTestId('root-leave-overlay').props.style).position).toBeUndefined();
+    expect(view.getByTestId('recent-image-leaf-wall')).toBeTruthy();
+  } finally {
+    await view.unmount();
+    await act(async () => { Dimensions.set({ window: original, screen: originalScreen }); });
+  }
 });
